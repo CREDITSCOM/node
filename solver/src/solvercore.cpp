@@ -130,6 +130,7 @@ void SolverCore::setState(const StatePtr& pState) {
   }
 
   if (pstate) {
+    csdebug() << "SolverCore: pstate-off";
     pstate->off(*pcontext);
   }
   if (Consensus::Log) {
@@ -199,6 +200,19 @@ bool SolverCore::stateFailed(Result res) {
   return false;
 
 }
+
+//void SolverCore::adjustTrustedCandidates(cs::Bytes mask, cs::PublicKeys& confidants) {
+//  for (int i = 0; i < mask.size(); ++i) {
+//    if (mask[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+//      auto it = std::find(trusted_candidates.cbegin(), trusted_candidates.cend(), confidants[i]);
+//      if (it != trusted_candidates.cend()) {
+//        trusted_candidates.erase(it);
+//      }
+//    }
+//  }
+//}
+
+
 //TODO: this function is to be implemented the block and RoundTable building <====
 void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
                                   const cs::PacketsHashes& hashes,
@@ -212,16 +226,20 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
   table.hashes = hashes;
 
   csmeta(csdetails) << "Applying " << hashes.size() << " hashes to ROUND Table";
-  csmeta(csdetails) << "Timestamp: " << currentTimeStamp;
-  for (std::size_t i = 0; i < hashes.size(); ++i) {
-    csmeta(csdetails) << '\t' << i << ". " << hashes[i].toString();
-  }
 
   // only for new consensus
   cs::PoolMetaInfo poolMetaInfo;
   poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
   poolMetaInfo.timestamp = std::move(currentTimeStamp);
+  
+  poolMetaInfo.confirmationMask = pnode->getBlockChain().confirmationList(conveyer.currentRoundNumber()).mask;
+  poolMetaInfo.confirmations = pnode->getBlockChain().confirmationList(conveyer.currentRoundNumber()).signatures;
 
+   csmeta(csdetails) << "Timestamp: " << poolMetaInfo.timestamp;
+  for (std::size_t i = 0; i < hashes.size(); ++i) {
+    csmeta(csdetails) << '\t' << i << ". " << hashes[i].toString();
+  }
+   
   if (stage3.sender != cs::ConfidantConsts::InvalidConfidantIndex) {
     const cs::ConfidantsKeys& confidants = conveyer.confidants();
     if (stage3.writer < confidants.size()) {
@@ -235,25 +253,62 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
 
   poolMetaInfo.realTrustedMask = stage3.realTrustedMask;
   poolMetaInfo.previousHash = pnode->getBlockChain().getLastHash();
+  
   //TODO: in this method we delete the local hashes - so if we need to rebuild thid pool again from the roundTable it's impossible
-  std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
-
-  if (!pool.has_value()) {
-    csmeta(cserror) << "ApplyCharacteristic() failed to create block";
-    return;
-  }
-
   uint32_t binSize = 0;
-  deferredBlock_ = std::move(pool.value());
-  deferredBlock_.set_confidants(conveyer.confidants());
+  if(stage3.iteration == 0){
+    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
 
-  csmeta(csdebug) << "block #" << deferredBlock_.sequence() << " add new wallets to pool";
-  pnode->getBlockChain().addNewWalletsToPool(deferredBlock_);
-  pnode->getBlockChain().setTransactionsFees(deferredBlock_);
+    if (!pool.has_value()) {
+      csmeta(cserror) << "ApplyCharacteristic() failed to create block";
+      return;
+    }
 
+
+    deferredBlock_ = std::move(pool.value());
+    deferredBlock_.set_confidants(conveyer.confidants());
+
+    csmeta(csdebug) << "block #" << deferredBlock_.sequence() << " add new wallets to pool";
+    pnode->getBlockChain().addNewWalletsToPool(deferredBlock_);
+    pnode->getBlockChain().setTransactionsFees(deferredBlock_);
+  }
+  else {
+    csdb::Pool tmpPool;
+    tmpPool.set_sequence(deferredBlock_.sequence());
+    tmpPool.set_previous_hash(deferredBlock_.previous_hash());
+    tmpPool.add_real_trusted(cs::Utils::maskToBits(stage3.realTrustedMask));
+    tmpPool.add_number_trusted(static_cast<uint8_t>(stage3.realTrustedMask.size()));
+    tmpPool.setRoundCost(deferredBlock_.roundCost());
+    tmpPool.set_confidants(deferredBlock_.confidants());
+    for(auto& it: deferredBlock_.transactions()) {
+      tmpPool.add_transaction(it);
+    }
+    tmpPool.add_user_field(0, poolMetaInfo.timestamp);
+    for (auto& it : deferredBlock_.smartSignatures()) {
+      tmpPool.add_smart_signature(it);
+    }
+
+    csdb::Pool::NewWallets* newWallets = tmpPool.newWallets();
+    csdb::Pool::NewWallets* defWallets = deferredBlock_.newWallets();
+    if (!newWallets) {
+      cserror() << "newPool is read-only";
+      return;
+    }
+    for (auto& it : *defWallets) {
+      newWallets->push_back(it);
+    }
+    if (poolMetaInfo.sequenceNumber > 1) {
+      tmpPool.add_number_confirmations(static_cast<uint8_t>(poolMetaInfo.confirmationMask.size()));
+      tmpPool.add_confirmation_mask(cs::Utils::maskToBits(poolMetaInfo.confirmationMask));
+      tmpPool.add_round_confirmations(poolMetaInfo.confirmations);
+    }
+
+    deferredBlock_ = csdb::Pool{};
+    deferredBlock_ = tmpPool;
+  }
   deferredBlock_.to_byte_stream(binSize);
   deferredBlock_.hash();
-
+  csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
   const auto lastHashBin = deferredBlock_.hash().to_binary();
   std::copy(lastHashBin.cbegin(), lastHashBin.cend(), stage3.blockHash.begin());
   stage3.blockSignature = cscrypto::generateSignature(private_key,
@@ -268,14 +323,17 @@ void SolverCore::sendRoundTable() {
   pnode->sendRoundTable();
 }
 
-bool SolverCore::addSignaturesToDeferredBlock(cs::BlockSignatures&& blockSignatures) {
+bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) {
   csmeta(csdetails) << "begin";
   if (!deferredBlock_.is_valid()) {
     csmeta(cserror) << " ... Failed!!!";
     return false;
   }
 
-  deferredBlock_.set_signatures(std::move(blockSignatures));
+  for (auto& it : blockSignatures) {
+    csdebug() << cs::Utils::byteStreamToHex(it.data(), it.size());
+  }
+  deferredBlock_.set_signatures(blockSignatures);
 
   auto resPool = pnode->getBlockChain().createBlock(deferredBlock_);
 

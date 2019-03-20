@@ -357,8 +357,15 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
   iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
   iPackStream_.safeSkip<uint8_t>(1);
 
+  cs::PublicKey ss_key;
+  iPackStream_ >> ss_key;
+  node_->getKeySS(ss_key);
+
   cs::RoundNumber rNum = 0;
   iPackStream_ >> rNum;
+
+  //cs::PublicKey ss_key;
+  //iPackStream_ >> ss_key;
 
   auto trStart = iPackStream_.getCurrentPtr();
 
@@ -433,6 +440,7 @@ constexpr cs::RoundNumber getRoundTimeout(const MsgTypes type) {
   case MsgTypes::FirstSmartStage:
   case MsgTypes::SecondSmartStage:
   case MsgTypes::ThirdSmartStage:
+  case MsgTypes::RejectedContracts:
     return 100;
   default:
     return 5;
@@ -575,6 +583,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
   case MsgTypes::SmartThirdStageRequest:
     return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
+  case MsgTypes::RejectedContracts:
+    return node_->getSmartReject(data, size, rNum, firstPack.getSender());
   case MsgTypes::RoundTableReply:
     return node_->getRoundTableReply(data, size, firstPack.getSender());
   default:
@@ -805,12 +815,21 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
   cslog() << "Connection to the Signal Server has been established";
   nh_.addSignalServer(task->sender, ssEp_, rNode);
 
-  if (task->pack.getMsgSize() > 2) {
+  constexpr int MinRegistartionSize = 1 + cscrypto::kPublicKeySize;
+  size_t msg_size = task->pack.getMsgSize();
+
+  if (msg_size > MinRegistartionSize) {
     if (!parseSSSignal(task)) {
       cswarning() << "Bad Signal Server response";
     }
   }
   else {
+    if (msg_size == MinRegistartionSize) {
+      const uint8_t * pdata = task->pack.getMsgData() + 1;
+      cs::PublicKey ss_key;
+      std::copy(pdata, pdata + cscrypto::kPublicKeySize, ss_key.data());
+      node_->getKeySS(ss_key);
+    }
     ssStatus_ = SSBootstrapStatus::RegisteredWait;
   }
 

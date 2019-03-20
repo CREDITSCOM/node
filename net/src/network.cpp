@@ -3,7 +3,14 @@
 #include <chrono>
 #include <lib/system/utils.hpp>
 #include <net/logger.hpp>
-#include <sys/timeb.h>
+
+#ifdef __linux__
+#include <sys/socket.h>
+#include <sys/eventfd.h>
+#include <unistd.h>
+#include <array>
+#include <vector>
+#endif
 
 #include "network.hpp"
 #include "transport.hpp"
@@ -21,13 +28,12 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
     }
 
     sock.set_option(ip::udp::socket::reuse_address(true));
-
 #ifndef __APPLE__
     sock.set_option(ip::udp::socket::send_buffer_size(1 << 23));
     sock.set_option(ip::udp::socket::receive_buffer_size(1 << 23));
-#endif
-
+#else
     sock.non_blocking(true);
+#endif
 
 #ifdef WIN32
     BOOL bNewBehavior = FALSE;
@@ -35,7 +41,6 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
     WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof bNewBehavior, NULL, 0, &dwBytesReturned,
              NULL, NULL);
 #endif
-
     if (data.ipSpecified) {
       auto ep = net->resolve(data);
       sock.bind(ep);
@@ -89,13 +94,12 @@ void Network::readerRoutine(const Config& config) {
   while (!initFlag_.load());
 
   boost::system::error_code lastError;
+  size_t packetSize;
 
   while (stopReaderRoutine == false) { // changed from true
     auto& task = iPacMan_.allocNext();
-
-    size_t packetSize = 0;
+#ifdef __APPLE__
     uint32_t cnt = 0;
-
     do {
       if (stopReaderRoutine) {
         return;
@@ -108,10 +112,27 @@ void Network::readerRoutine(const Config& config) {
         cnt = 0;
         std::this_thread::yield();
       }
-    } while (!stopReaderRoutine && lastError == boost::asio::error::would_block);
+    } while (lastError == boost::asio::error::would_block);
+#else
+    if (stopReaderRoutine) {
+        return;
+    }
 
+    packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
+    task.size = task.pack.decode(packetSize);
+#endif
     if (!lastError) {
       iPacMan_.enQueueLast();
+#ifdef __linux__
+      static uint64_t one = 1;
+      int s = write(readerEventfd_, &one, sizeof(uint64_t));
+#elif WIN32
+      while (readerLock.test_and_set(std::memory_order_acquire)) // acquire lock
+        ; // spin
+      readerTaskCount_.fetch_add(1, std::memory_order_relaxed);
+      SetEvent(readerEvent_);
+      readerLock.clear(std::memory_order_release); // release lock
+#endif
 #ifdef LOG_NET
       csdebug(logger::Net) << "<-- " << packetSize << " bytes from " << task.sender << " " << task.pack;
 #endif
@@ -162,72 +183,144 @@ void Network::writerRoutine(const Config& config) {
   if (!sock) {
     return;
   }
-
+#ifdef __linux__
+  std::vector<struct mmsghdr> msg;
+  std::vector<struct iovec> iovecs;
+  std::vector<std::array<char, Packet::MaxSize>> packets_buffer;
+  std::vector<boost::asio::mutable_buffer> encoded_packets;
+#endif
   while (stopWriterRoutine == false) { //changed from true
+#ifdef __linux__
+    uint64_t tasks;
+    int s = read(writerEventfd_, &tasks, sizeof(uint64_t));
+    if (s != sizeof(uint64_t)) continue;
+
+    msg.resize(tasks);
+    std::fill(msg.begin(), msg.end(), mmsghdr{});
+    iovecs.resize(tasks);
+    std::fill(iovecs.begin(), iovecs.end(), iovec{});
+    packets_buffer.resize(tasks);
+    encoded_packets.clear();
+
+    for (uint64_t i = 0; i < tasks; i++) {
+      auto task = oPacMan_.getNextTask();
+      encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[i].data(), Packet::MaxSize)));
+      iovecs[i].iov_base = encoded_packets[i].data();
+      iovecs[i].iov_len = encoded_packets[i].size();
+      msg[i].msg_hdr.msg_iov = &iovecs[i];
+      msg[i].msg_hdr.msg_iovlen = 1;
+      msg[i].msg_hdr.msg_name = task->endpoint.data();
+      msg[i].msg_hdr.msg_namelen = task->endpoint.size();
+    }
+    int sended = 0;
+    struct mmsghdr *messages = msg.data();
+    do {
+      sended = sendmmsg(sock->native_handle(), messages, tasks, 0);
+      messages += sended;
+      tasks -= sended;
+    } while (tasks);
+#elif WIN32
+    WaitForSingleObject(writerEvent_, INFINITE);
+    while (writerLock.test_and_set(std::memory_order_acquire)) // acquire lock
+      ; // spin
+    int tasks = writerTaskCount_;
+    writerTaskCount_ = 0;
+    writerLock.clear(std::memory_order_release); // release lock
+
+    for (int i = 0; i < tasks; i++) {
+      auto task = oPacMan_.getNextTask();
+      sendPack(*sock, task, task->endpoint);
+    }
+#elif __APPLE__
     auto task = oPacMan_.getNextTask();
     sendPack(*sock, task, task->endpoint);
+#endif
   }
 
   cswarning() << "writerRoutine STOPPED!!!\n";
 }
 
 // Processors
-
 void Network::processorRoutine() {
-  FixedHashMap<cs::Hash, uint32_t, uint16_t, 100000> packetMap;
   CallsQueue& externals = CallsQueue::instance();
 
   while (stopProcessorRoutine == false) {
     externals.callAll();
+#ifdef __linux__
+    uint64_t tasks;
+    int s = read(readerEventfd_, &tasks, sizeof(uint64_t));
+    if (s != sizeof(uint64_t)) continue;
 
+    for (uint64_t i = 0; i < tasks; i++) {
+      auto task = iPacMan_.getNextTask();
+      processTask(task);
+    }
+#elif WIN32
+    WaitForSingleObject(readerEvent_, INFINITE);
+    while (readerLock.test_and_set(std::memory_order_acquire)) // acquire lock
+      ; // spin
+    int tasks = readerTaskCount_;
+    readerTaskCount_ = 0;
+    readerLock.clear(std::memory_order_release); // release lock
+
+    for (int i = 0; i < tasks; i++) {
+      auto task = iPacMan_.getNextTask();
+      processTask(task);
+    }
+#else
     auto task = iPacMan_.getNextTask();
-    auto remoteSender = transport_->getPackSenderEntry(task->sender);
-
-    if (remoteSender->isBlackListed()) {
-      cswarning() << "Blacklisted";
-      continue;
-    }
-
-    if (!(task->pack.isHeaderValid())) {
-      static constexpr size_t limit = 100;
-      auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
-
-      cswarning() << "Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
-      remoteSender->addStrike();
-      continue;
-    }
-
-    // Pure network processing
-    if (task->pack.isNetwork()) {
-      transport_->processNetworkTask(task, remoteSender);
-      continue;
-    }
-
-    // Non-network data
-    uint32_t& recCounter = packetMap.tryStore(task->pack.getHash());
-    if (!recCounter && task->pack.addressedToMe(transport_->getMyPublicKey())) {
-      if (task->pack.isFragmented() || task->pack.isCompressed()) {
-        bool newFragmentedMsg = false;
-        MessagePtr msg = collector_.getMessage(task->pack, newFragmentedMsg);
-        transport_->gotPacket(task->pack, remoteSender);
-
-        if (newFragmentedMsg) {
-          transport_->registerMessage(msg);
-        }
-
-        if (msg->isComplete()) {
-          transport_->processNodeMessage(**msg);
-        }
-      }
-      else {
-        transport_->processNodeMessage(task->pack);
-      }
-    }
-
-    transport_->redirectPacket(task->pack, remoteSender);
-    ++recCounter;
+    processTask(task);
+#endif
   }
   cswarning() << "processorRoutine STOPPED!!!\n";
+}
+
+inline void Network::processTask(TaskPtr<IPacMan> &task) {
+  auto remoteSender = transport_->getPackSenderEntry(task->sender);
+
+  if (remoteSender->isBlackListed()) {
+    cswarning() << "Blacklisted";
+    return;
+  }
+
+  if (!(task->pack.isHeaderValid())) {
+    static constexpr size_t limit = 100;
+    auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
+
+    cswarning() << "Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
+    remoteSender->addStrike();
+    return;
+  }
+
+  // Pure network processing
+  if (task->pack.isNetwork()) {
+    transport_->processNetworkTask(task, remoteSender);
+    return;
+  }
+
+  // Non-network data
+  uint32_t& recCounter = packetMap_.tryStore(task->pack.getHash());
+  if (!recCounter && task->pack.addressedToMe(transport_->getMyPublicKey())) {
+    if (task->pack.isFragmented() || task->pack.isCompressed()) {
+      bool newFragmentedMsg = false;
+      MessagePtr msg = collector_.getMessage(task->pack, newFragmentedMsg);
+      transport_->gotPacket(task->pack, remoteSender);
+
+      if (newFragmentedMsg) {
+        transport_->registerMessage(msg);
+      }
+
+      if (msg->isComplete()) {
+        transport_->processNodeMessage(**msg);
+      }
+    }
+    else {
+      transport_->processNodeMessage(task->pack);
+    }
+  }
+
+  transport_->redirectPacket(task->pack, remoteSender);
+  ++recCounter;
 }
 
 void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
@@ -237,15 +330,63 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
   qePtr->element.pack = p;
 
   oPacMan_.enQueueLast(qePtr);
+#ifdef __linux__
+  static uint64_t one = 1;
+  int s = write(writerEventfd_, &one, sizeof(uint64_t));
+#elif WIN32
+  while (writerLock.test_and_set(std::memory_order_acquire)) // acquire lock
+    ; // spin
+  writerTaskCount_.fetch_add(1, std::memory_order_relaxed);
+  SetEvent(writerEvent_);
+  writerLock.clear(std::memory_order_release); // release lock
+#endif
 }
 
 Network::Network(const Config& config, Transport* transport)
 : resolver_(context_)
 , transport_(transport)
-, readerThread_{ &Network::readerRoutine, this, config }
-, writerThread_{ &Network::writerRoutine, this, config }
-, processorThread_{ &Network::processorRoutine, this }
 {
+#ifdef __linux__
+  readerEventfd_ = eventfd(0, 0);
+  if (readerEventfd_ == -1) {
+    good_ = false;
+    return;
+  }
+
+  writerEventfd_ = eventfd(0, 0);
+  if (writerEventfd_ == -1) {
+    good_ = false;
+    return;
+  }
+#elif WIN32
+  writerEvent_ = CreateEvent(
+    NULL,               // default security attributes
+    FALSE,              // automatic-reset event
+    FALSE,              // initial state is nonsignaled
+    TEXT("WriteEvent")  // object name
+  );
+
+  if (writerEvent_ == NULL) {
+    good_ = false;
+    return;
+  }
+
+  readerEvent_ = CreateEvent(
+    NULL,               // default security attributes
+    FALSE,              // automatic-reset event
+    FALSE,              // initial state is nonsignaled
+    TEXT("ReadEvent")   // object name
+  );
+
+  if (writerEvent_ == NULL) {
+    good_ = false;
+    return;
+  }
+#endif
+  readerThread_ = std::thread(&Network::readerRoutine, this, config);
+  writerThread_ = std::thread(&Network::writerRoutine, this, config);
+  processorThread_ = std::thread(&Network::processorRoutine, this);
+
   if (!config.hasTwoSockets()) {
     auto sockPtr = new ip::udp::socket(bindSocket(context_, this, config.getInputEndpoint(), config.useIPv6()));
 
@@ -262,6 +403,7 @@ Network::Network(const Config& config, Transport* transport)
   while (writerStatus_.load() == ThreadStatus::NonInit);
 
   good_ = (readerStatus_.load() == ThreadStatus::Success && writerStatus_.load() == ThreadStatus::Success);
+
 
   if (!good_) {
     cserror() << "Cannot start the network: error binding sockets";

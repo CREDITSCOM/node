@@ -82,6 +82,10 @@ public:
     }
   }
 
+  void complete_stage1() {
+    core.handleTransitions(SolverCore::Event::Hashes); // SolverCore::Event::Transactions may be used as well
+  }
+
   void complete_stage2() {
     core.handleTransitions(SolverCore::Event::Stage1Enough);
   }
@@ -90,10 +94,17 @@ public:
     core.handleTransitions(SolverCore::Event::Stage2Enough);
   }
 
+  void fail_stage3() {
+    core.handleTransitions(SolverCore::Event::FailConsensus);
+  }
+
   void complete_post_stage() {
     core.handleTransitions(SolverCore::Event::Stage3Enough);
   }
 
+  void back_to_stage3() {
+    core.handleTransitions(SolverCore::Event::Stage3NonComplete);
+  }
   /**
    * @fn  NodeLevel SolverContext::level() const;
    *
@@ -119,7 +130,7 @@ public:
    */
 
 
-  bool addSignaturesToLastBlock(BlockSignatures&& blockSignatures);
+  bool addSignaturesToLastBlock(Signatures&& blockSignatures);
 
   void spawn_next_round(cs::StageThree& st3);
 
@@ -270,6 +281,34 @@ public:
     return core.trueStagesThree();
   }
 
+  bool realTrustedChanged() const {
+    return core.realTrustedChanged();
+  }
+
+  void realTrustedChangedSet(bool val) const {
+    return core.realTrustedChangedSet(val);
+  }
+
+  void realTrustedSetValue(cs::Byte position, cs::Byte value) {
+    csdebug() << __func__;
+    core.realTrustedSetValue(position, value);
+  }
+
+  void realTrustedSet(cs::Bytes realTrusted) {
+    csdebug() << __func__;
+    core.realTrustedSet(realTrusted);
+  }
+
+
+  cs::Bytes getRealTrusted() {
+    return core.getRealTrusted();
+  }
+
+  bool checkNodeCache(cs::PublicKey sender) const {
+    return core.checkNodeCache(sender);
+  }
+
+
   size_t stagesThree() const {
     return core.stagesThree();
   }
@@ -326,14 +365,14 @@ public:
     }
   }
 
-  //void fake_stage3(uint8_t from)
-  //{
-  //  if(core.find_stage3(from) == nullptr) {
-  //    cs::StageThree fake;
-  //    fake.sender = from;
-  //    core.gotStageThree(fake);
-  //  }
-  //}
+  void fake_stage3(uint8_t from)
+  {
+    if(core.find_stage3(from) == nullptr) {
+      cs::StageThree fake;
+      fake.sender = from;
+      core.gotStageThree(fake, false);
+    }
+  }
 
   void mark_untrusted(uint8_t sender) {
     if (sender < Consensus::MaxTrustedNodes) {
@@ -408,6 +447,8 @@ public:
    * @return  A reference to a const std::vector&lt;PublicKey&gt;
    *
    */
+
+  size_t cnt_real_trusted() const;
 
   const std::vector<cs::PublicKey>& trusted() const;
 
@@ -543,6 +584,8 @@ public:
 
   bool transaction_still_in_pool(int64_t inner_id) const;
   void request_round_info(uint8_t respondent1, uint8_t respondent2);
+
+  void send_rejected_smarts(std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list);
 
 private:
   SolverCore& core;

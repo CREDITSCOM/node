@@ -13,15 +13,28 @@ void WaitingState::on(SolverContext &context) {
     return;
   }
 
-  cs::BlockSignatures blockSignatures;
-  blockSignatures.reserve(context.final_stage3_data().size());
-  for (auto& it : context.final_stage3_data()) {
-    blockSignatures.emplace_back(it.sender, it.blockSignature);
+  cs::Signatures bSignatures;
+  cs::Bytes rMask = ptr->realTrustedMask;
+  size_t counter = 0;
+  for (auto& it : rMask) {
+    if (it != cs::ConfidantConsts::InvalidConfidantIndex) {
+      ++counter;
+    }
+  }
+  if (context.final_stage3_data().size() != counter) {
+    //TODO: write what to do if these parameters arn't equal
+  }
+
+  bSignatures.reserve(counter);
+  for (int i=0; i< rMask.size(); ++i){ //auto& it : context.final_stage3_data()) {
+    if(rMask[i] != cs::ConfidantConsts::InvalidConfidantIndex) {
+      bSignatures.push_back(context.stage3(i)->blockSignature);//emplace_back(it.sender, it.blockSignature);    
+    }
   }
 
   //TODO: The pool should be send to blockchain here <===
-  csmeta(csdebug) << "Signatures to add: " << blockSignatures.size();
-  if (!context.addSignaturesToLastBlock(std::move(blockSignatures))) {
+  csmeta(csdebug) << "Signatures to add: " << bSignatures.size();
+  if (!context.addSignaturesToLastBlock(std::move(bSignatures))) {
     csmeta(cserror) << "Signatures added to new block failed";
     return;
   }

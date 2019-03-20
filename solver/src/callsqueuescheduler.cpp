@@ -129,9 +129,9 @@ CallsQueueScheduler::CallTag CallsQueueScheduler::Insert(ClockType::duration wai
   }
   // TODO: find better way to identify procs (especially, in case of "in-place" lambdas when those may have the same
   // address)
-  // CallTag id = (CallTag) &proc;
+  const CallTag id = (CallTag) &proc;
   // current solution requires enable RTTI = Yes (/GR) to compile:
-  const CallTag id = proc.target_type().hash_code();
+  //const CallTag id = proc.target_type().hash_code();
   {
     std::lock_guard<std::mutex> l(_mtx_queue);
     auto it = std::find(_queue.cbegin(), _queue.cend(), id);

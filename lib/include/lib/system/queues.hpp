@@ -50,7 +50,7 @@ public:
     unlock(ptr,
            /*change from*/ Element::State::Write,
            /*to*/ Element::State::New,
-           /*and move*/ readingBarrier_);
+           /*and move*/ writingBarrier_);
   }
 
 private:
@@ -68,16 +68,15 @@ private:
     typename Element::State state = targetState;
 
     uint32_t attempts = 0;
-    while (!target->lockState.compare_exchange_strong(state, newState, std::memory_order_release,
-                                                      std::memory_order_relaxed)) {
+    while (!target->lockState.compare_exchange_strong(state, newState, std::memory_order_acq_rel)) {
       if (++attempts == BackOffTreshold) {
         attempts = 0;
         std::this_thread::yield();
       }
 
-      if (state != spinState && target != rightBarr.load(std::memory_order_relaxed)) {
+      if (state != spinState && target != rightBarr.load(std::memory_order_acquire)) {
         auto nextTarget = nextPtr(target);
-        leftBarr.compare_exchange_strong(target, nextPtr(target), std::memory_order_release, std::memory_order_relaxed);
+        leftBarr.compare_exchange_strong(target, nextPtr(target), std::memory_order_acq_rel, std::memory_order_relaxed);
         target = nextTarget;
       }
 
@@ -89,12 +88,8 @@ private:
 
   void unlock(Element* ptr, typename Element::State oldState, typename Element::State newState,
               std::atomic<Element*>& movingBar) {
-    if (!ptr->lockState.compare_exchange_strong(oldState, newState, std::memory_order_release,
-                                                std::memory_order_relaxed)) {
-      cserror() << "Unexpected element state";
-    }
-
-    movingBar.compare_exchange_strong(ptr, nextPtr(ptr), std::memory_order_release, std::memory_order_relaxed);
+       ptr->lockState.store(newState, std::memory_order_release);
+    movingBar.compare_exchange_strong(ptr, nextPtr(ptr), std::memory_order_acq_rel, std::memory_order_relaxed);
   }
 
   Element elements[MaxSize];

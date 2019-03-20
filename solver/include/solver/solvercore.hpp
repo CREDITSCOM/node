@@ -59,7 +59,7 @@ public:
 
   void sendRoundTable();
 
-  bool addSignaturesToDeferredBlock(cs::BlockSignatures&& blockSignatures);
+  bool addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures);
 
   uint8_t subRound(); 
   // Solver "public" interface,
@@ -96,10 +96,18 @@ public:
   void printStage3(const cs::StageThree& stage);
 
   void removeDeferredBlock(cs::Sequence);
-
+  bool realTrustedChanged() const;
+  void adjustStageThreeStorage();
+  void realTrustedChangedSet(bool);
+  void realTrustedSetValue(cs::Byte position, cs::Byte value);
+  void realTrustedSet(cs::Bytes realTrusted);
+  bool checkNodeCache(const cs::PublicKey& sender);
+  cs::Bytes getRealTrusted();
   size_t trueStagesThree();
+
   size_t stagesThree();
   bool stateFailed(Result res);
+
 
   /// <summary>   Adds a transaction passed to send pool </summary>
   ///
@@ -135,7 +143,9 @@ private:
     Hashes,
     Stage1Enough,
     Stage2Enough,
+    FailConsensus,
     Stage3Enough,
+    Stage3NonComplete,
     SmartDeploy,
     SmartResult,
     Expired,
@@ -277,6 +287,9 @@ private:
   std::vector<cs::StageTwo> stageTwoStorage;
   std::vector<cs::StageThree> stageThreeStorage;
   std::vector<cs::StageThree> trueStageThreeStorage;
+  bool realTrustedChanged_;
+  cs::Bytes tempRealTrusted_;
+
   std::vector <std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
   std::vector <int> smartUntrusted;
@@ -285,6 +298,7 @@ private:
   std::vector<cs::PublicKey> trusted_candidates;
   std::vector <cs::TransactionsPacketHash> hashes_candidates;
   csdb::Pool deferredBlock_;
+  uint8_t currentStage3iteration_ = 0;
 
   // tracks round info missing ("last hope" tool)
   TimeoutTracking track_next_round;

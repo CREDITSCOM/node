@@ -62,6 +62,7 @@ namespace cs {
       cs::Sequence smartRoundNumber();
 
       void createFinalTransactionSet(const csdb::Amount finalFee);
+      size_t smartStage3StorageSize();
       void sendFinalTransactionSet();
       bool smartConfidantExist(uint8_t);
       void gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRound, uint32_t startTransaction,
@@ -69,21 +70,27 @@ namespace cs {
 
       void requestSmartStages(int st);
       void requestSmartStagesNeighbors(int st);
-      void markSmartOutboundNodes();
-    
+      void markSmartOutboundNodes(int st);
+
       const std::vector<cs::PublicKey>& smartConfidants() const;
 
       TimeoutTracking timeout_request_stage;
       TimeoutTracking timeout_request_neighbors;
       TimeoutTracking timeout_force_transition;
     private:
-  
+      void fake_stage1(uint8_t from);
+      void fake_stage2(uint8_t from);
+
+      void init_zero(cs::StageOneSmarts & stage);
+      void init_zero(cs::StageTwoSmarts & stage);
+
       Node* pnode_;
       SmartContracts* psmarts_;
 
       std::vector<cs::StageOneSmarts> smartStageOneStorage_;
       std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
       std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
+      std::vector<cs::StageThreeSmarts> smartStageThreeTempStorage_;
       bool smartStagesStorageRefreshed_ = false;
       std::vector<cs::PublicKey> smartConfidants_;
       uint8_t ownSmartsConfNum_ = cs::ConfidantConsts::InvalidConfidantIndex;
@@ -97,7 +104,10 @@ namespace cs {
       std::vector <csdb::Pool::SmartSignature> solverSmartSignatures_;
       cs::Sequence smartRoundNumber_;
       uint32_t smartTransaction_;
-
+      bool trustedChanged_ = false;
+      bool smartStageThreeSent_ = false;
+      cs::Hash  zeroHash;
+      cs::Signature  zeroSignature;
       std::vector<cs::Bytes> smartStageOneMessage_;
       std::vector<cs::Bytes> smartStageTwoMessage_;
       std::vector<cs::Bytes> smartStageThreeMessage_;

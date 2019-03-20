@@ -134,7 +134,7 @@ bool BlockChain::postInitFromDB() {
   auto func = [](const WalletData::Address&, const WalletData& wallet) {
     double bal = wallet.balance_.to_double();
     if(bal < -std::numeric_limits<double>::min()) {
-      cslog() << "Wallet with negative balance (" << bal << ") detected: "
+      csdebug() << "Wallet with negative balance (" << bal << ") detected: "
         << cs::Utils::byteStreamToHex(wallet.address_.data(), wallet.address_.size())
         << " (" << EncodeBase58(wallet.address_.data(), wallet.address_.data() + wallet.address_.size()) << ")";
     }
@@ -194,6 +194,45 @@ cs::Sequence BlockChain::getLastSequence() const {
   }
   else {
     return static_cast<cs::Sequence> (-1);
+  }
+}
+
+void BlockChain::addConfirmationToList(cs::RoundNumber rNum, bool bang, cs::ConfidantsKeys confidants, cs::Bytes confirmationsMask,cs::Signatures confirmation) {
+  if(confirmationList_.find(rNum) != confirmationList_.cend()){
+    removeConfirmationFromList(rNum);
+  }
+  TrustedConfirmation tConfirmation;
+  tConfirmation.bigBang = bang;
+  tConfirmation.confidants = confidants;
+  tConfirmation.mask = confirmationsMask;
+  tConfirmation.signatures = confirmation;
+  confirmationList_.emplace(rNum, tConfirmation);
+}
+
+void BlockChain::removeConfirmationFromList(cs::RoundNumber rNum) {
+  if(confirmationList_.find(rNum)!=confirmationList_.end()) {
+    confirmationList_.erase(rNum);
+    csdebug() << "The confirmation of R-" << rNum << " was successfully erased";
+  }
+  else {
+    csdebug() << "The confirmation of R-" << rNum << " was not found";
+  }
+}
+
+TrustedConfirmation BlockChain::confirmationList(cs::RoundNumber rNum) {
+  if (confirmationList_.find(rNum) == confirmationList_.end()) {
+    return TrustedConfirmation{};
+  }
+  return confirmationList_.at(rNum);
+}
+
+cs::Bytes BlockChain::getLastBlockTrustedMask() {
+  if(deferredBlock_.is_valid()) {
+    return cs::Utils::bitsToMask(deferredBlock_.numberTrusted(), deferredBlock_.realTrusted());
+  }
+  else {
+    auto pool = loadBlock(getLastSequence());
+    return cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
   }
 }
 
@@ -268,7 +307,7 @@ void BlockChain::writeGenesisBlock() {
 
   csdebug() << "Genesis block completed ... trying to save";
 
-  finalizeBlock(genesis, true);
+  finalizeBlock(genesis, true, cs::PublicKeys{});
   deferredBlock_ = genesis;
   emit storeBlockEvent(deferredBlock_);
 
@@ -312,7 +351,6 @@ csdb::PoolHash BlockChain::getLastHash() const {
 
 size_t BlockChain::getSize() const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-
   const auto storageSize = storage_.size();
   return deferredBlock_.is_valid() ? (storageSize + 1) : storageSize;
 }
@@ -465,7 +503,8 @@ void BlockChain::logBlockInfo(csdb::Pool& pool)
 {
   const auto& trusted = pool.confidants();
   std::string  realTrustedString;
-  for (auto& i : pool.realTrusted()) {
+  auto mask = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
+  for (auto i : mask) {
     realTrustedString = realTrustedString + "[" + std::to_string(static_cast<int>(i)) + "] ";
   }
 
@@ -478,54 +517,87 @@ void BlockChain::logBlockInfo(csdb::Pool& pool)
     csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
   }
   csdebug() << " previous hash: " << pool.previous_hash().to_string();
-  csdebug() << " hash: " << pool.hash().to_string();
+  csdebug() << " hash(" << pool.sequence() << "): " << pool.hash().to_string();
   csdebug() << " last storage size: " << getSize();
 }
 
-bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted) {
+bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys lastConfidants) {
   if(!pool.compose()) {
     csmeta(cserror) << "Couldn't compose block: " << pool.sequence();
     return false;
   }
 
+  cs::Sequence currentSequence = pool.sequence();
   const auto& confidants = pool.confidants();
   const auto& signatures = pool.signatures();
-  if (signatures.empty() && !isTrusted && pool.sequence() != 0) {
+  const auto& realTrusted = pool.realTrusted();
+  if (currentSequence > 1) {  
+  csdebug() << "Finalize: starting confidants validation procedure:";
+
+    cs::Bytes trustedToHash;
+    cs::DataStream tth(trustedToHash);
+    tth << currentSequence;
+    tth << confidants;
+       
+    cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
+    
+
+
+    cs::Signatures sigs = pool.roundConfirmations();
+    const auto& confMask = cs::Utils::bitsToMask(pool.numberConfirmations(), pool.roundConfirmationMask());
+    //for debugging only delete->
+    csdebug() << "Mask size = " << confMask.size() << " for next confidants:";
+    for (auto& it : lastConfidants) {
+      csdebug() << cs::Utils::byteStreamToHex(it.data(), it.size());
+    }
+    // <-delete
+    if( confMask.size() > 1) {
+      if (!checkGroupSignature(lastConfidants, confMask, sigs, trustedHash)) {
+        csdebug() << "           The Confidants confirmations are not OK";
+        return false;
+      }
+      else {
+        csdebug() << "           The Confidants confirmations are OK";
+      }
+    }
+    else {
+      //TODO: add SS PKey to the prevConfidants
+    }
+
+
+  }
+
+  if (signatures.empty() && (!isTrusted || pool.sequence() != 0)) {
      csmeta(csdebug) << "The pool #" << pool.sequence() << " doesn't contain signatures";
     return false;
   }
 
-  if (signatures.size() < confidants.size() / 2U + 1U && !isTrusted && pool.sequence() != 0) {
+  if (signatures.size() < static_cast<size_t>(cs::Utils::maskValue(realTrusted)) && !isTrusted && pool.sequence() != 0) {
+  
      csmeta(csdebug) << "The number of signatures is insufficient";
     return false;
   }
+  auto mask = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
 
-  size_t truePoolSignatures = 0;
-  csmeta(csdebug) << "Pool Hash: " << cs::Utils::byteStreamToHex(pool.hash().to_binary().data(), pool.hash().to_binary().size());
-  csmeta(csdebug) << "Prev Hash: " << cs::Utils::byteStreamToHex(pool.previous_hash().to_binary().data(), pool.previous_hash().to_binary().size());
-  for (auto& it : signatures) {
-    const std::size_t idx = static_cast<std::size_t>(it.first);
-    if (idx < confidants.size()) {
-      if (cscrypto::verifySignature(it.second, confidants.at(idx), pool.hash().to_binary().data(), pool.hash().to_binary().size())) {
-        csmeta(csdebug) << "The confidant #" << idx << " signature is valid";
-        ++truePoolSignatures;
-      }
-      else {
-        csmeta(cserror) << "The signature of " << cs::Utils::byteStreamToHex(confidants.at(idx).data(), confidants.at(idx).size()) << " is NOT VALID";
-      }
+  //pool signatures check: start
+  if(pool.sequence() > 0){
+  //  csmeta(csdebug) << "Pool Hash: " << cs::Utils::byteStreamToHex(pool.hash().to_binary().data(), pool.hash().to_binary().size());
+  //  csmeta(csdebug) << "Prev Hash: " << cs::Utils::byteStreamToHex(pool.previous_hash().to_binary().data(), pool.previous_hash().to_binary().size());
+    Hash tempHash;
+    auto hash = pool.hash().to_binary();
+    std::copy(hash.cbegin(), hash.cend(), tempHash.data());
+    if(checkGroupSignature(confidants,mask,signatures,tempHash)) {
+      csmeta(csdebug) << "The number of signatures is sufficient and all of them are OK!";
     }
     else {
-      csmeta(cserror) << "The number of confidants in pool doesn't correspond the indexes of the signatures";
+      cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
       return false;
     }
   }
-  if (truePoolSignatures >= confidants.size() / 2U + 1U || pool.sequence() == 0) {
-    csmeta(csdebug) << "The number of signatures is sufficient and all of them are OK!";
-  }
   else {
-    cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
-    return false;
+    csmeta(csdebug) << "Genesis block will be written without signatures verification";
   }
+  //pool signatures check: end
 
 #ifdef TRANSACTIONS_INDEX
   createTransactionsIndex(pool);
@@ -555,6 +627,81 @@ csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
 
 cs::Sequence BlockChain::getRequestedBlockNumber() const {
   return getLastSequence() + 1;
+}
+
+bool BlockChain::checkGroupSignature(cs::ConfidantsKeys confidants, cs::Bytes mask, cs::Signatures signatures, cs::Hash hash)
+{
+  if(confidants.size() ==0){
+    csdebug() << "The number of confidants is 0";
+    return false;
+  }
+  if(confidants.size() != mask.size()) {
+    cserror() << "The number of confidants doesn't correspond the mask size";
+    return false;
+  }
+
+  size_t signatureCount = 0;
+  for (auto& it : mask) {
+    if (it == cs::ConfidantConsts::InvalidConfidantIndex) {
+      continue;
+    }
+    ++signatureCount;
+  }
+
+  if(signatures.size() != signatureCount) {
+    cserror() << "The number of signatures doesn't correspond the mask value";
+
+    std::string realTrustedString;
+
+    for (auto& i : mask) {
+      realTrustedString = realTrustedString + "[" + std::to_string(int(i)) + "] ";
+    }
+
+    csdebug() << "Mask: " << realTrustedString << ", Signatures: ";
+    for (auto& it : signatures) {
+      csdebug() << cs::Utils::byteStreamToHex(it);
+    }
+
+    return false;
+  }
+
+  signatureCount = 0;
+  size_t cnt = 0;
+  bool validSig = true;
+  csdebug() << "BlockChain> Hash: " << cs::Utils::byteStreamToHex(hash);
+  for (auto& it : mask){
+    if (it != cs::ConfidantConsts::InvalidConfidantIndex) {
+      if (cscrypto::verifySignature(signatures[signatureCount], confidants[cnt], hash.data(), hash.size())) {
+        csdebug() << "BlockChain> Signature of [" << cnt << "] is valid";
+        ++signatureCount;
+      }
+      else {
+        csdebug() << "BlockChain> Signature of [" << cnt << "] is NOT VALID: " << cs::Utils::byteStreamToHex(signatures[signatureCount]);
+        validSig = false;
+        ++signatureCount;
+      }
+    }
+    ++cnt;
+  }
+  if(!validSig) {
+    csdebug() << "Some signatures are not valid";
+    return false;
+  }
+  else {
+    csdebug() << "The signatures are valid";
+    return true;
+  }
+}
+
+size_t BlockChain::realTrustedValue(cs::Bytes mask)
+{
+  size_t cnt = 0;
+  for(auto& it : mask) {
+    if(it!=cs::ConfidantConsts::InvalidConfidantIndex) {
+      ++cnt;
+    }
+  }
+  return cnt;
 }
 
 uint64_t BlockChain::getWalletsCount() {
@@ -817,7 +964,6 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
     const auto& currentRoundConfidants = nextPool.confidants();
     walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants, *this);
     walletsPools_->loadNextBlock(nextPool);
-
     if (!blockHashes_->loadNextBlock(nextPool)) {
       cslog() << "Error writing DB structure";
     }
@@ -946,9 +1092,19 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
   {
     cs::Lock lock(dbLock_);
 
+    cs::PublicKeys lastConfidants;
+    if(pool_seq>1) {
+      if(deferredBlock_.sequence() + 1 == pool_seq) {
+        lastConfidants = deferredBlock_.confidants();
+      }
+      else {
+        lastConfidants = loadBlock(pool_seq - 1).confidants();
+      }
+    }
+
     // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
     deferredBlock_ = pool;
-    if (finalizeBlock(deferredBlock_, isTrusted)) {
+    if (finalizeBlock(deferredBlock_, isTrusted, lastConfidants)) {
       csdebug() << "The block is correct";
     }
     else {
@@ -957,7 +1113,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     }
     pool = deferredBlock_.clone();
   }
-
+  //csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
   emit storeBlockEvent(pool);
 
   // log cached block
@@ -977,6 +1133,10 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool by_sync) {
     csdebug() << "BLOCKCHAIN> ignore oudated block #" << pool_seq << ", last written #" << last_seq;
     // it is not error, so caller code nothing to do with it
     return true;
+  }
+
+  if((pool.numberConfirmations()==0 || pool.roundConfirmations().size() ==0) && pool.sequence()>1) {
+    return false;
   }
  
   if (pool_seq == last_seq) {
