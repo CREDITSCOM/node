@@ -1661,7 +1661,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
 
 void Node::sendSmartReject(const std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list)
 {
-  uint32_t cnt = ref_list.size();
+  uint32_t cnt = (uint32_t) ref_list.size();
   if (cnt == 0) {
     csmeta(cserror) << "cannot send empty rejected contracts pack";
     return;
@@ -1680,6 +1680,9 @@ void Node::sendSmartReject(const std::vector< std::pair<cs::Sequence, uint32_t> 
 
 void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender)
 {
+  csunused(rNum);
+  csunused(sender);
+
   istream_.init(data, size);
 
   cs::Bytes raw_data;
