@@ -43,6 +43,13 @@ using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
 }  // namespace cs
 
+struct TrustedConfirmation {
+  bool bigBang = false;
+  cs::ConfidantsKeys confidants;
+  cs::Bytes mask;
+  cs::Signatures signatures;
+};
+
 class BlockChain {
 public:
   using Transactions  = std::vector<csdb::Transaction>;
@@ -115,7 +122,15 @@ public:
 
   cs::Sequence getLastSequence() const;
 
+  void addConfirmationToList(cs::RoundNumber rNum, bool bang, cs::ConfidantsKeys confidants, cs::Bytes confirmationsMask, cs::Signatures confirmation);
+  void removeConfirmationFromList(cs::RoundNumber);
+  TrustedConfirmation confirmationList(cs::RoundNumber);
+
+  cs::Bytes getLastBlockTrustedMask();
   cs::Sequence getRequestedBlockNumber() const;
+
+  bool checkGroupSignature(cs::ConfidantsKeys, cs::Bytes, cs::Signatures, cs::Hash);
+  size_t realTrustedValue(cs::Bytes);
 
   void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
 
@@ -175,7 +190,7 @@ private:
   void logBlockInfo(csdb::Pool& pool);
 
   // Thread unsafe
-  bool finalizeBlock(csdb::Pool& pool, bool is_Trusted);
+  bool finalizeBlock(csdb::Pool& pool, bool is_Trusted, cs::PublicKeys lastConfidants);
 
   void onReadFromDB(csdb::Pool block, bool* should_stop);
   bool postInitFromDB();
@@ -332,6 +347,9 @@ private:
 
   // fee calculator
   std::unique_ptr<cs::Fee> fee_;
+  //confidant confirmation
+  std::map<cs::RoundNumber, TrustedConfirmation> confirmationList_;
+
 };
 
 class TransactionsIterator {

@@ -47,6 +47,7 @@ public:
   // incoming requests processing
   void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum);
   void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
+  void getKeySS(const cs::PublicKey& key);
   void getTransactionsPacket(const uint8_t* data, const std::size_t size);
   void getNodeStopRequest(const uint8_t* data, const std::size_t size);
 
@@ -85,6 +86,9 @@ public:
   void removeSmartConsensus(cs::Sequence block, uint32_t transaction);
   void checkForSavedSmartStages(cs::Sequence block, uint32_t transaction);
 
+  void sendSmartReject(const std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list);
+  void getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
+
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey);
 
@@ -94,6 +98,9 @@ public:
   void startConsensus();
 
   void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3);
+  bool receivingSignatures(const cs::Bytes& sigBytes, const cs::Bytes& roundBytes, const cs::RoundNumber rNum
+      , const cs::Bytes& trustedMask, const cs::ConfidantsKeys& newConfidants
+      , cs::Signatures& poolSignatures);
   void addRoundSignature(const cs::StageThree& st3);
   //smart-contracts consensus stages sending and getting
 
@@ -117,7 +124,7 @@ public:
   void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
-                         const cs::PublicKey& sender, cs::BlockSignatures&& poolSignatures);
+                         const cs::PublicKey& sender, cs::Signatures&& poolSignatures, cs::Bytes realTrusted);
 
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
@@ -139,8 +146,8 @@ public:
 
   bool isPoolsSyncroStarted();
 
-  void smartStagesStorageClear(size_t cSize);
-
+  //void smartStagesStorageClear(size_t cSize);
+  
   enum Level {
     Normal,
     Confidant,
@@ -203,6 +210,7 @@ public signals:
   SmartsSignal<cs::StageTwoSmarts> gotSmartStageTwo;
   SmartsSignal<cs::StageThreeSmarts> gotSmartStageThree;
   SmartStageRequestSignal receivedSmartStageRequest;
+  cs::Signal<void(const std::vector< std::pair<cs::Sequence, uint32_t> >&)> gotRejectedContracts;
 
 public slots:
   void processTimer();
@@ -217,7 +225,7 @@ private:
   void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo,
                              const cs::Characteristic& characteristic, cs::StageThree& st3);
 
-  bool readRoundData(cs::RoundTable& roundTable);
+  bool readRoundData(cs::RoundTable& roundTable, bool bang);
   void reviewConveyerHashes();
 
   // conveyer
@@ -276,6 +284,8 @@ private:
   static const csdb::Address genesisAddress_;
   static const csdb::Address startAddress_;
 
+  cs::PublicKey ssKey_;
+
   const cs::PublicKey nodeIdKey_;
   const cs::PrivateKey nodeIdPrivate_;
   bool good_ = true;
@@ -325,9 +335,9 @@ private:
   };
 
   struct SentSignatures {
-    cs::BlockSignatures poolSignatures;
-    cs::BlockSignatures roundSignatures;
-    cs::BlockSignatures trustedConfirmation;
+    cs::Signatures poolSignatures;
+    cs::Signatures roundSignatures;
+    cs::Signatures trustedConfirmation;
   };
 
   cs::Bytes lastRoundTableMessage_;

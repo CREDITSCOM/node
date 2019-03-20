@@ -65,7 +65,27 @@ const cs::PublicKey& SolverCore::getWriterPublicKey() const {
   return SolverContext::zeroKey;
 }
 
+bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
+  if (cs::Conveyer::instance().currentRoundNumber() < Consensus::StartingDPOS) {
+    csdebug() << "The DPOS doesn't work unless the roundNumber is less than " << Consensus::StartingDPOS;
+    return true;
+  }
+  BlockChain::WalletData wData;
+  BlockChain::WalletId wId;
+  pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(sender), wData, wId);
+  if (wData.balance_ < Consensus::MinStakeValue) {
+    return false;
+  }
+  return true;
+}
+
 void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender) {
+//DPOS check start -> comment if unnecessary
+  if (!checkNodeCache(sender)) {
+    csdebug() << "The sender's cash value is too low -> Don't allowed to be a confidant";
+    return;
+  }
+//DPOS check finish
   cs::Sequence delta = cs::Conveyer::instance().currentRoundNumber() - pnode->getBlockChain().getLastSequence();
   if (delta > 1) {
     recv_hash.push_back(std::make_pair<>(hash, sender));
@@ -101,6 +121,10 @@ void SolverCore::nextRound() {
   stageThreeStorage.clear();
   trueStageThreeStorage.clear();
   trusted_candidates.clear();
+  realTrustedChanged_ = false;
+  tempRealTrusted_.clear();
+  currentStage3iteration_ = 0;
+
 
   if (!pstate) {
     return;
@@ -190,41 +214,72 @@ void SolverCore::printStage3(const cs::StageThree& stage) {
 }
 
 void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg) {
-  if (find_stage3(stage.sender) != nullptr) {
-    // duplicated
+  if (stage.iteration < currentStage3iteration_) {
+    //stage with old iteration
     return;
+  }
+  auto ptr = find_stage3(stage.sender);
+  //potential THREAT!!!
+  if (ptr != nullptr) {
+    if(ptr->iteration == currentStage3iteration_) {
+      // duplicated
+      return;
+    }
   }
 
   auto lamda = [this] (const cs::StageThree& stageFrom, const cs::StageThree& stageTo) {
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
+    bool somethingInvalid = false;
+    if (stageTo.realTrustedMask[stageFrom.sender] == cs::ConfidantConsts::InvalidConfidantIndex) {
+      cswarning() << "The node, who sent this stage was marked as untrusted";
+      somethingInvalid = true;
+    }
+
     if (!cscrypto::verifySignature(stageFrom.blockSignature, conveyer.confidantByIndex(stageFrom.sender),
                                    stageTo.blockHash.data(), stageTo.blockHash.size())) {
-      cswarning() << "Block Signatures are not valid !";
-      return;
+      cswarning() << "Block Signatures are not valid ! -> ";
+      printStage3(stageFrom);
+      somethingInvalid = true;
     }
 
     if (!cscrypto::verifySignature(stageFrom.roundSignature, conveyer.confidantByIndex(stageFrom.sender),
                                    stageTo.roundHash.data(), stageTo.roundHash.size())) {
       cswarning() << "Round Signatures are not valid !";
-      return;
+      printStage3(stageFrom);
+      somethingInvalid = true;
     }
 
     if (!cscrypto::verifySignature(stageFrom.trustedSignature, conveyer.confidantByIndex(stageFrom.sender),
                                     stageTo.trustedHash.data(), stageTo.trustedHash.size())) {
       cswarning() << "Trusted Signatures are not valid !";
-      return;
+      printStage3(stageFrom);
+      somethingInvalid = true;
     }
 
-    if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask)) {
+    if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask) || stageTo.realTrustedMask[stageFrom.sender] == cs::ConfidantConsts::InvalidConfidantIndex) {
       cswarning() << "Real Trusted are not valid !";
-      return;
+      printStage3(stageFrom);
+      somethingInvalid = true;
     }
 
     if (!(stageFrom.writer == stageTo.writer)) {
       cswarning() << "Writer is not valid !";
+      printStage3(stageFrom);
+      somethingInvalid = true;
+    }
+
+
+
+    if (somethingInvalid) {
+      if (stageTo.realTrustedMask[stageFrom.sender] != cs::ConfidantConsts::InvalidConfidantIndex) {
+        realTrustedSetValue(stageFrom.sender,cs::ConfidantConsts::InvalidConfidantIndex);
+      }
       return;
     }
 
+    //if (getRealTrusted()[stageFrom.sender] == cs::ConfidantConsts::InvalidConfidantIndex) {
+    //  realTrustedSet(stageFrom.sender, cs::ConfidantConsts::FirstWriterIndex);
+    //}
     trueStageThreeStorage.emplace_back(stageFrom);
     pnode->addRoundSignature(stageFrom);
     csdebug() << "Stage3 [" << static_cast<int>(stageFrom.sender) << "] - signatures are OK";
@@ -237,15 +292,20 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
     case 1:
       // TODO: change the routine of pool signing
       for (const auto& st : stageThreeStorage) {
-        lamda(st, stage);
+        if(st.iteration == currentStage3iteration_) {
+          lamda(st, stage);
+        }
       }
       trueStageThreeStorage.push_back(stage);
+
       pnode->addRoundSignature(stage);
       break;
 
     case 2:
       const auto st = find_stage3(pnode->getConfidantNumber());
-      lamda(stage, *st);
+      if (stage.iteration == st->iteration) {
+        lamda(stage, *st);
+      }
       break;
   }
 
@@ -262,6 +322,11 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
     case Result::Finish: 
       handleTransitions(Event::Stage3Enough);
       break;
+    case Result::Retry:
+      ++currentStage3iteration_;
+      adjustStageThreeStorage();
+      handleTransitions(Event::Stage3NonComplete);
+      break;
     case Result::Failure:
       cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null");
       removeDeferredBlock(deferredBlock_.sequence());
@@ -270,9 +335,49 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
   }
 }
 
+void SolverCore::adjustStageThreeStorage() {
+  std::vector<cs::StageThree> tmpStageThreeStorage;
+  for (auto& it : stageThreeStorage) {
+    if (it.iteration == currentStage3iteration_) {
+      tmpStageThreeStorage.push_back(it);
+    }
+  }
+  stageThreeStorage.clear();
+  stageThreeStorage = tmpStageThreeStorage;
+  trueStageThreeStorage.clear();//how to put the realTrusted value to the on-stage3
+}
+
 size_t SolverCore::trueStagesThree() {
   return trueStageThreeStorage.size();
 }
+
+bool SolverCore::realTrustedChanged() const {
+  return realTrustedChanged_;
+}
+
+void SolverCore::realTrustedChangedSet(bool val) {
+  realTrustedChanged_ = val;
+}
+
+void SolverCore::realTrustedSetValue(cs::Byte position, cs::Byte value) {
+  csdebug() << __func__ << ": realtrusted in solvercore set, realTrustedChanged switched to true";
+  realTrustedChangedSet(true);
+  size_t pos = static_cast<size_t>(position);
+  if(tempRealTrusted_.size() > pos) {
+    tempRealTrusted_[pos] = value;
+  }
+}
+
+void SolverCore::realTrustedSet(cs::Bytes realTrusted) {
+  tempRealTrusted_ = realTrusted;
+}
+
+cs::Bytes SolverCore::getRealTrusted()
+{
+  return tempRealTrusted_;
+}
+
+
 
 size_t SolverCore::stagesThree() {
   return stageThreeStorage.size();

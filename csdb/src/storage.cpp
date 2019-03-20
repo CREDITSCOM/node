@@ -415,12 +415,14 @@ bool Storage::pool_save(Pool pool) {
     d->set_last_error(InvalidParameter, "%s: Pool already pressent [hash: %s]", funcName(), hash.to_string().c_str());
     return false;
   }
-
+/*
   {
     std::unique_lock<std::mutex> lock(d->write_lock);
     d->write_queue.push_back(pool);
     d->write_cond_var.notify_one();
   }
+*/
+  d->db->put(hash.to_binary(), static_cast<uint32_t>(pool.sequence()), pool.to_binary());
 
   {
     std::unique_lock<std::mutex> lock(d->data_lock);
