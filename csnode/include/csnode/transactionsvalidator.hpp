@@ -27,7 +27,7 @@ public:
   TransactionsValidator(WalletsState& walletsState, const Config& config);
 
   void reset(size_t transactionsNum);
-  bool validateTransaction(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1, bool newState = false);
+  bool validateTransaction(const csdb::Transaction& trx, size_t trxInd, bool newState = false);
   void checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
   void validateByGraph(CharacteristicMask& maskIncluded, const Transactions& trxs, csdb::Pool& trxsExcluded);
   size_t getCntRemovedTrxs() const {
@@ -41,7 +41,7 @@ private:
   static constexpr csdb::Amount zeroBalance_ = 0.0_c;
 
 private:
-  bool validateTransactionAsSource(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1, bool newState);
+  bool validateTransactionAsSource(const csdb::Transaction& trx, size_t trxInd, bool newState);
   bool validateTransactionAsTarget(const csdb::Transaction& trx);
 
   void removeTransactions(Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded,

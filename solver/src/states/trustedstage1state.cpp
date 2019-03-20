@@ -218,23 +218,22 @@ void TrustedStage1State::checkRejectedSmarts(SolverContext& context, cs::Bytes& 
   }
 }
 
-void TrustedStage1State::validateTransactions( SolverContext& context, cs::Bytes& characteristicMask, const cs::TransactionsPacket& packet ) {
-  const std::size_t transactionsCount = packet.transactionsCount();
+void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes& characteristicMask, const cs::TransactionsPacket& packet) {
+  const size_t transactionsCount = packet.transactionsCount();
   const auto& transactions = packet.transactions();
-  uint8_t del1;
   // validate each transaction
-  for( std::size_t i = 0; i < transactionsCount; ++i ) {
-    const csdb::Transaction& transaction = transactions [ i ];
+  for (size_t i = 0; i < transactionsCount; ++i) {
+    const csdb::Transaction& transaction = transactions[i];
     bool is_valid = true;
-    bool is_smart_new_state = SmartContracts::is_new_state( transaction );
-    if( !is_smart_new_state ) {
-      is_valid = !( transaction.source() == transaction.target() );
-      if( !is_valid ) {
+    bool is_smart_new_state = SmartContracts::is_new_state(transaction);
+    if (!is_smart_new_state) {
+      is_valid = !(transaction.source() == transaction.target());
+      if (!is_valid) {
         cslog() << name() << ": transaction[" << i << "] rejected, source equals to target";
       }
-      else if( csdb::Amount( transaction.max_fee().to_double() ) >= csdb::Amount( transaction.counted_fee().to_double() ) ) {
-        is_valid = ptransval->validateTransaction( transaction, i, del1 );
-        if( !is_valid ) {
+      else if (csdb::Amount(transaction.max_fee().to_double()) >= csdb::Amount (transaction.counted_fee().to_double())) {
+        is_valid = ptransval->validateTransaction(transaction, i);
+        if (!is_valid) {
           cslog() << name() << ": transaction[" << i << "] rejected by validator";
         }
       }
@@ -245,7 +244,7 @@ void TrustedStage1State::validateTransactions( SolverContext& context, cs::Bytes
     }
     else {
       csdebug() << name() << ": smart new_state transaction[" << i << "] included in consensus";
-      if( context.smart_contracts().is_closed_smart_contract( transaction.target() ) ) {
+      if (context.smart_contracts().is_closed_smart_contract(transaction.target())) {
         is_valid = false;
         cslog() << name() << ": reject smart new_state transaction because related contract is closed";
       }
@@ -253,16 +252,16 @@ void TrustedStage1State::validateTransactions( SolverContext& context, cs::Bytes
         // set to false, then test by validator:
         is_valid = false;
         csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx( transaction, context.blockchain() );
-        if( initTransaction.is_valid() ) {
+        if (initTransaction.is_valid()) {
           csdb::UserField fee_fld = transaction.user_field( trx_uf::new_state::Fee );
-          if( fee_fld.is_valid() ) {
-            csdb::Amount feeForExecution( fee_fld.value<csdb::Amount>() );
-            if( ( csdb::Amount( initTransaction.max_fee().to_double() ) - csdb::Amount( initTransaction.counted_fee().to_double() ) )
-              >= csdb::Amount( transaction.counted_fee().to_double() ) + feeForExecution ) {
-              csdb::Transaction new_state_tr( transaction );
-              new_state_tr.set_source( initTransaction.source() );
-              is_valid = ptransval->validateTransaction( new_state_tr, i, del1, true );
-              if( !is_valid ) {
+          if (fee_fld.is_valid()) {
+            csdb::Amount feeForExecution(fee_fld.value<csdb::Amount>());
+            if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()))
+              >= csdb::Amount(transaction.counted_fee().to_double()) + feeForExecution) {
+              csdb::Transaction new_state_tr(transaction);
+              new_state_tr.set_source(initTransaction.source());
+              is_valid = ptransval->validateTransaction(new_state_tr, i, true);
+              if (!is_valid) {
                 cslog() << name() << ": transaction[" << i << "] rejected by validator";
               }
             }
@@ -279,26 +278,26 @@ void TrustedStage1State::validateTransactions( SolverContext& context, cs::Bytes
         }
       }
     }
-    if( is_valid ) {
+    if (is_valid) {
       // yrtimd: test with get_valid_smart_address() only for deploy transactions:
-      if( SmartContracts::is_deploy( transaction ) ) {
-        auto sci = context.smart_contracts().get_smart_contract( transaction );
-        if( sci.has_value() && sci.value().method.empty() ) {  // Is deploy
-          csdb::Address deployer = context.blockchain().get_addr_by_type( transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY );
-          is_valid = SmartContracts::get_valid_smart_address( deployer, transaction.innerID(), sci.value().smartContractDeploy ) == transaction.target();
-          if( !is_valid ) {
+      if (SmartContracts::is_deploy(transaction)) {
+        auto sci = context.smart_contracts().get_smart_contract(transaction);
+        if (sci.has_value() && sci.value().method.empty()) {  // Is deploy
+          csdb::Address deployer = context.blockchain().get_addr_by_type(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+          is_valid = SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target();
+          if (!is_valid) {
             cslog() << name() << ": transaction[" << i << "] rejected, malformed contract address";
           }
         }
       }
-      if( is_valid ) {
-        is_valid = check_transaction_signature( context, transaction );
-        if( !is_valid ) {
+      if (is_valid) {
+        is_valid = check_transaction_signature(context, transaction);
+        if (!is_valid) {
           cslog() << name() << ": transaction[" << i << "] rejected by check_transaction_signature()";
         }
       }
     }
-    characteristicMask.push_back( is_valid ? ( cs::Byte )1 : ( cs::Byte )0 );
+    characteristicMask.push_back(is_valid ? static_cast<cs::Byte>(1) : static_cast<cs::Byte>(0));
   }
   //validation of all transactions by graph
   csdb::Pool excluded;
