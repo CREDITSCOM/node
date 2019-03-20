@@ -9,6 +9,9 @@
 #include <vector>
 
 namespace cs {
+
+class SolverContext;
+
 class TransactionsValidator {
 public:
   using Transactions = std::vector<csdb::Transaction>;
@@ -25,6 +28,7 @@ public:
 
   void reset(size_t transactionsNum);
   bool validateTransaction(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1, bool newState = false);
+  void checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
   void validateByGraph(CharacteristicMask& maskIncluded, const Transactions& trxs, csdb::Pool& trxsExcluded);
   size_t getCntRemovedTrxs() const {
     return cntRemovedTrxs_;
