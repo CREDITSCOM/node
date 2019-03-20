@@ -2,7 +2,7 @@
 
 #include <stage.hpp>
 #include "defaultstatebehavior.hpp"
-#include <timeouttracking.hpp>
+//#include <timeouttracking.hpp>
 
 #include <csdb/pool.hpp>
 #include <csnode/transactionsvalidator.hpp>
@@ -51,7 +51,7 @@ protected:
   bool transactions_checked{ false };
   bool min_time_expired{ false };
 
-  TimeoutTracking min_time_tracking;
+  //TimeoutTracking min_time_tracking;
 
   cs::StageOne stage;
   std::unique_ptr<cs::TransactionsValidator> ptransval;

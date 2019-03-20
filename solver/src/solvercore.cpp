@@ -212,31 +212,6 @@ bool SolverCore::stateFailed(Result res) {
 //  }
 //}
 
-//void SolverCore::rebuildDeferredBLock(cs::StageThree& st3) {
-//  csmeta(csdetails) << "start";
-//  cs::Conveyer& conveyer = cs::Conveyer::instance();
-//  cs::RoundTable table;
-//  adjustTrustedCandidates(st3.realTrustedMask, conveyer.confidants());
-//  table.round = conveyer.currentRoundNumber() + 1;
-//  table.confidants = trusted_candidates;
-//  table.hashes = hashes_candidates;
-//  csdb::Pool newDeferredBlock;
-//  for(auto& it : deferredBlock_.transactions()) {
-//    newDeferredBlock.add_transaction(it);
-//  }
-//
-//  newDeferredBlock.set_previous_hash(deferredBlock_.previous_hash());
-//  newDeferredBlock.set_sequence();
-//  newDeferredBlock.add_user_field(0, deferredBlock_.user_field(0));
-//  newDeferredBlockadd_number_trusted(st3.realTrustedMask.size());
-//  newDeferredBlockadd_real_trusted(cs::Utils::maskToBits(st3.realTrustedMask));
-//
-//  newDeferredBlock.newWallets() = deferredBlock_.newWallets();
-//  newDeferredBlock.set_confidants(conveyer.confidants());
-//
-//
-//  }
-
 
 //TODO: this function is to be implemented the block and RoundTable building <====
 void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,

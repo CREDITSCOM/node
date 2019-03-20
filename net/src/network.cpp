@@ -126,7 +126,6 @@ void Network::readerRoutine(const Config& config) {
 #ifdef __linux__
       static uint64_t one = 1;
       int s = write(readerEventfd_, &one, sizeof(uint64_t));
-      ++count_;
 #elif WIN32
       while (readerLock.test_and_set(std::memory_order_acquire)) // acquire lock
         ; // spin
@@ -250,8 +249,6 @@ void Network::processorRoutine() {
 #ifdef __linux__
     uint64_t tasks;
     int s = read(readerEventfd_, &tasks, sizeof(uint64_t));
-    count_ -= tasks;
-
     if (s != sizeof(uint64_t)) continue;
 
     for (uint64_t i = 0; i < tasks; i++) {

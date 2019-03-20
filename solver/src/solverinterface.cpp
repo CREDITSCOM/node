@@ -123,6 +123,7 @@ void SolverCore::nextRound() {
   trusted_candidates.clear();
   realTrustedChanged_ = false;
   tempRealTrusted_.clear();
+  currentStage3iteration_ = 0;
 
 
   if (!pstate) {
@@ -213,9 +214,14 @@ void SolverCore::printStage3(const cs::StageThree& stage) {
 }
 
 void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg) {
+  if (stage.iteration < currentStage3iteration_) {
+    //stage with old iteration
+    return;
+  }
   auto ptr = find_stage3(stage.sender);
+  //potential THREAT!!!
   if (ptr != nullptr) {
-    if(ptr->iteration >= stage.iteration) {
+    if(ptr->iteration == currentStage3iteration_) {
       // duplicated
       return;
     }
@@ -250,7 +256,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
       somethingInvalid = true;
     }
 
-    if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask)) {
+    if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask) || stageTo.realTrustedMask[stageFrom.sender] == cs::ConfidantConsts::InvalidConfidantIndex) {
       cswarning() << "Real Trusted are not valid !";
       printStage3(stageFrom);
       somethingInvalid = true;
@@ -286,11 +292,12 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
     case 1:
       // TODO: change the routine of pool signing
       for (const auto& st : stageThreeStorage) {
-        if(stage.iteration == st.iteration) {
+        if(st.iteration == currentStage3iteration_) {
           lamda(st, stage);
         }
       }
       trueStageThreeStorage.push_back(stage);
+
       pnode->addRoundSignature(stage);
       break;
 
@@ -316,8 +323,8 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
       handleTransitions(Event::Stage3Enough);
       break;
     case Result::Retry:
-      stageThreeStorage.clear();
-      trueStageThreeStorage.clear();//how to put the realTrusted value to the on-stage3
+      ++currentStage3iteration_;
+      adjustStageThreeStorage();
       handleTransitions(Event::Stage3NonComplete);
       break;
     case Result::Failure:
@@ -326,6 +333,18 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
       handleTransitions(Event::SetNormal);
       break;
   }
+}
+
+void SolverCore::adjustStageThreeStorage() {
+  std::vector<cs::StageThree> tmpStageThreeStorage;
+  for (auto& it : stageThreeStorage) {
+    if (it.iteration == currentStage3iteration_) {
+      tmpStageThreeStorage.push_back(it);
+    }
+  }
+  stageThreeStorage.clear();
+  stageThreeStorage = tmpStageThreeStorage;
+  trueStageThreeStorage.clear();//how to put the realTrusted value to the on-stage3
 }
 
 size_t SolverCore::trueStagesThree() {

@@ -299,9 +299,6 @@ public:
     core.realTrustedSet(realTrusted);
   }
 
-  void rebuildDeferredBlock(cs::StageThree& st3) {
-    core.rebuildDeferredBLock(st3);
-  }
 
   cs::Bytes getRealTrusted() {
     return core.getRealTrusted();
