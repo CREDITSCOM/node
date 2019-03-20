@@ -440,6 +440,7 @@ constexpr cs::RoundNumber getRoundTimeout(const MsgTypes type) {
   case MsgTypes::FirstSmartStage:
   case MsgTypes::SecondSmartStage:
   case MsgTypes::ThirdSmartStage:
+  case MsgTypes::RejectedContracts:
     return 100;
   default:
     return 5;
@@ -582,6 +583,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
   case MsgTypes::SmartThirdStageRequest:
     return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
+  case MsgTypes::RejectedContracts:
+    return node_->getSmartReject(data, size, rNum, firstPack.getSender());
   case MsgTypes::RoundTableReply:
     return node_->getRoundTableReply(data, size, firstPack.getSender());
   default:

@@ -186,7 +186,7 @@ void TrustedStage1State::checkRejectedSmarts(SolverContext& context, cs::Bytes& 
   for(const auto& tr : transactions) {
     if(i < mask_size && *(characteristicMask.cbegin() + i) == 0) {
       if(smarts.is_known_smart_contract(tr.source())) {
-        smart_rejected.insert(tr.source());
+        smart_rejected.insert(smarts.absolute_address(tr.source()));
       }
     }
     ++i;
@@ -194,11 +194,10 @@ void TrustedStage1State::checkRejectedSmarts(SolverContext& context, cs::Bytes& 
   if(!smart_rejected.empty()) {
     cslog() << name() << ": detected rejected trxs from " << smart_rejected.size() << " smart contract(s)";
     cs::TransactionsPacket rejected;
-
     // 2. reject all trxs from those smarts & collect all rejected trxs
     size_t cnt_add_rejected = 0;
     for(auto it = transactions.begin(); it != transactions.end(); ++it) {
-      if(smart_rejected.count(it->source()) > 0) {
+      if(smart_rejected.count(smarts.absolute_address(it->source())) > 0) {
         auto itm = characteristicMask.begin() + (it - transactions.cbegin());
         if(*itm > 0) {
           *itm = 0;
@@ -211,9 +210,21 @@ void TrustedStage1State::checkRejectedSmarts(SolverContext& context, cs::Bytes& 
       cslog() << name() << ": additionaly rejected " << cnt_add_rejected << " trxs";
     }
 
-    // 3. signal SmartContracts service some trxs are rejected
+    // 3. signal some trxs are rejected
     if(rejected.transactionsCount() > 0) {
-      context.smart_contracts().on_reject(rejected);
+      std::vector< std::pair<cs::Sequence, uint32_t> > ref_list;
+      for (const auto t : rejected.transactions()) {
+        if (SmartContracts::is_new_state(t)) {
+          csdb::UserField fld = t.user_field(trx_uf::new_state::RefStart);
+          if (fld.is_valid()) {
+            SmartContractRef ref(fld);
+            ref_list.emplace_back(std::make_pair(ref.sequence, (uint32_t)ref.transaction));
+          }
+        }
+      }
+      if (!ref_list.empty()) {
+        context.send_rejected_smarts(ref_list);
+      }
     }
   }
 }

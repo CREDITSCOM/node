@@ -60,6 +60,8 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node)
 {
   cs::Lock lock(public_access_lock);
 
+  cs::Connector::connect(&node->gotRejectedContracts, this, &SmartContracts::on_reject);
+
   pnode = node;
   auto connector_ptr = pnode->getConnector();
   if (connector_ptr != nullptr) {
@@ -1119,34 +1121,39 @@ csdb::Transaction SmartContracts::create_new_state(const QueueItem& queue_item) 
 
 // get & handle rejected transactions
 // usually ordinary consensus may not reject smart-related transactions
-void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
+void SmartContracts::on_reject(const std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list) {
 
   cs::Lock lock(public_access_lock);
 
   bool retest_queue_required = false;
   // will contain "unchanged" states of rejected smart contract calls:
-  cs::TransactionsPacket unchanged_pack;
-  const auto cnt = pack.transactionsCount();
+  cs::TransactionsPacket empty_states_pack;
+  const auto cnt = ref_list.size();
   if (cnt == 0) {
-    cserror() << log_prefix << "rejected transactions list is empty";
+    cserror() << log_prefix << "rejected contract list is empty";
     return;
   }
-  csdebug() << log_prefix << "" << cnt << " transactions are rejected";
-  std::vector<csdb::Address> done;
+  csdebug() << log_prefix << "" << cnt << " contract(s) are rejected";
 
-  for (const auto t : pack.transactions()) {
-    csdb::Address abs_addr = absolute_address(t.source());
-    if (std::find(done.cbegin(), done.cend(), abs_addr) != done.cend()) {
-      continue;
+  for (const auto ref : ref_list) {
+
+    // find rejected contract in queue
+    queue_iterator it = exe_queue.end();
+    for (auto i = exe_queue.begin(); i != exe_queue.end(); ++i) {
+      if (i->ref_start.sequence == ref.first && i->ref_start.transaction == ref.second) {
+        it = i;
+        break;
+      }
     }
-
-    // find source contract in queue
-    queue_iterator it = find_first_in_queue(abs_addr);
     if (it == exe_queue.end()) {
       cserror() << log_prefix << "cannot find in queue source contract for rejected transactions";
     }
     else {
-      done.push_back(abs_addr);
+      if (it->is_rejected) {
+        // already in new consensus
+        continue;
+      }
+      it->is_rejected = true;
       csdebug() << log_prefix << "send to conveyer {"
         << it->ref_start.sequence << '.' << it->ref_start.transaction << "} failed status (emitted transactions or state are rejected)";
       // send to consensus
@@ -1159,7 +1166,7 @@ void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
       err_code.__set_v_byte(error::ConsensusRejected);
       tr.add_user_field(trx_uf::new_state::RetVal, serialize(err_code));
       if (tr.is_valid()) {
-        unchanged_pack.addTransaction(tr);
+        empty_states_pack.addTransaction(tr);
       }
       else {
         cserror() << log_prefix << "failed to store {"
@@ -1170,8 +1177,29 @@ void SmartContracts::on_reject(cs::TransactionsPacket& pack) {
     }
   }
 
-  if (unchanged_pack.transactionsCount() > 0) {
-    Conveyer::instance().addSeparatePacket(unchanged_pack);
+  if (empty_states_pack.transactionsCount() > 0) {
+    
+     
+    // find in queue the first contract in pack and start new smart-consensus
+    const auto& transactions = empty_states_pack.transactions();
+    csdb::Address abs_addr = absolute_address(transactions.front().source());
+    queue_iterator it = find_first_in_queue(abs_addr);
+    if (it == exe_queue.end()) {
+      // nothing else to do then simple put transaction into blockchain
+      empty_states_pack.makeHash();
+      csdebug() << log_prefix << "restarting consensus to validate empty new_state of " << empty_states_pack.transactionsCount() << " contract(s) failed, so put empty new_state unsigned";
+      Conveyer::instance().addSeparatePacket(empty_states_pack);
+    }
+    else {
+      // replace if any previous
+      if (it->is_executor) {
+        csdebug() << log_prefix << "restarting consensus to validate empty new_state of " << empty_states_pack.transactionsCount() << " contract(s)";
+        start_consensus(*it, empty_states_pack);
+      }
+      else {
+        csdebug() << log_prefix << "restarting consensus to validate empty new_state of " << empty_states_pack.transactionsCount() << " contract(s) required, wait for new_state(s)";
+      }
+    }
   }
 
   if (retest_queue_required) {

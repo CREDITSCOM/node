@@ -233,4 +233,9 @@ void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2)
   core.pnode->sendRoundTableRequest(respondent2);
 }
 
+void SolverContext::send_rejected_smarts(std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list)
+{
+  core.pnode->sendSmartReject(ref_list);
+}
+
 }  // namespace slv2

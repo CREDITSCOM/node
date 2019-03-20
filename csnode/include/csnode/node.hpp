@@ -86,6 +86,9 @@ public:
   void removeSmartConsensus(cs::Sequence block, uint32_t transaction);
   void checkForSavedSmartStages(cs::Sequence block, uint32_t transaction);
 
+  void sendSmartReject(const std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list);
+  void getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
+
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey);
 
@@ -143,8 +146,8 @@ public:
 
   bool isPoolsSyncroStarted();
 
-  void smartStagesStorageClear(size_t cSize);
-
+  //void smartStagesStorageClear(size_t cSize);
+  
   enum Level {
     Normal,
     Confidant,
@@ -207,6 +210,7 @@ public signals:
   SmartsSignal<cs::StageTwoSmarts> gotSmartStageTwo;
   SmartsSignal<cs::StageThreeSmarts> gotSmartStageThree;
   SmartStageRequestSignal receivedSmartStageRequest;
+  cs::Signal<void(const std::vector< std::pair<cs::Sequence, uint32_t> >&)> gotRejectedContracts;
 
 public slots:
   void processTimer();

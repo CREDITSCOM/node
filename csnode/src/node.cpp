@@ -831,6 +831,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     case MsgTypes::TransactionsPacketRequest:
     case MsgTypes::TransactionsPacketReply:
     case MsgTypes::RoundTableRequest:
+    case MsgTypes::RejectedContracts:
       return MessageActions::Process;
 
     default:
@@ -1655,6 +1656,49 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   }
 
   csmeta(csdetails) << "done";
+}
+
+void Node::sendSmartReject(const std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list)
+{
+  uint32_t cnt = ref_list.size();
+  if (cnt == 0) {
+    csmeta(cserror) << "cannot send empty rejected contracts pack";
+    return;
+  }
+  cs::Bytes data;
+  cs::DataStream stream(data);
+  stream << cnt;
+  for (const auto& p : ref_list) {
+    stream << p.first << p.second;
+  }
+  csdebug() << "Node: sending " << cnt << " rejected contract(s) to related smart confidants";
+  sendBroadcast(MsgTypes::RejectedContracts, cs::Conveyer::instance().currentRoundNumber(),
+    // payload
+    data);
+}
+
+void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender)
+{
+  istream_.init(data, size);
+
+  cs::Bytes raw_data;
+  istream_ >> raw_data;
+  cs::DataStream stream(raw_data.data(), raw_data.size());
+  uint32_t cnt = 0;
+  stream >> cnt;
+  std::vector< std::pair<cs::Sequence, uint32_t> > ref_list;
+  for (uint32_t i = 0; i < cnt; ++i) {
+    cs::Sequence seq;
+    uint32_t tr_idx;
+    stream >> seq >> tr_idx;
+    ref_list.emplace_back(std::make_pair<>(seq, tr_idx));
+  }
+  if (ref_list.empty()) {
+    csmeta(cserror) << "empty rejected contracts pack received";
+    return;
+  }
+  csdebug() << "Node: " << cnt << " rejected contract(s) received";
+  emit gotRejectedContracts(ref_list);
 }
 
 void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::StageOneSmarts& stageOneInfo) {

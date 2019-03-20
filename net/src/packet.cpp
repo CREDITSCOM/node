@@ -231,6 +231,8 @@ const char* getMsgTypesString(MsgTypes messageType) {
       return "BigBang";
     case NodeStopRequest:
       return "NodeStopRequest";
+    case RejectedContracts:
+      return "RejectedContracts";
     default:
       return "Unknown";
   }

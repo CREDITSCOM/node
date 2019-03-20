@@ -268,7 +268,7 @@ namespace cs{
       stagesPlot = stagesPlot + '[' + std::to_string(static_cast<int>(smartStageTwoStorage_.at(i).sender)) + "] ";
     }
     csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "}  <-- SMART-Stage-2 - SmartRound {"
-      << st2.sBlockNum << '.' << st2.startTransaction << "} "  << stagesPlot;
+      << stage.sBlockNum << '.' << stage.startTransaction << "} "  << stagesPlot;
     if (smartStageTwoEnough()) {
       killTimer(2);
       cs::Connector::disconnect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
@@ -406,7 +406,7 @@ namespace cs{
     auto lambda = [this](const cs::StageThreeSmarts& stageFrom, cs::Bytes hash) {
       if (!cscrypto::verifySignature(stageFrom.packageSignature, smartConfidants().at(stageFrom.sender)
         , hash.data(), hash.size())) {
-        cslog() << log_prefix << "{" << smartRoundNumber_ << "} ____ The signature is not valid";
+        cslog() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} ____ The signature is not valid";
         return; //returns this function if the signature of smartco
       }
       smartStageThreeStorage_.at(stageFrom.sender) = stageFrom;

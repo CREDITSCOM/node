@@ -230,9 +230,9 @@ public:
     return std::move(get_smart_contract_impl(tr));
   }
 
-  // get & handle rejected transactions
+  // get & handle rejected transactions from smart contract(s)
   // usually ordinary consensus may reject smart-related transactions
-  void on_reject(cs::TransactionsPacket& pack);
+  void on_reject(const std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list);
 
   csdb::Address absolute_address(const csdb::Address& optimized_address) const {
     return bc.get_addr_by_type(optimized_address, BlockChain::ADDR_TYPE::PUBLIC_KEY);
@@ -358,6 +358,8 @@ private:
     csdb::Amount consumed_fee;
     // actively taking part in smart consensus, perform a call to executor
     bool is_executor;
+    // is rejected by consensus
+    bool is_rejected;
     // actual consensus
     std::unique_ptr<SmartConsensus> pconsensus;
     // using contracts, must store absolute addresses (public keys)
@@ -372,6 +374,7 @@ private:
       , abs_addr(absolute_address)
       , consumed_fee(0)
       , is_executor(false)
+      , is_rejected(false)
     {
       avail_fee = csdb::Amount(tr_start.max_fee().to_double());
       csdb::Amount tr_start_fee = csdb::Amount(tr_start.counted_fee().to_double());

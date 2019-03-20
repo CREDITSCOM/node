@@ -380,6 +380,7 @@ namespace executor {
     }
 
     void deleteFromLockSmart(const general::Address &address, const general::AccessID &accessId) {
+      csunused(accessId);
       std::lock_guard lk(mtx_);
       lockSmarts.erase(address);
     }
