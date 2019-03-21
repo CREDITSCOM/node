@@ -1543,6 +1543,11 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
   solver_->gotStageThree(std::move(stage), (stageThreeSent ? 2 : 0));
 }
 
+void Node::adjustStageThreeStorage() {
+  stageThreeSent = false;
+  stageThreeMessage_.clear();
+}
+
 void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required) {
   if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
     cswarning() << "NODE> Only confidant nodes can request consensus stages";

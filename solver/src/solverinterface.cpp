@@ -303,7 +303,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
 
     case 2:
       const auto st = find_stage3(pnode->getConfidantNumber());
-      if (stage.iteration == st->iteration) {
+      if (st != nullptr && stage.iteration == st->iteration) {
         lamda(stage, *st);
       }
       break;
@@ -345,6 +345,7 @@ void SolverCore::adjustStageThreeStorage() {
   stageThreeStorage.clear();
   stageThreeStorage = tmpStageThreeStorage;
   trueStageThreeStorage.clear();//how to put the realTrusted value to the on-stage3
+  pnode->adjustStageThreeStorage();
 }
 
 size_t SolverCore::trueStagesThree() {
