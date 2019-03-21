@@ -78,6 +78,19 @@ void WalletsCache::ProcessorBase::invokeReplenishPayableContract(const csdb::Tra
   wallData.balance_ -= transaction.amount();
   setModified(id);
   data_.smartPayableTransactions_.push_back(transaction);
+
+  if (!SmartContracts::is_executable(transaction)) {
+    WalletId sourceId{};
+    csdb::Address sourceAddress = transaction.source();
+    if (!findWalletId(sourceAddress, sourceId)) {
+      cserror() << "Cannot find source wallet, source is " << sourceAddress.to_string();
+      return;
+    }
+    WalletData& sourceWallData = getWalletData(sourceId, sourceAddress);
+    sourceWallData.balance_ += csdb::Amount(transaction.counted_fee().to_double())
+                             - csdb::Amount(transaction.max_fee().to_double());
+    setModified(sourceId);
+  }
 }
 
 void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::Transaction& transaction) {
@@ -93,11 +106,11 @@ void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::T
   }
 
   WalletData& wallData = getWalletData(id, wallAddress);
-  wallData.balance_ += transaction.amount();
+  wallData.balance_ += transaction.amount()
+                     + csdb::Amount(transaction.max_fee().to_double())
+                     - csdb::Amount(transaction.counted_fee().to_double());
 
   if (SmartContracts::is_executable(transaction)) {
-    wallData.balance_ += csdb::Amount(transaction.max_fee().to_double());
-    wallData.balance_ -= csdb::Amount(transaction.counted_fee().to_double());
     data_.closedSmarts_.push_back(transaction);
   } else {
     for (auto it = data_.smartPayableTransactions_.begin(); it != data_.smartPayableTransactions_.end(); it++) {
