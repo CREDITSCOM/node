@@ -93,6 +93,8 @@ private:
     virtual void setModified(WalletId id) = 0;
     void invokeReplenishPayableContract(const csdb::Transaction&);
     void rollbackReplenishPayableContract(const csdb::Transaction&);
+    void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx,
+                                        const csdb::Transaction& initTrx);
     void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction);
     bool isClosedSmart(const csdb::Transaction& transaction);
     void checkClosedSmart(const csdb::Transaction& transaction);

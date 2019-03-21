@@ -93,6 +93,30 @@ void WalletsCache::ProcessorBase::invokeReplenishPayableContract(const csdb::Tra
   }
 }
 
+void WalletsCache::ProcessorBase::smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx,
+                                                                 const csdb::Transaction& initTrx) {
+  csdb::Address smartSourceAddress = smartSourceTrx.source();
+  csdb::Address initAddress = initTrx.source();
+  auto countedFee = csdb::Amount(smartSourceTrx.counted_fee().to_double());
+  WalletId smartId{};
+  WalletId initId{};
+  if (!findWalletId(smartSourceAddress, smartId)) {
+    cserror() << "Cannot find source wallet, source is " << smartSourceAddress.to_string();
+    return;
+  }
+  if (!findWalletId(initAddress, initId)) {
+    cserror() << "Cannot find source wallet, source is " << initAddress.to_string();
+    return;
+  }
+  WalletData& smartWallData = getWalletData(smartId, smartSourceAddress);
+  smartWallData.balance_ += countedFee;
+  WalletData& initWallData = getWalletData(initId, initAddress);
+  initWallData.balance_ -= countedFee;
+
+  setModified(smartId);
+  setModified(initId);
+}
+
 void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::Transaction& transaction) {
   csdb::Address wallAddress = transaction.source();
   if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
