@@ -68,11 +68,13 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
 #ifndef SPAMMER
   if (newState && !wallStateIfNewState.trxTail_.isAllowed(trx.innerID())) {
     del1 = -bitcnt;
-    csdebug() << log_prefix << "new_state rejected, incorrect innerID";
+    csdebug() << log_prefix << "new_state rejected, incorrect innerID " << trx.innerID()
+      << ", expected " << wallStateIfNewState.trxTail_.printRange();
     return false;
   }
   else if (!newState && !wallState.trxTail_.isAllowed(trx.innerID())) {
-    csdebug() << log_prefix << "transaction rejected, incorrect innerID";
+    csdebug() << log_prefix << "transaction rejected, incorrect innerID " << trx.innerID()
+      << ", expected " << wallStateIfNewState.trxTail_.printRange();
     del1 = -bitcnt;
     return false;
   }

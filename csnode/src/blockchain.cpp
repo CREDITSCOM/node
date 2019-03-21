@@ -1080,9 +1080,6 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     }
   }
 
-  // notify block recording
-  newBlockCv_.notify_all();
-
   if (flushed_block_seq != NoSequence) {
     csdebug() << "---------------------------- Flush block #" << flushed_block_seq << " to disk ---------------------------";
     csdebug() << "signatures amount = " << deferredBlock_.signatures().size() << ", smartSignatures amount = " << deferredBlock_.smartSignatures().size() << ", see block info above";
@@ -1113,8 +1110,11 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     }
     pool = deferredBlock_.clone();
   }
-  //csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+  csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
   emit storeBlockEvent(pool);
+
+  // notify block recording
+  newBlockCv_.notify_all();
 
   // log cached block
   csdebug() << "----------------------- Defer block #" << pool.sequence() << " until next round ----------------------";
@@ -1140,6 +1140,8 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool by_sync) {
   }
  
   if (pool_seq == last_seq) {
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+
     if (!deferredBlock_.signatures().empty()) {
       // ignore
       csdebug() << "BLOCKCHAIN> ignore oudated block #" << pool_seq << ", last written #" << last_seq;
