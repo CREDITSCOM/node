@@ -85,19 +85,77 @@ bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, con
   return true;
 }
 
+bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const Transactions& trxs,
+                                                   size_t trxInd, WalletsState::WalletData& wallState) {
+  auto& smarts = context.smart_contracts();
+  const auto trx = trxs[trxInd];
+  csdb::Amount newBalance;
+
+  if (trx.source() == trx.target()) {
+    cslog() << __func__ << ": transaction[" << trxInd << "] rejected, source equals to target";
+    return false;
+  }
+  if (csdb::Amount(trx.max_fee().to_double()) < csdb::Amount(trx.counted_fee().to_double())) {
+    cslog() << __func__ << ": transaction[" << trxInd << "] max fee is less than counted fee";
+    return false;
+  }
+
+  if (SmartContracts::is_executable(trx)) {
+    newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
+  } else {
+    if (smarts.is_known_smart_contract(trx.source())) {
+      bool ok = false;
+      for (const auto& t : trxs) {
+        if (SmartContracts::is_new_state(t) &&
+            std::find(rejectedNewStates_.begin(), rejectedNewStates_.end(),
+            context.smart_contracts().absolute_address(t.source())) == rejectedNewStates_.end()) {
+          auto initTransaction = WalletsCache::findSmartContractInitTrx(t, context.blockchain());
+          if (initTransaction.is_valid() &&
+              smarts.absolute_address(initTransaction.target()) == smarts.absolute_address(trx.source())) {
+            auto it = payableMaxFees_.find(smarts.absolute_address(initTransaction.source()));
+            csdb::Amount leftFromMaxFee;
+            if (it == payableMaxFees_.end()) {
+              leftFromMaxFee = csdb::Amount(initTransaction.max_fee().to_double() - csdb::Amount(trx.counted_fee().to_double()));
+            } else {
+              leftFromMaxFee = it->second - csdb::Amount(trx.counted_fee().to_double());
+            }
+            if (leftFromMaxFee < zeroBalance_) {
+              cslog() << __func__ << ": smart source transaction rejected, out of max fee from init trx";
+              return false;
+            }
+            ok = true;
+            payableMaxFees_.insert(std::make_pair(smarts.absolute_address(initTransaction.source()), leftFromMaxFee));
+          }
+        }
+      }
+      if (!ok) {
+        cslog() << __func__ << ": smart source transaction rejected, no or bad new state in round";
+        return false;
+      }
+      newBalance = wallState.balance_ - trx.amount();      
+    } else {
+      if (smarts.is_known_smart_contract(trx.target())) {
+        newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
+      } else {
+        newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
+      }
+    }
+  }
+  wallState.balance_ = newBalance;
+  return true;
+}
+
 bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, const Transactions& trxs,
                                                         size_t trxInd) {
   const auto& trx = trxs[trxInd];
   WalletsState::WalletId walletId{};
   WalletsState::WalletData& wallState = walletsState_.getData(trx.source(), walletId);
-  csdb::Amount newBalance;
-  auto& smarts = context.smart_contracts();
 
 #ifndef SPAMMER
   if (!wallState.trxTail_.isAllowed(trx.innerID())) {
     csdebug() << log_prefix << "trx rejected, incorrect innerID";
     if (SmartContracts::is_new_state(trx)) {
-      rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
+      rejectedNewStates_.push_back(context.smart_contracts().absolute_address(trx.source()));
     }
     return false;
   }
@@ -109,50 +167,9 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
       return false;
     }
   } else {
-    if (trx.source() == trx.target()) {
-      cslog() << __func__ << ": transaction[" << trxInd << "] rejected, source equals to target";
+    if (!validateCommonAsSource(context, trxs, trxInd, wallState)) {
       return false;
     }
-    if (csdb::Amount(trx.max_fee().to_double()) < csdb::Amount(trx.counted_fee().to_double())) {
-      cslog() << __func__ << ": transaction[" << trxInd << "] max fee is less than counted fee";
-      return false;
-    }
-    if (SmartContracts::is_executable(trx)) {
-      newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
-    } else {
-      if (smarts.is_known_smart_contract(trx.source())) {
-        for (const auto& t : trxs) {
-          if (SmartContracts::is_new_state(t) &&
-              std::find(rejectedNewStates_.begin(), rejectedNewStates_.end(),
-              context.smart_contracts().absolute_address(t.source())) == rejectedNewStates_.end()) {
-            auto initTransaction = WalletsCache::findSmartContractInitTrx(t, context.blockchain());
-            if (initTransaction.is_valid() &&
-                smarts.absolute_address(initTransaction.target()) == smarts.absolute_address(trx.source())) {
-              auto it = payableMaxFees_.find(smarts.absolute_address(initTransaction.source()));
-              csdb::Amount leftFromMaxFee;
-              if (it == payableMaxFees_.end()) {
-                leftFromMaxFee = csdb::Amount(initTransaction.max_fee().to_double() - csdb::Amount(trx.counted_fee().to_double()));
-              } else {
-                leftFromMaxFee = it->second - csdb::Amount(trx.counted_fee().to_double());
-              }
-              if (leftFromMaxFee < zeroBalance_) {
-                cslog() << __func__ << ": smart source transactions rejected, out of max fee from init trx";
-                return false;
-              }
-              payableMaxFees_.insert(std::make_pair(smarts.absolute_address(initTransaction.source()), leftFromMaxFee));
-            }
-          }
-        }
-        newBalance = wallState.balance_ - trx.amount();      
-      } else {
-        if (smarts.is_known_smart_contract(trx.target())) {
-          newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
-        } else {
-          newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
-        }
-      }
-    }
-    wallState.balance_ = newBalance;
   }
 
   if (wallState.balance_ < zeroBalance_) {
