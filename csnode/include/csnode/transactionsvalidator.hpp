@@ -43,6 +43,7 @@ private:
 private:
   bool validateTransactionAsSource(SolverContext& context, const Transactions& trxs,
                                    size_t trxInd);
+  bool validateNewStateAsSource(SolverContext& context, const csdb::Transaction& trx);
   bool validateTransactionAsTarget(const csdb::Transaction& trx);
 
   void removeTransactions(Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded,

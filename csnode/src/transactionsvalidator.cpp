@@ -40,6 +40,51 @@ bool TransactionsValidator::validateTransaction(SolverContext& context, const Tr
   return validateTransactionAsTarget(trxs[trxInd]);
 }
 
+bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, const csdb::Transaction& trx) {
+  auto& smarts = context.smart_contracts();
+  if (smarts.is_closed_smart_contract(trx.target())) {
+    cslog() << __func__ << ": reject smart new_state transaction because related contract is closed";
+    rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
+    return false;
+  }
+  csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(trx, context.blockchain());
+  if (!initTransaction.is_valid()) {
+    cslog() << __func__ << ": reject new_state transaction because related start transaction is not found";
+    rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
+    return false;    
+  }
+  csdb::UserField feeField = trx.user_field(trx_uf::new_state::Fee);
+  if (!feeField.is_valid()) {
+    cslog() << __func__ << ": reject new_state transaction because execution fee is not set properly";
+    rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
+    return false;
+  }
+  csdb::Amount feeForExecution(feeField.value<csdb::Amount>());
+  if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()))
+     < csdb::Amount(trx.counted_fee().to_double()) + feeForExecution) {
+    cslog() << __func__ << ": reject new_state transaction because execution fee is not enough";
+    rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
+    return false;
+  }
+  WalletsState::WalletId initTrxId{};
+  WalletsState::WalletData& initTrxWallState = walletsState_.getData(initTransaction.source(), initTrxId);
+  csdb::Amount newBalance = initTrxWallState.balance_
+                          + csdb::Amount(initTransaction.max_fee().to_double())
+                          - csdb::Amount(initTransaction.counted_fee().to_double())
+                          - trx.amount()
+                          - feeForExecution
+                          - csdb::Amount(trx.counted_fee().to_double());
+
+  initTrxWallState.balance_ = newBalance;
+  if (initTrxWallState.balance_ < zeroBalance_) {
+    cslog() << __func__ << ": reject new_state transaction because initier not enough balance";
+    rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
+    return false;
+  }
+  walletsState_.setModified(initTrxId);
+  return true;
+}
+
 bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, const Transactions& trxs,
                                                         size_t trxInd) {
   const auto& trx = trxs[trxInd];
@@ -60,53 +105,16 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
 
   if (SmartContracts::is_new_state(trx)) {
     csdebug() << __func__ << ": smart new_state transaction[" << trxInd << "] included in consensus";
-    if (context.smart_contracts().is_closed_smart_contract(trx.target())) {
-      cslog() << __func__ << ": reject smart new_state transaction because related contract is closed";
-      rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
+    if (!validateNewStateAsSource(context, trx)) {
       return false;
     }
-    csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(trx, context.blockchain());
-    if (!initTransaction.is_valid()) {
-      cslog() << __func__ << ": reject new_state transaction because related start transaction is not found";
-      rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
-      return false;    
-    }
-    csdb::UserField feeField = trx.user_field(trx_uf::new_state::Fee);
-    if (!feeField.is_valid()) {
-      cslog() << __func__ << ": reject new_state transaction because execution fee is not set properly";
-      rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
-      return false;
-    }
-    csdb::Amount feeForExecution(feeField.value<csdb::Amount>());
-    if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()))
-       < csdb::Amount(trx.counted_fee().to_double()) + feeForExecution) {
-      cslog() << __func__ << ": reject new_state transaction because execution fee is not enough";
-      rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
-      return false;
-    }
-    WalletsState::WalletId initTrxId{};
-    WalletsState::WalletData& initTrxWallState = walletsState_.getData(initTransaction.source(), initTrxId);
-    newBalance = initTrxWallState.balance_
-               + csdb::Amount(initTransaction.max_fee().to_double())
-               - csdb::Amount(initTransaction.counted_fee().to_double())
-               - trx.amount()
-               - feeForExecution
-               - csdb::Amount(trx.counted_fee().to_double());
-
-    initTrxWallState.balance_ = newBalance;
-    if (initTrxWallState.balance_ < zeroBalance_) {
-      cslog() << __func__ << ": reject new_state transaction because initier not enough balance";
-      rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
-      return false;
-    }
-    walletsState_.setModified(initTrxId);
   } else {
     if (trx.source() == trx.target()) {
       cslog() << __func__ << ": transaction[" << trxInd << "] rejected, source equals to target";
       return false;
     }
     if (csdb::Amount(trx.max_fee().to_double()) < csdb::Amount(trx.counted_fee().to_double())) {
-      cslog() << __func__ << ": transaction[" << trxInd << "] rejected, fee is not enough";
+      cslog() << __func__ << ": transaction[" << trxInd << "] max fee is less than counted fee";
       return false;
     }
     if (SmartContracts::is_executable(trx)) {
