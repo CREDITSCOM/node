@@ -117,7 +117,8 @@ void WalletsCache::ProcessorBase::smartSourceTransactionReleased(const csdb::Tra
   setModified(initId);
 }
 
-void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::Transaction& transaction) {
+void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::Transaction& transaction,
+                                                                   const csdb::Amount& execFee) {
   csdb::Address wallAddress = transaction.source();
   if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
     return;
@@ -141,6 +142,7 @@ void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::T
       if (it->source() == transaction.source() &&
           it->innerID() == transaction.innerID()) {
         data_.smartPayableTransactions_.erase(it);
+        wallData.balance_ -= execFee;
         break;
       }
     }
@@ -367,7 +369,8 @@ void WalletsCache::ProcessorBase::checkClosedSmart(const csdb::Transaction& tran
 
 void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction) {
   if (newStateTransaction.user_field(trx_uf::new_state::Value).value<std::string>().empty()) {
-    return rollbackReplenishPayableContract(initTransaction);
+    return rollbackReplenishPayableContract(initTransaction,
+                                            csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>()));
   }
   bool waitingSmart = false;
   for (auto it = data_.smartPayableTransactions_.begin(); it != data_.smartPayableTransactions_.end(); it++) {

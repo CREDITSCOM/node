@@ -92,7 +92,8 @@ private:
     virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;
     virtual void setModified(WalletId id) = 0;
     void invokeReplenishPayableContract(const csdb::Transaction&);
-    void rollbackReplenishPayableContract(const csdb::Transaction&);
+    void rollbackReplenishPayableContract(const csdb::Transaction&,
+                                          const csdb::Amount& execFee = 0);
     void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx,
                                         const csdb::Transaction& initTrx);
     void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction);
