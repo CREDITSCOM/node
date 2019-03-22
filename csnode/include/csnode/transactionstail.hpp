@@ -36,6 +36,15 @@ public:
     }
   }
 
+  std::string printRange() {
+    if (heap_.empty()) {
+      return "any";
+    }
+    std::ostringstream os;
+    os << '[' << heap_.minMaxRange().first << ".." << heap_.minMaxRange().second << ']';
+    return os.str();
+  }
+
 private:
   using Heap = BitHeap<TransactionId, BitSize>;
   Heap heap_;

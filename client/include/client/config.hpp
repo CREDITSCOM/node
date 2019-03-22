@@ -13,7 +13,7 @@ namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
 typedef uint16_t NodeVersion;
-const NodeVersion NODE_VERSION = 402;
+const NodeVersion NODE_VERSION = 403;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
@@ -48,8 +48,8 @@ enum BootstrapType {
 struct PoolSyncData {
   bool oneReplyBlock = true;            // true: sendBlockRequest one pool at a time. false: equal to number of pools requested.
   bool isFastMode = false;               // true: is silent mode synchro(sync up to the current round). false: normal mode
-  uint8_t blockPoolsCount = 5;          // max block count in one request: cannot be 0
-  uint8_t requestRepeatRoundCount = 5;  // round count for repeat request : 0-never
+  uint8_t blockPoolsCount = 25;          // max block count in one request: cannot be 0
+  uint8_t requestRepeatRoundCount = 20;  // round count for repeat request : 0-never
   uint8_t neighbourPacketsCount = 10;   // packet count for connect another neighbor : 0-never
   uint16_t sequencesVerificationFrequency = 350; // sequences received verification frequency : 0-never; 1-once per round: other- in ms;
 };

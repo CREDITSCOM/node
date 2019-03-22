@@ -53,6 +53,7 @@ struct StageThree {
 
   uint8_t sender;
   uint8_t writer;
+  uint8_t iteration;
   std::vector<uint8_t> realTrustedMask;
   Signature blockSignature;
   Hash blockHash;
@@ -88,6 +89,7 @@ struct StageTwoSmarts {
 
 struct StageThreeSmarts {
   uint8_t sender;
+  uint8_t iteration;
   cs::Sequence sBlockNum;
   uint32_t startTransaction;
   uint8_t writer;

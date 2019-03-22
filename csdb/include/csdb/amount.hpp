@@ -268,7 +268,7 @@ inline constexpr Amount Amount::operator-() const noexcept {
 inline Amount& Amount::operator+=(const Amount& other) noexcept {
   integral_ += other.integral_;
   fraction_ += other.fraction_;
-  if (fraction_ > AMOUNT_MAX_FRACTION) {
+  if (fraction_ >= AMOUNT_MAX_FRACTION) {
     ++integral_;
     fraction_ -= AMOUNT_MAX_FRACTION;
   }
@@ -306,7 +306,7 @@ inline Amount& Amount::operator-=(double other) {
 }
 
 inline constexpr Amount Amount::operator+(const Amount& other) const noexcept {
-  return (AMOUNT_MAX_FRACTION <= (fraction_ + other.fraction_))
+  return (AMOUNT_MAX_FRACTION < (fraction_ + other.fraction_))
              ? Amount(integral_ + other.integral_ + 1, fraction_ + other.fraction_ - AMOUNT_MAX_FRACTION, nullptr)
              : Amount(integral_ + other.integral_, fraction_ + other.fraction_, nullptr);
 }

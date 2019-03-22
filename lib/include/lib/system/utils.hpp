@@ -16,6 +16,13 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <algorithm>
+
+#ifdef _MSC_VER
+#include <intrin.h>
+#else
+#include <x86intrin.h>
+#endif
 
 #include <time.h>
 
@@ -307,6 +314,46 @@ public:
     return cs::Utils::byteStreamToHex(reinterpret_cast<const char*>(stream), length);
   }
 
+  inline static uint64_t maskToBits(cs::Bytes mask) {
+    if (mask.size() > 64) {
+      cserror() << "The mask number is larger than the alloowed value";
+    }
+    uint64_t addition = 1;
+    uint64_t value = 0;
+    for (auto& it : mask) {
+      if (it != 255U) {
+        value += addition;
+      }
+      addition *= 2;
+    }
+    return value;
+  }
+
+  inline static std::vector<uint8_t> bitsToMask(uint8_t size, uint64_t value) {
+    std::vector<uint8_t> mask;
+    mask.reserve(static_cast<size_t>(size));
+    uint64_t valCopy = value;
+    for(uint8_t i = 0; i< size; ++i){
+      if (valCopy % 2 == 1U) {
+        mask.push_back(0U);
+      }
+      else {
+        mask.push_back(255U);
+      }
+      valCopy /= 2U;
+    }
+    return mask;
+  }
+
+  inline static uint8_t maskValue(uint64_t value) {
+#ifdef _MSC_VER
+    uint8_t cnt = static_cast<uint8_t>( __popcnt64(value) );
+#else
+    uint8_t cnt = __builtin_popcountl(value);
+#endif
+    return cnt;
+  }
+
   ///
   /// Convert container bytes to hex
   ///
@@ -398,6 +445,63 @@ public:
     (std::cout << ... << std::forward<Args>(args)) << std::endl;
   }
 };
+
+template<class _RanIt, class _RngFn>
+inline void shuffle(_RanIt _First, _RanIt _Last, _RngFn&& _RngFunc) {
+  // shuffle [_First, _Last) using random function _RngFunc
+  auto _UFirst = _First;
+  const auto _ULast = _Last;
+  if (_UFirst == _ULast) {
+    return;
+  }
+
+  typedef typename std::iterator_traits<_RanIt>::difference_type _Diff;
+  typedef typename std::make_unsigned<_Diff>::type _Udiff;
+
+  _Udiff _Bits = 8 * sizeof(_Udiff);
+  _Udiff _Bmask = _Udiff(-1);
+
+  auto _UTarget = _UFirst;
+  _Diff _Target_index = 1;
+  for (; ++_UTarget != _ULast; ++_Target_index) {
+    // randomly place an element from [_First, _Target] at _Target
+    _Diff _Off;// = _RngFunc(static_cast<_Diff>(_Target_index + 1));
+    _Diff _Index = _Target_index + 1;
+    for (;;) {
+      // try a sample random value
+      _Udiff _Ret = 0;    // random bits
+      _Udiff _Mask = 0;    // 2^N - 1, _Ret is within [0, _Mask]
+
+      while (_Mask < _Udiff(_Index - 1)) {
+        // need more random bits
+        _Ret <<= _Bits - 1;    // avoid full shift
+        _Ret <<= 1;
+        _Udiff _Get_bits;
+        // return a random value within [0, _Bmask]
+        for (;;) {
+          // repeat until random value is in range
+          _Udiff _Val = _RngFunc();
+
+          if (_Val <= _Bmask) {
+            _Get_bits = _Val;
+            break;
+          }
+        }
+        _Ret |= _Get_bits;
+        _Mask <<= _Bits - 1;    // avoid full shift
+        _Mask <<= 1;
+        _Mask |= _Bmask;
+      }
+      // _Ret is [0, _Mask], _Index - 1 <= _Mask, return if unbiased
+      if (_Ret / _Index < _Mask / _Index
+        || _Mask % _Index == _Udiff(_Index - 1)) {
+        _Off = static_cast<_Diff>(_Ret % _Index);
+        break;
+      }
+    }
+    std::iter_swap(_UTarget, _UFirst + _Off);
+  }
+}
 }  // namespace cs
 
 inline constexpr unsigned char operator"" _u8(unsigned long long arg) noexcept {

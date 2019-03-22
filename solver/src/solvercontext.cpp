@@ -80,6 +80,11 @@ size_t SolverContext::cnt_trusted() const {
   return cs::Conveyer::instance().confidantsCount();
 }
 
+size_t SolverContext::cnt_real_trusted() const {
+  const auto rtMask = stage3(own_conf_number())->realTrustedMask;
+  return rtMask.size() - std::count(rtMask.cbegin(),rtMask.cend(),cs::ConfidantConsts::InvalidConfidantIndex);
+}
+
 const std::vector<cs::PublicKey>& SolverContext::trusted() const {
   return cs::Conveyer::instance().confidants();
 }
@@ -88,8 +93,8 @@ void SolverContext::request_round_table() const {
   //        core.pnode->sendRoundTableRequest(core.cur_round);
 }
 
-bool SolverContext::addSignaturesToLastBlock(BlockSignatures&& blockSignatures) {
-  return core.addSignaturesToDeferredBlock(std::move(blockSignatures));
+bool SolverContext::addSignaturesToLastBlock(Signatures&& signatures) {
+  return core.addSignaturesToDeferredBlock(std::move(signatures));
 }
 
 Role SolverContext::role() const {
@@ -111,7 +116,7 @@ Role SolverContext::role() const {
 
 void SolverContext::spawn_next_round(cs::StageThree& st3) {
   if (st3.sender == InvalidConfidantIndex) {
-    cserror() << "Writer wans't elected on this node";
+    cserror() << "Writer wasn't elected on this node";
     return;
   }
 
@@ -146,7 +151,11 @@ void SolverContext::spawn_next_round(cs::StageThree& st3) {
 }
 
 void SolverContext::sendRoundTable() {
-  core.sendRoundTable();
+  //if(own_conf_number()==1) {
+  //  return;
+  //}
+    core.sendRoundTable();
+
 }
 
 csdb::Address SolverContext::optimize(const csdb::Address& address) const {
@@ -222,6 +231,11 @@ void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2)
 
   csdebug() << "SolverCore: ask [" << static_cast<int>(respondent2) << "] for RoundTable";
   core.pnode->sendRoundTableRequest(respondent2);
+}
+
+void SolverContext::send_rejected_smarts(std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list)
+{
+  core.pnode->sendSmartReject(ref_list);
 }
 
 }  // namespace slv2

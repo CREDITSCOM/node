@@ -2,12 +2,17 @@
 #include <intrin.h>
 #endif
 
+#include <vector>
+#include <map>
+
 #include <csdb/amount.hpp>
 #include <csdb/amount_commission.hpp>
 #include <client/params.hpp>
 #include <lib/system/logger.hpp>
 #include <csnode/transactionsvalidator.hpp>
 #include <smartcontracts.hpp>
+#include <solvercontext.hpp>
+#include <walletscache.hpp>
 
 namespace cs {
 TransactionsValidator::TransactionsValidator(WalletsState& walletsState, const Config& config)
@@ -24,6 +29,8 @@ void TransactionsValidator::reset(size_t transactionsNum) {
   negativeNodes_.clear();
   cntRemovedTrxs_ = 0;
 }
+
+static const char * log_prefix = "Validator: ";
 
 bool TransactionsValidator::validateTransaction(const csdb::Transaction& trx, size_t trxInd, uint8_t& del1, bool newState) {
   if (!validateTransactionAsSource(trx, trxInd, del1, newState)) {
@@ -61,9 +68,13 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
 #ifndef SPAMMER
   if (newState && !wallStateIfNewState.trxTail_.isAllowed(trx.innerID())) {
     del1 = -bitcnt;
+    csdebug() << log_prefix << "new_state rejected, incorrect innerID " << trx.innerID()
+      << ", expected " << wallStateIfNewState.trxTail_.printRange();
     return false;
   }
   else if (!newState && !wallState.trxTail_.isAllowed(trx.innerID())) {
+    csdebug() << log_prefix << "transaction rejected, incorrect innerID " << trx.innerID()
+      << ", expected " << wallStateIfNewState.trxTail_.printRange();
     del1 = -bitcnt;
     return false;
   }
@@ -73,10 +84,14 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
   wallState.balance_ = newBalance;
 #else
 #ifndef SPAMMER
-  if (newState && !wallStateIfNewState.trxTail_.isAllowed(trx.innerID()))
+  if( newState && !wallStateIfNewState.trxTail_.isAllowed( trx.innerID() ) ) {
+    csdebug() << log_prefix << "new_state rejected, incorrect innerID";
     return false;
-  else if (!newState && !wallState.trxTail_.isAllowed(trx.innerID()))
+  }
+  else if( !newState && !wallState.trxTail_.isAllowed( trx.innerID() ) ) {
+    csdebug() << log_prefix << "transaction rejected, incorrect innerID";
     return false;
+  }
 #endif
   if (!newState && !SmartContracts::is_executable(trx)) {
     wallState.balance_ = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
@@ -103,6 +118,7 @@ bool TransactionsValidator::validateTransactionAsSource(const csdb::Transaction&
 
   if (wallState.balance_ < zeroBalance_) {
     negativeNodes_.push_back(&wallState);
+    return false;
   }
 
   return true;
@@ -117,6 +133,45 @@ bool TransactionsValidator::validateTransactionAsTarget(const csdb::Transaction&
 
   walletsState_.setModified(walletId);
   return true;
+}
+
+void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Transactions& trxs,
+                                                CharacteristicMask& maskIncluded) {
+  using rejectedSmart = std::pair<csdb::Transaction, size_t>;
+  auto& smarts = context.smart_contracts();
+  std::vector<csdb::Transaction> newStates;
+  std::vector<rejectedSmart> rejectedSmarts;
+  size_t maskSize = maskIncluded.size();
+  size_t i = 0;
+
+  for (const auto& t : trxs) {
+    if (i < maskSize && *(maskIncluded.cbegin() + i) == 0) {
+      if (smarts.is_known_smart_contract(t.source())) {
+        rejectedSmarts.push_back(std::make_pair(t, i));
+      }
+    }
+    if (i < maskSize && SmartContracts::is_new_state(t) &&
+        *(maskIncluded.cbegin() + i) != 0) {
+      newStates.push_back(t);
+    }
+    ++i;
+  } 
+
+  for (const auto& state : newStates) {
+    csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(state, context.blockchain());
+    auto it = std::find_if(rejectedSmarts.cbegin(), rejectedSmarts.cend(),
+      [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == smarts.absolute_address(initTransaction.target())); });
+    if (it != rejectedSmarts.end()) {
+      WalletsState::WalletId walletId{};
+      WalletsState::WalletData& wallState = walletsState_.getData(it->first.source(), walletId);
+      wallState.balance_ += initTransaction.amount();
+      wallState.balance_ += csdb::Amount(it->first.counted_fee().to_double());
+      if (wallState.balance_ >= zeroBalance_) {
+        maskIncluded[it->second] = 1;
+        rejectedSmarts.erase(it);
+      }
+    }
+  }
 }
 
 void TransactionsValidator::validateByGraph(CharacteristicMask& maskIncluded, const Transactions& trxs,

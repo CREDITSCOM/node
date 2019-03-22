@@ -346,10 +346,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
 
     result.trxn.__set_smartContract(sci);
   }
-  else if (is_smart_state(transaction)) {
-    result.trxn.type = api::TransactionType::TT_SmartState;
-    result.trxn.__set_smartInfo(api::SmartTransInfo{});
-
+  else if (is_smart_state(transaction)) {    
     api::SmartStateTransInfo sti;
     sti.success = !(transaction.user_field(cs::trx_uf::new_state::Value).value<std::string>().empty());
     sti.executionFee = convertAmount(transaction.user_field(cs::trx_uf::new_state::Value).value<csdb::Amount>());
@@ -359,14 +356,15 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     sti.startTransaction = convert_transaction_id(scr.getTransactionID());
 
     auto retVal = transaction.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
-    //if (!retVal.empty()) sti.__set_returnValue(deserialize<::general::Variant>(std::move(retVal)));
 
     auto varRetVal = deserialize<::general::Variant>(std::move(retVal));
     sti.__isset.returnValue = varRetVal.__isset.v_string;
-    if (sti.__isset.returnValue)
+    if (sti.__isset.returnValue){
+      result.trxn.type = api::TransactionType::TT_SmartState;
+      result.trxn.__set_smartInfo(api::SmartTransInfo{});
       sti.__set_returnValue(deserialize<::general::Variant>(std::move(retVal)));
-
-    result.trxn.smartInfo.__set_v_smartState(sti);
+      result.trxn.smartInfo.__set_v_smartState(sti);
+    }
   }
   else {
     result.trxn.type = api::TransactionType::TT_Normal;

@@ -90,6 +90,8 @@ struct PoolMetaInfo {
   cs::Sequence sequenceNumber;
   cs::Bytes realTrustedMask;
   std::vector <csdb::Pool::SmartSignature> smartSignatures;
+  cs::Bytes confirmationMask;
+  cs::Signatures confirmations;
 };
 
 struct HashVector {
@@ -127,7 +129,8 @@ struct ConveyerMeta {
 struct CharacteristicMeta {
   cs::Bytes bytes;
   cs::PublicKey sender;
-  cs::BlockSignatures signatures;
+  cs::Signatures signatures;
+  cs::Bytes realTrusted;
 };
 
 // meta storages

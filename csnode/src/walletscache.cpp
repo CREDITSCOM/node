@@ -141,7 +141,7 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
   }
 #endif
 
-  for (auto itTrx = transactions.crbegin(); itTrx != transactions.crend(); ++itTrx) {
+  for (auto itTrx = transactions.cbegin(); itTrx != transactions.cend(); ++itTrx) {
     totalAmountOfCountedFee += load(*itTrx, blockchain);
     if (SmartContracts::is_new_state(*itTrx)) {
       fundConfidantsWalletsWithExecFee(*itTrx, blockchain);
@@ -152,7 +152,7 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
 #endif
 
   if (totalAmountOfCountedFee > 0) {
-    fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants, pool.realTrusted());
+    fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants, cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()));
   }
 
   [[maybe_unused]] auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
@@ -220,7 +220,7 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithExecFee(const csdb::T
     return;
   }
   const ConfidantsKeys& confidants = pool.confidants();
-  const std::vector<uint8_t>& realTrusted = pool.realTrusted();
+  const std::vector<uint8_t> realTrusted = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
   int32_t realTrustedNumber = 0; // int32_t due to csdb::Amount operator/
   for (const auto& trustedMarker : realTrusted) {
     if (trustedMarker != kUntrustedMarker) {
@@ -288,6 +288,19 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
     } else {
       checkSmartWaitingForMoney(initTransaction, tr);
     }
+    //
+    WalletId id_s{};
+    if (!findWalletId(tr.source(), id_s)) {
+      cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
+      return 0;
+    }
+    WalletData& wallData_s = getWalletData(id_s, tr.source());
+#ifdef MONITOR_NODE
+    ++wallData_s.transNum_;
+    setWalletTime(wallData_s.address_, tr.get_time());
+    wallData_s.lastTransaction_ = tr.id();
+#endif
+    //
   } else {
     wallData.balance_ -= csdb::Amount(tr.counted_fee().to_double());
   }
@@ -420,7 +433,7 @@ void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) 
 
 #ifdef MONITOR_NODE
   if (tr.source() != tr.target())  // Already counted in loadTrxForSource
-  ++wallData.transNum_;
+    ++wallData.transNum_;
 
   setWalletTime(wallData.address_, tr.get_time());
 #endif
