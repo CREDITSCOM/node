@@ -253,11 +253,14 @@ void cs::PoolSynchronizer::onTimeOut() {
 
 void cs::PoolSynchronizer::onRoundSimulation() {
   csmeta(csdetails) << "on round simulation";
-  bool isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
 
-  if (isAvailable) {
-    sendBlockRequest();
-  }
+  CallsQueue::instance().insert([this] {
+    bool isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
+
+    if (isAvailable) {
+      sendBlockRequest();
+    }
+  });
 }
 
 void cs::PoolSynchronizer::onWriteBlock(const csdb::Pool pool) {
