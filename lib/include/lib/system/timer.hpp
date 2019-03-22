@@ -15,6 +15,9 @@ using TimerCallbackSignature = void();
 using TimerCallback = std::function<TimerCallbackSignature>;
 using TimeOutSignal = cs::Signal<TimerCallbackSignature>;
 
+class Timer;
+using TimerPtr = std::shared_ptr<Timer>;
+
 ///
 /// Represents standard timer that calls callbacks every msec with time correction.
 ///
@@ -44,7 +47,7 @@ public:
   ///
   /// @brief Stops timer.
   /// @brief Timer would not stop immediatly if it's type is Standard, only after thread joined.
-  /// @brief If timer type is HigPrecise it stops immediatly.
+  /// @brief If timer type is HighPrecise it stops immediatly.
   ///
   void stop();
 
@@ -69,6 +72,9 @@ public:
   /// @param callback is any functor, lambda, closure, function object.
   ///
   static void singleShot(int msec, cs::RunPolicy policy, const TimerCallback& callback);
+
+  // creates and returns ptr on timer
+  static TimerPtr create();
 
 public signals:
 

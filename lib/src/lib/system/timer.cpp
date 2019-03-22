@@ -58,7 +58,11 @@ cs::Timer::Type cs::Timer::type() const {
 }
 
 void cs::Timer::singleShot(int msec, cs::RunPolicy policy, const cs::TimerCallback& callback) {
-  cs::Concurrent::runAfter(std::chrono::milliseconds(msec), policy, callback);
+    cs::Concurrent::runAfter(std::chrono::milliseconds(msec), policy, callback);
+}
+
+cs::TimerPtr cs::Timer::create() {
+  return std::make_shared<Timer>();
 }
 
 void cs::Timer::loop() {
