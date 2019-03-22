@@ -170,13 +170,23 @@ void SolverCore::gotStageTwoRequest(uint8_t requester, uint8_t required) {
   }
 }
 
-void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required) {
-  csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-3 of [" << static_cast<int>(required) << "]";
+uint8_t SolverCore::currentStage3iteration() {
+  return currentStage3iteration_;
+}
 
-  const auto ptr = find_stage3(required);
-  if (ptr != nullptr) {
-    pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::ThirdStage, requester);
+void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required, uint8_t iteration) {
+  csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-3 of [" 
+    << static_cast<int>(required) << "] - i" << static_cast<int>(iteration);
+
+  //const auto ptr = find_stage3(required);
+
+  for (auto& it : stageThreeStorage) {
+    if (it.iteration == iteration && it.sender == requester) {
+      pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester);  
+      return;
+    }
   }
+  csdebug() << "SolverCore: don't have the requested stage three";
 }
 
 void SolverCore::gotStageTwo(const cs::StageTwo& stage) {
@@ -297,7 +307,6 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
         }
       }
       trueStageThreeStorage.push_back(stage);
-
       pnode->addRoundSignature(stage);
       break;
 
