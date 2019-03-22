@@ -188,7 +188,7 @@ using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
 
 // to inform subscribed slots on deploy/execution/replenish completion or timeout
 // passes to every slot the "starter" transaction
-using SmartContractSignal = cs::Signal<void(csdb::Transaction)>;
+using SmartContractSignal = cs::Signal<void(const csdb::Transaction&)>;
 
 class SmartContracts final {
 public:
@@ -265,9 +265,14 @@ public:
   CallsQueueScheduler& scheduler;
 
 public signals:
+  // emits on contract execution
   SmartContractExecutedSignal signal_smart_executed;
+  // emits on invocation of payable()
   SmartContractSignal signal_payable_invoke;
+  // emits on invocation of payable() is failed after timeout
   SmartContractSignal signal_payable_timeout;
+  // emits on every contract emitted transaction is appeared in blockchain, args are (emitted_transaction, starter_transaction):
+  cs::Signal<void(const csdb::Transaction&, const csdb::Transaction&)> signal_emitted_accepted;
 
 public slots:
   // called when execute_async() completed

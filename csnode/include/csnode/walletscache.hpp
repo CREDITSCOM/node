@@ -138,6 +138,7 @@ public:
   public:
     using ProcessorBase::invokeReplenishPayableContract;
     using ProcessorBase::rollbackReplenishPayableContract;
+    using ProcessorBase::smartSourceTransactionReleased;
     Updater(WalletsCache& data);
     void loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
     const WalletData* findWallet(WalletId id) const;

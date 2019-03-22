@@ -52,6 +52,7 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
   // as event source:
   cs::Connector::connect(&signal_payable_invoke, &bc, &BlockChain::onPayableContractReplenish);
   cs::Connector::connect(&signal_payable_timeout, &bc, &BlockChain::onPayableContractTimeout);
+  cs::Connector::connect(&signal_emitted_accepted, &bc, &BlockChain::onContractEmittedAccepted);
 }
 
 SmartContracts::~SmartContracts() = default;
@@ -730,6 +731,21 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
         csdebug() << log_prefix << "contract balance is replenished by #" << block.sequence() << "." << tr_idx;
         emit signal_payable_invoke(tr);
         enqueue( block, tr_idx );
+      }
+      else {
+        // test is emitted by contract
+        const auto it = known_contracts.find(absolute_address(tr.source()));
+        if (it != known_contracts.cend()) {
+          // is emitted by contract
+          const auto& state = it->second;
+          csdb::Transaction starter = get_transaction(state.ref_execute);
+          if (state.payable == PayableStatus::Implemented && starter.is_valid()) {
+            emit signal_emitted_accepted(tr, starter);
+          }
+          else {
+            cserror() << log_prefix << "failed to find starter transaction for contract emitted one";
+          }
+        }
       }
       ++tr_idx;
     }
