@@ -174,14 +174,14 @@ uint8_t SolverCore::currentStage3iteration() {
   return currentStage3iteration_;
 }
 
-void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required, uint8_t iteration) {
+void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required/*, uint8_t iteration*/) {
   csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-3 of [" 
-    << static_cast<int>(required) << "] - i" << static_cast<int>(iteration);
+    << static_cast<int>(required) << "]";// - i" << static_cast<int>(iteration);
 
   //const auto ptr = find_stage3(required);
 
   for (auto& it : stageThreeStorage) {
-    if (it.iteration == iteration && it.sender == requester) {
+    if (it.iteration == currentStage3iteration_ && it.sender == requester) {
       pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester);  
       return;
     }

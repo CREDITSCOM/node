@@ -1560,7 +1560,7 @@ void Node::adjustStageThreeStorage() {
   stageThreeMessage_.clear();
 }
 
-void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, uint8_t iteration) {
+void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required /*, uint8_t iteration*/) {
   if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
     cswarning() << "NODE> Only confidant nodes can request consensus stages";
     return;
@@ -1572,7 +1572,7 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, 
     return;
   }
 
-  sendDefault(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber() , subRound_,  myConfidantIndex_, required, iteration);
+  sendDefault(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber() , subRound_,  myConfidantIndex_, required/*, iteration*/);
   csmeta(csdetails) << "done";
 }
 
@@ -1598,8 +1598,8 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
 
   uint8_t requiredNumber = 0;
   istream_ >> requiredNumber;
-  uint8_t iteration;
-  istream_ >> iteration;
+  //uint8_t iteration;
+  //istream_ >> iteration;
 
   if (!istream_.good() || !istream_.end()) {
     cserror() << "Bad StageThree packet format";
@@ -1617,9 +1617,9 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
     return;
   }
 
-  if (iteration > conveyer.confidantsCount() / 2U) {
-    return;
-  }
+  //if (iteration > conveyer.confidantsCount() / 2U) {
+  //  return;
+  //}
 
   switch (msgType) {
   case MsgTypes::FirstStageRequest:
@@ -1629,7 +1629,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
     solver_->gotStageTwoRequest(requesterNumber, requiredNumber);
     break;
   case MsgTypes::ThirdStageRequest:
-    solver_->gotStageThreeRequest(requesterNumber, requiredNumber, iteration);
+    solver_->gotStageThreeRequest(requesterNumber, requiredNumber/*, iteration*/);
     break;
   default:
     break;
