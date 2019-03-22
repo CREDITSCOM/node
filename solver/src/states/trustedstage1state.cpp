@@ -239,7 +239,6 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
           }
         }
       }
-      isValid = check_transaction_signature(context, transaction);
     }
     characteristicMask.push_back(isValid ? static_cast<cs::Byte>(1) : static_cast<cs::Byte>(0));
   }
@@ -247,8 +246,26 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
   csdb::Pool excluded;
   ptransval->checkRejectedSmarts(context, packet.transactions(), characteristicMask);
   ptransval->validateByGraph(characteristicMask, packet.transactions(), excluded);
+  checkTransactionsSignatures(context, transactions, characteristicMask, excluded);
   if (excluded.transactions_count() > 0) {
-    cslog() << name() << ": " << excluded.transactions_count() << " transactions are rejected in validateByGraph()";
+    cslog() << name() << ": " << excluded.transactions_count() << " transactions were rejected.";
+  }
+}
+
+void TrustedStage1State::checkTransactionsSignatures(SolverContext& context,
+                                                     const std::vector<csdb::Transaction>& transactions,
+                                                     cs::Bytes& characteristicMask,
+                                                     csdb::Pool& excluded) {
+  size_t transactionsCount = transactions.size();
+  size_t maskSize = characteristicMask.size();
+  for (size_t i = 0; i < transactionsCount; ++i) {
+    if (i < maskSize && characteristicMask[i] == 1) {
+      bool correctSignature = checkTransactionSignature(context, transactions[i]);    
+      if (!correctSignature) {
+        characteristicMask[i] = 0;      
+        excluded.add_transaction(transactions[i]);
+      }
+    }
   }
 }
 
@@ -268,7 +285,7 @@ cs::Hash TrustedStage1State::formHashFromCharacteristic(const cs::Characteristic
   return hash;
 }
 
-bool TrustedStage1State::check_transaction_signature(SolverContext& context, const csdb::Transaction& transaction) {
+bool TrustedStage1State::checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction) {
   BlockChain::WalletData data_to_fetch_pulic_key;
   csdb::Address src = transaction.source();
   // TODO: is_known_smart_contract() does not recognize not yet deployed contract, so all transactions emitted in constructor

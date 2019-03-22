@@ -57,7 +57,11 @@ protected:
   std::unique_ptr<cs::TransactionsValidator> ptransval;
   std::set<csdb::Address> smartSourceInvalidSignatures_;
 
-  bool check_transaction_signature(SolverContext& context, const csdb::Transaction& transaction);
+  bool checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction);
+  void checkTransactionsSignatures(SolverContext& context,
+                                   const std::vector<csdb::Transaction>& transactions,
+                                   cs::Bytes& characteristicMask,
+                                   csdb::Pool& excluded);
   cs::Hash build_vector(SolverContext& context, const cs::TransactionsPacket& trans_pack);
   cs::Hash formHashFromCharacteristic(const cs::Characteristic& characteristic);
   void validateTransactions(SolverContext&, cs::Bytes& characteristicMask, const cs::TransactionsPacket&);
