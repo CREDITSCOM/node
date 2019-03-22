@@ -6,7 +6,7 @@
 namespace cs {
 class TransactionsTail {
 public:
-  static constexpr size_t BitSize = 32;
+  static constexpr size_t BitSize = 1024;
   using TransactionId = int64_t;
 
 public:
