@@ -123,15 +123,16 @@ void CallsQueueScheduler::Stop() {
 }
 
 CallsQueueScheduler::CallTag CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcType& proc,
-                                                         Launch scheme, bool replace_existing /*= false*/) {
+                                                         Launch scheme, bool replace_existing /*= false*/,
+                                                         CallTag tag /*= auto_tag*/ ) {
   if (!_worker.joinable()) {
     Run();
   }
   // TODO: find better way to identify procs (especially, in case of "in-place" lambdas when those may have the same
   // address)
-  const CallTag id = (CallTag) &proc;
+  // CallTag id = (CallTag) &proc;
   // current solution requires enable RTTI = Yes (/GR) to compile:
-  //const CallTag id = proc.target_type().hash_code();
+  CallTag id = (tag == auto_tag ? proc.target_type().hash_code() : tag);
   {
     std::lock_guard<std::mutex> l(_mtx_queue);
     auto it = std::find(_queue.cbegin(), _queue.cend(), id);
@@ -144,6 +145,7 @@ CallsQueueScheduler::CallTag CallsQueueScheduler::Insert(ClockType::duration wai
       else {
         // remove from queue, below we will add a new schedule
         _queue.erase(it);
+        csdebug() << "Erasing existing calls: " << it->id ;
       }
     }
     // add new item

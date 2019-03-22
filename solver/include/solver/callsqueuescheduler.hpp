@@ -27,6 +27,7 @@ public:
   using CallTag = uintptr_t;
 
   constexpr static CallTag no_tag = 0;
+  constexpr static CallTag auto_tag = no_tag;
 
   /**
    * @fn  CallsQueueScheduler::CallsQueueScheduler()
@@ -68,74 +69,73 @@ public:
   void Stop();
 
   /**
-   * @fn  CallTag CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme, bool
-   * replace_existing = false);
+   * @fn  CallTag CallsQueueScheduler::Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme, bool replace_existing = false, CallTag tag = auto_tag);
    *
-   * @brief   Inserts new call into queue according to wait_for parameter. Do check before insert
-   *          to avoid queuing of duplicated calls
+   * @brief Inserts new call into queue according to wait_for parameter. Do check before insert to
+   *        avoid queuing of duplicated calls
    *
    * @author  aae
-   * @date    17.09.2018
+   * @date  17.09.2018
    *
-   * @param   wait_for            Time to wait before do call a procedure.
-   * @param   proc                The procedure to be scheduled for call.
-   * @param   scheme              The scheme: once - do one call, periodic - repeat calls every
-   *                              wait_for period.
-   * @param   replace_existing    (Optional) True to replace existing scheduled calls if any, otherwise reject new
-   * schedule.
+   * @param wait_for          Time to wait before do call a procedure.
+   * @param proc              The procedure to be scheduled for call.
+   * @param scheme            The scheme: once - do one call, periodic - repeat calls every wait_for
+   *                          period.
+   * @param replace_existing  (Optional) True to replace existing scheduled calls if any, otherwise
+   *                          reject new schedule.
+   * @param tag               (Optional) The tag desired, must be unique through all the queue. When not specified is assigned automatically
    *
    * @return  A tag that can be used in future to remove scheduled call from queue if any, or
-   *          CallsQueueScheduler::no_tag if schedule failed. If schedule rejected due to existing one returns tag of
-   * existing schedule.
+   *          CallsQueueScheduler::no_tag if schedule failed. If schedule rejected due to existing one
+   *          returns tag of existing schedule.
    */
 
-  CallTag Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme, bool replace_existing = false);
+  CallTag Insert(ClockType::duration wait_for, const ProcType& proc, Launch scheme, bool replace_existing = false, CallTag tag = auto_tag);
 
   /**
-   * @fn  CallTag CallsQueueScheduler::InsertOnce(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing =
-   * false)
+   * @fn  CallTag CallsQueueScheduler::InsertOnce(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing = false, CallTag tag = auto_tag)
    *
-   * @brief   Schedule proc to be called once
+   * @brief Schedule proc to be called once
    *
    * @author  aae
-   * @date    18.09.2018
+   * @date  18.09.2018
    *
-   * @param   wait_for_ms         The wait for in milliseconds.
-   * @param   proc                The procedure to call.
-   * @param   replace_existing    (Optional) True to replace existing scheduled calls if any, otherwise reject new
-   * schedule.
+   * @param wait_for_ms       The wait for in milliseconds.
+   * @param proc              The procedure to call.
+   * @param replace_existing  (Optional) True to replace existing scheduled calls if any, otherwise
+   *                          reject new schedule.
+   * @param tag               (Optional) The tag desired, must be unique through all the queue. When not specified is assigned automatically
    *
    * @return  An id that can be used in future to remove scheduled call from queue if any, or
-   *          CallsQueueScheduler::no_tag if schedule failed. If schedule rejected due to existing one returns tag of
-   * existing schedule.
+   *          CallsQueueScheduler::no_tag if schedule failed. If schedule rejected due to existing one
+   *          returns tag of existing schedule.
    */
 
-  CallTag InsertOnce(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing = false) {
-    return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::once, replace_existing);
+  CallTag InsertOnce(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing = false, CallTag tag = auto_tag) {
+    return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::once, replace_existing, tag);
   }
 
   /**
-   * @fn  CallTag CallsQueueScheduler::InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing
-   * = false)
+   * @fn  CallTag CallsQueueScheduler::InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing = false, CallTag tag = auto_tag)
    *
-   * @brief   Schedule periodic call of proc
+   * @brief Schedule periodic call of proc
    *
    * @author  aae
-   * @date    18.09.2018
+   * @date  18.09.2018
    *
-   * @param   wait_for_ms         The wait for the first call in milliseconds and period between
-   *                              calls.
-   * @param   proc                The procedure o call.
-   * @param   replace_existing    (Optional) True to replace existing scheduled calls if any, otherwise reject new
-   * schedule.
+   * @param wait_for_ms       The wait for the first call in milliseconds and period between calls.
+   * @param proc              The procedure o call.
+   * @param replace_existing  (Optional) True to replace existing scheduled calls if any, otherwise
+   *                          reject new schedule.
+   * @param tag               (Optional) The tag desired, must be unique through all the queue. When not specified is assigned automatically
    *
    * @return  An id that can be used in future to remove scheduled call from queue if any, or
-   *          CallsQueueScheduler::no_tag if schedule failed. If schedule rejected due to existing one returns tag of
-   * existing schedule.
+   *          CallsQueueScheduler::no_tag if schedule failed. If schedule rejected due to existing one
+   *          returns tag of existing schedule.
    */
 
-  CallTag InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing = false) {
-    return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::periodic, replace_existing);
+  CallTag InsertPeriodic(uint32_t wait_for_ms, const ProcType& proc, bool replace_existing = false, CallTag tag = auto_tag) {
+    return Insert(std::chrono::milliseconds(wait_for_ms), proc, Launch::periodic, replace_existing, tag);
   }
 
   /**
