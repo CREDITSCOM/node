@@ -1557,7 +1557,12 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
 
 void Node::adjustStageThreeStorage() {
   stageThreeSent = false;
+  std::vector<cs::Bytes> tmpStorage;
+  for( auto& it : stageThreeMessage_ ) {
+    tmpStorage.push_back( it );
+  }
   stageThreeMessage_.clear();
+  stageThreeMessage_ = tmpStorage;
 }
 
 void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required /*, uint8_t iteration*/) {
