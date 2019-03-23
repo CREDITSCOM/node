@@ -38,7 +38,7 @@ public:
   constexpr static uint8_t GeneralNotSelected = 100;
 
   /** @brief   Min duration (msec) to collect hashes in stage-1 of consensus */
-  constexpr static uint32_t T_min_stage1 = 220;
+  constexpr static uint32_t T_min_stage1 = 170;
 
   /** @brief   Max duration (msec) of the whole round (SolverCore on the 1st round) */
   constexpr static uint32_t T_round = 2000;
