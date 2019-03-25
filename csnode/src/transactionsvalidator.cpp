@@ -229,9 +229,22 @@ void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Tr
       WalletsState::WalletData& wallState = walletsState_.getData(it->first.source(), walletId);
       wallState.balance_ += initTransaction.amount();
       if (wallState.balance_ >= zeroBalance_) {
-        maskIncluded[it->second] = 1;
-        rejectedSmarts.erase(it);
+        makeSmartsValid(context, rejectedSmarts, it->first.source(), maskIncluded);
       }
+    }
+  }
+}
+
+void TransactionsValidator::makeSmartsValid(SolverContext& context,
+                                            RejectedSmarts& smarts,
+                                            const csdb::Address& source,
+                                            CharacteristicMask& maskIncluded) {
+  size_t maskSize = maskIncluded.size();
+  auto& s = context.smart_contracts();
+  for (size_t i = 0; i < smarts.size(); ++i) {
+    if (s.absolute_address(smarts[i].first.source()) == s.absolute_address(source)
+        && smarts[i].second < maskSize) {
+      maskIncluded[smarts[i].second] = 1;
     }
   }
 }
