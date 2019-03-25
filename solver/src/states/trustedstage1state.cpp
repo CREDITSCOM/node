@@ -275,6 +275,7 @@ void TrustedStage1State::checkTransactionsSignatures(SolverContext& context,
       if (!correctSignature) {
         characteristicMask[i] = 0;      
         excluded.add_transaction(transactions[i]);
+        cslog() << "Validator: transaction[" << i << "] rejected, incorrect signature.";
       }
     }
   }
