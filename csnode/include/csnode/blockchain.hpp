@@ -180,6 +180,8 @@ public:
 
   void addNewWalletsToPool(csdb::Pool& pool);
 
+  bool canBeTrusted();
+
 private:
 
   void writeGenesisBlock();
