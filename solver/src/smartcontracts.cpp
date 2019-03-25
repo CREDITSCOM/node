@@ -1078,6 +1078,7 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
             t.set_target(addr);
             t.add_user_field(trx_uf::new_state::Value, state);
             t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
+            t.add_user_field(trx_uf::new_state::RetVal, serialize(::general::Variant{}));
             packet.addTransaction(t);
           }
         }
