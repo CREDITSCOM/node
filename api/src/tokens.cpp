@@ -276,8 +276,8 @@ void TokensMaster::refreshTokenState(const csdb::Address& token,
 
   executor::SmartContractBinary smartContractBinary;
   smartContractBinary.contractAddress = addr;
-  smartContractBinary.byteCodeObjects = byteCodeObjects;
-  smartContractBinary.contractState = newState;
+  smartContractBinary.object.byteCodeObjects = byteCodeObjects;
+  smartContractBinary.object.instance = newState;
   smartContractBinary.stateCanModify = 0;
 
   api_->getExecutor().executeByteCodeMultiple(result, dpAddr, smartContractBinary, "balanceOf", holderKeysParams, 100);
