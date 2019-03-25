@@ -44,6 +44,9 @@ void SolverContext::add_stage1(cs::StageOne& stage, bool send) {
   if (send) {
     core.pnode->sendStageOne(stage);
   }
+  csdebug() << "Context> Stage1 message: " << cs::Utils::byteStreamToHex(stage.message);
+  csdebug() << "Context> Stage1 signature: " << cs::Utils::byteStreamToHex(stage.signature);
+
   /*the order is important! the signature is created in node
   before sending stage and then is inserted in the field .sig
   now we can add it to stages storage*/

@@ -140,7 +140,6 @@ void SolverCore::gotStageOne(const cs::StageOne& stage) {
     // duplicated
     return;
   }
-
   stageOneStorage.push_back(stage);
   csdebug() << "SolverCore: <-- stage-1 [" << static_cast<int>(stage.sender) << "] = " << stageOneStorage.size();
 
@@ -157,7 +156,7 @@ void SolverCore::gotStageOneRequest(uint8_t requester, uint8_t required) {
 
   const auto ptr = find_stage1(required);
   if (ptr != nullptr) {
-    pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::FirstStage, requester);
+    pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::FirstStage, requester, ptr->message);
   }
 }
 
@@ -166,7 +165,7 @@ void SolverCore::gotStageTwoRequest(uint8_t requester, uint8_t required) {
 
   const auto ptr = find_stage2(required);
   if (ptr != nullptr) {
-    pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::SecondStage, requester);
+    pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::SecondStage, requester, ptr->message);
   }
 }
 
@@ -182,7 +181,7 @@ void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required/*, uin
 
   for (auto& it : stageThreeStorage) {
     if (it.iteration == currentStage3iteration_ && it.sender == requester) {
-      pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester);  
+      pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester, it.message);  
       return;
     }
   }
@@ -228,13 +227,9 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
     //stage with old iteration
     return;
   }
-  auto ptr = find_stage3(stage.sender);
-  //potential THREAT!!!
+  auto ptr = find_stage3(stage.sender, stage.iteration);
   if (ptr != nullptr) {
-    if(ptr->iteration == currentStage3iteration_) {
-      // duplicated
-      return;
-    }
+    return;
   }
 
   auto lamda = [this] (const cs::StageThree& stageFrom, const cs::StageThree& stageTo) {
@@ -248,33 +243,28 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
     if (!cscrypto::verifySignature(stageFrom.blockSignature, conveyer.confidantByIndex(stageFrom.sender),
                                    stageTo.blockHash.data(), stageTo.blockHash.size())) {
       cswarning() << "Block Signatures are not valid ! -> ";
-      printStage3(stageFrom);
       somethingInvalid = true;
     }
 
     if (!cscrypto::verifySignature(stageFrom.roundSignature, conveyer.confidantByIndex(stageFrom.sender),
                                    stageTo.roundHash.data(), stageTo.roundHash.size())) {
       cswarning() << "Round Signatures are not valid !";
-      printStage3(stageFrom);
       somethingInvalid = true;
     }
 
     if (!cscrypto::verifySignature(stageFrom.trustedSignature, conveyer.confidantByIndex(stageFrom.sender),
                                     stageTo.trustedHash.data(), stageTo.trustedHash.size())) {
       cswarning() << "Trusted Signatures are not valid !";
-      printStage3(stageFrom);
       somethingInvalid = true;
     }
 
     if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask) || stageTo.realTrustedMask[stageFrom.sender] == cs::ConfidantConsts::InvalidConfidantIndex) {
       cswarning() << "Real Trusted are not valid !";
-      printStage3(stageFrom);
       somethingInvalid = true;
     }
 
     if (!(stageFrom.writer == stageTo.writer)) {
       cswarning() << "Writer is not valid !";
-      printStage3(stageFrom);
       somethingInvalid = true;
     }
 
@@ -282,6 +272,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
 
     if (somethingInvalid) {
       if (stageTo.realTrustedMask[stageFrom.sender] != cs::ConfidantConsts::InvalidConfidantIndex) {
+        printStage3(stageFrom);
         realTrustedSetValue(stageFrom.sender,cs::ConfidantConsts::InvalidConfidantIndex);
       }
       return;
