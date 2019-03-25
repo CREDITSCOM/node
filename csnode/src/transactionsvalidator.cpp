@@ -43,26 +43,26 @@ bool TransactionsValidator::validateTransaction(SolverContext& context, const Tr
 bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, const csdb::Transaction& trx) {
   auto& smarts = context.smart_contracts();
   if (smarts.is_closed_smart_contract(trx.target())) {
-    cslog() << __func__ << ": reject smart new_state transaction, related contract is closed";
+    cslog() << log_prefix << __func__ << ": reject smart new_state transaction, related contract is closed";
     rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
     return false;
   }
   csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(trx, context.blockchain());
   if (!initTransaction.is_valid()) {
-    cslog() << __func__ << ": reject new_state transaction, starter transaction is not found";
+    cslog() << log_prefix << __func__ << ": reject new_state transaction, starter transaction is not found";
     rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
     return false;    
   }
   csdb::UserField feeField = trx.user_field(trx_uf::new_state::Fee);
   if (!feeField.is_valid()) {
-    cslog() << __func__ << ": reject new_state transaction, execution fee is not set properly";
+    cslog() << log_prefix << __func__ << ": reject new_state transaction, execution fee is not set properly";
     rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
     return false;
   }
   csdb::Amount feeForExecution(feeField.value<csdb::Amount>());
   if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()))
      < csdb::Amount(trx.counted_fee().to_double()) + feeForExecution) {
-    cslog() << __func__ << ": reject new_state transaction, execution fee is not enough";
+    cslog() << log_prefix << __func__ << ": reject new_state transaction, execution fee is not enough";
     rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
     return false;
   }
@@ -77,7 +77,7 @@ bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, con
 
   initTrxWallState.balance_ = newBalance;
   if (initTrxWallState.balance_ < zeroBalance_) {
-    cslog() << __func__ << ": reject new_state transaction, initier is out of funds";
+    cslog() << log_prefix << __func__ << ": reject new_state transaction, initier is out of funds";
     rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
     return false;
   }
@@ -92,11 +92,11 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
   csdb::Amount newBalance;
 
   if (trx.source() == trx.target()) {
-    cslog() << __func__ << ": reject transaction[" << trxInd << "], source equals to target";
+    cslog() << log_prefix << __func__ << ": reject transaction[" << trxInd << "], source equals to target";
     return false;
   }
   if (csdb::Amount(trx.max_fee().to_double()) < csdb::Amount(trx.counted_fee().to_double())) {
-    cslog() << __func__ << ": reject transaction[" << trxInd << "], max fee is less than counted fee";
+    cslog() << log_prefix << __func__ << ": reject transaction[" << trxInd << "], max fee is less than counted fee";
     return false;
   }
 
@@ -120,7 +120,7 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
               leftFromMaxFee = it->second - csdb::Amount(trx.counted_fee().to_double());
             }
             if (leftFromMaxFee < zeroBalance_) {
-              cslog() << __func__ << ": reject contract emitted transaction, out of fee in starter transaction";
+              cslog() << log_prefix << __func__ << ": reject contract emitted transaction, out of fee in starter transaction";
               return false;
             }
             ok = true;
@@ -129,7 +129,7 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
         }
       }
       if (!ok) {
-        cslog() << __func__ << ": reject contract emitted transaction, new_state not found in block";
+        cslog() << log_prefix << __func__ << ": reject contract emitted transaction, new_state not found in block";
         return false;
       }
       newBalance = wallState.balance_ - trx.amount();      
@@ -163,7 +163,8 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
 #endif
 
   if (SmartContracts::is_new_state(trx)) {
-    csdebug() << __func__ << ": smart new_state transaction[" << trxInd << "] included in consensus";
+    csdebug() << log_prefix << __func__ << ": smart new_state transaction["
+              << trxInd << "] included in consensus";
     if (!validateNewStateAsSource(context, trx)) {
       return false;
     }
