@@ -181,7 +181,8 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
 
   if (wallState.balance_ < zeroBalance_) {
     negativeNodes_.push_back(&wallState);
-    csdebug() << "result to potentially negative balance " << wallState.balance_.to_double();
+    csdebug() << log_prefix  << "transaction[" << trxInd
+              << "] results to potentially negative balance " << wallState.balance_.to_double();
     return false;
   }
 
@@ -251,6 +252,8 @@ void TransactionsValidator::makeSmartsValid(SolverContext& context,
     if (s.absolute_address(smarts[i].first.source()) == s.absolute_address(source)
         && smarts[i].second < maskSize) {
       maskIncluded[smarts[i].second] = kValidMarker;
+      csdebug() << log_prefix << "transation["
+                << smarts[i].second << "] balance was maden not negative.";
     }
   }
 }
