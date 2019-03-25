@@ -17,6 +17,7 @@ public:
   using Transactions = std::vector<csdb::Transaction>;
   using CharacteristicMask = cs::Bytes;
   using TransactionIndex = WalletsState::TransactionIndex;
+  using RejectedSmarts = std::vector<std::pair<csdb::Transaction, size_t>>;
 
 public:
   struct Config {
@@ -41,6 +42,8 @@ private:
   static constexpr csdb::Amount zeroBalance_ = 0.0_c;
 
 private:
+  void makeSmartsValid(SolverContext& context, RejectedSmarts& smarts,
+                       const csdb::Address& source, CharacteristicMask& maskIncluded);
   bool validateTransactionAsSource(SolverContext& context, const Transactions& trxs,
                                    size_t trxInd);
   bool validateNewStateAsSource(SolverContext& context, const csdb::Transaction& trx);
