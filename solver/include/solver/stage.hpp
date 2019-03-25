@@ -4,6 +4,7 @@
 #include <consensus.hpp>
 #include <csnode/nodecore.hpp>
 #include <cstdint>
+#include <lib/system/utils.hpp>
 
 namespace cs {
 
@@ -17,6 +18,7 @@ struct StageOne {
   std::vector<TransactionsPacketHash> hashesCandidates;
   Hash messageHash;
   Signature signature;
+  cs::Bytes message;
 };
 
 struct StageTwo {
@@ -24,6 +26,7 @@ struct StageTwo {
   cs::Hashes hashes;  // hashes of stage one
   cs::Signatures signatures;
   Signature signature;
+  cs::Bytes message;
 };
 
 //struct StageThree {
@@ -62,6 +65,7 @@ struct StageThree {
   Hash trustedHash;
   Signature trustedSignature;
   Signature signature;
+  cs::Bytes message;
 
 };
 
