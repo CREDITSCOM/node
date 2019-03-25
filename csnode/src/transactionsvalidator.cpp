@@ -176,6 +176,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
 
   if (wallState.balance_ < zeroBalance_) {
     negativeNodes_.push_back(&wallState);
+    csdebug() << "result to potentially negative balance " << wallState.balance_.to_double();
     return false;
   }
 
