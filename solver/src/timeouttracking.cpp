@@ -2,8 +2,10 @@
 
 namespace cs {
 
-void TimeoutTracking::start(CallsQueueScheduler& scheduler, uint32_t wait_for_ms,
-                            const CallsQueueScheduler::ProcType& proc, bool replace_existing) {
+  void TimeoutTracking::start(CallsQueueScheduler& scheduler, uint32_t wait_for_ms,
+    const CallsQueueScheduler::ProcType& proc,
+    bool replace_existing,
+    CallsQueueScheduler::CallTag tag) {
   pscheduler = &scheduler;
   call_tag = pscheduler->InsertOnce(wait_for_ms,
                                     [this, proc]() {
@@ -13,14 +15,15 @@ void TimeoutTracking::start(CallsQueueScheduler& scheduler, uint32_t wait_for_ms
                                         proc();
                                       }
                                     },
-                                    replace_existing);
+                                    replace_existing,
+                                    tag);
 }
 
 bool TimeoutTracking::cancel() {
   if (call_tag != CallsQueueScheduler::no_tag) {
-    bool ret = pscheduler->Remove(call_tag);
+    pscheduler->Remove(call_tag);
     call_tag = CallsQueueScheduler::no_tag;
-    return ret;
+    return true;
   }
   return false;
 }

@@ -1531,6 +1531,18 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     return;
   }
 
+  if (!conveyer.isConfidantExists(stage.writer)) {
+    return;
+  }
+
+  if (stage.iteration < solver_->currentStage3iteration() ) {
+    return;
+  } 
+  else if (stage.iteration > solver_->currentStage3iteration()) {
+    //store
+    return;
+  }
+
   if (!cscrypto::verifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
     cswarning() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
     return;
@@ -1543,7 +1555,17 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
   solver_->gotStageThree(std::move(stage), (stageThreeSent ? 2 : 0));
 }
 
-void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required) {
+void Node::adjustStageThreeStorage() {
+  stageThreeSent = false;
+  std::vector<cs::Bytes> tmpStorage;
+  for( auto& it : stageThreeMessage_ ) {
+    tmpStorage.push_back( it );
+  }
+  stageThreeMessage_.clear();
+  stageThreeMessage_ = tmpStorage;
+}
+
+void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required /*, uint8_t iteration*/) {
   if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
     cswarning() << "NODE> Only confidant nodes can request consensus stages";
     return;
@@ -1555,7 +1577,7 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required) 
     return;
   }
 
-  sendDefault(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber() , subRound_,  myConfidantIndex_, required);
+  sendDefault(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber() , subRound_,  myConfidantIndex_, required/*, iteration*/);
   csmeta(csdetails) << "done";
 }
 
@@ -1581,6 +1603,8 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
 
   uint8_t requiredNumber = 0;
   istream_ >> requiredNumber;
+  //uint8_t iteration;
+  //istream_ >> iteration;
 
   if (!istream_.good() || !istream_.end()) {
     cserror() << "Bad StageThree packet format";
@@ -1598,6 +1622,10 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
     return;
   }
 
+  //if (iteration > conveyer.confidantsCount() / 2U) {
+  //  return;
+  //}
+
   switch (msgType) {
   case MsgTypes::FirstStageRequest:
     solver_->gotStageOneRequest(requesterNumber, requiredNumber);
@@ -1606,7 +1634,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
     solver_->gotStageTwoRequest(requesterNumber, requiredNumber);
     break;
   case MsgTypes::ThirdStageRequest:
-    solver_->gotStageThreeRequest(requesterNumber, requiredNumber);
+    solver_->gotStageThreeRequest(requesterNumber, requiredNumber/*, iteration*/);
     break;
   default:
     break;
@@ -1661,7 +1689,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
 
 void Node::sendSmartReject(const std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list)
 {
-  uint32_t cnt = ref_list.size();
+  uint32_t cnt = (uint32_t) ref_list.size();
   if (cnt == 0) {
     csmeta(cserror) << "cannot send empty rejected contracts pack";
     return;
@@ -1680,6 +1708,9 @@ void Node::sendSmartReject(const std::vector< std::pair<cs::Sequence, uint32_t> 
 
 void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender)
 {
+  csunused(rNum);
+  csunused(sender);
+
   istream_.init(data, size);
 
   cs::Bytes raw_data;

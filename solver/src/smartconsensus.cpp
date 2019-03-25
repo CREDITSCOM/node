@@ -17,7 +17,7 @@ namespace {
 
 namespace cs{
 
-  SmartConsensus::SmartConsensus(){
+  SmartConsensus::SmartConsensus() {
     pnode_ = nullptr;
     psmarts_ = nullptr;
   }
@@ -292,7 +292,7 @@ namespace cs{
       }
       if (st.hash != hash_t) {
         ++(smartUntrusted.at(st.sender));
-        cslog() << "Confidant [" << static_cast<int>(st.sender) << "] is markt as untrusted (wrong hash)";
+        cslog() << log_prefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong hash)";
       }
       else {
         ++hashFrequency;
@@ -309,11 +309,11 @@ namespace cs{
         if (st.signatures[i] != myStage2.signatures[i]) {
           if (cscrypto::verifySignature(st.signatures[i], smartConfidants_[i], st.hashes[i].data(), sizeof(st.hashes[i]))) {
             ++(smartUntrusted.at(i));
-            cslog() << "Confidant [" << i << "] is marked as untrusted (wrong hash)";
+            cslog() << log_prefix << "Confidant [" << i << "] is marked as untrusted (wrong hash)";
           }
           else {
             ++(smartUntrusted.at(st.sender));
-            cslog() << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong signature)";
+            cslog() << log_prefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong signature)";
           }
         }
       }
@@ -620,14 +620,14 @@ namespace cs{
         timeout_force_transition.start(
           psmarts_->getScheduler(), Consensus::T_stage_request,
           [this, st]() {
-          csdebug() << __func__ << "(): timeout for transition is expired, mark silent nodes as outbound";
-          markSmartOutboundNodes(st);
+            csdebug() << __func__ << "(): timeout for transition is expired, mark silent nodes as outbound";
+            markSmartOutboundNodes(st);
+          },
+          true/*replace if exists*/, timer_tag());
         },
-          true/*replace if exists*/);
+        true /*replace if exists*/, timer_tag());
       },
-        true /*replace if exists*/);
-    },
-      true /*replace if exists*/);
+      true /*replace if exists*/, timer_tag());
   }
 
   void SmartConsensus::killTimer(int st) {

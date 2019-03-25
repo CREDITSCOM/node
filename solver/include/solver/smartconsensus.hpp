@@ -84,6 +84,14 @@ namespace cs {
       void init_zero(cs::StageOneSmarts & stage);
       void init_zero(cs::StageTwoSmarts & stage);
 
+      CallsQueueScheduler::CallTag timer_tag_{ CallsQueueScheduler::no_tag };
+      CallsQueueScheduler::CallTag timer_tag() {
+        if (timer_tag_ == CallsQueueScheduler::no_tag) {
+          timer_tag_ = (((smartRoundNumber_ & 0xFFFFFFFFFFFF) << 16) | (0xFFFF & smartTransaction_));
+        }
+        return timer_tag_;
+      }
+
       Node* pnode_;
       SmartContracts* psmarts_;
 

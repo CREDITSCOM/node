@@ -310,7 +310,7 @@ inline void Network::processTask(TaskPtr<IPacMan> &task) {
         transport_->registerMessage(msg);
       }
 
-      if (msg->isComplete()) {
+      if (msg && msg->isComplete()) {
         transport_->processNodeMessage(**msg);
       }
     }

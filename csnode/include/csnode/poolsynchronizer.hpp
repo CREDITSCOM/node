@@ -20,7 +20,7 @@ namespace cs {
 using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, std::size_t packet)>;
 
 class PoolSynchronizer {
-public:  // Interface
+public:
   explicit PoolSynchronizer(const PoolSyncData& data, Transport* transport, BlockChain* blockChain);
 
   void processingSync(cs::RoundNumber roundNum, bool isBigBand = false);
@@ -37,7 +37,7 @@ public:  // Interface
 
   bool isFastMode() const;
 
-public signals:  // Signals
+public signals:
 
   PoolSynchronizerRequestSignal sendRequest;
 
@@ -49,7 +49,7 @@ private slots:
   void onWriteBlock(const cs::Sequence sequence);
   void onRemoveBlock(const cs::Sequence sequence);
 
-private:  // Service
+private:
   enum class CounterType;
   enum class SequenceRemovalAccuracy;
   class NeighboursSetElemet;
@@ -79,7 +79,7 @@ private:  // Service
 
   void printNeighbours(const std::string& funcName) const;
 
-private:  // struct
+private:
   enum class CounterType {
     ROUND,
     TIMER
@@ -210,7 +210,7 @@ private:  // struct
     cs::RoundNumber roundCounter_;
   };
 
-private:  // Members
+private:
   inline static const cs::RoundNumber roundDifferentForSync_ = cs::values::defaultMetaStorageMaxSize;
 
   const PoolSyncData syncData_;

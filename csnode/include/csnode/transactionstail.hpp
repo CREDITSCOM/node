@@ -6,7 +6,7 @@
 namespace cs {
 class TransactionsTail {
 public:
-  static constexpr size_t BitSize = 32;
+  static constexpr size_t BitSize = 1024;
   using TransactionId = int64_t;
 
 public:
@@ -34,6 +34,15 @@ public:
       else
         return !heap_.contains(trxId);
     }
+  }
+
+  std::string printRange() {
+    if (heap_.empty()) {
+      return "any";
+    }
+    std::ostringstream os;
+    os << '[' << heap_.minMaxRange().first << ".." << heap_.minMaxRange().second << ']';
+    return os.str();
   }
 
 private:

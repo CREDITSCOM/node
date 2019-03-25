@@ -6,8 +6,9 @@ namespace cs {
 
 class TimeoutTracking {
 public:
+
   void start(CallsQueueScheduler& scheduler, uint32_t wait_for_ms, const CallsQueueScheduler::ProcType& proc,
-             bool replace_existing);
+             bool replace_existing, CallsQueueScheduler::CallTag tag = CallsQueueScheduler::auto_tag);
 
   bool cancel();
 

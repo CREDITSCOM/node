@@ -32,13 +32,13 @@ public:
   constexpr static csdb::Amount MinStakeValue = csdb::Amount{ 50000 };
 
   /** @brief   The round when DPOS starts working */
-  constexpr static uint64_t StartingDPOS = 10000U;
+  constexpr static uint64_t StartingDPOS = 10000ULL;
 
   /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
   constexpr static uint8_t GeneralNotSelected = 100;
 
   /** @brief   Min duration (msec) to collect hashes in stage-1 of consensus */
-  constexpr static uint32_t T_min_stage1 = 150;
+  constexpr static uint32_t T_min_stage1 = 170;
 
   /** @brief   Max duration (msec) of the whole round (SolverCore on the 1st round) */
   constexpr static uint32_t T_round = 2000;
