@@ -952,10 +952,6 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
   }
 }
 
-bool BlockChain::canBeTrusted() {
-  return true; // gag
-}
-
 bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
   if (!walletsCacheUpdater_) {
     cserror() << "!walletsCacheUpdater";

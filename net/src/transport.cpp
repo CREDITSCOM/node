@@ -296,13 +296,13 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       gotSSPingWhiteNode(task);
       break;
     case NetworkCommand::SSLastBlock:
-      gotSSLastBlock(task, node_->getBlockChain().getLastSequence(), node_->getBlockChain().getLastHash(), node_->getBlockChain().canBeTrusted());
+      gotSSLastBlock(task, node_->getBlockChain().getLastSequence(), node_->getBlockChain().getLastHash(), node_->canBeTrusted());
       break;
     case NetworkCommand::SSSpecificBlock: {
       try {
         cs::RoundNumber round = 0;
         iPackStream_ >> round;
-        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round), node_->getBlockChain().canBeTrusted());//TODO:
+        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round), node_->canBeTrusted());//TODO:
       }
       catch (std::out_of_range&) { }
       break;

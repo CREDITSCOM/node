@@ -50,6 +50,7 @@ public:
   void getKeySS(const cs::PublicKey& key);
   void getTransactionsPacket(const uint8_t* data, const std::size_t size);
   void getNodeStopRequest(const uint8_t* data, const std::size_t size);
+  bool canBeTrusted();
 
   // SOLVER3 methods
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);

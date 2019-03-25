@@ -340,6 +340,22 @@ void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
   });
 }
 
+bool Node::canBeTrusted() {
+  if (cs::Conveyer::instance().currentRoundNumber() < Consensus::StartingDPOS) {
+    csdebug() << "The DPOS doesn't work unless the roundNumber is less than " << Consensus::StartingDPOS;
+    return true;
+  }
+  BlockChain::WalletData wData;
+  BlockChain::WalletId wId;
+  if (!getBlockChain().findWalletData(csdb::Address::from_public_key(this->nodeIdKey_), wData, wId)) {
+    return false;
+  }
+  if (wData.balance_ < Consensus::MinStakeValue) {
+    return false;
+  }
+  return true;
+}
+
 void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
   //csdebug() << __func__ << ": start";
   istream_.init(data, size);
