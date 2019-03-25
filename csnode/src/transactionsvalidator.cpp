@@ -14,6 +14,11 @@
 #include <solvercontext.hpp>
 #include <walletscache.hpp>
 
+namespace {
+const uint8_t kInvalidMarker = 0;
+const uint8_t kValidMarker = 1;
+} // namespace
+
 namespace cs {
 TransactionsValidator::TransactionsValidator(WalletsState& walletsState, const Config& config)
 : config_(config)
@@ -208,13 +213,13 @@ void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Tr
   size_t i = 0;
 
   for (const auto& t : trxs) {
-    if (i < maskSize && *(maskIncluded.cbegin() + i) == 0) {
+    if (i < maskSize && *(maskIncluded.cbegin() + i) == kInvalidMarker) {
       if (smarts.is_known_smart_contract(t.source())) {
         rejectedSmarts.push_back(std::make_pair(t, i));
       }
     }
     if (i < maskSize && SmartContracts::is_new_state(t) &&
-        *(maskIncluded.cbegin() + i) != 0) {
+        *(maskIncluded.cbegin() + i) == kValidMarker) {
       newStates.push_back(t);
     }
     ++i;
@@ -244,7 +249,7 @@ void TransactionsValidator::makeSmartsValid(SolverContext& context,
   for (size_t i = 0; i < smarts.size(); ++i) {
     if (s.absolute_address(smarts[i].first.source()) == s.absolute_address(source)
         && smarts[i].second < maskSize) {
-      maskIncluded[smarts[i].second] = 1;
+      maskIncluded[smarts[i].second] = kValidMarker;
     }
   }
 }
