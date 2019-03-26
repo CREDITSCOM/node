@@ -14,6 +14,11 @@
 #include <solvercontext.hpp>
 #include <walletscache.hpp>
 
+namespace {
+const uint8_t kInvalidMarker = 0;
+const uint8_t kValidMarker = 1;
+} // namespace
+
 namespace cs {
 TransactionsValidator::TransactionsValidator(WalletsState& walletsState, const Config& config)
 : config_(config)
@@ -176,6 +181,8 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
 
   if (wallState.balance_ < zeroBalance_) {
     negativeNodes_.push_back(&wallState);
+    csdebug() << log_prefix  << "transaction[" << trxInd
+              << "] results to potentially negative balance " << wallState.balance_.to_double();
     return false;
   }
 
@@ -208,13 +215,17 @@ void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Tr
   size_t i = 0;
 
   for (const auto& t : trxs) {
-    if (i < maskSize && *(maskIncluded.cbegin() + i) == 0) {
+    if (i < maskSize && *(maskIncluded.cbegin() + i) == kInvalidMarker) {
       if (smarts.is_known_smart_contract(t.source())) {
-        rejectedSmarts.push_back(std::make_pair(t, i));
+        WalletsState::WalletId id{};
+        WalletsState::WalletData& wallState = walletsState_.getData(t.source(), id);
+        if (wallState.balance_ < zeroBalance_) {
+          rejectedSmarts.push_back(std::make_pair(t, i));
+        }
       }
     }
     if (i < maskSize && SmartContracts::is_new_state(t) &&
-        *(maskIncluded.cbegin() + i) != 0) {
+        *(maskIncluded.cbegin() + i) == kValidMarker) {
       newStates.push_back(t);
     }
     ++i;
@@ -229,9 +240,24 @@ void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Tr
       WalletsState::WalletData& wallState = walletsState_.getData(it->first.source(), walletId);
       wallState.balance_ += initTransaction.amount();
       if (wallState.balance_ >= zeroBalance_) {
-        maskIncluded[it->second] = 1;
-        rejectedSmarts.erase(it);
+        makeSmartsValid(context, rejectedSmarts, it->first.source(), maskIncluded);
       }
+    }
+  }
+}
+
+void TransactionsValidator::makeSmartsValid(SolverContext& context,
+                                            RejectedSmarts& smarts,
+                                            const csdb::Address& source,
+                                            CharacteristicMask& maskIncluded) {
+  size_t maskSize = maskIncluded.size();
+  auto& s = context.smart_contracts();
+  for (size_t i = 0; i < smarts.size(); ++i) {
+    if (s.absolute_address(smarts[i].first.source()) == s.absolute_address(source)
+        && smarts[i].second < maskSize) {
+      maskIncluded[smarts[i].second] = kValidMarker;
+      csdebug() << log_prefix << "transation["
+                << smarts[i].second << "] balance was maden not negative.";
     }
   }
 }

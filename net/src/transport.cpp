@@ -296,13 +296,13 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
       gotSSPingWhiteNode(task);
       break;
     case NetworkCommand::SSLastBlock:
-      gotSSLastBlock(task, node_->getBlockChain().getLastSequence(), node_->getBlockChain().getLastHash());
+      gotSSLastBlock(task, node_->getBlockChain().getLastSequence(), node_->getBlockChain().getLastHash(), node_->canBeTrusted());
       break;
     case NetworkCommand::SSSpecificBlock: {
       try {
         cs::RoundNumber round = 0;
         iPackStream_ >> round;
-        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round));//TODO:
+        gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round), node_->canBeTrusted());//TODO:
       }
       catch (std::out_of_range&) { }
       break;
@@ -878,7 +878,7 @@ bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
   return true;
 }
 
-bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBlock, const csdb::PoolHash& lastHash) {
+bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBlock, const csdb::PoolHash& lastHash, bool canBeTrusted) {
 #if !defined(MONITOR_NODE) && !defined(WEB_WALLET_NODE)
   csdebug() << "TRANSPORT> Got SS Last Block: " << lastBlock;
   csunused(task);
@@ -895,7 +895,7 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
   const auto hashBinary = lastHash.to_binary();
   std::copy(hashBinary.begin(), hashBinary.end(), lastHash_.begin());
 
-  oPackStream_ << lastBlock << myPublicKey_ << lastHash_;
+  oPackStream_ << lastBlock << canBeTrusted << myPublicKey_ << lastHash_;
 
   sendDirect(oPackStream_.getPackets(), conn);
 #endif

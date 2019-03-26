@@ -270,6 +270,15 @@ private:
   const cs::StageThree* find_stage3(uint8_t sender) const {
     return find_stage<>(stageThreeStorage, sender);
   }
+  const cs::StageThree* find_stage3(uint8_t sender, uint8_t iteration) const {
+    for (auto& it : stageThreeStorage) {
+      if (it.sender == sender && it.iteration == iteration) {
+        return &it;
+      }
+    }
+    return nullptr;
+  }
+
 
   template <typename StageT>
   StageT* find_stage(const std::vector<StageT>& vec, uint8_t sender) const {

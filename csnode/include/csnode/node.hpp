@@ -50,6 +50,7 @@ public:
   void getKeySS(const cs::PublicKey& key);
   void getTransactionsPacket(const uint8_t* data, const std::size_t size);
   void getNodeStopRequest(const uint8_t* data, const std::size_t size);
+  bool canBeTrusted();
 
   // SOLVER3 methods
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
@@ -67,7 +68,7 @@ public:
   void adjustStageThreeStorage();
   void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required/*, uint8_t iteration*/);
   void getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-  void sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester);
+  void sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester, cs::Bytes& message);
 
   //smart-contracts consensus communicatioin
   void sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::StageOneSmarts& stageOneInfo);
