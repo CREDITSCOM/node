@@ -256,8 +256,8 @@ void TransactionsValidator::makeSmartsValid(SolverContext& context,
     if (s.absolute_address(smarts[i].first.source()) == s.absolute_address(source)
         && smarts[i].second < maskSize) {
       maskIncluded[smarts[i].second] = kValidMarker;
-      csdebug() << log_prefix << "transation["
-                << smarts[i].second << "] balance was maden not negative.";
+      csdebug() << log_prefix << "balance of transation["
+                << smarts[i].second << "] source is replenished by other transaction";
     }
   }
 }

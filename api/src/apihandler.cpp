@@ -1910,14 +1910,14 @@ void apiexec::APIEXECHandler::GetSeed(apiexec::GetSeedResult &_return, const gen
 }
 
 void apiexec::APIEXECHandler::SendTransaction(apiexec::SendTransactionResult &_return, const general::AccessID accessId, const api::Transaction &transaction) {
-  const csdb::Address addr = BlockChain::getAddressFromKey(transaction.source);
-  BlockChain::WalletData wallData{};
-  BlockChain::WalletId wallId{};
-  if (!blockchain_.findWalletData(addr, wallData, wallId)) {
-    SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
-    return;
-  }
-  const_cast<api::Transaction&>(transaction).id = wallData.trxTail_.empty() ? 0 : wallData.trxTail_.getLastTransactionId() + 1;
+  //const csdb::Address addr = BlockChain::getAddressFromKey(transaction.source);
+  //BlockChain::WalletData wallData{};
+  //BlockChain::WalletId wallId{};
+  //if (!blockchain_.findWalletData(addr, wallData, wallId)) {
+  //  SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+  //  return;
+  //}
+  //const_cast<api::Transaction&>(transaction).id = wallData.trxTail_.empty() ? 0 : wallData.trxTail_.getLastTransactionId() + 1;
   executor_.addInnerSendTransaction(accessId, executor_.make_transaction(transaction));
 }
 

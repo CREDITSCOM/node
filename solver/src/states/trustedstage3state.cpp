@@ -11,6 +11,9 @@
 #include <algorithm>
 
 namespace cs {
+
+#define TIMER_BASE_ID 30
+
 void TrustedStage3State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
   if(!context.realTrustedChanged()) {
@@ -96,11 +99,11 @@ void TrustedStage3State::on(SolverContext& context) {
                   csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
                   mark_outbound_nodes(*pctx, rnum);
                 },
-                true/*replace if exists*/);
+                true/*replace if exists*/, TIMER_BASE_ID + 3);
             },
-            true /*replace if exists*/);
+            true /*replace if exists*/, TIMER_BASE_ID + 2);
       },
-      true /*replace if exists*/);
+      true /*replace if exists*/, TIMER_BASE_ID + 1);
 }
 
 void TrustedStage3State::off(SolverContext& /*context*/) {

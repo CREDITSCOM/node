@@ -237,7 +237,7 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
     const csdb::Transaction& transaction = transactions[i];
     bool isValid = ptransval->validateTransaction(context, transactions, i);
     if (!isValid) {
-      cslog() << name() << ": transaction[" << i << "] rejected by validator";
+      csdebug() << name() << ": transaction[" << i << "] rejected by validator";
     } else {
        // yrtimd: test with get_valid_smart_address() only for deploy transactions:
       if (SmartContracts::is_deploy(transaction)) {

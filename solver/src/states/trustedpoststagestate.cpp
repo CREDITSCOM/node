@@ -4,6 +4,9 @@
 #include <csnode/conveyer.hpp>
 
 namespace cs {
+
+#define TIMER_BASE_ID 40
+
 void TrustedPostStageState::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
 
@@ -58,11 +61,11 @@ void TrustedPostStageState::on(SolverContext& context) {
                   csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound and recalculate the signatures";
                   mark_outbound_nodes(*pctx);
                 },
-                true/*replace if exists*/);
+                true/*replace if exists*/, TIMER_BASE_ID + 3);
         },
-            true /*replace if exists*/);
+            true /*replace if exists*/, TIMER_BASE_ID + 2);
       },
-      true /*replace if exists*/);
+      true /*replace if exists*/, TIMER_BASE_ID + 1);
 }
 
 void TrustedPostStageState::off(SolverContext& /*context*/) {

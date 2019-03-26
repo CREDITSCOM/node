@@ -1055,8 +1055,19 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
 
       // put emitted transactions
       if (!data.result.trxns.empty()) {
+        int64_t next_emitted_id = result.innerID() + 1; // may or may not be useful below
         for (const auto& tr : data.result.trxns) {
-          packet.addTransaction(tr);
+          if (tr.innerID() == 0) {
+            // must not be here normally, but anyway...
+            cslog() << log_prefix << "incorrect innerID in emitted transaction, fix";
+            csdb::Transaction tmp = tr.clone();
+            tmp.set_innerID(next_emitted_id);
+            packet.addTransaction(tmp);
+            ++next_emitted_id;
+          }
+          else {
+            packet.addTransaction(tr);
+          }
         }
         csdebug() << log_prefix << "add " << data.result.trxns.size() << " emitted transaction(s) to {"
           << it->ref_start.sequence << '.' << it->ref_start.transaction << "} state";

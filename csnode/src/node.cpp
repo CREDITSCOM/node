@@ -1311,8 +1311,8 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
   istream_ >> stage.signature;
   istream_ >> stage.message;
 
-  csdebug() << "Stage1 message: " << cs::Utils::byteStreamToHex(stage.message);
-  csdebug() << "Stage1 signature: " << cs::Utils::byteStreamToHex(stage.signature);
+  csdetails() << "Stage1 message: " << cs::Utils::byteStreamToHex(stage.message);
+  csdetails() << "Stage1 signature: " << cs::Utils::byteStreamToHex(stage.signature);
 
 
   if (!istream_.good() || !istream_.end()) {
