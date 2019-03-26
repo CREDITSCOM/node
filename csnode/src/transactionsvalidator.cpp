@@ -217,7 +217,11 @@ void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Tr
   for (const auto& t : trxs) {
     if (i < maskSize && *(maskIncluded.cbegin() + i) == kInvalidMarker) {
       if (smarts.is_known_smart_contract(t.source())) {
-        rejectedSmarts.push_back(std::make_pair(t, i));
+        WalletsState::WalletId id{};
+        WalletsState::WalletData& wallState = walletsState_.getData(t.source(), id);
+        if (wallState.balance_ < zeroBalance_) {
+          rejectedSmarts.push_back(std::make_pair(t, i));
+        }
       }
     }
     if (i < maskSize && SmartContracts::is_new_state(t) &&
