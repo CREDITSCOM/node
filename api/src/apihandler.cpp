@@ -595,7 +595,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   const auto byteStream = send_transaction.to_byte_stream_for_sig();
   if (!cscrypto::verifySignature(send_transaction.signature(), send_transaction.source().public_key(), byteStream.data(), byteStream.size())) {
     _return.status.code = 1;
-    _return.status.message = "wrong signature! byteStream: " + fromByteArray(byteStream);
+    _return.status.message = "wrong signature! ByteStream:" + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
     return;
   }
 
