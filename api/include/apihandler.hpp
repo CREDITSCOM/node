@@ -513,6 +513,7 @@ namespace apiexec {
     void SendTransaction(apiexec::SendTransactionResult &_return, const general::AccessID accessId, const api::Transaction &transaction) override;
     void WalletIdGet(api::WalletIdGetResult &_return, const general::AccessID accessId, const general::Address &address) override;
     void SmartContractGet(SmartContractGetResult &_return, const general::AccessID accessId, const general::Address &address) override;
+    void WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address);
 
     executor::Executor& getExecutor() const {
       return executor_;

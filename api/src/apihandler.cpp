@@ -1954,3 +1954,16 @@ void apiexec::APIEXECHandler::SmartContractGet(SmartContractGetResult &_return, 
   
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
+
+void apiexec::APIEXECHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) {
+  const csdb::Address addr = BlockChain::getAddressFromKey(address);
+  BlockChain::WalletData wallData{};
+  BlockChain::WalletId wallId{};
+  if (!blockchain_.findWalletData(addr, wallData, wallId)) {
+    SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+    return;
+  }
+  _return.balance.integral = wallData.balance_.integral();
+  _return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
