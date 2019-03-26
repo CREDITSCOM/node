@@ -32,6 +32,8 @@ void TrustedPostStageState::on(SolverContext& context) {
     }
   }
 
+  constexpr size_t TimerBaseId = 40;
+
   SolverContext* pctx = &context;
   csdebug() << name() << ": start track timeout " << 0 << " ms of stages-3 received";
   timeout_request_stage.start(
@@ -58,11 +60,11 @@ void TrustedPostStageState::on(SolverContext& context) {
                   csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound and recalculate the signatures";
                   mark_outbound_nodes(*pctx);
                 },
-                true/*replace if exists*/);
+                true/*replace if exists*/, TimerBaseId + 3);
         },
-            true /*replace if exists*/);
+            true /*replace if exists*/, TimerBaseId + 2);
       },
-      true /*replace if exists*/);
+      true /*replace if exists*/, TimerBaseId + 1);
 }
 
 void TrustedPostStageState::off(SolverContext& /*context*/) {

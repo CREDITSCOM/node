@@ -70,6 +70,8 @@ void TrustedStage3State::on(SolverContext& context) {
   //  - request stages-2 from anyone
   //  - create fake stages-2 from outbound nodes and force to next state
 
+  constexpr size_t TimerBaseId = 30;
+
   SolverContext* pctx = &context;
   auto dt = 2 * Consensus::T_stage_request;
   csdebug() << name() << ": start track timeout " << 0 << " ms of stages-2 received";
@@ -96,11 +98,11 @@ void TrustedStage3State::on(SolverContext& context) {
                   csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
                   mark_outbound_nodes(*pctx, rnum);
                 },
-                true/*replace if exists*/);
+                true/*replace if exists*/, TimerBaseId + 3);
             },
-            true /*replace if exists*/);
+            true /*replace if exists*/, TimerBaseId + 2);
       },
-      true /*replace if exists*/);
+      true /*replace if exists*/, TimerBaseId + 1);
 }
 
 void TrustedStage3State::off(SolverContext& /*context*/) {
