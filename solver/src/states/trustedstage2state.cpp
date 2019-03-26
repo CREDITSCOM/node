@@ -4,6 +4,9 @@
 #include <lib/system/logger.hpp>
 
 namespace cs {
+
+#define TIMER_BASE_ID 20
+
 void TrustedStage2State::on(SolverContext& context) {
   DefaultStateBehavior::on(context);
   cnt_recv_stages = 0;
@@ -65,11 +68,11 @@ void TrustedStage2State::on(SolverContext& context) {
                   csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
                   mark_outbound_nodes(*pctx);
                 },
-                true/*replace if exists*/, TimerBaseId + 3);
+                true/*replace if exists*/, TIMER_BASE_ID + 3);
             },
-            true /*replace if exists*/, TimerBaseId + 2);
+            true /*replace if exists*/, TIMER_BASE_ID + 2);
       },
-      true /*replace if exists*/, TimerBaseId + 1);
+      true /*replace if exists*/, TIMER_BASE_ID + 1);
 }
 
 void TrustedStage2State::off(SolverContext& /*context*/) {
