@@ -104,8 +104,8 @@ namespace executor {
       if (!code.empty()) {
         executor::SmartContractBinary smartContractBinary;
         smartContractBinary.contractAddress = smart_address;
-        smartContractBinary.byteCodeObjects = code;
-        smartContractBinary.contractState   = state;
+        smartContractBinary.object.byteCodeObjects = code;
+        smartContractBinary.object.instance = state;
         smartContractBinary.stateCanModify  = solver_.isContractLocked(BlockChain::getAddressFromKey(smart_address)) ? true : false;
         if(auto optOriginRes = execute(address, smartContractBinary, method, params))
           resp = optOriginRes.value().resp;
@@ -274,10 +274,10 @@ namespace executor {
       const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());  
       executor::SmartContractBinary smartContractBinary;
       smartContractBinary.contractAddress = smartTarget.to_api_addr();
-      smartContractBinary.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
+      smartContractBinary.object.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
       auto optState = getState(smartTarget);
       if (optState.has_value())
-        smartContractBinary.contractState = optState.value();
+        smartContractBinary.object.instance = optState.value();
       smartContractBinary.stateCanModify  = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr())) ? true : false;
 
       std::string method;

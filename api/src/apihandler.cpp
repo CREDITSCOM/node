@@ -590,6 +590,15 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   const auto smart_addr = s_blockchain.get_addr_by_type(send_transaction.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
   const bool deploy     = is_smart_deploy(input_smart);
 
+  send_transaction.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
+
+  const auto byteStream = send_transaction.to_byte_stream_for_sig();
+  if (!cscrypto::verifySignature(send_transaction.signature(), send_transaction.source().public_key(), byteStream.data(), byteStream.size())) {
+    _return.status.code = 1;
+    _return.status.message = "wrong signature! byteStream: " + fromByteArray(byteStream);
+    return;
+  }
+
   std::vector<general::ByteCodeObject> origin_bytecode;
   if (!deploy) {
     for (auto &it : input_smart.smartContractDeploy.byteCodeObjects) {
@@ -663,10 +672,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     contract_state_entry.yield();
     return;
   }
-
-  using namespace cs::trx_uf;
-  // cs::trx_uf::deploy::Code == cs::trx_uf::start::Methods == 0
-  send_transaction.add_user_field(deploy::Code, serialize(transaction.smartContract));
 
   solver.send_wallet_transaction(send_transaction);
 
@@ -1905,6 +1910,14 @@ void apiexec::APIEXECHandler::GetSeed(apiexec::GetSeedResult &_return, const gen
 }
 
 void apiexec::APIEXECHandler::SendTransaction(apiexec::SendTransactionResult &_return, const general::AccessID accessId, const api::Transaction &transaction) {
+  const csdb::Address addr = BlockChain::getAddressFromKey(transaction.source);
+  BlockChain::WalletData wallData{};
+  BlockChain::WalletId wallId{};
+  if (!blockchain_.findWalletData(addr, wallData, wallId)) {
+    SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+    return;
+  }
+  const_cast<api::Transaction&>(transaction).id = wallData.trxTail_.empty() ? 0 : wallData.trxTail_.getLastTransactionId() + 1;
   executor_.addInnerSendTransaction(accessId, executor_.make_transaction(transaction));
 }
 
