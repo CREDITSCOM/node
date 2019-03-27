@@ -349,7 +349,8 @@ bool Node::canBeTrusted() {
 #else
 
   if (Consensus::DisableTrustedRequestNextRound) {
-    if (myLevel_ == Level::Confidant) {
+    // ignore flag after bigbang
+    if (myLevel_ == Level::Confidant && subRound_ == 0) {
       return false;
     }
   }
