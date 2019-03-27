@@ -1,15 +1,9 @@
 [submodule "third-party/blake2"]
 	path = third-party/blake2
 	url = ../../credits_bc/third_party/blake2.git
-[submodule "third-party/thrift-interface-definitions"]
-	path = third-party/thrift-interface-definitions
-	url = ../../main-credits-dev/thrift-interface-definitions
 [submodule "third-party/thrift"]
 	path = third-party/thrift
 	url = ../../credits_bc/third_party/thrift.git
-[submodule "third-party/libcuckoo"]
-	path = third-party/libcuckoo
-	url = https://github.com/efficient/libcuckoo.git
 [submodule "third-party/googletest"]
 	path = third-party/googletest
 	url = https://github.com/google/googletest.git
@@ -19,3 +13,6 @@
 [submodule "third-party/berkeleydb"]
 	path = third-party/berkeleydb
 	url = https://gitlab.com/SychevS/berkeleydb.git
+[submodule "third-party/thrift-interface-definitions"]
+	path = third-party/thrift-interface-definitions
+	url = https://gitlab.com/main-credits-dev/thrift-interface-definitions.git
