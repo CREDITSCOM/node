@@ -1,9 +1,9 @@
 [submodule "third-party/blake2"]
 	path = third-party/blake2
-	url = ../../credits_bc/third_party/blake2.git
+	url = https://gitlab.com/credits_bc/third_party/blake2.git
 [submodule "third-party/thrift"]
 	path = third-party/thrift
-	url = ../../credits_bc/third_party/thrift.git
+	url = https://gitlab.com/credits_bc/third_party/thrift.git
 [submodule "third-party/googletest"]
 	path = third-party/googletest
 	url = https://github.com/google/googletest.git
