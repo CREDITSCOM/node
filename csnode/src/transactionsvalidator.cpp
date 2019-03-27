@@ -180,10 +180,14 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
   }
 
   if (wallState.balance_ < zeroBalance_) {
-    negativeNodes_.push_back(&wallState);
     csdebug() << log_prefix  << "transaction[" << trxInd
               << "] results to potentially negative balance " << wallState.balance_.to_double();
-    return false;
+    // will be checked in rejected smarts
+    if (context.smart_contracts().is_known_smart_contract(trx.source())) {
+      return false;
+    }
+    // will be validate by graph
+    negativeNodes_.push_back(&wallState);
   }
 
   wallState.trxTail_.push(trx.innerID());
@@ -195,7 +199,6 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
 }
 
 bool TransactionsValidator::validateTransactionAsTarget(const csdb::Transaction& trx) {
-  //TODO: test WalletId exists
   WalletsState::WalletId walletId{};
   WalletsState::WalletData& wallState = walletsState_.getData(trx.target(), walletId);
 
@@ -215,18 +218,15 @@ void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Tr
   size_t i = 0;
 
   for (const auto& t : trxs) {
-    if (i < maskSize && *(maskIncluded.cbegin() + i) == kInvalidMarker) {
-      if (smarts.is_known_smart_contract(t.source())) {
+    if (i < maskSize && smarts.is_known_smart_contract(t.source())) {
         WalletsState::WalletId id{};
         WalletsState::WalletData& wallState = walletsState_.getData(t.source(), id);
         if (wallState.balance_ < zeroBalance_) {
           rejectedSmarts.push_back(std::make_pair(t, i));
         }
-      }
-    }
-    if (i < maskSize && SmartContracts::is_new_state(t) &&
-        *(maskIncluded.cbegin() + i) == kValidMarker) {
-      newStates.push_back(t);
+      } else if (i < maskSize && SmartContracts::is_new_state(t) &&
+                 *(maskIncluded.cbegin() + i) == kValidMarker) {
+        newStates.push_back(t);
     }
     ++i;
   } 
@@ -258,14 +258,22 @@ void TransactionsValidator::makeSmartsValid(SolverContext& context,
       maskIncluded[smarts[i].second] = kValidMarker;
       csdebug() << log_prefix << "balance of transation["
                 << smarts[i].second << "] source is replenished by other transaction";
+      
+      WalletsState::WalletId walletId{};
+      WalletsState::WalletData& wallState = walletsState_.getData(smarts[i].first.source(), walletId);
+      wallState.trxTail_.push(smarts[i].first.innerID());
+      trxList_[smarts[i].second] = wallState.lastTrxInd_;
+      wallState.lastTrxInd_ = static_cast<decltype(wallState.lastTrxInd_)>(smarts[i].second);
+      walletsState_.setModified(walletId);
     }
   }
 }
 
-void TransactionsValidator::validateByGraph(CharacteristicMask& maskIncluded, const Transactions& trxs,
-                                            csdb::Pool& trxsExcluded) {
+void TransactionsValidator::validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded,
+                                            const Transactions& trxs, csdb::Pool& trxsExcluded) {
   payableMaxFees_.clear();
   rejectedNewStates_.clear();
+
   while (!negativeNodes_.empty()) {
     Node& currNode = *negativeNodes_.back();
     negativeNodes_.pop_back();
@@ -274,39 +282,46 @@ void TransactionsValidator::validateByGraph(CharacteristicMask& maskIncluded, co
       continue;
     }
 
-    removeTransactions(currNode, trxs, maskIncluded, trxsExcluded);
+    removeTransactions(context, currNode, trxs, maskIncluded, trxsExcluded);
   }
 }
 
-void TransactionsValidator::removeTransactions(Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded,
-                                               csdb::Pool& trxsExcluded) {
-  if (removeTransactions_PositiveOne(node, trxs, maskIncluded, trxsExcluded)) {
+void TransactionsValidator::removeTransactions(SolverContext& context, Node& node, const Transactions& trxs,
+                                               CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded) {
+  if (removeTransactions_PositiveOne(context, node, trxs, maskIncluded, trxsExcluded)) {
     return;
   }
-  if (removeTransactions_PositiveAll(node, trxs, maskIncluded, trxsExcluded)) {
+  if (removeTransactions_PositiveAll(context, node, trxs, maskIncluded, trxsExcluded)) {
     return;
   }
-  if (removeTransactions_NegativeOne(node, trxs, maskIncluded, trxsExcluded)) {
+  if (removeTransactions_NegativeOne(context, node, trxs, maskIncluded, trxsExcluded)) {
     return;
   }
-  if (removeTransactions_NegativeAll(node, trxs, maskIncluded, trxsExcluded)) {
+  if (removeTransactions_NegativeAll(context, node, trxs, maskIncluded, trxsExcluded)) {
     return;
   }
 
   csdebug() << "removeTransactions: Failed to make balance non-negative ";
 }
 
-bool TransactionsValidator::removeTransactions_PositiveOne(Node& node, const Transactions& trxs,
+bool TransactionsValidator::removeTransactions_PositiveOne(SolverContext& context, Node& node, const Transactions& trxs,
                                                            CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded) {
   if (node.balance_ >= zeroBalance_)
     return true;
 
   const csdb::Amount absBalance = -node.balance_;
   TransactionIndex* prevNext = &node.lastTrxInd_;
+  auto& smarts = context.smart_contracts();
 
   for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext) {
     const csdb::Transaction& trx = trxs[trxInd];
-    const csdb::Amount& trxCost = trx.amount().to_double() + trx.counted_fee().to_double();
+
+    csdb::Amount trxCost = trx.amount().to_double();
+    if (smarts.is_known_smart_contract(trx.target())) {
+      trxCost += csdb::Amount(trx.max_fee().to_double());
+    } else {
+      trxCost += csdb::Amount(trx.counted_fee().to_double());
+    }
 
     if (trxCost < absBalance) {
       prevNext = &trxList_[trxInd];
@@ -329,7 +344,11 @@ bool TransactionsValidator::removeTransactions_PositiveOne(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
+    if (smarts.is_known_smart_contract(trx.target())) {
+      node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.max_fee().to_double());
+    } else {
+      node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
+    }
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];
@@ -343,12 +362,13 @@ bool TransactionsValidator::removeTransactions_PositiveOne(Node& node, const Tra
   return false;
 }
 
-bool TransactionsValidator::removeTransactions_PositiveAll(Node& node, const Transactions& trxs,
+bool TransactionsValidator::removeTransactions_PositiveAll(SolverContext& context, Node& node, const Transactions& trxs,
                                                            CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded) {
   if (node.balance_ >= zeroBalance_)
     return true;
 
   TransactionIndex* prevNext = &node.lastTrxInd_;
+  auto& smarts = context.smart_contracts();
 
   for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext) {
     const csdb::Transaction& trx = trxs[trxInd];
@@ -368,7 +388,11 @@ bool TransactionsValidator::removeTransactions_PositiveAll(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
+    if (smarts.is_known_smart_contract(trx.target())) {
+      node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.max_fee().to_double());
+    } else {
+      node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
+    }
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];
@@ -384,17 +408,23 @@ bool TransactionsValidator::removeTransactions_PositiveAll(Node& node, const Tra
   return false;
 }
 
-bool TransactionsValidator::removeTransactions_NegativeOne(Node& node, const Transactions& trxs,
+bool TransactionsValidator::removeTransactions_NegativeOne(SolverContext& context, Node& node, const Transactions& trxs,
                                                            CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded) {
   if (node.balance_ >= zeroBalance_)
     return true;
 
   const csdb::Amount absBalance = -node.balance_;
   TransactionIndex* prevNext = &node.lastTrxInd_;
+  auto& smarts = context.smart_contracts();
 
   for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext) {
     const csdb::Transaction& trx = trxs[trxInd];
-    const csdb::Amount& trxCost = trx.amount().to_double() + trx.counted_fee().to_double();
+    csdb::Amount trxCost = trx.amount().to_double();
+    if (smarts.is_known_smart_contract(trx.target())) {
+      trxCost += csdb::Amount(trx.max_fee().to_double());
+    } else {
+      trxCost += csdb::Amount(trx.counted_fee().to_double());
+    }
 
     if (trxCost < absBalance) {
       prevNext = &trxList_[trxInd];
@@ -410,7 +440,11 @@ bool TransactionsValidator::removeTransactions_NegativeOne(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
+    if (smarts.is_known_smart_contract(trx.target())) {
+      node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.max_fee().to_double());
+    } else {
+      node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
+    }
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];
@@ -426,12 +460,13 @@ bool TransactionsValidator::removeTransactions_NegativeOne(Node& node, const Tra
   return false;
 }
 
-bool TransactionsValidator::removeTransactions_NegativeAll(Node& node, const Transactions& trxs,
+bool TransactionsValidator::removeTransactions_NegativeAll(SolverContext& context, Node& node, const Transactions& trxs,
                                                            CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded) {
   if (node.balance_ >= zeroBalance_)
     return true;
 
   TransactionIndex* prevNext = &node.lastTrxInd_;
+  auto& smarts = context.smart_contracts();
 
   for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext) {
     const csdb::Transaction& trx = trxs[trxInd];
@@ -445,7 +480,11 @@ bool TransactionsValidator::removeTransactions_NegativeAll(Node& node, const Tra
     trxsExcluded.add_transaction(trx);
 #endif
 
-    node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
+    if (smarts.is_known_smart_contract(trx.target())) {
+      node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.max_fee().to_double());
+    } else {
+      node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.counted_fee().to_double());
+    }
     destNode.balance_ = destNode.balance_ - trx.amount();
 
     *prevNext = trxList_[trxInd];
