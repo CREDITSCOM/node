@@ -256,7 +256,11 @@ void Network::processorRoutine() {
       processTask(task);
     }
 #elif WIN32
-    WaitForSingleObject(readerEvent_, INFINITE);
+    while (true) {
+      auto ret = WaitForSingleObject(readerEvent_, 50); // timeout 50ms
+      if (ret != WAIT_TIMEOUT) break;
+      externals.callAll();
+    };
     while (readerLock.test_and_set(std::memory_order_acquire)) // acquire lock
       ; // spin
     int tasks = readerTaskCount_;
