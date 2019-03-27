@@ -7,6 +7,7 @@
 #ifdef __linux__
 #include <sys/socket.h>
 #include <sys/eventfd.h>
+#include <sys/poll.h>
 #include <unistd.h>
 #include <array>
 #include <vector>
@@ -243,11 +244,21 @@ void Network::writerRoutine(const Config& config) {
 // Processors
 void Network::processorRoutine() {
   CallsQueue& externals = CallsQueue::instance();
-
+#ifdef __linux__
+  struct pollfd pfd{};
+  pfd.fd = readerEventfd_;
+  pfd.events = POLLIN;
+  constexpr int timeout = 50; // 50ms
+#endif
   while (stopProcessorRoutine == false) {
     externals.callAll();
 #ifdef __linux__
     uint64_t tasks;
+    while (true) {
+      int ret = poll(&pfd, 1, timeout);
+      if (ret != 0) break;
+      externals.callAll();
+    }
     int s = read(readerEventfd_, &tasks, sizeof(uint64_t));
     if (s != sizeof(uint64_t)) continue;
 
