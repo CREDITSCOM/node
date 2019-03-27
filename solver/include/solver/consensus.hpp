@@ -63,4 +63,7 @@ public:
    * into chain, otherwise  contract is assumed failed unconditionally
    */
   constexpr static unsigned int MaxRoundsExecuteContract = 95;
+
+  /** @brief True to disable, false to enable the trusted request to become trusted next round again */
+  constexpr static bool DisableTrustedRequestNextRound = false;
 };

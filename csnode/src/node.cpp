@@ -341,6 +341,19 @@ void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
 }
 
 bool Node::canBeTrusted() {
+
+#if defined(MONITOR_NODE) || defined(WEB_WALLET_NODE)
+
+  return false;
+
+#else
+
+  if (Consensus::DisableTrustedRequestNextRound) {
+    if (myLevel_ == Level::Confidant) {
+      return false;
+    }
+  }
+
   if (cs::Conveyer::instance().currentRoundNumber() < Consensus::StartingDPOS) {
     csdebug() << "The DPOS doesn't work unless the roundNumber is less than " << Consensus::StartingDPOS;
     return true;
@@ -354,6 +367,8 @@ bool Node::canBeTrusted() {
     return false;
   }
   return true;
+
+#endif
 }
 
 void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
@@ -2346,7 +2361,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 }
 
 void Node::sendHash(cs::RoundNumber round) {
-#if !defined(MONITOR_NODE) && !defined(WEB_WALLET_NODE)
+  if (!canBeTrusted()) {
+    return;
+  }
+
   if (blockChain_.getLastSequence() != round - 1) {
     // should not send hash until have got proper block sequence
     return;
@@ -2356,7 +2374,6 @@ void Node::sendHash(cs::RoundNumber round) {
   csdb::PoolHash spoiledHash = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
   sendToConfidants(MsgTypes::BlockHash, round, subRound_, spoiledHash);
   csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_);
-#endif
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
