@@ -709,6 +709,11 @@ uint64_t BlockChain::getWalletsCount() {
   return walletsCacheStorage_->getCount();
 }
 
+uint64_t BlockChain::getWalletsCountWithBalance() {
+  std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+  return walletsCacheStorage_->getCountWithBalance();
+}
+
 class BlockChain::TransactionsLoader {
 public:
   using Transactions = std::vector<csdb::Transaction>;

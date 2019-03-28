@@ -70,6 +70,14 @@ public:
 
   uint64_t getCount() const { return wallets_.size(); }
 
+  uint64_t getCountWithBalance() const {
+    return std::count_if(wallets_.begin(), wallets_.end(), [](const auto elm) {
+      if (elm && !elm->address_.empty() && elm->balance_ >= csdb::Amount(0))
+        return true;
+      return false;
+    });
+  }
+
 private:
   using Data = std::vector<WalletData*>;
 

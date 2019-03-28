@@ -141,6 +141,8 @@ public:
 
   uint64_t getWalletsCount();
 
+  uint64_t getWalletsCountWithBalance();
+
   csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
 
 #ifdef TRANSACTIONS_INDEX
