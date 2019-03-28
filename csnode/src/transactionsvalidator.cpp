@@ -219,14 +219,14 @@ void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Tr
 
   for (const auto& t : trxs) {
     if (i < maskSize && smarts.is_known_smart_contract(t.source())) {
-        WalletsState::WalletId id{};
-        WalletsState::WalletData& wallState = walletsState_.getData(t.source(), id);
-        if (wallState.balance_ < zeroBalance_) {
-          rejectedSmarts.push_back(std::make_pair(t, i));
-        }
-      } else if (i < maskSize && SmartContracts::is_new_state(t) &&
-                 *(maskIncluded.cbegin() + i) == kValidMarker) {
-        newStates.push_back(t);
+      WalletsState::WalletId id{};
+      WalletsState::WalletData& wallState = walletsState_.getData(t.source(), id);
+      if (wallState.balance_ < zeroBalance_) {
+        rejectedSmarts.push_back(std::make_pair(t, i));
+      }
+    } else if (i < maskSize && SmartContracts::is_new_state(t) &&
+               *(maskIncluded.cbegin() + i) == kValidMarker) {
+      newStates.push_back(t);
     }
     ++i;
   } 
@@ -338,7 +338,7 @@ bool TransactionsValidator::removeTransactions_PositiveOne(SolverContext& contex
       continue;
     }
 
-    maskIncluded[trxInd] = 0;
+    maskIncluded[trxInd] = kInvalidMarker;
 
 #ifndef WITHOUT_BAD_BLOCK
     trxsExcluded.add_transaction(trx);
@@ -382,7 +382,7 @@ bool TransactionsValidator::removeTransactions_PositiveAll(SolverContext& contex
       continue;
     }
 
-    maskIncluded[trxInd] = 0;
+    maskIncluded[trxInd] = kInvalidMarker;
 
 #ifndef WITHOUT_BAD_BLOCK
     trxsExcluded.add_transaction(trx);
@@ -434,7 +434,7 @@ bool TransactionsValidator::removeTransactions_NegativeOne(SolverContext& contex
     WalletsState::WalletId walletId{};
     Node& destNode = walletsState_.getData(trx.target(), walletId);
 
-    maskIncluded[trxInd] = 0;
+    maskIncluded[trxInd] = kInvalidMarker;
 
 #ifndef WITHOUT_BAD_BLOCK
     trxsExcluded.add_transaction(trx);
@@ -474,7 +474,7 @@ bool TransactionsValidator::removeTransactions_NegativeAll(SolverContext& contex
     WalletsState::WalletId walletId{};
     Node& destNode = walletsState_.getData(trx.target(), walletId);
 
-    maskIncluded[trxInd] = 0;
+    maskIncluded[trxInd] = kInvalidMarker;
 
 #ifndef WITHOUT_BAD_BLOCK
     trxsExcluded.add_transaction(trx);
