@@ -1193,13 +1193,13 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
 
 void BlockChain::setTransactionsFees(TransactionsPacket& packet) {
   if (fee_) {
-    fee_->CountFeesInPool(*this, &packet);
+    fee_->CountFeesInPool(*this, packet.transactions());
   }
 }
 
 void BlockChain::setTransactionsFees(csdb::Pool& pool) {
   if (fee_) {
-    fee_->CountFeesInPool(*this, &pool);
+    fee_->CountFeesInPool(*this, pool.transactions());
   }
 }
 

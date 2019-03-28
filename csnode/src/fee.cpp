@@ -7,15 +7,12 @@
 
 #include <cinttypes>
 #include <string>
-#include <vector>
 #include <limits>
 #include <algorithm>
 
 #include <csdb/amount_commission.hpp>
-#include <csdb/pool.hpp>
 #include <csdb/transaction.hpp>
 #include <csnode/blockchain.hpp>
-#include <transactionspacket.hpp>
 
 namespace cs {
 namespace {
@@ -35,81 +32,41 @@ Fee::Fee()
     one_byte_cost_(0),
     one_round_cost_(0),
     rounds_frequency_(0),
-    update_trusted_cache_(true),
-    current_pool_(nullptr),
-    transactions_packet_(nullptr) {}
+    update_trusted_cache_(true) {}
 
-csdb::Amount Fee::CountFeesInPool(const BlockChain& blockchain, csdb::Pool* pool) {
-  if (num_of_last_block_ > blockchain.getLastSequence()) {
-    ResetTrustedCache(blockchain);
-    update_trusted_cache_ = false;
-  } else if (num_of_last_block_ == blockchain.getLastSequence() && last_trusted_.size() != 0) {
-    update_trusted_cache_ = false;
-  } else {
-    update_trusted_cache_ = true;
-  }
+csdb::Amount Fee::CountFeesInPool(const BlockChain& blockchain, Transactions& transactions) {
+  update_trusted_cache_ = TakeDecisionOnCacheUpdate(blockchain);
+  num_of_last_block_ = blockchain.getLastSequence();
 
-  Init(blockchain, pool);
-
-  if (pool->transactions().empty()) {
+  if (transactions.empty()) {
     EstimateNumOfNodesInNetwork(blockchain);
     return csdb::Amount(0);
   }
-  CountOneByteCost(blockchain);
-  SetCountedFee();
+  CountOneByteCost(blockchain, transactions);
+  SetCountedFee(transactions);
   return csdb::Amount(one_round_cost_);
 }
 
-csdb::Amount Fee::CountFeesInPool(const BlockChain& blockchain, TransactionsPacket* packet) {
+bool Fee::TakeDecisionOnCacheUpdate(const BlockChain& blockchain) {
   if (num_of_last_block_ > blockchain.getLastSequence()) {
     ResetTrustedCache(blockchain);
-    update_trusted_cache_ = false;
+    return false;
   } else if (num_of_last_block_ == blockchain.getLastSequence() && last_trusted_.size() != 0) {
-    update_trusted_cache_ = false;
+    return false;
   } else {
-    update_trusted_cache_ = true;
+    return true;
   }
-
-  Init(blockchain, packet);
-
-  if (packet->transactionsCount() == 0) {
-    EstimateNumOfNodesInNetwork(blockchain);
-    return csdb::Amount(0);
-  }
-  CountOneByteCost(blockchain);
-  SetCountedFee();
-  return csdb::Amount(one_round_cost_);
 }
 
-inline void Fee::Init(const BlockChain& blockchain, csdb::Pool* pool) {
-  current_pool_ = pool;
-  transactions_packet_ = nullptr;
-  num_of_last_block_ = blockchain.getLastSequence();
-}
-
-inline void Fee::Init(const BlockChain& blockchain, TransactionsPacket* packet) {
-  transactions_packet_ = packet;
-  current_pool_ = nullptr;
-  num_of_last_block_ = blockchain.getLastSequence();
-}
-
-void Fee::SetCountedFee() {
-  std::vector<csdb::Transaction>* transactions = nullptr;
-
-  if (current_pool_ != nullptr) {
-    transactions = &(current_pool_->transactions());
-  } else {
-    transactions = &(transactions_packet_->transactions());
-  }
-
-  for (auto& transaction : (*transactions)) {
+void Fee::SetCountedFee(Transactions& transactions) {
+  for (auto& transaction : transactions) {
     const size_t size_of_transaction = transaction.to_byte_stream().size();
     const double counted_fee = one_byte_cost_ * size_of_transaction;
     transaction.set_counted_fee(csdb::AmountCommission(std::max(kMinFee, counted_fee)));
   }
 }
 
-void Fee::CountOneByteCost(const BlockChain& blockchain) {
+void Fee::CountOneByteCost(const BlockChain& blockchain, Transactions& transactions) {
   if (num_of_last_block_ == 0) {
     one_byte_cost_ = 0;
     return;
@@ -121,22 +78,15 @@ void Fee::CountOneByteCost(const BlockChain& blockchain) {
     return;
   }
 
-  CountTotalTransactionsLength();
+  CountTotalTransactionsLength(transactions);
   CountOneRoundCost(blockchain);
   one_byte_cost_ = one_round_cost_ / total_transactions_length_;
 }
 
-void Fee::CountTotalTransactionsLength() {
+void Fee::CountTotalTransactionsLength(Transactions& transactions) {
   total_transactions_length_ = 0;
-  std::vector<csdb::Transaction>* transactions = nullptr;
 
-  if (current_pool_ != nullptr) {
-    transactions = &(current_pool_->transactions());
-  } else {
-    transactions = &(transactions_packet_->transactions());
-  }
-
-  for (const auto& transaction : (*transactions)) {
+  for (const auto& transaction : transactions) {
     total_transactions_length_ += transaction.to_byte_stream().size();
   }
 }
