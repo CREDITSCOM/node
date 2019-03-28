@@ -333,8 +333,8 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
       cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
       return 0;
     }
-    WalletData& wallData_s = getWalletData(id_s, tr.source());
 #ifdef MONITOR_NODE
+    WalletData& wallData_s = getWalletData(id_s, tr.source());
     ++wallData_s.transNum_;
     wallData_s.lastTransaction_ = tr.id();
 #endif
