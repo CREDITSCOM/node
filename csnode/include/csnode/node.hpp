@@ -17,6 +17,7 @@
 #include "blockchain.hpp"
 #include "packstream.hpp"
 #include "roundstat.hpp"
+#include "confirmationlist.hpp"
 
 class Transport;
 
@@ -148,6 +149,11 @@ public:
   bool isPoolsSyncroStarted();
 
   //void smartStagesStorageClear(size_t cSize);
+  
+  std::optional<cs::TrustedConfirmation> getConfirmation(cs::RoundNumber rNum) const
+  {
+    return confirmationList.find(rNum);
+  }
   
   enum Level {
     Normal,
@@ -368,6 +374,9 @@ private:
 
   // round stat
   cs::RoundStat stat_;
+
+  // confirmation list
+  cs::ConfirmationList confirmationList;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);
