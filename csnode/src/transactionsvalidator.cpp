@@ -1,15 +1,15 @@
-#ifdef _MSC_VER
-#include <intrin.h>
-#endif
+#include <csnode/transactionsvalidator.hpp>
 
 #include <vector>
 #include <map>
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 
 #include <csdb/amount.hpp>
 #include <csdb/amount_commission.hpp>
 #include <client/params.hpp>
 #include <lib/system/logger.hpp>
-#include <csnode/transactionsvalidator.hpp>
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
 #include <walletscache.hpp>
@@ -30,7 +30,6 @@ TransactionsValidator::TransactionsValidator(WalletsState& walletsState, const C
 void TransactionsValidator::reset(size_t transactionsNum) {
   trxList_.clear();
   trxList_.resize(transactionsNum, WalletsState::noInd_);
-
   negativeNodes_.clear();
   cntRemovedTrxs_ = 0;
 }
@@ -186,7 +185,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
     if (context.smart_contracts().is_known_smart_contract(trx.source())) {
       return false;
     }
-    // will be validate by graph
+    // will be validated by graph
     negativeNodes_.push_back(&wallState);
   }
 

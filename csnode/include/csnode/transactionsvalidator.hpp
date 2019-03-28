@@ -43,8 +43,6 @@ private:
   static constexpr csdb::Amount zeroBalance_ = 0.0_c;
 
 private:
-  void makeSmartsValid(SolverContext& context, RejectedSmarts& smarts,
-                       const csdb::Address& source, CharacteristicMask& maskIncluded);
   bool validateTransactionAsSource(SolverContext& context, const Transactions& trxs,
                                    size_t trxInd);
   bool validateNewStateAsSource(SolverContext& context, const csdb::Transaction& trx);
@@ -64,17 +62,16 @@ private:
   bool removeTransactions_NegativeAll(SolverContext& context, Node& node, const Transactions& trxs,
                                       CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded);
 
+  void makeSmartsValid(SolverContext& context, RejectedSmarts& smarts,
+                       const csdb::Address& source, CharacteristicMask& maskIncluded);
 private:
   Config config_;
-
   WalletsState& walletsState_;
   TrxList trxList_;
-
   std::map<csdb::Address, csdb::Amount> payableMaxFees_;
   std::vector<csdb::Address> rejectedNewStates_;
   Stack negativeNodes_;
   size_t cntRemovedTrxs_;
 };
 }  // namespace cs
-
-#endif
+#endif // TRANSACTIONS_VALIDATOR_HPP
