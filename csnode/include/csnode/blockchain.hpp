@@ -222,6 +222,11 @@ public slots:
   uint32_t getTransactionsCount(const csdb::Address&);
 #endif
 
+  // updates fees in every transaction
+  void setTransactionsFees(cs::TransactionsPacket& packet);
+  void setTransactionsFees(csdb::Pool& pool);
+  void setTransactionsFees(std::vector<csdb::Transaction>& transactions);
+
 #ifdef TRANSACTIONS_INDEX
   csdb::TransactionID getLastTransaction(const csdb::Address&);
   csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
