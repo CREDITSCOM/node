@@ -237,6 +237,7 @@ double Fee::CountBlockTimeStampDifference(size_t num_block_from, const BlockChai
 void Fee::ResetTrustedCache(const BlockChain& blockchain) {
   last_trusted_.clear();
   size_t last_sequence = blockchain.getLastSequence();
+  num_of_last_block_ = last_sequence;
   if (last_sequence == 0) {
     return;
   }
