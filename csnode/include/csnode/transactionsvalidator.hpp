@@ -7,6 +7,7 @@
 #include <limits>
 #include <csnode/walletsstate.hpp>
 #include <vector>
+#include <map>
 
 namespace cs {
 
