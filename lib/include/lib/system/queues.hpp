@@ -88,7 +88,8 @@ private:
 
   void unlock(Element* ptr, typename Element::State oldState, typename Element::State newState,
               std::atomic<Element*>& movingBar) {
-       ptr->lockState.store(newState, std::memory_order_release);
+    (void)(oldState);
+    ptr->lockState.store(newState, std::memory_order_release);
     movingBar.compare_exchange_strong(ptr, nextPtr(ptr), std::memory_order_acq_rel, std::memory_order_relaxed);
   }
 

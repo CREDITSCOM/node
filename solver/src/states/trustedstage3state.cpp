@@ -578,7 +578,7 @@ bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
       ++idx;
     }
   }
-  if (std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), cs::ConfidantConsts::InvalidConfidantIndex) > stage.realTrustedMask.size() / 2U + 1U) {
+  if ((size_t)std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), cs::ConfidantConsts::InvalidConfidantIndex) > stage.realTrustedMask.size() / 2U + 1U) {
     return false;
   }
   return true;

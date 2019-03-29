@@ -40,9 +40,9 @@ void SmartContractRef::from_user_field(const csdb::UserField& fld) {
 
 /*explicit*/
 SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& calls_queue_scheduler)
-: execution_allowed(true)
+: scheduler(calls_queue_scheduler)
 , bc(blockchain)
-, scheduler(calls_queue_scheduler) {
+, execution_allowed(true) {
 
   // signals subscription (MUST occur AFTER the BlockChains has already subscribed to storage)
   

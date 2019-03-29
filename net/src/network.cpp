@@ -110,7 +110,7 @@ void Network::readerRoutine(const Config& config) {
       iPacMan_.enQueueLast();
 #ifdef __linux__
       static uint64_t one = 1;
-      int s = write(readerEventfd_, &one, sizeof(uint64_t));
+      write(readerEventfd_, &one, sizeof(uint64_t));
 #endif
 #if defined(WIN32) || defined(__APPLE__)
       while (readerLock.test_and_set(std::memory_order_acquire)) // acquire lock
@@ -352,7 +352,7 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
   oPacMan_.enQueueLast(qePtr);
 #ifdef __linux__
   static uint64_t one = 1;
-  int s = write(writerEventfd_, &one, sizeof(uint64_t));
+  write(writerEventfd_, &one, sizeof(uint64_t));
 #endif
 #if defined(WIN32) || defined(__APPLE__)
   while (writerLock.test_and_set(std::memory_order_acquire)) // acquire lock

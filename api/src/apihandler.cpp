@@ -15,16 +15,17 @@ using namespace api;
 using namespace ::apache;
 
 apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& solver, executor::Executor& executor, const csconnector::Config& config)
-  : blockchain_(blockchain)
-  ,solver_(solver)
-  ,executor_(executor)
+  : executor_(executor)
+  , blockchain_(blockchain)
+  , solver_(solver)
 {
+  csunused(config);
 }
 
 APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const csconnector::Config& config)
-: s_blockchain(blockchain)
+: executor_(executor)
+, s_blockchain(blockchain)
 , solver(_solver)
-, executor_(executor)
 #ifdef MONITOR_NODE
 , stats(blockchain)
 #endif
@@ -390,7 +391,7 @@ std::vector<api::SealedTransaction> APIHandler::convertTransactions(const std::v
     it.trxn.smartInfo.__set_v_smartDeploy(SmartDeployTransInfo());
     fillTransInfoWithOpData(smartResult, trxn.smartInfo.v_smartDeploy);
   }*/
-  for (int Count = 0; Count < result.size(); Count++) {
+  for (size_t Count = 0; Count < result.size(); Count++) {
     result[Count] = convertTransaction(transactions[Count]);
   }
   return result;
@@ -1910,6 +1911,8 @@ void apiexec::APIEXECHandler::GetSeed(apiexec::GetSeedResult &_return, const gen
 }
 
 void apiexec::APIEXECHandler::SendTransaction(apiexec::SendTransactionResult &_return, const general::AccessID accessId, const api::Transaction &transaction) {
+  csunused(_return);
+  csunused(accessId);
   //const csdb::Address addr = BlockChain::getAddressFromKey(transaction.source);
   //BlockChain::WalletData wallData{};
   //BlockChain::WalletId wallId{};
@@ -1922,6 +1925,7 @@ void apiexec::APIEXECHandler::SendTransaction(apiexec::SendTransactionResult &_r
 }
 
 void apiexec::APIEXECHandler::WalletIdGet(api::WalletIdGetResult &_return, const general::AccessID accessId, const general::Address &address) {
+  csunused(accessId);
   const csdb::Address addr = BlockChain::getAddressFromKey(address);
   BlockChain::WalletData wallData{};
   BlockChain::WalletId wallId{};

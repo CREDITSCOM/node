@@ -332,6 +332,8 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
       removeDeferredBlock(deferredBlock_.sequence());
       handleTransitions(Event::SetNormal);
       break;
+    default:
+      break;
   }
 }
 
