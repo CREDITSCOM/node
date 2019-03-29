@@ -979,29 +979,16 @@ bool Transport::gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) 
 void Transport::askForMissingPackages() {
   typename decltype(uncollected_)::const_iterator ptr;
   MessagePtr msg;
-  uint32_t i = 0;
+  size_t i = 0;
 
   // magic numbers??
   const uint64_t maxMask = 1ull << 63;
 
+  cs::Lock lock(uLock_);
+  ptr = uncollected_.begin();
   while (true) {
-    {
-      cs::Lock lock(uLock_);
-
-      if (i >= uncollected_.size()) {
-        break;
-      }
-
-      ptr = uncollected_.begin();
-
-      for (uint32_t j = 0; j < i; ++j) {
-        ++ptr;
-      }
-
-      msg = *ptr;
-      ++i;
-    }
-
+    if (i >= uncollected_.size()) break;
+    msg = *ptr; ++ptr; ++i;
     {
       cs::Lock lock(msg->pLock_);
       const auto end = msg->packets_ + msg->packetsTotal_;
