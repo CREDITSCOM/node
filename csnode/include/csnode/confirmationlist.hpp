@@ -1,4 +1,6 @@
-#pragma once
+#ifndef CONFIRMATIONLIST_HPP
+#define CONFIRMATIONLIST_HPP
+
 #include <csnode/nodecore.hpp>
 #include <lib/system/common.hpp>
 
@@ -24,3 +26,5 @@ private:
   std::map<cs::RoundNumber, TrustedConfirmation> confirmationList_;
 };
 }  // namespace cs
+
+#endif // CONFIRMATIONLIST_HPP

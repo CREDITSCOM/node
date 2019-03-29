@@ -508,7 +508,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     std::random_device rd;
     std::mt19937 g;
     g.seed( (unsigned int) Conveyer::instance().currentRoundNumber());
-    cs::shuffle(aboveThreshold.begin(), aboveThreshold.end(), g);
+    cs::Utils::shuffle(aboveThreshold.begin(), aboveThreshold.end(), g);
     for (size_t i = 0; i < max_conf; ++i) {
       const auto& tmp = aboveThreshold.at(i);
       next_round_trust.emplace_back(tmp);

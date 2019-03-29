@@ -1,6 +1,7 @@
-#pragma once
+#ifndef NODEUTILS_HPP
+#define NODEUTILS_HPP
+
 #include <csnode/nodecore.hpp>
-#include <lib/system/common.hpp>
 
 namespace csdb {
 class Pool;
@@ -14,3 +15,5 @@ public:
   static cs::Bytes getTrustedMask(const csdb::Pool& block);
 };
 }  // namespace cs
+
+#endif // NODEUTILS_HPP

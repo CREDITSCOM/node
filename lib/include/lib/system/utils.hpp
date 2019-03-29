@@ -395,6 +395,65 @@ public:
 
     return result;
   }
+
+  template<typename RandomIterator, typename Generator>
+  static void shuffle(RandomIterator first, RandomIterator last, Generator&& rng) {
+    // shuffle [first, last) using random function rng
+    auto uFirst = first;
+    const auto uLast = last;
+    if (uFirst == uLast) {
+      return;
+    }
+
+    using diff = typename std::iterator_traits<RandomIterator>::difference_type;
+    using udiff = typename std::make_unsigned<diff>::type;
+
+    udiff bits = 8 * sizeof(udiff);
+    udiff bmask = udiff(-1);
+
+    auto target = uFirst;
+    diff targetIndex = 1;
+    for (; ++target != uLast; ++targetIndex) {
+      // randomly place an element from [first, target] at target
+      diff off;// = rng(static_cast<_Diff>(targetIndex + 1));
+      diff index = targetIndex + 1;
+      for (;;) {
+        // try a sample random value
+        udiff ret = 0;    // random bits
+        udiff mask = 0;    // 2^N - 1, _Ret is within [0, mask]
+
+        while (mask < udiff(index - 1)) {
+          // need more random bits
+          ret <<= bits - 1;    // avoid full shift
+          ret <<= 1;
+          udiff _Get_bits;
+          // return a random value within [0, bmask]
+          for (;;) {
+            // repeat until random value is in range
+            udiff _Val = rng();
+
+            if (_Val <= bmask) {
+              _Get_bits = _Val;
+              break;
+            }
+          }
+          ret |= _Get_bits;
+          mask <<= bits - 1;    // avoid full shift
+          mask <<= 1;
+          mask |= bmask;
+        }
+
+        // _Ret is [0, mask], index - 1 <= mask, return if unbiased
+        if (ret / index < mask / index
+          || mask % index == udiff(index - 1)) {
+          off = static_cast<diff>(ret % index);
+          break;
+        }
+      }
+
+      std::iter_swap(target, uFirst + off);
+    }
+  }
 };
 
 ///
@@ -445,63 +504,6 @@ public:
     (std::cout << ... << std::forward<Args>(args)) << std::endl;
   }
 };
-
-template<class _RanIt, class _RngFn>
-inline void shuffle(_RanIt _First, _RanIt _Last, _RngFn&& _RngFunc) {
-  // shuffle [_First, _Last) using random function _RngFunc
-  auto _UFirst = _First;
-  const auto _ULast = _Last;
-  if (_UFirst == _ULast) {
-    return;
-  }
-
-  typedef typename std::iterator_traits<_RanIt>::difference_type _Diff;
-  typedef typename std::make_unsigned<_Diff>::type _Udiff;
-
-  _Udiff _Bits = 8 * sizeof(_Udiff);
-  _Udiff _Bmask = _Udiff(-1);
-
-  auto _UTarget = _UFirst;
-  _Diff _Target_index = 1;
-  for (; ++_UTarget != _ULast; ++_Target_index) {
-    // randomly place an element from [_First, _Target] at _Target
-    _Diff _Off;// = _RngFunc(static_cast<_Diff>(_Target_index + 1));
-    _Diff _Index = _Target_index + 1;
-    for (;;) {
-      // try a sample random value
-      _Udiff _Ret = 0;    // random bits
-      _Udiff _Mask = 0;    // 2^N - 1, _Ret is within [0, _Mask]
-
-      while (_Mask < _Udiff(_Index - 1)) {
-        // need more random bits
-        _Ret <<= _Bits - 1;    // avoid full shift
-        _Ret <<= 1;
-        _Udiff _Get_bits;
-        // return a random value within [0, _Bmask]
-        for (;;) {
-          // repeat until random value is in range
-          _Udiff _Val = _RngFunc();
-
-          if (_Val <= _Bmask) {
-            _Get_bits = _Val;
-            break;
-          }
-        }
-        _Ret |= _Get_bits;
-        _Mask <<= _Bits - 1;    // avoid full shift
-        _Mask <<= 1;
-        _Mask |= _Bmask;
-      }
-      // _Ret is [0, _Mask], _Index - 1 <= _Mask, return if unbiased
-      if (_Ret / _Index < _Mask / _Index
-        || _Mask % _Index == _Udiff(_Index - 1)) {
-        _Off = static_cast<_Diff>(_Ret % _Index);
-        break;
-      }
-    }
-    std::iter_swap(_UTarget, _UFirst + _Off);
-  }
-}
 }  // namespace cs
 
 inline constexpr unsigned char operator"" _u8(unsigned long long arg) noexcept {

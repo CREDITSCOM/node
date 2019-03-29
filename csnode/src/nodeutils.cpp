@@ -2,7 +2,6 @@
 #include <csnode/nodeutils.hpp>
 
 namespace cs {
-
 /*static*/
 bool NodeUtils::checkGroupSignature(const cs::ConfidantsKeys& confidants, const cs::Bytes& mask, const cs::Signatures& signatures, const cs::Hash& hash) {
   if (confidants.size() == 0) {
@@ -43,7 +42,7 @@ bool NodeUtils::checkGroupSignature(const cs::ConfidantsKeys& confidants, const 
   size_t cnt = 0;
   bool validSig = true;
   csdebug() << "BlockChain> Hash: " << cs::Utils::byteStreamToHex(hash);
-  for (auto& it : mask) {
+  for (auto it : mask) {
     if (it != cs::ConfidantConsts::InvalidConfidantIndex) {
       if (cscrypto::verifySignature(signatures[signatureCount], confidants[cnt], hash.data(), hash.size())) {
         csdebug() << "BlockChain> Signature of [" << cnt << "] is valid";
@@ -70,7 +69,7 @@ bool NodeUtils::checkGroupSignature(const cs::ConfidantsKeys& confidants, const 
 /*static*/
 size_t NodeUtils::realTrustedValue(const cs::Bytes& mask) {
   size_t cnt = 0;
-  for (auto& it : mask) {
+  for (auto it : mask) {
     if (it != cs::ConfidantConsts::InvalidConfidantIndex) {
       ++cnt;
     }
