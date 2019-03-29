@@ -2,6 +2,9 @@
 #ifndef NETWORK_HPP
 #define NETWORK_HPP
 
+#ifdef __APPLE__
+#include <sys/event.h>
+#endif
 #include <boost/asio.hpp>
 
 #include <client/config.hpp>
@@ -82,6 +85,13 @@ private:
 #elif WIN32
   HANDLE readerEvent_;
   HANDLE writerEvent_;
+#elif __APPLE__
+  int readerKq_;
+  int writerKq_;
+  struct kevent readerEvent_;
+  struct kevent writerEvent_;
+#endif
+#if defined(WIN32) || defined(__APPLE__)
   std::atomic<int> readerTaskCount_ = 0;
   std::atomic<int> writerTaskCount_ = 0;
   std::atomic_flag readerLock = ATOMIC_FLAG_INIT;
