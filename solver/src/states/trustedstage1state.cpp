@@ -148,7 +148,7 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
   return Result::Ignore;
 }
 
-cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::TransactionsPacket& packet) {
+cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::TransactionsPacket& packet) {
   const std::size_t transactionsCount = packet.transactionsCount();
 
   cs::Characteristic characteristic;
@@ -159,7 +159,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, const cs::Tran
 
     cs::Bytes characteristicMask;
     characteristicMask.reserve(transactionsCount);
-    validateTransactions(context, characteristicMask, packet);
+    validateTransactions(context, characteristicMask, packet.transactions());
     checkRejectedSmarts(context, characteristicMask, packet);
 
     characteristic.mask = std::move(characteristicMask);
@@ -229,9 +229,8 @@ void TrustedStage1State::checkRejectedSmarts(SolverContext& context, cs::Bytes& 
   }
 }
 
-void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes& characteristicMask, const cs::TransactionsPacket& packet) {
-  const size_t transactionsCount = packet.transactionsCount();
-  const auto& transactions = packet.transactions();
+void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes& characteristicMask, const Transactions& transactions) {
+  const size_t transactionsCount = transactions.size();
   // validate each transaction
   for (size_t i = 0; i < transactionsCount; ++i) {
     const csdb::Transaction& transaction = transactions[i];
@@ -254,8 +253,8 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
     characteristicMask.push_back(isValid ? static_cast<cs::Byte>(1) : static_cast<cs::Byte>(0));
   }
   //validation of all transactions by graph
-  ptransval->checkRejectedSmarts(context, packet.transactions(), characteristicMask);
-  ptransval->validateByGraph(context, characteristicMask, packet.transactions());
+  ptransval->checkRejectedSmarts(context, transactions, characteristicMask);
+  ptransval->validateByGraph(context, characteristicMask, transactions);
   if (ptransval->getCntRemovedTrxsByGraph() > 0) {
     cslog() << "Validator: num of trxs rejected by graph validation - "
             << ptransval->getCntRemovedTrxsByGraph();
@@ -269,7 +268,7 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
 }
 
 void TrustedStage1State::checkTransactionsSignatures(SolverContext& context,
-                                                     const std::vector<csdb::Transaction>& transactions,
+                                                     const Transactions& transactions,
                                                      cs::Bytes& characteristicMask,
                                                      csdb::Pool& excluded) {
   size_t transactionsCount = transactions.size();

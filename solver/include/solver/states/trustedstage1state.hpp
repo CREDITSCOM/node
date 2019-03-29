@@ -9,6 +9,7 @@
 
 #include <memory>
 #include <set>
+#include <vector>
 
 namespace cs {
 class TransactionsPacket;
@@ -31,6 +32,8 @@ namespace cs {
 
 class TrustedStage1State : public DefaultStateBehavior {
 public:
+  using Transactions = std::vector<csdb::Transaction>;
+
   ~TrustedStage1State() override {
   }
 
@@ -59,12 +62,12 @@ protected:
 
   bool checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction);
   void checkTransactionsSignatures(SolverContext& context,
-                                   const std::vector<csdb::Transaction>& transactions,
+                                   const Transactions& transactions,
                                    cs::Bytes& characteristicMask,
                                    csdb::Pool& excluded);
-  cs::Hash build_vector(SolverContext& context, const cs::TransactionsPacket& trans_pack);
+  cs::Hash build_vector(SolverContext& context, TransactionsPacket& trans_pack);
   cs::Hash formHashFromCharacteristic(const cs::Characteristic& characteristic);
-  void validateTransactions(SolverContext&, cs::Bytes& characteristicMask, const cs::TransactionsPacket&);
+  void validateTransactions(SolverContext&, cs::Bytes& characteristicMask, const Transactions&);
   void checkRejectedSmarts(SolverContext&, cs::Bytes& characteristicMask, const cs::TransactionsPacket&);
   void checkSignaturesSmartSource(SolverContext&, cs::Packets& smartContractsPackets);
 };
