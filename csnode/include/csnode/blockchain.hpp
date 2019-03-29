@@ -201,7 +201,7 @@ public slots:
   // info
   
   size_t getSize() const;
-  uint64_t getWalletsCount();
+  uint64_t getWalletsCountWithBalance();
   csdb::PoolHash getLastHash() const;
   cs::Sequence getLastSequence() const;
   csdb::PoolHash getHashBySequence(cs::Sequence seq) const;

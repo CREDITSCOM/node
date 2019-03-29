@@ -269,7 +269,7 @@ void TransactionsValidator::makeSmartsValid(SolverContext& context,
 }
 
 void TransactionsValidator::validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded,
-                                            const Transactions& trxs, csdb::Pool& trxsExcluded) {
+                                            const Transactions& trxs) {
   payableMaxFees_.clear();
   rejectedNewStates_.clear();
 
@@ -281,22 +281,22 @@ void TransactionsValidator::validateByGraph(SolverContext& context, Characterist
       continue;
     }
 
-    removeTransactions(context, currNode, trxs, maskIncluded, trxsExcluded);
+    removeTransactions(context, currNode, trxs, maskIncluded);
   }
 }
 
 void TransactionsValidator::removeTransactions(SolverContext& context, Node& node, const Transactions& trxs,
-                                               CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded) {
-  if (removeTransactions_PositiveOne(context, node, trxs, maskIncluded, trxsExcluded)) {
+                                               CharacteristicMask& maskIncluded) {
+  if (removeTransactions_PositiveOne(context, node, trxs, maskIncluded)) {
     return;
   }
-  if (removeTransactions_PositiveAll(context, node, trxs, maskIncluded, trxsExcluded)) {
+  if (removeTransactions_PositiveAll(context, node, trxs, maskIncluded)) {
     return;
   }
-  if (removeTransactions_NegativeOne(context, node, trxs, maskIncluded, trxsExcluded)) {
+  if (removeTransactions_NegativeOne(context, node, trxs, maskIncluded)) {
     return;
   }
-  if (removeTransactions_NegativeAll(context, node, trxs, maskIncluded, trxsExcluded)) {
+  if (removeTransactions_NegativeAll(context, node, trxs, maskIncluded)) {
     return;
   }
 
@@ -304,7 +304,7 @@ void TransactionsValidator::removeTransactions(SolverContext& context, Node& nod
 }
 
 bool TransactionsValidator::removeTransactions_PositiveOne(SolverContext& context, Node& node, const Transactions& trxs,
-                                                           CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded) {
+                                                           CharacteristicMask& maskIncluded) {
   if (node.balance_ >= zeroBalance_)
     return true;
 
@@ -339,10 +339,6 @@ bool TransactionsValidator::removeTransactions_PositiveOne(SolverContext& contex
 
     maskIncluded[trxInd] = kInvalidMarker;
 
-#ifndef WITHOUT_BAD_BLOCK
-    trxsExcluded.add_transaction(trx);
-#endif
-
     if (smarts.is_known_smart_contract(trx.target())) {
       node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.max_fee().to_double());
     } else {
@@ -362,7 +358,7 @@ bool TransactionsValidator::removeTransactions_PositiveOne(SolverContext& contex
 }
 
 bool TransactionsValidator::removeTransactions_PositiveAll(SolverContext& context, Node& node, const Transactions& trxs,
-                                                           CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded) {
+                                                           CharacteristicMask& maskIncluded) {
   if (node.balance_ >= zeroBalance_)
     return true;
 
@@ -382,10 +378,6 @@ bool TransactionsValidator::removeTransactions_PositiveAll(SolverContext& contex
     }
 
     maskIncluded[trxInd] = kInvalidMarker;
-
-#ifndef WITHOUT_BAD_BLOCK
-    trxsExcluded.add_transaction(trx);
-#endif
 
     if (smarts.is_known_smart_contract(trx.target())) {
       node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.max_fee().to_double());
@@ -408,7 +400,7 @@ bool TransactionsValidator::removeTransactions_PositiveAll(SolverContext& contex
 }
 
 bool TransactionsValidator::removeTransactions_NegativeOne(SolverContext& context, Node& node, const Transactions& trxs,
-                                                           CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded) {
+                                                           CharacteristicMask& maskIncluded) {
   if (node.balance_ >= zeroBalance_)
     return true;
 
@@ -435,10 +427,6 @@ bool TransactionsValidator::removeTransactions_NegativeOne(SolverContext& contex
 
     maskIncluded[trxInd] = kInvalidMarker;
 
-#ifndef WITHOUT_BAD_BLOCK
-    trxsExcluded.add_transaction(trx);
-#endif
-
     if (smarts.is_known_smart_contract(trx.target())) {
       node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.max_fee().to_double());
     } else {
@@ -460,7 +448,7 @@ bool TransactionsValidator::removeTransactions_NegativeOne(SolverContext& contex
 }
 
 bool TransactionsValidator::removeTransactions_NegativeAll(SolverContext& context, Node& node, const Transactions& trxs,
-                                                           CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded) {
+                                                           CharacteristicMask& maskIncluded) {
   if (node.balance_ >= zeroBalance_)
     return true;
 
@@ -474,10 +462,6 @@ bool TransactionsValidator::removeTransactions_NegativeAll(SolverContext& contex
     Node& destNode = walletsState_.getData(trx.target(), walletId);
 
     maskIncluded[trxInd] = kInvalidMarker;
-
-#ifndef WITHOUT_BAD_BLOCK
-    trxsExcluded.add_transaction(trx);
-#endif
 
     if (smarts.is_known_smart_contract(trx.target())) {
       node.balance_ = node.balance_ + trx.amount() + csdb::Amount(trx.max_fee().to_double());

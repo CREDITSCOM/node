@@ -1843,7 +1843,7 @@ APIHandler::WalletsGet(WalletsGetResult& _return,
     _return.wallets.push_back(wi);
   }
 
-  _return.count = s_blockchain.getWalletsCount();
+  _return.count = s_blockchain.getWalletsCountWithBalance();
 }
 
 void

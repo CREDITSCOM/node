@@ -587,9 +587,19 @@ csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
   return blockHashes_->find(seq);
 }
 
-uint64_t BlockChain::getWalletsCount() {
+uint64_t BlockChain::getWalletsCountWithBalance() {
   std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
-  return walletsCacheStorage_->getCount();
+
+  uint64_t count = 0;
+  auto proc = [&](const WalletData::Address& addr, const WalletData& wallet) {
+    constexpr csdb::Amount zero_balance(0);
+    if (!addr.empty() && wallet.balance_ >= zero_balance) {
+      count++;
+    }
+    return true;
+  };
+  walletsCacheStorage_->iterateOverWallets(proc);
+  return count;
 }
 
 class BlockChain::TransactionsLoader {

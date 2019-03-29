@@ -189,6 +189,7 @@ void Network::writerRoutine(const Config& config) {
   std::vector<struct iovec> iovecs;
   std::vector<std::array<char, Packet::MaxSize>> packets_buffer;
   std::vector<boost::asio::mutable_buffer> encoded_packets;
+  std::vector<TaskPtr<OPacMan>> tasks_vector;
 #endif
   while (stopWriterRoutine == false) { //changed from true
 #ifdef __linux__
@@ -201,17 +202,18 @@ void Network::writerRoutine(const Config& config) {
     iovecs.resize(tasks);
     std::fill(iovecs.begin(), iovecs.end(), iovec{});
     packets_buffer.resize(tasks);
+    tasks_vector.reserve(tasks);
     encoded_packets.clear();
 
     for (uint64_t i = 0; i < tasks; i++) {
-      auto task = oPacMan_.getNextTask();
-      encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[i].data(), Packet::MaxSize)));
+      tasks_vector.emplace_back(oPacMan_.getNextTask());
+      encoded_packets.emplace_back(tasks_vector[i]->pack.encode(buffer(packets_buffer[i].data(), Packet::MaxSize)));
       iovecs[i].iov_base = encoded_packets[i].data();
       iovecs[i].iov_len = encoded_packets[i].size();
       msg[i].msg_hdr.msg_iov = &iovecs[i];
       msg[i].msg_hdr.msg_iovlen = 1;
-      msg[i].msg_hdr.msg_name = task->endpoint.data();
-      msg[i].msg_hdr.msg_namelen = task->endpoint.size();
+      msg[i].msg_hdr.msg_name = tasks_vector[i]->endpoint.data();
+      msg[i].msg_hdr.msg_namelen = tasks_vector[i]->endpoint.size();
     }
     int sended = 0;
     struct mmsghdr *messages = msg.data();
@@ -220,6 +222,7 @@ void Network::writerRoutine(const Config& config) {
       messages += sended;
       tasks -= sended;
     } while (tasks);
+    tasks_vector.clear();
 #elif WIN32
     WaitForSingleObject(writerEvent_, INFINITE);
     while (writerLock.test_and_set(std::memory_order_acquire)) // acquire lock

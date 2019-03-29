@@ -7,6 +7,7 @@
 #include <limits>
 #include <csnode/walletsstate.hpp>
 #include <vector>
+#include <map>
 
 namespace cs {
 
@@ -30,9 +31,9 @@ public:
   void reset(size_t transactionsNum);
   bool validateTransaction(SolverContext& context, const Transactions& trxs, size_t trxInd);
   void checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
-  void validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded,
-                       const Transactions& trxs, csdb::Pool& trxsExcluded);
-  size_t getCntRemovedTrxs() const {
+  void validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded, const Transactions& trxs);
+
+  size_t getCntRemovedTrxsByGraph() const {
     return cntRemovedTrxs_;
   }
 
@@ -52,15 +53,15 @@ private:
   bool validateTransactionAsTarget(const csdb::Transaction& trx);
 
   void removeTransactions(SolverContext& context, Node& node, const Transactions& trxs,
-                          CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded);
+                          CharacteristicMask& maskIncluded);
   bool removeTransactions_PositiveOne(SolverContext& context, Node& node, const Transactions& trxs,
-                                      CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded);
+                                      CharacteristicMask& maskIncluded);
   bool removeTransactions_PositiveAll(SolverContext& context, Node& node, const Transactions& trxs,
-                                      CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded);
+                                      CharacteristicMask& maskIncluded);
   bool removeTransactions_NegativeOne(SolverContext& context, Node& node, const Transactions& trxs,
-                                      CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded);
+                                      CharacteristicMask& maskIncluded);
   bool removeTransactions_NegativeAll(SolverContext& context, Node& node, const Transactions& trxs,
-                                      CharacteristicMask& maskIncluded, csdb::Pool& trxsExcluded);
+                                      CharacteristicMask& maskIncluded);
 
   void makeSmartsValid(SolverContext& context, RejectedSmarts& smarts,
                        const csdb::Address& source, CharacteristicMask& maskIncluded);

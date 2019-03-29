@@ -254,12 +254,17 @@ void TrustedStage1State::validateTransactions(SolverContext& context, cs::Bytes&
     characteristicMask.push_back(isValid ? static_cast<cs::Byte>(1) : static_cast<cs::Byte>(0));
   }
   //validation of all transactions by graph
-  csdb::Pool excluded;
   ptransval->checkRejectedSmarts(context, packet.transactions(), characteristicMask);
-  ptransval->validateByGraph(context, characteristicMask, packet.transactions(), excluded);
-  checkTransactionsSignatures(context, transactions, characteristicMask, excluded);
-  if (excluded.transactions_count() > 0) {
-    cslog() << name() << ": " << excluded.transactions_count() << " transactions were rejected.";
+  ptransval->validateByGraph(context, characteristicMask, packet.transactions());
+  if (ptransval->getCntRemovedTrxsByGraph() > 0) {
+    cslog() << "Validator: num of trxs rejected by graph validation - "
+            << ptransval->getCntRemovedTrxsByGraph();
+  }
+
+  csdb::Pool wrongSignaturesPool;
+  checkTransactionsSignatures(context, transactions, characteristicMask, wrongSignaturesPool);
+  if (wrongSignaturesPool.transactions_count() > 0) {
+    cslog() << "Validator: num of trxs with incorrect signature - " << wrongSignaturesPool.transactions_count();
   }
 }
 
