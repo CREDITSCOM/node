@@ -12,7 +12,6 @@
 #include <lib/system/utils.hpp>
 #include <lib/system/hash.hpp>
 
-/// pointer implementation realization
 struct cs::ConveyerBase::Impl {
   // first storage of transactions, before sending to network
   cs::TransactionsBlock transactionsBlock;
@@ -552,7 +551,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
   newPool.add_real_trusted(cs::Utils::maskToBits(metaPoolInfo.realTrustedMask));
   newPool.set_previous_hash(metaPoolInfo.previousHash);
 
-  if(metaPoolInfo.sequenceNumber>1) {
+  if (metaPoolInfo.sequenceNumber > 1) {
     newPool.add_number_confirmations(static_cast<uint8_t>(metaPoolInfo.confirmationMask.size()));
     newPool.add_confirmation_mask(cs::Utils::maskToBits(metaPoolInfo.confirmationMask));
     newPool.add_round_confirmations(metaPoolInfo.confirmations);

@@ -314,42 +314,49 @@ public:
     return cs::Utils::byteStreamToHex(reinterpret_cast<const char*>(stream), length);
   }
 
-  inline static uint64_t maskToBits(cs::Bytes mask) {
+  inline static uint64_t maskToBits(const cs::Bytes& mask) {
     if (mask.size() > 64) {
       cserror() << "The mask number is larger than the alloowed value";
     }
+
     uint64_t addition = 1;
     uint64_t value = 0;
+
     for (auto& it : mask) {
       if (it != 255U) {
         value += addition;
       }
       addition *= 2;
     }
+
     return value;
   }
 
-  inline static std::vector<uint8_t> bitsToMask(uint8_t size, uint64_t value) {
-    std::vector<uint8_t> mask;
+  inline static cs::Bytes bitsToMask(uint8_t size, uint64_t value) {
+    cs::Bytes mask;
     mask.reserve(static_cast<size_t>(size));
+
     uint64_t valCopy = value;
-    for(uint8_t i = 0; i< size; ++i){
+
+    for(cs::Byte i = 0; i< size; ++i){
       if (valCopy % 2 == 1U) {
         mask.push_back(0U);
       }
       else {
         mask.push_back(255U);
       }
+
       valCopy /= 2U;
     }
+
     return mask;
   }
 
-  inline static uint8_t maskValue(uint64_t value) {
+  inline static cs::Byte maskValue(uint64_t value) {
 #ifdef _MSC_VER
-    uint8_t cnt = static_cast<uint8_t>( __popcnt64(value) );
+    cs::Byte cnt = static_cast<cs::Byte>( __popcnt64(value) );
 #else
-    uint8_t cnt = __builtin_popcountl(value);
+    cs::Byte cnt = __builtin_popcountl(value);
 #endif
     return cnt;
   }
@@ -506,8 +513,8 @@ public:
 };
 }  // namespace cs
 
-inline constexpr unsigned char operator"" _u8(unsigned long long arg) noexcept {
-  return static_cast<unsigned char>(arg);
+inline constexpr cs::Byte operator"" _b(unsigned long long arg) noexcept {
+  return static_cast<cs::Byte>(arg);
 }
 
 inline constexpr char operator"" _i8(unsigned long long arg) noexcept {
