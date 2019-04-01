@@ -112,6 +112,7 @@ public:
   // updates fees in every transaction
   void setTransactionsFees(cs::TransactionsPacket& packet);
   void setTransactionsFees(csdb::Pool& pool);
+  void setTransactionsFees(std::vector<csdb::Transaction>& transactions);
   void addNewWalletsToPool(csdb::Pool& pool);
 
   // block cache
@@ -221,11 +222,6 @@ public slots:
   void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>);
   uint32_t getTransactionsCount(const csdb::Address&);
 #endif
-
-  // updates fees in every transaction
-  void setTransactionsFees(cs::TransactionsPacket& packet);
-  void setTransactionsFees(csdb::Pool& pool);
-  void setTransactionsFees(std::vector<csdb::Transaction>& transactions);
 
 #ifdef TRANSACTIONS_INDEX
   csdb::TransactionID getLastTransaction(const csdb::Address&);
