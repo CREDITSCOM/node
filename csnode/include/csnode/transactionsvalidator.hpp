@@ -32,6 +32,8 @@ public:
   bool validateTransaction(SolverContext& context, const Transactions& trxs, size_t trxInd);
   void checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
   void validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded, const Transactions& trxs);
+  void clearCaches();
+  void addRejectedNewState(const csdb::Address& newState);
 
   size_t getCntRemovedTrxsByGraph() const {
     return cntRemovedTrxs_;

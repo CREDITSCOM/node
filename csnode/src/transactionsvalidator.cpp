@@ -268,11 +268,17 @@ void TransactionsValidator::makeSmartsValid(SolverContext& context,
   }
 }
 
-void TransactionsValidator::validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded,
-                                            const Transactions& trxs) {
+void TransactionsValidator::clearCaches() {
   payableMaxFees_.clear();
   rejectedNewStates_.clear();
+}
 
+void TransactionsValidator::addRejectedNewState(const csdb::Address& newState) {
+  rejectedNewStates_.push_back(newState);
+}
+
+void TransactionsValidator::validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded,
+                                            const Transactions& trxs) {
   while (!negativeNodes_.empty()) {
     Node& currNode = *negativeNodes_.back();
     negativeNodes_.pop_back();

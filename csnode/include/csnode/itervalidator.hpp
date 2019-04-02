@@ -23,7 +23,7 @@ public:
 
   IterValidator(WalletsState& wallets);
   Characteristic formCharacteristic(SolverContext&, Transactions&,
-                                        Packets& smartsPackets);
+                                    Packets& smartsPackets);
 
 private:
   bool validateTransactions(SolverContext&, Bytes& characteristicMask, const Transactions&);

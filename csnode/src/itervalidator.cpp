@@ -26,31 +26,18 @@ Characteristic IterValidator::formCharacteristic(SolverContext& context,
   memset(characteristic.mask.data(), 1, characteristic.mask.size());
 
   checkTransactionsSignatures(context, transactions, characteristic.mask, smartsPackets);
-  auto trxs = removeInvalidTransactions(transactions, characteristic.mask);
 
   bool needNewIteration = false;
   do {
-//    context.blockchain().setTransactionsFees(trxs);
+    context.blockchain().setTransactionsFees(transactions, characteristic.mask);
     context.wallets().updateFromSource();
-    pTransval_->reset(trxs.size());
+    pTransval_->reset(transactions.size());
     needNewIteration = validateTransactions(context, characteristic.mask, transactions);
   } while (needNewIteration);
 
   checkRejectedSmarts(context, characteristic.mask, transactions);
+  pTransval_->clearCaches();
   return characteristic;
-}
-
-IterValidator::Transactions
-IterValidator::removeInvalidTransactions(const Transactions& transactions,
-                                         const Bytes& characteristic) const {
-  Transactions res;
-  const size_t characteristicSize = characteristic.size();
-  for (size_t i = 0; i < transactions.size(); ++i) {
-    if (i < characteristicSize && characteristic[i] == kValidMarker) {
-      res.push_back(transactions[i]);
-    }
-  }
-  return res;
 }
 
 void IterValidator::checkRejectedSmarts(SolverContext& context,
@@ -108,14 +95,20 @@ void IterValidator::checkRejectedSmarts(SolverContext& context,
 }
 
 bool IterValidator::validateTransactions(SolverContext& context, cs::Bytes& characteristicMask, const Transactions& transactions) {
+  bool needOneMoreIteration = false;
   const size_t transactionsCount = transactions.size();
+
   // validate each transaction
   for (size_t i = 0; i < transactionsCount; ++i) {
-    if (characteristicMask[i] == kInvalidMarker) continue;
+    if (characteristicMask[i] == kInvalidMarker) {
+      continue;
+    }
+
     const csdb::Transaction& transaction = transactions[i];
     bool isValid = pTransval_->validateTransaction(context, transactions, i);
     if (!isValid) {
       csdebug() << log_prefix << "transaction[" << i << "] rejected by validator";
+      needOneMoreIteration = true; 
     } else {
       // test with get_valid_smart_address() only for deploy transactions
       if (SmartContracts::is_deploy(transaction)) {
@@ -125,42 +118,52 @@ bool IterValidator::validateTransactions(SolverContext& context, cs::Bytes& char
           isValid = SmartContracts::get_valid_smart_address(deployer, transaction.innerID(),
                                                             sci.value().smartContractDeploy) == transaction.target();
           if (!isValid) {
-            cslog() << log_prefix << ": transaction[" << i << "] rejected, malformed contract address";
+            cslog() << log_prefix << ": transaction[" << i
+                    << "] rejected, malformed contract address";
+            needOneMoreIteration = true; 
           }
         }
       }
     }
-    characteristicMask.push_back(isValid ? static_cast<cs::Byte>(1) : static_cast<cs::Byte>(0));
+    characteristicMask[i] = (isValid ? static_cast<cs::Byte>(1) : static_cast<cs::Byte>(0));
   }
+
   //validation of all transactions by graph
   pTransval_->checkRejectedSmarts(context, transactions, characteristicMask);
   pTransval_->validateByGraph(context, characteristicMask, transactions);
+
   if (pTransval_->getCntRemovedTrxsByGraph() > 0) {
     cslog() << log_prefix  << "num of trxs rejected by graph validation - "
             << pTransval_->getCntRemovedTrxsByGraph();
+    needOneMoreIteration = true;
   }
+
+  return needOneMoreIteration;
 }
 
 void IterValidator::checkTransactionsSignatures(SolverContext& context,
-                                                     const Transactions& transactions,
-                                                     cs::Bytes& characteristicMask,
-                                                     Packets& smartsPackets) {
+                                                const Transactions& transactions,
+                                                cs::Bytes& characteristicMask,
+                                                Packets& smartsPackets) {
   checkSignaturesSmartSource(context, smartsPackets);
   size_t transactionsCount = transactions.size();
   size_t maskSize = characteristicMask.size();
-  size_t rejecteCounter = 0;
+  size_t rejectedCounter = 0;
   for (size_t i = 0; i < transactionsCount; ++i) {
     if (i < maskSize) {
       bool correctSignature = checkTransactionSignature(context, transactions[i]);    
       if (!correctSignature) {
         characteristicMask[i] = 0;      
-        rejecteCounter++;
+        rejectedCounter++;
         cslog() << log_prefix << "transaction[" << i << "] rejected, incorrect signature.";
+        if (SmartContracts::is_new_state(transactions[i])) {
+          pTransval_->addRejectedNewState(context.smart_contracts().absolute_address(transactions[i].source()));
+        }
       }
     }
   }
-  if (rejecteCounter) {
-    cslog() << log_prefix << "wrong signatures num: " << rejecteCounter;
+  if (rejectedCounter) {
+    cslog() << log_prefix << "wrong signatures num: " << rejectedCounter;
   }
 }
 
@@ -241,5 +244,4 @@ void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packe
     }
   }
 }
-
 } // namespace cs
