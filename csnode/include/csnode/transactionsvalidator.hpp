@@ -32,12 +32,11 @@ public:
   bool validateTransaction(SolverContext& context, const Transactions& trxs, size_t trxInd);
   void checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
   void validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded, const Transactions& trxs);
+
   void clearCaches();
   void addRejectedNewState(const csdb::Address& newState);
 
-  size_t getCntRemovedTrxsByGraph() const {
-    return cntRemovedTrxs_;
-  }
+  size_t getCntRemovedTrxsByGraph() const;
 
 private:
   using TrxList = std::vector<TransactionIndex>;
@@ -76,5 +75,19 @@ private:
   Stack negativeNodes_;
   size_t cntRemovedTrxs_;
 };
+
+inline void TransactionsValidator::clearCaches() {
+  payableMaxFees_.clear();
+  rejectedNewStates_.clear();
+}
+
+inline void TransactionsValidator::addRejectedNewState(const csdb::Address& newState) {
+  rejectedNewStates_.push_back(newState);
+}
+
+inline size_t TransactionsValidator::getCntRemovedTrxsByGraph() const {
+  return cntRemovedTrxs_;
+}
+
 }  // namespace cs
 #endif // TRANSACTIONS_VALIDATOR_HPP
