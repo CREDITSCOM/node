@@ -28,6 +28,7 @@ public:  // Static interface
   ///         If the binary representation is incorrect, an empty hash is returned.
   ///
   static TransactionsPacketHash fromBinary(const cs::Bytes& data);
+  static TransactionsPacketHash fromBinary(cs::Bytes&& data);
 
   ///
   /// @brief Calculates hash from binary data
