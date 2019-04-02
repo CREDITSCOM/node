@@ -49,7 +49,7 @@ void IterValidator::checkRejectedSmarts(SolverContext& context,
   size_t mask_size = characteristicMask.size();
   size_t i = 0;
   for(const auto& tr : transactions) {
-    if(i < mask_size && *(characteristicMask.cbegin() + i) == 0) {
+    if(i < mask_size && *(characteristicMask.cbegin() + i) == kInvalidMarker) {
       if(smarts.is_known_smart_contract(tr.source())) {
         smart_rejected.insert(smarts.absolute_address(tr.source()));
       }
@@ -125,7 +125,7 @@ bool IterValidator::validateTransactions(SolverContext& context, cs::Bytes& char
         }
       }
     }
-    characteristicMask[i] = (isValid ? static_cast<cs::Byte>(1) : static_cast<cs::Byte>(0));
+    characteristicMask[i] = (isValid ? kValidMarker : kInvalidMarker);
   }
 
   //validation of all transactions by graph
@@ -153,7 +153,7 @@ void IterValidator::checkTransactionsSignatures(SolverContext& context,
     if (i < maskSize) {
       bool correctSignature = checkTransactionSignature(context, transactions[i]);    
       if (!correctSignature) {
-        characteristicMask[i] = 0;      
+        characteristicMask[i] = kInvalidMarker;      
         rejectedCounter++;
         cslog() << log_prefix << "transaction[" << i << "] rejected, incorrect signature.";
         if (SmartContracts::is_new_state(transactions[i])) {
