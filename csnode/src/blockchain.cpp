@@ -163,6 +163,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
 #else
       csdb::PoolHash lapoo = getLastTransaction(key).pool_hash();
 #endif
+      std::lock_guard<decltype(dbLock_)> l(dbLock_);
       storage_.set_previous_transaction_block(key, pool.hash(), lapoo);
     }
   };
