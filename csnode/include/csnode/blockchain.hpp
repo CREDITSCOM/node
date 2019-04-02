@@ -113,6 +113,9 @@ public:
   void setTransactionsFees(cs::TransactionsPacket& packet);
   void setTransactionsFees(csdb::Pool& pool);
   void setTransactionsFees(std::vector<csdb::Transaction>& transactions);
+  void setTransactionsFees(std::vector<csdb::Transaction>& transactions,
+                           const cs::Bytes& characteristicMask);
+
   void addNewWalletsToPool(csdb::Pool& pool);
 
   // block cache

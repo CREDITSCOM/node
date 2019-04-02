@@ -1209,6 +1209,13 @@ void BlockChain::setTransactionsFees(std::vector<csdb::Transaction>& transaction
   }
 }
 
+void BlockChain::setTransactionsFees(std::vector<csdb::Transaction>& transactions,
+    const cs::Bytes& characteristicMask) {
+  if (fee_) {
+    fee_->CountFeesInPool(*this, transactions, characteristicMask);
+  }
+}
+
 const csdb::Address& BlockChain::getGenesisAddress() const {
   return genesisAddress_;
 }
