@@ -35,7 +35,8 @@ public:
    *
    * @param transactions - transactions from current pool.
    */
-  csdb::Amount CountFeesInPool(const BlockChain& blockchain, Transactions& transactions);
+  csdb::Amount CountFeesInPool(const BlockChain& blockchain, Transactions& transactions,
+                               const Bytes& characteristicMask = {});
 
   /**
    * @brief Reset internal cache. Shout be called explicitly when restart node
@@ -54,13 +55,14 @@ private:
    *  one_byte_cost_ member) should be multiplied by number of bytes
    *  in transaction.
    */
-  void CountOneByteCost(const BlockChain& blockchain, Transactions& transactions);
+  void CountOneByteCost(const BlockChain& blockchain, Transactions& transactions,
+                        const Bytes& characteristicMask);
 
   /** @brief Set "counted_fee_" field for each transaction in transactions_.
    *
    *  To find counted fee it multiplies size of transaction by one_byte_cost_.
    */
-  void SetCountedFee(Transactions& transactions);
+  void SetCountedFee(Transactions& transactions, const Bytes& characteristicMask);
 
   /** @brief Counts cost of the current round.
    *
@@ -78,7 +80,7 @@ private:
   void CountRoundsFrequency(const BlockChain& blockchain);
 
   double CountBlockTimeStampDifference(size_t num_block_from, const BlockChain& blockchain);
-  void CountTotalTransactionsLength(Transactions& transactions);
+  void CountTotalTransactionsLength(Transactions& transactions, const Bytes& characteristicMask);
   size_t EstimateNumOfNodesInNetwork(const BlockChain& blockchain);
   void AddConfidants(const std::vector<cs::PublicKey>& pool);
   bool TakeDecisionOnCacheUpdate(const BlockChain& blockchain);

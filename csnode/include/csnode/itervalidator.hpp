@@ -38,6 +38,9 @@ private:
                                    Packets& smartsPackets);
   bool checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction);
 
+  Transactions removeInvalidTransactions(const Transactions& transactions,
+                                         const Bytes& characteristic) const;
+
   std::unique_ptr<TransactionsValidator> pTransval_;
   std::set<csdb::Address> smartSourceInvalidSignatures_;
 };

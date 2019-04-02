@@ -26,12 +26,13 @@ Characteristic IterValidator::formCharacteristic(SolverContext& context,
   memset(characteristic.mask.data(), 1, characteristic.mask.size());
 
   checkTransactionsSignatures(context, transactions, characteristic.mask, smartsPackets);
+  auto trxs = removeInvalidTransactions(transactions, characteristic.mask);
 
   bool needNewIteration = false;
   do {
-    context.blockchain().setTransactionsFees(transactions);
+//    context.blockchain().setTransactionsFees(trxs);
     context.wallets().updateFromSource();
-    pTransval_->reset(transactions.size());
+    pTransval_->reset(trxs.size());
     needNewIteration = validateTransactions(context, characteristic.mask, transactions);
   } while (needNewIteration);
 
@@ -39,8 +40,21 @@ Characteristic IterValidator::formCharacteristic(SolverContext& context,
   return characteristic;
 }
 
-void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& characteristicMask,
-    const Transactions& transactions) {
+IterValidator::Transactions
+IterValidator::removeInvalidTransactions(const Transactions& transactions,
+                                         const Bytes& characteristic) const {
+  Transactions res;
+  const size_t characteristicSize = characteristic.size();
+  for (size_t i = 0; i < transactions.size(); ++i) {
+    if (i < characteristicSize && characteristic[i] == kValidMarker) {
+      res.push_back(transactions[i]);
+    }
+  }
+  return res;
+}
+
+void IterValidator::checkRejectedSmarts(SolverContext& context,
+    cs::Bytes& characteristicMask, const Transactions& transactions) {
   // test if any of smart-emitted transaction rejected, reject all transactions from this smart
   // 1. collect rejected smart addresses
   const auto& smarts = context.smart_contracts();

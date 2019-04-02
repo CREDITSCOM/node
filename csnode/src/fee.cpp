@@ -9,6 +9,7 @@
 #include <string>
 #include <limits>
 #include <algorithm>
+#include <cassert>
 
 #include <csdb/amount_commission.hpp>
 #include <csdb/transaction.hpp>
@@ -24,6 +25,8 @@ constexpr double kNodeRentalCostPerDay = 100. / 30.5 / kMarketRateCS;
 constexpr size_t kNumOfBlocksToCountFrequency = 100;
 constexpr size_t kBlocksNumForNodesQtyEstimation = 100;
 constexpr size_t kDefaultRoundFrequency = 5;
+constexpr uint8_t kInvalidMarker = 0;
+constexpr uint8_t kValidMarker = 1;
 }  // namespace
 
 Fee::Fee()
@@ -34,7 +37,8 @@ Fee::Fee()
     rounds_frequency_(0),
     update_trusted_cache_(true) {}
 
-csdb::Amount Fee::CountFeesInPool(const BlockChain& blockchain, Transactions& transactions) {
+csdb::Amount Fee::CountFeesInPool(const BlockChain& blockchain, Transactions& transactions,
+    const Bytes& characteristicMask) {
   update_trusted_cache_ = TakeDecisionOnCacheUpdate(blockchain);
   num_of_last_block_ = blockchain.getLastSequence();
 
@@ -42,8 +46,8 @@ csdb::Amount Fee::CountFeesInPool(const BlockChain& blockchain, Transactions& tr
     EstimateNumOfNodesInNetwork(blockchain);
     return csdb::Amount(0);
   }
-  CountOneByteCost(blockchain, transactions);
-  SetCountedFee(transactions);
+  CountOneByteCost(blockchain, transactions, characteristicMask);
+  SetCountedFee(transactions, characteristicMask);
   return csdb::Amount(one_round_cost_);
 }
 
@@ -58,15 +62,28 @@ bool Fee::TakeDecisionOnCacheUpdate(const BlockChain& blockchain) {
   }
 }
 
-void Fee::SetCountedFee(Transactions& transactions) {
-  for (auto& transaction : transactions) {
-    const size_t size_of_transaction = transaction.to_byte_stream().size();
-    const double counted_fee = one_byte_cost_ * size_of_transaction;
-    transaction.set_counted_fee(csdb::AmountCommission(std::max(kMinFee, counted_fee)));
+void Fee::SetCountedFee(Transactions& transactions, const Bytes& characteristicMask) {
+  auto maskSize = characteristicMask.size();
+  if (!maskSize) {
+    for (auto& transaction : transactions) {
+      size_t size_of_transaction = transaction.to_byte_stream().size();
+      double counted_fee = one_byte_cost_ * size_of_transaction;
+      transaction.set_counted_fee(csdb::AmountCommission(std::max(kMinFee, counted_fee)));
+    }
+  } else {
+    assert(transactions.size() == maskSize);
+    for (size_t i = 0; i < transactions.size(); ++i) {
+      if (i < maskSize && characteristicMask[i] == kValidMarker) {
+        size_t size_of_transaction = transactions[i].to_byte_stream().size();
+        double counted_fee = one_byte_cost_ * size_of_transaction;
+        transactions[i].set_counted_fee(csdb::AmountCommission(std::max(kMinFee, counted_fee)));
+      }
+    }  
   }
 }
 
-void Fee::CountOneByteCost(const BlockChain& blockchain, Transactions& transactions) {
+void Fee::CountOneByteCost(const BlockChain& blockchain, Transactions& transactions,
+    const Bytes& characteristicMask) {
   if (num_of_last_block_ == 0) {
     one_byte_cost_ = 0;
     return;
@@ -78,16 +95,26 @@ void Fee::CountOneByteCost(const BlockChain& blockchain, Transactions& transacti
     return;
   }
 
-  CountTotalTransactionsLength(transactions);
+  CountTotalTransactionsLength(transactions, characteristicMask);
   CountOneRoundCost(blockchain);
   one_byte_cost_ = one_round_cost_ / total_transactions_length_;
 }
 
-void Fee::CountTotalTransactionsLength(Transactions& transactions) {
+void Fee::CountTotalTransactionsLength(Transactions& transactions,
+    const Bytes& characteristicMask) {
   total_transactions_length_ = 0;
-
-  for (const auto& transaction : transactions) {
-    total_transactions_length_ += transaction.to_byte_stream().size();
+  auto maskSize = characteristicMask.size();
+  if (!maskSize) {
+    for (const auto& transaction : transactions) {
+      total_transactions_length_ += transaction.to_byte_stream().size();
+    }
+  } else {
+    assert(transactions.size() == maskSize);
+    for (size_t i = 0; i < transactions.size(); ++i) {
+      if (i < maskSize && characteristicMask[i] == kValidMarker) {
+        total_transactions_length_ += transactions[i].to_byte_stream().size();
+      }
+    }
   }
 }
 
