@@ -106,18 +106,18 @@ bool IterValidator::validateTransactions(SolverContext& context, cs::Bytes& char
 
     const csdb::Transaction& transaction = transactions[i];
     bool isValid = pTransval_->validateTransaction(context, transactions, i);
+
+    if (isValid && SmartContracts::is_deploy(transaction)) {
+      isValid = deployAdditionalCheck(context, i, transaction);
+    }
+
     if (!isValid) {
       csdebug() << log_prefix << "transaction[" << i << "] rejected by validator";
-      needOneMoreIteration = true; 
+      characteristicMask[i] = kInvalidMarker;
+      needOneMoreIteration = true;
     } else {
-      if (SmartContracts::is_deploy(transaction)) {
-        isValid = deployAdditionalCheck(context, i, transaction);
-        if (!isValid) {
-          needOneMoreIteration = true; 
-        }
-      }
+      characteristicMask[i] = kValidMarker;    
     }
-    characteristicMask[i] = (isValid ? kValidMarker : kInvalidMarker);
   }
 
   //validation of all transactions by graph
