@@ -393,11 +393,16 @@ csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) cons
 
 csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-
-  if (deferredBlock_.hash() == transId.pool_hash())
-    return deferredBlock_.transaction(transId).clone();
-
-  return storage_.transaction(transId);
+  csdb::Transaction trxn;
+  if (deferredBlock_.hash() == transId.pool_hash()) {
+    trxn = deferredBlock_.transaction(transId).clone();
+    trxn.set_time(deferredBlock_.get_time());
+  }
+  else {
+    trxn = storage_.transaction(transId);
+    trxn.set_time(storage_.pool_load(transId.pool_hash()).get_time());
+  }
+  return trxn;
 }
 
 void BlockChain::removeLastBlock() {
@@ -1307,6 +1312,10 @@ void BlockChain::setTransactionsFees(csdb::Pool& pool) {
   if (fee_) {
     fee_->CountFeesInPool(*this, &pool);
   }
+}
+
+const csdb::Address& BlockChain::getGenesisAddress() const {
+  return genesisAddress_;
 }
 
 csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) const {

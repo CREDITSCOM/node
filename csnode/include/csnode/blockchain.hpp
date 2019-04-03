@@ -182,6 +182,8 @@ public:
 
   void addNewWalletsToPool(csdb::Pool& pool);
 
+  const csdb::Address& BlockChain::getGenesisAddress() const;
+
 private:
 
   void writeGenesisBlock();
