@@ -9,10 +9,6 @@
 #include <csnode/nodecore.hpp>
 #include <lib/system/common.hpp>
 
-namespace csdb {
-class Pool;
-} // namespace csdb
-
 namespace cs {
 class SolverContext;
 class WalletsState;
@@ -37,9 +33,6 @@ private:
                                    Bytes& characteristicMask,
                                    Packets& smartsPackets);
   bool checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction);
-
-  Transactions removeInvalidTransactions(const Transactions& transactions,
-                                         const Bytes& characteristic) const;
 
   std::unique_ptr<TransactionsValidator> pTransval_;
   std::set<csdb::Address> smartSourceInvalidSignatures_;
