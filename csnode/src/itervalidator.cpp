@@ -28,11 +28,14 @@ Characteristic IterValidator::formCharacteristic(SolverContext& context,
   checkTransactionsSignatures(context, transactions, characteristic.mask, smartsPackets);
 
   bool needNewIteration = false;
+  size_t iterationCounter = 1;
   do {
+    csdebug() << log_prefix << "current iteration: " << iterationCounter;
     context.blockchain().setTransactionsFees(transactions, characteristic.mask);
     context.wallets().updateFromSource();
     pTransval_->reset(transactions.size());
     needNewIteration = validateTransactions(context, characteristic.mask, transactions);
+    ++iterationCounter;
   } while (needNewIteration);
 
   checkRejectedSmarts(context, characteristic.mask, transactions);
