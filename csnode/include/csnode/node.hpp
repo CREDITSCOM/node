@@ -17,6 +17,7 @@
 #include "blockchain.hpp"
 #include "packstream.hpp"
 #include "roundstat.hpp"
+#include "confirmationlist.hpp"
 
 class Transport;
 
@@ -58,13 +59,16 @@ public:
   void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
   void sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respondent);
   void getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
+
   //consensus communication
   void sendStageOne(cs::StageOne&);
   void sendStageTwo(cs::StageTwo&);
   void sendStageThree(cs::StageThree&);
+
   void getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
   void getStageThree(const uint8_t* data, const size_t size);
+
   void adjustStageThreeStorage();
   void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required/*, uint8_t iteration*/);
   void getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
@@ -148,6 +152,11 @@ public:
   bool isPoolsSyncroStarted();
 
   //void smartStagesStorageClear(size_t cSize);
+  
+  std::optional<cs::TrustedConfirmation> getConfirmation(cs::RoundNumber rNum) const
+  {
+    return confirmationList.find(rNum);
+  }
   
   enum Level {
     Normal,
@@ -368,6 +377,9 @@ private:
 
   // round stat
   cs::RoundStat stat_;
+
+  // confirmation list
+  cs::ConfirmationList confirmationList;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

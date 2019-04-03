@@ -13,6 +13,10 @@
 #include <vector>
 #endif
 
+#ifdef __APPLE__
+#include <sys/time.h>
+#endif
+
 #include "network.hpp"
 #include "transport.hpp"
 
@@ -32,11 +36,7 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
 #ifndef __APPLE__
     sock.set_option(ip::udp::socket::send_buffer_size(1 << 23));
     sock.set_option(ip::udp::socket::receive_buffer_size(1 << 23));
-#else
-    sock.non_blocking(true);
-#endif
-
-#ifdef WIN32
+#elif WIN32
     BOOL bNewBehavior = FALSE;
     DWORD dwBytesReturned = 0;
     WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof bNewBehavior, NULL, 0, &dwBytesReturned,
@@ -99,39 +99,28 @@ void Network::readerRoutine(const Config& config) {
 
   while (stopReaderRoutine == false) { // changed from true
     auto& task = iPacMan_.allocNext();
-#ifdef __APPLE__
-    uint32_t cnt = 0;
-    do {
-      if (stopReaderRoutine) {
-        return;
-      }
 
-      packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
-      task.size = task.pack.decode(packetSize);
-
-      if (++cnt == 10) {
-        cnt = 0;
-        std::this_thread::yield();
-      }
-    } while (lastError == boost::asio::error::would_block);
-#else
     if (stopReaderRoutine) {
         return;
     }
 
     packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
     task.size = task.pack.decode(packetSize);
-#endif
     if (!lastError) {
       iPacMan_.enQueueLast();
 #ifdef __linux__
       static uint64_t one = 1;
-      int s = write(readerEventfd_, &one, sizeof(uint64_t));
-#elif WIN32
+      write(readerEventfd_, &one, sizeof(uint64_t));
+#endif
+#if defined(WIN32) || defined(__APPLE__)
       while (readerLock.test_and_set(std::memory_order_acquire)) // acquire lock
         ; // spin
       readerTaskCount_.fetch_add(1, std::memory_order_relaxed);
+#ifdef WIN32
       SetEvent(readerEvent_);
+#else
+      kevent(readerKq_, &readerEvent_, 1, NULL, 0, NULL);
+#endif
       readerLock.clear(std::memory_order_release); // release lock
 #endif
 #ifdef LOG_NET
@@ -189,6 +178,7 @@ void Network::writerRoutine(const Config& config) {
   std::vector<struct iovec> iovecs;
   std::vector<std::array<char, Packet::MaxSize>> packets_buffer;
   std::vector<boost::asio::mutable_buffer> encoded_packets;
+  std::vector<TaskPtr<OPacMan>> tasks_vector;
 #endif
   while (stopWriterRoutine == false) { //changed from true
 #ifdef __linux__
@@ -201,17 +191,18 @@ void Network::writerRoutine(const Config& config) {
     iovecs.resize(tasks);
     std::fill(iovecs.begin(), iovecs.end(), iovec{});
     packets_buffer.resize(tasks);
+    tasks_vector.reserve(tasks);
     encoded_packets.clear();
 
     for (uint64_t i = 0; i < tasks; i++) {
-      auto task = oPacMan_.getNextTask();
-      encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[i].data(), Packet::MaxSize)));
+      tasks_vector.emplace_back(oPacMan_.getNextTask());
+      encoded_packets.emplace_back(tasks_vector[i]->pack.encode(buffer(packets_buffer[i].data(), Packet::MaxSize)));
       iovecs[i].iov_base = encoded_packets[i].data();
       iovecs[i].iov_len = encoded_packets[i].size();
       msg[i].msg_hdr.msg_iov = &iovecs[i];
       msg[i].msg_hdr.msg_iovlen = 1;
-      msg[i].msg_hdr.msg_name = task->endpoint.data();
-      msg[i].msg_hdr.msg_namelen = task->endpoint.size();
+      msg[i].msg_hdr.msg_name = tasks_vector[i]->endpoint.data();
+      msg[i].msg_hdr.msg_namelen = tasks_vector[i]->endpoint.size();
     }
     int sended = 0;
     struct mmsghdr *messages = msg.data();
@@ -220,8 +211,15 @@ void Network::writerRoutine(const Config& config) {
       messages += sended;
       tasks -= sended;
     } while (tasks);
-#elif WIN32
+    tasks_vector.clear();
+#endif
+#if defined(WIN32) || defined(__APPLE__)
+#ifdef WIN32
     WaitForSingleObject(writerEvent_, INFINITE);
+#else
+    struct kevent event;
+    kevent(writerKq_, NULL, 0, &event, 1, NULL);
+#endif
     while (writerLock.test_and_set(std::memory_order_acquire)) // acquire lock
       ; // spin
     int tasks = writerTaskCount_;
@@ -232,9 +230,6 @@ void Network::writerRoutine(const Config& config) {
       auto task = oPacMan_.getNextTask();
       sendPack(*sock, task, task->endpoint);
     }
-#elif __APPLE__
-    auto task = oPacMan_.getNextTask();
-    sendPack(*sock, task, task->endpoint);
 #endif
   }
 
@@ -249,7 +244,10 @@ void Network::processorRoutine() {
   pfd.fd = readerEventfd_;
   pfd.events = POLLIN;
   constexpr int timeout = 50; // 50ms
+#elif __APPLE__
+   struct timespec timeout{0, 50000000}; // 50ms
 #endif
+
   while (stopProcessorRoutine == false) {
     externals.callAll();
 #ifdef __linux__
@@ -266,12 +264,22 @@ void Network::processorRoutine() {
       auto task = iPacMan_.getNextTask();
       processTask(task);
     }
-#elif WIN32
+#endif
+#if defined(WIN32) || defined(__APPLE__)
+#ifdef WIN32
     while (true) {
       auto ret = WaitForSingleObject(readerEvent_, 50); // timeout 50ms
       if (ret != WAIT_TIMEOUT) break;
       externals.callAll();
     };
+#else
+    while (true) {
+      struct kevent event;
+      int ret = kevent(readerKq_, NULL, 0, &event, 1, &timeout);
+      if (ret) break;
+      externals.callAll();
+    }
+#endif
     while (readerLock.test_and_set(std::memory_order_acquire)) // acquire lock
       ; // spin
     int tasks = readerTaskCount_;
@@ -282,9 +290,6 @@ void Network::processorRoutine() {
       auto task = iPacMan_.getNextTask();
       processTask(task);
     }
-#else
-    auto task = iPacMan_.getNextTask();
-    processTask(task);
 #endif
   }
   cswarning() << "processorRoutine STOPPED!!!\n";
@@ -347,12 +352,17 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
   oPacMan_.enQueueLast(qePtr);
 #ifdef __linux__
   static uint64_t one = 1;
-  int s = write(writerEventfd_, &one, sizeof(uint64_t));
-#elif WIN32
+  write(writerEventfd_, &one, sizeof(uint64_t));
+#endif
+#if defined(WIN32) || defined(__APPLE__)
   while (writerLock.test_and_set(std::memory_order_acquire)) // acquire lock
     ; // spin
   writerTaskCount_.fetch_add(1, std::memory_order_relaxed);
+#ifdef WIN32
   SetEvent(writerEvent_);
+#else
+  kevent(writerKq_, &writerEvent_, 1, NULL, 0, NULL);
+#endif
   writerLock.clear(std::memory_order_release); // release lock
 #endif
 }
@@ -397,6 +407,38 @@ Network::Network(const Config& config, Transport* transport)
     good_ = false;
     return;
   }
+#elif __APPLE__
+  readerKq_ = kqueue();
+  if (readerKq_ == -1) {
+    good_ = false;
+    return;
+  }
+
+  EV_SET(&readerEvent_, 0, EVFILT_USER, EV_ADD | EV_DISPATCH | EV_DISABLE, NOTE_FFCOPY | NOTE_TRIGGER, 0, NULL);
+  int ret = kevent(readerKq_, &readerEvent_, 1, NULL, 0, NULL);
+
+  if (ret == -1 || (readerEvent_.flags & EV_ERROR)) {
+    good_ = false;
+    return;
+  }
+
+  EV_SET(&readerEvent_, 0, EVFILT_USER, EV_DISPATCH | EV_ENABLE, NOTE_FFCOPY | NOTE_TRIGGER, 0, NULL);
+
+  writerKq_ = kqueue();
+  if (writerKq_ == -1) {
+    good_ = false;
+    return;
+  }
+
+  EV_SET(&writerEvent_, 0, EVFILT_USER, EV_ADD | EV_DISPATCH | EV_DISABLE, NOTE_FFCOPY | NOTE_TRIGGER, 0, NULL);
+  ret = kevent(writerKq_, &writerEvent_, 1, NULL, 0, NULL);
+
+  if (ret == -1 || (writerEvent_.flags & EV_ERROR)) {
+    good_ = false;
+    return;
+  }
+
+  EV_SET(&writerEvent_, 0, EVFILT_USER, EV_DISPATCH | EV_ENABLE, NOTE_FFCOPY | NOTE_TRIGGER, 0, NULL);
 #endif
   readerThread_ = std::thread(&Network::readerRoutine, this, config);
   writerThread_ = std::thread(&Network::writerRoutine, this, config);

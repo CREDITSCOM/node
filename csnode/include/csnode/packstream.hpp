@@ -471,7 +471,11 @@ inline cs::IPackStream& cs::IPackStream::operator>>(cs::TransactionsPacketHash& 
   cs::Bytes bytes;
   (*this) >> bytes;
 
-  hash = cs::TransactionsPacketHash::fromBinary(bytes);
+  if (!good()) {
+    return *this;
+  }
+
+  hash = cs::TransactionsPacketHash::fromBinary(std::move(bytes));
   return *this;
 }
 

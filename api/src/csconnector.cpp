@@ -29,10 +29,6 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 , apiexec_handler(make_shared<apiexec::APIEXECHandler>(m_blockchain, *solver, executor_, config))
 , p_api_processor(make_shared<api::APIProcessor>(api_handler))
 , p_apiexec_processor(make_shared<apiexec::APIEXECProcessor>(apiexec_handler))
-#ifdef BINARY_TCP_EXECAPI
-, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.apiexec_port), make_shared<TBufferedTransportFactory>(),
-  make_shared<TBinaryProtocolFactory>())
-#endif
 #ifdef BINARY_TCP_API
 , server(p_api_processor, make_shared<TServerSocket>(config.port), make_shared<TBufferedTransportFactory>(),
          make_shared<TBinaryProtocolFactory>())
@@ -40,6 +36,10 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 #ifdef AJAX_IFACE
 , ajax_server(p_api_processor, make_shared<TServerSocket>(config.ajax_port),
               make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
+#endif
+#ifdef BINARY_TCP_EXECAPI
+, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.apiexec_port), make_shared<TBufferedTransportFactory>(),
+  make_shared<TBinaryProtocolFactory>())
 #endif
 {
   cslog() << "Api port " << config.port << ", ajax port " << config.ajax_port;

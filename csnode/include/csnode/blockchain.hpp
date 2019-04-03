@@ -43,13 +43,6 @@ using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
 }  // namespace cs
 
-struct TrustedConfirmation {
-  bool bigBang = false;
-  cs::ConfidantsKeys confidants;
-  cs::Bytes mask;
-  cs::Signatures signatures;
-};
-
 class BlockChain {
 public:
   using Transactions  = std::vector<csdb::Transaction>;
@@ -62,12 +55,19 @@ public:
   ~BlockChain();
 
   bool init(const std::string& path);
-
   bool isGood() const;
+
+  // utility methods
 
   enum class ADDR_TYPE { PUBLIC_KEY, ID };
   csdb::Address get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) const;
   bool is_equal(const csdb::Address &laddr, const csdb::Address &raddr) const;
+
+  static csdb::Address getAddressFromKey(const std::string&);
+
+  const csdb::Storage& getStorage() const;
+
+  // create/save block and related methods
 
   /**
    * @fn    bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync);
@@ -106,149 +106,13 @@ public:
     return recordBlock(pool, true);
   }
 
-  void removeWalletsInPoolFromCache(const csdb::Pool& pool);  // obsolete?
-  size_t getSize() const;
-  csdb::PoolHash getLastHash() const;
-
-  csdb::PoolHash wait_for_block(const csdb::PoolHash& obsolete);
-
-  csdb::Pool loadBlock(const csdb::PoolHash&) const;
-  csdb::Pool loadBlock(const cs::Sequence sequence) const;
-  csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
-  csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
+  void removeWalletsInPoolFromCache(const csdb::Pool& pool);
   void removeLastBlock();
-
-  static csdb::Address getAddressFromKey(const std::string&);
-
-  cs::Sequence getLastSequence() const;
-
-  void addConfirmationToList(cs::RoundNumber rNum, bool bang, cs::ConfidantsKeys confidants, cs::Bytes confirmationsMask, cs::Signatures confirmation);
-  void removeConfirmationFromList(cs::RoundNumber);
-  TrustedConfirmation confirmationList(cs::RoundNumber);
-
-  cs::Bytes getLastBlockTrustedMask();
-  cs::Sequence getRequestedBlockNumber() const;
-
-  bool checkGroupSignature(cs::ConfidantsKeys, cs::Bytes, cs::Signatures, cs::Hash);
-  size_t realTrustedValue(cs::Bytes);
-
-  void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
-
-#ifdef MONITOR_NODE
-  void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
-  void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>);
-#endif
-
-  uint64_t getWalletsCount();
-
-  uint64_t getWalletsCountWithBalance();
-
-  csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
-
-#ifdef TRANSACTIONS_INDEX
-  csdb::TransactionID getLastTransaction(const csdb::Address&);
-  csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
-
-  std::pair<csdb::PoolHash, uint32_t> getLastNonEmptyBlock();
-  std::pair<csdb::PoolHash, uint32_t> getPreviousNonEmptyBlock(const csdb::PoolHash&);
-
-  uint64_t getTransactionsCount() const { return total_transactions_count_; }
-#endif
-
-#ifdef MONITOR_NODE
-  uint32_t getTransactionsCount(const csdb::Address&);
-#endif
-
-  // all wallet data (from cache)
-  bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
-  bool findWalletData(WalletId id, WalletData& wallData) const;
-  bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
-
-  // searches for existing wallet id
-  // returns true if found
-  bool findWalletId(const WalletAddress& address, WalletId& id) const;
-
-  // wallet transactions: pools cache + db search
-  void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
-
-  // wallets modified by last new block
-  bool getModifiedWallets(Mask& dest) const;
 
   // updates fees in every transaction
   void setTransactionsFees(cs::TransactionsPacket& packet);
   void setTransactionsFees(csdb::Pool& pool);
-
-  const csdb::Storage& getStorage() const;
-
   void addNewWalletsToPool(csdb::Pool& pool);
-
-  const csdb::Address& BlockChain::getGenesisAddress() const;
-
-private:
-
-  void writeGenesisBlock();
-#ifdef TRANSACTIONS_INDEX
-  void createTransactionsIndex(csdb::Pool&);
-#endif
-
-  void logBlockInfo(csdb::Pool& pool);
-
-  // Thread unsafe
-  bool finalizeBlock(csdb::Pool& pool, bool is_Trusted, cs::PublicKeys lastConfidants);
-
-  void onReadFromDB(csdb::Pool block, bool* should_stop);
-  bool postInitFromDB();
-
-  template <typename WalletCacheProcessor>
-  bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
-  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Initer& initer);
-  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
-
-  void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId,
-                          csdb::Pool::NewWallets& newWallets);
-
-  bool updateFromNextBlock(csdb::Pool& pool);
-
-  // returns true if new id was inserted
-  bool getWalletId(const WalletAddress& address, WalletId& id);
-  bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
-
-  class TransactionsLoader;
-
-  bool findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id,
-                               cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
-
-  void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id,
-                       const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
-
-  bool good_;
-
-  mutable std::recursive_mutex dbLock_;
-  csdb::Storage storage_;
-
-  std::unique_ptr<cs::BlockHashes> blockHashes_;
-
-  const csdb::Address genesisAddress_;
-  const csdb::Address startAddress_;
-  std::unique_ptr<cs::WalletsIds> walletIds_;
-  std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
-  std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
-  std::unique_ptr<cs::WalletsPools> walletsPools_;
-  mutable cs::SpinLock cacheMutex_;
-
-  std::condition_variable_any newBlockCv_;
-
-#ifdef TRANSACTIONS_INDEX
-  uint64_t total_transactions_count_ = 0;
-
-  struct NonEmptyBlockData {
-    csdb::PoolHash hash;
-    uint32_t transCount = 0;
-  };
-  std::map<csdb::PoolHash, NonEmptyBlockData> previousNonEmpty_;
-
-  NonEmptyBlockData lastNonEmptyBlock_;
-#endif
 
   // block cache
 
@@ -320,7 +184,121 @@ public slots:
     this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter);
   }
 
+  // load methods
+
+  csdb::PoolHash wait_for_block(const csdb::PoolHash& obsolete);
+  csdb::Pool loadBlock(const csdb::PoolHash&) const;
+  csdb::Pool loadBlock(const cs::Sequence sequence) const;
+  csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
+  csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
+  void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
+  csdb::Pool getLastBlock() const
+  {
+    return loadBlock(getLastSequence());
+  }
+
+
+  // info
+  
+  size_t getSize() const;
+  uint64_t getWalletsCountWithBalance();
+  csdb::PoolHash getLastHash() const;
+  cs::Sequence getLastSequence() const;
+  csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
+
+  // get inner data (from caches)
+
+  bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
+  bool findWalletData(WalletId id, WalletData& wallData) const;
+  bool findWalletId(const WalletAddress& address, WalletId& id) const;
+  // wallet transactions: pools cache + db search
+  void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
+  // wallets modified by last new block
+  bool getModifiedWallets(Mask& dest) const;
+
+#ifdef MONITOR_NODE
+  void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
+  void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>);
+  uint32_t getTransactionsCount(const csdb::Address&);
+#endif
+
+#ifdef TRANSACTIONS_INDEX
+  csdb::TransactionID getLastTransaction(const csdb::Address&);
+  csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
+
+  std::pair<csdb::PoolHash, uint32_t> getLastNonEmptyBlock();
+  std::pair<csdb::PoolHash, uint32_t> getPreviousNonEmptyBlock(const csdb::PoolHash&);
+  uint64_t getTransactionsCount() const { return total_transactions_count_; }
+#endif
+
+  const csdb::Address& BlockChain::getGenesisAddress() const;
+
 private:
+  bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
+
+  void writeGenesisBlock();
+#ifdef TRANSACTIONS_INDEX
+  void createTransactionsIndex(csdb::Pool&);
+#endif
+
+  void logBlockInfo(csdb::Pool& pool);
+
+  // Thread unsafe
+  bool finalizeBlock(csdb::Pool& pool, bool is_Trusted, cs::PublicKeys lastConfidants);
+
+  void onReadFromDB(csdb::Pool block, bool* should_stop);
+  bool postInitFromDB();
+
+  template <typename WalletCacheProcessor>
+  bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
+  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Initer& initer);
+  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
+
+  void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId,
+                          csdb::Pool::NewWallets& newWallets);
+
+  bool updateFromNextBlock(csdb::Pool& pool);
+
+  // returns true if new id was inserted
+  bool getWalletId(const WalletAddress& address, WalletId& id);
+  bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
+
+  class TransactionsLoader;
+
+  bool findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id,
+                               cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
+
+  void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id,
+                       const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
+
+  bool good_;
+
+  mutable std::recursive_mutex dbLock_;
+  csdb::Storage storage_;
+
+  std::unique_ptr<cs::BlockHashes> blockHashes_;
+
+  const csdb::Address genesisAddress_;
+  const csdb::Address startAddress_;
+  std::unique_ptr<cs::WalletsIds> walletIds_;
+  std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
+  std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
+  std::unique_ptr<cs::WalletsPools> walletsPools_;
+  mutable cs::SpinLock cacheMutex_;
+
+  std::condition_variable_any newBlockCv_;
+
+#ifdef TRANSACTIONS_INDEX
+  uint64_t total_transactions_count_ = 0;
+
+  struct NonEmptyBlockData {
+    csdb::PoolHash hash;
+    uint32_t transCount = 0;
+  };
+  std::map<csdb::PoolHash, NonEmptyBlockData> previousNonEmpty_;
+
+  NonEmptyBlockData lastNonEmptyBlock_;
+#endif
 
   /**
    * @fn    std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, std::optional<cs::PrivateKey> writer_key);
@@ -338,8 +316,8 @@ private:
 
   std::optional<csdb::Pool> recordBlock(csdb::Pool& pool, bool isTrusted);
 
-  // to store outrunning blocks until the time to insert them comes
-  // stores pairs of <block, sender> sorted by sequence number
+  // to store outrunning blocks until the time to insert comes;
+  // stores pairs of <sequence, metadata>
   struct BlockMeta
   {
     csdb::Pool pool;
@@ -354,8 +332,6 @@ private:
 
   // fee calculator
   std::unique_ptr<cs::Fee> fee_;
-  //confidant confirmation
-  std::map<cs::RoundNumber, TrustedConfirmation> confirmationList_;
 
 };
 

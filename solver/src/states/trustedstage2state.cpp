@@ -42,6 +42,7 @@ void TrustedStage2State::on(SolverContext& context) {
   //  - create fake stages-1 from outbound nodes and force to next state
 
   constexpr size_t TimerBaseId = 20;
+  csunused(TimerBaseId);
 
   SolverContext* pctx = &context;
   auto dt = Consensus::T_stage_request;

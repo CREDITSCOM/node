@@ -70,14 +70,6 @@ public:
 
   uint64_t getCount() const { return wallets_.size(); }
 
-  uint64_t getCountWithBalance() const {
-    return std::count_if(wallets_.begin(), wallets_.end(), [](const auto elm) {
-      if (elm && !elm->address_.empty() && elm->balance_ >= csdb::Amount(0))
-        return true;
-      return false;
-    });
-  }
-
 private:
   using Data = std::vector<WalletData*>;
 
@@ -94,7 +86,7 @@ private:
     void load(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
     double load(const csdb::Transaction& tr, const BlockChain& blockchain);
     double loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain);
-    void fundConfidantsWalletsWithFee(double totalFee, const cs::ConfidantsKeys& confidants,
+    void fundConfidantsWalletsWithFee(const csdb::Amount& totalFee, const cs::ConfidantsKeys& confidants,
                                       const std::vector<uint8_t>& realTrusted);
     void loadTrxForTarget(const csdb::Transaction& tr);
     virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;

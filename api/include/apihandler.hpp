@@ -404,12 +404,12 @@ namespace executor {
   private:
     std::map<general::Address, general::AccessID> lockSmarts;
     explicit Executor(const BlockChain &p_blockchain, const cs::SolverCore& solver, const int p_exec_port) :
-      executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
+      blockchain_(p_blockchain)
+      , solver_(solver)
+      , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
         ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", p_exec_port)))
       , origExecutor_(std::make_unique<executor::ContractExecutorConcurrentClient>(
         ::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_)))
-      , blockchain_(p_blockchain)
-      , solver_(solver)
     {
       std::thread th([&]() {
         while (true) {

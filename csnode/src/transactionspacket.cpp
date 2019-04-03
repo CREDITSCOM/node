@@ -28,13 +28,24 @@ TransactionsPacketHash TransactionsPacketHash::fromString(const ::std::string& s
 
 TransactionsPacketHash TransactionsPacketHash::fromBinary(const cs::Bytes& data) {
   const size_t size = data.size();
-  TransactionsPacketHash resHash;
+  TransactionsPacketHash hash;
 
-  if ((0 == size) || (::csdb::priv::crypto::hash_size == size)) {
-    resHash.m_bytes = data;
+  if (::csdb::priv::crypto::hash_size == size) {
+    hash.m_bytes = data;
   }
 
-  return resHash;
+  return hash;
+}
+
+TransactionsPacketHash TransactionsPacketHash::fromBinary(cs::Bytes&& data) {
+  const size_t size = data.size();
+  TransactionsPacketHash hash;
+
+  if (::csdb::priv::crypto::hash_size == size) {
+    hash.m_bytes = std::move(data);
+  }
+
+  return hash;
 }
 
 TransactionsPacketHash TransactionsPacketHash::calcFromData(const cs::Bytes& data) {

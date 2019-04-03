@@ -232,8 +232,11 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
   poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
   poolMetaInfo.timestamp = std::move(currentTimeStamp);
   
-  poolMetaInfo.confirmationMask = pnode->getBlockChain().confirmationList(conveyer.currentRoundNumber()).mask;
-  poolMetaInfo.confirmations = pnode->getBlockChain().confirmationList(conveyer.currentRoundNumber()).signatures;
+  const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
+  if (confirmation.has_value()) {
+    poolMetaInfo.confirmationMask = confirmation.value().mask;
+    poolMetaInfo.confirmations = confirmation.value().signatures;
+  }
 
    csmeta(csdetails) << "Timestamp: " << poolMetaInfo.timestamp;
   for (std::size_t i = 0; i < hashes.size(); ++i) {

@@ -26,7 +26,7 @@ void WaitingState::on(SolverContext &context) {
   }
 
   bSignatures.reserve(counter);
-  for (int i=0; i< rMask.size(); ++i){ //auto& it : context.final_stage3_data()) {
+  for (size_t i=0; i< rMask.size(); ++i){ //auto& it : context.final_stage3_data()) {
     if(rMask[i] != cs::ConfidantConsts::InvalidConfidantIndex) {
       bSignatures.push_back(context.stage3(i)->blockSignature);//emplace_back(it.sender, it.blockSignature);    
     }
