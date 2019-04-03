@@ -30,7 +30,7 @@ public:
 
   void reset(size_t transactionsNum);
   bool validateTransaction(SolverContext& context, const Transactions& trxs, size_t trxInd);
-  void checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
+  size_t checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
   void validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded, const Transactions& trxs);
 
   void clearCaches();
@@ -64,7 +64,7 @@ private:
   bool removeTransactions_NegativeAll(SolverContext& context, Node& node, const Transactions& trxs,
                                       CharacteristicMask& maskIncluded);
 
-  void makeSmartsValid(SolverContext& context, RejectedSmarts& smarts,
+  size_t makeSmartsValid(SolverContext& context, RejectedSmarts& smarts,
                        const csdb::Address& source, CharacteristicMask& maskIncluded);
 private:
   Config config_;

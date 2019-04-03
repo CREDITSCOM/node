@@ -97,6 +97,7 @@ void IterValidator::checkRejectedSmarts(SolverContext& context,
 bool IterValidator::validateTransactions(SolverContext& context, cs::Bytes& characteristicMask, const Transactions& transactions) {
   bool needOneMoreIteration = false;
   const size_t transactionsCount = transactions.size();
+  size_t blockedCounter = 0;
 
   // validate each transaction
   for (size_t i = 0; i < transactionsCount; ++i) {
@@ -115,13 +116,17 @@ bool IterValidator::validateTransactions(SolverContext& context, cs::Bytes& char
       csdebug() << log_prefix << "transaction[" << i << "] rejected by validator";
       characteristicMask[i] = kInvalidMarker;
       needOneMoreIteration = true;
+      ++blockedCounter;
     } else {
       characteristicMask[i] = kValidMarker;    
     }
   }
 
   //validation of all transactions by graph
-  pTransval_->checkRejectedSmarts(context, transactions, characteristicMask);
+  size_t restoredCounter = pTransval_->checkRejectedSmarts(context, transactions, characteristicMask);
+  if (blockedCounter == restoredCounter) {
+    needOneMoreIteration = false;
+  }
   pTransval_->validateByGraph(context, characteristicMask, transactions);
 
   if (pTransval_->getCntRemovedTrxsByGraph() > 0) {
