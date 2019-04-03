@@ -110,18 +110,10 @@ bool IterValidator::validateTransactions(SolverContext& context, cs::Bytes& char
       csdebug() << log_prefix << "transaction[" << i << "] rejected by validator";
       needOneMoreIteration = true; 
     } else {
-      // test with get_valid_smart_address() only for deploy transactions
       if (SmartContracts::is_deploy(transaction)) {
-        auto sci = context.smart_contracts().get_smart_contract(transaction);
-        if (sci.has_value() && sci.value().method.empty()) {  // Is deploy
-          csdb::Address deployer = context.blockchain().get_addr_by_type(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
-          isValid = SmartContracts::get_valid_smart_address(deployer, transaction.innerID(),
-                                                            sci.value().smartContractDeploy) == transaction.target();
-          if (!isValid) {
-            cslog() << log_prefix << ": transaction[" << i
-                    << "] rejected, malformed contract address";
-            needOneMoreIteration = true; 
-          }
+        isValid = deployAdditionalCheck(context, i, transaction);
+        if (!isValid) {
+          needOneMoreIteration = true; 
         }
       }
     }
@@ -139,6 +131,26 @@ bool IterValidator::validateTransactions(SolverContext& context, cs::Bytes& char
   }
 
   return needOneMoreIteration;
+}
+
+bool IterValidator::deployAdditionalCheck(SolverContext& context, size_t trxInd,
+    const csdb::Transaction& transaction) {
+  // test with get_valid_smart_address() only for deploy transactions
+  bool isValid = true;
+  auto sci = context.smart_contracts().get_smart_contract(transaction);
+
+  if (sci.has_value() && sci.value().method.empty()) { // is deploy
+    csdb::Address deployer = context.blockchain().get_addr_by_type(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+    isValid = SmartContracts::get_valid_smart_address(deployer, transaction.innerID(),
+                                                      sci.value().smartContractDeploy) == transaction.target();
+  }
+
+  if (!isValid) {
+    cslog() << log_prefix << ": transaction[" << trxInd
+            << "] rejected, malformed contract address";
+  }
+
+  return isValid;
 }
 
 void IterValidator::checkTransactionsSignatures(SolverContext& context,
