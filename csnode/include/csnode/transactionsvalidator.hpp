@@ -30,12 +30,13 @@ public:
 
   void reset(size_t transactionsNum);
   bool validateTransaction(SolverContext& context, const Transactions& trxs, size_t trxInd);
-  void checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
+  size_t checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
   void validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded, const Transactions& trxs);
 
-  size_t getCntRemovedTrxsByGraph() const {
-    return cntRemovedTrxs_;
-  }
+  void clearCaches();
+  void addRejectedNewState(const csdb::Address& newState);
+
+  size_t getCntRemovedTrxsByGraph() const;
 
 private:
   using TrxList = std::vector<TransactionIndex>;
@@ -63,7 +64,7 @@ private:
   bool removeTransactions_NegativeAll(SolverContext& context, Node& node, const Transactions& trxs,
                                       CharacteristicMask& maskIncluded);
 
-  void makeSmartsValid(SolverContext& context, RejectedSmarts& smarts,
+  size_t makeSmartsValid(SolverContext& context, RejectedSmarts& smarts,
                        const csdb::Address& source, CharacteristicMask& maskIncluded);
 private:
   Config config_;
@@ -74,5 +75,19 @@ private:
   Stack negativeNodes_;
   size_t cntRemovedTrxs_;
 };
+
+inline void TransactionsValidator::clearCaches() {
+  payableMaxFees_.clear();
+  rejectedNewStates_.clear();
+}
+
+inline void TransactionsValidator::addRejectedNewState(const csdb::Address& newState) {
+  rejectedNewStates_.push_back(newState);
+}
+
+inline size_t TransactionsValidator::getCntRemovedTrxsByGraph() const {
+  return cntRemovedTrxs_;
+}
+
 }  // namespace cs
 #endif // TRANSACTIONS_VALIDATOR_HPP

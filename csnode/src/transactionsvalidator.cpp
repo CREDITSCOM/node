@@ -207,7 +207,7 @@ bool TransactionsValidator::validateTransactionAsTarget(const csdb::Transaction&
   return true;
 }
 
-void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Transactions& trxs,
+size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Transactions& trxs,
                                                 CharacteristicMask& maskIncluded) {
   using rejectedSmart = std::pair<csdb::Transaction, size_t>;
   auto& smarts = context.smart_contracts();
@@ -215,6 +215,7 @@ void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Tr
   std::vector<rejectedSmart> rejectedSmarts;
   size_t maskSize = maskIncluded.size();
   size_t i = 0;
+  size_t restoredCounter = 0;
 
   for (const auto& t : trxs) {
     if (i < maskSize && smarts.is_known_smart_contract(t.source())) {
@@ -239,22 +240,26 @@ void TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Tr
       WalletsState::WalletData& wallState = walletsState_.getData(it->first.source(), walletId);
       wallState.balance_ += initTransaction.amount();
       if (wallState.balance_ >= zeroBalance_) {
-        makeSmartsValid(context, rejectedSmarts, it->first.source(), maskIncluded);
+        restoredCounter += makeSmartsValid(context, rejectedSmarts, it->first.source(), maskIncluded);
       }
     }
   }
+
+  return restoredCounter;
 }
 
-void TransactionsValidator::makeSmartsValid(SolverContext& context,
+size_t TransactionsValidator::makeSmartsValid(SolverContext& context,
                                             RejectedSmarts& smarts,
                                             const csdb::Address& source,
                                             CharacteristicMask& maskIncluded) {
   size_t maskSize = maskIncluded.size();
   auto& s = context.smart_contracts();
+  size_t restoredCounter = 0;
   for (size_t i = 0; i < smarts.size(); ++i) {
     if (s.absolute_address(smarts[i].first.source()) == s.absolute_address(source)
         && smarts[i].second < maskSize) {
       maskIncluded[smarts[i].second] = kValidMarker;
+      ++restoredCounter;
       csdebug() << log_prefix << "balance of transation["
                 << smarts[i].second << "] source is replenished by other transaction";
       
@@ -266,13 +271,11 @@ void TransactionsValidator::makeSmartsValid(SolverContext& context,
       walletsState_.setModified(walletId);
     }
   }
+  return restoredCounter;
 }
 
 void TransactionsValidator::validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded,
                                             const Transactions& trxs) {
-  payableMaxFees_.clear();
-  rejectedNewStates_.clear();
-
   while (!negativeNodes_.empty()) {
     Node& currNode = *negativeNodes_.back();
     negativeNodes_.pop_back();
