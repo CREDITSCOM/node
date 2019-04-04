@@ -523,6 +523,10 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   csmeta(csdetails) << "done";
 }
 
+void Node::cleanConfirmationList(cs::RoundNumber rNum) {
+  confirmationList.remove(rNum);
+}
+
 cs::ConfidantsKeys Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber) const {
   csmeta(csdebug);
   //возможна ошибка если на пишущем узле происходит запись блока в конце предыдущего раунда, а в других нодах в начале

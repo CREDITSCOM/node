@@ -18,7 +18,7 @@ void ConfirmationList::add(cs::RoundNumber rNum, bool bang, const cs::Confidants
 void ConfirmationList::remove(cs::RoundNumber rNum) {
   if (confirmationList_.find(rNum) != confirmationList_.end()) {
     confirmationList_.erase(rNum);
-    csdebug() << "The confirmation of R-" << rNum << " was successfully erased";
+    csdebug() << "The confirmation of R-" << rNum << " was successfully erased, conf.size = " << confirmationList_.size();
   }
   else {
     csdebug() << "The confirmation of R-" << rNum << " was not found";
