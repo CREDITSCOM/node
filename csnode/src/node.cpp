@@ -11,6 +11,7 @@
 #include <csnode/nodecore.hpp>
 #include <csnode/spammer.hpp>
 #include <csnode/poolsynchronizer.hpp>
+#include <csnode/nodeutils.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -477,9 +478,12 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       poolMetaInfo.writerKey = key;
     }
   }
-  if(round!=0){
-    poolMetaInfo.confirmationMask = getBlockChain().confirmationList(round).mask;
-    poolMetaInfo.confirmations = getBlockChain().confirmationList(round).signatures;
+  if (round != 0) {
+    auto confirmation = confirmationList.find(round);
+    if (confirmation.has_value()) {
+      poolMetaInfo.confirmationMask = confirmation.value().mask;
+      poolMetaInfo.confirmations = confirmation.value().signatures;
+    }
   }
   if (!istream_.good()) {
     csmeta(cserror) << "Round info parsing failed, data is corrupted";
@@ -513,10 +517,14 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   }
   else {
     blockChain_.testCachedBlocks();
-    getBlockChain().removeConfirmationFromList(round);
+    confirmationList.remove(round);
   }
 
   csmeta(csdetails) << "done";
+}
+
+void Node::cleanConfirmationList(cs::RoundNumber rNum) {
+  confirmationList.remove(rNum);
 }
 
 cs::ConfidantsKeys Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber) const {
@@ -995,8 +1003,8 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
     cs::Signatures signatures;
     signatures.push_back(sig);
     confMask.push_back(0);
-    getBlockChain().removeConfirmationFromList(roundTable.round);
-    getBlockChain().addConfirmationToList(roundTable.round, bang, confidants, confMask, signatures);
+    confirmationList.remove(roundTable.round);
+    confirmationList.add(roundTable.round, bang, confidants, confMask, signatures);
   }
 
 
@@ -2139,8 +2147,9 @@ void Node::sendRoundTable() {
   becomeWriter();
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
-  csdebug() << "SendRoundTable: addConfirmation for round " << conveyer.currentRoundTable().round << " trusted";
-  getBlockChain().addConfirmationToList(lastSentRoundData_.table.round, false, conveyer.confidants(), getBlockChain().getLastBlockTrustedMask(), lastSentSignatures_.trustedConfirmation);
+  csdebug() << "SendRoundTable: add confirmation for round " << conveyer.currentRoundTable().round << " trusted";
+  confirmationList.add(lastSentRoundData_.table.round, false, conveyer.confidants(),
+    cs::NodeUtils::getTrustedMask(getBlockChain().getLastBlock()), lastSentSignatures_.trustedConfirmation);
 
   conveyer.setRound(lastSentRoundData_.table.round);
 
@@ -2207,7 +2216,7 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
 
   //here should be placed parcing of round table
 
-  size_t sigSize = getBlockChain().realTrustedValue(poolMetaInfo.realTrustedMask);
+  size_t sigSize = cs::NodeUtils::realTrustedValue(poolMetaInfo.realTrustedMask);
   csdebug() << "NODE> PoolSignatures reserved to size = " << sigSize;
   lastSentSignatures_.poolSignatures.clear();
   lastSentSignatures_.poolSignatures.resize(sigSize);
@@ -2260,7 +2269,7 @@ bool Node::receivingSignatures(const cs::Bytes& sigBytes, const cs::Bytes& round
   }
   cs::Hash tempHash = cscrypto::calculateHash(roundBytes.data(), roundBytes.size());
 
-  if (!getBlockChain().checkGroupSignature(currentConfidants, trustedMask, roundSignatures, tempHash)) {
+  if (!cs::NodeUtils::checkGroupSignature(currentConfidants, trustedMask, roundSignatures, tempHash)) {
     csdebug() << "NODE> The roundtable signatures are NOT OK";
     return false;
   }
@@ -2274,9 +2283,9 @@ bool Node::receivingSignatures(const cs::Bytes& sigBytes, const cs::Bytes& round
   tth << newConfidants;
   cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
   
-  if (getBlockChain().checkGroupSignature(currentConfidants, trustedMask, trustedConfirmation, trustedHash)) {
+  if (cs::NodeUtils::checkGroupSignature(currentConfidants, trustedMask, trustedConfirmation, trustedHash)) {
     csdebug() << "NODE> The trusted confirmation for the next round are ok";
-    getBlockChain().addConfirmationToList(rNum, false, currentConfidants, trustedMask, trustedConfirmation);
+    confirmationList.add(rNum, false, currentConfidants, trustedMask, trustedConfirmation);
   }
   else {
     csdebug() << "NODE> The trusted confirmation for the next round are NOT OK";

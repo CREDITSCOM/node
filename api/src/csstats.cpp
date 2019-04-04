@@ -34,8 +34,9 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
 
   {
     auto future_last_hash = blockHash;
-    if (blockHash.is_empty())
+    if (blockHash.is_empty()) {
       cserror() << "Stats: no bricks in the wall (last hash is empty)";
+    }
 
     while (blockHash != lastHash && !blockHash.is_empty()) {
       csdb::Pool pool = blockchain.loadBlock(blockHash);
@@ -206,6 +207,8 @@ AllStats csstats::collectAllStats(const Periods& periods) {
       for (size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
 
+        if (transaction.source() == blockchain.getGenesisAddress())
+          continue;
 #ifdef MONITOR_NODE
         if (is_smart(transaction) || is_smart_state(transaction))
           ++periodStats.transactionsSmartCount;

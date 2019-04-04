@@ -168,3 +168,27 @@ TEST(TransactionsPacket, signaturesSerialization) {
   ASSERT_EQ(pack.signatures().size(), expectedPacket.signatures().size());
   ASSERT_EQ(pack.hash(), expectedPacket.hash());
 }
+
+TEST(TransactionPacketHash, fromBinary) {
+  auto startAddress = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000007");
+
+  cs::PublicKey myPublicForSig;
+  myPublicForSig.fill(0);
+
+  csdb::Transaction transaction;
+  transaction.set_target(csdb::Address::from_public_key(myPublicForSig));
+  transaction.set_source(startAddress);
+  transaction.set_currency(1);
+  transaction.set_amount(csdb::Amount(10000, 0));
+  transaction.set_innerID(cs::Utils::generateRandomValue<int64_t>(1, 2789));
+
+  cs::TransactionsPacket testPacket;
+  testPacket.addTransaction(transaction);
+
+  ASSERT_EQ(testPacket.makeHash(), true);
+
+  auto bytes = testPacket.hash().toBinary();
+  cs::TransactionsPacketHash hash = cs::TransactionsPacketHash::fromBinary(std::move(bytes));
+
+  ASSERT_EQ(hash, testPacket.hash());
+}

@@ -7,6 +7,7 @@
 #include <limits>
 #include <csnode/walletsstate.hpp>
 #include <vector>
+#include <map>
 
 namespace cs {
 
@@ -29,11 +30,13 @@ public:
 
   void reset(size_t transactionsNum);
   bool validateTransaction(SolverContext& context, const Transactions& trxs, size_t trxInd);
-  void checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
-  void validateByGraph(CharacteristicMask& maskIncluded, const Transactions& trxs, csdb::Pool& trxsExcluded);
-  size_t getCntRemovedTrxs() const {
-    return cntRemovedTrxs_;
-  }
+  size_t checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
+  void validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded, const Transactions& trxs);
+
+  void clearCaches();
+  void addRejectedNewState(const csdb::Address& newState);
+
+  size_t getCntRemovedTrxsByGraph() const;
 
 private:
   using TrxList = std::vector<TransactionIndex>;
@@ -42,8 +45,6 @@ private:
   static constexpr csdb::Amount zeroBalance_ = 0.0_c;
 
 private:
-  void makeSmartsValid(SolverContext& context, RejectedSmarts& smarts,
-                       const csdb::Address& source, CharacteristicMask& maskIncluded);
   bool validateTransactionAsSource(SolverContext& context, const Transactions& trxs,
                                    size_t trxInd);
   bool validateNewStateAsSource(SolverContext& context, const csdb::Transaction& trx);
@@ -52,28 +53,41 @@ private:
 
   bool validateTransactionAsTarget(const csdb::Transaction& trx);
 
-  void removeTransactions(Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded,
-                          csdb::Pool& trxsExcluded);
-  bool removeTransactions_PositiveOne(Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded,
-                                      csdb::Pool& trxsExcluded);
-  bool removeTransactions_PositiveAll(Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded,
-                                      csdb::Pool& trxsExcluded);
-  bool removeTransactions_NegativeOne(Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded,
-                                      csdb::Pool& trxsExcluded);
-  bool removeTransactions_NegativeAll(Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded,
-                                      csdb::Pool& trxsExcluded);
+  void removeTransactions(SolverContext& context, Node& node, const Transactions& trxs,
+                          CharacteristicMask& maskIncluded);
+  bool removeTransactions_PositiveOne(SolverContext& context, Node& node, const Transactions& trxs,
+                                      CharacteristicMask& maskIncluded);
+  bool removeTransactions_PositiveAll(SolverContext& context, Node& node, const Transactions& trxs,
+                                      CharacteristicMask& maskIncluded);
+  bool removeTransactions_NegativeOne(SolverContext& context, Node& node, const Transactions& trxs,
+                                      CharacteristicMask& maskIncluded);
+  bool removeTransactions_NegativeAll(SolverContext& context, Node& node, const Transactions& trxs,
+                                      CharacteristicMask& maskIncluded);
 
+  size_t makeSmartsValid(SolverContext& context, RejectedSmarts& smarts,
+                       const csdb::Address& source, CharacteristicMask& maskIncluded);
 private:
   Config config_;
-
   WalletsState& walletsState_;
   TrxList trxList_;
-
   std::map<csdb::Address, csdb::Amount> payableMaxFees_;
   std::vector<csdb::Address> rejectedNewStates_;
   Stack negativeNodes_;
   size_t cntRemovedTrxs_;
 };
-}  // namespace cs
 
-#endif
+inline void TransactionsValidator::clearCaches() {
+  payableMaxFees_.clear();
+  rejectedNewStates_.clear();
+}
+
+inline void TransactionsValidator::addRejectedNewState(const csdb::Address& newState) {
+  rejectedNewStates_.push_back(newState);
+}
+
+inline size_t TransactionsValidator::getCntRemovedTrxsByGraph() const {
+  return cntRemovedTrxs_;
+}
+
+}  // namespace cs
+#endif // TRANSACTIONS_VALIDATOR_HPP

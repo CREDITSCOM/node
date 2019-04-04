@@ -314,42 +314,49 @@ public:
     return cs::Utils::byteStreamToHex(reinterpret_cast<const char*>(stream), length);
   }
 
-  inline static uint64_t maskToBits(cs::Bytes mask) {
+  inline static uint64_t maskToBits(const cs::Bytes& mask) {
     if (mask.size() > 64) {
       cserror() << "The mask number is larger than the alloowed value";
     }
+
     uint64_t addition = 1;
     uint64_t value = 0;
+
     for (auto& it : mask) {
       if (it != 255U) {
         value += addition;
       }
       addition *= 2;
     }
+
     return value;
   }
 
-  inline static std::vector<uint8_t> bitsToMask(uint8_t size, uint64_t value) {
-    std::vector<uint8_t> mask;
+  inline static cs::Bytes bitsToMask(uint8_t size, uint64_t value) {
+    cs::Bytes mask;
     mask.reserve(static_cast<size_t>(size));
+
     uint64_t valCopy = value;
-    for(uint8_t i = 0; i< size; ++i){
+
+    for(cs::Byte i = 0; i< size; ++i){
       if (valCopy % 2 == 1U) {
         mask.push_back(0U);
       }
       else {
         mask.push_back(255U);
       }
+
       valCopy /= 2U;
     }
+
     return mask;
   }
 
-  inline static uint8_t maskValue(uint64_t value) {
+  inline static cs::Byte maskValue(uint64_t value) {
 #ifdef _MSC_VER
-    uint8_t cnt = static_cast<uint8_t>( __popcnt64(value) );
+    cs::Byte cnt = static_cast<cs::Byte>( __popcnt64(value) );
 #else
-    uint8_t cnt = __builtin_popcountl(value);
+    cs::Byte cnt = __builtin_popcountl(value);
 #endif
     return cnt;
   }
@@ -394,6 +401,65 @@ public:
     }
 
     return result;
+  }
+
+  template<typename RandomIterator, typename Generator>
+  static void shuffle(RandomIterator first, RandomIterator last, Generator&& rng) {
+    // shuffle [first, last) using random function rng
+    auto uFirst = first;
+    const auto uLast = last;
+    if (uFirst == uLast) {
+      return;
+    }
+
+    using diff = typename std::iterator_traits<RandomIterator>::difference_type;
+    using udiff = typename std::make_unsigned<diff>::type;
+
+    udiff bits = 8 * sizeof(udiff);
+    udiff bmask = udiff(-1);
+
+    auto target = uFirst;
+    diff targetIndex = 1;
+    for (; ++target != uLast; ++targetIndex) {
+      // randomly place an element from [first, target] at target
+      diff off;// = rng(static_cast<_Diff>(targetIndex + 1));
+      diff index = targetIndex + 1;
+      for (;;) {
+        // try a sample random value
+        udiff ret = 0;    // random bits
+        udiff mask = 0;    // 2^N - 1, _Ret is within [0, mask]
+
+        while (mask < udiff(index - 1)) {
+          // need more random bits
+          ret <<= bits - 1;    // avoid full shift
+          ret <<= 1;
+          udiff _Get_bits;
+          // return a random value within [0, bmask]
+          for (;;) {
+            // repeat until random value is in range
+            udiff _Val = rng();
+
+            if (_Val <= bmask) {
+              _Get_bits = _Val;
+              break;
+            }
+          }
+          ret |= _Get_bits;
+          mask <<= bits - 1;    // avoid full shift
+          mask <<= 1;
+          mask |= bmask;
+        }
+
+        // _Ret is [0, mask], index - 1 <= mask, return if unbiased
+        if (ret / index < mask / index
+          || mask % index == udiff(index - 1)) {
+          off = static_cast<diff>(ret % index);
+          break;
+        }
+      }
+
+      std::iter_swap(target, uFirst + off);
+    }
   }
 };
 
@@ -445,67 +511,10 @@ public:
     (std::cout << ... << std::forward<Args>(args)) << std::endl;
   }
 };
-
-template<class _RanIt, class _RngFn>
-inline void shuffle(_RanIt _First, _RanIt _Last, _RngFn&& _RngFunc) {
-  // shuffle [_First, _Last) using random function _RngFunc
-  auto _UFirst = _First;
-  const auto _ULast = _Last;
-  if (_UFirst == _ULast) {
-    return;
-  }
-
-  typedef typename std::iterator_traits<_RanIt>::difference_type _Diff;
-  typedef typename std::make_unsigned<_Diff>::type _Udiff;
-
-  _Udiff _Bits = 8 * sizeof(_Udiff);
-  _Udiff _Bmask = _Udiff(-1);
-
-  auto _UTarget = _UFirst;
-  _Diff _Target_index = 1;
-  for (; ++_UTarget != _ULast; ++_Target_index) {
-    // randomly place an element from [_First, _Target] at _Target
-    _Diff _Off;// = _RngFunc(static_cast<_Diff>(_Target_index + 1));
-    _Diff _Index = _Target_index + 1;
-    for (;;) {
-      // try a sample random value
-      _Udiff _Ret = 0;    // random bits
-      _Udiff _Mask = 0;    // 2^N - 1, _Ret is within [0, _Mask]
-
-      while (_Mask < _Udiff(_Index - 1)) {
-        // need more random bits
-        _Ret <<= _Bits - 1;    // avoid full shift
-        _Ret <<= 1;
-        _Udiff _Get_bits;
-        // return a random value within [0, _Bmask]
-        for (;;) {
-          // repeat until random value is in range
-          _Udiff _Val = _RngFunc();
-
-          if (_Val <= _Bmask) {
-            _Get_bits = _Val;
-            break;
-          }
-        }
-        _Ret |= _Get_bits;
-        _Mask <<= _Bits - 1;    // avoid full shift
-        _Mask <<= 1;
-        _Mask |= _Bmask;
-      }
-      // _Ret is [0, _Mask], _Index - 1 <= _Mask, return if unbiased
-      if (_Ret / _Index < _Mask / _Index
-        || _Mask % _Index == _Udiff(_Index - 1)) {
-        _Off = static_cast<_Diff>(_Ret % _Index);
-        break;
-      }
-    }
-    std::iter_swap(_UTarget, _UFirst + _Off);
-  }
-}
 }  // namespace cs
 
-inline constexpr unsigned char operator"" _u8(unsigned long long arg) noexcept {
-  return static_cast<unsigned char>(arg);
+inline constexpr cs::Byte operator"" _b(unsigned long long arg) noexcept {
+  return static_cast<cs::Byte>(arg);
 }
 
 inline constexpr char operator"" _i8(unsigned long long arg) noexcept {

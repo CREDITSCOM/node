@@ -10,6 +10,7 @@ using namespace std;
 
 namespace {
 const uint8_t kUntrustedMarker = 255;
+
 } // namespace
 
 namespace cs {
@@ -154,7 +155,7 @@ void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::T
 // ProcessorBase
 void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
   const csdb::Pool::Transactions& transactions = pool.transactions();
-  double totalAmountOfCountedFee = 0;
+  csdb::Amount totalAmountOfCountedFee = 0;
 #ifdef MONITOR_NODE
   auto wrWall = pool.writer_public_key();
 
@@ -190,7 +191,7 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
   it_writer->second.totalFee += totalAmountOfCountedFee;
 #endif
 
-  if (totalAmountOfCountedFee > 0) {
+  if (totalAmountOfCountedFee > csdb::Amount(0)) {
     fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants, cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()));
   }
 
@@ -211,19 +212,21 @@ bool WalletsCache::ProcessorBase::setWalletTime(const WalletData::Address& addre
 }
 #endif
 
-void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, const cs::ConfidantsKeys& confidants,
+void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(const csdb::Amount& totalFee, const cs::ConfidantsKeys& confidants,
                                                                const std::vector<uint8_t>& realTrusted) {
   if (!confidants.size()) {
     cslog() << "WALLETS CACHE>> NO CONFIDANTS";
     return;
   }
-  size_t realTrustedNumber = 0;
+  int32_t realTrustedNumber = 0;
   for (const auto& trustedMarker : realTrusted) {
     if (trustedMarker != kUntrustedMarker) {
       ++realTrustedNumber; 
     }
   }
-  double feeToEachConfidant = totalFee / realTrustedNumber;
+  csdb::Amount feeToEachConfidant = totalFee / realTrustedNumber;
+  csdb::Amount payedFee = 0;
+  int32_t numPayedTrusted = 0;
   for (size_t i = 0; i < confidants.size(); ++i) {
     if (i < realTrusted.size() && realTrusted[i] != kUntrustedMarker) {
       WalletId confidantId{};
@@ -234,6 +237,11 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(double totalFee, 
       }
       WalletData& walletData = getWalletData(confidantId, confidantAddress);
       walletData.balance_ += feeToEachConfidant;
+      payedFee += feeToEachConfidant;
+      ++numPayedTrusted;
+      if (numPayedTrusted == (realTrustedNumber - 1)) {
+        feeToEachConfidant = totalFee - payedFee;
+      }
       setModified(confidantId);
     }
   }
@@ -268,6 +276,8 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithExecFee(const csdb::T
   }
   csdb::Amount feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>()
                                   / realTrustedNumber;
+  csdb::Amount payedFee = 0;
+  int32_t numPayedTrusted = 0;
   for (size_t i = 0; i < confidants.size(); ++i) {
     if (i < realTrusted.size() && realTrusted[i] != kUntrustedMarker) {
       WalletId confidantId{};
@@ -278,6 +288,12 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithExecFee(const csdb::T
       }
       WalletData& walletData = getWalletData(confidantId, confidantAddress);
       walletData.balance_ += feeToEachConfidant;
+      payedFee += feeToEachConfidant;
+      ++numPayedTrusted;
+      if (numPayedTrusted == (realTrustedNumber - 1)) {
+        feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>()
+                           - payedFee;
+      }
       setModified(confidantId);
     }
   }
@@ -333,8 +349,8 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
       cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
       return 0;
     }
-    WalletData& wallData_s = getWalletData(id_s, tr.source());
 #ifdef MONITOR_NODE
+    WalletData& wallData_s = getWalletData(id_s, tr.source());
     ++wallData_s.transNum_;
     wallData_s.lastTransaction_ = tr.id();
 #endif

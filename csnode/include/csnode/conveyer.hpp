@@ -281,10 +281,6 @@ public:
   size_t blockTransactionsCount() const;
 
   // sync, try do not use it :]
-
-  ///
-  /// @brief Returns shared mutex object reference to lock/unlock outside conveyer behaviour.
-  ///
   std::unique_lock<cs::SharedMutex> lock() const;
 
 public slots:
@@ -297,7 +293,6 @@ protected:
   cs::TransactionsPacketTable& poolTable(cs::RoundNumber round);
 
 private:
-  /// pointer implementation
   struct Impl;
   std::unique_ptr<Impl> pimpl_;
 

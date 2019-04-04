@@ -682,7 +682,8 @@ bool Pool::add_transaction(Transaction transaction
 }
 
 size_t Pool::transactions_count() const noexcept {
-  return d->transactionsCount_;  // transactions_.size();
+  //return d->transactionsCount_; // bad work
+  return d->transactions_.size();
 }
 
 void Pool::recount() noexcept {

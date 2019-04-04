@@ -397,15 +397,19 @@ namespace executor {
       state_update(pool);
     }
 
+    /*void onReadBlock(const csdb::Pool& block, bool* test_failed) {
+      update_smart_caches_once
+    }*/
+
   private:
     std::map<general::Address, general::AccessID> lockSmarts;
     explicit Executor(const BlockChain &p_blockchain, const cs::SolverCore& solver, const int p_exec_port) :
-      executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
+      blockchain_(p_blockchain)
+      , solver_(solver)
+      , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
         ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", p_exec_port)))
       , origExecutor_(std::make_unique<executor::ContractExecutorConcurrentClient>(
         ::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_)))
-      , blockchain_(p_blockchain)
-      , solver_(solver)
     {
       std::thread th([&]() {
         while (true) {
@@ -501,7 +505,7 @@ namespace executor {
     std::condition_variable cvErrorConnect_;
     std::atomic_bool isConnect_{ false };
 
-    const uint8_t EXECUTOR_VERSION = 0;
+    const uint16_t EXECUTOR_VERSION = 0;
   };
 }
 namespace apiexec {

@@ -40,9 +40,9 @@ void SmartContractRef::from_user_field(const csdb::UserField& fld) {
 
 /*explicit*/
 SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& calls_queue_scheduler)
-: execution_allowed(true)
+: scheduler(calls_queue_scheduler)
 , bc(blockchain)
-, scheduler(calls_queue_scheduler) {
+, execution_allowed(true) {
 
   // signals subscription (MUST occur AFTER the BlockChains has already subscribed to storage)
   
@@ -1239,7 +1239,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
   using namespace trx_uf;
   csdb::UserField fld = t.user_field(new_state::Value);
   if (!fld.is_valid()) {
-    cserror() << log_prefix << "contract state is not updated, transaction does not contain it";
+    csdebug() << log_prefix << "contract state is not updated, transaction does not contain it";
     return false;
   }
   std::string state_value = fld.value<std::string>();

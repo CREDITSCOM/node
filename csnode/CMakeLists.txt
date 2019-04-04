@@ -56,6 +56,9 @@ add_library(csnode
   include/csnode/transactionsvalidator.hpp
   include/csnode/walletsstate.hpp
   include/csnode/roundstat.hpp
+  include/csnode/confirmationlist.hpp
+  include/csnode/nodeutils.hpp
+  include/csnode/itervalidator.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -72,6 +75,9 @@ add_library(csnode
   src/transactionsvalidator.cpp
   src/walletsstate.cpp
   src/roundstat.cpp
+  src/confirmationlist.cpp
+  src/nodeutils.cpp
+  src/itervalidator.cpp
 )
 
 target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 Boost::thread)

@@ -74,17 +74,17 @@ void addMyOut(const Config& config, cs::OPackStream& stream, const uint8_t initF
       stream << config.getAddressEndpoint().ip;
     }
     else {
-      uint8_t c = 0_u8;
+      uint8_t c = 0_b;
       stream << c;
     }
 
     stream << config.getAddressEndpoint().port;
   }
   else if (config.hasTwoSockets()) {
-    stream << 0_u8 << config.getInputEndpoint().port;
+    stream << 0_b << config.getInputEndpoint().port;
   }
   else {
-    stream << 0_u8;
+    stream << 0_b;
   }
 
   *flagChar |= initFlagValue | regFlag;
@@ -808,7 +808,7 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 
 bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode) {
   if (ssStatus_ != SSBootstrapStatus::Requested) {
-    cswarning() << "Unexpected Signal Server response " << (int) ssStatus_ << " instead of Requested";
+    cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of Requested";
     return false;
   }
 
@@ -850,7 +850,7 @@ bool Transport::gotSSReRegistration() {
 
 bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
   if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
-    cswarning() << "Unexpected Signal Server response " << (int)ssStatus_ << " instead of RegisteredWait";
+    cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of RegisteredWait";
   }
 
   if (!parseSSSignal(task)) {
@@ -934,7 +934,7 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
 void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
   cs::Lock lock(oLock_);
   oPackStream_.init(BaseFlags::NetworkMsg);
-  oPackStream_ << NetworkCommand::PackInform << (uint8_t)pack.isNeighbors() << pack.getHash();
+  oPackStream_ << NetworkCommand::PackInform << static_cast<cs::Byte>(pack.isNeighbors()) << pack.getHash();
   sendDirect(oPackStream_.getPackets(), addr);
   oPackStream_.clear();
 }
@@ -979,31 +979,23 @@ bool Transport::gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) 
 void Transport::askForMissingPackages() {
   typename decltype(uncollected_)::const_iterator ptr;
   MessagePtr msg;
-  uint32_t i = 0;
+  size_t i = 0;
 
   // magic numbers??
   const uint64_t maxMask = 1ull << 63;
 
+  cs::Lock lock(uLock_);
+  ptr = uncollected_.begin();
+
   while (true) {
-    {
-      cs::Lock lock(uLock_);
-
-      if (i >= uncollected_.size()) {
-        break;
-      }
-
-      ptr = uncollected_.begin();
-
-      for (uint32_t j = 0; j < i; ++j) {
-        ++ptr;
-      }
-
-      msg = *ptr;
-      ++i;
+    if (i >= uncollected_.size()) {
+      break;
     }
 
+    msg = *ptr; ++ptr; ++i;
+
     {
-      cs::Lock lock(msg->pLock_);
+      cs::Lock messageLock(msg->pLock_);
       const auto end = msg->packets_ + msg->packetsTotal_;
 
       uint16_t start = 0;

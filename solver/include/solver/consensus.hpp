@@ -32,7 +32,7 @@ public:
   constexpr static csdb::Amount MinStakeValue = csdb::Amount{ 50000 };
 
   /** @brief   The round when DPOS starts working */
-  constexpr static uint64_t StartingDPOS = 10000ULL;
+  constexpr static uint64_t StartingDPOS = 10'000ULL;
 
   /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
   constexpr static uint8_t GeneralNotSelected = 100;
@@ -65,5 +65,5 @@ public:
   constexpr static unsigned int MaxRoundsExecuteContract = 95;
 
   /** @brief True to disable, false to enable the trusted request to become trusted next round again */
-  constexpr static bool DisableTrustedRequestNextRound = false;
+  constexpr static bool DisableTrustedRequestNextRound = true;
 };

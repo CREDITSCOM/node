@@ -508,7 +508,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     std::random_device rd;
     std::mt19937 g;
     g.seed( (unsigned int) Conveyer::instance().currentRoundNumber());
-    cs::shuffle(aboveThreshold.begin(), aboveThreshold.end(), g);
+    cs::Utils::shuffle(aboveThreshold.begin(), aboveThreshold.end(), g);
     for (size_t i = 0; i < max_conf; ++i) {
       const auto& tmp = aboveThreshold.at(i);
       next_round_trust.emplace_back(tmp);
@@ -578,7 +578,7 @@ bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
       ++idx;
     }
   }
-  if (std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), cs::ConfidantConsts::InvalidConfidantIndex) > stage.realTrustedMask.size() / 2U + 1U) {
+  if ((size_t)std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), cs::ConfidantConsts::InvalidConfidantIndex) > stage.realTrustedMask.size() / 2U + 1U) {
     return false;
   }
   return true;
