@@ -132,7 +132,7 @@ public:
 
   void sendPingPack(const Connection&);
 
-  void registerMessage(MessagePtr);
+  void registerMessage(MessagePtr&);
 
   uint32_t getNeighboursCount();
   uint32_t getNeighboursCountWithoutSS();
