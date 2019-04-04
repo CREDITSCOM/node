@@ -163,6 +163,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
 #else
       csdb::PoolHash lapoo = getLastTransaction(key).pool_hash();
 #endif
+      std::lock_guard<decltype(dbLock_)> l(dbLock_);
       storage_.set_previous_transaction_block(key, pool.hash(), lapoo);
     }
   };
@@ -355,11 +356,16 @@ csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) cons
 
 csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId) const {
   std::lock_guard<decltype(dbLock_)> l(dbLock_);
-
-  if (deferredBlock_.hash() == transId.pool_hash())
-    return deferredBlock_.transaction(transId).clone();
-
-  return storage_.transaction(transId);
+  csdb::Transaction trxn;
+  if (deferredBlock_.hash() == transId.pool_hash()) {
+    trxn = deferredBlock_.transaction(transId).clone();
+    trxn.set_time(deferredBlock_.get_time());
+  }
+  else {
+    trxn = storage_.transaction(transId);
+    trxn.set_time(storage_.pool_load(transId.pool_hash()).get_time());
+  }
+  return trxn;
 }
 
 void BlockChain::removeLastBlock() {
@@ -1187,14 +1193,31 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const
 
 void BlockChain::setTransactionsFees(TransactionsPacket& packet) {
   if (fee_) {
-    fee_->CountFeesInPool(*this, &packet);
+    fee_->CountFeesInPool(*this, packet.transactions());
   }
 }
 
 void BlockChain::setTransactionsFees(csdb::Pool& pool) {
   if (fee_) {
-    fee_->CountFeesInPool(*this, &pool);
+    fee_->CountFeesInPool(*this, pool.transactions());
   }
+}
+
+void BlockChain::setTransactionsFees(std::vector<csdb::Transaction>& transactions) {
+  if (fee_) {
+    fee_->CountFeesInPool(*this, transactions);
+  }
+}
+
+void BlockChain::setTransactionsFees(std::vector<csdb::Transaction>& transactions,
+    const cs::Bytes& characteristicMask) {
+  if (fee_) {
+    fee_->CountFeesInPool(*this, transactions, characteristicMask);
+  }
+}
+
+const csdb::Address& BlockChain::getGenesisAddress() const {
+  return genesisAddress_;
 }
 
 csdb::Address BlockChain::get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) const {

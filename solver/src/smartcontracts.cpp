@@ -1239,7 +1239,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
   using namespace trx_uf;
   csdb::UserField fld = t.user_field(new_state::Value);
   if (!fld.is_valid()) {
-    cserror() << log_prefix << "contract state is not updated, transaction does not contain it";
+    csdebug() << log_prefix << "contract state is not updated, transaction does not contain it";
     return false;
   }
   std::string state_value = fld.value<std::string>();

@@ -207,6 +207,8 @@ AllStats csstats::collectAllStats(const Periods& periods) {
       for (size_t i = 0; i < transactionsCount; ++i) {
         const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
 
+        if (transaction.source() == blockchain.getGenesisAddress())
+          continue;
 #ifdef MONITOR_NODE
         if (is_smart(transaction) || is_smart_state(transaction))
           ++periodStats.transactionsSmartCount;

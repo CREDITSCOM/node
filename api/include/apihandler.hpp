@@ -397,6 +397,10 @@ namespace executor {
       state_update(pool);
     }
 
+    /*void onReadBlock(const csdb::Pool& block, bool* test_failed) {
+      update_smart_caches_once
+    }*/
+
   private:
     std::map<general::Address, general::AccessID> lockSmarts;
     explicit Executor(const BlockChain &p_blockchain, const cs::SolverCore& solver, const int p_exec_port) :
@@ -501,7 +505,7 @@ namespace executor {
     std::condition_variable cvErrorConnect_;
     std::atomic_bool isConnect_{ false };
 
-    const uint8_t EXECUTOR_VERSION = 0;
+    const uint16_t EXECUTOR_VERSION = 0;
   };
 }
 namespace apiexec {
