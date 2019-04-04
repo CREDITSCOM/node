@@ -131,6 +131,8 @@ public:
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
                          const cs::PublicKey& sender, cs::Signatures&& poolSignatures, cs::Bytes realTrusted);
 
+  void cleanConfirmationList(cs::RoundNumber rNum);
+
   // syncro get functions
   void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
   void getBlockReply(const uint8_t*, const size_t);
