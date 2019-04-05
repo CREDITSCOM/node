@@ -1239,7 +1239,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
   using namespace trx_uf;
   csdb::UserField fld = t.user_field(new_state::Value);
   if (!fld.is_valid()) {
-    csdebug() << log_prefix << "contract state is not updated, transaction does not contain it";
+    cserror() << log_prefix << "contract state is not updated, transaction does not contain it";
     return false;
   }
   std::string state_value = fld.value<std::string>();
@@ -1304,7 +1304,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
         }
       }
     }
-    cswarning() << log_prefix << "contract state is not updated, new state is empty meaning execution is failed";
+    csdebug() << log_prefix << "contract state is not updated, new state is empty meaning execution is failed";
     return false;
   }
   return true;
