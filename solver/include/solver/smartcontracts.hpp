@@ -579,8 +579,13 @@ private:
 
   bool start_consensus(QueueItem& item, const cs::TransactionsPacket& pack)
   {
+    // if re-run consensus
+    uint8_t run_counter = 0;
+    if (item.pconsensus) {
+      run_counter = item.pconsensus->runCounter() + 1;
+    }
     item.pconsensus = std::make_unique<SmartConsensus>();
-    return item.pconsensus->initSmartRound(pack, this->pnode, this);
+    return item.pconsensus->initSmartRound(pack, run_counter, this->pnode, this);
   }
 
   void test_contracts_locks();
