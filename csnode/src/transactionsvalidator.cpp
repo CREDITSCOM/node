@@ -145,6 +145,11 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
       }
     }
   }
+  if (smarts.is_known_smart_contract(trx.target()) &&
+      csdb::Amount(trx.max_fee().to_double()) > wallState.balance_) {
+    cslog() << log_prefix << "transaction[" << trxInd << "] balance = "
+            << wallState.balance_.to_double() << ", max_fee = " << trx.max_fee().to_double();
+  }
   wallState.balance_ = newBalance;
   return true;
 }
