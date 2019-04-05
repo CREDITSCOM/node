@@ -54,8 +54,6 @@ private:
 #ifdef TRANSACTIONS_INDEX
   std::unique_ptr<Db> db_trans_idx_;
 #endif
-  constexpr static auto cachesize = 1 << 30 >> 1;
-  constexpr static auto lg_bsize = cachesize;
 };
 
 }  // namespace csdb
