@@ -344,7 +344,7 @@ bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) 
     csmeta(cserror) << "Blockchain failed to write new block";
     return false;
   }
-
+  pnode->cleanConfirmationList(deferredBlock_.sequence());
   deferredBlock_ = csdb::Pool();
 
   csmeta(csdetails) << "end";

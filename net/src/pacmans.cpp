@@ -2,54 +2,50 @@
 #include "pacmans.hpp"
 
 IPacMan::Task& IPacMan::allocNext() {
-  if (!lockedLast_) {
-    lastElt_ = queue_.lockWrite();
-    lockedLast_ = true;
+  new (&lastElt_) Task();
+  lastElt_.pack.data_ = allocator_.allocateNext(Packet::MaxSize);
 
-    new (&lastElt_->element) Task();
-
-    lastElt_->element.pack.data_ = allocator_.allocateNext(Packet::MaxSize);
-  }
-
-  return lastElt_->element;
+  return lastElt_;
 }
 
 void IPacMan::enQueueLast() {
-  allocator_.shrinkLast(static_cast<uint32_t>(lastElt_->element.size));
-  queue_.unlockWrite(lastElt_);
-  lockedLast_ = false;
+  allocator_.shrinkLast(static_cast<uint32_t>(lastElt_.size));
+  while(!queue_.push(lastElt_));
+  lastElt_.~Task();
 }
 
 TaskPtr<IPacMan> IPacMan::getNextTask() {
   TaskPtr<IPacMan> result;
   result.owner_ = this;
-  result.ptr_ = queue_.lockRead();
+  Task *elt = new Task;
+  while (!queue_.pop(*elt));
+  result.ptr_ = elt;
   return result;
 }
 
-void IPacMan::releaseTask(IPacMan::Queue::Element* elt) {
-  elt->element.~Task();
-  queue_.unlockRead(elt);
+void IPacMan::releaseTask(Task* elt) {
+  delete elt;
+}
+
+OPacMan::Task* OPacMan::allocNext() {
+  new (&lastElt_) Task();
+  return &lastElt_;
+}
+
+void OPacMan::enQueueLast() {
+  while (!queue_.push(lastElt_));
+  lastElt_.~Task();
 }
 
 TaskPtr<OPacMan> OPacMan::getNextTask() {
   TaskPtr<OPacMan> result;
   result.owner_ = this;
-  result.ptr_ = queue_.lockRead();
+  Task *elt = new Task;
+  while (!queue_.pop(*elt));
+  result.ptr_ = elt;
   return result;
 }
 
-void OPacMan::releaseTask(OPacMan::Queue::Element* elt) {
-  elt->element.~Task();
-  queue_.unlockRead(elt);
-}
-
-OPacMan::Queue::Element* OPacMan::allocNext() {
-  auto elt = queue_.lockWrite();
-  new (&elt->element) Task();
-  return elt;
-}
-
-void OPacMan::enQueueLast(Queue::Element* elt) {
-  queue_.unlockWrite(elt);
+void OPacMan::releaseTask(Task* elt) {
+  delete elt;
 }

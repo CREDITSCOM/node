@@ -1304,7 +1304,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
         }
       }
     }
-    cswarning() << log_prefix << "contract state is not updated, new state is empty meaning execution is failed";
+    csdebug() << log_prefix << "contract state is not updated, new state is empty meaning execution is failed";
     return false;
   }
   return true;

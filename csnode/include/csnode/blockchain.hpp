@@ -112,6 +112,10 @@ public:
   // updates fees in every transaction
   void setTransactionsFees(cs::TransactionsPacket& packet);
   void setTransactionsFees(csdb::Pool& pool);
+  void setTransactionsFees(std::vector<csdb::Transaction>& transactions);
+  void setTransactionsFees(std::vector<csdb::Transaction>& transactions,
+                           const cs::Bytes& characteristicMask);
+
   void addNewWalletsToPool(csdb::Pool& pool);
 
   // block cache
@@ -231,7 +235,7 @@ public slots:
   uint64_t getTransactionsCount() const { return total_transactions_count_; }
 #endif
 
-  const csdb::Address& BlockChain::getGenesisAddress() const;
+  const csdb::Address& getGenesisAddress() const;
 
 private:
   bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;

@@ -57,7 +57,7 @@ bool WalletsState::WalletsExisting::updateFromSource(const WalletId& id) {
 WalletsState::WalletData* WalletsState::WalletsExisting::getData(const WalletId& id) {
   if (id >= toCopy_.size())
     return nullptr;
-  if (toCopy_[id] && !updateFromSource(id))
+  if (/*toCopy_[id] && */!updateFromSource(id))
     return nullptr;
   return storage_[id];
 }

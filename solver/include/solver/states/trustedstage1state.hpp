@@ -5,14 +5,13 @@
 //#include <timeouttracking.hpp>
 
 #include <csdb/pool.hpp>
-#include <csnode/transactionsvalidator.hpp>
+#include <csnode/itervalidator.hpp>
 
 #include <memory>
-#include <set>
 
 namespace cs {
 class TransactionsPacket;
-class TransactionsValidator;
+class IterValidator;
 }  // namespace cs
 
 namespace cs {
@@ -54,19 +53,12 @@ protected:
   //TimeoutTracking min_time_tracking;
 
   cs::StageOne stage;
-  std::unique_ptr<cs::TransactionsValidator> ptransval;
-  std::set<csdb::Address> smartSourceInvalidSignatures_;
 
-  bool checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction);
-  void checkTransactionsSignatures(SolverContext& context,
-                                   const std::vector<csdb::Transaction>& transactions,
-                                   cs::Bytes& characteristicMask,
-                                   csdb::Pool& excluded);
-  cs::Hash build_vector(SolverContext& context, const cs::TransactionsPacket& trans_pack);
+  cs::Hash build_vector(SolverContext& context, TransactionsPacket& trans_pack,
+                        cs::Packets& smartsPackets);
   cs::Hash formHashFromCharacteristic(const cs::Characteristic& characteristic);
-  void validateTransactions(SolverContext&, cs::Bytes& characteristicMask, const cs::TransactionsPacket&);
-  void checkRejectedSmarts(SolverContext&, cs::Bytes& characteristicMask, const cs::TransactionsPacket&);
-  void checkSignaturesSmartSource(SolverContext&, cs::Packets& smartContractsPackets);
+
+  std::unique_ptr<IterValidator> pValidator_;
 };
 
 }  // namespace slv2

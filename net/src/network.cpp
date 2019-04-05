@@ -346,10 +346,10 @@ inline void Network::processTask(TaskPtr<IPacMan> &task) {
 void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
   auto qePtr = oPacMan_.allocNext();
 
-  qePtr->element.endpoint = ep;
-  qePtr->element.pack = p;
+  qePtr->endpoint = ep;
+  qePtr->pack = p;
 
-  oPacMan_.enQueueLast(qePtr);
+  oPacMan_.enQueueLast();
 #ifdef __linux__
   static uint64_t one = 1;
   write(writerEventfd_, &one, sizeof(uint64_t));
