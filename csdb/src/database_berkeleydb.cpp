@@ -116,10 +116,14 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
   db_blocks_.reset(nullptr);
   db_seq_no_.reset(nullptr);
 
+  env_.log_set_config(DB_LOG_AUTO_REMOVE, 1);
+
   uint32_t db_env_open_flags = DB_CREATE | DB_INIT_MPOOL
-	  | DB_THREAD | DB_RECOVER | DB_INIT_TXN | DB_INIT_LOCK;
+    | DB_THREAD | DB_RECOVER | DB_INIT_TXN | DB_INIT_LOCK;
   int status = env_.open(path.c_str(), db_env_open_flags, 0);
   status = status ? status : env_.set_flags(DB_TXN_NOSYNC, 1);
+
+  env_.txn_checkpoint(1024 * 1024, 0, 0);
 
   DbTxn *txn;
   status = status ? status : env_.txn_begin(nullptr, &txn, DB_READ_UNCOMMITTED);
