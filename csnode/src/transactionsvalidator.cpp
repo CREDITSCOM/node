@@ -66,7 +66,11 @@ bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, con
   csdb::Amount feeForExecution(feeField.value<csdb::Amount>());
   if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()))
      < csdb::Amount(trx.counted_fee().to_double()) + feeForExecution) {
-    cslog() << log_prefix << __func__ << ": reject new_state transaction, execution fee is not enough";
+    cslog() << log_prefix << __func__ << ": reject new_state transaction, fee is not enough"
+            << "\nInit Transaction max fee = " << initTransaction.max_fee().to_double()
+            << "\nInit Transaction counted fee = "  << initTransaction.counted_fee().to_double()
+            << "\nNew State transaction counted fee = " << trx.counted_fee().to_double()
+            << "\nNew State transaction exec fee = " << feeForExecution.to_double();
     rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
     return false;
   }
