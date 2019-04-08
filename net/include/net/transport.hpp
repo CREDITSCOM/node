@@ -18,7 +18,7 @@
 #include "packet.hpp"
 #include "pacmans.hpp"
 
-extern volatile std::sig_atomic_t gSignalStatus;
+inline volatile std::sig_atomic_t gSignalStatus = 0;
 
 using ConnectionId = uint64_t;
 using Tick = uint64_t;
@@ -86,7 +86,7 @@ public:
   // [[noreturn]] void run();
   void run();
 
-  static volatile std::sig_atomic_t gSignalStatus;
+  inline static volatile std::sig_atomic_t gSignalStatus = 0;
 
   static void stop() {
     Transport::gSignalStatus = 1;
