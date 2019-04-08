@@ -87,9 +87,9 @@ public:
   void sendSmartStageReply(const cs::Bytes& message, const cs::RoundNumber smartRNum, const cs::Signature& signature
       , const MsgTypes msgType, const cs::PublicKey& requester);
 
-  void addSmartConsensus(cs::Sequence block, uint32_t transaction);
-  void removeSmartConsensus(cs::Sequence block, uint32_t transaction);
-  void checkForSavedSmartStages(cs::Sequence block, uint32_t transaction);
+  void addSmartConsensus(uint64_t id);
+  void removeSmartConsensus(uint64_t id);
+  void checkForSavedSmartStages(uint64_t id);
 
   void sendSmartReject(const std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list);
   void getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
@@ -370,7 +370,8 @@ private:
   int corruptionLevel_ = 0;
 
   std::vector<cs::Stage> smartStageTemporary_;
-  std::vector<std::pair<cs::Sequence, uint32_t>> activeSmartConsensuses_;
+  // smart consensus IDs:
+  std::vector<uint64_t> activeSmartConsensuses_;
 
   SentRoundData lastSentRoundData_;
   SentSignatures lastSentSignatures_;
