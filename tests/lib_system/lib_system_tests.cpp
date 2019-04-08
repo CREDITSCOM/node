@@ -10,6 +10,8 @@
 #include <lib/system/queues.hpp>
 #include <lib/system/structures.hpp>
 
+#include <boost/lockfree/spsc_queue.hpp>
+
 #include "gtest/gtest.h"
 
 void CreateRegionAllocatorAndThenAllocateInIt(
@@ -193,7 +195,7 @@ TEST(fuqueue, overwrite) {
   }
 }
 
-TEST(fuqueue, multithreaded_stress) {
+TEST(fuqueue, DISABLED_multithreaded_stress) {
   FUQueue<uint32_t, 1000> q;
 
   std::atomic<uint64_t> wSum = {0};
@@ -233,6 +235,58 @@ TEST(fuqueue, multithreaded_stress) {
   r1.join();
   r2.join();
   r3.join();
+}
+
+TEST(boost_spsc_queue, DISABLED_multithreaded_stress) {
+  boost::lockfree::spsc_queue<uint32_t, boost::lockfree::capacity<10000>> queue;
+
+  std::atomic<uint64_t> wSum = {0};
+  std::atomic<uint64_t> rSum = {0};
+
+  std::atomic<uint64_t> executions = {0};
+  std::atomic<uint64_t> enqueues = {0};
+
+  size_t count = 10000;
+
+  auto wrFunc = [&]() {
+    for (size_t i = 0; i < count; ++i) {
+      const uint32_t t = rand() % 500;
+
+      while (!queue.push(t)) {
+        executions.fetch_add(1, std::memory_order_acq_rel);
+        wSum.fetch_add(t, std::memory_order_acq_rel);
+      }
+    }
+  };
+
+  auto rdFunc = [&]() {
+    while (executions.load(std::memory_order_acquire) != enqueues.load(std::memory_order_acquire)) {
+      uint32_t value = 0;
+      while (queue.pop(value)) {
+        rSum.fetch_add(value, std::memory_order_acq_rel);
+        enqueues.fetch_add(1, std::memory_order_acq_rel);
+      }
+    }
+  };
+
+  std::thread w1(wrFunc);
+  std::thread w2(wrFunc);
+  std::thread w3(wrFunc);
+
+  std::thread r1(rdFunc);
+  std::thread r2(rdFunc);
+  std::thread r3(rdFunc);
+
+  w1.join();
+  w2.join();
+  w3.join();
+
+  r1.join();
+  r2.join();
+  r3.join();
+
+  ASSERT_EQ(enqueues.load(std::memory_order_acquire), executions.load(std::memory_order_acquire));
+  ASSERT_EQ(wSum.load(std::memory_order_acquire), rSum.load(std::memory_order_acquire));
 }
 
 // TODO: Enable test and fix crush on linux

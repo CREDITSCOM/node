@@ -18,7 +18,7 @@
 #include "packet.hpp"
 #include "pacmans.hpp"
 
-extern volatile std::sig_atomic_t gSignalStatus;
+inline volatile std::sig_atomic_t gSignalStatus = 0;
 
 using ConnectionId = uint64_t;
 using Tick = uint64_t;
@@ -68,7 +68,7 @@ public:
   Transport(const Config& config, Node* node)
   : config_(config)
   , sendPacksFlag_()
-  , remoteNodes_(MaxRemoteNodes + 1)
+  , remoteNodes_(maxRemoteNodes_ + 1)
   , netPacksAllocator_(1 << 24, 1)
   , myPublicKey_(node->getNodeIdKey())
   , oLock_()
@@ -83,10 +83,9 @@ public:
 
   ~Transport();
 
-  // [[noreturn]] void run();
   void run();
 
-  static volatile std::sig_atomic_t gSignalStatus;
+  inline static volatile std::sig_atomic_t gSignalStatus = 0;
 
   static void stop() {
     Transport::gSignalStatus = 1;
@@ -134,6 +133,7 @@ public:
 
   void registerMessage(MessagePtr&);
 
+  // neighbours interface
   uint32_t getNeighboursCount();
   uint32_t getNeighboursCountWithoutSS();
   uint32_t getMaxNeighbours() const;
@@ -192,8 +192,8 @@ private:
   bool good_;
   Config config_;
 
-  static const uint32_t MaxPacksQueue = 2048;
-  static const uint32_t MaxRemoteNodes = 4096;
+  static const uint32_t maxPacksQueue_ = 2048;
+  static const uint32_t maxRemoteNodes_ = 4096;
 
   cs::SpinLock sendPacksFlag_;
 
@@ -203,11 +203,11 @@ private:
     bool incrementId;
   };
 
-  FixedCircularBuffer<PackSendTask, MaxPacksQueue> sendPacks_;
+  FixedCircularBuffer<PackSendTask, maxPacksQueue_> sendPacks_;
 
   TypedAllocator<RemoteNode> remoteNodes_;
 
-  FixedHashMap<ip::udp::endpoint, RemoteNodePtr, uint16_t, MaxRemoteNodes> remoteNodesMap_;
+  FixedHashMap<ip::udp::endpoint, RemoteNodePtr, uint16_t, maxRemoteNodes_> remoteNodesMap_;
 
   RegionAllocator netPacksAllocator_;
   cs::PublicKey myPublicKey_;

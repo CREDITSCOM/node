@@ -415,7 +415,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
-                             const cs::PublicKey& sender, cs::Signatures&& poolSignatures, cs::Bytes realTrusted) {
+                             const cs::PublicKey& sender, cs::Signatures&& poolSignatures, cs::Bytes&& realTrusted) {
   csmeta(csdetails) << "started";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -446,6 +446,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   poolStream >> poolMetaInfo.previousHash;
   poolStream >> smartSigCount;
   poolMetaInfo.realTrustedMask = realTrusted;
+
   if (myLevel_ == Level::Confidant) {
     csdebug() << "We probably don't have enough confirmations so we try to throw our last deferred block";
     solver_->removeDeferredBlock(poolMetaInfo.sequenceNumber);
@@ -478,6 +479,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       poolMetaInfo.writerKey = key;
     }
   }
+
   if (round != 0) {
     auto confirmation = confirmationList.find(round);
     if (confirmation.has_value()) {
@@ -485,6 +487,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       poolMetaInfo.confirmations = confirmation.value().signatures;
     }
   }
+
   if (!istream_.good()) {
     csmeta(cserror) << "Round info parsing failed, data is corrupted";
     return;
@@ -501,7 +504,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   // otherwise senseless, this block is already in chain
   conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
-
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
 
   if (!pool.has_value()) {
@@ -2324,14 +2326,17 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
   cs::ConfidantsKeys confidants;
   roundStream >> confidants;
+
   if (confidants.empty()) {
     csmeta(cserror) << "Illegal confidants count in round table";
     return;
   }
+
   cs::Bytes realTrusted;
   roundStream >> realTrusted;
 
   cs::Signatures poolSignatures;
+
   if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures)){
     //return;
   }
@@ -2528,9 +2533,12 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   stageThreeMessage_.clear();
   stageThreeMessage_.resize(roundTable.confidants.size());
   stageThreeSent = false;
+
   constexpr int padWidth = 30;
+
   badHashReplyCounter_.clear();
   badHashReplyCounter_.resize(roundTable.confidants.size());
+
   for(auto badHash : badHashReplyCounter_) {
     badHash = false;
   }
@@ -2556,15 +2564,15 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   }
 
   const auto s = line1.str();
-  const std::size_t fixed_width = s.size();
+  const std::size_t fixedWidth = s.size();
 
   cslog() << s;
-  csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_.data(), nodeIdKey_.size());
-  cslog() << " last written sequence = " << blockChain_.getLastSequence();
+  csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
+  cslog() << " Last written sequence = " << blockChain_.getLastSequence() << ", neighbours = " << transport_->getNeighboursCount();
 
   std::ostringstream line2;
 
-  for (std::size_t i = 0; i < fixed_width; ++i) {
+  for (std::size_t i = 0; i < fixedWidth; ++i) {
     line2 << '-';
   }
 
@@ -2572,9 +2580,8 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   csdebug() << " Confidants:";
 
   for (size_t i = 0; i < roundTable.confidants.size(); ++i) {
-    const auto& confidant = roundTable.confidants[i];
     auto result = myLevel_ == Level::Confidant && i == myConfidantIndex_;
-    auto name =  result ? "me" : cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
+    auto name =  result ? "me" : cs::Utils::byteStreamToHex(roundTable.confidants[i]);
 
     csdebug() << "[" << i << "] " << name;
   }
@@ -2582,8 +2589,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   csdebug() << " Hashes: " << roundTable.hashes.size();
 
   for (size_t j = 0; j < roundTable.hashes.size(); ++j) {
-    const auto& hashBinary = roundTable.hashes[j].toBinary();
-    csdetails() << "[" << j << "] " << cs::Utils::byteStreamToHex(hashBinary.data(), hashBinary.size());
+    csdetails() << "[" << j << "] " << cs::Utils::byteStreamToHex(roundTable.hashes[j].toBinary());
   }
 
   csdebug() << line2.str();

@@ -119,6 +119,7 @@ public:
   const static uint32_t MinConnections = 1;
   const static uint32_t MaxConnections = 1024;
   const static uint32_t MaxNeighbours = 32;
+  const static uint32_t MinNeighbours = 3;
   const static uint32_t MaxConnectAttempts = 64;
 
   explicit Neighbourhood(Transport*);
@@ -135,6 +136,7 @@ public:
   void resendPackets();
   void checkPending(const uint32_t maxNeighbours);
   void checkSilent();
+  void checkNeighbours();
 
   void refreshLimits();
 

@@ -8,12 +8,6 @@
 #include "network.hpp"
 #include "transport.hpp"
 
-// Variable to store Class signal status.
-volatile std::sig_atomic_t Transport::gSignalStatus = 0;
-
-// variable defined in client/main.cpp
-volatile std::sig_atomic_t gSignalStatus = 0;
-
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
   Transport::stop();
@@ -163,6 +157,7 @@ void Transport::run() {
 
     if (checkSilent) {
       nh_.checkSilent();
+      nh_.checkNeighbours();
     }
 
     if (resendPacks) {
@@ -327,6 +322,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
 }
 
 void Transport::refillNeighbourhood() {
+  // TODO: check this algorithm when all list nodes are dead
   if (config_.getBootstrapType() == BootstrapType::IpList) {
     for (auto& ep : config_.getIpList()) {
       if (!nh_.canHaveNewConnection()) {
