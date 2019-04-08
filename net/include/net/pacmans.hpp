@@ -55,7 +55,7 @@ public:
     Packet pack;
   };
 
-  typedef boost::lockfree::spsc_queue<Task, boost::lockfree::capacity<1024>> Queue;
+  using Queue = boost::lockfree::spsc_queue<Task, boost::lockfree::capacity<1024>>;
 
   Task& allocNext();
   void enQueueLast();
@@ -76,7 +76,7 @@ public:
     Packet pack;
   };
 
-  typedef boost::lockfree::spsc_queue<Task, boost::lockfree::capacity<1024>> Queue;
+  using Queue = boost::lockfree::spsc_queue<Task, boost::lockfree::capacity<1024>>;
 
   Task* allocNext();
   void enQueueLast();
