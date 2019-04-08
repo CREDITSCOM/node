@@ -166,6 +166,19 @@ void Neighbourhood::checkSilent()
   }
 }
 
+void Neighbourhood::checkNeighbours() {
+  uint32_t size = 0;
+
+  {
+    cs::Lock lock(nLockFlag_);
+    size = neighbours_.size();
+  }
+
+  if (size < MinNeighbours) {
+    transport_->refillNeighbourhood();
+  }
+}
+
 template <typename Vec>
 static ConnectionPtr* findInVec(const Connection::Id& id, Vec& vec) {
   for (auto it = vec.begin(); it != vec.end(); ++it) {
