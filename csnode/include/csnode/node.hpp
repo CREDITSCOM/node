@@ -129,7 +129,7 @@ public:
   void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
   void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
-                         const cs::PublicKey& sender, cs::Signatures&& poolSignatures, cs::Bytes realTrusted);
+                         const cs::PublicKey& sender, cs::Signatures&& poolSignatures, cs::Bytes&& realTrusted);
 
   void cleanConfirmationList(cs::RoundNumber rNum);
 

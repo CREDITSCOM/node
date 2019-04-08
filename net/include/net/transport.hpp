@@ -83,7 +83,6 @@ public:
 
   ~Transport();
 
-  // [[noreturn]] void run();
   void run();
 
   inline static volatile std::sig_atomic_t gSignalStatus = 0;
@@ -134,6 +133,7 @@ public:
 
   void registerMessage(MessagePtr&);
 
+  // neighbours interface
   uint32_t getNeighboursCount();
   uint32_t getNeighboursCountWithoutSS();
   uint32_t getMaxNeighbours() const;
