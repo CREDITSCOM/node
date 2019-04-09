@@ -6,12 +6,16 @@
 #include <csignal>
 
 #include <client/config.hpp>
+
 #include <csnode/node.hpp>
 #include <csnode/packstream.hpp>
+
 #include <lib/system/allocators.hpp>
 #include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
+#include <lib/system/signals.hpp>
+
 #include <net/network.hpp>
 
 #include "neighbourhood.hpp"
@@ -22,6 +26,7 @@ inline volatile std::sig_atomic_t gSignalStatus = 0;
 
 using ConnectionId = uint64_t;
 using Tick = uint64_t;
+using PingSignal = cs::Signal<void(cs::Sequence)>;
 
 enum class NetworkCommand : uint8_t {
   Registration = 2,
@@ -155,6 +160,9 @@ public:
   void syncReplied(const cs::Sequence seq);
   bool isPingDone();
   void resetNeighbours();
+
+public signals:
+  PingSignal pingReceived;
 
 private:
   void registerTask(Packet* pack, const uint32_t packNum, const bool);

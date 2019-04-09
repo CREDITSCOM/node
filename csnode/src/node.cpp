@@ -51,6 +51,8 @@ Node::Node(const Config& config)
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
   cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
   cs::Connector::connect(&blockChain_.storeBlockEvent, &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort), &executor::Executor::onBlockStored);
+  cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
+
   good_ = init(config);
 }
 
@@ -212,7 +214,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   onRoundStart(globalTable);
   conveyer.updateRoundTable(cachedRound, globalTable);
 
-  poolSynchronizer_->processingSync(globalTable.round, true);
+  poolSynchronizer_->sync(globalTable.round, cs::PoolSynchronizer::roundDifferentForSync, true);
 
   if (conveyer.isSyncCompleted()) {
     startConsensus();
@@ -299,7 +301,7 @@ void Node::handleRoundMismatch(const cs::RoundTable& globalTable) {
   if (last_block + cs::Conveyer::HashTablesStorageCapacity < globalTable.round) {
     // activate pool synchronizer
 
-    poolSynchronizer_->processingSync(globalTable.round);
+    poolSynchronizer_->sync(globalTable.round);
     // no return, ask for next round info
   }
 }
@@ -828,6 +830,32 @@ void Node::processTimer() {
 
 void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
+}
+
+void Node::onPingReceived(cs::Sequence sequence) {
+  static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
+  static std::chrono::milliseconds delta{0};
+  static cs::Sequence maxSequence = 0;
+
+  auto now = std::chrono::steady_clock::now();
+  delta += std::chrono::duration_cast<std::chrono::milliseconds>(now - point);
+
+  if (maxSequence < sequence) {
+    maxSequence = sequence;
+    delta = std::chrono::milliseconds(0);
+  }
+
+  if (maxPingSynchroDelay_ <= delta.count()) {
+    delta = std::chrono::milliseconds(0);
+    auto lastSequence = blockChain_.getLastSequence();
+
+    if (lastSequence < maxSequence) {
+      cswarning() << "Last sequence is lower than network max sequence, trying to sync";
+
+      auto sequenceDifference = maxSequence - lastSequence;
+      poolSynchronizer_->sync(maxSequence, sequenceDifference);
+    }
+  }
 }
 
 void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packetNum) {
@@ -1716,50 +1744,57 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   csmeta(csdetails) << "done";
 }
 
-void Node::sendSmartReject(const std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list)
-{
-  uint32_t cnt = (uint32_t) ref_list.size();
-  if (cnt == 0) {
+void Node::sendSmartReject(const std::vector<std::pair<cs::Sequence, uint32_t>>& referenceList) {
+  uint32_t count = static_cast<uint32_t>(referenceList.size());
+
+  if (count == 0) {
     csmeta(cserror) << "cannot send empty rejected contracts pack";
     return;
   }
+
   cs::Bytes data;
   cs::DataStream stream(data);
-  stream << cnt;
-  for (const auto& p : ref_list) {
+  stream << count;
+
+  for (const auto& p : referenceList) {
     stream << p.first << p.second;
   }
-  csdebug() << "Node: sending " << cnt << " rejected contract(s) to related smart confidants";
-  sendBroadcast(MsgTypes::RejectedContracts, cs::Conveyer::instance().currentRoundNumber(),
-    // payload
-    data);
+
+  csdebug() << "Node: sending " << count << " rejected contract(s) to related smart confidants";
+  sendBroadcast(MsgTypes::RejectedContracts, cs::Conveyer::instance().currentRoundNumber(), data);
 }
 
-void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender)
-{
+void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
   csunused(rNum);
   csunused(sender);
 
   istream_.init(data, size);
 
-  cs::Bytes raw_data;
-  istream_ >> raw_data;
-  cs::DataStream stream(raw_data.data(), raw_data.size());
-  uint32_t cnt = 0;
-  stream >> cnt;
-  std::vector< std::pair<cs::Sequence, uint32_t> > ref_list;
-  for (uint32_t i = 0; i < cnt; ++i) {
-    cs::Sequence seq;
-    uint32_t tr_idx;
-    stream >> seq >> tr_idx;
-    ref_list.emplace_back(std::make_pair<>(seq, tr_idx));
+  cs::Bytes bytes;
+  istream_ >> bytes;
+
+  cs::DataStream stream(bytes.data(), bytes.size());
+
+  uint32_t count = 0;
+  stream >> count;
+
+  std::vector<std::pair<cs::Sequence, uint32_t>> referenceList;
+
+  for (uint32_t i = 0; i < count; ++i) {
+    cs::Sequence sequence;
+    uint32_t index;
+    stream >> sequence >> index;
+    referenceList.emplace_back(std::make_pair(sequence, index));
   }
-  if (ref_list.empty()) {
+
+  if (referenceList.empty()) {
     csmeta(cserror) << "empty rejected contracts pack received";
     return;
   }
-  csdebug() << "Node: " << cnt << " rejected contract(s) received";
-  emit gotRejectedContracts(ref_list);
+
+  csdebug() << "Node: " << count << " rejected contract(s) received";
+
+  emit gotRejectedContracts(referenceList);
 }
 
 void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::StageOneSmarts& stageOneInfo) {
@@ -2312,7 +2347,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   }
 
   conveyer.setRound(rNum);
-  poolSynchronizer_->processingSync(conveyer.currentRoundNumber());
+  poolSynchronizer_->sync(conveyer.currentRoundNumber());
 
   // update sub round
   subRound_ = subRound;

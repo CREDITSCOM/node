@@ -1113,5 +1113,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
   }
 
   nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq);
+
+  emit pingReceived(lastSeq);
   return true;
 }

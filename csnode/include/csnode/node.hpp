@@ -91,7 +91,7 @@ public:
   void removeSmartConsensus(uint64_t id);
   void checkForSavedSmartStages(uint64_t id);
 
-  void sendSmartReject(const std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list);
+  void sendSmartReject(const std::vector<std::pair<cs::Sequence, uint32_t>>& referenceList);
   void getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
 
   csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
@@ -227,6 +227,7 @@ public signals:
 public slots:
   void processTimer();
   void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
+  void onPingReceived(cs::Sequence sequence);
   void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
 
 private:
@@ -327,8 +328,9 @@ private:
   uint32_t startPacketRequestPoint_ = 0;
 
   // ms timeout
-  inline static const uint32_t packetRequestStep_ = 450;
-  inline static const size_t maxPacketRequestSize_ = 1000;
+  static const uint32_t packetRequestStep_ = 450;
+  static const size_t maxPacketRequestSize_ = 1000;
+  static const int64_t maxPingSynchroDelay_ = 90000;
 
   // serialization/deserialization entities
   cs::IPackStream istream_;
