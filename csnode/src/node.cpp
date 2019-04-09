@@ -1745,22 +1745,17 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
 }
 
 void Node::sendSmartReject(const std::vector<std::pair<cs::Sequence, uint32_t>>& referenceList) {
-  uint32_t count = static_cast<uint32_t>(referenceList.size());
-
-  if (count == 0) {
+  if (referenceList.empty()) {
     csmeta(cserror) << "cannot send empty rejected contracts pack";
     return;
   }
 
   cs::Bytes data;
   cs::DataStream stream(data);
-  stream << count;
 
-  for (const auto& p : referenceList) {
-    stream << p.first << p.second;
-  }
+  stream << referenceList;
 
-  csdebug() << "Node: sending " << count << " rejected contract(s) to related smart confidants";
+  csdebug() << "Node: sending " << referenceList.size() << " rejected contract(s) to related smart confidants";
   sendBroadcast(MsgTypes::RejectedContracts, cs::Conveyer::instance().currentRoundNumber(), data);
 }
 
@@ -1775,25 +1770,15 @@ void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::Roun
 
   cs::DataStream stream(bytes.data(), bytes.size());
 
-  uint32_t count = 0;
-  stream >> count;
-
   std::vector<std::pair<cs::Sequence, uint32_t>> referenceList;
-
-  for (uint32_t i = 0; i < count; ++i) {
-    cs::Sequence sequence;
-    uint32_t index;
-    stream >> sequence >> index;
-    referenceList.emplace_back(std::make_pair(sequence, index));
-  }
+  stream >> referenceList;
 
   if (referenceList.empty()) {
     csmeta(cserror) << "empty rejected contracts pack received";
     return;
   }
 
-  csdebug() << "Node: " << count << " rejected contract(s) received";
-
+  csdebug() << "Node: " << referenceList.size() << " rejected contract(s) received";
   emit gotRejectedContracts(referenceList);
 }
 
