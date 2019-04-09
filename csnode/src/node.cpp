@@ -851,13 +851,14 @@ void Node::onPingReceived(cs::Sequence sequence) {
 
     if (lastSequence < maxSequence) {
       cswarning() << "Last sequence is lower than network max sequence, trying to sync";
-
       cs::Conveyer::instance().setRound(maxSequence);
 
       auto sequenceDifference = maxSequence - lastSequence;
       poolSynchronizer_->sync(maxSequence, sequenceDifference);
     }
   }
+
+  point = now;
 }
 
 void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packetNum) {
