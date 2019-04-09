@@ -23,7 +23,7 @@ Characteristic IterValidator::formCharacteristic(SolverContext& context,
     Transactions& transactions, Packets& smartsPackets) {
   cs::Characteristic characteristic;
   characteristic.mask.resize(transactions.size());
-  memset(characteristic.mask.data(), 1, characteristic.mask.size());
+  memset(characteristic.mask.data(), kValidMarker, characteristic.mask.size());
 
   checkTransactionsSignatures(context, transactions, characteristic.mask, smartsPackets);
 

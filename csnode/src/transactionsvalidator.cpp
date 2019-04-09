@@ -163,6 +163,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
   const auto& trx = trxs[trxInd];
   WalletsState::WalletId walletId{};
   WalletsState::WalletData& wallState = walletsState_.getData(trx.source(), walletId);
+  walletsState_.setModified(walletId);
 
 #ifndef SPAMMER
   if (!wallState.trxTail_.isAllowed(trx.innerID())) {
@@ -201,7 +202,6 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
   wallState.trxTail_.push(trx.innerID());
   trxList_[trxInd] = wallState.lastTrxInd_;
   wallState.lastTrxInd_ = static_cast<decltype(wallState.lastTrxInd_)>(trxInd);
-  walletsState_.setModified(walletId);
 
   return true;
 }
@@ -227,7 +227,8 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
   size_t restoredCounter = 0;
 
   for (const auto& t : trxs) {
-    if (i < maskSize && smarts.is_known_smart_contract(t.source())) {
+    if (i < maskSize && smarts.is_known_smart_contract(t.source()) &&
+        !SmartContracts::is_new_state(t)) {
       WalletsState::WalletId id{};
       WalletsState::WalletData& wallState = walletsState_.getData(t.source(), id);
       if (wallState.balance_ < zeroBalance_) {
