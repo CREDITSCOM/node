@@ -17,6 +17,7 @@
 namespace {
 const uint8_t kInvalidMarker = 0;
 const uint8_t kValidMarker = 1;
+const char* log_prefix = "Validator: ";
 } // namespace
 
 namespace cs {
@@ -33,8 +34,6 @@ void TransactionsValidator::reset(size_t transactionsNum) {
   negativeNodes_.clear();
   cntRemovedTrxs_ = 0;
 }
-
-static const char * log_prefix = "Validator: ";
 
 bool TransactionsValidator::validateTransaction(SolverContext& context, const Transactions& trxs,
                                                 size_t trxInd) {
@@ -84,12 +83,13 @@ bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, con
                           - csdb::Amount(trx.counted_fee().to_double());
 
   initTrxWallState.balance_ = newBalance;
+  walletsState_.setModified(initTrxId);
+
   if (initTrxWallState.balance_ < zeroBalance_) {
     cslog() << log_prefix << __func__ << ": reject new_state transaction, initier is out of funds";
     rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
     return false;
   }
-  walletsState_.setModified(initTrxId);
   return true;
 }
 
