@@ -23,7 +23,7 @@ class PoolSynchronizer {
 public:
   explicit PoolSynchronizer(const PoolSyncData& data, Transport* transport, BlockChain* blockChain);
 
-  void processingSync(cs::RoundNumber roundNum, bool isBigBand = false);
+  void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = roundDifferentForSync, bool isBigBand = false);
 
   // syncro get functions
   void getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_t packetNum);
@@ -36,6 +36,8 @@ public:
   bool isOneBlockReply() const;
 
   bool isFastMode() const;
+
+  static const cs::RoundNumber roundDifferentForSync = cs::values::defaultMetaStorageMaxSize;
 
 public signals:
 
@@ -211,8 +213,6 @@ private:
   };
 
 private:
-  inline static const cs::RoundNumber roundDifferentForSync_ = cs::values::defaultMetaStorageMaxSize;
-
   const PoolSyncData syncData_;
 
   Transport* transport_;

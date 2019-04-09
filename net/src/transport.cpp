@@ -8,12 +8,6 @@
 #include "network.hpp"
 #include "transport.hpp"
 
-// Variable to store Class signal status.
-volatile std::sig_atomic_t Transport::gSignalStatus = 0;
-
-// variable defined in client/main.cpp
-volatile std::sig_atomic_t gSignalStatus = 0;
-
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
   Transport::stop();
@@ -163,6 +157,7 @@ void Transport::run() {
 
     if (checkSilent) {
       nh_.checkSilent();
+      nh_.checkNeighbours();
     }
 
     if (resendPacks) {
@@ -327,6 +322,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
 }
 
 void Transport::refillNeighbourhood() {
+  // TODO: check this algorithm when all list nodes are dead
   if (config_.getBootstrapType() == BootstrapType::IpList) {
     for (auto& ep : config_.getIpList()) {
       if (!nh_.canHaveNewConnection()) {
@@ -452,10 +448,10 @@ bool Transport::shouldSendPacket(const Packet& pack) {
     return false;
   }
 
-  const cs::RoundNumber current_round = cs::Conveyer::instance().currentRoundNumber();
+  const cs::RoundNumber currentRound = cs::Conveyer::instance().currentRoundNumber();
 
   if (!pack.isFragmented()) {
-    return (pack.getRoundNum() + getRoundTimeout(pack.getType())) >= current_round;
+    return (pack.getRoundNum() + getRoundTimeout(pack.getType())) >= currentRound;
   }
 
   auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
@@ -464,7 +460,7 @@ bool Transport::shouldSendPacket(const Packet& pack) {
     rn = pack.getRoundNum() + getRoundTimeout(pack.getType());
   }
 
-  return !rn || rn >= current_round;
+  return !rn || rn >= currentRound;
 }
 
 void Transport::processNodeMessage(const Packet& pack) {
@@ -1111,13 +1107,13 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     return false;
   }
 
-  nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq);
-
   if (lastSeq > maxBlock_) {
     maxBlock_ = lastSeq;
     maxBlockCount_ = 1;
   }
 
   nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq);
+
+  emit pingReceived(lastSeq);
   return true;
 }
