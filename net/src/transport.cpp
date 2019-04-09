@@ -1107,8 +1107,6 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     return false;
   }
 
-  nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq);
-
   if (lastSeq > maxBlock_) {
     maxBlock_ = lastSeq;
     maxBlockCount_ = 1;
