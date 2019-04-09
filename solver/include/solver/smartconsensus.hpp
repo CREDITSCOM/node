@@ -32,7 +32,7 @@ namespace cs {
 
       ~SmartConsensus();
 
-      bool initSmartRound(const cs::TransactionsPacket& pack, Node* node, SmartContracts* smarts);
+      bool initSmartRound(const cs::TransactionsPacket& pack, uint8_t runCounter, Node* node, SmartContracts* smarts);
       uint8_t calculateSmartsConfNum();
       uint8_t ownSmartsConfidantNumber();
 
@@ -77,7 +77,30 @@ namespace cs {
       TimeoutTracking timeout_request_stage;
       TimeoutTracking timeout_request_neighbors;
       TimeoutTracking timeout_force_transition;
-    private:
+
+      uint8_t runCounter() const {
+        return runCounter_;
+      }
+
+      // smartRoundNumber[5 bytes] + smartTransaction[2 bytes] + runCounter[1 byte]
+      uint64_t id() const {
+        return (((smartRoundNumber_ & 0xFFFFFFFFFF) << 24) | ((0xFFFF & smartTransaction_) << 8) | static_cast<uint64_t>(runCounter_));
+      }
+
+      static inline cs::Sequence blockPart(uint64_t id) {
+        return ((id >> 24) & 0x000000FFFFFFFFFF);
+      }
+
+      static inline uint32_t transactionPart(uint64_t id) {
+        return ((id >> 8) & 0x000000000000FFFF);
+      }
+
+      static inline uint32_t runCounterPart(uint64_t id) {
+        return (id & 0x00000000000000FF);
+      }
+  
+  private:
+
       void fake_stage1(uint8_t from);
       void fake_stage2(uint8_t from);
 
@@ -87,7 +110,7 @@ namespace cs {
       CallsQueueScheduler::CallTag timer_tag_{ CallsQueueScheduler::no_tag };
       CallsQueueScheduler::CallTag timer_tag() {
         if (timer_tag_ == CallsQueueScheduler::no_tag) {
-          timer_tag_ = (((smartRoundNumber_ & 0xFFFFFFFFFFFF) << 16) | (0xFFFF & smartTransaction_));
+          timer_tag_ = id();
         }
         return timer_tag_;
       }
@@ -112,6 +135,7 @@ namespace cs {
       std::vector <csdb::Pool::SmartSignature> solverSmartSignatures_;
       cs::Sequence smartRoundNumber_;
       uint32_t smartTransaction_;
+      uint8_t runCounter_;
       bool trustedChanged_ = false;
       bool smartStageThreeSent_ = false;
       cs::Hash  zeroHash;

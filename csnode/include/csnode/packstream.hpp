@@ -116,7 +116,7 @@ public:
         break;
       }
 
-      entity.push_back(element);
+      entity.push_back(std::move(element));
     }
 
     if (entity.size() != size) {
@@ -125,6 +125,26 @@ public:
     }
 
     vector = std::move(entity);
+    return *this;
+  }
+
+  template <typename T, typename U>
+  IPackStream& operator>>(std::pair<T, U>& pair) {
+    T first;
+    (*this) >> first;
+
+    if (!good_) {
+      return *this;
+    }
+
+    U second;
+    (*this) >> second;
+
+    if (!good_) {
+      return *this;
+    }
+
+    pair = std::make_pair(std::move(first), std::move(second));
     return *this;
   }
 
@@ -240,7 +260,6 @@ public:
     return *this;
   }
 
-  // overloading
   OPackStream& operator<<(cs::BytesView view) {
     (*this) << view.size();
     insertBytes(view.data(), static_cast<uint32_t>(view.size()));
@@ -248,12 +267,20 @@ public:
   }
 
   template <typename T, typename A>
-  cs::OPackStream& operator<<(const std::vector<T, A>& vector) {
+  OPackStream& operator<<(const std::vector<T, A>& vector) {
     (*this) << vector.size();
 
     for (const auto& element : vector) {
       (*this) << element;
     }
+
+    return *this;
+  }
+
+  template <typename T, typename U>
+  OPackStream& operator<<(const std::pair<T, U>& pair) {
+    (*this) << pair.first;
+    (*this) << pair.second;
 
     return *this;
   }

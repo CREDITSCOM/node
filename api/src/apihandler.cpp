@@ -593,8 +593,17 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
   send_transaction.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
 
+  /*
   const auto byteStream = send_transaction.to_byte_stream_for_sig();
   if (!cscrypto::verifySignature(send_transaction.signature(), send_transaction.source().public_key(), byteStream.data(), byteStream.size())) {
+    _return.status.code = 1;
+    _return.status.message = "wrong signature! ByteStream:" + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+    return;
+  }
+  */
+
+  const auto byteStream = send_transaction.to_byte_stream_for_sig();
+  if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key(), byteStream.data(), byteStream.size())) {
     _return.status.code = 1;
     _return.status.message = "wrong signature! ByteStream:" + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
     return;

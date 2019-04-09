@@ -51,6 +51,8 @@ Node::Node(const Config& config)
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
   cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
   cs::Connector::connect(&blockChain_.storeBlockEvent, &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort), &executor::Executor::onBlockStored);
+  cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
+
   good_ = init(config);
 }
 
@@ -212,7 +214,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
   onRoundStart(globalTable);
   conveyer.updateRoundTable(cachedRound, globalTable);
 
-  poolSynchronizer_->processingSync(globalTable.round, true);
+  poolSynchronizer_->sync(globalTable.round, cs::PoolSynchronizer::roundDifferentForSync, true);
 
   if (conveyer.isSyncCompleted()) {
     startConsensus();
@@ -299,7 +301,7 @@ void Node::handleRoundMismatch(const cs::RoundTable& globalTable) {
   if (last_block + cs::Conveyer::HashTablesStorageCapacity < globalTable.round) {
     // activate pool synchronizer
 
-    poolSynchronizer_->processingSync(globalTable.round);
+    poolSynchronizer_->sync(globalTable.round);
     // no return, ask for next round info
   }
 }
@@ -415,7 +417,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 }
 
 void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round,
-                             const cs::PublicKey& sender, cs::Signatures&& poolSignatures, cs::Bytes realTrusted) {
+                             const cs::PublicKey& sender, cs::Signatures&& poolSignatures, cs::Bytes&& realTrusted) {
   csmeta(csdetails) << "started";
   cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -446,6 +448,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   poolStream >> poolMetaInfo.previousHash;
   poolStream >> smartSigCount;
   poolMetaInfo.realTrustedMask = realTrusted;
+
   if (myLevel_ == Level::Confidant) {
     csdebug() << "We probably don't have enough confirmations so we try to throw our last deferred block";
     solver_->removeDeferredBlock(poolMetaInfo.sequenceNumber);
@@ -478,6 +481,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       poolMetaInfo.writerKey = key;
     }
   }
+
   if (round != 0) {
     auto confirmation = confirmationList.find(round);
     if (confirmation.has_value()) {
@@ -485,6 +489,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
       poolMetaInfo.confirmations = confirmation.value().signatures;
     }
   }
+
   if (!istream_.good()) {
     csmeta(cserror) << "Round info parsing failed, data is corrupted";
     return;
@@ -501,7 +506,6 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
 
   // otherwise senseless, this block is already in chain
   conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
-
   std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
 
   if (!pool.has_value()) {
@@ -826,6 +830,35 @@ void Node::processTimer() {
 
 void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
   CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
+}
+
+void Node::onPingReceived(cs::Sequence sequence) {
+  static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
+  static std::chrono::milliseconds delta{0};
+  static cs::Sequence maxSequence = 0;
+
+  auto now = std::chrono::steady_clock::now();
+  delta += std::chrono::duration_cast<std::chrono::milliseconds>(now - point);
+
+  if (maxSequence < sequence) {
+    maxSequence = sequence;
+    delta = std::chrono::milliseconds(0);
+  }
+
+  if (maxPingSynchroDelay_ <= delta.count()) {
+    delta = std::chrono::milliseconds(0);
+    auto lastSequence = blockChain_.getLastSequence();
+
+    if (lastSequence < maxSequence) {
+      cswarning() << "Last sequence is lower than network max sequence, trying to sync";
+      cs::Conveyer::instance().setRound(maxSequence);
+
+      auto sequenceDifference = maxSequence - lastSequence;
+      poolSynchronizer_->sync(maxSequence, sequenceDifference);
+    }
+  }
+
+  point = now;
 }
 
 void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packetNum) {
@@ -1714,50 +1747,42 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
   csmeta(csdetails) << "done";
 }
 
-void Node::sendSmartReject(const std::vector< std::pair<cs::Sequence, uint32_t> >& ref_list)
-{
-  uint32_t cnt = (uint32_t) ref_list.size();
-  if (cnt == 0) {
+void Node::sendSmartReject(const std::vector<std::pair<cs::Sequence, uint32_t>>& referenceList) {
+  if (referenceList.empty()) {
     csmeta(cserror) << "cannot send empty rejected contracts pack";
     return;
   }
+
   cs::Bytes data;
   cs::DataStream stream(data);
-  stream << cnt;
-  for (const auto& p : ref_list) {
-    stream << p.first << p.second;
-  }
-  csdebug() << "Node: sending " << cnt << " rejected contract(s) to related smart confidants";
-  sendBroadcast(MsgTypes::RejectedContracts, cs::Conveyer::instance().currentRoundNumber(),
-    // payload
-    data);
+
+  stream << referenceList;
+
+  csdebug() << "Node: sending " << referenceList.size() << " rejected contract(s) to related smart confidants";
+  sendBroadcast(MsgTypes::RejectedContracts, cs::Conveyer::instance().currentRoundNumber(), data);
 }
 
-void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender)
-{
+void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
   csunused(rNum);
   csunused(sender);
 
   istream_.init(data, size);
 
-  cs::Bytes raw_data;
-  istream_ >> raw_data;
-  cs::DataStream stream(raw_data.data(), raw_data.size());
-  uint32_t cnt = 0;
-  stream >> cnt;
-  std::vector< std::pair<cs::Sequence, uint32_t> > ref_list;
-  for (uint32_t i = 0; i < cnt; ++i) {
-    cs::Sequence seq;
-    uint32_t tr_idx;
-    stream >> seq >> tr_idx;
-    ref_list.emplace_back(std::make_pair<>(seq, tr_idx));
-  }
-  if (ref_list.empty()) {
+  cs::Bytes bytes;
+  istream_ >> bytes;
+
+  cs::DataStream stream(bytes.data(), bytes.size());
+
+  std::vector<std::pair<cs::Sequence, uint32_t>> referenceList;
+  stream >> referenceList;
+
+  if (referenceList.empty()) {
     csmeta(cserror) << "empty rejected contracts pack received";
     return;
   }
-  csdebug() << "Node: " << cnt << " rejected contract(s) received";
-  emit gotRejectedContracts(ref_list);
+
+  csdebug() << "Node: " << referenceList.size() << " rejected contract(s) received";
+  emit gotRejectedContracts(referenceList);
 }
 
 void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::StageOneSmarts& stageOneInfo) {
@@ -1768,28 +1793,24 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::Stag
   }
 
   csmeta(csdetails) << std::endl
-                    << "Smart starting Round: " << stageOneInfo.sBlockNum << '.' << stageOneInfo.startTransaction << std::endl
+                    << "Smart starting Round: " << cs::SmartConsensus::blockPart(stageOneInfo.id)
+                    << '.' << cs::SmartConsensus::transactionPart(stageOneInfo.id) << std::endl
                     << "Sender: " << static_cast<int>(stageOneInfo.sender) << std::endl
                     << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
 
-  size_t expectedMessageSize = sizeof(stageOneInfo.sender) + sizeof(stageOneInfo.startTransaction) + stageOneInfo.hash.size();
+  size_t expectedMessageSize = sizeof(stageOneInfo.sender) + stageOneInfo.hash.size();
 
   cs::Bytes message;
   message.reserve(expectedMessageSize);
-
-  cs::Bytes messageToSign;
-  messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(cs::Hash));
-
   cs::DataStream stream(message);
   stream << stageOneInfo.sender;
-  stream << stageOneInfo.startTransaction;
   stream << stageOneInfo.hash;
 
+  cs::Bytes messageToSign;
+  messageToSign.reserve(sizeof(cs::Hash));
   // hash of message
   stageOneInfo.messageHash = cscrypto::calculateHash(message.data(), message.size());
-
   cs::DataStream signStream(messageToSign);
-  signStream << stageOneInfo.sBlockNum;
   signStream << stageOneInfo.messageHash;
 
   csdebug() << "MsgHash: " << cs::Utils::byteStreamToHex(stageOneInfo.messageHash.data(), stageOneInfo.messageHash.size());
@@ -1799,7 +1820,7 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::Stag
 
   sendToList(smartConfidants, stageOneInfo.sender, MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
     // payload
-    stageOneInfo.sBlockNum, stageOneInfo.signature, message, stageOneInfo.fee.integral(), stageOneInfo.fee.fraction());
+    stageOneInfo.id, stageOneInfo.signature, message, stageOneInfo.fee.integral(), stageOneInfo.fee.fraction());
 
   // cache
   stageOneInfo.message = std::move(message);
@@ -1814,7 +1835,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   istream_.init(data, size);
 
   cs::StageOneSmarts stage;
-  istream_ >> stage.sBlockNum >> stage.signature;
+  istream_ >> stage.id >> stage.signature;
 
   int32_t fee_integral = 0;
   uint64_t fee_fraction = 0;
@@ -1832,17 +1853,17 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
 
   cs::Bytes signedMessage;
   cs::DataStream signedStream(signedMessage);
-  signedStream << stage.sBlockNum;
   signedStream << stage.messageHash;
 
 
   // stream for main message
   cs::DataStream stream(bytes.data(), bytes.size());
   stream >> stage.sender;
-  stream >> stage.startTransaction;
   stream >> stage.hash;
 
-  csdebug() << __func__ << ": starting {" << stage.sBlockNum << '.' << stage.startTransaction << '}';
+  cs::Sequence block = cs::SmartConsensus::blockPart(stage.id);
+  uint32_t transaction = cs::SmartConsensus::transactionPart(stage.id);
+  csdebug() << __func__ << ": starting {" << block << '.' << transaction << '}';
 
   csdb::Amount fee{fee_integral,fee_fraction,csdb::Amount::AMOUNT_MAX_FRACTION};
   csdebug() << "Fee constructed: " << fee.to_string();
@@ -1850,7 +1871,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
   csdebug() << "StageHash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
   if (!cscrypto::verifySignature(stage.signature, sender, signedMessage.data(), signedMessage.size())) {
     cswarning() << "NODE> Smart stage One from T[" << static_cast<int>(stage.sender) << "] {" 
-      << stage.sBlockNum << '.' << stage.startTransaction << "} -  WRONG SIGNATURE!!!";
+      << block << '.' << transaction << "} -  WRONG SIGNATURE!!!";
     return;
   }
 
@@ -1858,14 +1879,13 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
 
   csmeta(csdebug) << "Sender: " << static_cast<int>(stage.sender)
                 << ", sender key: " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << std::endl 
-                << "Smart#: {" << stage.sBlockNum << '.' << stage.startTransaction << '}';
+                << "Smart#: {" << block << '.' << transaction << '}';
   csdebug() << "Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
 
   csdebug() << "NODE> SmartStage One from T[" << static_cast<int>(stage.sender) << "] is OK!";
   //solver_->gotSmartStageOne(stage);
-  const auto val = std::make_pair<>(stage.sBlockNum, stage.startTransaction);
-  if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), val) == activeSmartConsensuses_.cend()) {
-    csdebug() << "The SmartConsensus {" << stage.sBlockNum << '.' << stage.startTransaction
+  if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), stage.id) == activeSmartConsensuses_.cend()) {
+    csdebug() << "The SmartConsensus {" << block << '.' << transaction
       << "} is not active now, storing the stage";
       smartStageOneStorage_.push_back(stage);
       return;
@@ -1891,7 +1911,6 @@ void Node::sendSmartStageTwo(const cs::ConfidantsKeys& smartConfidants, cs::Stag
 
   cs::DataStream stream(bytes);
   stream << stageTwoInfo.sender;
-  stream << stageTwoInfo.startTransaction;
   stream << stageTwoInfo.signatures;
   stream << stageTwoInfo.hashes;
 
@@ -1899,7 +1918,7 @@ void Node::sendSmartStageTwo(const cs::ConfidantsKeys& smartConfidants, cs::Stag
   stageTwoInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
   sendToList(smartConfidants, stageTwoInfo.sender,
              MsgTypes::SecondSmartStage, cs::Conveyer::instance().currentRoundNumber(),
-             stageTwoInfo.sBlockNum, stageTwoInfo.signature, bytes);
+             stageTwoInfo.id, stageTwoInfo.signature, bytes);
 
   // cash our stage two
   stageTwoInfo.message = std::move(bytes);
@@ -1914,7 +1933,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
   istream_.init(data, size);
 
   cs::StageTwoSmarts stage;
-  istream_ >> stage.sBlockNum >> stage.signature;
+  istream_ >> stage.id >> stage.signature;
 
   cs::Bytes bytes;
   istream_ >> bytes;
@@ -1926,7 +1945,6 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
 
   cs::DataStream stream(bytes.data(), bytes.size());
   stream >> stage.sender;
-  stream >> stage.startTransaction;
   stream >> stage.signatures;
   stream >> stage.hashes;
   csdebug() << "NODE> Read all data from the stream";
@@ -1958,7 +1976,6 @@ void Node::sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::St
 
   cs::DataStream stream(bytes);
   stream << stageThreeInfo.sender;
-  stream << stageThreeInfo.startTransaction;
   stream << stageThreeInfo.writer;
   stream << stageThreeInfo.realTrustedMask;
   stream << stageThreeInfo.packageSignature;
@@ -1966,7 +1983,7 @@ void Node::sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::St
   stageThreeInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
   sendToList(smartConfidants, stageThreeInfo.sender, MsgTypes::ThirdSmartStage, cs::Conveyer::instance().currentRoundNumber(),
     // payload:
-             stageThreeInfo.sBlockNum, stageThreeInfo.signature, bytes);
+             stageThreeInfo.id, stageThreeInfo.signature, bytes);
   
   // cach stage three
   stageThreeInfo.message = std::move(bytes);
@@ -1980,7 +1997,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
   istream_.init(data, size);
 
   cs::StageThreeSmarts stage;
-  istream_ >> stage.sBlockNum >> stage.signature;
+  istream_ >> stage.id >> stage.signature;
 
   cs::Bytes bytes;
   istream_ >> bytes;
@@ -1992,7 +2009,6 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
 
   cs::DataStream stream(bytes.data(), bytes.size());
   stream >> stage.sender;
-  stream >> stage.startTransaction;
   stream >> stage.writer;
   stream >> stage.realTrustedMask;
   stream >> stage.packageSignature;
@@ -2046,29 +2062,27 @@ void Node::sendSmartStageReply(const cs::Bytes& message, const cs::RoundNumber s
   csmeta(csdetails) << "done";
 }
 
-void Node::addSmartConsensus(cs::Sequence block, uint32_t transaction) {
-  const auto val = std::make_pair(block, transaction);
-  if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), val) != activeSmartConsensuses_.cend()) {
-    csdebug() << "The smartConsensus for {" << block << '.' << transaction << "} is already active";
+void Node::addSmartConsensus(uint64_t id) {
+  if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), id) != activeSmartConsensuses_.cend()) {
+    csdebug() << "The smartConsensus for {" << cs::SmartConsensus::blockPart(id) << '.' << cs::SmartConsensus::transactionPart(id) << "} is already active";
     return;
   }
-  activeSmartConsensuses_.push_back(val);
-  checkForSavedSmartStages(block, transaction);
+  activeSmartConsensuses_.push_back(id);
+  checkForSavedSmartStages(id);
 }
 
-void Node::removeSmartConsensus(cs::Sequence block, uint32_t transaction) {
-  const auto val = std::make_pair(block, transaction);
-  const auto it = std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), val);
+void Node::removeSmartConsensus(uint64_t id) {
+  const auto it = std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), id);
   if (it == activeSmartConsensuses_.cend()) {
-    csdebug() << "The smartConsensus for {" << block << '.' << transaction << "} is not active";
+    csdebug() << "The smartConsensus for {" << cs::SmartConsensus::blockPart(id) << '.' << cs::SmartConsensus::transactionPart(id) << "} is not active";
     return;
   }
   activeSmartConsensuses_.erase(it);
 }
 
-void Node::checkForSavedSmartStages(cs::Sequence block, uint32_t transaction) {
+void Node::checkForSavedSmartStages(uint64_t id) {
   for (auto& it : smartStageOneStorage_) {
-    if (it.sBlockNum == block && it.startTransaction == transaction) {
+    if (it.id == id) {
       emit gotSmartStageOne(it, false);
     }
   }
@@ -2321,7 +2335,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   }
 
   conveyer.setRound(rNum);
-  poolSynchronizer_->processingSync(conveyer.currentRoundNumber());
+  poolSynchronizer_->sync(conveyer.currentRoundNumber());
 
   // update sub round
   subRound_ = subRound;
@@ -2335,14 +2349,17 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
   cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
   cs::ConfidantsKeys confidants;
   roundStream >> confidants;
+
   if (confidants.empty()) {
     csmeta(cserror) << "Illegal confidants count in round table";
     return;
   }
+
   cs::Bytes realTrusted;
   roundStream >> realTrusted;
 
   cs::Signatures poolSignatures;
+
   if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures)){
     //return;
   }
@@ -2539,9 +2556,12 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   stageThreeMessage_.clear();
   stageThreeMessage_.resize(roundTable.confidants.size());
   stageThreeSent = false;
+
   constexpr int padWidth = 30;
+
   badHashReplyCounter_.clear();
   badHashReplyCounter_.resize(roundTable.confidants.size());
+
   for(auto badHash : badHashReplyCounter_) {
     badHash = false;
   }
@@ -2567,15 +2587,15 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   }
 
   const auto s = line1.str();
-  const std::size_t fixed_width = s.size();
+  const std::size_t fixedWidth = s.size();
 
   cslog() << s;
-  csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_.data(), nodeIdKey_.size());
-  cslog() << " last written sequence = " << blockChain_.getLastSequence();
+  csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
+  cslog() << " Last written sequence = " << blockChain_.getLastSequence() << ", neighbours = " << transport_->getNeighboursCount();
 
   std::ostringstream line2;
 
-  for (std::size_t i = 0; i < fixed_width; ++i) {
+  for (std::size_t i = 0; i < fixedWidth; ++i) {
     line2 << '-';
   }
 
@@ -2583,9 +2603,8 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   csdebug() << " Confidants:";
 
   for (size_t i = 0; i < roundTable.confidants.size(); ++i) {
-    const auto& confidant = roundTable.confidants[i];
     auto result = myLevel_ == Level::Confidant && i == myConfidantIndex_;
-    auto name =  result ? "me" : cs::Utils::byteStreamToHex(confidant.data(), confidant.size());
+    auto name =  result ? "me" : cs::Utils::byteStreamToHex(roundTable.confidants[i]);
 
     csdebug() << "[" << i << "] " << name;
   }
@@ -2593,8 +2612,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
   csdebug() << " Hashes: " << roundTable.hashes.size();
 
   for (size_t j = 0; j < roundTable.hashes.size(); ++j) {
-    const auto& hashBinary = roundTable.hashes[j].toBinary();
-    csdetails() << "[" << j << "] " << cs::Utils::byteStreamToHex(hashBinary.data(), hashBinary.size());
+    csdetails() << "[" << j << "] " << cs::Utils::byteStreamToHex(roundTable.hashes[j].toBinary());
   }
 
   csdebug() << line2.str();

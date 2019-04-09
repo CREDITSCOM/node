@@ -166,6 +166,19 @@ void Neighbourhood::checkSilent()
   }
 }
 
+void Neighbourhood::checkNeighbours() {
+  uint32_t size = 0;
+
+  {
+    cs::Lock lock(nLockFlag_);
+    size = neighbours_.size();
+  }
+
+  if (size < MinNeighbours) {
+    transport_->refillNeighbourhood();
+  }
+}
+
 template <typename Vec>
 static ConnectionPtr* findInVec(const Connection::Id& id, Vec& vec) {
   for (auto it = vec.begin(); it != vec.end(); ++it) {
@@ -266,7 +279,7 @@ std::unique_lock<cs::SpinLock> Neighbourhood::getNeighboursLock() const {
 
 void Neighbourhood::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
   cs::Lock lock(nLockFlag_);
-  for (const ConnectionPtr connection : neighbours_) {
+  for (const ConnectionPtr& connection : neighbours_) {
     if (connection) {
       func(connection);
     }
@@ -275,7 +288,7 @@ void Neighbourhood::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
 
 void Neighbourhood::forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)> func) {
   cs::Lock lock(nLockFlag_);
-  for (const ConnectionPtr connection : neighbours_) {
+  for (const ConnectionPtr& connection : neighbours_) {
     if (connection && !connection->isSignal) {
       func(connection);
     }

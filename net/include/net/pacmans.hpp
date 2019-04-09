@@ -3,8 +3,7 @@
 #define PACMANS_HPP
 
 #include <boost/asio.hpp>
-
-#include <lib/system/queues.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
 
 #include "packet.hpp"
 
@@ -30,17 +29,16 @@ public:
   }
 
   typename Pacman::Task* operator->() {
-    return &(ptr_->element);
+    return ptr_;
   }
   const typename Pacman::Task* operator->() const {
-    return &(ptr_->element);
+    return ptr_;
   }
 
 private:
-  TaskPtr() {
-  }
+  TaskPtr() {}
 
-  typename Pacman::Queue::Element* ptr_;
+  typename Pacman::Task* ptr_;
   Pacman* owner_;
 
   friend Pacman;
@@ -49,65 +47,45 @@ private:
 class IPacMan {
 public:
   IPacMan()
-  : allocator_(1 << 20) {
-  }
+  : allocator_(1 << 20) {}
 
   struct Task {
     ip::udp::endpoint sender;
     size_t size;
     Packet pack;
-
-    Task() {
-    }
-
-    Task(const Task&) = delete;
-    Task(Task&&) = delete;
-    Task& operator=(const Task&) = delete;
-    Task& operator=(Task&&) = delete;
   };
 
-  typedef FUQueue<Task, 1000000lu> Queue;
+  using Queue = boost::lockfree::spsc_queue<Task, boost::lockfree::capacity<1024>>;
 
   Task& allocNext();
   void enQueueLast();
 
   TaskPtr<IPacMan> getNextTask();
-  void releaseTask(Queue::Element*);
+  void releaseTask(Task*);
 
 private:
+  Task lastElt_;
   Queue queue_;
-  typename Queue::Element* lastElt_;
-  bool lockedLast_ = false;
-
   RegionAllocator allocator_;
 };
 
 class OPacMan {
 public:
-  const static std::size_t MaxTimesRedirect = 1;
-
   struct Task {
     ip::udp::endpoint endpoint;
     Packet pack;
-
-    Task() {
-    }
-
-    Task(const Task&) = delete;
-    Task(Task&&) = delete;
-    Task& operator=(const Task&) = delete;
-    Task& operator=(Task&&) = delete;
   };
 
-  typedef FUQueue<Task, 1000000lu> Queue;
+  using Queue = boost::lockfree::spsc_queue<Task, boost::lockfree::capacity<1024>>;
 
-  Queue::Element* allocNext();
-  void enQueueLast(Queue::Element*);
+  Task* allocNext();
+  void enQueueLast();
 
   TaskPtr<OPacMan> getNextTask();
-  void releaseTask(Queue::Element*);
+  void releaseTask(Task*);
 
 private:
+  Task lastElt_;
   Queue queue_;
 };
 
