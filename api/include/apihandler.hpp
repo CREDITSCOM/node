@@ -724,6 +724,8 @@ private:
   TokensMaster tm;
 
   const uint32_t MAX_EXECUTION_TIME = 1000;
+
+  const uint8_t ERROR_CODE = 1;
 };
 }  // namespace api
 

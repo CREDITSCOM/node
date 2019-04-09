@@ -593,21 +593,31 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
   send_transaction.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
 
-  /*
-  const auto byteStream = send_transaction.to_byte_stream_for_sig();
-  if (!cscrypto::verifySignature(send_transaction.signature(), send_transaction.source().public_key(), byteStream.data(), byteStream.size())) {
-    _return.status.code = 1;
-    _return.status.message = "wrong signature! ByteStream:" + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
-    return;
-  }
-  */
-
+  // check signature
   const auto byteStream = send_transaction.to_byte_stream_for_sig();
   if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key(), byteStream.data(), byteStream.size())) {
-    _return.status.code = 1;
+    _return.status.code = ERROR_CODE;
     _return.status.message = "wrong signature! ByteStream:" + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
     return;
   }
+
+  // check money
+  const auto source_addr = s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+  BlockChain::WalletData wallData{};
+  BlockChain::WalletId wallId{};
+  if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
+	  _return.status.code = ERROR_CODE;
+	  _return.status.message = "wallet not found!";
+	  return;
+  }
+  const auto max_fee = send_transaction.max_fee().to_double();
+  const auto balance = wallData.balance_.to_double();
+  if (max_fee > balance) {
+	  _return.status.code = ERROR_CODE;
+	  _return.status.message = "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
+	  return;
+  }
+  //
 
   std::vector<general::ByteCodeObject> origin_bytecode;
   if (!deploy) {
@@ -633,7 +643,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
       send_transaction.innerID(),
       input_smart.smartContractDeploy);
     if(scKey != addr) {
-      _return.status.code = 1;
+      _return.status.code = ERROR_CODE;
       const auto data = scKey.public_key().data();
       std::string str = EncodeBase58(data, data + cscrypto::kPublicKeySize);
       _return.status.message = "Bad smart contract address, expected " + str;
