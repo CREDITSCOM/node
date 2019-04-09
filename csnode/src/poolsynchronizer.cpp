@@ -33,7 +33,7 @@ cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* tran
                   << std::setw(hl) << "Polling frequency:" << std::setw(vl) << syncData_.sequencesVerificationFrequency;
 }
 
-void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBand) {
+void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber difference, bool isBigBand) {
   if (transport_->getNeighboursCount() == 0) {
     csmeta(csdebug) << "Cannot start sync (no neighbours). Needed sequence: " << roundNum
                     << ",   Requested pools block size:" << syncData_.blockPoolsCount;
@@ -50,7 +50,7 @@ void cs::PoolSynchronizer::processingSync(cs::RoundNumber roundNum, bool isBigBa
     return;
   }
 
-  if (!isSyncroStarted_ && roundNum < (lastWrittenSequence + roundDifferentForSync_)) {
+  if (!isSyncroStarted_ && roundNum < (lastWrittenSequence + difference)) {
     return;
   }
 
