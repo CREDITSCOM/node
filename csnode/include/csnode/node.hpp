@@ -152,13 +152,8 @@ public:
   void becomeWriter();
 
   bool isPoolsSyncroStarted();
-
-  //void smartStagesStorageClear(size_t cSize);
   
-  std::optional<cs::TrustedConfirmation> getConfirmation(cs::RoundNumber rNum) const
-  {
-    return confirmationList.find(rNum);
-  }
+  std::optional<cs::TrustedConfirmation> getConfirmation(cs::RoundNumber round) const;
   
   enum Level {
     Normal,
@@ -208,7 +203,7 @@ public:
   }
 
 #ifdef NODE_API
-  csconnector::connector *getConnector() {
+  csconnector::connector* getConnector() {
     return api_.get();
   }
 #endif
@@ -384,7 +379,7 @@ private:
   cs::RoundStat stat_;
 
   // confirmation list
-  cs::ConfirmationList confirmationList;
+  cs::ConfirmationList confirmationList_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);
