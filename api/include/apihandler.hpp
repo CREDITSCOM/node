@@ -35,6 +35,10 @@
 
 #include <solvercore.hpp>
 
+namespace csconnector {
+class connector;
+} // namespace csconnector
+
 class APIHandlerBase {
 public:
   enum class APIRequestStatusType : uint8_t {
@@ -716,6 +720,8 @@ private:
                                  std::vector<decltype(mapper(api::SmartContract()))>& out);
 
   bool update_smart_caches_once(const csdb::PoolHash&, bool = false);
+  void update_smart_caches_slot(const csdb::Pool& pool);
+  void run();
 
   ::csdb::Transaction make_transaction(const ::api::Transaction&);
   void dumb_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
@@ -726,6 +732,8 @@ private:
   const uint32_t MAX_EXECUTION_TIME = 1000;
 
   const uint8_t ERROR_CODE = 1;
+
+  friend class ::csconnector::connector;
 };
 }  // namespace api
 
