@@ -720,7 +720,6 @@ private:
                                  std::vector<decltype(mapper(api::SmartContract()))>& out);
 
   bool update_smart_caches_once(const csdb::PoolHash&, bool = false);
-  void update_smart_caches_slot(const csdb::Pool& pool);
   void run();
 
   ::csdb::Transaction make_transaction(const ::api::Transaction&);
@@ -734,6 +733,13 @@ private:
   const uint8_t ERROR_CODE = 1;
 
   friend class ::csconnector::connector;
+
+  std::condition_variable_any newBlockCv_;
+  std::mutex dbLock_;
+
+private slots:
+  void update_smart_caches_slot(const csdb::Pool& pool);
+  void store_block_slot(const csdb::Pool& pool);
 };
 }  // namespace api
 

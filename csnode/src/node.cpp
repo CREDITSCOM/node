@@ -64,6 +64,7 @@ Node::Node(const Config& config)
     });
   std::cout << "Done\n";
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
+  cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
 #endif // NODE_API
 
   good_ = init(config);

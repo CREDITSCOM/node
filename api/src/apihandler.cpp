@@ -64,7 +64,10 @@ void APIHandler::state_updater_work_function() {
     auto lasthash = s_blockchain.getLastHash();
     while (state_updater_running.test_and_set(std::memory_order_acquire)) {
       if (!update_smart_caches_once(lasthash)) {
-        /*lasthash = */s_blockchain.wait_for_block(lasthash);
+        {
+          std::unique_lock lk(dbLock_);
+          newBlockCv_.wait(lk); 
+        }
         lasthash = s_blockchain.getLastHash();
       }
     }
@@ -823,6 +826,10 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
   return;
 }
 
+void APIHandler::store_block_slot(const csdb::Pool&) {
+  newBlockCv_.notify_all();
+}
+
 void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
   auto pending_smart_transactions = lockedReference(this->pending_smart_transactions);
   pending_smart_transactions->last_pull_hash = pool.hash();
@@ -1247,8 +1254,10 @@ void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, 
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
-void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& obsolete) {
-  _return = fromByteArray(s_blockchain.wait_for_block(csdb::PoolHash::from_binary(toByteArray(obsolete))).to_binary());
+void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& /* obsolete */) {
+  std::unique_lock lk(dbLock_);
+  newBlockCv_.wait(lk); 
+  _return = fromByteArray(s_blockchain.getLastHash().to_binary());
 }
 
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const general::Address& address, const std::vector<int64_t>& v) {

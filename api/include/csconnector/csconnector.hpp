@@ -51,6 +51,10 @@ public:
     }
   }
 
+  void onStoreBlock(const csdb::Pool& pool) {
+    api_handler->store_block_slot(pool);
+  }
+
   void run() {
     api_handler->run();  
   }

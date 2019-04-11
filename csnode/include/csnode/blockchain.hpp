@@ -190,7 +190,6 @@ public slots:
 
   // load methods
 
-  csdb::PoolHash wait_for_block(const csdb::PoolHash& obsolete);
   csdb::Pool loadBlock(const csdb::PoolHash&) const;
   csdb::Pool loadBlock(const cs::Sequence sequence) const;
   csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
@@ -289,8 +288,6 @@ private:
   std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
   std::unique_ptr<cs::WalletsPools> walletsPools_;
   mutable cs::SpinLock cacheMutex_;
-
-  std::condition_variable_any newBlockCv_;
 
 #ifdef TRANSACTIONS_INDEX
   uint64_t total_transactions_count_ = 0;
