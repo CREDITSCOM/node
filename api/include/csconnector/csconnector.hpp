@@ -18,6 +18,7 @@
 
 #include <solvercore.hpp>
 #include <client/params.hpp>
+#include <csdb/pool.hpp>
 
 #include <memory>
 #include <thread>
@@ -43,6 +44,20 @@ public:
 
   connector(const connector&) = delete;
   connector& operator=(const connector&) = delete;
+
+  void onReadFromDB(csdb::Pool pool, bool* should_stop) {
+    if (!*should_stop) {
+      api_handler->update_smart_caches_slot(pool);  
+    }
+  }
+
+  void onStoreBlock(const csdb::Pool& pool) {
+    api_handler->store_block_slot(pool);
+  }
+
+  void run() {
+    api_handler->run();  
+  }
 
   // interface
   ApiHandlerPtr apiHandler() const;

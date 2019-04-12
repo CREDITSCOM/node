@@ -426,14 +426,6 @@ void BlockChain::removeLastBlock() {
   csmeta(csdebug) << "done";
 }
 
-csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
-  csunused(obsolete_block);
-  std::unique_lock lock(dbLock_);
-
-  newBlockCv_.wait(lock);
-  return getLastHash();
-}
-
 csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
   if (key.size() == PUBLIC_KEY_LENGTH) {
     csdb::Address res = csdb::Address::from_public_key(key.data());
@@ -1011,9 +1003,6 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
   }
   csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
   emit storeBlockEvent(pool);
-
-  // notify block recording
-  newBlockCv_.notify_all();
 
   // log cached block
   csdebug() << "----------------------- Defer block #" << pool.sequence() << " until next round ----------------------";
