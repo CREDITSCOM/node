@@ -104,6 +104,10 @@ bool BlockChain::isGood() const {
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
 {
+  if(!validateBlockFromDb(block)) {
+    *should_stop = true;
+    return;
+  }
   if(!updateWalletIds(block, *walletsCacheUpdater_.get())) {
     cserror() << "Blockchain: updateWalletIds() failed on block #" << block.sequence();
     *should_stop = true;
@@ -129,6 +133,10 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
 #endif
     }
   }
+}
+
+bool BlockChain::validateBlockFromDb(const csdb::Pool&) {
+  return true;
 }
 
 bool BlockChain::postInitFromDB() {
