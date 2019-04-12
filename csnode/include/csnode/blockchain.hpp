@@ -237,7 +237,7 @@ public slots:
   const csdb::Address& getGenesisAddress() const;
 
 private:
-  bool validateBlockFromDb(const csdb::Pool& block);
+  bool validateBlock(const csdb::Pool& block, bool fullValidation = false);
   bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
 
   void writeGenesisBlock();

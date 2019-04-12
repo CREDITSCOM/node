@@ -104,7 +104,7 @@ bool BlockChain::isGood() const {
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
 {
-  if(!validateBlockFromDb(block)) {
+  if(!validateBlock(block)) {
     *should_stop = true;
     return;
   }
@@ -135,7 +135,41 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
   }
 }
 
-bool BlockChain::validateBlockFromDb(const csdb::Pool&) {
+bool BlockChain::validateBlock(const csdb::Pool& block, bool fullValidation) {
+  if (block.sequence() == 0) {
+    return true;
+  }
+
+  // check hash integrity
+  {
+    auto prev_hash = block.previous_hash();
+    auto prev_block = loadBlock(prev_hash);
+    auto data = prev_block.to_binary();
+    auto counted_prev_hash = csdb::PoolHash::calc_from_data(cs::Bytes(data.data(), data.data() + prev_block.hashingLength()));
+    if (prev_hash != counted_prev_hash) {
+      cserror() << __func__ << ": prev pool's hash != real prev pool's hash";
+      return false;      
+    }
+  }
+
+  if (!fullValidation) {
+    return true;
+  }
+
+  // TODO check
+  //
+  // for block:
+  // 1. sequence
+  // 2. timestamp
+  // 3. trusted signatures according to real trusted mask
+  // 4. smart source trxs signatures
+  // 5. wallets' balances after writing block
+  //
+  // for trxs:
+  // 1. all complex of IterValidator activities
+  //    including signatures validation, fee counting,
+  //    balance check, graph validation
+
   return true;
 }
 
