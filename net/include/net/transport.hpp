@@ -203,7 +203,7 @@ private:
   static const uint32_t maxPacksQueue_ = 2048;
   static const uint32_t maxRemoteNodes_ = 4096;
 
-  cs::SpinLock sendPacksFlag_;
+  cs::SpinLock sendPacksFlag_{false};
 
   struct PackSendTask {
     Packet pack;
@@ -222,7 +222,7 @@ private:
 
   cs::IPackStream iPackStream_;
 
-  cs::SpinLock oLock_;
+  cs::SpinLock oLock_{false};
   cs::OPackStream oPackStream_;
 
   // SS Data
@@ -258,7 +258,7 @@ private:
     &postponedPacketsSecond_
   };
 
-  cs::SpinLock uLock_;
+  cs::SpinLock uLock_{false};
   FixedCircularBuffer<MessagePtr, PacketCollector::MaxParallelCollections> uncollected_;
 
   cs::Sequence maxBlock_ = 0;

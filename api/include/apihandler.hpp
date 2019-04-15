@@ -625,7 +625,7 @@ private:
   executor::Executor& executor_;
 
   struct smart_trxns_queue {
-    cs::SpinLock lock;
+    cs::SpinLock lock{false};
     std::condition_variable_any new_trxn_cv{};
     size_t awaiter_num{0};
     std::deque<csdb::TransactionID> trid_queue{};
