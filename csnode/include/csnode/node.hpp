@@ -152,13 +152,8 @@ public:
   void becomeWriter();
 
   bool isPoolsSyncroStarted();
-
-  //void smartStagesStorageClear(size_t cSize);
   
-  std::optional<cs::TrustedConfirmation> getConfirmation(cs::RoundNumber rNum) const
-  {
-    return confirmationList.find(rNum);
-  }
+  std::optional<cs::TrustedConfirmation> getConfirmation(cs::RoundNumber round) const;
   
   enum Level {
     Normal,
@@ -208,7 +203,7 @@ public:
   }
 
 #ifdef NODE_API
-  csconnector::connector *getConnector() {
+  csconnector::connector* getConnector() {
     return api_.get();
   }
 #endif
@@ -307,8 +302,8 @@ private:
   inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
   inline const static std::string publicKeyFileName_ = "NodePublic.txt";
 
-  Level myLevel_;
-  cs::Byte myConfidantIndex_;
+  Level myLevel_{ Level::Normal };
+  cs::Byte myConfidantIndex_{ cs::ConfidantConsts::InvalidConfidantIndex };
 
   // main cs storage
   BlockChain blockChain_;
@@ -340,12 +335,12 @@ private:
 
   // sends transactions blocks to network
   cs::Timer sendingTimer_;
-  cs::Byte subRound_;
+  cs::Byte subRound_{ 0 };
 
   // round package sent data storage
   struct SentRoundData {
     cs::RoundTable table;
-    cs::Byte subRound;
+    cs::Byte subRound{ 0 };
   };
 
   struct SentSignatures {
@@ -384,7 +379,7 @@ private:
   cs::RoundStat stat_;
 
   // confirmation list
-  cs::ConfirmationList confirmationList;
+  cs::ConfirmationList confirmationList_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

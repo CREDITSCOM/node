@@ -83,8 +83,8 @@ private:
   int readerEventfd_;
   int writerEventfd_;
 #elif WIN32
-  HANDLE readerEvent_;
-  HANDLE writerEvent_;
+  HANDLE readerEvent_ = nullptr;
+  HANDLE writerEvent_ = nullptr;
 #elif __APPLE__
   int readerKq_;
   int writerKq_;

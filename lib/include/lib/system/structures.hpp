@@ -85,8 +85,9 @@ public:
 
   const_iterator end() const {
     const_iterator ci;
-    if (size_)
+    if (size_) {
       ci.circ_ = true;
+    }
     ci.ptr_ = tail_;
     return ci;
   }
@@ -120,11 +121,11 @@ public:
     --size_;
 
     if (toRem >= head_) {
-      memmove(head_ + 1, head_, (toRem - head_) * sizeof(T));
+      std::memmove(head_ + 1, head_, (toRem - head_) * sizeof(T));
       ++head_;
     }
     else {
-      memmove(toRem, toRem + 1, (tail_ - toRem - 1) * sizeof(T));
+      std::memmove(toRem, toRem + 1, (tail_ - toRem - 1) * sizeof(T));
       --tail_;
     }
   }
@@ -135,8 +136,9 @@ public:
 
 private:
   T* incrementPtr(T* ptr) const {
-    if (++ptr == end_)
+    if (++ptr == end_) {
       ptr = elements_;
+    }
 
     return ptr;
   }
@@ -161,8 +163,9 @@ public:
   }
 
   ~FixedVector() {
-    for (auto ptr = elements_; ptr != end_; ++ptr)
+    for (auto ptr = elements_; ptr != end_; ++ptr) {
       ptr->~T();
+    }
 
     delete[] reinterpret_cast<uint8_t*>(elements_);
   }
@@ -193,7 +196,7 @@ public:
   void remove(T* element) {
     element->~T();
 
-    memmove(static_cast<void*>(element), static_cast<const void*>(element + 1), sizeof(T) * (end_ - element - 1));
+    std::memmove(static_cast<void*>(element), static_cast<const void*>(element + 1), sizeof(T) * (end_ - element - 1));
     --end_;
   }
 
@@ -241,7 +244,7 @@ public:
 
     const size_t bucketsSize = 1 << (sizeof(IndexType) * 8);
     buckets_ = new ElementPtr[bucketsSize];
-    memset(buckets_, 0, bucketsSize * sizeof(ElementPtr));
+    std::memset(buckets_, 0, bucketsSize * sizeof(ElementPtr));
   }
 
   FixedHashMap(const FixedHashMap&) = delete;
@@ -259,20 +262,23 @@ public:
     Element** myBucket;
     auto foundElement = getElt(key, &myBucket);
 
-    if (foundElement)
+    if (foundElement) {
       return foundElement->data;
+    }
 
     // Element not found, add a new one
-    if (buffer_.size() == MaxSize)
+    if (buffer_.size() == MaxSize) {
       preparePopLeft();
+    }
 
     Element& newComer = buffer_.emplace(key, myBucket);
-
     newComer.up = *myBucket;
-    if (newComer.up)
-      newComer.up->down = &newComer;
-    *myBucket = &newComer;
 
+    if (newComer.up) {
+      newComer.up->down = &newComer;
+    }
+
+    *myBucket = &newComer;
     return newComer.data;
   }
 
@@ -290,8 +296,9 @@ private:
 
     Element* eltInBucket = **bucket;
     while (eltInBucket) {
-      if (eltInBucket->key == key)
+      if (eltInBucket->key == key) {
         return eltInBucket;
+      }
 
       eltInBucket = eltInBucket->up;
     }
@@ -302,13 +309,16 @@ private:
   void preparePopLeft() {
     auto toRemove = buffer_.frontPtr();
 
-    if (toRemove->down)
+    if (toRemove->down) {
       toRemove->down->up = toRemove->up;
-    else
+    }
+    else {
       *(toRemove->bucket) = toRemove->up;
+    }
 
-    if (toRemove->up)
+    if (toRemove->up) {
       toRemove->up->down = toRemove->down;
+    }
   }
 
   FixedCircularBuffer<Element, MaxSize> buffer_;
@@ -339,11 +349,15 @@ private:
 
 inline void CallsQueue::callAll() {
   Call* startHead = head_.load(std::memory_order_relaxed);
-  if (!startHead)
+
+  if (!startHead) {
     return;
+  }
+
   Call* newHead = startHead;
   head_.compare_exchange_strong(newHead, nullptr, std::memory_order_relaxed, std::memory_order_relaxed);
   Call* elt = startHead;
+
   do {
     elt->func();
     Call* rem = elt;
@@ -358,6 +372,7 @@ inline void CallsQueue::callAll() {
         break;
       newHead = next;
     } while (true);
+
     newHead->next.store(nullptr, std::memory_order_relaxed);
   }
 }
@@ -438,7 +453,7 @@ class CharFunc {
 public:
   CharFunc(uint32_t realSize) {
     const uint32_t bNum = realSize / 8;
-    memset(bytes_, 0, (bNum + ((bNum * 8) != realSize)));
+    std::memset(bytes_, 0, (bNum + ((bNum * 8) != realSize)));
   }
 
   CharFunc()
@@ -455,10 +470,12 @@ public:
     uint32_t mask;
     uint32_t& byte = getByte(id, mask);
 
-    if (val)
+    if (val) {
       byte |= mask;
-    else
+    }
+    else {
       byte &= ~mask;
+    }
   }
 
 private:

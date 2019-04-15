@@ -454,11 +454,11 @@ private:
   }
 
   uint32_t pages_ = 0;
-  cs::SpinLock allocFlag_;
+  cs::SpinLock allocFlag_{ATOMIC_FLAG_INIT};
 
   IntType** freeChunks_ = nullptr;
   std::atomic<IntType**> freeChunksLast_;
-  cs::SpinLock freeFlag_;
+  cs::SpinLock freeFlag_{ATOMIC_FLAG_INIT};
 };
 
 template <typename T>

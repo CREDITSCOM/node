@@ -42,6 +42,8 @@ Node::Node(const Config& config)
 , ostream_(&packStreamAllocator_, nodeIdKey_)
 , stat_() {
 
+  std::fill(ssKey_.begin(), ssKey_.end(), 0);
+
   solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
   std::cout << "Start transport... ";
   transport_ = new Transport(config, this);
@@ -52,6 +54,20 @@ Node::Node(const Config& config)
   cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
   cs::Connector::connect(&blockChain_.storeBlockEvent, &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort), &executor::Executor::onBlockStored);
   cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
+
+#ifdef NODE_API
+  std::cout << "Init API... ";
+  api_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
+    csconnector::Config {
+     config.getApiSettings().port,
+     config.getApiSettings().ajaxPort,
+     config.getApiSettings().executorPort,
+     config.getApiSettings().apiexecPort
+    });
+  std::cout << "Done\n";
+  cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
+  cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
+#endif // NODE_API
 
   good_ = init(config);
 }
@@ -71,16 +87,8 @@ bool Node::init(const Config& config) {
   cslog() << "Blockchain is ready, contains " << stat_.total_transactions() << " transactions";
 
 #ifdef NODE_API
-  std::cout << "Init API... ";
-  api_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
-    csconnector::Config {
-     config.getApiSettings().port,
-     config.getApiSettings().ajaxPort,
-     config.getApiSettings().executorPort,
-     config.getApiSettings().apiexecPort
-    });
-  std::cout << "Done\n";
-#endif
+  api_->run();
+#endif // NODE_API
 
   if (!transport_->isGood()) {
     return false;
@@ -483,7 +491,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   }
 
   if (round != 0) {
-    auto confirmation = confirmationList.find(round);
+    auto confirmation = confirmationList_.find(round);
     if (confirmation.has_value()) {
       poolMetaInfo.confirmationMask = confirmation.value().mask;
       poolMetaInfo.confirmations = confirmation.value().signatures;
@@ -521,14 +529,14 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
   }
   else {
     blockChain_.testCachedBlocks();
-    confirmationList.remove(round);
+    confirmationList_.remove(round);
   }
 
   csmeta(csdetails) << "done";
 }
 
 void Node::cleanConfirmationList(cs::RoundNumber rNum) {
-  confirmationList.remove(rNum);
+  confirmationList_.remove(rNum);
 }
 
 cs::ConfidantsKeys Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber) const {
@@ -817,6 +825,10 @@ bool Node::isPoolsSyncroStarted() {
   return poolSynchronizer_->isSyncroStarted();
 }
 
+std::optional<cs::TrustedConfirmation> Node::getConfirmation(cs::RoundNumber round) const {
+  return confirmationList_.find(round);
+}
+
 void Node::processTimer() {
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   const auto round = conveyer.currentRoundNumber();
@@ -851,10 +863,13 @@ void Node::onPingReceived(cs::Sequence sequence) {
 
     if (lastSequence < maxSequence) {
       cswarning() << "Last sequence is lower than network max sequence, trying to sync";
-      cs::Conveyer::instance().setRound(maxSequence);
 
-      auto sequenceDifference = maxSequence - lastSequence;
-      poolSynchronizer_->sync(maxSequence, sequenceDifference);
+      CallsQueue::instance().insert([=] {
+        cs::Conveyer::instance().setRound(maxSequence);
+
+        auto sequenceDifference = maxSequence - lastSequence;
+        poolSynchronizer_->sync(maxSequence, sequenceDifference);
+      });
     }
   }
 
@@ -1036,8 +1051,8 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
     cs::Signatures signatures;
     signatures.push_back(sig);
     confMask.push_back(0);
-    confirmationList.remove(roundTable.round);
-    confirmationList.add(roundTable.round, bang, confidants, confMask, signatures);
+    confirmationList_.remove(roundTable.round);
+    confirmationList_.add(roundTable.round, bang, confidants, confMask, signatures);
   }
 
 
@@ -2162,7 +2177,7 @@ void Node::sendRoundTable() {
 
   cs::Conveyer& conveyer = cs::Conveyer::instance();
   csdebug() << "SendRoundTable: add confirmation for round " << conveyer.currentRoundTable().round << " trusted";
-  confirmationList.add(lastSentRoundData_.table.round, false, conveyer.confidants(),
+  confirmationList_.add(lastSentRoundData_.table.round, false, conveyer.confidants(),
     cs::NodeUtils::getTrustedMask(getBlockChain().getLastBlock()), lastSentSignatures_.trustedConfirmation);
 
   conveyer.setRound(lastSentRoundData_.table.round);
@@ -2299,7 +2314,7 @@ bool Node::receivingSignatures(const cs::Bytes& sigBytes, const cs::Bytes& round
   
   if (cs::NodeUtils::checkGroupSignature(currentConfidants, trustedMask, trustedConfirmation, trustedHash)) {
     csdebug() << "NODE> The trusted confirmation for the next round are ok";
-    confirmationList.add(rNum, false, currentConfidants, trustedMask, trustedConfirmation);
+    confirmationList_.add(rNum, false, currentConfidants, trustedMask, trustedConfirmation);
   }
   else {
     csdebug() << "NODE> The trusted confirmation for the next round are NOT OK";

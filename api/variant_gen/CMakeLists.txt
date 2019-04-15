@@ -27,7 +27,7 @@ add_custom_command(
 
 add_library(variant_gen
     ${THRIFT_GENERATED_FILES}
-	variant_aux.cpp
+    variant_aux.cpp
 )
 
 target_link_libraries (variant_gen PUBLIC thrift_static)

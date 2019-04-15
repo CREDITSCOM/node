@@ -35,6 +35,10 @@
 
 #include <solvercore.hpp>
 
+namespace csconnector {
+class connector;
+} // namespace csconnector
+
 class APIHandlerBase {
 public:
   enum class APIRequestStatusType : uint8_t {
@@ -621,7 +625,7 @@ private:
   executor::Executor& executor_;
 
   struct smart_trxns_queue {
-    cs::SpinLock lock;
+    cs::SpinLock lock{ATOMIC_FLAG_INIT};
     std::condition_variable_any new_trxn_cv{};
     size_t awaiter_num{0};
     std::deque<csdb::TransactionID> trid_queue{};
@@ -716,6 +720,7 @@ private:
                                  std::vector<decltype(mapper(api::SmartContract()))>& out);
 
   bool update_smart_caches_once(const csdb::PoolHash&, bool = false);
+  void run();
 
   ::csdb::Transaction make_transaction(const ::api::Transaction&);
   void dumb_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
@@ -724,6 +729,17 @@ private:
   TokensMaster tm;
 
   const uint32_t MAX_EXECUTION_TIME = 1000;
+
+  const uint8_t ERROR_CODE = 1;
+
+  friend class ::csconnector::connector;
+
+  std::condition_variable_any newBlockCv_;
+  std::mutex dbLock_;
+
+private slots:
+  void update_smart_caches_slot(const csdb::Pool& pool);
+  void store_block_slot(const csdb::Pool& pool);
 };
 }  // namespace api
 

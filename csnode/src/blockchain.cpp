@@ -104,6 +104,10 @@ bool BlockChain::isGood() const {
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
 {
+  if(!validateBlock(block)) {
+    *should_stop = true;
+    return;
+  }
   if(!updateWalletIds(block, *walletsCacheUpdater_.get())) {
     cserror() << "Blockchain: updateWalletIds() failed on block #" << block.sequence();
     *should_stop = true;
@@ -129,6 +133,44 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
 #endif
     }
   }
+}
+
+bool BlockChain::validateBlock(const csdb::Pool& block, bool fullValidation) {
+  if (block.sequence() == 0) {
+    return true;
+  }
+
+  // check hash integrity
+  {
+    auto prev_hash = block.previous_hash();
+    auto prev_block = loadBlock(prev_hash);
+    auto data = prev_block.to_binary();
+    auto counted_prev_hash = csdb::PoolHash::calc_from_data(cs::Bytes(data.data(), data.data() + prev_block.hashingLength()));
+    if (prev_hash != counted_prev_hash) {
+      cserror() << __func__ << ": prev pool's hash != real prev pool's hash";
+      return false;      
+    }
+  }
+
+  if (!fullValidation) {
+    return true;
+  }
+
+  // TODO check
+  //
+  // for block:
+  // 1. sequence
+  // 2. timestamp
+  // 3. trusted signatures according to real trusted mask
+  // 4. smart source trxs signatures
+  // 5. wallets' balances after writing block
+  //
+  // for trxs:
+  // 1. all complex of IterValidator activities
+  //    including signatures validation, fee counting,
+  //    balance check, graph validation
+
+  return true;
 }
 
 bool BlockChain::postInitFromDB() {
@@ -424,14 +466,6 @@ void BlockChain::removeLastBlock() {
   emit removeBlockEvent(pool.sequence());
 
   csmeta(csdebug) << "done";
-}
-
-csdb::PoolHash BlockChain::wait_for_block(const csdb::PoolHash& obsolete_block) {
-  csunused(obsolete_block);
-  std::unique_lock lock(dbLock_);
-
-  newBlockCv_.wait(lock);
-  return getLastHash();
 }
 
 csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
@@ -1011,9 +1045,6 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
   }
   csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
   emit storeBlockEvent(pool);
-
-  // notify block recording
-  newBlockCv_.notify_all();
 
   // log cached block
   csdebug() << "----------------------- Defer block #" << pool.sequence() << " until next round ----------------------";
