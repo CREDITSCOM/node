@@ -302,8 +302,8 @@ private:
   inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
   inline const static std::string publicKeyFileName_ = "NodePublic.txt";
 
-  Level myLevel_;
-  cs::Byte myConfidantIndex_;
+  Level myLevel_{ Level::Normal };
+  cs::Byte myConfidantIndex_{ cs::ConfidantConsts::InvalidConfidantIndex };
 
   // main cs storage
   BlockChain blockChain_;
@@ -335,12 +335,12 @@ private:
 
   // sends transactions blocks to network
   cs::Timer sendingTimer_;
-  cs::Byte subRound_;
+  cs::Byte subRound_{ 0 };
 
   // round package sent data storage
   struct SentRoundData {
     cs::RoundTable table;
-    cs::Byte subRound;
+    cs::Byte subRound{ 0 };
   };
 
   struct SentSignatures {
