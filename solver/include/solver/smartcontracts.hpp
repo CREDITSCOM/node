@@ -413,15 +413,16 @@ private:
     }
   };
 
-  // executiom queue
-  std::vector<QueueItem> exe_queue;
+  // execution queue
+  // requirements: items are non-movable during the whole life cycle
+  std::list<QueueItem> exe_queue;
 
   // is locked in all non-static public methods
   // is locked in const methods also
   mutable cs::SpinLock public_access_lock;
 
-  using queue_iterator = std::vector<QueueItem>::iterator;
-  using queue_const_iterator = std::vector<QueueItem>::const_iterator;
+  using queue_iterator = std::list<QueueItem>::iterator;
+  using queue_const_iterator = std::list<QueueItem>::const_iterator;
 
   Node* pnode;
 
