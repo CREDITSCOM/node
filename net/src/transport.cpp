@@ -894,6 +894,11 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
   oPackStream_ << lastBlock << canBeTrusted << myPublicKey_ << lastHash_;
 
   sendDirect(oPackStream_.getPackets(), conn);
+#else
+  csunused(task);
+  csunused(lastBlock);
+  csunused(lastHash);
+  csunused(canBeTrusted);
 #endif
   return true;
 }
