@@ -184,12 +184,12 @@ bool CallsQueueScheduler::Remove(CallsQueueScheduler::CallTag id) {
     if (it == _queue.cend()) {
       return false;
     }
-    _queue.erase(it);
     // rollback last counter increment
     auto it_sync = _exe_sync.find( it->id );
     if( it_sync != _exe_sync.end() ) {
       it_sync->second.queued = it_sync->second.done;
     }
+    _queue.erase(it);
   }
   // awake worker thread to re-schedule its waiting
   _flag = true;
