@@ -143,19 +143,20 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
 
   uint32_t cnt = 0;
 
-  // net code was built on this constant (Packet::MaxSize)
-  // and is used it implicitly in a lot of places( 
-  char packetBuffer[Packet::MaxSize];
-  boost::asio::mutable_buffer encodedPacket = task->pack.encode(buffer(packetBuffer, sizeof(packetBuffer)));
-  encodedSize = encodedPacket.size();
   do {
+    // net code was built on this constant (Packet::MaxSize)
+    // and is used it implicitly in a lot of places( 
+    char packetBuffer[Packet::MaxSize];
+    boost::asio::mutable_buffer encodedPacket = task->pack.encode(buffer(packetBuffer, sizeof(packetBuffer)));
+    encodedSize = encodedPacket.size();
+
     size = sock.send_to(encodedPacket, ep, NO_FLAGS, lastError);
 
     if (++cnt == 10) {
       cnt = 0;
       std::this_thread::yield();
     }
-  } while (lastError);
+  } while (lastError == boost::asio::error::would_block);
 
   if (lastError || size < encodedSize) {
     cserror() << "Cannot send packet. Error " << lastError;
@@ -208,7 +209,6 @@ void Network::writerRoutine(const Config& config) {
     struct mmsghdr *messages = msg.data();
     do {
       sended = sendmmsg(sock->native_handle(), messages, tasks, 0);
-      if (sended < 0) continue;
       messages += sended;
       tasks -= sended;
     } while (tasks);
