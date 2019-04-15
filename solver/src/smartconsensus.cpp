@@ -23,7 +23,8 @@ namespace cs{
   }
 
   SmartConsensus::~SmartConsensus() {
-    cslog() << "======================  SMART-ROUND {" << smartRoundNumber_ << '.' << smartTransaction_ << "} END =====================";
+    cslog() << log_prefix << "======================  SMART-ROUND {" << smartRoundNumber_ << '.' << smartTransaction_ << "} END =====================";
+    killTimer();
     pnode_->removeSmartConsensus(id());
     cs::Connector::disconnect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
     cs::Connector::disconnect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
@@ -46,6 +47,7 @@ namespace cs{
     runCounter_ = runCounter;
     smartRoundNumber_ = 0;
     smartTransaction_ = std::numeric_limits<uint32_t>::max();
+    timeoutStageCounter_ = 0;
 	  //csdb::Address abs_addr;
     csdb::Amount executor_fee{0};
     cs::TransactionsPacket tmpPacket;
@@ -234,7 +236,7 @@ namespace cs{
     st2.signatures.at(stage.sender) = stage.signature;
     st2.hashes.at(stage.sender) = stage.messageHash;
     if (smartStageOneEnough()) {
-      killTimer(1);
+      killTimer();
       cs::Connector::disconnect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
       st2.sender = ownSmartsConfNum_;
       st2.id = id();
@@ -268,7 +270,7 @@ namespace cs{
     csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "}  <-- SMART-Stage-2 - SmartRound {"
       << blockPart(stage.id) << '.' << transactionPart(stage.id) << "} "  << stagesPlot;
     if (smartStageTwoEnough()) {
-      killTimer(2);
+      killTimer();
       cs::Connector::disconnect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
       processStages();
     }
@@ -446,7 +448,7 @@ namespace cs{
     csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} <-- SMART-Stage-3 ["
       << static_cast<int>(stage.sender) << "] = " << smartStage3StorageSize();
     if (smartStageThreeSent_ && smartStageThreeEnough()) {
-      killTimer(3);
+      killTimer();
       cs::Connector::disconnect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
       if(finalSmartTransactionPack_.isHashEmpty()) {
         cserror() << log_prefix << "Trying to send FinalTransactionSet that doesn't exest";
@@ -598,44 +600,45 @@ namespace cs{
   void SmartConsensus::startTimer(int st)
   {
     csmeta(csdebug) << "start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
+    timeoutStageCounter_ = st;
     timeout_request_stage.start(
       psmarts_->getScheduler(), Consensus::T_stage_request,
       // timeout #1 handler:
       [this, st]() {
-      csdebug() << __func__ << "(): timeout for stages-" << st << " is expired, make requests";
-      requestSmartStages(st);
-      // start subsequent track timeout for "wide" request
-      csdebug() << __func__ << "(): start subsequent track timeout " << Consensus::T_stage_request
-        << " ms to request neighbors about stages-" << st;
-      timeout_request_neighbors.start(
-        psmarts_->getScheduler(), Consensus::T_stage_request,
-        // timeout #2 handler:
-        [this, st]() {
-        csdebug() << __func__ << "(): timeout for requested stages is expired, make requests to neighbors";
-        requestSmartStagesNeighbors(st);
-        // timeout #3 handler
-        timeout_force_transition.start(
+        csdebug() << __func__ << "(): timeout for stages-" << st << " is expired, make requests";
+        requestSmartStages(st);
+        // start subsequent track timeout for "wide" request
+        csdebug() << __func__ << "(): start subsequent track timeout " << Consensus::T_stage_request
+          << " ms to request neighbors about stages-" << st;
+        timeout_request_neighbors.start(
           psmarts_->getScheduler(), Consensus::T_stage_request,
+          // timeout #2 handler:
           [this, st]() {
-            csdebug() << __func__ << "(): timeout for transition is expired, mark silent nodes as outbound";
-            markSmartOutboundNodes(st);
+            csdebug() << __func__ << "(): timeout for requested stages-" << st << " is expired, make requests to neighbors";
+            requestSmartStagesNeighbors(st);
+            // timeout #3 handler
+            timeout_force_transition.start(
+              psmarts_->getScheduler(), Consensus::T_stage_request,
+              [this, st]() {
+                csdebug() << __func__ << "(): timeout for transition is expired, mark silent nodes as no stage-" << st;
+                markSmartOutboundNodes(st);
+              },
+              true/*replace if exists*/, timer_tag());
           },
-          true/*replace if exists*/, timer_tag());
-        },
-        true /*replace if exists*/, timer_tag());
+          true /*replace if exists*/, timer_tag());
       },
       true /*replace if exists*/, timer_tag());
   }
 
-  void SmartConsensus::killTimer(int st) {
+  void SmartConsensus::killTimer() {
     if (timeout_request_stage.cancel()) {
-      csdebug() << log_prefix << __func__ << "(): cancel track timeout of stages-" << st;
+      csdebug() << log_prefix << __func__ << "(): cancel track timeout of stages-" << timeoutStageCounter_;
     }
     if (timeout_request_neighbors.cancel()) {
-      csdebug() << log_prefix << __func__ << "(): cancel track timeout to request neighbors about stages-" << st;
+      csdebug() << log_prefix << __func__ << "(): cancel track timeout to request neighbors about stages-" << timeoutStageCounter_;
     }
     if (timeout_force_transition.cancel()) {
-      csdebug() << log_prefix << __func__ << "(): cancel track timeout to force transition to next state";
+      csdebug() << log_prefix << __func__ << "(): cancel track timeout to force transition to next state after stages-" << timeoutStageCounter_;
     }
   }
 

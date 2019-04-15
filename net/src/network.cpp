@@ -36,11 +36,12 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
 #ifndef __APPLE__
     sock.set_option(ip::udp::socket::send_buffer_size(1 << 23));
     sock.set_option(ip::udp::socket::receive_buffer_size(1 << 23));
-#elif WIN32
+#endif
+
+#ifdef WIN32
     BOOL bNewBehavior = FALSE;
     DWORD dwBytesReturned = 0;
-    WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof bNewBehavior, NULL, 0, &dwBytesReturned,
-             NULL, NULL);
+    WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof(bNewBehavior), nullptr, 0, &dwBytesReturned, nullptr, nullptr);
 #endif
     if (data.ipSpecified) {
       auto ep = net->resolve(data);
@@ -142,20 +143,19 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
 
   uint32_t cnt = 0;
 
+  // net code was built on this constant (Packet::MaxSize)
+  // and is used it implicitly in a lot of places( 
+  char packetBuffer[Packet::MaxSize];
+  boost::asio::mutable_buffer encodedPacket = task->pack.encode(buffer(packetBuffer, sizeof(packetBuffer)));
+  encodedSize = encodedPacket.size();
   do {
-    // net code was built on this constant (Packet::MaxSize)
-    // and is used it implicitly in a lot of places( 
-    char packetBuffer[Packet::MaxSize];
-    boost::asio::mutable_buffer encodedPacket = task->pack.encode(buffer(packetBuffer, sizeof(packetBuffer)));
-    encodedSize = encodedPacket.size();
-
     size = sock.send_to(encodedPacket, ep, NO_FLAGS, lastError);
 
     if (++cnt == 10) {
       cnt = 0;
       std::this_thread::yield();
     }
-  } while (lastError == boost::asio::error::would_block);
+  } while (lastError);
 
   if (lastError || size < encodedSize) {
     cserror() << "Cannot send packet. Error " << lastError;
@@ -208,6 +208,7 @@ void Network::writerRoutine(const Config& config) {
     struct mmsghdr *messages = msg.data();
     do {
       sended = sendmmsg(sock->native_handle(), messages, tasks, 0);
+      if (sended < 0) continue;
       messages += sended;
       tasks -= sended;
     } while (tasks);
@@ -385,25 +386,25 @@ Network::Network(const Config& config, Transport* transport)
   }
 #elif WIN32
   writerEvent_ = CreateEvent(
-    NULL,               // default security attributes
-    FALSE,              // automatic-reset event
-    FALSE,              // initial state is nonsignaled
-    TEXT("WriteEvent")  // object name
+    nullptr,               // default security attributes
+    FALSE,                // automatic-reset event
+    FALSE,                // initial state is nonsignaled
+    TEXT("WriteEvent")    // object name
   );
 
-  if (writerEvent_ == NULL) {
+  if (writerEvent_ == nullptr) {
     good_ = false;
     return;
   }
 
   readerEvent_ = CreateEvent(
-    NULL,               // default security attributes
-    FALSE,              // automatic-reset event
-    FALSE,              // initial state is nonsignaled
-    TEXT("ReadEvent")   // object name
+    nullptr,               // default security attributes
+    FALSE,                // automatic-reset event
+    FALSE,                // initial state is nonsignaled
+    TEXT("ReadEvent")     // object name
   );
 
-  if (writerEvent_ == NULL) {
+  if (writerEvent_ == nullptr) {
     good_ = false;
     return;
   }
@@ -522,16 +523,22 @@ void Network::registerMessage(Packet* pack, const uint32_t size) {
 
 Network::~Network() {
   stopReaderRoutine = true;
+
   if (readerThread_.joinable()) {
     readerThread_.join();
   }
+
   stopWriterRoutine = true;
+
   if (writerThread_.joinable()) {
     writerThread_.join();
   }
+
   stopProcessorRoutine = true;
+
   if (processorThread_.joinable()) {
     processorThread_.join();
   }
+
   delete singleSock_.load();
 }

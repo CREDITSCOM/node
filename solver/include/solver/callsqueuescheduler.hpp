@@ -292,10 +292,12 @@ private:
 
   // methods below are NOT thread-safe, they must be synced at point of call!
 
-  // must be called when the lambda put in CallsQueue for execution
+  // must be called when put the lambda in CallsQueue for execution
   void OnExeQueued(CallTag id);
   // must be called from within lambda executed by CallsQueue
   void OnExeDone(CallTag id);
   // must be called before put lambda in CallsQueue to avoid duplicated lambdas in CallsQueue
   bool CanExe(CallTag id);
+  // must be called from within lambda to confirm execution
+  bool ConfirmExe(CallTag id);
 };

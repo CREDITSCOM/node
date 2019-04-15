@@ -40,7 +40,7 @@ namespace cs {
       bool smartStageEnough(const std::vector<T>& smartStageStorage, const std::string& funcName);
 
       void startTimer(int st);
-      void killTimer(int st);
+      void killTimer();
       void fakeStage(uint8_t confIndex);
 
       //cs::PublicKey smartAddress();
@@ -77,6 +77,7 @@ namespace cs {
       TimeoutTracking timeout_request_stage;
       TimeoutTracking timeout_request_neighbors;
       TimeoutTracking timeout_force_transition;
+      int timeoutStageCounter_;
 
       uint8_t runCounter() const {
         return runCounter_;
@@ -84,7 +85,7 @@ namespace cs {
 
       // smartRoundNumber[5 bytes] + smartTransaction[2 bytes] + runCounter[1 byte]
       uint64_t id() const {
-        return (((smartRoundNumber_ & 0xFFFFFFFFFF) << 24) | ((0xFFFF & smartTransaction_) << 8) | static_cast<uint64_t>(runCounter_));
+        return (((smartRoundNumber_ & 0xFFFFFFFFFF) << 24) | ((0x0000FFFF & smartTransaction_) << 8) | static_cast<uint64_t>(runCounter_));
       }
 
       static inline cs::Sequence blockPart(uint64_t id) {

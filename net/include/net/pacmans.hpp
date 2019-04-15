@@ -2,8 +2,10 @@
 #ifndef PACMANS_HPP
 #define PACMANS_HPP
 
+#include <queue>
+#include <mutex>
+#include <atomic>
 #include <boost/asio.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
 
 #include "packet.hpp"
 
@@ -55,8 +57,6 @@ public:
     Packet pack;
   };
 
-  using Queue = boost::lockfree::spsc_queue<Task, boost::lockfree::capacity<1024>>;
-
   Task& allocNext();
   void enQueueLast();
 
@@ -65,7 +65,9 @@ public:
 
 private:
   Task lastElt_;
-  Queue queue_;
+  std::queue<Task> queue_;
+  std::mutex mutex_;
+  std::atomic<size_t> size_ = {0};
   RegionAllocator allocator_;
 };
 
@@ -76,8 +78,6 @@ public:
     Packet pack;
   };
 
-  using Queue = boost::lockfree::spsc_queue<Task, boost::lockfree::capacity<1024>>;
-
   Task* allocNext();
   void enQueueLast();
 
@@ -86,7 +86,9 @@ public:
 
 private:
   Task lastElt_;
-  Queue queue_;
+  std::queue<Task> queue_;
+  std::mutex mutex_;
+  std::atomic<size_t> size_ = {0};
 };
 
 #endif  // PACMANS_HPP

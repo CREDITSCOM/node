@@ -15,10 +15,10 @@ set(THRIFT_GENERATED_FILES
   ${THRIFT_GEN_DIR}/API.h
   ${THRIFT_GEN_DIR}/api_constants.h
   ${THRIFT_GEN_DIR}/api_types.h
-  ${THRIFT_GEN_DIR}/general_constants.cpp
-  ${THRIFT_GEN_DIR}/general_types.cpp
-  ${THRIFT_GEN_DIR}/general_constants.h
-  ${THRIFT_GEN_DIR}/general_types.h
+#  ${THRIFT_GEN_DIR}/general_constants.cpp
+#  ${THRIFT_GEN_DIR}/general_types.cpp
+#  ${THRIFT_GEN_DIR}/general_constants.h
+#  ${THRIFT_GEN_DIR}/general_types.h
   ${THRIFT_GEN_DIR}/APIEXEC.cpp
   ${THRIFT_GEN_DIR}/APIEXEC.h
   ${THRIFT_GEN_DIR}/apiexec_constants.cpp

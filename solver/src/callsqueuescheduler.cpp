@@ -59,8 +59,12 @@ void CallsQueueScheduler::SchedulerProc() {
         if (CanExe(run.id)) {
           OnExeQueued(run.id);
           CallsQueue::instance().insert([this, run]() {
+            std::lock_guard<std::mutex> lque( _mtx_queue );
+            if( !ConfirmExe( run.id ) ) {
+              // its highly likely the job was canceled
+              return;
+            }
             run.proc();
-            std::lock_guard<std::mutex> lque(_mtx_queue);
             OnExeDone(run.id);
           });
           _cnt_total += 1;
@@ -109,6 +113,14 @@ bool CallsQueueScheduler::CanExe(CallTag id) {
     return it->second.done == it->second.queued;
   }
   return true;
+}
+
+bool CallsQueueScheduler::ConfirmExe(CallTag id) {
+  auto it = _exe_sync.find( id );
+  if( it != _exe_sync.end() ) {
+    return (it->second.done - it->second.queued) == 1;
+  }
+  return false;
 }
 
 void CallsQueueScheduler::Stop() {
@@ -173,6 +185,11 @@ bool CallsQueueScheduler::Remove(CallsQueueScheduler::CallTag id) {
       return false;
     }
     _queue.erase(it);
+    // rollback last counter increment
+    auto it_sync = _exe_sync.find( it->id );
+    if( it_sync != _exe_sync.end() ) {
+      it_sync->second.queued = it_sync->second.done;
+    }
   }
   // awake worker thread to re-schedule its waiting
   _flag = true;
@@ -184,6 +201,10 @@ void CallsQueueScheduler::RemoveAll() {
   {
     std::lock_guard<std::mutex> l(_mtx_queue);
     _queue.clear();
+    for(auto& sync: _exe_sync) {
+      // rollback last counter increment
+      sync.second.queued = sync.second.done;
+    }
   }
   // awake worker thread to re-schedule its waiting
   _flag = true;
