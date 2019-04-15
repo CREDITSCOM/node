@@ -332,7 +332,7 @@ private:
   std::unordered_map<std::thread::id, typename tids_t::iterator> tidMap_;
 
   std::condition_variable_any conditionalVariable_;
-  cs::SpinLock lock_{false};
+  cs::SpinLock lock_{ATOMIC_FLAG_INIT};
   S state_;
 
 public:
@@ -390,7 +390,7 @@ public:
 struct SweetSpot {
 private:
   std::condition_variable_any conditionalVariable_;
-  cs::SpinLock lock_{false};
+  cs::SpinLock lock_{ATOMIC_FLAG_INIT};
   bool occupied_ = false;
 
 public:
