@@ -27,32 +27,32 @@ bool BlockValidator::validateBlock(const csdb::Pool& block, ValidationLevel leve
   }
 
   ErrorType validationResult = checkHashIntergrity(block);
-  if (level == ValidationLevel::hashIntergrity) {
+  if (level == ValidationLevel::hashIntergrity || !return_(validationResult, severity)) {
     return return_(validationResult, severity);
   }
 
   validationResult = checkBlockNum(block);
-  if (level == ValidationLevel::blockNum) {
+  if (level == ValidationLevel::blockNum || !return_(validationResult, severity)) {
     return return_(validationResult, severity);
   }
 
   validationResult = checkTimestamp(block);
-  if (level == ValidationLevel::timestamp) {
+  if (level == ValidationLevel::timestamp || !return_(validationResult, severity)) {
     return return_(validationResult, severity);
   }
 
   validationResult = checkBlockSignatures(block);
-  if (level == ValidationLevel::blockSignatures) {
+  if (level == ValidationLevel::blockSignatures || !return_(validationResult, severity)) {
     return return_(validationResult, severity);
   }
 
   validationResult = checkSmartSourceSignatures(block);
-  if (level == ValidationLevel::smartSourceSignatures) {
+  if (level == ValidationLevel::smartSourceSignatures || !return_(validationResult, severity)) {
     return return_(validationResult, severity);
   }
 
   validationResult = checkBalances(block);
-  if (level == ValidationLevel::balances) {
+  if (level == ValidationLevel::balances || !return_(validationResult, severity)) {
     return return_(validationResult, severity);
   }
 
