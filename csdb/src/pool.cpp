@@ -580,6 +580,10 @@ PoolHash Pool::previous_hash() const noexcept {
   return d->previous_hash_;
 }
 
+size_t Pool::hashingLength() const noexcept {
+  return d->hashingLength_;
+}
+
 Storage Pool::storage() const noexcept {
   return Storage(d->storage_);
 }
