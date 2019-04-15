@@ -136,7 +136,7 @@ public:
 
   void sendPingPack(const Connection&);
 
-  void registerMessage(MessagePtr&);
+  void registerMessage(MessagePtr);
 
   // neighbours interface
   uint32_t getNeighboursCount();
