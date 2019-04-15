@@ -29,7 +29,7 @@ struct RemoteNode {
   __cacheline_aligned std::atomic<uint64_t> packets = {0};
 
   __cacheline_aligned std::atomic<uint32_t> strikes = {0};
-  __cacheline_aligned std::atomic<bool> blackListed = {false};
+  __cacheline_aligned std::atomic<bool> blackListed = {ATOMIC_FLAG_INIT};
 
   void addStrike() {
     strikes.fetch_add(1, std::memory_order_relaxed);
@@ -212,10 +212,10 @@ private:
 
   TypedAllocator<Connection> connectionsAllocator_;
 
-  mutable cs::SpinLock nLockFlag_{false};
+  mutable cs::SpinLock nLockFlag_{ATOMIC_FLAG_INIT};
   FixedVector<ConnectionPtr, MaxNeighbours> neighbours_;
 
-  mutable cs::SpinLock mLockFlag_{false};
+  mutable cs::SpinLock mLockFlag_{ATOMIC_FLAG_INIT};
   FixedHashMap<ip::udp::endpoint, ConnectionPtr, uint16_t, MaxConnections> connections_;
 
   struct SenderInfo {

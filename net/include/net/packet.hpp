@@ -316,7 +316,7 @@ private:
 
   void composeFullData() const;
 
-  cs::SpinLock pLock_{false};
+  cs::SpinLock pLock_{ATOMIC_FLAG_INIT};
 
   uint32_t packetsLeft_;
   uint32_t packetsTotal_ = 0;
@@ -348,7 +348,7 @@ public:
 private:
   TypedAllocator<Message> msgAllocator_;
 
-  cs::SpinLock mLock_{false};
+  cs::SpinLock mLock_{ATOMIC_FLAG_INIT};
   FixedHashMap<cs::Hash, MessagePtr, uint16_t, MaxParallelCollections> map_;
 
   Message lastMessage_;
