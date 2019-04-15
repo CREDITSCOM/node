@@ -101,8 +101,8 @@ struct Connection {
 
   FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
-  cs::Sequence syncSeqs[BlocksToSync];
-  cs::Sequence syncSeqsRetries[BlocksToSync];
+  cs::Sequence syncSeqs[BlocksToSync] = {0};
+  cs::Sequence syncSeqsRetries[BlocksToSync] = {0};
   cs::Sequence lastSeq = 0;
 
   bool operator!=(const Connection& rhs) const {
@@ -212,10 +212,10 @@ private:
 
   TypedAllocator<Connection> connectionsAllocator_;
 
-  mutable cs::SpinLock nLockFlag_;
+  mutable cs::SpinLock nLockFlag_{false};
   FixedVector<ConnectionPtr, MaxNeighbours> neighbours_;
 
-  mutable cs::SpinLock mLockFlag_;
+  mutable cs::SpinLock mLockFlag_{false};
   FixedHashMap<ip::udp::endpoint, ConnectionPtr, uint16_t, MaxConnections> connections_;
 
   struct SenderInfo {
