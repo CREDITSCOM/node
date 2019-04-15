@@ -11,13 +11,12 @@ void IPacMan::enQueueLast() {
   std::lock_guard<std::mutex> lock(mutex_);
   allocator_.shrinkLast(static_cast<uint32_t>(lastElt_.size));
   queue_.emplace(lastElt_);
-  size_.fetch_add(1, std::memory_order_release);
   std::atomic_thread_fence(std::memory_order_acquire);
   lastElt_.~Task();
 }
 
 TaskPtr<IPacMan> IPacMan::getNextTask() {
-  while (!size_.load(std::memory_order_acquire)) {
+  while (!queue_.size()) {
     std::this_thread::yield();
   }
   std::lock_guard<std::mutex> lock(mutex_);
@@ -25,7 +24,6 @@ TaskPtr<IPacMan> IPacMan::getNextTask() {
   result.owner_ = this;
   Task *elt = new Task(queue_.front());
   queue_.pop();
-  size_.fetch_sub(1, std::memory_order_release);
   result.ptr_ = elt;
   return result;
 }
@@ -42,13 +40,12 @@ OPacMan::Task* OPacMan::allocNext() {
 void OPacMan::enQueueLast() {
   std::lock_guard<std::mutex> lock(mutex_);
   queue_.emplace(lastElt_);
-  size_.fetch_add(1, std::memory_order_release);
   std::atomic_thread_fence(std::memory_order_acquire);
   lastElt_.~Task();
 }
 
 TaskPtr<OPacMan> OPacMan::getNextTask() {
-  while (!size_.load(std::memory_order_acquire)) {
+  while (!queue_.size()) {
     std::this_thread::yield();
   }
   std::lock_guard<std::mutex> lock(mutex_);
@@ -56,7 +53,6 @@ TaskPtr<OPacMan> OPacMan::getNextTask() {
   result.owner_ = this;
   Task *elt = new Task(queue_.front());
   queue_.pop();
-  size_.fetch_sub(1, std::memory_order_release);
   result.ptr_ = elt;
   return result;
 }

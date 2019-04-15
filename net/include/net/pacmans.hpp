@@ -4,7 +4,6 @@
 
 #include <queue>
 #include <mutex>
-#include <atomic>
 #include <boost/asio.hpp>
 
 #include "packet.hpp"
@@ -67,7 +66,6 @@ private:
   Task lastElt_;
   std::queue<Task> queue_;
   std::mutex mutex_;
-  std::atomic<size_t> size_ = {0};
   RegionAllocator allocator_;
 };
 
@@ -88,7 +86,6 @@ private:
   Task lastElt_;
   std::queue<Task> queue_;
   std::mutex mutex_;
-  std::atomic<size_t> size_ = {0};
 };
 
 #endif  // PACMANS_HPP
