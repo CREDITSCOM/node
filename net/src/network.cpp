@@ -250,7 +250,7 @@ void Network::writerRoutine(const Config& config) {
 
     for (int i = 0; i < tasks; i++) {
       auto task = oPacMan_.getNextTask();
-      if (!tasks->pack.data_.ptr_) {
+      if (!task->pack.data_.ptr_) {
         cslog() << "net: invalid packet!!!!!!!!!";
         continue;
       }
@@ -374,9 +374,9 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
 
   if (ep.size() > 16) {
     cslog() << "endpoint address too big " << ep.size();
-    const uint8_t *p = reinterpret_cast<const uint8_t *>(ep.data());
+    const uint8_t *ptr = reinterpret_cast<const uint8_t *>(ep.data());
     for (int i = 0; i < ep.size(); i++) {
-      cslog() << *p++;
+      cslog() << *ptr++;
     }
   }
   qePtr->endpoint = ep;
