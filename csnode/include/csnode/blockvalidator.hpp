@@ -63,7 +63,7 @@ private:
   std::shared_ptr<WalletsState> wallets_;
   std::shared_ptr<IterValidator> iterValidator_;
 
-  csdb::Pool prev_block_;
+  csdb::Pool prevBlock_;
 };
 } // namespace cs
 #endif // BLOCKVALIDATOR_HPP

@@ -35,7 +35,12 @@ bool BlockValidator::validateBlock(const csdb::Pool& block, ValidationLevel leve
     return true;
   }
 
-  prev_block_ = bc_.loadBlock(block.previous_hash());
+  prevBlock_ = bc_.loadBlock(block.previous_hash());
+  if (!prevBlock_.is_valid()) {
+    csfatal() << "BlockValidator: block with hash "
+              << block.previous_hash().to_string() << " is not valid.";
+    return false;
+  }
 
   ErrorType validationResult = noError;
   for (uint8_t i = 0; i <= static_cast<uint8_t>(level); ++i) {

@@ -7,20 +7,20 @@ namespace cs {
 
 class ValidationPlugin {
 public:
-  ValidationPlugin(BlockValidator& bv) : block_validator_(bv) {}
+  ValidationPlugin(BlockValidator& bv) : blockValidator_(bv) {}
 
   using ErrorType = BlockValidator::ErrorType;
   virtual ErrorType validateBlock(const csdb::Pool&) = 0;
 
 protected:
-  const BlockChain& getBlockChain() { return block_validator_.bc_; }
-  auto getFeeCounter() { return block_validator_.feeCounter_; }
-  auto getWallets() { return block_validator_.wallets_; }
-  auto getIterValidator() { return block_validator_.iterValidator_; }
-  auto& getPrevBlock() { return block_validator_.prev_block_; }
+  const BlockChain& getBlockChain() { return blockValidator_.bc_; }
+  auto getFeeCounter() { return blockValidator_.feeCounter_; }
+  auto getWallets() { return blockValidator_.wallets_; }
+  auto getIterValidator() { return blockValidator_.iterValidator_; }
+  auto& getPrevBlock() { return blockValidator_.prevBlock_; }
 
 private:
-  BlockValidator& block_validator_;
+  BlockValidator& blockValidator_;
 };
 
 class HashValidator : public ValidationPlugin {
