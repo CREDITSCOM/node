@@ -158,7 +158,7 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
       cnt = 0;
       std::this_thread::yield();
     }
-  } while (lastError);
+  } while (lastError == boost::asio::error::would_block);
 
   if (lastError || size < encodedSize) {
     cserror() << "Cannot send packet. Error " << lastError;
@@ -250,6 +250,10 @@ void Network::writerRoutine(const Config& config) {
 
     for (int i = 0; i < tasks; i++) {
       auto task = oPacMan_.getNextTask();
+      if (!tasks->pack.data_.ptr_) {
+        cslog() << "net: invalid packet!!!!!!!!!";
+        continue;
+      }
       sendPack(*sock, task, task->endpoint);
     }
 #endif
