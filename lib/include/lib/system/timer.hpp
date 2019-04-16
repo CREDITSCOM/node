@@ -20,7 +20,6 @@ using TimerPtr = std::shared_ptr<Timer>;
 
 ///
 /// Represents standard timer that calls callbacks every msec with time correction.
-///
 /// @brief Timer uses callback in another thread.
 ///
 class Timer {
@@ -37,43 +36,14 @@ public:
   Timer();
   ~Timer();
 
-  ///
-  /// @brief Starts timer with milliseconds period.
-  /// @param msec is time in msec to tick.
-  /// @param type is timer type to use.
-  ///
   void start(int msec, Type type = Type::Standard);
-
-  ///
-  /// @brief Stops timer.
-  /// @brief Timer would not stop immediatly if it's type is Standard, only after thread joined.
-  /// @brief If timer type is HighPrecise it stops immediatly.
-  ///
   void stop();
-
-  ///
-  /// @brief Restars timer.
-  ///
   void restart();
 
-  ///
-  /// @brief Returns timer status.
-  ///
   bool isRunning() const;
-
-  ///
-  /// @brief Returns current timer type.
-  ///
   Type type() const;
 
-  ///
-  /// @brief Calls callback once in another thread after msec time.
-  /// @param msec is time in msec to tick.
-  /// @param callback is any functor, lambda, closure, function object.
-  ///
-  static void singleShot(int msec, cs::RunPolicy policy, const TimerCallback& callback);
-
-  // creates and returns ptr on timer
+  static void singleShot(int msec, cs::RunPolicy policy, TimerCallback callback);
   static TimerPtr create();
 
 public signals:

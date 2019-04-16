@@ -57,8 +57,8 @@ cs::Timer::Type cs::Timer::type() const {
   return type_;
 }
 
-void cs::Timer::singleShot(int msec, cs::RunPolicy policy, const cs::TimerCallback& callback) {
-    cs::Concurrent::runAfter(std::chrono::milliseconds(msec), policy, callback);
+void cs::Timer::singleShot(int msec, cs::RunPolicy policy, cs::TimerCallback callback) {
+  cs::Concurrent::runAfter(std::chrono::milliseconds(msec), policy, std::move(callback));
 }
 
 cs::TimerPtr cs::Timer::create() {
@@ -81,6 +81,8 @@ void cs::Timer::loop() {
 }
 
 void cs::Timer::preciseLoop() {
+  size_t counter = 0;
+  static constexpr size_t maxCount = 10;
   std::chrono::high_resolution_clock::time_point previousTimePoint = std::chrono::high_resolution_clock::now();
 
   while (!interruption_) {
@@ -96,9 +98,13 @@ void cs::Timer::preciseLoop() {
       emit timeOut();
     }
 
-    // recalc
     previousTimePoint = now;
-    std::this_thread::yield();
+    ++counter;
+
+    if (counter >= maxCount) {
+      counter = 0;
+      std::this_thread::yield();
+    }
   }
 }
 
