@@ -360,7 +360,7 @@ public:
   }
 
   void use() {
-    users_.fetch_add(1, std::memory_order_relaxed);
+    users_.fetch_add(1, std::memory_order_acq_rel);
   }
 
   inline void unuse();
@@ -454,16 +454,16 @@ private:
   }
 
   uint32_t pages_ = 0;
-  cs::SpinLock allocFlag_;
+  cs::SpinLock allocFlag_{ATOMIC_FLAG_INIT};
 
   IntType** freeChunks_ = nullptr;
-  std::atomic<IntType**> freeChunksLast_;
-  cs::SpinLock freeFlag_;
+  std::atomic<IntType**> freeChunksLast_ = {nullptr};
+  cs::SpinLock freeFlag_{ATOMIC_FLAG_INIT};
 };
 
 template <typename T>
 inline void TypedSlot<T>::unuse() {
-  if (users_.fetch_sub(1, std::memory_order_release) == 1) {
+  if (users_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
     allocator_->remove(this);
   }
 }
