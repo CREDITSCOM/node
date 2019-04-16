@@ -3,6 +3,7 @@
 #include <csdb/pool.hpp>
 #include <csnode/blockchain.hpp>
 #include <lib/system/logger.hpp>
+#include <lib/system/common.hpp>
 #include <csnode/itervalidator.hpp>
 #include <csnode/fee.hpp>
 #include <csnode/walletsstate.hpp>
@@ -10,6 +11,7 @@
 
 namespace {
 const char* log_prefix = "BlockValidator: ";
+const cs::Sequence kGapBtwNeighbourBlocks = 1;
 } // namespace
 
 namespace cs {
@@ -24,7 +26,7 @@ ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block
                                                           prev_block.hashingLength()));
 
   if (prev_hash != counted_prev_hash) {
-    cserror() << log_prefix << ": prev pool's (" << prev_block.sequence()
+    csfatal() << log_prefix << ": prev pool's (" << prev_block.sequence()
               << ") hash != real prev pool's hash";
     res = ErrorType::fatalError;      
   }
@@ -32,8 +34,15 @@ ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block
   return res;
 }
 
-ValidationPlugin::ErrorType BlockNumValidator::validateBlock(const csdb::Pool&) {
-  return ErrorType::noError;
+ValidationPlugin::ErrorType BlockNumValidator::validateBlock(const csdb::Pool& block) {
+  ErrorType res = ErrorType::noError;
+  auto& prev_block = getPrevBlock();
+  if (block.sequence() - prev_block.sequence() != kGapBtwNeighbourBlocks) {
+    res = ErrorType::error;
+    cserror() << log_prefix << "Current block's sequence is " << block.sequence()
+              << ", previous block sequence is " << prev_block.sequence();
+  }
+  return res;
 }
 
 ValidationPlugin::ErrorType TimestampValidator::validateBlock(const csdb::Pool&) {
