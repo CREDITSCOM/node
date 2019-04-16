@@ -101,8 +101,8 @@ struct Connection {
 
   FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
-  cs::Sequence syncSeqs[BlocksToSync];
-  cs::Sequence syncSeqsRetries[BlocksToSync];
+  cs::Sequence syncSeqs[BlocksToSync] = {0};
+  cs::Sequence syncSeqsRetries[BlocksToSync] = {0};
   cs::Sequence lastSeq = 0;
 
   bool operator!=(const Connection& rhs) const {
