@@ -35,13 +35,20 @@ bool BlockValidator::validateBlock(const csdb::Pool& block, ValidationLevel leve
     return true;
   }
 
-  prevBlock_ = bc_.loadBlock(block.previous_hash());
-  if (!prevBlock_.is_valid()) {
-    csfatal() << "BlockValidator: block with hash "
-              << block.previous_hash().to_string() << " is not valid.";
+  if (!block.is_valid()) {
+    cserror() << "BlockValidator: invalid block received";
     return false;
   }
 
+  if (!prevBlock_.is_valid() || block.sequence() - prevBlock_.sequence() != 1) {
+    prevBlock_ = bc_.loadBlock(block.previous_hash());
+    if (!prevBlock_.is_valid()) {
+      cserror() << "BlockValidator: block with hash "
+                << block.previous_hash().to_string() << " is not valid.";
+      return false;
+    }
+  }
+ 
   ErrorType validationResult = noError;
   for (uint8_t i = 0; i <= static_cast<uint8_t>(level); ++i) {
     validationResult = plugins_[i]->validateBlock(block);
@@ -50,6 +57,7 @@ bool BlockValidator::validateBlock(const csdb::Pool& block, ValidationLevel leve
     }
   }
 
+  prevBlock_ = block;
   return true;
 }
 } // namespace cs
