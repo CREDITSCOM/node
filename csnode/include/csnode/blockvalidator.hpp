@@ -2,30 +2,30 @@
 #define BLOCK_VALIDATOR_HPP
 
 #include <memory>
+#include <vector>
 
-#include <csnode/itervalidator.hpp>
-#include <csnode/fee.hpp>
-#include <csnode/walletsstate.hpp>
-
-namespace csdb {
-class Pool;
-} // namespace csdb
+#include <csdb/pool.hpp>
 
 class BlockChain;
 
 namespace cs {
 
+class ValidationPlugin;
+class Fee;
+class IterValidator;
+class WalletsState; 
+
 class BlockValidator {
 public:
   enum ValidationLevel : uint8_t {
-    noValidation,
-    hashIntergrity,
+    hashIntergrity = 0,
     blockNum,
     timestamp,
     blockSignatures,
     smartSourceSignatures,
     balances,
-    fullValidation
+    fullValidation,
+    noValidation = 255
   };
 
   enum SeverityLevel : uint8_t {
@@ -35,6 +35,7 @@ public:
   };
 
   explicit BlockValidator(const BlockChain&);
+  ~BlockValidator();
   bool validateBlock(const csdb::Pool&, ValidationLevel = hashIntergrity,
                      SeverityLevel = GreaterThanWarnings);
 
@@ -51,20 +52,18 @@ private:
     fatalError = 1 << 3
   };
 
-  ErrorType checkHashIntergrity(const csdb::Pool&);
-  ErrorType checkBlockNum(const csdb::Pool&) { return noError; }
-  ErrorType checkTimestamp(const csdb::Pool&) { return noError; }
-  ErrorType checkBlockSignatures(const csdb::Pool&) { return noError; }
-  ErrorType checkSmartSourceSignatures(const csdb::Pool&) { return noError; }
-  ErrorType checkBalances(const csdb::Pool&) { return noError; }
-  ErrorType checkAllTransactions(const csdb::Pool&) { return noError; }
-
   bool return_(ErrorType, SeverityLevel);
 
   const BlockChain& bc_;
-  std::unique_ptr<Fee> feeCounter_;   
-  std::unique_ptr<WalletsState> wallets_;
-  std::unique_ptr<IterValidator> iterValidator_;
+  std::vector<std::unique_ptr<ValidationPlugin>> plugins_;
+
+  friend class ValidationPlugin;
+
+  std::shared_ptr<Fee> feeCounter_;   
+  std::shared_ptr<WalletsState> wallets_;
+  std::shared_ptr<IterValidator> iterValidator_;
+
+  csdb::Pool prev_block_;
 };
 } // namespace cs
 #endif // BLOCKVALIDATOR_HPP

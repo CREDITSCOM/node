@@ -60,6 +60,7 @@ add_library(csnode
   include/csnode/nodeutils.hpp
   include/csnode/itervalidator.hpp
   include/csnode/blockvalidator.hpp
+  include/csnode/blockvalidatorplugins.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -80,6 +81,7 @@ add_library(csnode
   src/nodeutils.cpp
   src/itervalidator.cpp
   src/blockvalidator.cpp
+  src/blokcvalidatorplugins.cpp
 )
 
 target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 Boost::thread)

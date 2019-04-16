@@ -1,20 +1,29 @@
 #include <csnode/blockvalidator.hpp>
 
-#include <csdb/pool.hpp>
 #include <csnode/blockchain.hpp>
-#include <lib/system/logger.hpp>
+#include <csnode/itervalidator.hpp>
+#include <csnode/fee.hpp>
+#include <csnode/walletsstate.hpp>
 
-namespace {
-const char* log_prefix = "BlockValidator: ";
-} // namespace
+#include <csnode/blockvalidatorplugins.hpp>
 
 namespace cs {
 
 BlockValidator::BlockValidator(const BlockChain& bc)
     : bc_(bc),
-      feeCounter_(::std::make_unique<Fee>()),
-      wallets_(::std::make_unique<WalletsState>(bc_)),
-      iterValidator_(::std::make_unique<IterValidator>(*wallets_.get())) {}
+      feeCounter_(::std::make_shared<Fee>()),
+      wallets_(::std::make_shared<WalletsState>(bc_)),
+      iterValidator_(::std::make_shared<IterValidator>(*wallets_.get())) {
+  plugins_.push_back(std::make_unique<HashValidator>(*this));
+  plugins_.push_back(std::make_unique<BlockNumValidator>(*this));
+  plugins_.push_back(std::make_unique<TimestampValidator>(*this));
+  plugins_.push_back(std::make_unique<BlockSignaturesValidator>(*this));
+  plugins_.push_back(std::make_unique<SmartSourceSignaturesValidator>(*this));
+  plugins_.push_back(std::make_unique<BalanceChecker>(*this));
+  plugins_.push_back(std::make_unique<TransactionsChecker>(*this));
+}
+
+BlockValidator::~BlockValidator() {}
 
 inline bool BlockValidator::return_(ErrorType error, SeverityLevel severity) {
   return !(error >> severity);
@@ -22,65 +31,20 @@ inline bool BlockValidator::return_(ErrorType error, SeverityLevel severity) {
 
 bool BlockValidator::validateBlock(const csdb::Pool& block, ValidationLevel level,
                                    SeverityLevel severity) {
-  if (level == ValidationLevel::noValidation) {
+  if (level == ValidationLevel::noValidation || block.sequence() == 0) {
     return true;
   }
 
-  ErrorType validationResult = checkHashIntergrity(block);
-  if (level == ValidationLevel::hashIntergrity || !return_(validationResult, severity)) {
-    return return_(validationResult, severity);
+  prev_block_ = bc_.loadBlock(block.previous_hash());
+
+  ErrorType validationResult = noError;
+  for (uint8_t i = 0; i <= static_cast<uint8_t>(level); ++i) {
+    validationResult = plugins_[i]->validateBlock(block);
+    if (!return_(validationResult, severity)) {
+      return false;
+    }
   }
 
-  validationResult = checkBlockNum(block);
-  if (level == ValidationLevel::blockNum || !return_(validationResult, severity)) {
-    return return_(validationResult, severity);
-  }
-
-  validationResult = checkTimestamp(block);
-  if (level == ValidationLevel::timestamp || !return_(validationResult, severity)) {
-    return return_(validationResult, severity);
-  }
-
-  validationResult = checkBlockSignatures(block);
-  if (level == ValidationLevel::blockSignatures || !return_(validationResult, severity)) {
-    return return_(validationResult, severity);
-  }
-
-  validationResult = checkSmartSourceSignatures(block);
-  if (level == ValidationLevel::smartSourceSignatures || !return_(validationResult, severity)) {
-    return return_(validationResult, severity);
-  }
-
-  validationResult = checkBalances(block);
-  if (level == ValidationLevel::balances || !return_(validationResult, severity)) {
-    return return_(validationResult, severity);
-  }
-
-  return return_(checkAllTransactions(block), severity);
+  return true;
 }
-
-BlockValidator::ErrorType BlockValidator::checkHashIntergrity(const csdb::Pool& block) {
-  ErrorType res = noError;
-  if (block.sequence() == 0) {
-    return res;
-  }
-
-  auto prev_hash = block.previous_hash();
-  auto prev_block = bc_.loadBlock(prev_hash);
-  auto data = prev_block.to_binary();
-  auto counted_prev_hash = csdb::PoolHash::calc_from_data(cs::Bytes(data.data(),
-                                                          data.data() +
-                                                          prev_block.hashingLength()));
-
-  if (prev_hash != counted_prev_hash) {
-    cserror() << log_prefix << ": prev pool's (" << prev_block.sequence()
-              << ") hash != real prev pool's hash";
-    res = fatalError;      
-  }
-
-  return res;
-}
-
-
-
 } // namespace cs
