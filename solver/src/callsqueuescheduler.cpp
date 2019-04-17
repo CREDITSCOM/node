@@ -59,13 +59,19 @@ void CallsQueueScheduler::SchedulerProc() {
         if (CanExe(run.id)) {
           OnExeQueued(run.id);
           CallsQueue::instance().insert([this, run]() {
-            std::lock_guard<std::mutex> lque( _mtx_queue );
-            if( !ConfirmExe( run.id ) ) {
-              // its highly likely the job was canceled
-              return;
+            {
+              std::lock_guard<std::mutex> lque(_mtx_queue);
+              if (!ConfirmExe(run.id)) {
+                // its highly likely the job was canceled
+                return;
+              }
             }
+            // call out of lock to avoid recursive mutex locking if proc to insert another scheduled call
             run.proc();
-            OnExeDone(run.id);
+            {
+              std::lock_guard<std::mutex> lque(_mtx_queue);
+              OnExeDone(run.id);
+            }
           });
           _cnt_total += 1;
         }
@@ -118,7 +124,7 @@ bool CallsQueueScheduler::CanExe(CallTag id) {
 bool CallsQueueScheduler::ConfirmExe(CallTag id) {
   auto it = _exe_sync.find( id );
   if( it != _exe_sync.end() ) {
-    return (it->second.done - it->second.queued) == 1;
+    return (it->second.queued - it->second.done) == 1;
   }
   return false;
 }

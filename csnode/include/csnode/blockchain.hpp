@@ -35,6 +35,7 @@ class BlockHashes;
 class WalletsIds;
 class Fee;
 class TransactionsPacket;
+class BlockValidator;
 
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
 using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
@@ -237,7 +238,6 @@ public slots:
   const csdb::Address& getGenesisAddress() const;
 
 private:
-  bool validateBlock(const csdb::Pool& block, bool fullValidation = false);
   bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
 
   void writeGenesisBlock();
@@ -334,7 +334,7 @@ private:
 
   // fee calculator
   std::unique_ptr<cs::Fee> fee_;
-
+  std::unique_ptr<cs::BlockValidator> blockValidator_;
 };
 
 class TransactionsIterator {

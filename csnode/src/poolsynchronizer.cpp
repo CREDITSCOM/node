@@ -90,7 +90,7 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 
     // BigBang received
     if (isBigBand && !timer_.isRunning()) {
-      timer_.start(delay);
+      timer_.start(delay, Timer::Type::Standard, RunPolicy::CallQueuePolicy);
     }
   }
 
@@ -104,10 +104,10 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
     sendBlockRequest();
 
     if (isBigBand || useTimer) {
-      timer_.start(delay);
+      timer_.start(delay, Timer::Type::Standard, RunPolicy::CallQueuePolicy);
     }
 
-    roundSimulation_.start(60000, cs::Timer::Type::HighPrecise); // 1 Min
+    roundSimulation_.start(60000, cs::Timer::Type::HighPrecise, RunPolicy::CallQueuePolicy); // 1 Min
   }
   else if (syncData_.requestRepeatRoundCount > 0) {
     roundSimulation_.restart();
@@ -223,44 +223,40 @@ bool cs::PoolSynchronizer::isFastMode() const {
 //
 
 void cs::PoolSynchronizer::onTimeOut() {
-  CallsQueue::instance().insert([this] {
-    if (!isSyncroStarted_) {
-      return;
-    }
+  if (!isSyncroStarted_) {
+    return;
+  }
 
-    bool isAvailable = false;
+  bool isAvailable = false;
 
-    if (isFastMode()) {
-      static uint8_t fastCounter = 0;
-      ++fastCounter;
-      if (fastCounter > 20) {
-        fastCounter = 0;
-        csmeta(csdetails) << "OnTimeOut Fast: " << syncData_.sequencesVerificationFrequency * 20;
-        isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
-      }
+  if (isFastMode()) {
+    static uint8_t fastCounter = 0;
+    ++fastCounter;
+    if (fastCounter > 20) {
+      fastCounter = 0;
+      csmeta(csdetails) << "OnTimeOut Fast: " << syncData_.sequencesVerificationFrequency * 20;
+      isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
     }
+  }
 
-    if (!isAvailable) {
-      csmeta(csdetails) << "OnTimeOut: " << syncData_.sequencesVerificationFrequency;
-      isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::TIMER);
-    }
+  if (!isAvailable) {
+    csmeta(csdetails) << "OnTimeOut: " << syncData_.sequencesVerificationFrequency;
+    isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::TIMER);
+  }
 
-    if (isAvailable) {
-      sendBlockRequest();
-    }
-  });
+  if (isAvailable) {
+    sendBlockRequest();
+  }
 }
 
 void cs::PoolSynchronizer::onRoundSimulation() {
   csmeta(csdetails) << "on round simulation";
 
-  CallsQueue::instance().insert([this] {
-    bool isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
+  bool isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
 
-    if (isAvailable) {
-      sendBlockRequest();
-    }
-  });
+  if (isAvailable) {
+    sendBlockRequest();
+  }
 }
 
 void cs::PoolSynchronizer::onWriteBlock(const csdb::Pool pool) {

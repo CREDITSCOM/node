@@ -112,6 +112,7 @@ private:
   MemRegion* ptr_ = nullptr;
 
   friend typename MemRegion::Allocator;
+  friend class Network;
 };
 
 /* Now, RegionAllocator provides a basic allocation strategy, where we
@@ -142,7 +143,7 @@ public:
   using Type = void;
 
   void use() {
-    users_.fetch_add(1, std::memory_order_relaxed);
+    users_.fetch_add(1, std::memory_order_acq_rel);
   }
 
   inline void unuse();
@@ -314,32 +315,10 @@ private:
 };
 
 inline void Region::unuse() {
-  if (users_.fetch_sub(1, std::memory_order_release) == 1) {
+  if (users_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
     page_->allocator->freeMem(this);
   }
 }
-
-/* By the way, we're gonna need this soon enough */
-struct SpinLock {
-public:
-  SpinLock(std::atomic_flag& flag)
-  : flag_(flag) {
-    uint32_t cnt = 0;
-    while (flag_.test_and_set(std::memory_order_acquire)) {
-      if (++cnt == 10) {
-        cnt = 0;
-        std::this_thread::yield();
-      }
-    }
-  }
-
-  ~SpinLock() {
-    flag_.clear(std::memory_order_release);
-  }
-
-private:
-  __cacheline_aligned std::atomic_flag& flag_;
-};
 
 /* Not, TypedAllocator is a completely different thing. It allocates
    big chunks of data, uses it for objects of fixed size and keeps
@@ -360,7 +339,7 @@ public:
   }
 
   void use() {
-    users_.fetch_add(1, std::memory_order_relaxed);
+    users_.fetch_add(1, std::memory_order_acq_rel);
   }
 
   inline void unuse();
@@ -457,13 +436,13 @@ private:
   cs::SpinLock allocFlag_{ATOMIC_FLAG_INIT};
 
   IntType** freeChunks_ = nullptr;
-  std::atomic<IntType**> freeChunksLast_;
+  std::atomic<IntType**> freeChunksLast_ = {nullptr};
   cs::SpinLock freeFlag_{ATOMIC_FLAG_INIT};
 };
 
 template <typename T>
 inline void TypedSlot<T>::unuse() {
-  if (users_.fetch_sub(1, std::memory_order_release) == 1) {
+  if (users_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
     allocator_->remove(this);
   }
 }

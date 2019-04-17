@@ -93,7 +93,10 @@ void Network::readerRoutine(const Config& config) {
     return;
   }
 
-  while (!initFlag_.load());
+  while (!initFlag_.load()) {
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(1s);
+  }
 
   boost::system::error_code lastError;
   size_t packetSize;
@@ -154,7 +157,7 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
       cnt = 0;
       std::this_thread::yield();
     }
-  } while (lastError);
+  } while (lastError == boost::asio::error::would_block);
 
   if (lastError || size < encodedSize) {
     cserror() << "Cannot send packet. Error " << lastError;
@@ -177,7 +180,7 @@ void Network::writerRoutine(const Config& config) {
   std::vector<struct iovec> iovecs;
   std::vector<std::array<char, Packet::MaxSize>> packets_buffer;
   std::vector<boost::asio::mutable_buffer> encoded_packets;
-  std::vector<TaskPtr<OPacMan>> tasks_vector;
+  std::vector<ip::udp::endpoint> endpoints;
 #endif
   while (stopWriterRoutine == false) { //changed from true
 #ifdef __linux__
@@ -185,32 +188,50 @@ void Network::writerRoutine(const Config& config) {
     int s = read(writerEventfd_, &tasks, sizeof(uint64_t));
     if (s != sizeof(uint64_t)) continue;
 
+    if (tasks > 200) {
+      cslog() << "strange: too many tasks " << tasks;
+    }
+
     msg.resize(tasks);
     std::fill(msg.begin(), msg.end(), mmsghdr{});
     iovecs.resize(tasks);
     std::fill(iovecs.begin(), iovecs.end(), iovec{});
     packets_buffer.resize(tasks);
-    tasks_vector.reserve(tasks);
+    endpoints.resize(tasks);
     encoded_packets.clear();
 
+    int j = 0;
     for (uint64_t i = 0; i < tasks; i++) {
-      tasks_vector.emplace_back(oPacMan_.getNextTask());
-      encoded_packets.emplace_back(tasks_vector[i]->pack.encode(buffer(packets_buffer[i].data(), Packet::MaxSize)));
-      iovecs[i].iov_base = encoded_packets[i].data();
-      iovecs[i].iov_len = encoded_packets[i].size();
-      msg[i].msg_hdr.msg_iov = &iovecs[i];
-      msg[i].msg_hdr.msg_iovlen = 1;
-      msg[i].msg_hdr.msg_name = tasks_vector[i]->endpoint.data();
-      msg[i].msg_hdr.msg_namelen = tasks_vector[i]->endpoint.size();
+      auto task = oPacMan_.getNextTask();
+      std::atomic_thread_fence(std::memory_order_acquire);
+      if (!task->pack.data_.ptr_) {
+        cslog() << "net: invalid packet!!!!!!!!!";
+        continue;
+      }
+      encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
+      endpoints[j] = task->endpoint;
+      iovecs[j].iov_base = encoded_packets[j].data();
+      iovecs[j].iov_len = encoded_packets[j].size();
+      msg[j].msg_hdr.msg_iov = &iovecs[j];
+      msg[j].msg_hdr.msg_iovlen = 1;
+      msg[j].msg_hdr.msg_name = endpoints[j].data();
+      msg[j].msg_hdr.msg_namelen = endpoints[j].size();
+      ++j;
     }
+    if (j == 0) continue;
+    tasks = j;
+
     int sended = 0;
     struct mmsghdr *messages = msg.data();
     do {
       sended = sendmmsg(sock->native_handle(), messages, tasks, 0);
+      if (sended < 0) {
+        cslog() << "sendmmsg errno = " << errno;
+        if (errno != EAGAIN) break;
+      }
       messages += sended;
       tasks -= sended;
     } while (tasks);
-    tasks_vector.clear();
 #endif
 #if defined(WIN32) || defined(__APPLE__)
 #ifdef WIN32
@@ -227,6 +248,10 @@ void Network::writerRoutine(const Config& config) {
 
     for (int i = 0; i < tasks; i++) {
       auto task = oPacMan_.getNextTask();
+      if (!task->pack.data_.ptr_) {
+        cslog() << "net: invalid packet!!!!!!!!!";
+        continue;
+      }
       sendPack(*sock, task, task->endpoint);
     }
 #endif
@@ -345,8 +370,8 @@ inline void Network::processTask(TaskPtr<IPacMan> &task) {
 void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
   auto qePtr = oPacMan_.allocNext();
 
-  qePtr->element.endpoint = ep;
-  qePtr->element.pack = p;
+  qePtr->endpoint = ep;
+  qePtr->pack = p;
 
   oPacMan_.enQueueLast(qePtr);
 #ifdef __linux__
