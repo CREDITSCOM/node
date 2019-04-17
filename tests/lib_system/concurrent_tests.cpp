@@ -114,7 +114,7 @@ TEST(Concurrent, VoidFutureWatcherBindedRun) {
   std::string message = "Finished";
   auto binder = std::bind(&Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
 
-  cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, std::move(binder));
+  cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPolicy, std::move(binder));
   cs::Console::writeLine("Not connected yet");
 
   cs::Connector::connect(&watcher->finished, &demo, &Demo::onWatcherFinished);
@@ -165,7 +165,7 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
   Demo demo;
   std::string message = "Finished";
 
-  cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPoolPolicy, &Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
+  cs::FutureWatcherPtr<void> watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPolicy, &Demo::method, &demo, message, std::ref(concurrentId), std::ref(isRunningFinished));
   cs::Console::writeLine("Not connected yet");
 
   // look at watcher
