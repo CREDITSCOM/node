@@ -20,7 +20,7 @@ using TimerPtr = std::shared_ptr<Timer>;
 
 ///
 /// Represents standard timer that calls callbacks every msec with time correction.
-/// @brief Timer uses callback in another thread.
+/// @brief Timer emits time out signal by run policy.
 ///
 class Timer {
 public:
@@ -28,7 +28,7 @@ public:
     RangeDeltaInPercents = 10
   };
 
-  enum class Type {
+  enum class Type : cs::Byte {
     Standard,
     HighPrecise
   };
@@ -36,7 +36,7 @@ public:
   Timer();
   ~Timer();
 
-  void start(int msec, Type type = Type::Standard);
+  void start(int msec, Type type = Type::Standard, RunPolicy policy = RunPolicy::ThreadPolicy);
   void stop();
   void restart();
 
@@ -48,16 +48,18 @@ public:
 
 public signals:
 
-  /// generates when timer ticks
+  // generates when timer ticks
   TimeOutSignal timeOut;
 
 protected:
+
   // timer main loop
   void loop();
   void preciseLoop();
 
   // timer rehabilitation when timer degradate
   void rehabilitation();
+  void call();
 
 private:
   bool isRunning_;
@@ -66,6 +68,7 @@ private:
 
   std::thread timerThread_;
   Type type_;
+  std::atomic<RunPolicy> policy_;
 
   unsigned int allowDifference_;
   std::chrono::milliseconds ms_;

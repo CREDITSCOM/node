@@ -13,11 +13,12 @@ cs::Timer::~Timer() {
   }
 }
 
-void cs::Timer::start(int msec, Type type) {
+void cs::Timer::start(int msec, Type type, RunPolicy policy) {
   interruption_ = false;
   isRunning_ = true;
 
   type_ = type;
+  policy_.store(policy, std::memory_order_release);
 
   ms_ = std::chrono::milliseconds(msec);
   ns_ = 0;
@@ -75,8 +76,7 @@ void cs::Timer::loop() {
     std::this_thread::sleep_for(ms_);
 
     rehabilitation();
-
-    emit timeOut();
+    call();
   }
 }
 
@@ -94,8 +94,7 @@ void cs::Timer::preciseLoop() {
 
     if (needMsInNs.count() <= ns_) {
       ns_ = 0;
-
-      emit timeOut();
+      call();
     }
 
     previousTimePoint = now;
@@ -126,5 +125,18 @@ void cs::Timer::rehabilitation() {
         ms_ = realMs_;
       }
     }
+  }
+}
+
+void cs::Timer::call() {
+  auto policy = policy_.load(std::memory_order_acquire);
+
+  if (policy == RunPolicy::ThreadPolicy) {
+    emit timeOut();
+  }
+  else {
+    CallsQueue::instance().insert([=] {
+      emit timeOut();
+    });
   }
 }
