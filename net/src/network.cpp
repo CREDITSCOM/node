@@ -108,7 +108,16 @@ void Network::readerRoutine(const Config& config) {
         return;
     }
 
+    std::atomic_thread_fence(std::memory_order_acq_rel);
+    if (!task.pack.data_.ptr_) {
+      cslog() << "net: invalid input packet!!!!!!!!!";
+      continue;
+    }
     packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
+    if (!task.pack.data_.ptr_) {
+      cslog() << "net: invalid input packet!!!!!!!!!";
+      continue;
+    }
     task.size = task.pack.decode(packetSize);
     if (!lastError) {
       iPacMan_.enQueueLast();
@@ -181,7 +190,7 @@ void Network::writerRoutine(const Config& config) {
   std::vector<struct iovec> iovecs;
   std::vector<std::array<char, Packet::MaxSize>> packets_buffer;
   std::vector<boost::asio::mutable_buffer> encoded_packets;
-  std::vector<TaskPtr<OPacMan>> tasks_vector;
+  std::vector<ip::udp::endpoint> endpoints;
 #endif
   while (stopWriterRoutine == false) { //changed from true
 #ifdef __linux__
@@ -198,25 +207,25 @@ void Network::writerRoutine(const Config& config) {
     iovecs.resize(tasks);
     std::fill(iovecs.begin(), iovecs.end(), iovec{});
     packets_buffer.resize(tasks);
-    tasks_vector.reserve(tasks);
+    endpoints.resize(tasks);
     encoded_packets.clear();
 
     int j = 0;
     for (uint64_t i = 0; i < tasks; i++) {
-      tasks_vector.emplace_back(oPacMan_.getNextTask());
+      auto task = oPacMan_.getNextTask();
       std::atomic_thread_fence(std::memory_order_acquire);
-      if (!tasks_vector[j]->pack.data_.ptr_) {
-        tasks_vector.pop_back();
+      if (!task->pack.data_.ptr_) {
         cslog() << "net: invalid packet!!!!!!!!!";
         continue;
       }
-      encoded_packets.emplace_back(tasks_vector[j]->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
+      encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
+      endpoints[j] = task->endpoint;
       iovecs[j].iov_base = encoded_packets[j].data();
       iovecs[j].iov_len = encoded_packets[j].size();
       msg[j].msg_hdr.msg_iov = &iovecs[j];
       msg[j].msg_hdr.msg_iovlen = 1;
-      msg[j].msg_hdr.msg_name = tasks_vector[j]->endpoint.data();
-      msg[j].msg_hdr.msg_namelen = tasks_vector[j]->endpoint.size();
+      msg[j].msg_hdr.msg_name = endpoints[j].data();
+      msg[j].msg_hdr.msg_namelen = endpoints[j].size();
       ++j;
     }
     if (j == 0) continue;
@@ -233,7 +242,6 @@ void Network::writerRoutine(const Config& config) {
       messages += sended;
       tasks -= sended;
     } while (tasks);
-    tasks_vector.clear();
 #endif
 #if defined(WIN32) || defined(__APPLE__)
 #ifdef WIN32

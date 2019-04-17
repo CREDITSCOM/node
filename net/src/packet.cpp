@@ -161,13 +161,13 @@ void Message::composeFullData() const {
   }
 }
 
-Message::~Message() {
+//Message::~Message() {
   /*auto pEnd = packets_ + packetsTotal_;
   for (auto ptr = packets_; ptr != pEnd; ++ptr)
     if (ptr) ptr->~Packet();
 
     memset(packets_, 0, sizeof(Packet*) * packetsTotal_);*/
-}
+//}
 
 const char* getMsgTypesString(MsgTypes messageType) {
   switch (messageType) {

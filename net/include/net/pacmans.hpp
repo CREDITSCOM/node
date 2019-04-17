@@ -2,7 +2,7 @@
 #ifndef PACMANS_HPP
 #define PACMANS_HPP
 
-#include <queue>
+#include <list>
 #include <mutex>
 #include <atomic>
 #include <boost/asio.hpp>
@@ -15,9 +15,10 @@ template <typename Pacman>
 class TaskPtr {
 public:
   TaskPtr(TaskPtr&& rhs)
-  : ptr_(rhs.ptr_)
+  : it_(rhs.it_)
   , owner_(rhs.owner_) {
-    rhs.ptr_ = nullptr;
+    valid_ = true;
+    rhs.valid_ = false;
   }
 
   TaskPtr(const TaskPtr&) = delete;
@@ -25,25 +26,36 @@ public:
   TaskPtr& operator=(TaskPtr&&) = delete;
 
   ~TaskPtr() {
-    if (ptr_) {
-      owner_->releaseTask(ptr_);
+    if (valid_) {
+      owner_->releaseTask(it_);
+//      valid_ = false;
     }
   }
 
   typename Pacman::Task* operator->() {
-    return ptr_;
+    return &(static_cast<typename Pacman::Task&>(*it_));
   }
   const typename Pacman::Task* operator->() const {
-    return ptr_;
+    return &(static_cast<typename Pacman::Task&>(*it_));
   }
 
 private:
   TaskPtr() {}
 
-  typename Pacman::Task* ptr_;
+  typename Pacman::TaskIterator it_;
   Pacman* owner_;
+  bool valid_ = true;
 
   friend Pacman;
+};
+
+template<typename Task>
+struct TaskBody {
+  operator Task&() {
+    return *reinterpret_cast<Task *>(data);
+  }
+
+  char data[sizeof(Task)];
 };
 
 class IPacMan {
@@ -61,11 +73,12 @@ public:
   void enQueueLast();
 
   TaskPtr<IPacMan> getNextTask();
-  void releaseTask(Task*);
+
+  using TaskIterator = std::list<TaskBody<Task>>::iterator;
+  void releaseTask(TaskIterator&);
 
 private:
-  Task lastElt_;
-  std::queue<Task> queue_;
+  std::list<TaskBody<Task>> queue_;
   std::mutex mutex_;
   std::atomic<size_t> size_ = {0};
   RegionAllocator allocator_;
@@ -82,11 +95,12 @@ public:
   void enQueueLast();
 
   TaskPtr<OPacMan> getNextTask();
-  void releaseTask(Task*);
+
+  using TaskIterator = std::list<TaskBody<Task>>::iterator;
+  void releaseTask(TaskIterator&);
 
 private:
-  Task lastElt_;
-  std::queue<Task> queue_;
+  std::list<TaskBody<Task>> queue_;
   std::mutex mutex_;
   std::atomic<size_t> size_ = {0};
 };

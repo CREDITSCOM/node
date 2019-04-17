@@ -279,7 +279,7 @@ public:
   Message(const Message&) = delete;
   Message& operator=(const Message&) = delete;
 
-  ~Message();
+//  ~Message();
 
   bool isComplete() const {
     return packetsLeft_ == 0;
