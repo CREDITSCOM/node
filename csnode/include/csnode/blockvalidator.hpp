@@ -29,15 +29,15 @@ public:
   };
 
   enum SeverityLevel : uint8_t {
-    WarningsAsErrors = 1,
-    GreaterThanWarnings,
-    OnlyFatalErrors
+    warningsAsErrors = 1,
+    greaterThanWarnings,
+    onlyFatalErrors
   };
 
   explicit BlockValidator(const BlockChain&);
   ~BlockValidator();
   bool validateBlock(const csdb::Pool&, ValidationLevel = hashIntergrity,
-                     SeverityLevel = GreaterThanWarnings);
+                     SeverityLevel = greaterThanWarnings);
 
   BlockValidator(const BlockValidator&) = delete;
   BlockValidator(BlockValidator&&) = delete;
