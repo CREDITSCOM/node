@@ -42,7 +42,7 @@ void cs::Timer::restart() {
   if (isRunning_) {
     if (type_ == Type::Standard) {
       stop();
-      start(static_cast<int>(ms_.count()));
+      start(static_cast<int>(ms_.count()), type_, policy_);
     }
     else {
       ns_ = 0;
