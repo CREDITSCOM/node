@@ -320,28 +320,6 @@ inline void Region::unuse() {
   }
 }
 
-/* By the way, we're gonna need this soon enough */
-struct SpinLock {
-public:
-  SpinLock(std::atomic_flag& flag)
-  : flag_(flag) {
-    uint32_t cnt = 0;
-    while (flag_.test_and_set(std::memory_order_acquire)) {
-      if (++cnt == 10) {
-        cnt = 0;
-        std::this_thread::yield();
-      }
-    }
-  }
-
-  ~SpinLock() {
-    flag_.clear(std::memory_order_release);
-  }
-
-private:
-  __cacheline_aligned std::atomic_flag& flag_;
-};
-
 /* Not, TypedAllocator is a completely different thing. It allocates
    big chunks of data, uses it for objects of fixed size and keeps
    track of freed objects for reuse. */
@@ -458,7 +436,7 @@ private:
   cs::SpinLock allocFlag_{ATOMIC_FLAG_INIT};
 
   IntType** freeChunks_ = nullptr;
-  std::atomic<IntType**> freeChunksLast_;
+  std::atomic<IntType**> freeChunksLast_ = {nullptr};
   cs::SpinLock freeFlag_{ATOMIC_FLAG_INIT};
 };
 

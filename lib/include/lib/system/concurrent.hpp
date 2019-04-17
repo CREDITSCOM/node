@@ -24,7 +24,7 @@
 namespace cs {
 enum class RunPolicy : cs::Byte {
   CallQueuePolicy,
-  ThreadPoolPolicy
+  ThreadPolicy
 };
 
 enum class WatcherState : cs::Byte {
@@ -56,19 +56,19 @@ class Concurrent;
 class Worker {
 private:
   template <typename Func>
-  inline static void execute(Func&& function) {
-    Threads& threadPool = ThreadPool::instance();
-    boost::asio::post(threadPool, std::forward<Func>(function));
-  }
-
-  template <typename Func>
-  inline static void policyRun(cs::RunPolicy policy, Func&& function) {
+  static void execute(cs::RunPolicy policy, Func&& function) {
     if (policy == cs::RunPolicy::CallQueuePolicy) {
       CallsQueue::instance().insert(std::forward<Func>(function));
     }
     else {
       function();
     }
+  }
+
+  template <typename Func>
+  static void execute(Func&& function) {
+    Threads& threadPool = ThreadPool::instance();
+    boost::asio::post(threadPool, std::forward<Func>(function));
   }
 
   template<typename T>
@@ -145,7 +145,7 @@ protected:
 
   template <typename Func>
   void callSignal(Func&& func) {
-    Worker::policyRun(policy_, std::forward<Func>(func));
+    Worker::execute(policy_, std::forward<Func>(func));
 
     future_ = Future<Result>();
     state_ = WatcherState::Compeleted;
@@ -198,7 +198,7 @@ protected:
           emit finished(std::move(res));
         };
 
-        Super::callSignal(std::bind(lambda));
+        Super::callSignal(std::bind(std::move(lambda)));
       }
       catch (std::exception& e) {
         Super::await(failed);
@@ -252,7 +252,7 @@ protected:
           emit finished();
         };
 
-        Super::callSignal(signal);
+        Super::callSignal(std::move(signal));
       }
       catch (std::exception& e) {
         Super::await(failed);
@@ -301,15 +301,20 @@ public:
   }
 
   // calls std::function after ms time in another thread
-  static void runAfter(const std::chrono::milliseconds& ms, cs::RunPolicy policy, const std::function<void()>& callBack) {
+  static void runAfter(const std::chrono::milliseconds& ms, cs::RunPolicy policy, std::function<void()> callBack) {
     auto timePoint = std::chrono::steady_clock::now() + ms;
-    Worker::execute(std::bind(&Concurrent::runAfterHelper, timePoint, policy, callBack));
+    Worker::execute(std::bind(&Concurrent::runAfterHelper, timePoint, policy, std::move(callBack)));
+  }
+
+  template<typename Func>
+  static void execute(cs::RunPolicy policy, Func&& function) {
+    Worker::execute(policy, std::forward<Func>(function));
   }
 
 private:
-  static void runAfterHelper(const std::chrono::steady_clock::time_point& timePoint, cs::RunPolicy policy, const std::function<void()>& callBack) {
+  static void runAfterHelper(const std::chrono::steady_clock::time_point& timePoint, cs::RunPolicy policy, std::function<void()> callBack) {
     std::this_thread::sleep_until(timePoint);
-    Worker::policyRun(policy, callBack);
+    Worker::execute(policy, std::move(callBack));
   }
 };
 

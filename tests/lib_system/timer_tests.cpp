@@ -6,23 +6,24 @@
 #include "lib/system/timer.hpp"
 #include "lib/system/utils.hpp"
 
-template<typename... Types>
-void print(Types&& ...args) {
-  (std::cout << ... << std::forward<Types>(args)) << std::endl;
-}
-
 TEST(Timer, BaseTimerUsage) {
   static std::atomic<bool> isCalled = false;
   static std::atomic<bool> isFailed = false;
+  static std::atomic<bool> isChecked = false;
   static std::atomic<size_t> counter = 0;
   static size_t expectedCalls = 10;
-  static int awaitTime = 10000;
+  static int awaitTime = 2500;
 
   class Demo {
   public slots:
     void onTick() {
-      print("Timer tick done", ++counter);
-      isCalled = true;
+      if (!isCalled) {
+        cs::Console::writeLine("Timer tick done", ++counter);
+      }
+
+      if (counter == expectedCalls) {
+        isCalled = true;
+      }
     }
   };
 
@@ -34,24 +35,28 @@ TEST(Timer, BaseTimerUsage) {
   // run timer
   timer.start(100);
 
-  cs::Timer::singleShot(awaitTime, cs::RunPolicy::ThreadPoolPolicy, [&] {
+  cs::Timer::singleShot(awaitTime, cs::RunPolicy::ThreadPolicy, [&] {
     if (counter != expectedCalls) {
-      print("Timer bad call, counts: ", counter);
+      cs::Console::writeLine("Timer bad call, counts: ", counter);
       isFailed = true;
     }
+
+    isChecked = true;
   });
 
-  while (counter != expectedCalls && !isCalled) {
+  while (counter != expectedCalls) {
     if (isFailed) {
       break;
     }
   }
 
-  print("Time point before timer stop: ", cs::Utils::formattedCurrentTime());
+  cs::Console::writeLine("Time point before timer stop: ", cs::Utils::formattedCurrentTime());
 
   timer.stop();
 
-  print("Time point after timer stop: ", cs::Utils::formattedCurrentTime());
+  cs::Console::writeLine("Time point after timer stop: ", cs::Utils::formattedCurrentTime());
+
+  while (!isChecked);
 
   ASSERT_EQ(isCalled, true);
   ASSERT_EQ(isFailed, false);
@@ -60,10 +65,11 @@ TEST(Timer, BaseTimerUsage) {
 TEST(Timer, HighPreciseTimerUsage) {
   static std::atomic<bool> isCalled = false;
   static std::atomic<bool> isFailed = false;
+  static std::atomic<bool> isChecked = false;
   static std::atomic<size_t> counter = 0;
   static size_t expectedCalls = 10;
   static int timeTickTime = 200;
-  static int awaitTime = 10000;
+  static int awaitTime = 3000;
   static std::chrono::high_resolution_clock::time_point timePoint;
 
   class A {
@@ -75,7 +81,7 @@ TEST(Timer, HighPreciseTimerUsage) {
       ++counter;
       isCalled = true;
 
-      print("Time elapsed: ", ms.count(), ", counter: ", counter);
+      cs::Console::writeLine("Time elapsed: ", ms.count(), ", counter: ", counter);
     }
   };
 
@@ -83,11 +89,15 @@ TEST(Timer, HighPreciseTimerUsage) {
   cs::Timer timer;
   cs::Connector::connect(&timer.timeOut, &a, &A::onTimerTick);
 
-  cs::Timer::singleShot(awaitTime, cs::RunPolicy::ThreadPoolPolicy, [&] {
+  cs::Timer::singleShot(awaitTime, cs::RunPolicy::ThreadPolicy, [&]{
+    cs::Console::writeLine("Timer values, counter ", counter, ", expectedCalls ", expectedCalls);
+
     if (counter != expectedCalls) {
-      print("Timer bad call, counts: ", counter);
+      cs::Console::writeLine("Timer bad call, counts: ", counter);
       isFailed = true;
     }
+
+    isChecked = true;
   });
 
   while (expectedCalls != counter && !isFailed) {
@@ -99,10 +109,12 @@ TEST(Timer, HighPreciseTimerUsage) {
     isCalled = false;
     timer.stop();
 
-    print("Wait Cycle iteration");
+    cs::Console::writeLine("Wait Cycle iteration");
   }
 
-  print("Left main await cycle");
+  cs::Console::writeLine("Left main await cycle");
+
+  while (!isChecked);
 
   ASSERT_EQ(expectedCalls, counter);
   ASSERT_EQ(isFailed, false);
