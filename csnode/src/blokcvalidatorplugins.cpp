@@ -10,6 +10,11 @@
 #include <csnode/fee.hpp>
 #include <csnode/walletsstate.hpp>
 #include <csdb/pool.hpp>
+#include <cscrypto/cscrypto.hpp>
+
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 
 namespace {
 const char* log_prefix = "BlockValidator: ";
@@ -20,7 +25,6 @@ const csdb::user_field_id_t kTimeStampUserFieldNum = 0;
 namespace cs {
 
 ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block) {
-  ErrorType res = ErrorType::noError;
   auto prevHash = block.previous_hash();
   auto& prevBlock = getPrevBlock();
   auto data = prevBlock.to_binary();
@@ -30,24 +34,22 @@ ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block
   if (prevHash != countedPrevHash) {
     csfatal() << log_prefix << ": prev pool's (" << prevBlock.sequence()
               << ") hash != real prev pool's hash";
-    res = ErrorType::fatalError;      
+    return ErrorType::fatalError;      
   }
-  return res;
+  return ErrorType::noError;
 }
 
 ValidationPlugin::ErrorType BlockNumValidator::validateBlock(const csdb::Pool& block) {
-  ErrorType res = ErrorType::noError;
   auto& prevBlock = getPrevBlock();
   if (block.sequence() - prevBlock.sequence() != kGapBtwNeighbourBlocks) {
     cserror() << log_prefix << "Current block's sequence is " << block.sequence()
               << ", previous block sequence is " << prevBlock.sequence();
-    res = ErrorType::error;
+    return ErrorType::error;
   }
-  return res;
+  return ErrorType::noError;
 }
 
 ValidationPlugin::ErrorType TimestampValidator::validateBlock(const csdb::Pool& block) {
-  ErrorType res = ErrorType::noError;
   auto& prevBlock = getPrevBlock();
 
   auto prevBlockTimestampUf = prevBlock.user_field(kTimeStampUserFieldNum);
@@ -68,12 +70,52 @@ ValidationPlugin::ErrorType TimestampValidator::validateBlock(const csdb::Pool& 
                 << " has timestamp " << currentBlockTimestamp
                 << " less than " << prevBlockTimestamp
                 << " in block with sequence " << prevBlock.sequence();
-    res = ErrorType::warning;
+    return ErrorType::warning;
   }
-  return res;
+  return ErrorType::noError;
 }
 
-ValidationPlugin::ErrorType BlockSignaturesValidator::validateBlock(const csdb::Pool&) {
+ValidationPlugin::ErrorType BlockSignaturesValidator::validateBlock(const csdb::Pool& block) {
+  uint64_t realTrustedMask = block.realTrusted();
+#ifdef _MSC_VER
+  size_t numOfRealTrusted = static_cast<decltype(numOfRealTrusted)>(__popcnt64(realTrustedMask));
+#else
+  size_t numOfRealTrusted = static_cast<decltype(numOfRealTrusted)>(__builtin_popcountl(realTrustedMask));
+#endif
+
+  auto signatures = block.signatures();
+  if (signatures.size() != numOfRealTrusted) {
+    cserror() << log_prefix << "in block " << block.sequence()
+              << " num of signatures (" << signatures.size()
+              << ") != num of real trusted (" << numOfRealTrusted << ")";
+    return ErrorType::error;
+  }
+
+  auto confidants = block.confidants();
+  const size_t maxTrustedNum = sizeof(realTrustedMask) * 8;
+  if (confidants.size() > maxTrustedNum) {
+    cserror() << log_prefix << "in block " << block.sequence()
+              << " num of confidants " << confidants.size()
+              << " is greated than max bits in realTrustedMask";
+    return ErrorType::error;
+  }
+
+  size_t checkingSignature = 0;
+  auto signedData = cscrypto::calculateHash(block.to_binary().data(), block.hashingLength());
+  for (size_t i = 0; i < confidants.size(); ++i) {
+    if (realTrustedMask & (1 << i)) {
+      if (!cscrypto::verifySignature(signatures[checkingSignature],
+                                     confidants[i],
+                                     signedData.data(),
+                                     cscrypto::kHashSize)) {
+        cserror() << log_prefix << "block " << block.sequence()
+                  << "has invalid signatures";
+        return ErrorType::error;
+      }
+      ++checkingSignature;
+    }
+  }
+
   return ErrorType::noError;
 }
 
