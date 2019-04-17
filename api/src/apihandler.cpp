@@ -359,13 +359,12 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     auto retVal = transaction.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
 
     auto varRetVal = deserialize<::general::Variant>(std::move(retVal));
-    sti.__isset.returnValue = varRetVal.__isset.v_string;
-    if (sti.__isset.returnValue){
-      result.trxn.type = api::TransactionType::TT_SmartState;
-      result.trxn.__set_smartInfo(api::SmartTransInfo{});
-      sti.__set_returnValue(deserialize<::general::Variant>(std::move(retVal)));
-      result.trxn.smartInfo.__set_v_smartState(sti);
-    }
+	result.trxn.type = api::TransactionType::TT_SmartState;
+	if (!(retVal.size() == 1 && retVal[0] == 0)) {
+		result.trxn.__set_smartInfo(api::SmartTransInfo{});	  
+		sti.__set_returnValue(deserialize<::general::Variant>(std::move(retVal)));
+		result.trxn.smartInfo.__set_v_smartState(sti);
+	}
   }
   else {
     result.trxn.type = api::TransactionType::TT_Normal;
@@ -593,14 +592,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
   send_transaction.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
 
-  // check signature
-  const auto byteStream = send_transaction.to_byte_stream_for_sig();
-  if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key(), byteStream.data(), byteStream.size())) {
-    _return.status.code = ERROR_CODE;
-    _return.status.message = "wrong signature! ByteStream:" + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
-    return;
-  }
-
   // check money
   const auto source_addr = s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
   BlockChain::WalletData wallData{};
@@ -610,12 +601,22 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 	  _return.status.message = "wallet not found!";
 	  return;
   }
+
   const auto max_fee = send_transaction.max_fee().to_double();
   const auto balance = wallData.balance_.to_double();
   if (max_fee > balance) {
 	  _return.status.code = ERROR_CODE;
 	  _return.status.message = "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
 	  return;
+  }
+  //
+
+  // check signature
+  const auto byteStream = send_transaction.to_byte_stream_for_sig();
+  if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key(), byteStream.data(), byteStream.size())) {
+    _return.status.code = ERROR_CODE;
+    _return.status.message = "wrong signature! ByteStream:" + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+    return;
   }
   //
 

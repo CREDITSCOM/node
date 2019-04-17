@@ -112,6 +112,7 @@ private:
   MemRegion* ptr_ = nullptr;
 
   friend typename MemRegion::Allocator;
+  friend class Network;
 };
 
 /* Now, RegionAllocator provides a basic allocation strategy, where we
@@ -142,7 +143,7 @@ public:
   using Type = void;
 
   void use() {
-    users_.fetch_add(1, std::memory_order_relaxed);
+    users_.fetch_add(1, std::memory_order_acq_rel);
   }
 
   inline void unuse();
@@ -314,7 +315,7 @@ private:
 };
 
 inline void Region::unuse() {
-  if (users_.fetch_sub(1, std::memory_order_release) == 1) {
+  if (users_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
     page_->allocator->freeMem(this);
   }
 }

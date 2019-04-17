@@ -42,6 +42,8 @@ Node::Node(const Config& config)
 , ostream_(&packStreamAllocator_, nodeIdKey_)
 , stat_() {
 
+  std::fill(ssKey_.begin(), ssKey_.end(), 0);
+
   solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
   std::cout << "Start transport... ";
   transport_ = new Transport(config, this);

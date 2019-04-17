@@ -157,6 +157,7 @@ public:
   const ::std::vector<SmartSignature>& smartSignatures() const noexcept;
   const csdb::Amount& roundCost() const noexcept;
   const std::vector<cs::Signature>& roundConfirmations() const noexcept;
+  size_t hashingLength() const noexcept;
 
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(cs::Sequence sequence) noexcept;

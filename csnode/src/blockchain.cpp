@@ -11,6 +11,7 @@
 #include <csnode/datastream.hpp>
 #include <csnode/fee.hpp>
 #include <csnode/nodeutils.hpp>
+#include <csnode/blockvalidator.hpp>
 #include <solver/smartcontracts.hpp>
 
 #include <client/config.hpp>
@@ -34,7 +35,8 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
-, fee_(std::make_unique<cs::Fee>()) {
+, fee_(std::make_unique<cs::Fee>())
+, blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
 
   cs::Connector::connect(storage_.read_block_event(), this, &BlockChain::onReadFromDB);
   walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
@@ -104,6 +106,11 @@ bool BlockChain::isGood() const {
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
 {
+  if (!blockValidator_->validateBlock(block, BlockValidator::ValidationLevel::hashIntergrity,
+                                      BlockValidator::SeverityLevel::GreaterThanWarnings)) {
+    *should_stop = true;
+    return;
+  }
   if(!updateWalletIds(block, *walletsCacheUpdater_.get())) {
     cserror() << "Blockchain: updateWalletIds() failed on block #" << block.sequence();
     *should_stop = true;

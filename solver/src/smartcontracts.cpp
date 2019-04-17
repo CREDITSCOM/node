@@ -445,7 +445,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
     for (const auto& u : queue_item.uses) {
       if (!in_known_contracts(u)) {
         cslog() << log_prefix << "call to unknown contract declared in executing item, stop execution";
-        exe_queue.erase(exe_queue.cend() - 1);
+        exe_queue.pop_back();
         return;
       }
     }
