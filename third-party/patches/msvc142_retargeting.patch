@@ -1,0 +1,6 @@
+diff --git a/third-party/libsodium b/third-party/libsodium
+--- a/third-party/libsodium
++++ b/third-party/libsodium
+@@ -1 +1 @@
+-Subproject commit b732443c442239c2e0184820e9b23cca0de0828c
++Subproject commit b732443c442239c2e0184820e9b23cca0de0828c-dirty
