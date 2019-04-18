@@ -33,6 +33,8 @@ const unsigned MAX_CONFIDANTS = 100;
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
 
+bool Node::stopRequested_ = false;
+
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
@@ -2762,4 +2764,9 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     //TODO: examine what will be done without this function
     blockChain_.removeLastBlock();
   }
+}
+
+/*static*/
+void Node::requestStop() {
+  stopRequested_ = true;
 }

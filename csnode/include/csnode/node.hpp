@@ -43,6 +43,8 @@ public:
   void stop();
   void runSpammer();
 
+  static void requestStop();
+
   std::string getSenderText(const cs::PublicKey& sender);
 
   // incoming requests processing
@@ -298,7 +300,7 @@ private:
   const cs::PrivateKey nodeIdPrivate_;
   bool good_ = true;
 
-  bool stopRequested_{ false };
+  static bool stopRequested_;
 
   // file names for crypto public/private keys
   inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
