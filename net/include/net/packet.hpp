@@ -252,7 +252,6 @@ private:
   }
 
 private:
-  friend class Network;
   RegionPtr data_;
 
   mutable bool hashed_ = false;
