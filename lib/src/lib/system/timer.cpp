@@ -13,11 +13,12 @@ cs::Timer::~Timer() {
   }
 }
 
-void cs::Timer::start(int msec, Type type) {
+void cs::Timer::start(int msec, Type type, RunPolicy policy) {
   interruption_ = false;
   isRunning_ = true;
 
   type_ = type;
+  policy_.store(policy, std::memory_order_release);
 
   ms_ = std::chrono::milliseconds(msec);
   ns_ = 0;
@@ -41,7 +42,7 @@ void cs::Timer::restart() {
   if (isRunning_) {
     if (type_ == Type::Standard) {
       stop();
-      start(static_cast<int>(ms_.count()));
+      start(static_cast<int>(ms_.count()), type_, policy_);
     }
     else {
       ns_ = 0;
@@ -57,8 +58,8 @@ cs::Timer::Type cs::Timer::type() const {
   return type_;
 }
 
-void cs::Timer::singleShot(int msec, cs::RunPolicy policy, const cs::TimerCallback& callback) {
-    cs::Concurrent::runAfter(std::chrono::milliseconds(msec), policy, callback);
+void cs::Timer::singleShot(int msec, cs::RunPolicy policy, cs::TimerCallback callback) {
+  cs::Concurrent::runAfter(std::chrono::milliseconds(msec), policy, std::move(callback));
 }
 
 cs::TimerPtr cs::Timer::create() {
@@ -75,12 +76,13 @@ void cs::Timer::loop() {
     std::this_thread::sleep_for(ms_);
 
     rehabilitation();
-
-    emit timeOut();
+    call();
   }
 }
 
 void cs::Timer::preciseLoop() {
+  size_t counter = 0;
+  static constexpr size_t maxCount = 10;
   std::chrono::high_resolution_clock::time_point previousTimePoint = std::chrono::high_resolution_clock::now();
 
   while (!interruption_) {
@@ -92,13 +94,16 @@ void cs::Timer::preciseLoop() {
 
     if (needMsInNs.count() <= ns_) {
       ns_ = 0;
-
-      emit timeOut();
+      call();
     }
 
-    // recalc
     previousTimePoint = now;
-    std::this_thread::yield();
+    ++counter;
+
+    if (counter >= maxCount) {
+      counter = 0;
+      std::this_thread::yield();
+    }
   }
 }
 
@@ -120,5 +125,18 @@ void cs::Timer::rehabilitation() {
         ms_ = realMs_;
       }
     }
+  }
+}
+
+void cs::Timer::call() {
+  auto policy = policy_.load(std::memory_order_acquire);
+
+  if (policy == RunPolicy::ThreadPolicy) {
+    emit timeOut();
+  }
+  else {
+    CallsQueue::instance().insert([=] {
+      emit timeOut();
+    });
   }
 }

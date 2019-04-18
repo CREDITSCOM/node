@@ -140,7 +140,6 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
   boost::system::error_code lastError;
   size_t size = 0;
   size_t encodedSize = 0;
-
   uint32_t cnt = 0;
 
   // net code was built on this constant (Packet::MaxSize)
@@ -148,9 +147,9 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
   char packetBuffer[Packet::MaxSize];
   boost::asio::mutable_buffer encodedPacket = task->pack.encode(buffer(packetBuffer, sizeof(packetBuffer)));
   encodedSize = encodedPacket.size();
+
   do {
     size = sock.send_to(encodedPacket, ep, NO_FLAGS, lastError);
-
     if (++cnt == 10) {
       cnt = 0;
       std::this_thread::yield();
@@ -208,7 +207,6 @@ void Network::writerRoutine(const Config& config) {
     struct mmsghdr *messages = msg.data();
     do {
       sended = sendmmsg(sock->native_handle(), messages, tasks, 0);
-      if (sended < 0) continue;
       messages += sended;
       tasks -= sended;
     } while (tasks);
@@ -347,10 +345,10 @@ inline void Network::processTask(TaskPtr<IPacMan> &task) {
 void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
   auto qePtr = oPacMan_.allocNext();
 
-  qePtr->endpoint = ep;
-  qePtr->pack = p;
+  qePtr->element.endpoint = ep;
+  qePtr->element.pack = p;
 
-  oPacMan_.enQueueLast();
+  oPacMan_.enQueueLast(qePtr);
 #ifdef __linux__
   static uint64_t one = 1;
   write(writerEventfd_, &one, sizeof(uint64_t));

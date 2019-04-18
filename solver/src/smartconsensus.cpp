@@ -599,28 +599,28 @@ namespace cs{
 
   void SmartConsensus::startTimer(int st)
   {
-    csmeta(csdebug) << "start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
+    csdebug() << log_prefix << "start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
     timeoutStageCounter_ = st;
     timeout_request_stage.start(
       psmarts_->getScheduler(), Consensus::T_stage_request,
       // timeout #1 handler:
       [this, st]() {
-        csdebug() << __func__ << "(): timeout for stages-" << st << " is expired, make requests";
+        csdebug() << log_prefix << "(): timeout for stages-" << st << " is expired, make requests";
         requestSmartStages(st);
         // start subsequent track timeout for "wide" request
-        csdebug() << __func__ << "(): start subsequent track timeout " << Consensus::T_stage_request
+        csdebug() << log_prefix << "(): start subsequent track timeout " << Consensus::T_stage_request
           << " ms to request neighbors about stages-" << st;
         timeout_request_neighbors.start(
           psmarts_->getScheduler(), Consensus::T_stage_request,
           // timeout #2 handler:
           [this, st]() {
-            csdebug() << __func__ << "(): timeout for requested stages-" << st << " is expired, make requests to neighbors";
+            csdebug() << log_prefix << "(): timeout for requested stages-" << st << " is expired, make requests to neighbors";
             requestSmartStagesNeighbors(st);
             // timeout #3 handler
             timeout_force_transition.start(
               psmarts_->getScheduler(), Consensus::T_stage_request,
               [this, st]() {
-                csdebug() << __func__ << "(): timeout for transition is expired, mark silent nodes as no stage-" << st;
+                csdebug() << log_prefix << "(): timeout for transition is expired, mark silent nodes as no stage-" << st;
                 markSmartOutboundNodes(st);
               },
               true/*replace if exists*/, timer_tag());
@@ -765,8 +765,8 @@ namespace cs{
         break;
       }
     }
-    if (find) {
-      csdebug() << "SmartConsensus: make stage-1 [" << static_cast<int>(from) << "] as silent";
+    if (!find) {
+      csdebug() << log_prefix << "make stage-1 [" << static_cast<int>(from) << "] as silent";
       cs::StageOneSmarts fake;
       init_zero(fake);
       fake.sender = from;
@@ -782,8 +782,8 @@ namespace cs{
         break;
       }
     }
-    if (find) {
-      csdebug() << "SmartConsensus: make stage-2 [" << static_cast<int>(from) << "] as silent";
+    if (!find) {
+      csdebug() << log_prefix << "make stage-2 [" << static_cast<int>(from) << "] as silent";
       cs::StageTwoSmarts fake;
       init_zero(fake);
       fake.sender = from;

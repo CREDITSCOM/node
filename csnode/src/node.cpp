@@ -42,6 +42,8 @@ Node::Node(const Config& config)
 , ostream_(&packStreamAllocator_, nodeIdKey_)
 , stat_() {
 
+  std::fill(ssKey_.begin(), ssKey_.end(), 0);
+
   solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
   std::cout << "Start transport... ";
   transport_ = new Transport(config, this);
@@ -342,7 +344,7 @@ void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
   cswarning() << "NODE> Get stop request, node will be closed...";
 
   cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, cs::RunPolicy::CallQueuePolicy, [this] {
-    stop();
+    stopRequested_ = true;
   });
 }
 
@@ -353,6 +355,10 @@ bool Node::canBeTrusted() {
   return false;
 
 #else
+
+  if (stopRequested_) {
+    return false;
+  }
 
   if (Consensus::DisableTrustedRequestNextRound) {
     // ignore flag after bigbang
@@ -2556,6 +2562,10 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
   if (!found) {
     myLevel_ = Level::Normal;
+    if (stopRequested_) {
+      stop();
+      return;
+    }
   }
 
   // TODO: think how to improve this code.

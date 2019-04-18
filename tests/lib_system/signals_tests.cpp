@@ -147,7 +147,7 @@ TEST(Signals, MoveTest) {
 
   cs::Signal<void()> signal2 = std::move(signal1);
 
-  cs::Timer::singleShot(1000, cs::RunPolicy::ThreadPoolPolicy, [&] {
+  cs::Timer::singleShot(1000, cs::RunPolicy::ThreadPolicy, [&] {
     std::cout << "Calling signal2\n";
     emit signal2();
     std::cout << "Signal2 called\n";

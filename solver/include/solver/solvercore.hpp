@@ -312,8 +312,6 @@ private:
 
   // tracks round info missing ("last hope" tool)
   TimeoutTracking track_next_round;
-  std::vector<cs::SmartConsensus> smartProcesses_;
-  const size_t simultaneuosSmartsNumber_ = 20;
 };
 
 }  // namespace slv2

@@ -894,6 +894,11 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
   oPackStream_ << lastBlock << canBeTrusted << myPublicKey_ << lastHash_;
 
   sendDirect(oPackStream_.getPackets(), conn);
+#else
+  csunused(task);
+  csunused(lastBlock);
+  csunused(lastHash);
+  csunused(canBeTrusted);
 #endif
   return true;
 }
@@ -1046,7 +1051,7 @@ void Transport::requestMissing(const cs::Hash& hash, const uint16_t start, const
   }
 }
 
-void Transport::registerMessage(MessagePtr& msg) {
+void Transport::registerMessage(MessagePtr msg) {
   cs::Lock lock(uLock_);
   uncollected_.emplace(msg);
 }

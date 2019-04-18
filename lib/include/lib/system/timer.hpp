@@ -20,8 +20,7 @@ using TimerPtr = std::shared_ptr<Timer>;
 
 ///
 /// Represents standard timer that calls callbacks every msec with time correction.
-///
-/// @brief Timer uses callback in another thread.
+/// @brief Timer emits time out signal by run policy.
 ///
 class Timer {
 public:
@@ -29,7 +28,7 @@ public:
     RangeDeltaInPercents = 10
   };
 
-  enum class Type {
+  enum class Type : cs::Byte {
     Standard,
     HighPrecise
   };
@@ -37,57 +36,30 @@ public:
   Timer();
   ~Timer();
 
-  ///
-  /// @brief Starts timer with milliseconds period.
-  /// @param msec is time in msec to tick.
-  /// @param type is timer type to use.
-  ///
-  void start(int msec, Type type = Type::Standard);
-
-  ///
-  /// @brief Stops timer.
-  /// @brief Timer would not stop immediatly if it's type is Standard, only after thread joined.
-  /// @brief If timer type is HighPrecise it stops immediatly.
-  ///
+  void start(int msec, Type type = Type::Standard, RunPolicy policy = RunPolicy::ThreadPolicy);
   void stop();
-
-  ///
-  /// @brief Restars timer.
-  ///
   void restart();
 
-  ///
-  /// @brief Returns timer status.
-  ///
   bool isRunning() const;
-
-  ///
-  /// @brief Returns current timer type.
-  ///
   Type type() const;
 
-  ///
-  /// @brief Calls callback once in another thread after msec time.
-  /// @param msec is time in msec to tick.
-  /// @param callback is any functor, lambda, closure, function object.
-  ///
-  static void singleShot(int msec, cs::RunPolicy policy, const TimerCallback& callback);
-
-  // creates and returns ptr on timer
+  static void singleShot(int msec, cs::RunPolicy policy, TimerCallback callback);
   static TimerPtr create();
 
 public signals:
 
-  /// generates when timer ticks
+  // generates when timer ticks
   TimeOutSignal timeOut;
 
 protected:
+
   // timer main loop
   void loop();
   void preciseLoop();
 
   // timer rehabilitation when timer degradate
   void rehabilitation();
+  void call();
 
 private:
   bool isRunning_;
@@ -96,6 +68,7 @@ private:
 
   std::thread timerThread_;
   Type type_;
+  std::atomic<RunPolicy> policy_;
 
   unsigned int allowDifference_;
   std::chrono::milliseconds ms_;

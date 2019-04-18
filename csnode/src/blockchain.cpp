@@ -11,6 +11,7 @@
 #include <csnode/datastream.hpp>
 #include <csnode/fee.hpp>
 #include <csnode/nodeutils.hpp>
+#include <csnode/blockvalidator.hpp>
 #include <solver/smartcontracts.hpp>
 
 #include <client/config.hpp>
@@ -34,7 +35,8 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
-, fee_(std::make_unique<cs::Fee>()) {
+, fee_(std::make_unique<cs::Fee>())
+, blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
 
   cs::Connector::connect(storage_.read_block_event(), this, &BlockChain::onReadFromDB);
   walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
@@ -104,7 +106,8 @@ bool BlockChain::isGood() const {
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
 {
-  if(!validateBlock(block)) {
+  if (!blockValidator_->validateBlock(block, BlockValidator::ValidationLevel::hashIntergrity,
+                                      BlockValidator::SeverityLevel::greaterThanWarnings)) {
     *should_stop = true;
     return;
   }
@@ -133,44 +136,6 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
 #endif
     }
   }
-}
-
-bool BlockChain::validateBlock(const csdb::Pool& block, bool fullValidation) {
-  if (block.sequence() == 0) {
-    return true;
-  }
-
-  // check hash integrity
-  {
-    auto prev_hash = block.previous_hash();
-    auto prev_block = loadBlock(prev_hash);
-    auto data = prev_block.to_binary();
-    auto counted_prev_hash = csdb::PoolHash::calc_from_data(cs::Bytes(data.data(), data.data() + prev_block.hashingLength()));
-    if (prev_hash != counted_prev_hash) {
-      cserror() << __func__ << ": prev pool's hash != real prev pool's hash";
-      return false;      
-    }
-  }
-
-  if (!fullValidation) {
-    return true;
-  }
-
-  // TODO check
-  //
-  // for block:
-  // 1. sequence
-  // 2. timestamp
-  // 3. trusted signatures according to real trusted mask
-  // 4. smart source trxs signatures
-  // 5. wallets' balances after writing block
-  //
-  // for trxs:
-  // 1. all complex of IterValidator activities
-  //    including signatures validation, fee counting,
-  //    balance check, graph validation
-
-  return true;
 }
 
 bool BlockChain::postInitFromDB() {
