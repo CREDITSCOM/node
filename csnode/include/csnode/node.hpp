@@ -298,6 +298,8 @@ private:
   const cs::PrivateKey nodeIdPrivate_;
   bool good_ = true;
 
+  bool stopRequested_{ false };
+
   // file names for crypto public/private keys
   inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
   inline const static std::string publicKeyFileName_ = "NodePublic.txt";
