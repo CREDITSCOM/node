@@ -64,22 +64,23 @@ bool Fee::TakeDecisionOnCacheUpdate(const BlockChain& blockchain) {
 }
 
 void Fee::SetCountedFee(Transactions& transactions, const Bytes& characteristicMask) {
-  auto maskSize = characteristicMask.size();
-  if (!maskSize) {
-    for (auto& transaction : transactions) {
-      size_t size_of_transaction = transaction.to_byte_stream().size();
-      double counted_fee = one_byte_cost_ * size_of_transaction;
-      transaction.set_counted_fee(csdb::AmountCommission(std::max(kMinFee, counted_fee)));
-    }
-  } else {
-    assert(transactions.size() == maskSize);
-    for (size_t i = 0; i < transactions.size(); ++i) {
-      if (i < maskSize && characteristicMask[i] == kValidMarker) {
-        size_t size_of_transaction = transactions[i].to_byte_stream().size();
-        double counted_fee = one_byte_cost_ * size_of_transaction;
-        transactions[i].set_counted_fee(csdb::AmountCommission(std::max(kMinFee, counted_fee)));
+  const size_t maskSize = characteristicMask.size();
+  size_t i = 0;
+  for (auto& transaction : transactions) {
+    if (maskSize != 0) {
+      if (i < maskSize && characteristicMask[i] != kValidMarker) {
+        continue;
       }
-    }  
+    }
+    size_t size_of_transaction = transaction.to_byte_stream().size();
+    double counted_fee = one_byte_cost_ * size_of_transaction;
+    double max_comission = kFixedOneByteFee * size_of_transaction;
+    if (counted_fee > max_comission) {
+      csdebug() << "Fee> counted_fee " << counted_fee << " is restricted with max_comission value " << max_comission;
+      counted_fee = max_comission;
+    }
+    transaction.set_counted_fee(csdb::AmountCommission(std::max(kMinFee, counted_fee)));
+    ++i;
   }
 }
 
