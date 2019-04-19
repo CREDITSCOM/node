@@ -1,6 +1,7 @@
 #include <csnode/blockvalidatorplugins.hpp>
 
 #include <string>
+#include <algorithm>
 
 #include <csdb/pool.hpp>
 #include <csnode/blockchain.hpp>
@@ -11,6 +12,7 @@
 #include <csnode/walletsstate.hpp>
 #include <csdb/pool.hpp>
 #include <cscrypto/cscrypto.hpp>
+#include <smartcontracts.hpp>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -109,7 +111,7 @@ ValidationPlugin::ErrorType BlockSignaturesValidator::validateBlock(const csdb::
                                      signedData.data(),
                                      cscrypto::kHashSize)) {
         cserror() << log_prefix << "block " << block.sequence()
-                  << "has invalid signatures";
+                  << " has invalid signatures";
         return ErrorType::error;
       }
       ++checkingSignature;
@@ -119,8 +121,95 @@ ValidationPlugin::ErrorType BlockSignaturesValidator::validateBlock(const csdb::
   return ErrorType::noError;
 }
 
-ValidationPlugin::ErrorType SmartSourceSignaturesValidator::validateBlock(const csdb::Pool&) {
+ValidationPlugin::ErrorType SmartSourceSignaturesValidator::validateBlock(const csdb::Pool& block) {
+  const auto& transactions = block.transactions();
+  const auto& smartSignatures = block.smartSignatures();
+
+  if (smartSignatures.empty()) {
+    if (isNewStates(transactions)) {
+        cserror() << log_prefix << "no smart signatures in block "
+                  << block.sequence() << ", which contains new state";
+        return ErrorType::error;
+    }
+    return ErrorType::noError;
+  }
+
+  auto smartPacks = grepNewStatesPacks(transactions);
+
+  if (!checkSignatures(smartSignatures, smartPacks)) {
+    return ErrorType::error;
+  }
+
   return ErrorType::noError;
+}
+
+bool SmartSourceSignaturesValidator::checkSignatures(const SmartSignatures& sigs,
+                                                     const Packets& smartPacks) {
+  if (sigs.size() != smartPacks.size()) {
+    cserror() << log_prefix << "q-ty of smart signatures != q-ty of real smart packets"; 
+    return false;
+  }
+
+  for (const auto& pack : smartPacks) {
+    auto it = std::find_if(sigs.begin(), sigs.end(),
+                           [&pack, this] (const csdb::Pool::SmartSignature& s) -> bool {
+                           auto pubKeyAddr = getBlockChain().get_addr_by_type(pack.transactions()[0].source(),
+                                                                              BlockChain::ADDR_TYPE::PUBLIC_KEY);
+                           return pubKeyAddr.public_key() == s.smartKey; });
+
+    if (it == sigs.end()) {
+      cserror() << log_prefix << "no smart signatures for new state with key "
+                << pack.transactions()[0].source().to_string();
+      return false;
+    }
+
+    auto initPool = getBlockChain().loadBlock(it->smartConsensusPool);
+    const auto& confidants = initPool.confidants();
+    const auto& smartSignatures = it->signatures;
+    for (const auto& s : smartSignatures) {
+      if (s.first >= confidants.size()) {
+        cserror() << log_prefix << "smart signature validation: no conf with index "
+                  << s.first << " in init pool with sequence " << initPool.sequence();
+        return false;
+      }
+      if (!cscrypto::verifySignature(s.second, confidants[s.first], pack.hash().toBinary().data(), cscrypto::kHashSize)) {
+        cserror() << log_prefix << "incorrect signature of smart "
+                  << pack.transactions()[0].source().to_string() << " of confidant " << s.first
+                  << " from init pool with sequence " << initPool.sequence();
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+inline bool SmartSourceSignaturesValidator::isNewStates(const Transactions& trxs) {
+  for (const auto& t : trxs) {
+    if (SmartContracts::is_new_state(t)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Packets SmartSourceSignaturesValidator::grepNewStatesPacks(const Transactions& trxs) {
+  Packets res;
+  for (size_t i = 0; i < trxs.size(); ++i) {
+    if (SmartContracts::is_new_state(trxs[i])) {
+      cs::TransactionsPacket pack;
+      pack.addTransaction(trxs[i]);
+      std::for_each(trxs.begin() + i + 1, trxs.end(),
+          [&] (const csdb::Transaction& t) {
+            if (t.source() == trxs[i].source()) {
+              pack.addTransaction(t);
+            }
+          });
+      pack.makeHash();
+      res.push_back(pack);
+    }
+  }
+  return res;
 }
 
 ValidationPlugin::ErrorType BalanceChecker::validateBlock(const csdb::Pool&) {

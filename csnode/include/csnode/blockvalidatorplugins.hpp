@@ -1,7 +1,13 @@
 #ifndef BLOCK_VALIDATOR_PLUGINS_HPP
 #define BLOCK_VALIDATOR_PLUGINS_HPP
 
+#include <vector>
+
+#include <lib/system/common.hpp>
 #include <csnode/blockvalidator.hpp>
+#include <cscrypto/cryptotypes.hpp>
+#include <csdb/transaction.hpp>
+#include <csnode/transactionspacket.hpp>
 
 namespace cs {
 
@@ -49,8 +55,17 @@ public:
 
 class SmartSourceSignaturesValidator : public ValidationPlugin {
 public:
+  using Transactions = std::vector<csdb::Transaction>;
+  using SmartSignatures = std::vector<csdb::Pool::SmartSignature>;
+  using Packets = std::vector<cs::TransactionsPacket>;
+
   SmartSourceSignaturesValidator(BlockValidator& bv) : ValidationPlugin(bv) {}
   ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+  bool isNewStates(const Transactions&);
+  Packets grepNewStatesPacks(const Transactions&);
+  bool checkSignatures(const SmartSignatures&, const Packets&);
 };
 
 class BalanceChecker : public ValidationPlugin {
