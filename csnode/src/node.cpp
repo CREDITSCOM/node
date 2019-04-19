@@ -33,6 +33,8 @@ const unsigned MAX_CONFIDANTS = 100;
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
 
+bool Node::stopRequested_ = false;
+
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
@@ -55,20 +57,6 @@ Node::Node(const Config& config)
   cs::Connector::connect(&blockChain_.storeBlockEvent, &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort), &executor::Executor::onBlockStored);
   cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
 
-#ifdef NODE_API
-  std::cout << "Init API... ";
-  api_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
-    csconnector::Config {
-     config.getApiSettings().port,
-     config.getApiSettings().ajaxPort,
-     config.getApiSettings().executorPort,
-     config.getApiSettings().apiexecPort
-    });
-  std::cout << "Done\n";
-  cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
-  cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
-#endif // NODE_API
-
   good_ = init(config);
 }
 
@@ -87,6 +75,17 @@ bool Node::init(const Config& config) {
   cslog() << "Blockchain is ready, contains " << stat_.total_transactions() << " transactions";
 
 #ifdef NODE_API
+  std::cout << "Init API... ";
+  api_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
+	  csconnector::Config{
+	   config.getApiSettings().port,
+	   config.getApiSettings().ajaxPort,
+	   config.getApiSettings().executorPort,
+	   config.getApiSettings().apiexecPort
+	  });
+  std::cout << "Done\n";
+  cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
+  cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
   api_->run();
 #endif // NODE_API
 
@@ -347,7 +346,7 @@ void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
   cswarning() << "NODE> Get stop request, node will be closed...";
 
   cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, cs::RunPolicy::CallQueuePolicy, [this] {
-    stop();
+    stopRequested_ = true;
   });
 }
 
@@ -358,6 +357,10 @@ bool Node::canBeTrusted() {
   return false;
 
 #else
+
+  if (stopRequested_) {
+    return false;
+  }
 
   if (Consensus::DisableTrustedRequestNextRound) {
     // ignore flag after bigbang
@@ -2561,6 +2564,10 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
   if (!found) {
     myLevel_ = Level::Normal;
+    if (stopRequested_) {
+      stop();
+      return;
+    }
   }
 
   // TODO: think how to improve this code.
@@ -2754,4 +2761,9 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     //TODO: examine what will be done without this function
     blockChain_.removeLastBlock();
   }
+}
+
+/*static*/
+void Node::requestStop() {
+  stopRequested_ = true;
 }

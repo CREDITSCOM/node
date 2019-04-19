@@ -4,4 +4,4 @@ The Node processes and stores transactions, executes and confirms smart contract
 Written on C++.
 
 ## Version
-Current node version 4.2.407.3 CreditsNet 17.04.2019 20:00
+Current node version 4.2.407.4 CreditsNet 19.04.2019 13:00
