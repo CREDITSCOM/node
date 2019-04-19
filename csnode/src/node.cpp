@@ -55,20 +55,6 @@ Node::Node(const Config& config)
   cs::Connector::connect(&blockChain_.storeBlockEvent, &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort), &executor::Executor::onBlockStored);
   cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
 
-#ifdef NODE_API
-  std::cout << "Init API... ";
-  api_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
-    csconnector::Config {
-     config.getApiSettings().port,
-     config.getApiSettings().ajaxPort,
-     config.getApiSettings().executorPort,
-     config.getApiSettings().apiexecPort
-    });
-  std::cout << "Done\n";
-  cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
-  cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
-#endif // NODE_API
-
   good_ = init(config);
 }
 
@@ -87,6 +73,17 @@ bool Node::init(const Config& config) {
   cslog() << "Blockchain is ready, contains " << stat_.total_transactions() << " transactions";
 
 #ifdef NODE_API
+  std::cout << "Init API... ";
+  api_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
+	  csconnector::Config{
+	   config.getApiSettings().port,
+	   config.getApiSettings().ajaxPort,
+	   config.getApiSettings().executorPort,
+	   config.getApiSettings().apiexecPort
+	  });
+  std::cout << "Done\n";
+  cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
+  cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
   api_->run();
 #endif // NODE_API
 
