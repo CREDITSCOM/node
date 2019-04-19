@@ -69,25 +69,26 @@ Node::~Node() {
 }
 
 bool Node::init(const Config& config) {
-  if(!blockChain_.init(config.getPathToDB())) {
-    return false;
-  }
-  cslog() << "Blockchain is ready, contains " << stat_.total_transactions() << " transactions";
 
 #ifdef NODE_API
   std::cout << "Init API... ";
   api_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
-	  csconnector::Config{
-	   config.getApiSettings().port,
-	   config.getApiSettings().ajaxPort,
-	   config.getApiSettings().executorPort,
-	   config.getApiSettings().apiexecPort
-	  });
+    csconnector::Config{
+     config.getApiSettings().port,
+     config.getApiSettings().ajaxPort,
+     config.getApiSettings().executorPort,
+     config.getApiSettings().apiexecPort
+    });
   std::cout << "Done\n";
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
   cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
   api_->run();
 #endif // NODE_API
+
+  if(!blockChain_.init(config.getPathToDB())) {
+    return false;
+  }
+  cslog() << "Blockchain is ready, contains " << stat_.total_transactions() << " transactions";
 
   if (!transport_->isGood()) {
     return false;
