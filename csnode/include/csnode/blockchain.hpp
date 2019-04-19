@@ -122,7 +122,7 @@ public:
   // block cache
 
 public:
-  std::string getLastTimeStamp() const;
+
   /**
    * @fn    std::size_t BlockChain::getCachedBlocksSize() const;
    *

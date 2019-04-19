@@ -109,8 +109,6 @@ public:
   size_t stagesThree();
   bool stateFailed(Result res);
 
-  std::string chooseTimeStamp();
-
 
   /// <summary>   Adds a transaction passed to send pool </summary>
   ///
