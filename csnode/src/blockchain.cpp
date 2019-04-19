@@ -206,6 +206,18 @@ cs::Sequence BlockChain::getLastSequence() const {
   }
 }
 
+std::string BlockChain::getLastTimeStamp() const {
+  std::lock_guard<decltype(dbLock_)> l(dbLock_);
+
+  if (deferredBlock_.is_valid()) {
+    return deferredBlock_.user_field(0).value<std::string>();
+  }
+  else {
+    return getLastBlock().user_field(0).value<std::string>();
+  }
+}
+
+
 const std::string CHEAT_FILENAME = "__integr.seq";
 
 std::string prepareCheatData(std::string& path, const BlockHashes& bh) {

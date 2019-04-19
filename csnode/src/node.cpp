@@ -2416,9 +2416,22 @@ void Node::sendHash(cs::RoundNumber round) {
   }
 
   csdebug() << "NODE> Sending hash to ALL";
-  csdb::PoolHash spoiledHash = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
-  sendToConfidants(MsgTypes::BlockHash, round, subRound_, spoiledHash);
-  csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_);
+  cs::Bytes message;
+  cs::DataStream stream(message);
+  cs::Byte myTrustedSize = 0;
+  cs::Byte myRealTrustedSize = 0;
+  uint64_t timeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
+  csdebug() << "TimeStamp = " << std::to_string(timeStamp);
+  //if (cs::Conveyer::instance().currentRoundNumber() > 1) {
+  //  myTrustedSize = static_cast<uint8_t>(roundPackageList.back().poolMetaInfo().realTrustedMask.size());
+  //  myRealTrustedSize = cs::TrustedMask::trustedSize(roundPackageList.back().poolMetaInfo().realTrustedMask);
+  //}
+  csdb::PoolHash tmp = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
+  stream << tmp.to_binary() << myTrustedSize << myRealTrustedSize << timeStamp << round << subRound_;
+  cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+  cs::Bytes messageToSend(message.data(), message.data() + message.size() - sizeof(cs::RoundNumber) - sizeof(cs::Byte));
+  sendToConfidants(MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
+  csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_) << ", message: " << cs::Utils::byteStreamToHex(messageToSend);
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -2439,13 +2452,48 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     // TODO : Maybe return
   }
 
-  csdb::PoolHash tmp;
-  istream_ >> tmp;
+  cs::Bytes message;
+  cs::Signature signature;
+  istream_ >> message >> signature;
 
   if (!istream_.good() || !istream_.end()) {
     cswarning() << "NODE> bad hash packet format";
     return;
   }
+
+  cs::Bytes sHash;
+  cs::Byte trustedSize;
+  cs::Byte realTrustedSize;
+  uint64_t timeStamp;
+
+  cs::DataStream stream(message.data(), message.size());
+  stream >> sHash;
+  stream >> trustedSize;
+  stream >> realTrustedSize;
+  stream >> timeStamp;
+  uint64_t lastTimeStamp = std::atoll(getBlockChain().getLastTimeStamp().c_str());
+  uint64_t currentTimeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
+
+  csdebug() << "Got Hash message (" << sHash.size() << "): " << cs::Utils::byteStreamToHex(sHash.data(), sHash.size()) << " : " << static_cast<int>(trustedSize) << " - " << static_cast<int>(realTrustedSize);
+  csdebug() << "TimeStamp     = " << std::to_string(timeStamp);
+  uint64_t deltaStamp = currentTimeStamp - lastTimeStamp;
+  if (deltaStamp > Consensus::MaxTimeStampDelta) {
+    deltaStamp = Consensus::MaxTimeStampDelta;
+  }
+  if (timeStamp < lastTimeStamp || timeStamp > currentTimeStamp + deltaStamp / 2 * 3) {//here we just take the time inteerval 1.5 times larger than last round
+    csdebug() <<  "Our TimeStamp = " << std::to_string(currentTimeStamp) << " ... return" ;
+    return;
+  }
+  csdb::PoolHash tmp = csdb::PoolHash::from_binary(std::move(sHash));
+  cs::DataStream stream1(message);
+  stream1 << rNum << subRound;
+
+
+  if (!cscrypto::verifySignature(signature, sender, message.data(), message.size())) {
+    csdebug() << "Hash message signature is NOT VALID";
+    return;
+  }
+  csdebug() << "Hash message signature is  VALID";
 
   //csdb::PoolHash lastHash = blockChain_.getLastHash();
   //csdb::PoolHash spoiledHash = spoileHash(lastHash, sender);

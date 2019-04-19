@@ -198,6 +198,77 @@ bool SolverCore::stateFailed(Result res) {
 
 }
 
+std::string SolverCore::chooseTimeStamp() {
+  csdebug() << "start";
+  std::vector<long long int> stamps;
+  long long int lastTimeStamp = std::atoll(pnode->getBlockChain().getLastTimeStamp().c_str());
+  long long int tmp = 0;
+  long long int average = 0;
+  int sizeAve = 0;
+  for (auto& it : stageOneStorage) {
+    if (it.roundTimeStamp != "") {
+      tmp = std::atoll(it.roundTimeStamp.c_str());
+      csdebug() << "tmp = " << std::to_string(tmp) << " last time stamp = " << std::to_string(lastTimeStamp);
+      if (tmp > lastTimeStamp) {
+        stamps.push_back(tmp);
+        average += tmp;
+        ++sizeAve;
+      }
+    }
+  }
+  csdebug() << "start1";
+  if (sizeAve != 0) {
+    average = average / sizeAve;
+    csdebug() << "average = " << std::to_string(average);
+  }
+  else {
+    csdebug() << "denominator = 0";
+  }
+
+  int sizeAveNew = 0;
+  sizeAve = 0;
+  long long curAve;
+  long double sigma;
+  long long int sigmaInt;
+  long long int disp;
+  while (true) {
+    csdebug() << "start2";
+    disp = 0;
+    for (auto it : stamps) {
+      if (it != 0) {
+        disp += (it - average)*(it - average);
+      }
+    }
+    disp /= stamps.size();
+    curAve = average;
+    sigma = std::sqrtl(static_cast<long double>(disp));
+    sigmaInt = static_cast<long long int>(sigma);
+    csdebug() << "sigma = " << std::to_string(sigmaInt);
+    sizeAve = 0;
+    sizeAveNew = 0;
+    average = 0;
+    for (int i = 0; i < stamps.size(); ++i) {
+      if (stamps[i] != 0) {
+        if (stamps[i] > curAve + 3 * sigmaInt) {
+          stamps[i] = 0;
+        }
+        else {
+          average += stamps[i];
+          ++sizeAveNew;
+        }
+        ++sizeAve;
+      }
+    }
+    average /= sizeAveNew;
+    if (sizeAve == sizeAveNew) {
+      break;
+    }
+  }
+
+  csdebug() << "finish: " << std::to_string(average);
+  return std::to_string(average);
+}
+
 //void SolverCore::adjustTrustedCandidates(cs::Bytes mask, cs::PublicKeys& confidants) {
 //  for (int i = 0; i < mask.size(); ++i) {
 //    if (mask[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
@@ -226,8 +297,9 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes,
 
   // only for new consensus
   cs::PoolMetaInfo poolMetaInfo;
+  std::string timeStamp = chooseTimeStamp();
   poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
-  poolMetaInfo.timestamp = std::move(currentTimeStamp);
+  poolMetaInfo.timestamp = std::move(timeStamp);
   
   const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
   if (confirmation.has_value()) {
