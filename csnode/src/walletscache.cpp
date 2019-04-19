@@ -154,7 +154,7 @@ void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::T
 
 // ProcessorBase
 void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
-  const csdb::Pool::Transactions& transactions = pool.transactions();
+  csdb::Pool::Transactions& transactions = pool.transactions();
   csdb::Amount totalAmountOfCountedFee = 0;
 #ifdef MONITOR_NODE
   auto wrWall = pool.writer_public_key();
@@ -181,7 +181,8 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
   }
 #endif
 
-  for (auto itTrx = transactions.cbegin(); itTrx != transactions.cend(); ++itTrx) {
+  for (auto itTrx = transactions.begin(); itTrx != transactions.end(); ++itTrx) {
+	itTrx->set_time(pool.get_time());
     totalAmountOfCountedFee += load(*itTrx, blockchain);
     if (SmartContracts::is_new_state(*itTrx)) {
       fundConfidantsWalletsWithExecFee(*itTrx, blockchain);
