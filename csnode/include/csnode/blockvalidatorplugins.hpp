@@ -66,6 +66,10 @@ private:
   bool isNewStates(const Transactions&);
   Packets grepNewStatesPacks(const Transactions&);
   bool checkSignatures(const SmartSignatures&, const Packets&);
+
+  // tmp solution to pass validation,
+  // must be removed after fixes in consensus
+  csdb::Transaction switchCountedFee(const csdb::Transaction& newState);
 };
 
 class BalanceChecker : public ValidationPlugin {

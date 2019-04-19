@@ -10,6 +10,8 @@
 #include <csnode/itervalidator.hpp>
 #include <csnode/fee.hpp>
 #include <csnode/walletsstate.hpp>
+#include <csnode/walletscache.hpp>
+#include <csdb/amount_commission.hpp>
 #include <csdb/pool.hpp>
 #include <cscrypto/cscrypto.hpp>
 #include <smartcontracts.hpp>
@@ -152,10 +154,8 @@ bool SmartSourceSignaturesValidator::checkSignatures(const SmartSignatures& sigs
 
   for (const auto& pack : smartPacks) {
     auto it = std::find_if(sigs.begin(), sigs.end(),
-                           [&pack, this] (const csdb::Pool::SmartSignature& s) -> bool {
-                           auto pubKeyAddr = getBlockChain().get_addr_by_type(pack.transactions()[0].source(),
-                                                                              BlockChain::ADDR_TYPE::PUBLIC_KEY);
-                           return pubKeyAddr.public_key() == s.smartKey; });
+                           [&pack] (const csdb::Pool::SmartSignature& s) {
+                           return pack.transactions()[0].source().public_key() == s.smartKey; });
 
     if (it == sigs.end()) {
       cserror() << log_prefix << "no smart signatures for new state with key "
@@ -198,16 +198,31 @@ Packets SmartSourceSignaturesValidator::grepNewStatesPacks(const Transactions& t
   for (size_t i = 0; i < trxs.size(); ++i) {
     if (SmartContracts::is_new_state(trxs[i])) {
       cs::TransactionsPacket pack;
-      pack.addTransaction(trxs[i]);
+      pack.addTransaction(switchCountedFee(trxs[i]));
       std::for_each(trxs.begin() + i + 1, trxs.end(),
           [&] (const csdb::Transaction& t) {
             if (t.source() == trxs[i].source()) {
-              pack.addTransaction(t);
+              pack.addTransaction(switchCountedFee(t));
             }
           });
       pack.makeHash();
       res.push_back(pack);
     }
+  }
+  return res;
+}
+
+csdb::Transaction SmartSourceSignaturesValidator::switchCountedFee(const csdb::Transaction& t) {
+  auto initTrx = WalletsCache::findSmartContractInitTrx(t, getBlockChain());
+  if (!initTrx.is_valid()) {
+    cserror() << log_prefix << " no init transaction for smart source transaction in blockchain";
+    return t;
+  }
+  csdb::Transaction res(t.innerID(), t.source(), t.target(), t.currency(), t.amount(), t.max_fee(),
+                        initTrx.counted_fee(), t.signature());
+  auto ufIds = t.user_field_ids();
+  for (const auto& id : ufIds) {
+    res.add_user_field(id, t.user_field(id));
   }
   return res;
 }
