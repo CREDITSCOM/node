@@ -82,13 +82,16 @@ bool Node::init(const Config& config) {
   std::cout << "Done\n";
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
   cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
-  api_->run();
 #endif // NODE_API
 
   if(!blockChain_.init(config.getPathToDB())) {
     return false;
   }
   cslog() << "Blockchain is ready, contains " << stat_.total_transactions() << " transactions";
+
+#ifdef NODE_API
+  api_->run();
+#endif // NODE_API
 
   if (!transport_->isGood()) {
     return false;
@@ -271,7 +274,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   }
 
   // "hot" start
-  handleRoundMismatch(roundTable);
+  //handleRoundMismatch(roundTable);
 }
 
 // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
@@ -964,9 +967,9 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
       if (round > 1 && subRound_ == 0) {
         // not on the very start
         cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << ")";
-        cs::RoundTable emptyRoundTable;
-        emptyRoundTable.round = rNum;
-        handleRoundMismatch(emptyRoundTable);
+        //cs::RoundTable emptyRoundTable;
+        //emptyRoundTable.round = rNum;
+        //handleRoundMismatch(emptyRoundTable);
       }
 
       return MessageActions::Drop;
