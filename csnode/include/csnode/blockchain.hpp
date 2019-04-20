@@ -288,7 +288,7 @@ private:
   std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
   std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
   std::unique_ptr<cs::WalletsPools> walletsPools_;
-  mutable cs::SpinLock cacheMutex_;
+  mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
 #ifdef TRANSACTIONS_INDEX
   uint64_t total_transactions_count_ = 0;

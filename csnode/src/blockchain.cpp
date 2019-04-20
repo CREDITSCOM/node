@@ -107,7 +107,7 @@ bool BlockChain::isGood() const {
 void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop)
 {
   if (!blockValidator_->validateBlock(block, BlockValidator::ValidationLevel::hashIntergrity,
-                                      BlockValidator::SeverityLevel::GreaterThanWarnings)) {
+                                      BlockValidator::SeverityLevel::greaterThanWarnings)) {
     *should_stop = true;
     return;
   }

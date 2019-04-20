@@ -10,7 +10,8 @@
 
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
-  Transport::stop();
+  Node::requestStop();
+  //Transport::stop();
 }
 
 // Called periodically to poll the signal flag.
@@ -1051,7 +1052,7 @@ void Transport::requestMissing(const cs::Hash& hash, const uint16_t start, const
   }
 }
 
-void Transport::registerMessage(MessagePtr& msg) {
+void Transport::registerMessage(MessagePtr msg) {
   cs::Lock lock(uLock_);
   uncollected_.emplace(msg);
 }

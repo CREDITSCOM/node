@@ -714,7 +714,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     });
 
     if(new_state.empty()) {
-      SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+	  _return.status.code = ERROR_CODE;
+	  _return.status.message = "state is empty!";
       return;
     }
     else {
