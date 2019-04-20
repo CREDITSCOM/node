@@ -269,7 +269,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
   }
 
   // "hot" start
-  handleRoundMismatch(roundTable);
+  //handleRoundMismatch(roundTable);
 }
 
 // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
@@ -958,9 +958,9 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
       if (round > 1 && subRound_ == 0) {
         // not on the very start
         cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << ")";
-        cs::RoundTable emptyRoundTable;
-        emptyRoundTable.round = rNum;
-        handleRoundMismatch(emptyRoundTable);
+        //cs::RoundTable emptyRoundTable;
+        //emptyRoundTable.round = rNum;
+        //handleRoundMismatch(emptyRoundTable);
       }
 
       return MessageActions::Drop;
