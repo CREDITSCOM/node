@@ -133,6 +133,12 @@ struct CharacteristicMeta {
   cs::Bytes realTrusted;
 };
 
+struct RoundTableMessage {
+  cs::Bytes message;
+  cs::RoundNumber round = 0;
+  cs::PublicKey sender;
+};
+
 // meta storages
 using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;
 using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;

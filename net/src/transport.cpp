@@ -422,7 +422,7 @@ void Transport::processNodeMessage(const Message& msg) {
   auto type = msg.getFirstPack().getType();
   auto rNum = msg.getFirstPack().getRoundNum();
 
-  switch (node_->chooseMessageAction(rNum, type)) {
+  switch (node_->chooseMessageAction(rNum, type, msg.getFirstPack().getSender())) {
     case Node::MessageActions::Process:
       return dispatchNodeMessage(type, rNum, msg.getFirstPack(), msg.getFullData() + StrippedDataSize, msg.getFullSize() - StrippedDataSize);
     case Node::MessageActions::Postpone:
@@ -468,7 +468,7 @@ void Transport::processNodeMessage(const Packet& pack) {
   auto type = pack.getType();
   auto rNum = pack.getRoundNum();
 
-  switch (node_->chooseMessageAction(rNum, type)) {
+  switch (node_->chooseMessageAction(rNum, type, pack.getSender())) {
     case Node::MessageActions::Process:
       return dispatchNodeMessage(type, rNum, pack, pack.getMsgData() + StrippedDataSize, pack.getMsgSize() - StrippedDataSize);
     case Node::MessageActions::Postpone:

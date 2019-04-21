@@ -269,7 +269,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
 
     return;
   }
-
+  poolSynchronizer_->sync(rNum);
   // "hot" start
   //handleRoundMismatch(roundTable);
 }
@@ -899,7 +899,7 @@ void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequested
   ostream_.clear();
 }
 
-Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {
+Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type, const cs::PublicKey sender) {
   if (!good_) {
     return MessageActions::Drop;
   }
@@ -925,6 +925,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     case MsgTypes::TransactionsPacketReply:
     case MsgTypes::RoundTableRequest:
     case MsgTypes::RejectedContracts:
+    case MsgTypes::RoundPackRequest:
       return MessageActions::Process;
 
     default:
@@ -967,6 +968,8 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         //cs::RoundTable emptyRoundTable;
         //emptyRoundTable.round = rNum;
         //handleRoundMismatch(emptyRoundTable);
+        roundPackRequest(sender, rNum);
+        //TODO: roundTableRequest(cs::PublicKey respondent);
       }
 
       return MessageActions::Drop;
@@ -2383,6 +2386,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     //return;
   }
 
+  currentRoundTableMessage_.round = rNum;
+  currentRoundTableMessage_.sender = sender;
+  currentRoundTableMessage_.message = cs::Bytes(data ,data + size);
+
   cs::PacketsHashes hashes;
   roundStream >> hashes;
 
@@ -2418,6 +2425,9 @@ void Node::sendHash(cs::RoundNumber round) {
 
   csdebug() << "NODE> Sending hash to ALL";
   csdb::PoolHash spoiledHash = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
+  //if(round == 10 && myConfidantIndex_ == 1) {
+  //  round = round + 1000000000;
+  //}
   sendToConfidants(MsgTypes::BlockHash, round, subRound_, spoiledHash);
   csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_);
 }
@@ -2459,6 +2469,23 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
   //              << " DOES NOT MATCH to my value " << lastHash.to_string();
 
   //}
+}
+
+void Node::roundPackRequest(cs::PublicKey respondent, cs::RoundNumber round) {
+  csdebug() << "NODE> send request for round info  #" << round;
+  sendDefault(respondent, MsgTypes::RoundPackRequest, round);
+}
+
+void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
+  csdebug() << "NODE> getting roundPack request #" << rNum;
+  if (currentRoundTableMessage_.round = rNum && currentRoundTableMessage_.message.size()!=0) {
+    roundPackReply(sender);
+  }
+}
+
+void Node::roundPackReply(cs::PublicKey respondent) {
+  csdebug() << "NODE> sending roundPack reply to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
+  sendDefault(respondent, MsgTypes::RoundTable, currentRoundTableMessage_.round, currentRoundTableMessage_.message);
 }
 
 void Node::sendRoundTableRequest(uint8_t respondent) {

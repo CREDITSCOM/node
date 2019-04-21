@@ -59,6 +59,9 @@ public:
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
   void sendHash(cs::RoundNumber round);
   void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
+  void roundPackRequest(cs::PublicKey respondent, cs::RoundNumber round);
+  void getRoundPackRequest(const uint8_t * data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey & sender);
+  void roundPackReply(cs::PublicKey respondent);
   void sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respondent);
   void getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
 
@@ -170,7 +173,12 @@ public:
     Drop
   };
 
-  MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes);
+  /**
+   * @class   Node
+   *
+   * @brief   This function should filter the packages only using their roundNumber
+   */
+  MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes, const cs::PublicKey);
 
   const cs::PublicKey& getNodeIdKey() const {
     return nodeIdKey_;
@@ -384,6 +392,7 @@ private:
 
   // confirmation list
   cs::ConfirmationList confirmationList_;
+  cs::RoundTableMessage currentRoundTableMessage_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);
