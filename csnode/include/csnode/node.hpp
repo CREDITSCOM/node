@@ -226,6 +226,11 @@ public signals:
   SmartStageRequestSignal receivedSmartStageRequest;
   cs::Signal<void(const std::vector< std::pair<cs::Sequence, uint32_t> >&)> gotRejectedContracts;
 
+  static cs::Signal<void()> stopRequested;
+
+private slots:
+  void onStopRequested();
+
 public slots:
   void processTimer();
   void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
@@ -305,7 +310,7 @@ private:
   const cs::PrivateKey nodeIdPrivate_;
   bool good_ = true;
 
-  static bool stopRequested_;
+  bool stopRequested_ = false;
 
   // file names for crypto public/private keys
   inline const static std::string privateKeyFileName_ = "NodePrivate.txt";

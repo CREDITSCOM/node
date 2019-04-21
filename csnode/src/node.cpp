@@ -33,8 +33,6 @@ const unsigned MAX_CONFIDANTS = 100;
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
 
-bool Node::stopRequested_ = false;
-
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
@@ -57,6 +55,7 @@ Node::Node(const Config& config)
   cs::Connector::connect(&blockChain_.storeBlockEvent, &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort), &executor::Executor::onBlockStored);
   cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
 
+  cs::Connector::connect( &Node::stopRequested, this, &Node::onStopRequested );
   good_ = init(config);
 }
 
@@ -2748,6 +2747,25 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
 }
 
 /*static*/
+cs::Signal<void()> Node::stopRequested;
+
+/*static*/
 void Node::requestStop() {
+  /*signal*/ stopRequested();
+}
+
+void Node::onStopRequested() {
   stopRequested_ = true;
+  if( cs::Conveyer::instance().currentRoundNumber() == 0 ) {
+    stop();
+    return;
+  }
+  std::function<void()> proc = [ this, proc ]() {
+    if( myLevel_ != Level::Confidant ) {
+      stop();
+      return;
+    }
+    cs::Timer::singleShot( 1000, cs::RunPolicy::CallQueuePolicy, proc );
+  };
+  cs::Timer::singleShot( 1000, cs::RunPolicy::CallQueuePolicy, proc);
 }
