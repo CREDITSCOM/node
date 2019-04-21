@@ -833,9 +833,14 @@ void APIHandler::store_block_slot(const csdb::Pool&) {
 }
 
 void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
+  if( !pool.is_valid() ) {
+    return;
+  }
   auto pending_smart_transactions = lockedReference(this->pending_smart_transactions);
   pending_smart_transactions->last_pull_hash = pool.hash();
-
+  if( pending_smart_transactions->last_pull_sequence < pool.sequence() ) {
+    pending_smart_transactions->last_pull_sequence = pool.sequence();
+  }
   auto& trs = pool.transactions();
   for (auto i_tr = trs.rbegin(); i_tr != trs.rend(); ++i_tr) {
     auto& tr = *i_tr;
