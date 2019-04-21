@@ -81,13 +81,16 @@ bool Node::init(const Config& config) {
   std::cout << "Done\n";
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
   cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
-  api_->run();
 #endif // NODE_API
 
   if(!blockChain_.init(config.getPathToDB())) {
     return false;
   }
   cslog() << "Blockchain is ready, contains " << stat_.total_transactions() << " transactions";
+
+#ifdef NODE_API
+  api_->run();
+#endif // NODE_API
 
   if (!transport_->isGood()) {
     return false;
@@ -2755,17 +2758,15 @@ void Node::requestStop() {
 }
 
 void Node::onStopRequested() {
-  stopRequested_ = true;
-  if( cs::Conveyer::instance().currentRoundNumber() == 0 ) {
+  if( stopRequested_ ) {
     stop();
     return;
   }
-  std::function<void()> proc = [ this, proc ]() {
-    if( myLevel_ != Level::Confidant ) {
-      stop();
-      return;
-    }
-    cs::Timer::singleShot( 1000, cs::RunPolicy::CallQueuePolicy, proc );
-  };
-  cs::Timer::singleShot( 1000, cs::RunPolicy::CallQueuePolicy, proc);
+  stopRequested_ = true;
+  if( myLevel_ == Level::Confidant ) {
+    cslog() << "Node: wait until complete trusted role before exit";
+  }
+  else {
+    stop();
+  }
 }
