@@ -241,7 +241,7 @@ void Node::getKeySS(const cs::PublicKey& key)
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
   istream_.init(data, size);
-  if (!(cs::Conveyer::instance().currentRoundNumber() == 0 && rNum == 1)) {
+  if (cs::Conveyer::instance().currentRoundNumber() != 0) {
     csdebug() << "The RoundTable sent by SS doesn't correspond to the current RoundNumber";
     return;
   }
@@ -270,48 +270,6 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
     return;
   }
   poolSynchronizer_->sync(rNum);
-  // "hot" start
-  //handleRoundMismatch(roundTable);
-}
-
-// handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
-void Node::handleRoundMismatch(const cs::RoundTable& globalTable) {
-  csmeta(csdetails) << "round: " << globalTable.round;
-  const auto& localTable = cs::Conveyer::instance().currentRoundTable();
-
-  if (localTable.round == globalTable.round) {
-    // mismatch not confirmed
-    return;
-  }
-
-  // global round is behind local one
-  if (localTable.round > globalTable.round) {
-    // TODO: in case of bigbang, rollback round(s), then accept global_table, then start round again
-
-    if (localTable.round - globalTable.round == 1) {
-      csdebug() << "NODE> we are a one round forward, wait";
-      //csdebug() << "NODE> re-send last round info may help others to go to round #" << localTable.round;
-      //tryResendRoundTable(std::nullopt, localTable.round);  // broadcast round info
-    }
-    else {
-      // TODO: Test if we are in proper blockchain
-
-      // TODO: rollback local round to global one
-
-      cserror() << "NODE> round rollback (from #" << localTable.round << " to #" << globalTable.round
-                << " not implemented yet";
-    }
-    return;
-  }
-
-  // local round is behind global one
-  const auto last_block = blockChain_.getLastSequence();
-  if (last_block + cs::Conveyer::HashTablesStorageCapacity < globalTable.round) {
-    // activate pool synchronizer
-
-    poolSynchronizer_->sync(globalTable.round);
-    // no return, ask for next round info
-  }
 }
 
 void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {

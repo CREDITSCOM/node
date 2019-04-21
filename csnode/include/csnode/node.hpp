@@ -114,9 +114,6 @@ public:
   void addRoundSignature(const cs::StageThree& st3);
   //smart-contracts consensus stages sending and getting
 
-  // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
-  void handleRoundMismatch(const cs::RoundTable& global_table);
-
   // send request for next round info from trusted node specified by index in list
   void sendRoundTableRequest(uint8_t respondent);
 
