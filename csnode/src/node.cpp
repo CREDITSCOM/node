@@ -954,28 +954,6 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return MessageActions::Process;
   }
 
-  // outrunning packets of other types talk about round lag
-  if (rNum > round) {
-    if (rNum - round == 1) {
-      // wait for next round
-      return MessageActions::Postpone;
-    }
-    else {
-      // more then 1 round lag, request round info
-      if (round > 1 && subRound_ == 0) {
-        // not on the very start
-        cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << ")";
-        //cs::RoundTable emptyRoundTable;
-        //emptyRoundTable.round = rNum;
-        //handleRoundMismatch(emptyRoundTable);
-        roundPackRequest(sender, rNum);
-        //TODO: roundTableRequest(cs::PublicKey respondent);
-      }
-
-      return MessageActions::Drop;
-    }
-  }
-
   if (type == MsgTypes::RoundTableReply) {
     return (rNum >= round ? MessageActions::Process : MessageActions::Drop);
   }
@@ -1009,7 +987,27 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return type == MsgTypes::NewBlock ? MessageActions::Process : MessageActions::Drop;
   }
 
-  return (rNum == round ? MessageActions::Process : MessageActions::Postpone);
+  // outrunning packets mean round lag
+  if( rNum > round ) {
+    if( rNum - round == 1 ) {
+      // wait for next round
+      return MessageActions::Postpone;
+    }
+    else {
+      // more then 1 round lag, request round info
+      if( round > 1 && subRound_ == 0 ) {
+        // not on the very start
+        cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << ")";
+        roundPackRequest( sender, rNum );
+        //TODO: roundTableRequest(cs::PublicKey respondent);
+      }
+
+      return MessageActions::Drop;
+    }
+  }
+
+  // (rNum == round) => handle now
+  return MessageActions::Process;
 }
 
 inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
