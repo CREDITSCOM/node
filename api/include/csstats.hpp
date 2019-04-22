@@ -81,6 +81,8 @@ public:
 
   ~csstats();
 
+  void run();
+
 private:
   std::thread thread;
 
