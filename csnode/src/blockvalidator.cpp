@@ -1,8 +1,6 @@
 #include <csnode/blockvalidator.hpp>
 
 #include <csnode/blockchain.hpp>
-#include <csnode/itervalidator.hpp>
-#include <csnode/fee.hpp>
 #include <csnode/walletsstate.hpp>
 
 #include <csnode/blockvalidatorplugins.hpp>
@@ -11,9 +9,7 @@ namespace cs {
 
 BlockValidator::BlockValidator(const BlockChain& bc)
     : bc_(bc),
-      feeCounter_(::std::make_shared<Fee>()),
-      wallets_(::std::make_shared<WalletsState>(bc_)),
-      iterValidator_(::std::make_shared<IterValidator>(*wallets_.get())) {
+      wallets_(::std::make_shared<WalletsState>(bc_)) {
   plugins_.push_back(std::make_unique<HashValidator>(*this));
   plugins_.push_back(std::make_unique<BlockNumValidator>(*this));
   plugins_.push_back(std::make_unique<TimestampValidator>(*this));
