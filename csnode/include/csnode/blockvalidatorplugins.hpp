@@ -7,6 +7,7 @@
 #include <csnode/blockvalidator.hpp>
 #include <cscrypto/cryptotypes.hpp>
 #include <csdb/transaction.hpp>
+#include <csdb/amount.hpp>
 #include <csnode/transactionspacket.hpp>
 
 namespace cs {
@@ -20,9 +21,7 @@ public:
 
 protected:
   const BlockChain& getBlockChain() { return blockValidator_.bc_; }
-  auto getFeeCounter() { return blockValidator_.feeCounter_; }
   auto getWallets() { return blockValidator_.wallets_; }
-  auto getIterValidator() { return blockValidator_.iterValidator_; }
   auto& getPrevBlock() { return blockValidator_.prevBlock_; }
 
 private:
@@ -72,10 +71,16 @@ private:
   csdb::Transaction switchCountedFee(const csdb::Transaction& newState);
 };
 
+///
+/// @brief check balances when prev block was added to blockchain
+///
 class BalanceChecker : public ValidationPlugin {
 public:
   BalanceChecker(BlockValidator& bv) : ValidationPlugin(bv) {}
   ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+  static constexpr csdb::Amount zeroBalance_ = 0;
 };
 
 class TransactionsChecker : public ValidationPlugin {

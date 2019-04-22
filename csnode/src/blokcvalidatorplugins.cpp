@@ -228,6 +228,25 @@ csdb::Transaction SmartSourceSignaturesValidator::switchCountedFee(const csdb::T
 }
 
 ValidationPlugin::ErrorType BalanceChecker::validateBlock(const csdb::Pool&) {
+  const auto& prevBlock = getPrevBlock();
+  if (prevBlock.transactions().empty()) {
+    return ErrorType::noError;
+  }
+
+  const auto& trxs = prevBlock.transactions();
+  auto wallets = getWallets();
+  wallets->updateFromSource();
+  for (const auto& t : trxs) {
+    WalletsState::WalletId id{};
+    const WalletsState::WalletData& wallState = wallets->getData(t.source(), id);
+    if (wallState.balance_ < zeroBalance_) {
+      cserror() << log_prefix << "error detected in pool " << prevBlock.sequence()
+                << ", wall address " << t.source().to_string()
+                << " has balance " << wallState.balance_.to_double();
+      return ErrorType::error;
+    }
+  }
+
   return ErrorType::noError;
 }
 
