@@ -2,13 +2,12 @@
 
 #include <string>
 #include <algorithm>
+#include <set>
 
 #include <csdb/pool.hpp>
 #include <csnode/blockchain.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/common.hpp>
-#include <csnode/itervalidator.hpp>
-#include <csnode/fee.hpp>
 #include <csnode/walletsstate.hpp>
 #include <csnode/walletscache.hpp>
 #include <csdb/amount_commission.hpp>
@@ -250,8 +249,45 @@ ValidationPlugin::ErrorType BalanceChecker::validateBlock(const csdb::Pool&) {
   return ErrorType::noError;
 }
 
-ValidationPlugin::ErrorType TransactionsChecker::validateBlock(const csdb::Pool&) {
+ValidationPlugin::ErrorType TransactionsChecker::validateBlock(const csdb::Pool& block) {
+  const auto& trxs = block.transactions();
+  std::set<csdb::Address> newStates;
+  for (const auto& t : trxs) {
+    if (SmartContracts::is_new_state(t)) {
+      // already checked by another plugin
+      newStates.insert(t.source());
+      continue;
+    }
+
+    auto it = std::find(newStates.begin(), newStates.end(), t.source());
+    if (it != newStates.end()) {
+      continue;
+    }
+
+    if (!checkSignature(t)) {
+      cserror() << log_prefix << " in pool " << block.sequence()
+                << " transaction from " << t.source().to_string()
+                << ", with innerID " << t.innerID()
+                << " has incorrect signature";
+      return ErrorType::error;
+    }
+  }
   return ErrorType::noError;
+}
+
+bool TransactionsChecker::checkSignature(const csdb::Transaction& t) {
+  if (t.source().is_wallet_id()) {
+    const auto& bc = getBlockChain();
+    BlockChain::WalletData dataToFetchPublicKey;
+    if (!bc.findWalletData(t.source().wallet_id(), dataToFetchPublicKey)) {
+      cserror() << log_prefix << "no public key for id "
+                << t.source().wallet_id() << " in blockchain";
+      return false;
+    }
+    return t.verify_signature(dataToFetchPublicKey.address_);
+  } else {
+    return t.verify_signature(t.source().public_key());
+  }
 }
 
 } // namespace cs

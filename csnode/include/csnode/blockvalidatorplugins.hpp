@@ -87,6 +87,9 @@ class TransactionsChecker : public ValidationPlugin {
 public:
   TransactionsChecker(BlockValidator& bv) : ValidationPlugin(bv) {}
   ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+  bool checkSignature(const csdb::Transaction&);
 };
 } // namespace cs
 #endif // BLOCK_VALIDATOR_PLUGINS_HPP
