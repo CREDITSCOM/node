@@ -59,10 +59,7 @@ private:
 
   friend class ValidationPlugin;
 
-  std::shared_ptr<Fee> feeCounter_;   
   std::shared_ptr<WalletsState> wallets_;
-  std::shared_ptr<IterValidator> iterValidator_;
-
   csdb::Pool prevBlock_;
 };
 } // namespace cs

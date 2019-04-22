@@ -372,8 +372,10 @@ namespace executor {
 
           const auto address = blockchain_.get_addr_by_type(trxn.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
           const auto newstate = trxn.user_field(-2).value<std::string>();
-          setLastState(address, newstate);
-          updateCacheLastStates(address, pool.sequence(), newstate);
+          if (!newstate.empty()) {
+            setLastState(address, newstate);
+            updateCacheLastStates(address, pool.sequence(), newstate);
+          }
         }
       }
     }

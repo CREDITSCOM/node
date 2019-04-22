@@ -306,9 +306,9 @@ void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
 
   cswarning() << "NODE> Get stop request, node will be closed...";
 
-  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, cs::RunPolicy::CallQueuePolicy, [this] {
-    stopRequested_ = true;
-  });
+  stopRequested_ = true;
+  // unconditional stop
+  stop();
 }
 
 bool Node::canBeTrusted() {
@@ -2759,6 +2759,7 @@ void Node::requestStop() {
 
 void Node::onStopRequested() {
   if( stopRequested_ ) {
+    // subsequent request is handled as unconditional stop
     stop();
     return;
   }
