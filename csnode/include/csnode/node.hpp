@@ -59,6 +59,9 @@ public:
   void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
   void sendHash(cs::RoundNumber round);
   void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
+  void roundPackRequest(cs::PublicKey respondent, cs::RoundNumber round);
+  void getRoundPackRequest(const uint8_t * data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey & sender);
+  void roundPackReply(cs::PublicKey respondent);
   void sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respondent);
   void getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
 
@@ -110,9 +113,6 @@ public:
       , cs::Signatures& poolSignatures);
   void addRoundSignature(const cs::StageThree& st3);
   //smart-contracts consensus stages sending and getting
-
-  // handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
-  void handleRoundMismatch(const cs::RoundTable& global_table);
 
   // send request for next round info from trusted node specified by index in list
   void sendRoundTableRequest(uint8_t respondent);
@@ -170,7 +170,12 @@ public:
     Drop
   };
 
-  MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes);
+  /**
+   * @class   Node
+   *
+   * @brief   This function should filter the packages only using their roundNumber
+   */
+  MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes, const cs::PublicKey);
 
   const cs::PublicKey& getNodeIdKey() const {
     return nodeIdKey_;
@@ -220,6 +225,11 @@ public signals:
   SmartsSignal<cs::StageThreeSmarts> gotSmartStageThree;
   SmartStageRequestSignal receivedSmartStageRequest;
   cs::Signal<void(const std::vector< std::pair<cs::Sequence, uint32_t> >&)> gotRejectedContracts;
+
+  static cs::Signal<void()> stopRequested;
+
+private slots:
+  void onStopRequested();
 
 public slots:
   void processTimer();
@@ -300,7 +310,7 @@ private:
   const cs::PrivateKey nodeIdPrivate_;
   bool good_ = true;
 
-  static bool stopRequested_;
+  bool stopRequested_ = false;
 
   // file names for crypto public/private keys
   inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
@@ -384,6 +394,7 @@ private:
 
   // confirmation list
   cs::ConfirmationList confirmationList_;
+  cs::RoundTableMessage currentRoundTableMessage_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

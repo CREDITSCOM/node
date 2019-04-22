@@ -671,7 +671,15 @@ cs::TransactionsPacketTable& cs::ConveyerBase::poolTable(cs::RoundNumber round) 
   return pimpl_->packetsTable;
 }
 
+namespace
+{
+  cs::Conveyer* view_conveyer = nullptr;
+}
+
 cs::Conveyer& cs::Conveyer::instance() {
   static cs::Conveyer conveyer;
+  if( view_conveyer == nullptr ) {
+    view_conveyer = &conveyer;
+  }
   return conveyer;
 }
