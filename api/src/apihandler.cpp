@@ -37,7 +37,9 @@ void APIHandler::run() {
   if (!s_blockchain.isGood())
     return;
 
+#ifdef MONITOR_NODE
   stats.run();
+#endif
   tm.run();  // Run this AFTER updating all the caches for maximal efficiency
 
   state_updater_running.test_and_set(std::memory_order_acquire);
