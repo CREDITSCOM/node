@@ -52,9 +52,9 @@ private:
   ip::udp::socket* getSocketInThread(const bool, const EndpointData&, std::atomic<ThreadStatus>&, const bool useIPv6);
 
   bool good_;
-  bool stopReaderRoutine = false;
-  bool stopWriterRoutine = false;
-  bool stopProcessorRoutine = false;
+  bool stopReaderRoutine_ = false;
+  bool stopWriterRoutine_ = false;
+  bool stopProcessorRoutine_ = false;
 
   io_context context_;
   ip::udp::resolver resolver_;
