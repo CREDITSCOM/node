@@ -98,10 +98,10 @@ void Network::readerRoutine(const Config& config) {
   boost::system::error_code lastError;
   size_t packetSize;
 
-  while (stopReaderRoutine == false) { // changed from true
+  while (stopReaderRoutine_ == false) { // changed from true
     auto& task = iPacMan_.allocNext();
 
-    if (stopReaderRoutine) {
+    if (stopReaderRoutine_) {
         return;
     }
 
@@ -179,7 +179,7 @@ void Network::writerRoutine(const Config& config) {
   std::vector<boost::asio::mutable_buffer> encoded_packets;
   std::vector<TaskPtr<OPacMan>> tasks_vector;
 #endif
-  while (stopWriterRoutine == false) { //changed from true
+  while (stopWriterRoutine_ == false) { //changed from true
 #ifdef __linux__
     uint64_t tasks;
     int s = read(writerEventfd_, &tasks, sizeof(uint64_t));
@@ -247,7 +247,7 @@ void Network::processorRoutine() {
    struct timespec timeout{0, 50000000}; // 50ms
 #endif
 
-  while (stopProcessorRoutine == false) {
+  while (stopProcessorRoutine_ == false) {
     externals.callAll();
 #ifdef __linux__
     uint64_t tasks;
@@ -520,19 +520,19 @@ void Network::registerMessage(Packet* pack, const uint32_t size) {
 }
 
 Network::~Network() {
-  stopReaderRoutine = true;
+  stopReaderRoutine_ = true;
 
   if (readerThread_.joinable()) {
     readerThread_.join();
   }
 
-  stopWriterRoutine = true;
+  stopWriterRoutine_ = true;
 
   if (writerThread_.joinable()) {
     writerThread_.join();
   }
 
-  stopProcessorRoutine = true;
+  stopProcessorRoutine_ = true;
 
   if (processorThread_.joinable()) {
     processorThread_.join();

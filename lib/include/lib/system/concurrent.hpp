@@ -91,8 +91,10 @@ public:
 protected:
   FutureBase() {
     ++producedId;
+
     id_ = producedId;
     state_ = WatcherState::Idle;
+    policy_ = RunPolicy::ThreadPolicy;
   }
 
   FutureBase(FutureBase&) = delete;
@@ -110,7 +112,7 @@ protected:
   , state_(watcher.state_) {
   }
 
-  FutureBase& operator=(FutureBase&& watcher) {
+  FutureBase& operator=(FutureBase&& watcher) noexcept {
     if (state_ == WatcherState::Running) {
       cserror() << csname() << "Trying to use operator= in watcher running state";
     }
@@ -232,7 +234,7 @@ public:
   ~FutureWatcher() = default;
   FutureWatcher(FutureWatcher&& watcher) = default;
 
-  FutureWatcher& operator=(FutureWatcher&& watcher) {
+  FutureWatcher& operator=(FutureWatcher&& watcher) noexcept {
     FutureBase<void>::operator=(std::move(watcher));
 
     watch();
