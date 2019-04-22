@@ -128,7 +128,7 @@ ValidationPlugin::ErrorType SmartSourceSignaturesValidator::validateBlock(const 
   const auto& smartSignatures = block.smartSignatures();
 
   if (smartSignatures.empty()) {
-    if (isNewStates(transactions)) {
+    if (containsNewState(transactions)) {
         cserror() << log_prefix << "no smart signatures in block "
                   << block.sequence() << ", which contains new state";
         return ErrorType::error;
@@ -184,7 +184,7 @@ bool SmartSourceSignaturesValidator::checkSignatures(const SmartSignatures& sigs
   return true;
 }
 
-inline bool SmartSourceSignaturesValidator::isNewStates(const Transactions& trxs) {
+inline bool SmartSourceSignaturesValidator::containsNewState(const Transactions& trxs) {
   for (const auto& t : trxs) {
     if (SmartContracts::is_new_state(t)) {
       return true;

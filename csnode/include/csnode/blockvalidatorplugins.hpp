@@ -63,7 +63,7 @@ public:
   ErrorType validateBlock(const csdb::Pool&) override;
 
 private:
-  bool isNewStates(const Transactions&);
+  bool containsNewState(const Transactions&);
   Packets grepNewStatesPacks(const Transactions&);
   bool checkSignatures(const SmartSignatures&, const Packets&);
 
