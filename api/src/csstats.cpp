@@ -243,10 +243,15 @@ AllStats csstats::collectAllStats(const Periods& periods) {
 csstats::csstats(BlockChain& blockchain)
 : blockchain(blockchain) {
   cstrace() << "STATS> csstats start " << "update interval is " << updateTimeSec << " sec";
-#ifndef STATS
-  return;
-#endif
+}
 
+void csstats::run() {
+
+#ifndef STATS
+  
+  return;
+
+#else
   ScopedLock lock(mutex);
 
   thread = std::thread([this]() {
@@ -277,9 +282,9 @@ csstats::csstats(BlockChain& blockchain)
           ss << s.poolsCount << " pools, " << s.transactionsCount;
           ss << " transactions";
 
-          cstrace() << "STATS> "  << ss.str();
+          cstrace() << "STATS> " << ss.str();
 #ifdef LOG_STATS_TO_FILE
-          cstrace() << "STATS> "  << ss.str();
+          cstrace() << "STATS> " << ss.str();
 
           ss.str(std::string());
 
@@ -289,8 +294,8 @@ csstats::csstats(BlockChain& blockchain)
           cstrace() << "STATS> " << ss.str();
 #endif
           for (auto& t : s.balancePerCurrency) {
-            cstrace() << "STATS> "  << "'" << t.first
-                      << "' = " << std::to_string(t.second.integral) << "." << std::to_string(t.second.fraction);
+            cstrace() << "STATS> " << "'" << t.first
+              << "' = " << std::to_string(t.second.integral) << "." << std::to_string(t.second.fraction);
           }
         }
 
@@ -303,8 +308,10 @@ csstats::csstats(BlockChain& blockchain)
       std::this_thread::sleep_for(std::chrono::seconds(updateTimeSec));
     }
 
-      cstrace()  << "STATS> csstats thread stopped";
-  });
+    cstrace() << "STATS> csstats thread stopped";
+    });
+
+#endif
 }
 
 csstats::~csstats() {
