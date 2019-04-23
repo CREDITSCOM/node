@@ -23,6 +23,7 @@ namespace {
 const char* log_prefix = "BlockValidator: ";
 const cs::Sequence kGapBtwNeighbourBlocks = 1;
 const csdb::user_field_id_t kTimeStampUserFieldNum = 0;
+const uint8_t kBlockVerToSwitchCountedFees = 0;
 } // namespace
 
 namespace cs {
@@ -135,7 +136,8 @@ ValidationPlugin::ErrorType SmartSourceSignaturesValidator::validateBlock(const 
     return ErrorType::noError;
   }
 
-  auto smartPacks = grepNewStatesPacks(transactions);
+  bool switchCountedFees = block.version() == kBlockVerToSwitchCountedFees;
+  auto smartPacks = grepNewStatesPacks(transactions, switchCountedFees);
 
   if (!checkSignatures(smartSignatures, smartPacks)) {
     return ErrorType::error;
@@ -192,16 +194,16 @@ inline bool SmartSourceSignaturesValidator::containsNewState(const Transactions&
   return false;
 }
 
-Packets SmartSourceSignaturesValidator::grepNewStatesPacks(const Transactions& trxs) {
+Packets SmartSourceSignaturesValidator::grepNewStatesPacks(const Transactions& trxs, bool switchFees) {
   Packets res;
   for (size_t i = 0; i < trxs.size(); ++i) {
     if (SmartContracts::is_new_state(trxs[i])) {
       cs::TransactionsPacket pack;
-      pack.addTransaction(switchCountedFee(trxs[i]));
+      pack.addTransaction(switchFees ? switchCountedFee(trxs[i]) : trxs[i]);
       std::for_each(trxs.begin() + i + 1, trxs.end(),
           [&] (const csdb::Transaction& t) {
             if (t.source() == trxs[i].source()) {
-              pack.addTransaction(switchCountedFee(t));
+              pack.addTransaction(switchFees ? switchCountedFee(t) : t);
             }
           });
       pack.makeHash();
