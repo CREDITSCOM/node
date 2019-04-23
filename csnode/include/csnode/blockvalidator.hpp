@@ -11,8 +11,6 @@ class BlockChain;
 namespace cs {
 
 class ValidationPlugin;
-class Fee;
-class IterValidator;
 class WalletsState; 
 
 class BlockValidator {
