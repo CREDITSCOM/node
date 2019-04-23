@@ -153,6 +153,12 @@ AllStats csstats::collectAllStats(const Periods& periods) {
 
   auto future_lastHash = blockchain.getLastHash();
 
+  static bool log_to_console = true;
+  size_t cnt = 0;
+  if (log_to_console) {
+    std::cout << "STATS> analizing blockchain...\n";
+  }
+
   while (!blockHash.is_empty() && !quit) {
     const csdb::Pool pool = blockchain.loadBlock(blockHash);
 
@@ -227,6 +233,16 @@ AllStats csstats::collectAllStats(const Periods& periods) {
     });
 
     blockHash = pool.previous_hash();
+
+    ++cnt;
+    if (log_to_console && (cnt % 1000) == 0) {
+      std::cout << '\r' << cnt;
+    }
+  }
+
+  if (log_to_console) {
+    std::cout << '\r' << cnt << "... Done\n";
+    log_to_console = false;
   }
 
   //lastHash = blockchain.getLastHash();
@@ -254,10 +270,12 @@ void csstats::run() {
 #else
   ScopedLock lock(mutex);
 
-  thread = std::thread([this]() {
+  AllStats allStats = collectAllStats(::csstats::collectionPeriods);
+
+  thread = std::thread([this, allStats]() {
     cstrace() << "STATS> csstats thread started";
 
-    AllStats allStats = collectAllStats(::csstats::collectionPeriods);
+    //AllStats allStats = collectAllStats(::csstats::collectionPeriods);
 
     currentStats = std::move(allStats.second);
     statsCut = std::move(allStats.first);
