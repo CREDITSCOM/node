@@ -118,7 +118,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   }
 
   void put(::csdb::priv::obstream& os, bool doHash) const {
-    os.put(static_cast<uint8_t>(0)); // version
+    os.put(version_);
     os.put(previous_hash_);
     os.put(sequence_);
 
@@ -199,8 +199,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
   }
 
   bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
-    uint8_t version;
-    if (!is.get(version)) {
+    if (!is.get(version_)) {
       csmeta(cswarning) << "get version is failed";
       return false;
     }
@@ -492,6 +491,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
     priv result;
 
     result.is_valid_ = is_valid_;
+    result.version_ = version_;
     result.read_only_ = read_only_;
     result.hash_ = hash_.clone();
     result.previous_hash_ = previous_hash_.clone();
@@ -528,6 +528,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
 
   bool is_valid_ = false;
   bool read_only_ = false;
+  uint8_t version_ = 0;
   PoolHash hash_;
   PoolHash previous_hash_;
   cs::Sequence sequence_ {};
@@ -566,6 +567,10 @@ bool Pool::is_valid() const noexcept {
 
 bool Pool::is_read_only() const noexcept {
   return d->read_only_;
+}
+
+uint8_t Pool::version() const noexcept {
+  return d->version_;
 }
 
 PoolHash Pool::hash() const noexcept {
@@ -735,6 +740,16 @@ const ::std::vector<csdb::Pool::SmartSignature>& Pool::smartSignatures() const n
 
 const csdb::Amount& Pool::roundCost() const noexcept {
   return d->roundCost_;
+}
+
+void Pool::set_version(uint8_t version) noexcept {
+  if (d.constData()->read_only_) {
+    return;
+  }
+
+  priv* data = d.data();
+  data->is_valid_ = true;
+  data->version_ = version;
 }
 
 void Pool::set_sequence(cs::Sequence seq) noexcept {
