@@ -403,9 +403,10 @@ namespace executor {
       state_update(pool);
     }
 
-    /*void onReadBlock(const csdb::Pool& block, bool* test_failed) {
-      update_smart_caches_once
-    }*/
+    void onReadBlock(const csdb::Pool& block, bool* test_failed) {
+      csunused(test_failed);
+      state_update(block);
+    }
 
   private:
     std::map<general::Address, general::AccessID> lockSmarts;
