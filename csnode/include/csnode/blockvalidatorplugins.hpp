@@ -63,11 +63,11 @@ public:
 
 private:
   bool containsNewState(const Transactions&);
-  Packets grepNewStatesPacks(const Transactions&);
+  Packets grepNewStatesPacks(const Transactions&, bool switchFees);
   bool checkSignatures(const SmartSignatures&, const Packets&);
 
-  // tmp solution to pass validation,
-  // must be removed after fixes in consensus
+  // must be performed if block version is 0
+  // to pass validation
   csdb::Transaction switchCountedFee(const csdb::Transaction& newState);
 };
 
