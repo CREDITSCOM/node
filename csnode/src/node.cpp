@@ -52,7 +52,11 @@ Node::Node(const Config& config)
 
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
   cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
-  cs::Connector::connect(&blockChain_.storeBlockEvent, &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort), &executor::Executor::onBlockStored);
+
+  auto ptr_exec = &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort);
+  cs::Connector::connect(&blockChain_.storeBlockEvent, ptr_exec, &executor::Executor::onBlockStored);
+  cs::Connector::connect(blockChain_.getStorage().read_block_event(), ptr_exec, &executor::Executor::onReadBlock);
+  
   cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
 
   cs::Connector::connect( &Node::stopRequested, this, &Node::onStopRequested );
