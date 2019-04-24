@@ -577,6 +577,34 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
   if (!transaction.userFields.empty())
     tr.add_user_field(1, transaction.userFields);
 
+  // check money
+  const auto source_addr = s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+  BlockChain::WalletData wallData{};
+  BlockChain::WalletId wallId{};
+  if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
+    _return.status.code = ERROR_CODE;
+    _return.status.message = "wallet not found!";
+    return;
+  }
+
+  const auto max_sum = tr.max_fee().to_double() + tr.amount().to_double();
+  const auto balance = wallData.balance_.to_double();
+  if (max_sum > balance) {
+    cslog() << "API: reject transaction with insufficient balance";
+    _return.status.code = ERROR_CODE;
+    _return.status.message = "not enough money!\nmax_sum: " + std::to_string(max_sum) + "\nbalance: " + std::to_string(balance);
+    return;
+  }
+
+  // check signature
+  const auto byteStream = tr.to_byte_stream_for_sig();
+  if (!cscrypto::verifySignature(tr.signature(), s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key(), byteStream.data(), byteStream.size())) {
+    cslog() << "API: reject transaction with wrong signature";
+    _return.status.code = ERROR_CODE;
+    _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+    return;
+  }
+
   solver.send_wallet_transaction(tr);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
@@ -618,7 +646,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
   const auto byteStream = send_transaction.to_byte_stream_for_sig();
   if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key(), byteStream.data(), byteStream.size())) {
     _return.status.code = ERROR_CODE;
-    _return.status.message = "wrong signature! ByteStream:" + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+    cslog() << "API: reject transaction with wrong signature";
+    _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
     return;
   }
   //
