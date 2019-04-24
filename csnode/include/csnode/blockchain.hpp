@@ -65,8 +65,8 @@ public:
         ID
     };
 
-    csdb::Address get_addr_by_type(const csdb::Address& addr, ADDR_TYPE type) const;
-    bool is_equal(const csdb::Address& laddr, const csdb::Address& raddr) const;
+    csdb::Address getAddressByType(const csdb::Address& addr, ADDR_TYPE type) const;
+    bool isEqual(const csdb::Address& laddr, const csdb::Address& raddr) const;
 
     static csdb::Address getAddressFromKey(const std::string&);
 
@@ -92,7 +92,7 @@ public:
      *            for future use and will be recorded on time
      */
 
-    bool storeBlock(csdb::Pool& pool, bool by_sync);
+    bool storeBlock(csdb::Pool& pool, bool bySync);
 
     /**
      * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool);
@@ -250,9 +250,9 @@ private:
     void logBlockInfo(csdb::Pool& pool);
 
     // Thread unsafe
-    bool finalizeBlock(csdb::Pool& pool, bool is_Trusted, cs::PublicKeys lastConfidants);
+    bool finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys lastConfidants);
 
-    void onReadFromDB(csdb::Pool block, bool* should_stop);
+    void onReadFromDB(csdb::Pool block, bool* shouldStop);
     bool postInitFromDB();
 
     template <typename WalletCacheProcessor>

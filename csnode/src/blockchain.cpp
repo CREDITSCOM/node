@@ -48,20 +48,21 @@ BlockChain::~BlockChain() {
 bool BlockChain::init(const std::string& path) {
     cslog() << "Trying to open DB...";
 
-    size_t total_loaded = 0;
+    size_t totalLoaded = 0;
     csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
-        ++total_loaded;
+        ++totalLoaded;
         if (progress.poolsProcessed % 1000 == 0) {
             std::cout << '\r' << progress.poolsProcessed << "";
         }
         return false;
     };
+
     if (!storage_.open(path, progress)) {
         cserror() << "Couldn't open database at " << path;
         return false;
     }
 
-    cslog() << "\rDB is opened, loaded " << total_loaded << " blocks";
+    cslog() << "\rDB is opened, loaded " << totalLoaded << " blocks";
 
     if (storage_.last_hash().is_empty()) {
         csdebug() << "Last hash is empty...";
@@ -102,20 +103,20 @@ bool BlockChain::isGood() const {
     return good_;
 }
 
-void BlockChain::onReadFromDB(csdb::Pool block, bool* should_stop) {
+void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
     if (!blockValidator_->validateBlock(block, BlockValidator::ValidationLevel::hashIntergrity, BlockValidator::SeverityLevel::greaterThanWarnings)) {
-        *should_stop = true;
+        *shouldStop = true;
         return;
     }
     if (!updateWalletIds(block, *walletsCacheUpdater_.get())) {
         cserror() << "Blockchain: updateWalletIds() failed on block #" << block.sequence();
-        *should_stop = true;
+        *shouldStop = true;
     }
     else {
         walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
         if (!blockHashes_->initFromPrevBlock(block)) {
             cserror() << "Blockchain: blockHashes_->initFromPrevBlock(block) failed on block #" << block.sequence();
-            *should_stop = true;
+            *shouldStop = true;
         }
         else {
 #ifdef TRANSACTIONS_INDEX
@@ -999,7 +1000,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     return std::make_optional(pool);
 }
 
-bool BlockChain::storeBlock(csdb::Pool& pool, bool by_sync) {
+bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     csdebug() << csfunc() << ":";
     const auto last_seq = getLastSequence();
     const auto pool_seq = pool.sequence();
@@ -1045,7 +1046,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool by_sync) {
         setTransactionsFees(pool);
 
         // update wallet ids
-        if (by_sync) {
+        if (bySync) {
             // ready-to-record block does not require anything
             csdebug() << "BLOCKCHAIN> store block #" << pool_seq << " to chain, update wallets ids";
             updateWalletIds(pool, *walletsCacheUpdater_);
@@ -1075,7 +1076,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool by_sync) {
     }
     // cache block for future recording
     csdebug() << "BLOCKCHAIN> cached block has " << pool.signatures().size();
-    cachedBlocks_.emplace(pool_seq, BlockMeta{pool, by_sync});
+    cachedBlocks_.emplace(pool_seq, BlockMeta{pool, bySync});
     csdebug() << "BLOCKCHAIN> cache block #" << pool_seq << " for future (" << cachedBlocks_.size() << " total)";
     cachedBlockEvent(pool_seq);
     // cache always successful
@@ -1194,7 +1195,7 @@ const csdb::Address& BlockChain::getGenesisAddress() const {
     return genesisAddress_;
 }
 
-csdb::Address BlockChain::get_addr_by_type(const csdb::Address& addr, ADDR_TYPE type) const {
+csdb::Address BlockChain::getAddressByType(const csdb::Address& addr, ADDR_TYPE type) const {
     csdb::Address addr_res{};
     switch (type) {
         case ADDR_TYPE::PUBLIC_KEY:
@@ -1210,8 +1211,8 @@ csdb::Address BlockChain::get_addr_by_type(const csdb::Address& addr, ADDR_TYPE 
     return addr_res;
 }
 
-bool BlockChain::is_equal(const csdb::Address& laddr, const csdb::Address& raddr) const {
-    if (get_addr_by_type(laddr, ADDR_TYPE::PUBLIC_KEY) == get_addr_by_type(raddr, ADDR_TYPE::PUBLIC_KEY))
+bool BlockChain::isEqual(const csdb::Address& laddr, const csdb::Address& raddr) const {
+    if (getAddressByType(laddr, ADDR_TYPE::PUBLIC_KEY) == getAddressByType(raddr, ADDR_TYPE::PUBLIC_KEY))
         return true;
     return false;
 }
@@ -1317,7 +1318,7 @@ void TransactionsIterator::setFromHash(const csdb::PoolHash& ph) {
             break;
 
         for (it_ = lapoo_.transactions().rbegin(); it_ != lapoo_.transactions().rend(); ++it_) {
-            if (bc_.is_equal(it_->source(), addr_) || bc_.is_equal(it_->target(), addr_)) {
+            if (bc_.isEqual(it_->source(), addr_) || bc_.isEqual(it_->target(), addr_)) {
                 found = true;
                 break;
             }
@@ -1341,7 +1342,7 @@ void TransactionsIterator::next() {
     bool found = false;
 
     while (++it_ != lapoo_.transactions().rend()) {
-        if (bc_.is_equal(it_->source(), addr_) || bc_.is_equal(it_->target(), addr_)) {
+        if (bc_.isEqual(it_->source(), addr_) || bc_.isEqual(it_->target(), addr_)) {
             found = true;
             break;
         }

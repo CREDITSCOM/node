@@ -223,7 +223,7 @@ public:
     void on_reject(const std::vector<std::pair<cs::Sequence, uint32_t>>& ref_list);
 
     csdb::Address absolute_address(const csdb::Address& optimized_address) const {
-        return bc.get_addr_by_type(optimized_address, BlockChain::ADDR_TYPE::PUBLIC_KEY);
+        return bc.getAddressByType(optimized_address, BlockChain::ADDR_TYPE::PUBLIC_KEY);
     }
 
     bool is_closed_smart_contract(const csdb::Address& addr) const {
