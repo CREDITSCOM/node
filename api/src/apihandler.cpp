@@ -569,7 +569,7 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
         tr.add_user_field(1, transaction.userFields);
 
   // check money
-  const auto source_addr = s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+  const auto source_addr = s_blockchain.getAddressByType(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
   BlockChain::WalletData wallData{};
   BlockChain::WalletId wallId{};
   if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
@@ -578,10 +578,10 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
     return;
   }
 
-  const auto max_sum = tr.max_fee().to_double() + tr.amount().to_double();
+  const auto max_sum = tr.amount().to_double() + kMinFee;
   const auto balance = wallData.balance_.to_double();
   if (max_sum > balance) {
-    cslog() << "API: reject transaction with insufficient balance";
+    cslog() << "API: reject transaction with insufficient balance, max_sum = " << max_sum << ", balance = " << balance;
     _return.status.code = ERROR_CODE;
     _return.status.message = "not enough money!\nmax_sum: " + std::to_string(max_sum) + "\nbalance: " + std::to_string(balance);
     return;
@@ -589,7 +589,7 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
 
   // check signature
   const auto byteStream = tr.to_byte_stream_for_sig();
-  if (!cscrypto::verifySignature(tr.signature(), s_blockchain.get_addr_by_type(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key(), byteStream.data(), byteStream.size())) {
+  if (!cscrypto::verifySignature(tr.signature(), s_blockchain.getAddressByType(tr.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key(), byteStream.data(), byteStream.size())) {
     cslog() << "API: reject transaction with wrong signature";
     _return.status.code = ERROR_CODE;
     _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
@@ -635,7 +635,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
   // check signature
   const auto byteStream = send_transaction.to_byte_stream_for_sig();
-  if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.get_addr_by_type(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key(), byteStream.data(), byteStream.size())) {
+  if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY).public_key(), byteStream.data(), byteStream.size())) {
     _return.status.code = ERROR_CODE;
     cslog() << "API: reject transaction with wrong signature";
     _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
@@ -1733,7 +1733,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
             for (auto& t : pool.transactions()) {
                 if (!is_smart(t))
                     continue;
-                auto tIt = tokenCodes.find(s_blockchain.get_addr_by_type(t.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY));
+                auto tIt = tokenCodes.find(s_blockchain.getAddressByType(t.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY));
                 if (tIt == tokenCodes.end())
                     continue;
                 const auto smart = fetch_smart(t);
@@ -1741,7 +1741,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
                     continue;
                 if (--offset >= 0)
                     continue;
-                csdb::Address target_pk = s_blockchain.get_addr_by_type(t.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+                csdb::Address target_pk = s_blockchain.getAddressByType(t.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
                 auto addrPair = TokensMaster::getTransferData(target_pk, smart.method, smart.params);
                 addTokenResult(_return, target_pk, tIt->second, pool, t, smart, addrPair, s_blockchain);
                 if (--limit == 0)
