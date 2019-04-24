@@ -198,7 +198,9 @@ void SmartConsensus::refreshSmartStagesStorage() {
 
     smartUntrusted.clear();
     smartUntrusted.resize(cSize);
-
+    smartConsensusMask.clear();
+    smartConsensusMask.resize(cSize);
+    std::fill(smartConsensusMask.begin(), smartConsensusMask.end(), cs::ConfidantConsts::InvalidConfidantIndex);
     std::fill(smartUntrusted.begin(), smartUntrusted.end(), 0);
     startTimer(1);
 }
@@ -218,6 +220,12 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
     if (smartStageOneStorage_.at(stage.sender).sender == stage.sender) {
         return;
     }
+    if (stage.hash != zeroHash) {
+        smartConsensusMask[stage.sender] = 0;
+    }
+    else {
+        smartConsensusMask[stage.sender] = 254;
+    }
     smartStageOneStorage_.at(stage.sender) = stage;
     std::string stagesPlot;
     for (size_t i = 0; i < smartConfidants_.size(); ++i) {
@@ -233,6 +241,12 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
         st2.sender = ownSmartsConfNum_;
         st2.id = id();
         addSmartStageTwo(st2, true);
+        size_t index = 0;
+        for (auto it : smartConsensusMask) {
+            if (it == 255 || it == 254) {
+                fake_stage2(index);
+            }
+        }
         startTimer(2);
     }
 }
@@ -244,7 +258,6 @@ void SmartConsensus::addSmartStageTwo(cs::StageTwoSmarts& stage, bool send) {
     if (send) {
         pnode_->sendSmartStageTwo(smartConfidants_, stage);
     }
-
     if (smartStageTwoStorage_.size() <= (size_t)stage.sender) {
         // normally unexpected
         return;
@@ -783,6 +796,27 @@ void SmartConsensus::fakeStage(uint8_t confIndex) {
 
 bool SmartConsensus::smartConfidantExist(uint8_t confidantIndex) {
     return confidantIndex < smartConfidants_.size();
+}
+
+static void sendFakeStageOne(Node* pnode, cs::PublicKeys confidants, cs::Byte confidantIndex, uint64_t smartId) {
+    cs::StageOneSmarts fake;
+    fake.sender = confidantIndex;
+    fake.hash.fill(0);
+    fake.id = smartId;
+    pnode->sendSmartStageOne(confidants, fake);
+}
+
+static void sendFakeStageTwo(Node* pnode, cs::PublicKeys confidants, cs::Byte confidantIndex, uint64_t smartId) {
+    cs::StageTwoSmarts fake;
+    fake.sender = confidantIndex;
+    size_t cnt = confidants.size();
+    cs::Hash zHash;
+    cs::Signature zSignature;
+    zHash.fill(0);
+    zSignature.fill(0);
+    fake.hashes.resize(cnt, zHash);
+    fake.signatures.resize(cnt, zSignature);
+    pnode->sendSmartStageTwo(confidants, fake);
 }
 
 }  // namespace cs
