@@ -5,7 +5,7 @@ Glance coding style guide description.
 ### Base concept
 
 - C++17 standard
-- 2 spaces
+- 4 spaces
 - only camelCase naming style
 
 ---
@@ -118,4 +118,4 @@ Glance coding style guide description.
 >BreakBeforeBraces: 'Custom'
 >BraceWrapping: { AfterEnum: true, BeforeElse: true, BeforeCatch: true }
 >MaxEmptyLinesToKeep: 1
->AccessModifierOffset: -2
+>AccessModifierOffset: -4

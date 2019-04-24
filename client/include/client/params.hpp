@@ -2,9 +2,9 @@
 #define PARAMS_HPP
 
 /**
-*  Please don't commit these three defines
-*  below uncommented.
-*/
+ *  Please don't commit these three defines
+ *  below uncommented.
+ */
 //#define MONITOR_NODE
 //#define WEB_WALLET_NODE
 //#define SPAMMER
@@ -18,14 +18,14 @@
 #define DEFAULT_CURRENCY 1
 
 #if defined(MONITOR_NODE) || defined(WEB_WALLET_NODE)
-  #define TRANSACTIONS_INDEX
-  #define TOKENS_CACHE
+#define TRANSACTIONS_INDEX
+#define TOKENS_CACHE
 #else
 //  #define SPAMMER
 #endif
 
 #ifdef MONITOR_NODE
-  #define STATS
+#define STATS
 #endif
 
 // diagnostic output & compatibility checks
@@ -39,7 +39,7 @@
 #if defined(SPAMMER)
 #error Incompatible macros defined: MONITOR_NODE & SPAMMER
 #endif
-//#pragma message ( "*** Building monitor node" ) 
+//#pragma message ( "*** Building monitor node" )
 
 #elif defined(WEB_WALLET_NODE)
 
@@ -49,7 +49,7 @@
 #if defined(SPAMMER)
 #error Incompatible macros defined: WEB_WALLET_NODE & SPAMMER
 #endif
-//#pragma message ( "*** Building web wallet node" ) 
+//#pragma message ( "*** Building web wallet node" )
 
 #elif defined(SPAMMER)
 
@@ -59,14 +59,14 @@
 #if defined(WEB_WALLET_NODE)
 #error Incompatible macros defined: SPAMMER & WEB_WALLET_NODE
 #endif
-//#pragma message ( "*** Building spammer node" ) 
+//#pragma message ( "*** Building spammer node" )
 
 #else
 
-//#pragma message ( "*** Building basic node" ) 
+//#pragma message ( "*** Building basic node" )
 
 #endif
 
-#endif // _MSC_VER
+#endif  // _MSC_VER
 
 #endif

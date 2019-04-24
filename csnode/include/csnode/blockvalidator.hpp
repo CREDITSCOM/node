@@ -1,8 +1,8 @@
 #ifndef BLOCK_VALIDATOR_HPP
 #define BLOCK_VALIDATOR_HPP
 
-#include <memory>
 #include <map>
+#include <memory>
 
 #include <csdb/pool.hpp>
 
@@ -11,56 +11,55 @@ class BlockChain;
 namespace cs {
 
 class ValidationPlugin;
-class WalletsState; 
+class WalletsState;
 
 class BlockValidator {
 public:
-  using ValidationFlags = uint32_t;
+    using ValidationFlags = uint32_t;
 
-  enum ValidationLevel : uint32_t {
-    noValidation = 0,
-    hashIntergrity = 1,
-    blockNum = 1 << 1,
-    timestamp = 1 << 2,
-    blockSignatures = 1 << 3,
-    smartSignatures = 1 << 4,
-    balances = 1 << 5,
-    transactionsSignatures = 1 << 6
-  };
+    enum ValidationLevel : uint32_t {
+        noValidation = 0,
+        hashIntergrity = 1,
+        blockNum = 1 << 1,
+        timestamp = 1 << 2,
+        blockSignatures = 1 << 3,
+        smartSignatures = 1 << 4,
+        balances = 1 << 5,
+        transactionsSignatures = 1 << 6
+    };
 
-  enum SeverityLevel : uint8_t {
-    warningsAsErrors = 1,
-    greaterThanWarnings,
-    onlyFatalErrors
-  };
+    enum SeverityLevel : uint8_t {
+        warningsAsErrors = 1,
+        greaterThanWarnings,
+        onlyFatalErrors
+    };
 
-  explicit BlockValidator(const BlockChain&);
-  ~BlockValidator();
-  bool validateBlock(const csdb::Pool&, ValidationFlags = hashIntergrity,
-                     SeverityLevel = greaterThanWarnings);
+    explicit BlockValidator(const BlockChain&);
+    ~BlockValidator();
+    bool validateBlock(const csdb::Pool&, ValidationFlags = hashIntergrity, SeverityLevel = greaterThanWarnings);
 
-  BlockValidator(const BlockValidator&) = delete;
-  BlockValidator(BlockValidator&&) = delete;
-  BlockValidator& operator=(const BlockValidator&) = delete;
-  BlockValidator& operator=(BlockValidator&&) = delete;
+    BlockValidator(const BlockValidator&) = delete;
+    BlockValidator(BlockValidator&&) = delete;
+    BlockValidator& operator=(const BlockValidator&) = delete;
+    BlockValidator& operator=(BlockValidator&&) = delete;
 
 private:
-  enum ErrorType : uint8_t {
-    noError = 0,
-    warning = 1 << 1,
-    error = 1 << 2,
-    fatalError = 1 << 3
-  };
+    enum ErrorType : uint8_t {
+        noError = 0,
+        warning = 1 << 1,
+        error = 1 << 2,
+        fatalError = 1 << 3
+    };
 
-  bool return_(ErrorType, SeverityLevel);
+    bool return_(ErrorType, SeverityLevel);
 
-  const BlockChain& bc_;
-  std::map<ValidationLevel, std::unique_ptr<ValidationPlugin>> plugins_;
+    const BlockChain& bc_;
+    std::map<ValidationLevel, std::unique_ptr<ValidationPlugin>> plugins_;
 
-  friend class ValidationPlugin;
+    friend class ValidationPlugin;
 
-  std::shared_ptr<WalletsState> wallets_;
-  csdb::Pool prevBlock_;
+    std::shared_ptr<WalletsState> wallets_;
+    csdb::Pool prevBlock_;
 };
-} // namespace cs
-#endif // BLOCKVALIDATOR_HPP
+}  // namespace cs
+#endif  // BLOCKVALIDATOR_HPP

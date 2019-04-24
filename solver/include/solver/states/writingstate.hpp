@@ -14,13 +14,13 @@ namespace cs {
 
 class WritingState final : public DefaultStateBehavior {
 public:
-  ~WritingState() override {
-  }
+    ~WritingState() override {
+    }
 
-  void on(SolverContext& context) override;
+    void on(SolverContext& context) override;
 
-  const char* name() const override {
-    return "Writing";
-  }
+    const char* name() const override {
+        return "Writing";
+    }
 };
-}  // namespace slv2
+}  // namespace cs

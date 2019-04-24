@@ -10,8 +10,8 @@
 #include <thread>
 #include <vector>
 
-#include <csdb/address.hpp>
 #include <cscrypto/cscrypto.hpp>
+#include <csdb/address.hpp>
 
 class Node;
 namespace csdb {
@@ -33,26 +33,26 @@ namespace cs {
  */
 class Spammer {
 public:
-  void StartSpamming(Node&);
-  Spammer() = default;
-  ~Spammer() = default;
+    void StartSpamming(Node&);
+    Spammer() = default;
+    ~Spammer() = default;
 
-  Spammer(const Spammer&) = delete;
-  Spammer(Spammer&&) = delete;
-  const Spammer& operator=(const Spammer&) = delete;
+    Spammer(const Spammer&) = delete;
+    Spammer(Spammer&&) = delete;
+    const Spammer& operator=(const Spammer&) = delete;
 
 private:
-  void GenerateMyWallets();
-  void SpamWithTransactions(Node&);
-  void FundMyWallets(Node&);
-  csdb::Address OptimizeAddress(const csdb::Address&, Node&);
-  void SignTransaction(csdb::Transaction&, const std::vector<cscrypto::Byte>& private_key);
-  void SignTransaction(csdb::Transaction&, const cscrypto::PrivateKey& private_key);
+    void GenerateMyWallets();
+    void SpamWithTransactions(Node&);
+    void FundMyWallets(Node&);
+    csdb::Address OptimizeAddress(const csdb::Address&, Node&);
+    void SignTransaction(csdb::Transaction&, const std::vector<cscrypto::Byte>& private_key);
+    void SignTransaction(csdb::Transaction&, const cscrypto::PrivateKey& private_key);
 
-  // wallets to which spammer sends transactions
-  std::vector<std::pair<csdb::Address, cscrypto::PrivateKey>> my_wallets_;
-  // thread for: void SpamWithTransactions(Node&)
-  std::thread spam_thread_;
+    // wallets to which spammer sends transactions
+    std::vector<std::pair<csdb::Address, cscrypto::PrivateKey>> my_wallets_;
+    // thread for: void SpamWithTransactions(Node&)
+    std::thread spam_thread_;
 };
 
 }  // namespace cs

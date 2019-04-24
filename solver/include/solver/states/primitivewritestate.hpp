@@ -16,25 +16,25 @@ namespace cs {
 
 class PrimitiveWriteState final : public DefaultStateBehavior {
 public:
-  ~PrimitiveWriteState() override {
-  }
+    ~PrimitiveWriteState() override {
+    }
 
-  void on(SolverContext& context) override;
+    void on(SolverContext& context) override;
 
-  void off(SolverContext& context) override;
+    void off(SolverContext& context) override;
 
-  Result onHash(SolverContext& context, const csdb::PoolHash& pool_hash, const cs::PublicKey& sender) override;
+    Result onHash(SolverContext& context, const csdb::PoolHash& pool_hash, const cs::PublicKey& sender) override;
 
-  Result onSyncTransactions(SolverContext& context, cs::RoundNumber round) override;
+    Result onSyncTransactions(SolverContext& context, cs::RoundNumber round) override;
 
-  const char* name() const override {
-    return "Primitive Write";
-  }
+    const char* name() const override {
+        return "Primitive Write";
+    }
 
 private:
-  CallsQueueScheduler::CallTag tag_timeout{CallsQueueScheduler::no_tag};
+    CallsQueueScheduler::CallTag tag_timeout{CallsQueueScheduler::no_tag};
 
-  std::vector<cs::PublicKey> trusted_candidates;
+    std::vector<cs::PublicKey> trusted_candidates;
 };
 
-}  // namespace slv2
+}  // namespace cs

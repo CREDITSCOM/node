@@ -20,10 +20,10 @@
 #include <csdb/storage.hpp>
 
 #include <csdb/internal/types.hpp>
+#include <csnode/nodecore.hpp>
 #include <csnode/walletscache.hpp>
 #include <csnode/walletsids.hpp>
 #include <csnode/walletspools.hpp>
-#include <csnode/nodecore.hpp>
 
 #include <lib/system/concurrent.hpp>
 
@@ -46,322 +46,326 @@ using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
 
 class BlockChain {
 public:
-  using Transactions  = std::vector<csdb::Transaction>;
-  using WalletId      = csdb::internal::WalletId;
-  using WalletAddress = csdb::Address;
-  using WalletData    = cs::WalletsCache::WalletData;
-  using Mask          = boost::dynamic_bitset<uint64_t>;
+    using Transactions = std::vector<csdb::Transaction>;
+    using WalletId = csdb::internal::WalletId;
+    using WalletAddress = csdb::Address;
+    using WalletData = cs::WalletsCache::WalletData;
+    using Mask = boost::dynamic_bitset<uint64_t>;
 
-  explicit BlockChain(csdb::Address genesisAddress, csdb::Address startAddress);
-  ~BlockChain();
+    explicit BlockChain(csdb::Address genesisAddress, csdb::Address startAddress);
+    ~BlockChain();
 
-  bool init(const std::string& path);
-  bool isGood() const;
+    bool init(const std::string& path);
+    bool isGood() const;
 
-  // utility methods
+    // utility methods
 
-  enum class ADDR_TYPE { PUBLIC_KEY, ID };
-  csdb::Address get_addr_by_type(const csdb::Address &addr, ADDR_TYPE type) const;
-  bool is_equal(const csdb::Address &laddr, const csdb::Address &raddr) const;
+    enum class ADDR_TYPE {
+        PUBLIC_KEY,
+        ID
+    };
 
-  static csdb::Address getAddressFromKey(const std::string&);
+    csdb::Address getAddressByType(const csdb::Address& addr, ADDR_TYPE type) const;
+    bool isEqual(const csdb::Address& laddr, const csdb::Address& raddr) const;
 
-  const csdb::Storage& getStorage() const;
+    static csdb::Address getAddressFromKey(const std::string&);
 
-  // create/save block and related methods
+    const csdb::Storage& getStorage() const;
 
-  /**
-   * @fn    bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync);
-   *
-   * @brief Stores a block
-   *
-   * @author    Alexander Avramenko
-   * @date  23.11.2018
-   *
-   * @param pool    The pool representing block to store in blockchain. Its sequence number MUST be
-   *                set. It will be modified.
-   * @param by_sync False if block is new, just constructed, true if block is received via sync subsystem.
-   *                False - addNewWalletsToPool() called. If true updateWalletIds() called.
-   *
-   * @return    True if it succeeds, false if it fails. True DOES NOT MEAN the block recorded to
-   *            chain. It means block is correct and possibly recorded. If it is not recorded now, it is cached
-   *            for future use and will be recorded on time
-   */
+    // create/save block and related methods
 
-  bool storeBlock(csdb::Pool& pool, bool by_sync);
+    /**
+     * @fn    bool BlockChain::storeBlock(csdb::Pool pool, bool by_sync);
+     *
+     * @brief Stores a block
+     *
+     * @author    Alexander Avramenko
+     * @date  23.11.2018
+     *
+     * @param pool    The pool representing block to store in blockchain. Its sequence number MUST be
+     *                set. It will be modified.
+     * @param by_sync False if block is new, just constructed, true if block is received via sync subsystem.
+     *                False - addNewWalletsToPool() called. If true updateWalletIds() called.
+     *
+     * @return    True if it succeeds, false if it fails. True DOES NOT MEAN the block recorded to
+     *            chain. It means block is correct and possibly recorded. If it is not recorded now, it is cached
+     *            for future use and will be recorded on time
+     */
 
-  /**
-   * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool);
-   *
-   * @brief Creates a block and records to blockchain
-   *
-   * @author    Alexander Avramenko
-   * @date  23.11.2018
-   *
-   * @param pool    The pool.
-   *
-   * @return    The new recorded block if ok, otherwise nullopt.
-   */
+    bool storeBlock(csdb::Pool& pool, bool bySync);
 
-  std::optional<csdb::Pool> createBlock(csdb::Pool pool) {
-    return recordBlock(pool, true);
-  }
+    /**
+     * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool);
+     *
+     * @brief Creates a block and records to blockchain
+     *
+     * @author    Alexander Avramenko
+     * @date  23.11.2018
+     *
+     * @param pool    The pool.
+     *
+     * @return    The new recorded block if ok, otherwise nullopt.
+     */
 
-  void removeWalletsInPoolFromCache(const csdb::Pool& pool);
-  void removeLastBlock();
+    std::optional<csdb::Pool> createBlock(csdb::Pool pool) {
+        return recordBlock(pool, true);
+    }
 
-  // updates fees in every transaction
-  void setTransactionsFees(cs::TransactionsPacket& packet);
-  void setTransactionsFees(csdb::Pool& pool);
-  void setTransactionsFees(std::vector<csdb::Transaction>& transactions);
-  void setTransactionsFees(std::vector<csdb::Transaction>& transactions,
-                           const cs::Bytes& characteristicMask);
+    void removeWalletsInPoolFromCache(const csdb::Pool& pool);
+    void removeLastBlock();
 
-  void addNewWalletsToPool(csdb::Pool& pool);
+    // updates fees in every transaction
+    void setTransactionsFees(cs::TransactionsPacket& packet);
+    void setTransactionsFees(csdb::Pool& pool);
+    void setTransactionsFees(std::vector<csdb::Transaction>& transactions);
+    void setTransactionsFees(std::vector<csdb::Transaction>& transactions, const cs::Bytes& characteristicMask);
 
-  // block cache
+    void addNewWalletsToPool(csdb::Pool& pool);
+
+    // block cache
 
 public:
+    /**
+     * @fn    std::size_t BlockChain::getCachedBlocksSize() const;
+     *
+     * @brief Gets amount of cached blocks
+     *
+     * @author    Alexander Avramenko
+     * @date  06.12.2018
+     *
+     * @return    The cached blocks amount.
+     */
 
-  /**
-   * @fn    std::size_t BlockChain::getCachedBlocksSize() const;
-   *
-   * @brief Gets amount of cached blocks
-   *
-   * @author    Alexander Avramenko
-   * @date  06.12.2018
-   *
-   * @return    The cached blocks amount.
-   */
+    std::size_t getCachedBlocksSize() const;
 
-  std::size_t getCachedBlocksSize() const;
+    // continuous interval from ... to
+    using SequenceInterval = std::pair<cs::Sequence, cs::Sequence>;
 
-  // continuous interval from ... to
-  using SequenceInterval = std::pair<cs::Sequence, cs::Sequence>;
+    /**
+     * @fn    std::vector<SequenceInterval> BlockChain::getReqiredBlocks() const;
+     *
+     * @brief Gets required blocks in form vector of intervals. Starts with last written block and view through all cached
+     * ones. Each interval means [first..second] including bounds. Last interval ends with current round number
+     *
+     * @author    Alexander Avramenko
+     * @date  23.11.2018
+     *
+     * @return    The required blocks in form vector of intervals
+     */
 
-  /**
-   * @fn    std::vector<SequenceInterval> BlockChain::getReqiredBlocks() const;
-   *
-   * @brief Gets required blocks in form vector of intervals. Starts with last written block and view through all cached
-   * ones. Each interval means [first..second] including bounds. Last interval ends with current round number
-   *
-   * @author    Alexander Avramenko
-   * @date  23.11.2018
-   *
-   * @return    The required blocks in form vector of intervals
-   */
+    std::vector<SequenceInterval> getRequiredBlocks() const;
 
-  std::vector<SequenceInterval> getRequiredBlocks() const;
+    /**
+     * @fn    void BlockChain::testCachedBlocks();
+     *
+     * @brief Tests cached blocks: removes outdated, records actual until sequence interrupted
+     *
+     * @author    Alexander Avramenko
+     * @date  23.11.2018
+     */
 
-  /**
-   * @fn    void BlockChain::testCachedBlocks();
-   *
-   * @brief Tests cached blocks: removes outdated, records actual until sequence interrupted
-   *
-   * @author    Alexander Avramenko
-   * @date  23.11.2018
-   */
-
-  void testCachedBlocks();
+    void testCachedBlocks();
 
 public signals:
 
-  /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
-  cs::StoreBlockSignal storeBlockEvent;
+    /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
+    cs::StoreBlockSignal storeBlockEvent;
 
-  /** @brief The cached block event. Raised when the next block is flushed to storage */
-  cs::ChangeBlockSignal cachedBlockEvent;
+    /** @brief The cached block event. Raised when the next block is flushed to storage */
+    cs::ChangeBlockSignal cachedBlockEvent;
 
-  /** @brief The remove block event. Raised when the next block is flushed to storage */
-  cs::ChangeBlockSignal removeBlockEvent;
+    /** @brief The remove block event. Raised when the next block is flushed to storage */
+    cs::ChangeBlockSignal removeBlockEvent;
 
 public slots:
 
-  // prototype is void (csdb::Transaction)
-  // subscription is placed in SmartContracts constructor
-  void onPayableContractReplenish(const csdb::Transaction& starter) {
-    this->walletsCacheUpdater_->invokeReplenishPayableContract(starter);
-  }
-  void onPayableContractTimeout(const csdb::Transaction& starter) {
-    this->walletsCacheUpdater_->rollbackReplenishPayableContract(starter);
-  }
-  void onContractEmittedAccepted(const csdb::Transaction& emitted, const csdb::Transaction& starter) {
-    this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter);
-  }
+    // prototype is void (csdb::Transaction)
+    // subscription is placed in SmartContracts constructor
+    void onPayableContractReplenish(const csdb::Transaction& starter) {
+        this->walletsCacheUpdater_->invokeReplenishPayableContract(starter);
+    }
+    void onPayableContractTimeout(const csdb::Transaction& starter) {
+        this->walletsCacheUpdater_->rollbackReplenishPayableContract(starter);
+    }
+    void onContractEmittedAccepted(const csdb::Transaction& emitted, const csdb::Transaction& starter) {
+        this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter);
+    }
 
-  // load methods
+    // load methods
 
-  csdb::Pool loadBlock(const csdb::PoolHash&) const;
-  csdb::Pool loadBlock(const cs::Sequence sequence) const;
-  csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
-  csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
-  void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
-  csdb::Pool getLastBlock() const
-  {
-    return loadBlock(getLastSequence());
-  }
+    csdb::Pool loadBlock(const csdb::PoolHash&) const;
+    csdb::Pool loadBlock(const cs::Sequence sequence) const;
+    csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
+    csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
+    void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
+    csdb::Pool getLastBlock() const {
+        return loadBlock(getLastSequence());
+    }
 
+    // info
 
-  // info
-  
-  size_t getSize() const;
-  uint64_t getWalletsCountWithBalance();
-  csdb::PoolHash getLastHash() const;
-  cs::Sequence getLastSequence() const;
-  csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
+    size_t getSize() const;
+    uint64_t getWalletsCountWithBalance();
+    csdb::PoolHash getLastHash() const;
+    cs::Sequence getLastSequence() const;
+    csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
 
-  // get inner data (from caches)
+    // get inner data (from caches)
 
-  bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
-  bool findWalletData(WalletId id, WalletData& wallData) const;
-  bool findWalletId(const WalletAddress& address, WalletId& id) const;
-  // wallet transactions: pools cache + db search
-  void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
-  // wallets modified by last new block
-  bool getModifiedWallets(Mask& dest) const;
+    bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
+    bool findWalletData(WalletId id, WalletData& wallData) const;
+    bool findWalletId(const WalletAddress& address, WalletId& id) const;
+    // wallet transactions: pools cache + db search
+    void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
+    // wallets modified by last new block
+    bool getModifiedWallets(Mask& dest) const;
 
 #ifdef MONITOR_NODE
-  void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
-  void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>);
-  uint32_t getTransactionsCount(const csdb::Address&);
+    void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
+    void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>);
+    uint32_t getTransactionsCount(const csdb::Address&);
 #endif
 
 #ifdef TRANSACTIONS_INDEX
-  csdb::TransactionID getLastTransaction(const csdb::Address&);
-  csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
+    csdb::TransactionID getLastTransaction(const csdb::Address&);
+    csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
 
-  std::pair<csdb::PoolHash, uint32_t> getLastNonEmptyBlock();
-  std::pair<csdb::PoolHash, uint32_t> getPreviousNonEmptyBlock(const csdb::PoolHash&);
-  uint64_t getTransactionsCount() const { return total_transactions_count_; }
+    std::pair<csdb::PoolHash, uint32_t> getLastNonEmptyBlock();
+    std::pair<csdb::PoolHash, uint32_t> getPreviousNonEmptyBlock(const csdb::PoolHash&);
+    uint64_t getTransactionsCount() const {
+        return total_transactions_count_;
+    }
 #endif
 
-  const csdb::Address& getGenesisAddress() const;
+    const csdb::Address& getGenesisAddress() const;
 
 private:
-  bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
+    bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
 
-  void writeGenesisBlock();
+    void writeGenesisBlock();
 #ifdef TRANSACTIONS_INDEX
-  void createTransactionsIndex(csdb::Pool&);
+    void createTransactionsIndex(csdb::Pool&);
 #endif
 
-  void logBlockInfo(csdb::Pool& pool);
+    void logBlockInfo(csdb::Pool& pool);
 
-  // Thread unsafe
-  bool finalizeBlock(csdb::Pool& pool, bool is_Trusted, cs::PublicKeys lastConfidants);
+    // Thread unsafe
+    bool finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys lastConfidants);
 
-  void onReadFromDB(csdb::Pool block, bool* should_stop);
-  bool postInitFromDB();
+    void onReadFromDB(csdb::Pool block, bool* shouldStop);
+    bool postInitFromDB();
 
-  template <typename WalletCacheProcessor>
-  bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
-  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Initer& initer);
-  bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
+    template <typename WalletCacheProcessor>
+    bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
+    bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Initer& initer);
+    bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
-  void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId,
-                          csdb::Pool::NewWallets& newWallets);
+    void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
 
-  bool updateFromNextBlock(csdb::Pool& pool);
+    bool updateFromNextBlock(csdb::Pool& pool);
 
-  // returns true if new id was inserted
-  bool getWalletId(const WalletAddress& address, WalletId& id);
-  bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
+    // returns true if new id was inserted
+    bool getWalletId(const WalletAddress& address, WalletId& id);
+    bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
 
-  class TransactionsLoader;
+    class TransactionsLoader;
 
-  bool findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id,
-                               cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
+    bool findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id, cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
 
-  void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id,
-                       const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset, uint64_t limit);
+    void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id, const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset,
+                         uint64_t limit);
 
-  bool good_;
+    bool good_;
 
-  mutable std::recursive_mutex dbLock_;
-  csdb::Storage storage_;
+    mutable std::recursive_mutex dbLock_;
+    csdb::Storage storage_;
 
-  std::unique_ptr<cs::BlockHashes> blockHashes_;
+    std::unique_ptr<cs::BlockHashes> blockHashes_;
 
-  const csdb::Address genesisAddress_;
-  const csdb::Address startAddress_;
-  std::unique_ptr<cs::WalletsIds> walletIds_;
-  std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
-  std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
-  std::unique_ptr<cs::WalletsPools> walletsPools_;
-  mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
+    const csdb::Address genesisAddress_;
+    const csdb::Address startAddress_;
+    std::unique_ptr<cs::WalletsIds> walletIds_;
+    std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
+    std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
+    std::unique_ptr<cs::WalletsPools> walletsPools_;
+    mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
 #ifdef TRANSACTIONS_INDEX
-  uint64_t total_transactions_count_ = 0;
+    uint64_t total_transactions_count_ = 0;
 
-  struct NonEmptyBlockData {
-    csdb::PoolHash hash;
-    uint32_t transCount = 0;
-  };
-  std::map<csdb::PoolHash, NonEmptyBlockData> previousNonEmpty_;
+    struct NonEmptyBlockData {
+        csdb::PoolHash hash;
+        uint32_t transCount = 0;
+    };
+    std::map<csdb::PoolHash, NonEmptyBlockData> previousNonEmpty_;
 
-  NonEmptyBlockData lastNonEmptyBlock_;
+    NonEmptyBlockData lastNonEmptyBlock_;
 #endif
 
-  /**
-   * @fn    std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, std::optional<cs::PrivateKey> writer_key);
-   *
-   * @brief Finish pool, sign it or test signature, then record block to chain
-   *
-   * @author    Alexander Avramenko
-   * @date  23.11.2018
-   *
-   * @param pool    The pool to finish &amp; record to chain.
-   *
-   * @return    A std::pair of bool (success or fail) and std::optional&lt;csdb::Pool&gt; (recorded
-   *            pool)
-   */
+    /**
+     * @fn    std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, std::optional<cs::PrivateKey> writer_key);
+     *
+     * @brief Finish pool, sign it or test signature, then record block to chain
+     *
+     * @author    Alexander Avramenko
+     * @date  23.11.2018
+     *
+     * @param pool    The pool to finish &amp; record to chain.
+     *
+     * @return    A std::pair of bool (success or fail) and std::optional&lt;csdb::Pool&gt; (recorded
+     *            pool)
+     */
 
-  std::optional<csdb::Pool> recordBlock(csdb::Pool& pool, bool isTrusted);
+    std::optional<csdb::Pool> recordBlock(csdb::Pool& pool, bool isTrusted);
 
-  // to store outrunning blocks until the time to insert comes;
-  // stores pairs of <sequence, metadata>
-  struct BlockMeta
-  {
-    csdb::Pool pool;
-    // indicates that block has got by sync, so it is checked & tested in other way than ordinary ones
-    bool by_sync;
-  };
-  std::map<cs::Sequence, BlockMeta> cachedBlocks_;
+    // to store outrunning blocks until the time to insert comes;
+    // stores pairs of <sequence, metadata>
+    struct BlockMeta {
+        csdb::Pool pool;
+        // indicates that block has got by sync, so it is checked & tested in other way than ordinary ones
+        bool by_sync;
+    };
+    std::map<cs::Sequence, BlockMeta> cachedBlocks_;
 
-  // block storage to defer storing it in blockchain until confirmation from other nodes got
-  // (idea is it is more easy not to store block immediately then to revert it after storing)
-  csdb::Pool deferredBlock_;
+    // block storage to defer storing it in blockchain until confirmation from other nodes got
+    // (idea is it is more easy not to store block immediately then to revert it after storing)
+    csdb::Pool deferredBlock_;
 
-  // fee calculator
-  std::unique_ptr<cs::Fee> fee_;
-  std::unique_ptr<cs::BlockValidator> blockValidator_;
+    // fee calculator
+    std::unique_ptr<cs::Fee> fee_;
+    std::unique_ptr<cs::BlockValidator> blockValidator_;
 };
 
 class TransactionsIterator {
 public:
-  TransactionsIterator(BlockChain&, const csdb::Address&);
+    TransactionsIterator(BlockChain&, const csdb::Address&);
 
-  void next();
-  bool isValid() const;
+    void next();
+    bool isValid() const;
 
-  const csdb::Pool& getPool() const { return lapoo_; }
+    const csdb::Pool& getPool() const {
+        return lapoo_;
+    }
 
-  const csdb::Transaction& operator*() const { return *it_; }
-  auto operator->() const { return it_; }
+    const csdb::Transaction& operator*() const {
+        return *it_;
+    }
+    auto operator-> () const {
+        return it_;
+    }
 
 private:
 #ifdef TRANSACTIONS_INDEX
-  void setFromTransId(const csdb::TransactionID&);
+    void setFromTransId(const csdb::TransactionID&);
 #else
-  void setFromHash(const csdb::PoolHash&);
+    void setFromHash(const csdb::PoolHash&);
 #endif
 
-  BlockChain& bc_;
+    BlockChain& bc_;
 
-  csdb::Address addr_;
-  csdb::Pool lapoo_;
-  std::vector<csdb::Transaction>::const_reverse_iterator it_;
+    csdb::Address addr_;
+    csdb::Pool lapoo_;
+    std::vector<csdb::Transaction>::const_reverse_iterator it_;
 };
-
 
 #endif  //  BLOCKCHAIN_HPP

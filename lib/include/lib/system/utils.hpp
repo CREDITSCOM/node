@@ -1,6 +1,7 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <chrono>
@@ -16,7 +17,6 @@
 #include <sstream>
 #include <string>
 #include <thread>
-#include <algorithm>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -29,8 +29,8 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <lib/system/common.hpp>
-#include <lib/system/structures.hpp>
 #include <lib/system/logger.hpp>
+#include <lib/system/structures.hpp>
 
 #define cswatch(x) cslog() << (#x) << " is " << (x)
 #define csunused(x) (void)(x)
@@ -53,38 +53,38 @@ using namespace std::literals::string_literals;
 
 namespace cs {
 enum class Direction : uint8_t {
-  PrevBlock,
-  NextBlock
+    PrevBlock,
+    NextBlock
 };
 
 inline std::ostream& operator<<(std::ostream& os, Direction dir) {
-  switch (dir) {
-    case Direction::PrevBlock:
-      return os << "Previous Block";
+    switch (dir) {
+        case Direction::PrevBlock:
+            return os << "Previous Block";
 
-    case Direction::NextBlock:
-      return os << "Next Block";
+        case Direction::NextBlock:
+            return os << "Next Block";
 
-    default:
-      return os << "Wrong dir=" << static_cast<int64_t>(dir);
-  }
+        default:
+            return os << "Wrong dir=" << static_cast<int64_t>(dir);
+    }
 }
 
 inline std::ostream& printHex(std::ostream& os, const char* bytes, size_t num) {
-  static char hex[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+    static char hex[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
-  for (size_t i = 0; i < num; i++) {
-    os << hex[(bytes[i] >> 4) & 0x0F];
-    os << hex[bytes[i] & 0x0F];
-  }
+    for (size_t i = 0; i < num; i++) {
+        os << hex[(bytes[i] >> 4) & 0x0F];
+        os << hex[bytes[i] & 0x0F];
+    }
 
-  return os;
+    return os;
 }
 
 template <typename T, size_t Size>
 inline static std::ostream& operator<<(std::ostream& os, const std::array<T, Size>& address) {
-  printHex(os, reinterpret_cast<const char*>(&*address.begin()), address.size());
-  return os;
+    printHex(os, reinterpret_cast<const char*>(&*address.begin()), address.size());
+    return os;
 }
 
 template <typename T>
@@ -98,369 +98,367 @@ struct is_vector<std::vector<T, A>> : public std::true_type {};
 ///
 class Utils {
 public:
-  enum Values {
-    MinHashValue = std::numeric_limits<int>::min(),
-    MaxHashValue = std::numeric_limits<int>::max(),
-  };
+    enum Values {
+        MinHashValue = std::numeric_limits<int>::min(),
+        MaxHashValue = std::numeric_limits<int>::max(),
+    };
 
 private:
-  // random value generation helper
-  template<typename R, typename T>
-  static R randomValueImpl(T min, T max) {
-    static std::random_device randomDevice;
-    static std::mt19937 generator(randomDevice());
+    // random value generation helper
+    template <typename R, typename T>
+    static R randomValueImpl(T min, T max) {
+        static std::random_device randomDevice;
+        static std::mt19937 generator(randomDevice());
 
-    if constexpr (std::is_integral_v<T>) {
-      std::uniform_int_distribution<> dist(min, max);
-      return static_cast<R>(dist(generator));
+        if constexpr (std::is_integral_v<T>) {
+            std::uniform_int_distribution<> dist(min, max);
+            return static_cast<R>(dist(generator));
+        }
+        else {
+            std::uniform_real_distribution<> distribution(min, max);
+            return static_cast<R>(distribution(generator));
+        }
     }
-    else {
-      std::uniform_real_distribution<> distribution(min, max);
-      return static_cast<R>(distribution(generator));
-    }
-  }
 
 public:
-  ///
-  /// Generates random value from random generator [min, max] for integer type
-  ///
-  template<typename R>
-  inline static R generateRandomValue(int min, int max) {
-    return randomValueImpl<R, decltype(min)>(min, max);
-  }
-
-  ///
-  /// Generates random value from random generator [min, max] for floating point type
-  ///
-  template<typename R>
-  inline static R generateRandomValue(double min, double max) {
-    return randomValueImpl<R, decltype(min)>(min, max);
-  }
-
-  ///
-  /// Fills hash with first size of symbols
-  ///
-  inline static void fillHash(std::string& hash, uint32_t size, char symbol = '0') {
-    for (decltype(size) i = 0; i < size; ++i) {
-      hash[i] = symbol;
+    ///
+    /// Generates random value from random generator [min, max] for integer type
+    ///
+    template <typename R>
+    inline static R generateRandomValue(int min, int max) {
+        return randomValueImpl<R, decltype(min)>(min, max);
     }
-  }
 
-  ///
-  /// Returns current time in string representation
-  ///
-  static std::string formattedCurrentTime() {
-    auto now = std::chrono::system_clock::now();
-    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    ///
+    /// Generates random value from random generator [min, max] for floating point type
+    ///
+    template <typename R>
+    inline static R generateRandomValue(double min, double max) {
+        return randomValueImpl<R, decltype(min)>(min, max);
+    }
 
-    struct tm result;
-    std::stringstream ss;
+    ///
+    /// Fills hash with first size of symbols
+    ///
+    inline static void fillHash(std::string& hash, uint32_t size, char symbol = '0') {
+        for (decltype(size) i = 0; i < size; ++i) {
+            hash[i] = symbol;
+        }
+    }
+
+    ///
+    /// Returns current time in string representation
+    ///
+    static std::string formattedCurrentTime() {
+        auto now = std::chrono::system_clock::now();
+        auto in_time_t = std::chrono::system_clock::to_time_t(now);
+
+        struct tm result;
+        std::stringstream ss;
 #ifndef _WINDOWS
-    ss << std::put_time(localtime_r(&in_time_t, &result), "%H:%M:%S");
+        ss << std::put_time(localtime_r(&in_time_t, &result), "%H:%M:%S");
 #else
-    localtime_s(&result, &in_time_t);
-    ss << std::put_time(&result, "%H:%M:%S");
+        localtime_s(&result, &in_time_t);
+        ss << std::put_time(&result, "%H:%M:%S");
 #endif
-    return ss.str();
-  }
-
-  ///
-  /// Inserts value to char array by index
-  ///
-  template <typename T>
-  inline static void insertToArray(char* data, uint32_t index, T&& value) {
-    char* ptr = reinterpret_cast<char*>(&value);
-
-    for (uint32_t i = index, k = 0; i < index + sizeof(T); ++i, ++k) {
-      *(data + i) = *(ptr + k);
-    }
-  }
-
-  ///
-  /// Returns value from char array
-  ///
-  template <typename T>
-  inline static T getFromArray(char* data, size_t index) {
-    return *(reinterpret_cast<T*>(data + index));
-  }
-
-  ///
-  /// Represents type T as byte string
-  ///
-  template <typename T>
-  inline static std::string addressToString(T address) {
-    std::string str;
-    str.resize(sizeof(T));
-
-    cs::Utils::insertToArray(str.data(), 0, address);
-
-    return str;
-  }
-
-  ///
-  /// Returns all file data as string
-  ///
-  inline static std::string readAllFileData(std::ifstream& file) {
-    return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-  }
-
-  ///
-  /// Converts char array data to hex into std::string
-  ///
-  inline static std::string toHex(char* data, std::size_t size) {
-    assert(data != nullptr);
-
-    std::stringstream ss;
-
-    for (std::size_t i = 0; i < size; ++i) {
-      ss << std::hex << static_cast<int>(data[i]);
+        return ss.str();
     }
 
-    return ss.str();
-  }
+    ///
+    /// Inserts value to char array by index
+    ///
+    template <typename T>
+    inline static void insertToArray(char* data, uint32_t index, T&& value) {
+        char* ptr = reinterpret_cast<char*>(&value);
 
-  ///
-  /// Converts char array data to hex into std::string
-  ///
-  template <size_t size>
-  inline static std::string toHex(const char (&data)[size]) {
-    return Utils::toHex(static_cast<char*>(data), size);
-  }
-
-  ///
-  /// Clears memory
-  ///
-  template <typename T>
-  inline static void clearMemory(T& object) {
-    std::memset(&object, 0, sizeof(T));
-  }
-
-  ///
-  /// Converts string to hex
-  ///
-  static std::string stringToHex(const std::string& input) {
-    static const char* const lut = "0123456789ABCDEF";
-    std::size_t len = input.length();
-
-    std::string output;
-    output.reserve(2 * len);
-
-    for (size_t i = 0; i < len; ++i) {
-      const unsigned char c = static_cast<unsigned char>(input[i]);
-
-      output.push_back(lut[c >> 4]);
-      output.push_back(lut[c & 15]);
+        for (uint32_t i = index, k = 0; i < index + sizeof(T); ++i, ++k) {
+            *(data + i) = *(ptr + k);
+        }
     }
 
-    return output;
-  }
-
-  ///
-  /// Converts hex to string
-  ///
-  static std::string hexToString(const std::string& input) {
-    static const char* const lut = "0123456789ABCDEF";
-    std::size_t len = input.length();
-
-    if (len & 1) {
-      throw std::invalid_argument("odd length");
+    ///
+    /// Returns value from char array
+    ///
+    template <typename T>
+    inline static T getFromArray(char* data, size_t index) {
+        return *(reinterpret_cast<T*>(data + index));
     }
 
-    std::string output;
-    output.reserve(len / 2);
+    ///
+    /// Represents type T as byte string
+    ///
+    template <typename T>
+    inline static std::string addressToString(T address) {
+        std::string str;
+        str.resize(sizeof(T));
 
-    for (std::size_t i = 0; i < len; i += 2) {
-      char a = input[i];
-      const char* p = std::lower_bound(lut, lut + 16, a);
+        cs::Utils::insertToArray(str.data(), 0, address);
 
-      if (*p != a) {
-        throw std::invalid_argument("not a hex digit");
-      }
-
-      char b = input[i + 1];
-      const char* q = std::lower_bound(lut, lut + 16, b);
-
-      if (*q != b) {
-        throw std::invalid_argument("not a hex digit");
-      }
-
-      output.push_back(static_cast<char>(((p - lut) << 4) | (q - lut)));
+        return str;
     }
 
-    return output;
-  }
-
-  ///
-  /// Converts const char data pointer to hex
-  ///
-  inline static std::string byteStreamToHex(const char* stream, const std::size_t length) {
-    static const std::string map = "0123456789ABCDEF";
-
-    std::string result;
-    result.reserve(length * 2);
-
-    for (std::size_t i = 0; i < length; ++i) {
-      result.push_back(map[static_cast<uint8_t>(stream[i]) >> 4]);
-      result.push_back(map[static_cast<uint8_t>(stream[i]) & static_cast<uint8_t>(15)]);
+    ///
+    /// Returns all file data as string
+    ///
+    inline static std::string readAllFileData(std::ifstream& file) {
+        return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     }
 
-    return result;
-  }
+    ///
+    /// Converts char array data to hex into std::string
+    ///
+    inline static std::string toHex(char* data, std::size_t size) {
+        assert(data != nullptr);
 
-  ///
-  /// Converts const unsigned char data pointer to hex
-  ///
-  inline static std::string byteStreamToHex(const unsigned char* stream, const std::size_t length) {
-    return cs::Utils::byteStreamToHex(reinterpret_cast<const char*>(stream), length);
-  }
+        std::stringstream ss;
 
-  inline static uint64_t maskToBits(const cs::Bytes& mask) {
-    if (mask.size() > 64) {
-      cserror() << "The mask number is larger than the alloowed value";
+        for (std::size_t i = 0; i < size; ++i) {
+            ss << std::hex << static_cast<int>(data[i]);
+        }
+
+        return ss.str();
     }
 
-    uint64_t addition = 1;
-    uint64_t value = 0;
-
-    for (auto& it : mask) {
-      if (it != 255U) {
-        value += addition;
-      }
-      addition *= 2;
+    ///
+    /// Converts char array data to hex into std::string
+    ///
+    template <size_t size>
+    inline static std::string toHex(const char (&data)[size]) {
+        return Utils::toHex(static_cast<char*>(data), size);
     }
 
-    return value;
-  }
-
-  inline static cs::Bytes bitsToMask(uint8_t size, uint64_t value) {
-    cs::Bytes mask;
-    mask.reserve(static_cast<size_t>(size));
-
-    uint64_t valCopy = value;
-
-    for(cs::Byte i = 0; i< size; ++i){
-      if (valCopy % 2 == 1U) {
-        mask.push_back(0U);
-      }
-      else {
-        mask.push_back(255U);
-      }
-
-      valCopy /= 2U;
+    ///
+    /// Clears memory
+    ///
+    template <typename T>
+    inline static void clearMemory(T& object) {
+        std::memset(&object, 0, sizeof(T));
     }
 
-    return mask;
-  }
+    ///
+    /// Converts string to hex
+    ///
+    static std::string stringToHex(const std::string& input) {
+        static const char* const lut = "0123456789ABCDEF";
+        std::size_t len = input.length();
 
-  inline static cs::Byte maskValue(uint64_t value) {
+        std::string output;
+        output.reserve(2 * len);
+
+        for (size_t i = 0; i < len; ++i) {
+            const unsigned char c = static_cast<unsigned char>(input[i]);
+
+            output.push_back(lut[c >> 4]);
+            output.push_back(lut[c & 15]);
+        }
+
+        return output;
+    }
+
+    ///
+    /// Converts hex to string
+    ///
+    static std::string hexToString(const std::string& input) {
+        static const char* const lut = "0123456789ABCDEF";
+        std::size_t len = input.length();
+
+        if (len & 1) {
+            throw std::invalid_argument("odd length");
+        }
+
+        std::string output;
+        output.reserve(len / 2);
+
+        for (std::size_t i = 0; i < len; i += 2) {
+            char a = input[i];
+            const char* p = std::lower_bound(lut, lut + 16, a);
+
+            if (*p != a) {
+                throw std::invalid_argument("not a hex digit");
+            }
+
+            char b = input[i + 1];
+            const char* q = std::lower_bound(lut, lut + 16, b);
+
+            if (*q != b) {
+                throw std::invalid_argument("not a hex digit");
+            }
+
+            output.push_back(static_cast<char>(((p - lut) << 4) | (q - lut)));
+        }
+
+        return output;
+    }
+
+    ///
+    /// Converts const char data pointer to hex
+    ///
+    inline static std::string byteStreamToHex(const char* stream, const std::size_t length) {
+        static const std::string map = "0123456789ABCDEF";
+
+        std::string result;
+        result.reserve(length * 2);
+
+        for (std::size_t i = 0; i < length; ++i) {
+            result.push_back(map[static_cast<uint8_t>(stream[i]) >> 4]);
+            result.push_back(map[static_cast<uint8_t>(stream[i]) & static_cast<uint8_t>(15)]);
+        }
+
+        return result;
+    }
+
+    ///
+    /// Converts const unsigned char data pointer to hex
+    ///
+    inline static std::string byteStreamToHex(const unsigned char* stream, const std::size_t length) {
+        return cs::Utils::byteStreamToHex(reinterpret_cast<const char*>(stream), length);
+    }
+
+    inline static uint64_t maskToBits(const cs::Bytes& mask) {
+        if (mask.size() > 64) {
+            cserror() << "The mask number is larger than the alloowed value";
+        }
+
+        uint64_t addition = 1;
+        uint64_t value = 0;
+
+        for (auto& it : mask) {
+            if (it != 255U) {
+                value += addition;
+            }
+            addition *= 2;
+        }
+
+        return value;
+    }
+
+    inline static cs::Bytes bitsToMask(uint8_t size, uint64_t value) {
+        cs::Bytes mask;
+        mask.reserve(static_cast<size_t>(size));
+
+        uint64_t valCopy = value;
+
+        for (cs::Byte i = 0; i < size; ++i) {
+            if (valCopy % 2 == 1U) {
+                mask.push_back(0U);
+            }
+            else {
+                mask.push_back(255U);
+            }
+
+            valCopy /= 2U;
+        }
+
+        return mask;
+    }
+
+    inline static cs::Byte maskValue(uint64_t value) {
 #ifdef _MSC_VER
-    cs::Byte cnt = static_cast<cs::Byte>( __popcnt64(value) );
+        cs::Byte cnt = static_cast<cs::Byte>(__popcnt64(value));
 #else
-    cs::Byte cnt = __builtin_popcountl(value);
+        cs::Byte cnt = __builtin_popcountl(value);
 #endif
-    return cnt;
-  }
+        return cnt;
+    }
 
-  ///
-  /// Convert container bytes to hex
-  ///
-  template <typename T>
-  static std::string byteStreamToHex(const T& entity) {
-    return cs::Utils::byteStreamToHex(entity.data(), entity.size());
-  }
+    ///
+    /// Convert container bytes to hex
+    ///
+    template <typename T>
+    static std::string byteStreamToHex(const T& entity) {
+        return cs::Utils::byteStreamToHex(entity.data(), entity.size());
+    }
 
 public:
-
-  ///
-  /// Returns current time point as string representation
-  ///
-  static std::string currentTimestamp() {
-    auto now = std::chrono::system_clock::now();
-    return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
-  }
-
-  ///
-  /// Splits vector on equals parts
-  ///
-  template <typename T>
-  static std::vector<std::vector<T>> splitVector(const std::vector<T>& vector, std::size_t parts) {
-    std::vector<std::vector<T>> result;
-
-    std::size_t length = vector.size() / parts;
-    std::size_t remain = vector.size() % parts;
-
-    std::size_t begin = 0;
-    std::size_t end = 0;
-
-    for (std::size_t i = 0; i < std::min(parts, vector.size()); ++i) {
-      end += (remain > 0) ? (length + !!(remain--)) : length;
-
-      result.push_back(std::vector<T>(vector.begin() + begin, vector.begin() + end));
-
-      begin = end;
+    ///
+    /// Returns current time point as string representation
+    ///
+    static std::string currentTimestamp() {
+        auto now = std::chrono::system_clock::now();
+        return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
     }
 
-    return result;
-  }
+    ///
+    /// Splits vector on equals parts
+    ///
+    template <typename T>
+    static std::vector<std::vector<T>> splitVector(const std::vector<T>& vector, std::size_t parts) {
+        std::vector<std::vector<T>> result;
 
-  template<typename RandomIterator, typename Generator>
-  static void shuffle(RandomIterator first, RandomIterator last, Generator&& rng) {
-    // shuffle [first, last) using random function rng
-    auto uFirst = first;
-    const auto uLast = last;
-    if (uFirst == uLast) {
-      return;
+        std::size_t length = vector.size() / parts;
+        std::size_t remain = vector.size() % parts;
+
+        std::size_t begin = 0;
+        std::size_t end = 0;
+
+        for (std::size_t i = 0; i < std::min(parts, vector.size()); ++i) {
+            end += (remain > 0) ? (length + !!(remain--)) : length;
+
+            result.push_back(std::vector<T>(vector.begin() + begin, vector.begin() + end));
+
+            begin = end;
+        }
+
+        return result;
     }
 
-    using diff = typename std::iterator_traits<RandomIterator>::difference_type;
-    using udiff = typename std::make_unsigned<diff>::type;
+    template <typename RandomIterator, typename Generator>
+    static void shuffle(RandomIterator first, RandomIterator last, Generator&& rng) {
+        // shuffle [first, last) using random function rng
+        auto uFirst = first;
+        const auto uLast = last;
+        if (uFirst == uLast) {
+            return;
+        }
 
-    udiff bits = 8 * sizeof(udiff);
-    udiff bmask = udiff(-1);
+        using diff = typename std::iterator_traits<RandomIterator>::difference_type;
+        using udiff = typename std::make_unsigned<diff>::type;
 
-    auto target = uFirst;
-    diff targetIndex = 1;
-    for (; ++target != uLast; ++targetIndex) {
-      // randomly place an element from [first, target] at target
-      diff off;// = rng(static_cast<_Diff>(targetIndex + 1));
-      diff index = targetIndex + 1;
-      for (;;) {
-        // try a sample random value
-        udiff ret = 0;    // random bits
-        udiff mask = 0;    // 2^N - 1, _Ret is within [0, mask]
+        udiff bits = 8 * sizeof(udiff);
+        udiff bmask = udiff(-1);
 
-        while (mask < udiff(index - 1)) {
-          // need more random bits
-          ret <<= bits - 1;    // avoid full shift
-          ret <<= 1;
-          udiff _Get_bits;
-          // return a random value within [0, bmask]
-          for (;;) {
-            // repeat until random value is in range
-            udiff _Val = rng();
+        auto target = uFirst;
+        diff targetIndex = 1;
+        for (; ++target != uLast; ++targetIndex) {
+            // randomly place an element from [first, target] at target
+            diff off;  // = rng(static_cast<_Diff>(targetIndex + 1));
+            diff index = targetIndex + 1;
+            for (;;) {
+                // try a sample random value
+                udiff ret = 0;   // random bits
+                udiff mask = 0;  // 2^N - 1, _Ret is within [0, mask]
 
-            if (_Val <= bmask) {
-              _Get_bits = _Val;
-              break;
+                while (mask < udiff(index - 1)) {
+                    // need more random bits
+                    ret <<= bits - 1;  // avoid full shift
+                    ret <<= 1;
+                    udiff _Get_bits;
+                    // return a random value within [0, bmask]
+                    for (;;) {
+                        // repeat until random value is in range
+                        udiff _Val = rng();
+
+                        if (_Val <= bmask) {
+                            _Get_bits = _Val;
+                            break;
+                        }
+                    }
+                    ret |= _Get_bits;
+                    mask <<= bits - 1;  // avoid full shift
+                    mask <<= 1;
+                    mask |= bmask;
+                }
+
+                // _Ret is [0, mask], index - 1 <= mask, return if unbiased
+                if (ret / index < mask / index || mask % index == udiff(index - 1)) {
+                    off = static_cast<diff>(ret % index);
+                    break;
+                }
             }
-          }
-          ret |= _Get_bits;
-          mask <<= bits - 1;    // avoid full shift
-          mask <<= 1;
-          mask |= bmask;
-        }
 
-        // _Ret is [0, mask], index - 1 <= mask, return if unbiased
-        if (ret / index < mask / index
-          || mask % index == udiff(index - 1)) {
-          off = static_cast<diff>(ret % index);
-          break;
+            std::iter_swap(target, uFirst + off);
         }
-      }
-
-      std::iter_swap(target, uFirst + off);
     }
-  }
 };
 
 ///
@@ -469,68 +467,68 @@ public:
 template <typename Target, typename Source>
 inline auto numeric_cast(Source arg) {
 #ifndef NDEBUG
-  return boost::numeric_cast<Target>(arg);
+    return boost::numeric_cast<Target>(arg);
 #else
-  return static_cast<Target>(arg);
+    return static_cast<Target>(arg);
 #endif
 }
 
-template<typename T>
+template <typename T>
 constexpr T getMax(const T&) {
-  return std::numeric_limits<T>::max();
+    return std::numeric_limits<T>::max();
 }
 
-template<typename T>
+template <typename T>
 constexpr T getMin(const T&) {
-  return std::numeric_limits<T>::min();
+    return std::numeric_limits<T>::min();
 }
 
 constexpr int getMax(const bool) {
-  return static_cast<int>(std::numeric_limits<bool>::max());
+    return static_cast<int>(std::numeric_limits<bool>::max());
 }
 
 constexpr int getMin(const bool) {
-  return static_cast<int>(std::numeric_limits<bool>::min());
+    return static_cast<int>(std::numeric_limits<bool>::min());
 }
 
 template <typename T>
 constexpr bool isVector() {
-  return cs::is_vector<T>::value;
+    return cs::is_vector<T>::value;
 }
 
-template<typename TBytes>
+template <typename TBytes>
 inline constexpr cs::BytesView bytesView_cast(const TBytes& bytes) {
-  static_assert(std::is_same_v<typename TBytes::value_type, cs::Byte>, "Only bytes storages can use bytesView_cast func");
-  return cs::BytesView(bytes.data(), bytes.size());
+    static_assert(std::is_same_v<typename TBytes::value_type, cs::Byte>, "Only bytes storages can use bytesView_cast func");
+    return cs::BytesView(bytes.data(), bytes.size());
 }
 
 class Console {
 public:
-  template <typename... Args>
-  static void writeLine(Args&&... args) {
-    (std::cout << ... << std::forward<Args>(args)) << std::endl;
-  }
+    template <typename... Args>
+    static void writeLine(Args&&... args) {
+        (std::cout << ... << std::forward<Args>(args)) << std::endl;
+    }
 };
 }  // namespace cs
 
 inline constexpr cs::Byte operator"" _b(unsigned long long arg) noexcept {
-  return static_cast<cs::Byte>(arg);
+    return static_cast<cs::Byte>(arg);
 }
 
 inline constexpr char operator"" _i8(unsigned long long arg) noexcept {
-  return static_cast<signed char>(arg);
+    return static_cast<signed char>(arg);
 }
 
 inline constexpr unsigned short operator"" _u16(unsigned long long arg) noexcept {
-  return static_cast<unsigned short>(arg);
+    return static_cast<unsigned short>(arg);
 }
 
 inline constexpr short operator"" _i16(unsigned long long arg) noexcept {
-  return static_cast<short>(arg);
+    return static_cast<short>(arg);
 }
 
 inline constexpr std::size_t operator"" _sz(unsigned long long arg) noexcept {
-  return static_cast<std::size_t>(arg);
+    return static_cast<std::size_t>(arg);
 }
 
 #endif  //  UTILS_HPP

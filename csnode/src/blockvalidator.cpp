@@ -8,54 +8,53 @@
 namespace cs {
 
 BlockValidator::BlockValidator(const BlockChain& bc)
-    : bc_(bc),
-      wallets_(::std::make_shared<WalletsState>(bc_)) {
-  plugins_.insert(std::make_pair(hashIntergrity, std::make_unique<HashValidator>(*this)));
-  plugins_.insert(std::make_pair(blockNum, std::make_unique<BlockNumValidator>(*this)));
-  plugins_.insert(std::make_pair(timestamp, std::make_unique<TimestampValidator>(*this)));
-  plugins_.insert(std::make_pair(blockSignatures, std::make_unique<BlockSignaturesValidator>(*this)));
-  plugins_.insert(std::make_pair(smartSignatures, std::make_unique<SmartSourceSignaturesValidator>(*this)));
-  plugins_.insert(std::make_pair(balances, std::make_unique<BalanceChecker>(*this)));
-  plugins_.insert(std::make_pair(transactionsSignatures, std::make_unique<TransactionsChecker>(*this)));
+: bc_(bc)
+, wallets_(::std::make_shared<WalletsState>(bc_)) {
+    plugins_.insert(std::make_pair(hashIntergrity, std::make_unique<HashValidator>(*this)));
+    plugins_.insert(std::make_pair(blockNum, std::make_unique<BlockNumValidator>(*this)));
+    plugins_.insert(std::make_pair(timestamp, std::make_unique<TimestampValidator>(*this)));
+    plugins_.insert(std::make_pair(blockSignatures, std::make_unique<BlockSignaturesValidator>(*this)));
+    plugins_.insert(std::make_pair(smartSignatures, std::make_unique<SmartSourceSignaturesValidator>(*this)));
+    plugins_.insert(std::make_pair(balances, std::make_unique<BalanceChecker>(*this)));
+    plugins_.insert(std::make_pair(transactionsSignatures, std::make_unique<TransactionsChecker>(*this)));
 }
 
-BlockValidator::~BlockValidator() {}
+BlockValidator::~BlockValidator() {
+}
 
 inline bool BlockValidator::return_(ErrorType error, SeverityLevel severity) {
-  return !(error >> severity);
+    return !(error >> severity);
 }
 
-bool BlockValidator::validateBlock(const csdb::Pool& block, ValidationFlags flags,
-                                   SeverityLevel severity) {
-  if (!flags || block.sequence() == 0) {
-    return true;
-  }
-
-  if (!block.is_valid()) {
-    cserror() << "BlockValidator: invalid block received";
-    return false;
-  }
-
-  if (!prevBlock_.is_valid() || block.sequence() - prevBlock_.sequence() != 1) {
-    prevBlock_ = bc_.loadBlock(block.previous_hash());
-    if (!prevBlock_.is_valid()) {
-      cserror() << "BlockValidator: block with hash "
-                << block.previous_hash().to_string() << " is not valid.";
-      return false;
+bool BlockValidator::validateBlock(const csdb::Pool& block, ValidationFlags flags, SeverityLevel severity) {
+    if (!flags || block.sequence() == 0) {
+        return true;
     }
-  }
- 
-  ErrorType validationResult = noError;
-  for (auto& plugin : plugins_) {
-    if (flags & plugin.first) {
-      validationResult = plugin.second->validateBlock(block);
-      if (!return_(validationResult, severity)) {
+
+    if (!block.is_valid()) {
+        cserror() << "BlockValidator: invalid block received";
         return false;
-      }
     }
-  }
 
-  prevBlock_ = block;
-  return true;
+    if (!prevBlock_.is_valid() || block.sequence() - prevBlock_.sequence() != 1) {
+        prevBlock_ = bc_.loadBlock(block.previous_hash());
+        if (!prevBlock_.is_valid()) {
+            cserror() << "BlockValidator: block with hash " << block.previous_hash().to_string() << " is not valid.";
+            return false;
+        }
+    }
+
+    ErrorType validationResult = noError;
+    for (auto& plugin : plugins_) {
+        if (flags & plugin.first) {
+            validationResult = plugin.second->validateBlock(block);
+            if (!return_(validationResult, severity)) {
+                return false;
+            }
+        }
+    }
+
+    prevBlock_ = block;
+    return true;
 }
-} // namespace cs
+}  // namespace cs

@@ -7,17 +7,16 @@
 #include <mutex>
 #include <thread>
 
-#include "gtest/gtest.h"
 #include <csnode/node.hpp>
 #include "clientconfigmock.hpp"
+#include "gtest/gtest.h"
+#include "networkmock.hpp"
 #include "nodemock.hpp"
 #include "solvermock.hpp"
 #include "transportmock.hpp"
-#include "networkmock.hpp"
 
-TEST(NodeTest, connection)
-{
-  MockConfig config;
+TEST(NodeTest, connection) {
+    MockConfig config;
 
-  ASSERT_EQ(true, true);
+    ASSERT_EQ(true, true);
 }

@@ -46,25 +46,32 @@ using SpinLock = boost::detail::spinlock;
 
 // RAII locks
 // TODO: simple lock_guard and shared_lock using next?
-template<typename T>
+template <typename T>
 class Lock : public std::lock_guard<T> {
 public:
-  explicit inline Lock(T& lockable) noexcept : std::lock_guard<T>(lockable) {}
+    explicit inline Lock(T& lockable) noexcept
+    : std::lock_guard<T>(lockable) {
+    }
 };
 
-template<typename T>
+template <typename T>
 class SharedLock : public std::shared_lock<T> {
 public:
-  explicit inline SharedLock(T& lockable) noexcept : std::shared_lock<T>(lockable) {}
+    explicit inline SharedLock(T& lockable) noexcept
+    : std::shared_lock<T>(lockable) {
+    }
 };
 
 // aliasing, C++ 17 scoped lock, C++ 17 constructor template parameters deduction
-template<typename... T>
+template <typename... T>
 class ScopedLock {
 public:
-  explicit inline ScopedLock(T&... locables) noexcept : lock_(locables...) {}
+    explicit inline ScopedLock(T&... locables) noexcept
+    : lock_(locables...) {
+    }
+
 private:
-  std::scoped_lock<T...> lock_;
+    std::scoped_lock<T...> lock_;
 };
 }  // namespace cs
 #endif  // COMMON_HPP
