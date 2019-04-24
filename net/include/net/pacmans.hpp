@@ -13,102 +13,102 @@ namespace ip = boost::asio::ip;
 template <typename Pacman>
 class TaskPtr {
 public:
-  TaskPtr(TaskPtr&& rhs)
-  : ptr_(rhs.ptr_)
-  , owner_(rhs.owner_) {
-    rhs.ptr_ = nullptr;
-  }
-
-  TaskPtr(const TaskPtr&) = delete;
-  TaskPtr& operator=(const TaskPtr&) = delete;
-  TaskPtr& operator=(TaskPtr&&) = delete;
-
-  ~TaskPtr() {
-    if (ptr_) {
-      owner_->releaseTask(ptr_);
+    TaskPtr(TaskPtr&& rhs)
+    : ptr_(rhs.ptr_)
+    , owner_(rhs.owner_) {
+        rhs.ptr_ = nullptr;
     }
-  }
 
-  typename Pacman::Task* operator->() {
-    return &(ptr_->element);
-  }
-  const typename Pacman::Task* operator->() const {
-    return &(ptr_->element);
-  }
+    TaskPtr(const TaskPtr&) = delete;
+    TaskPtr& operator=(const TaskPtr&) = delete;
+    TaskPtr& operator=(TaskPtr&&) = delete;
+
+    ~TaskPtr() {
+        if (ptr_) {
+            owner_->releaseTask(ptr_);
+        }
+    }
+
+    typename Pacman::Task* operator->() {
+        return &(ptr_->element);
+    }
+    const typename Pacman::Task* operator->() const {
+        return &(ptr_->element);
+    }
 
 private:
-  TaskPtr() {
-  }
+    TaskPtr() {
+    }
 
-  typename Pacman::Queue::Element* ptr_;
-  Pacman* owner_;
+    typename Pacman::Queue::Element* ptr_;
+    Pacman* owner_;
 
-  friend Pacman;
+    friend Pacman;
 };
 
 class IPacMan {
 public:
-  IPacMan()
-  : allocator_(1 << 20) {
-  }
-
-  struct Task {
-    ip::udp::endpoint sender;
-    size_t size;
-    Packet pack;
-
-    Task() {
+    IPacMan()
+    : allocator_(1 << 20) {
     }
 
-    Task(const Task&) = delete;
-    Task(Task&&) = delete;
-    Task& operator=(const Task&) = delete;
-    Task& operator=(Task&&) = delete;
-  };
+    struct Task {
+        ip::udp::endpoint sender;
+        size_t size;
+        Packet pack;
 
-  typedef FUQueue<Task, 1000000lu> Queue;
+        Task() {
+        }
 
-  Task& allocNext();
-  void enQueueLast();
+        Task(const Task&) = delete;
+        Task(Task&&) = delete;
+        Task& operator=(const Task&) = delete;
+        Task& operator=(Task&&) = delete;
+    };
 
-  TaskPtr<IPacMan> getNextTask();
-  void releaseTask(Queue::Element*);
+    typedef FUQueue<Task, 1000000lu> Queue;
+
+    Task& allocNext();
+    void enQueueLast();
+
+    TaskPtr<IPacMan> getNextTask();
+    void releaseTask(Queue::Element*);
 
 private:
-  Queue queue_;
-  typename Queue::Element* lastElt_;
-  bool lockedLast_ = false;
+    Queue queue_;
+    typename Queue::Element* lastElt_;
+    bool lockedLast_ = false;
 
-  RegionAllocator allocator_;
+    RegionAllocator allocator_;
 };
 
 class OPacMan {
 public:
-  const static std::size_t MaxTimesRedirect = 1;
+    const static std::size_t MaxTimesRedirect = 1;
 
-  struct Task {
-    ip::udp::endpoint endpoint;
-    Packet pack;
+    struct Task {
+        ip::udp::endpoint endpoint;
+        Packet pack;
 
-    Task() {
-    }
+        Task() {
+        }
 
-    Task(const Task&) = delete;
-    Task(Task&&) = delete;
-    Task& operator=(const Task&) = delete;
-    Task& operator=(Task&&) = delete;
-  };
+        Task(const Task&) = delete;
+        Task(Task&&) = delete;
+        Task& operator=(const Task&) = delete;
+        Task& operator=(Task&&) = delete;
+    };
 
-  typedef FUQueue<Task, 1000000lu> Queue;
+    typedef FUQueue<Task, 1000000lu> Queue;
 
-  Queue::Element* allocNext();
-  void enQueueLast(Queue::Element*);
+    Queue::Element* allocNext();
+    void enQueueLast(Queue::Element*);
 
-  TaskPtr<OPacMan> getNextTask();
-  void releaseTask(Queue::Element*);
+    TaskPtr<OPacMan> getNextTask();
+    void releaseTask(Queue::Element*);
 
 private:
-  Queue queue_;
+    Queue queue_;
 };
 
 #endif  // PACMANS_HPP
