@@ -798,4 +798,25 @@ bool SmartConsensus::smartConfidantExist(uint8_t confidantIndex) {
     return confidantIndex < smartConfidants_.size();
 }
 
+static void sendFakeStageOne(Node* pnode, cs::PublicKeys confidants, cs::Byte confidantIndex, uint64_t smartId) {
+    cs::StageOneSmarts fake;
+    fake.sender = confidantIndex;
+    fake.hash.fill(0);
+    fake.id = smartId;
+    pnode->sendSmartStageOne(confidants, fake);
+}
+
+static void sendFakeStageTwo(Node* pnode, cs::PublicKeys confidants, cs::Byte confidantIndex, uint64_t smartId) {
+    cs::StageTwoSmarts fake;
+    fake.sender = confidantIndex;
+    size_t cnt = confidants.size();
+    cs::Hash zHash;
+    cs::Signature zSignature;
+    zHash.fill(0);
+    zSignature.fill(0);
+    fake.hashes.resize(cnt, zHash);
+    fake.signatures.resize(cnt, zSignature);
+    pnode->sendSmartStageTwo(confidants, fake);
+}
+
 }  // namespace cs

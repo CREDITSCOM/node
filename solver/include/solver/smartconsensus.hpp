@@ -49,6 +49,10 @@ public:
     void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
     void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
     void addSmartStageThree(cs::StageThreeSmarts& stage, bool send);
+
+    static void sendFakeStageOne(Node * pnode, cs::PublicKeys confidants, cs::Byte confidantIndex, uint64_t smartId);
+    static void sendFakeStageTwo(Node * pnode, cs::PublicKeys confidants, cs::Byte confidantIndex, uint64_t smartId);
+
     // void getSmartResult(const cs::TransactionsPacket pack);
     void refreshSmartStagesStorage();
     void processStages();
@@ -144,4 +148,5 @@ private:
     std::vector<cs::Stage> smartStageTemporary_;
     cs::Bytes smartConsensusMask;
 };
+
 }  // namespace cs
