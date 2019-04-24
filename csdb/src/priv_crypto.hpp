@@ -18,13 +18,13 @@ namespace priv {
 
 struct crypto {
 #ifndef CSDB_UNIT_TEST
-  static const size_t hash_size = cscrypto::kHashSize;
-  static const size_t public_key_size = cscrypto::kPublicKeySize;
+    static const size_t hash_size = cscrypto::kHashSize;
+    static const size_t public_key_size = cscrypto::kPublicKeySize;
 #else
-  static const size_t hash_size = sizeof(size_t);
-  static const size_t public_key_size = 20;
+    static const size_t hash_size = sizeof(size_t);
+    static const size_t public_key_size = 20;
 #endif
-  static cs::Bytes calc_hash(const cs::Bytes &buffer) noexcept;
+    static cs::Bytes calc_hash(const cs::Bytes &buffer) noexcept;
 };
 
 }  // namespace priv

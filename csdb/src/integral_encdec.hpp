@@ -17,7 +17,7 @@ namespace csdb {
 namespace priv {
 enum
 {
-  MAX_INTEGRAL_ENCODED_SIZE = sizeof(uint64_t) + 1,
+    MAX_INTEGRAL_ENCODED_SIZE = sizeof(uint64_t) + 1,
 };
 
 /**
@@ -29,10 +29,8 @@ enum
  * @return  Количество байт, записанное в буфер.
  */
 template <typename T>
-typename std::enable_if<(std::is_integral<T>::value || std::is_enum<T>::value) && (sizeof(T) <= sizeof(uint64_t)),
-                        std::size_t>::type
-encode(void *buf, T value) {
-  return encode<uint64_t>(buf, static_cast<uint64_t>(value));
+typename std::enable_if<(std::is_integral<T>::value || std::is_enum<T>::value) && (sizeof(T) <= sizeof(uint64_t)), std::size_t>::type encode(void *buf, T value) {
+    return encode<uint64_t>(buf, static_cast<uint64_t>(value));
 }
 
 /**
@@ -46,15 +44,14 @@ encode(void *buf, T value) {
  *          содержат ошибку или данных недостаточно для полного декодирования.
  */
 template <typename T>
-typename std::enable_if<(std::is_integral<T>::value || std::is_enum<T>::value) && (sizeof(T) <= sizeof(uint64_t)),
-                        std::size_t>::type
-decode(const void *buf, std::size_t size, T &value) {
-  uint64_t v;
-  std::size_t res = decode<uint64_t>(buf, size, v);
-  if (0 != res) {
-    value = static_cast<T>(v);
-  }
-  return res;
+typename std::enable_if<(std::is_integral<T>::value || std::is_enum<T>::value) && (sizeof(T) <= sizeof(uint64_t)), std::size_t>::type decode(const void *buf, std::size_t size,
+                                                                                                                                             T &value) {
+    uint64_t v;
+    std::size_t res = decode<uint64_t>(buf, size, v);
+    if (0 != res) {
+        value = static_cast<T>(v);
+    }
+    return res;
 }
 
 template<>
