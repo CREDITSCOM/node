@@ -1,8 +1,8 @@
 #pragma once
 #include "callsqueuescheduler.hpp"
-#include "timeouttracking.hpp"
 #include "consensus.hpp"
 #include "stage.hpp"
+#include "timeouttracking.hpp"
 
 //#include <csnode/node.hpp>
 //#include <solvercore.hpp>
@@ -20,131 +20,127 @@
 class Node;
 
 namespace cs {
-  class SolverCore;
-  class SmartContracts;
+class SolverCore;
+class SmartContracts;
 
-  class SmartConsensus{
-    public:
+class SmartConsensus {
+public:
+    /*SmartConsensus();*/
 
-      /*SmartConsensus();*/
+    SmartConsensus(/*Node* node*/);
 
-      SmartConsensus(/*Node* node*/);
+    ~SmartConsensus();
 
-      ~SmartConsensus();
+    bool initSmartRound(const cs::TransactionsPacket& pack, uint8_t runCounter, Node* node, SmartContracts* smarts);
+    uint8_t calculateSmartsConfNum();
+    uint8_t ownSmartsConfidantNumber();
 
-      bool initSmartRound(const cs::TransactionsPacket& pack, uint8_t runCounter, Node* node, SmartContracts* smarts);
-      uint8_t calculateSmartsConfNum();
-      uint8_t ownSmartsConfidantNumber();
+    template <class T>
+    bool smartStageEnough(const std::vector<T>& smartStageStorage, const std::string& funcName);
 
-      template<class T>
-      bool smartStageEnough(const std::vector<T>& smartStageStorage, const std::string& funcName);
+    void startTimer(int st);
+    void killTimer();
+    void fakeStage(uint8_t confIndex);
 
-      void startTimer(int st);
-      void killTimer();
-      void fakeStage(uint8_t confIndex);
+    // cs::PublicKey smartAddress();
+    // Solver smarts consensus methods
+    // void smartStagesStorageClear(size_t cSize);
 
-      //cs::PublicKey smartAddress();
-      //Solver smarts consensus methods
-      //void smartStagesStorageClear(size_t cSize);
+    void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
+    void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
+    void addSmartStageThree(cs::StageThreeSmarts& stage, bool send);
+    // void getSmartResult(const cs::TransactionsPacket pack);
+    void refreshSmartStagesStorage();
+    void processStages();
+    csdb::Amount calculateFinalFee(const csdb::Amount& finalFee, size_t realTrustedAmount);
 
-      void addSmartStageOne(cs::StageOneSmarts& stage, bool send);
-      void addSmartStageTwo(cs::StageTwoSmarts& stage, bool send);
-      void addSmartStageThree(cs::StageThreeSmarts& stage, bool send);
-      //void getSmartResult(const cs::TransactionsPacket pack);
-      void refreshSmartStagesStorage();
-      void processStages();
-      csdb::Amount calculateFinalFee(const csdb::Amount& finalFee, size_t realTrustedAmount);
+    bool smartStageOneEnough();
+    bool smartStageTwoEnough();
+    bool smartStageThreeEnough();
+    cs::Sequence smartRoundNumber();
 
+    void createFinalTransactionSet(const csdb::Amount finalFee);
+    size_t smartStage3StorageSize();
+    void sendFinalTransactionSet();
+    bool smartConfidantExist(uint8_t);
+    void gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRound, uint32_t startTransaction, uint8_t requesterNumber, uint8_t requiredNumber, const cs::PublicKey& requester);
 
-      bool smartStageOneEnough();
-      bool smartStageTwoEnough();
-      bool smartStageThreeEnough();
-      cs::Sequence smartRoundNumber();
+    void requestSmartStages(int st);
+    void requestSmartStagesNeighbors(int st);
+    void markSmartOutboundNodes(int st);
 
-      void createFinalTransactionSet(const csdb::Amount finalFee);
-      size_t smartStage3StorageSize();
-      void sendFinalTransactionSet();
-      bool smartConfidantExist(uint8_t);
-      void gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRound, uint32_t startTransaction,
-        uint8_t requesterNumber, uint8_t requiredNumber, const cs::PublicKey& requester);
+    const std::vector<cs::PublicKey>& smartConfidants() const;
 
-      void requestSmartStages(int st);
-      void requestSmartStagesNeighbors(int st);
-      void markSmartOutboundNodes(int st);
+    TimeoutTracking timeout_request_stage;
+    TimeoutTracking timeout_request_neighbors;
+    TimeoutTracking timeout_force_transition;
+    int timeoutStageCounter_;
 
-      const std::vector<cs::PublicKey>& smartConfidants() const;
-
-      TimeoutTracking timeout_request_stage;
-      TimeoutTracking timeout_request_neighbors;
-      TimeoutTracking timeout_force_transition;
-      int timeoutStageCounter_;
-
-      uint8_t runCounter() const {
+    uint8_t runCounter() const {
         return runCounter_;
-      }
+    }
 
-      // smartRoundNumber[5 bytes] + smartTransaction[2 bytes] + runCounter[1 byte]
-      uint64_t id() const {
+    // smartRoundNumber[5 bytes] + smartTransaction[2 bytes] + runCounter[1 byte]
+    uint64_t id() const {
         return (((smartRoundNumber_ & 0xFFFFFFFFFF) << 24) | ((0x0000FFFF & smartTransaction_) << 8) | static_cast<uint64_t>(runCounter_));
-      }
+    }
 
-      static inline cs::Sequence blockPart(uint64_t id) {
+    static inline cs::Sequence blockPart(uint64_t id) {
         return ((id >> 24) & 0x000000FFFFFFFFFF);
-      }
+    }
 
-      static inline uint32_t transactionPart(uint64_t id) {
+    static inline uint32_t transactionPart(uint64_t id) {
         return ((id >> 8) & 0x000000000000FFFF);
-      }
+    }
 
-      static inline uint32_t runCounterPart(uint64_t id) {
+    static inline uint32_t runCounterPart(uint64_t id) {
         return (id & 0x00000000000000FF);
-      }
-  
-  private:
+    }
 
-      void fake_stage1(uint8_t from);
-      void fake_stage2(uint8_t from);
+private:
+    void fake_stage1(uint8_t from);
+    void fake_stage2(uint8_t from);
 
-      void init_zero(cs::StageOneSmarts & stage);
-      void init_zero(cs::StageTwoSmarts & stage);
+    void init_zero(cs::StageOneSmarts& stage);
+    void init_zero(cs::StageTwoSmarts& stage);
 
-      CallsQueueScheduler::CallTag timer_tag_{ CallsQueueScheduler::no_tag };
-      CallsQueueScheduler::CallTag timer_tag() {
+    CallsQueueScheduler::CallTag timer_tag_{CallsQueueScheduler::no_tag};
+    CallsQueueScheduler::CallTag timer_tag() {
         if (timer_tag_ == CallsQueueScheduler::no_tag) {
-          timer_tag_ = id();
+            timer_tag_ = id();
         }
         return timer_tag_;
-      }
+    }
 
-      Node* pnode_;
-      SmartContracts* psmarts_;
+    Node* pnode_;
+    SmartContracts* psmarts_;
 
-      std::vector<cs::StageOneSmarts> smartStageOneStorage_;
-      std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
-      std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
-      std::vector<cs::StageThreeSmarts> smartStageThreeTempStorage_;
-      bool smartStagesStorageRefreshed_ = false;
-      std::vector<cs::PublicKey> smartConfidants_;
-      uint8_t ownSmartsConfNum_ = cs::ConfidantConsts::InvalidConfidantIndex;
-      cs::TransactionsPacket currentSmartTransactionPack_;
-      cs::TransactionsPacket finalSmartTransactionPack_;
-      csdb::Transaction tmpNewState_;
-      cs::StageOneSmarts st1;
-      cs::StageTwoSmarts st2;
-      cs::StageThreeSmarts st3;
-      std::vector <int> smartUntrusted;
-      std::vector <csdb::Pool::SmartSignature> solverSmartSignatures_;
-      cs::Sequence smartRoundNumber_;
-      uint32_t smartTransaction_;
-      uint8_t runCounter_;
-      bool trustedChanged_ = false;
-      bool smartStageThreeSent_ = false;
-      cs::Hash  zeroHash;
-      cs::Signature  zeroSignature;
-      std::vector<cs::Bytes> smartStageOneMessage_;
-      std::vector<cs::Bytes> smartStageTwoMessage_;
-      std::vector<cs::Bytes> smartStageThreeMessage_;
+    std::vector<cs::StageOneSmarts> smartStageOneStorage_;
+    std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
+    std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
+    std::vector<cs::StageThreeSmarts> smartStageThreeTempStorage_;
+    bool smartStagesStorageRefreshed_ = false;
+    std::vector<cs::PublicKey> smartConfidants_;
+    uint8_t ownSmartsConfNum_ = cs::ConfidantConsts::InvalidConfidantIndex;
+    cs::TransactionsPacket currentSmartTransactionPack_;
+    cs::TransactionsPacket finalSmartTransactionPack_;
+    csdb::Transaction tmpNewState_;
+    cs::StageOneSmarts st1;
+    cs::StageTwoSmarts st2;
+    cs::StageThreeSmarts st3;
+    std::vector<int> smartUntrusted;
+    std::vector<csdb::Pool::SmartSignature> solverSmartSignatures_;
+    cs::Sequence smartRoundNumber_;
+    uint32_t smartTransaction_;
+    uint8_t runCounter_;
+    bool trustedChanged_ = false;
+    bool smartStageThreeSent_ = false;
+    cs::Hash zeroHash;
+    cs::Signature zeroSignature;
+    std::vector<cs::Bytes> smartStageOneMessage_;
+    std::vector<cs::Bytes> smartStageTwoMessage_;
+    std::vector<cs::Bytes> smartStageThreeMessage_;
 
-      std::vector<cs::Stage> smartStageTemporary_;
-  };
-}
+    std::vector<cs::Stage> smartStageTemporary_;
+};
+}  // namespace cs

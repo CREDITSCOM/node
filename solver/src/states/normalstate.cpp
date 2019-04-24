@@ -16,7 +16,7 @@
 namespace cs {
 
 void NormalState::on(SolverContext& context) {
-  DefaultStateBehavior::on(context);
+    DefaultStateBehavior::on(context);
 }
 
-}  // namespace slv2
+}  // namespace cs

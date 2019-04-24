@@ -5,9 +5,9 @@
 namespace cs {
 
 void WritingState::on(SolverContext& context) {
-  // simply try to spawn next round
-  csdebug() << name() << ": spawn next round";
-  context.sendRoundTable();
+    // simply try to spawn next round
+    csdebug() << name() << ": spawn next round";
+    context.sendRoundTable();
 }
 
-}  // namespace slv2
+}  // namespace cs

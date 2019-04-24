@@ -18,29 +18,28 @@ namespace cs {
 
 class TrustedPostStageState final : public DefaultStateBehavior {
 public:
-  ~TrustedPostStageState() override {
-  }
+    ~TrustedPostStageState() override {
+    }
 
-  void on(SolverContext& context) override;
+    void on(SolverContext& context) override;
 
-  void off(SolverContext& context) override;
+    void off(SolverContext& context) override;
 
-  Result onStage3(SolverContext& context, const cs::StageThree& stage) override;
+    Result onStage3(SolverContext& context, const cs::StageThree& stage) override;
 
-  const char* name() const override {
-    return "Trusted-Z";
-  }
-  void request_stages(SolverContext& context);
-  void request_stages_neighbors(SolverContext& context);
-  void mark_outbound_nodes(SolverContext& context);
+    const char* name() const override {
+        return "Trusted-Z";
+    }
+    void request_stages(SolverContext& context);
+    void request_stages_neighbors(SolverContext& context);
+    void mark_outbound_nodes(SolverContext& context);
 
 protected:
+    size_t cnt_recv_stages;
 
-  size_t cnt_recv_stages;
-
-  TimeoutTracking timeout_request_stage;
-  TimeoutTracking timeout_request_neighbors;
-  TimeoutTracking timeout_force_transition;
+    TimeoutTracking timeout_request_stage;
+    TimeoutTracking timeout_request_neighbors;
+    TimeoutTracking timeout_force_transition;
 };
 
-}  // namespace slv2
+}  // namespace cs
