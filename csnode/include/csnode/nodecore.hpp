@@ -23,7 +23,7 @@ namespace std {
 // transactions packet hash specialization
 template <>
 struct hash<cs::TransactionsPacketHash> {
-  std::size_t operator()(const cs::TransactionsPacketHash& packetHash) const noexcept;
+    std::size_t operator()(const cs::TransactionsPacketHash& packetHash) const noexcept;
 };
 }  // namespace std
 
@@ -51,92 +51,92 @@ using PoolsRequestedSequences = std::vector<cs::Sequence>;
 using PoolsBlock = std::vector<csdb::Pool>;
 
 enum NodeConsts : uint32_t {
-  NeighboursRequestDelay = 350
+    NeighboursRequestDelay = 350
 };
 
 enum ConveyerConsts : uint32_t {
-  TransactionsFlushRound = 2,
-  TransactionsPacketInterval = 1000,
-  MaxPacketTransactions = 500,
+    TransactionsFlushRound = 2,
+    TransactionsPacketInterval = 1000,
+    MaxPacketTransactions = 500,
 };
 
 enum ConfidantConsts : uint8_t {
-  FirstWriterIndex = std::numeric_limits<uint8_t>::min(),
-  InvalidConfidantIndex = std::numeric_limits<uint8_t>::max(),
+    FirstWriterIndex = std::numeric_limits<uint8_t>::min(),
+    InvalidConfidantIndex = std::numeric_limits<uint8_t>::max(),
 };
 
 enum SpoilingConsts : uint8_t {
-  SpoilByRoundNumber,
-  SpoilByPublicKey,
+    SpoilByRoundNumber,
+    SpoilByPublicKey,
 };
 
 // all info about round
 struct Characteristic {
-  cs::Bytes mask;
+    cs::Bytes mask;
 };
 
 struct RoundTable {
-  RoundNumber round = 0;
-  PublicKey general;
-  ConfidantsKeys confidants;
-  PacketsHashes hashes;
-  Characteristic characteristic;
+    RoundNumber round = 0;
+    PublicKey general;
+    ConfidantsKeys confidants;
+    PacketsHashes hashes;
+    Characteristic characteristic;
 };
 
 struct PoolMetaInfo {
-  std::string timestamp;
-  cs::PublicKey writerKey;
-  csdb::PoolHash previousHash;
-  cs::Sequence sequenceNumber;
-  cs::Bytes realTrustedMask;
-  std::vector <csdb::Pool::SmartSignature> smartSignatures;
-  cs::Bytes confirmationMask;
-  cs::Signatures confirmations;
+    std::string timestamp;
+    cs::PublicKey writerKey;
+    csdb::PoolHash previousHash;
+    cs::Sequence sequenceNumber;
+    cs::Bytes realTrustedMask;
+    std::vector<csdb::Pool::SmartSignature> smartSignatures;
+    cs::Bytes confirmationMask;
+    cs::Signatures confirmations;
 };
 
 struct HashVector {
-  cs::Byte sender;
-  cs::Hash hash;
-  cs::Signature signature;
+    cs::Byte sender;
+    cs::Hash hash;
+    cs::Signature signature;
 };
 
 constexpr std::size_t hashVectorCount = 5;
 
 struct HashMatrix {
-  cs::Byte sender;
-  cs::HashVector hashVector[hashVectorCount];
-  cs::Signature signature;
+    cs::Byte sender;
+    cs::HashVector hashVector[hashVectorCount];
+    cs::Signature signature;
 };
 
 // metas
 struct PoolSyncMeta {
-  csdb::Pool pool;
-  cs::Signature signature;
-  cs::PublicKey sender;
+    csdb::Pool pool;
+    cs::Signature signature;
+    cs::PublicKey sender;
 };
 
 using PoolMetaMap = std::map<cs::Sequence, cs::PoolSyncMeta>;
 
 struct ConveyerMeta {
-  cs::Characteristic characteristic;
-  cs::TransactionsPacketTable hashTable;
-  cs::PacketsHashes neededHashes;
-  cs::RoundTable roundTable;
-  cs::Notifications notifications;
-  cs::TransactionsPacket invalidTransactions;
+    cs::Characteristic characteristic;
+    cs::TransactionsPacketTable hashTable;
+    cs::PacketsHashes neededHashes;
+    cs::RoundTable roundTable;
+    cs::Notifications notifications;
+    cs::TransactionsPacket invalidTransactions;
 };
 
 struct CharacteristicMeta {
-  cs::Bytes bytes;
-  cs::PublicKey sender;
-  cs::Signatures signatures;
-  cs::Bytes realTrusted;
+    cs::Bytes bytes;
+    cs::PublicKey sender;
+    cs::Signatures signatures;
+    cs::Bytes realTrusted;
 };
 
 struct RoundTableMessage {
-  cs::Bytes message;
-  cs::RoundNumber round = 0;
-  cs::PublicKey sender;
+    cs::Bytes message;
+    cs::RoundNumber round = 0;
+    cs::PublicKey sender;
 };
 
 // meta storages
