@@ -27,29 +27,29 @@ using Integral = int32_t;
 using Fraction = int64_t;
 
 struct Amount {
-  Integral integral = 0;
-  Fraction fraction = 0;
+    Integral integral = 0;
+    Fraction fraction = 0;
 };
 
 using Balance = Amount;
 using Currency = uint8_t;
 
 struct TotalAmount {
-  int64_t integral = 0;
-  int64_t fraction = 0;
+    int64_t integral = 0;
+    int64_t fraction = 0;
 };
 
 using BalancePerCurrency = std::unordered_map<Currency, TotalAmount>;
 using TimeStamp = std::chrono::system_clock::time_point;
 
 struct PeriodStats {
-  period_t periodSec = 0;
-  Count poolsCount = 0;
-  Count transactionsCount = 0;
-  BalancePerCurrency balancePerCurrency;
-  Count smartContractsCount = 0;
-  Count transactionsSmartCount = 0;
-  TimeStamp timeStamp;
+    period_t periodSec = 0;
+    Count poolsCount = 0;
+    Count transactionsCount = 0;
+    BalancePerCurrency balancePerCurrency;
+    Count smartContractsCount = 0;
+    Count transactionsSmartCount = 0;
+    TimeStamp timeStamp;
 };
 
 using StatsPerPeriod = std::vector<PeriodStats>;
@@ -57,12 +57,12 @@ using StatsCut = std::deque<PeriodStats>;
 using AllStats = std::pair<StatsCut, StatsPerPeriod>;
 
 enum PeriodIndex {
-  Day = 0,
-  Week,
-  Month,
-  Total,
+    Day = 0,
+    Week,
+    Month,
+    Total,
 
-  PeriodsCount
+    PeriodsCount
 };
 
 #ifdef NO_FAST_UPDATE
@@ -75,37 +75,37 @@ const Periods collectionPeriods = {secondsPerDay, secondsPerDay * 7, secondsPerD
 
 class csstats {
 public:
-  csstats(BlockChain& blockchain);
+    csstats(BlockChain& blockchain);
 
-  StatsPerPeriod getStats();
+    StatsPerPeriod getStats();
 
-  ~csstats();
+    ~csstats();
 
-  void run();
+    void run();
 
 private:
-  std::thread thread;
+    std::thread thread;
 
-  std::mutex mutex;
-  using ScopedLock = std::lock_guard<std::mutex>;
-  std::atomic<bool> quit = {false};
+    std::mutex mutex;
+    using ScopedLock = std::lock_guard<std::mutex>;
+    std::atomic<bool> quit = {false};
 
-  StatsPerPeriod currentStats;
-  StatsCut statsCut;
-  csdb::PoolHash lastHash;
+    StatsPerPeriod currentStats;
+    StatsCut statsCut;
+    csdb::PoolHash lastHash;
 
-  std::mutex currentStatsMutex;
-  std::chrono::system_clock::time_point lastUpdateTime = std::chrono::system_clock::from_time_t(0);
+    std::mutex currentStatsMutex;
+    std::chrono::system_clock::time_point lastUpdateTime = std::chrono::system_clock::from_time_t(0);
 
-  BlockChain& blockchain;
+    BlockChain& blockchain;
 
-  StatsPerPeriod collectStats(const Periods& periods);
-  AllStats collectAllStats(const Periods& periods);
+    StatsPerPeriod collectStats(const Periods& periods);
+    AllStats collectAllStats(const Periods& periods);
 
-  template <class F>
-  void matchPeriod(const Periods& periods, period_t period, F func);
+    template <class F>
+    void matchPeriod(const Periods& periods, period_t period, F func);
 
-  std::map<std::string, Currency> currencies_indexed = {{"CS", 1}};
+    std::map<std::string, Currency> currencies_indexed = {{"CS", 1}};
 };
 }  // namespace csstats
 
