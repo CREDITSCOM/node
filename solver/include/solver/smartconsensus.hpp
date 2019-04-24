@@ -142,5 +142,6 @@ private:
     std::vector<cs::Bytes> smartStageThreeMessage_;
 
     std::vector<cs::Stage> smartStageTemporary_;
+    cs::Bytes smartConsensusMask;
 };
 }  // namespace cs
