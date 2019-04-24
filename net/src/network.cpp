@@ -296,6 +296,10 @@ void Network::processorRoutine() {
 
     for (uint64_t i = 0; i < tasks; i++) {
       auto task = iPacMan_.getNextTask();
+      if (!task->pack.data_.ptr_) {
+        cslog() << "net: invalid packet!!!!!!!!!";
+        continue;
+      }
       processTask(task);
     }
 #endif

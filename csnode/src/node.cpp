@@ -52,23 +52,14 @@ Node::Node(const Config& config)
 
   cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
   cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
-  cs::Connector::connect(&blockChain_.storeBlockEvent, &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort), &executor::Executor::onBlockStored);
+
+  auto ptr_exec = &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort);
+  cs::Connector::connect(&blockChain_.storeBlockEvent, ptr_exec, &executor::Executor::onBlockStored);
+  cs::Connector::connect(blockChain_.getStorage().read_block_event(), ptr_exec, &executor::Executor::onReadBlock);
+  
   cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
 
-#ifdef NODE_API
-  std::cout << "Init API... ";
-  api_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
-    csconnector::Config {
-     config.getApiSettings().port,
-     config.getApiSettings().ajaxPort,
-     config.getApiSettings().executorPort,
-     config.getApiSettings().apiexecPort
-    });
-  std::cout << "Done\n";
-  cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
-  cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
-#endif // NODE_API
-
+  cs::Connector::connect( &Node::stopRequested, this, &Node::onStopRequested );
   good_ = init(config);
 }
 
@@ -81,6 +72,21 @@ Node::~Node() {
 }
 
 bool Node::init(const Config& config) {
+
+#ifdef NODE_API
+  std::cout << "Init API... ";
+  api_ = std::make_unique<csconnector::connector>(blockChain_, solver_,
+    csconnector::Config{
+     config.getApiSettings().port,
+     config.getApiSettings().ajaxPort,
+     config.getApiSettings().executorPort,
+     config.getApiSettings().apiexecPort
+    });
+  std::cout << "Done\n";
+  cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
+  cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
+#endif // NODE_API
+
   if(!blockChain_.init(config.getPathToDB())) {
     return false;
   }
@@ -241,7 +247,7 @@ void Node::getKeySS(const cs::PublicKey& key)
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
   istream_.init(data, size);
-  if (!(cs::Conveyer::instance().currentRoundNumber() == 0 && rNum == 1)) {
+  if (cs::Conveyer::instance().currentRoundNumber() != 0) {
     csdebug() << "The RoundTable sent by SS doesn't correspond to the current RoundNumber";
     return;
   }
@@ -269,49 +275,7 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
 
     return;
   }
-
-  // "hot" start
-  handleRoundMismatch(roundTable);
-}
-
-// handle mismatch between own round & global round, calling code should detect mismatch before calling to the method
-void Node::handleRoundMismatch(const cs::RoundTable& globalTable) {
-  csmeta(csdetails) << "round: " << globalTable.round;
-  const auto& localTable = cs::Conveyer::instance().currentRoundTable();
-
-  if (localTable.round == globalTable.round) {
-    // mismatch not confirmed
-    return;
-  }
-
-  // global round is behind local one
-  if (localTable.round > globalTable.round) {
-    // TODO: in case of bigbang, rollback round(s), then accept global_table, then start round again
-
-    if (localTable.round - globalTable.round == 1) {
-      csdebug() << "NODE> we are a one round forward, wait";
-      //csdebug() << "NODE> re-send last round info may help others to go to round #" << localTable.round;
-      //tryResendRoundTable(std::nullopt, localTable.round);  // broadcast round info
-    }
-    else {
-      // TODO: Test if we are in proper blockchain
-
-      // TODO: rollback local round to global one
-
-      cserror() << "NODE> round rollback (from #" << localTable.round << " to #" << globalTable.round
-                << " not implemented yet";
-    }
-    return;
-  }
-
-  // local round is behind global one
-  const auto last_block = blockChain_.getLastSequence();
-  if (last_block + cs::Conveyer::HashTablesStorageCapacity < globalTable.round) {
-    // activate pool synchronizer
-
-    poolSynchronizer_->sync(globalTable.round);
-    // no return, ask for next round info
-  }
+  poolSynchronizer_->sync(rNum);
 }
 
 void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
@@ -346,9 +310,9 @@ void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
 
   cswarning() << "NODE> Get stop request, node will be closed...";
 
-  cs::Timer::singleShot(TIME_TO_AWAIT_ACTIVITY << 5, cs::RunPolicy::CallQueuePolicy, [this] {
-    stop();
-  });
+  stopRequested_ = true;
+  // unconditional stop
+  stop();
 }
 
 bool Node::canBeTrusted() {
@@ -358,6 +322,10 @@ bool Node::canBeTrusted() {
   return false;
 
 #else
+
+  if (stopRequested_) {
+    return false;
+  }
 
   if (Consensus::DisableTrustedRequestNextRound) {
     // ignore flag after bigbang
@@ -895,7 +863,7 @@ void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequested
   ostream_.clear();
 }
 
-Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type) {
+Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type, const cs::PublicKey sender) {
   if (!good_) {
     return MessageActions::Drop;
   }
@@ -921,6 +889,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     case MsgTypes::TransactionsPacketReply:
     case MsgTypes::RoundTableRequest:
     case MsgTypes::RejectedContracts:
+    case MsgTypes::RoundPackRequest:
       return MessageActions::Process;
 
     default:
@@ -947,26 +916,6 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
   if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
     // which round would not be on the remote we may require the requested block or get block request
     return MessageActions::Process;
-  }
-
-  // outrunning packets of other types talk about round lag
-  if (rNum > round) {
-    if (rNum - round == 1) {
-      // wait for next round
-      return MessageActions::Postpone;
-    }
-    else {
-      // more then 1 round lag, request round info
-      if (round > 1 && subRound_ == 0) {
-        // not on the very start
-        cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << ")";
-        cs::RoundTable emptyRoundTable;
-        emptyRoundTable.round = rNum;
-        handleRoundMismatch(emptyRoundTable);
-      }
-
-      return MessageActions::Drop;
-    }
   }
 
   if (type == MsgTypes::RoundTableReply) {
@@ -1002,7 +951,27 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return type == MsgTypes::NewBlock ? MessageActions::Process : MessageActions::Drop;
   }
 
-  return (rNum == round ? MessageActions::Process : MessageActions::Postpone);
+  // outrunning packets mean round lag
+  if( rNum > round ) {
+    if( rNum - round == 1 ) {
+      // wait for next round
+      return MessageActions::Postpone;
+    }
+    else {
+      // more then 1 round lag, request round info
+      if( round > 1 && subRound_ == 0 ) {
+        // not on the very start
+        cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << ")";
+        roundPackRequest( sender, rNum );
+        //TODO: roundTableRequest(cs::PublicKey respondent);
+      }
+
+      return MessageActions::Drop;
+    }
+  }
+
+  // (rNum == round) => handle now
+  return MessageActions::Process;
 }
 
 inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
@@ -2379,6 +2348,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     //return;
   }
 
+  currentRoundTableMessage_.round = rNum;
+  currentRoundTableMessage_.sender = sender;
+  currentRoundTableMessage_.message = cs::Bytes(data ,data + size);
+
   cs::PacketsHashes hashes;
   roundStream >> hashes;
 
@@ -2414,6 +2387,9 @@ void Node::sendHash(cs::RoundNumber round) {
 
   csdebug() << "NODE> Sending hash to ALL";
   csdb::PoolHash spoiledHash = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
+  //if(round == 10 && myConfidantIndex_ == 1) {
+  //  round = round + 1000000000;
+  //}
   sendToConfidants(MsgTypes::BlockHash, round, subRound_, spoiledHash);
   csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_);
 }
@@ -2455,6 +2431,23 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
   //              << " DOES NOT MATCH to my value " << lastHash.to_string();
 
   //}
+}
+
+void Node::roundPackRequest(cs::PublicKey respondent, cs::RoundNumber round) {
+  csdebug() << "NODE> send request for round info  #" << round;
+  sendDefault(respondent, MsgTypes::RoundPackRequest, round);
+}
+
+void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
+  csdebug() << "NODE> getting roundPack request #" << rNum;
+  if (currentRoundTableMessage_.round = rNum && currentRoundTableMessage_.message.size()!=0) {
+    roundPackReply(sender);
+  }
+}
+
+void Node::roundPackReply(cs::PublicKey respondent) {
+  csdebug() << "NODE> sending roundPack reply to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
+  sendDefault(respondent, MsgTypes::RoundTable, currentRoundTableMessage_.round, currentRoundTableMessage_.message);
 }
 
 void Node::sendRoundTableRequest(uint8_t respondent) {
@@ -2561,6 +2554,10 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
   if (!found) {
     myLevel_ = Level::Normal;
+    if (stopRequested_) {
+      stop();
+      return;
+    }
   }
 
   // TODO: think how to improve this code.
@@ -2753,5 +2750,28 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     csmeta(csdebug) << "This node really have not valid HASH!!! Removing last block from DB and trying to syncronize";
     //TODO: examine what will be done without this function
     blockChain_.removeLastBlock();
+  }
+}
+
+/*static*/
+cs::Signal<void()> Node::stopRequested;
+
+/*static*/
+void Node::requestStop() {
+  /*signal*/ stopRequested();
+}
+
+void Node::onStopRequested() {
+  if( stopRequested_ ) {
+    // subsequent request is handled as unconditional stop
+    stop();
+    return;
+  }
+  stopRequested_ = true;
+  if( myLevel_ == Level::Confidant ) {
+    cslog() << "Node: wait until complete trusted role before exit";
+  }
+  else {
+    stop();
   }
 }

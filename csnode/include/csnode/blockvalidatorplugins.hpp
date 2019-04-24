@@ -1,7 +1,14 @@
 #ifndef BLOCK_VALIDATOR_PLUGINS_HPP
 #define BLOCK_VALIDATOR_PLUGINS_HPP
 
+#include <vector>
+
+#include <lib/system/common.hpp>
 #include <csnode/blockvalidator.hpp>
+#include <cscrypto/cryptotypes.hpp>
+#include <csdb/transaction.hpp>
+#include <csdb/amount.hpp>
+#include <csnode/transactionspacket.hpp>
 
 namespace cs {
 
@@ -14,9 +21,7 @@ public:
 
 protected:
   const BlockChain& getBlockChain() { return blockValidator_.bc_; }
-  auto getFeeCounter() { return blockValidator_.feeCounter_; }
   auto getWallets() { return blockValidator_.wallets_; }
-  auto getIterValidator() { return blockValidator_.iterValidator_; }
   auto& getPrevBlock() { return blockValidator_.prevBlock_; }
 
 private:
@@ -49,20 +54,42 @@ public:
 
 class SmartSourceSignaturesValidator : public ValidationPlugin {
 public:
+  using Transactions = std::vector<csdb::Transaction>;
+  using SmartSignatures = std::vector<csdb::Pool::SmartSignature>;
+  using Packets = std::vector<cs::TransactionsPacket>;
+
   SmartSourceSignaturesValidator(BlockValidator& bv) : ValidationPlugin(bv) {}
   ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+  bool containsNewState(const Transactions&);
+  Packets grepNewStatesPacks(const Transactions&, bool switchFees);
+  bool checkSignatures(const SmartSignatures&, const Packets&);
+
+  // must be performed if block version is 0
+  // to pass validation
+  csdb::Transaction switchCountedFee(const csdb::Transaction& newState);
 };
 
+///
+/// @brief check balances when prev block was added to blockchain
+///
 class BalanceChecker : public ValidationPlugin {
 public:
   BalanceChecker(BlockValidator& bv) : ValidationPlugin(bv) {}
   ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+  static constexpr csdb::Amount zeroBalance_ = 0;
 };
 
 class TransactionsChecker : public ValidationPlugin {
 public:
   TransactionsChecker(BlockValidator& bv) : ValidationPlugin(bv) {}
   ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+  bool checkSignature(const csdb::Transaction&);
 };
 } // namespace cs
 #endif // BLOCK_VALIDATOR_PLUGINS_HPP

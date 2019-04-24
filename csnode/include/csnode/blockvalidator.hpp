@@ -2,7 +2,7 @@
 #define BLOCK_VALIDATOR_HPP
 
 #include <memory>
-#include <vector>
+#include <map>
 
 #include <csdb/pool.hpp>
 
@@ -11,21 +11,21 @@ class BlockChain;
 namespace cs {
 
 class ValidationPlugin;
-class Fee;
-class IterValidator;
 class WalletsState; 
 
 class BlockValidator {
 public:
-  enum ValidationLevel : uint8_t {
-    hashIntergrity = 0,
-    blockNum,
-    timestamp,
-    blockSignatures,
-    smartSourceSignatures,
-    balances,
-    fullValidation,
-    noValidation = 255
+  using ValidationFlags = uint32_t;
+
+  enum ValidationLevel : uint32_t {
+    noValidation = 0,
+    hashIntergrity = 1,
+    blockNum = 1 << 1,
+    timestamp = 1 << 2,
+    blockSignatures = 1 << 3,
+    smartSignatures = 1 << 4,
+    balances = 1 << 5,
+    transactionsSignatures = 1 << 6
   };
 
   enum SeverityLevel : uint8_t {
@@ -36,7 +36,7 @@ public:
 
   explicit BlockValidator(const BlockChain&);
   ~BlockValidator();
-  bool validateBlock(const csdb::Pool&, ValidationLevel = hashIntergrity,
+  bool validateBlock(const csdb::Pool&, ValidationFlags = hashIntergrity,
                      SeverityLevel = greaterThanWarnings);
 
   BlockValidator(const BlockValidator&) = delete;
@@ -55,14 +55,11 @@ private:
   bool return_(ErrorType, SeverityLevel);
 
   const BlockChain& bc_;
-  std::vector<std::unique_ptr<ValidationPlugin>> plugins_;
+  std::map<ValidationLevel, std::unique_ptr<ValidationPlugin>> plugins_;
 
   friend class ValidationPlugin;
 
-  std::shared_ptr<Fee> feeCounter_;   
   std::shared_ptr<WalletsState> wallets_;
-  std::shared_ptr<IterValidator> iterValidator_;
-
   csdb::Pool prevBlock_;
 };
 } // namespace cs

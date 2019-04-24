@@ -37,6 +37,9 @@ void APIHandler::run() {
   if (!s_blockchain.isGood())
     return;
 
+#ifdef MONITOR_NODE
+  stats.run();
+#endif
   tm.run();  // Run this AFTER updating all the caches for maximal efficiency
 
   state_updater_running.test_and_set(std::memory_order_acquire);
@@ -714,7 +717,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     });
 
     if(new_state.empty()) {
-      SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+	  _return.status.code = ERROR_CODE;
+	  _return.status.message = "state is empty!";
       return;
     }
     else {
@@ -832,9 +836,14 @@ void APIHandler::store_block_slot(const csdb::Pool&) {
 }
 
 void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
+  if( !pool.is_valid() ) {
+    return;
+  }
   auto pending_smart_transactions = lockedReference(this->pending_smart_transactions);
   pending_smart_transactions->last_pull_hash = pool.hash();
-
+  if( pending_smart_transactions->last_pull_sequence < pool.sequence() ) {
+    pending_smart_transactions->last_pull_sequence = pool.sequence();
+  }
   auto& trs = pool.transactions();
   for (auto i_tr = trs.rbegin(); i_tr != trs.rend(); ++i_tr) {
     auto& tr = *i_tr;

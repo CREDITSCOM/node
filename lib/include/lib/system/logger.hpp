@@ -35,7 +35,7 @@ void cleanup();
 
 template <typename T = logging::trivial::logger>
 inline auto& getLogger() {
-  return T::get();
+    return T::get();
 }
 
 // <None> logger is used to eliminate logger code from build
@@ -43,30 +43,28 @@ BOOST_LOG_INLINE_GLOBAL_LOGGER_DEFAULT(None, logging::trivial::logger::logger_ty
 
 template <typename T = logging::trivial::logger>
 constexpr bool useLogger() {
-  return true;
+    return true;
 }
 template <>
 constexpr bool useLogger<None>() {
-  return false;
+    return false;
 }
 
 // Logger with channel "file", to support legacy csfile()
-BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channel_logger_mt<severity_level>,
-                                         (logging::keywords::channel = "file"))
+BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channel_logger_mt<severity_level>, (logging::keywords::channel = "file"))
 }  // namespace logger
 
-#define _LOG_SEV(level, ...)             \
-  if (!logger::useLogger<__VA_ARGS__>()) \
-    ;                                    \
-  else                                   \
-    BOOST_LOG_SEV(logger::getLogger<__VA_ARGS__>(), logger::severity_level::level)
+#define _LOG_SEV(level, ...)               \
+    if (!logger::useLogger<__VA_ARGS__>()) \
+        ;                                  \
+    else                                   \
+        BOOST_LOG_SEV(logger::getLogger<__VA_ARGS__>(), logger::severity_level::level)
 
-#define cstrace(...)                     \
-  if (!logger::useLogger<__VA_ARGS__>()) \
-    ;                                    \
-  else                                   \
-    BOOST_LOG_SEV(logger::getLogger<__VA_ARGS__>(), logger::severity_level::trace) \
-      << __FILE__ << ":" << __func__ << ":" << __LINE__ << " "
+#define cstrace(...)                       \
+    if (!logger::useLogger<__VA_ARGS__>()) \
+        ;                                  \
+    else                                   \
+        BOOST_LOG_SEV(logger::getLogger<__VA_ARGS__>(), logger::severity_level::trace) << __FILE__ << ":" << __func__ << ":" << __LINE__ << " "
 
 // set Filter="%Severity% >= trace" in config to view this level messages:
 #define csdetails(...) _LOG_SEV(trace, __VA_ARGS__)

@@ -147,6 +147,7 @@ public:
 
   bool is_valid() const noexcept;
   bool is_read_only() const noexcept;
+  uint8_t version() const noexcept;
   PoolHash previous_hash() const noexcept;
   cs::Sequence sequence() const noexcept;
   Storage storage() const noexcept;
@@ -159,6 +160,7 @@ public:
   const std::vector<cs::Signature>& roundConfirmations() const noexcept;
   size_t hashingLength() const noexcept;
 
+  void set_version(uint8_t version) noexcept;
   void set_previous_hash(PoolHash previous_hash) noexcept;
   void set_sequence(cs::Sequence sequence) noexcept;
   void set_storage(const Storage& storage) noexcept;

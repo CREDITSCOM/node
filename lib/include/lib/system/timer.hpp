@@ -24,58 +24,57 @@ using TimerPtr = std::shared_ptr<Timer>;
 ///
 class Timer {
 public:
-  enum : unsigned int {
-    RangeDeltaInPercents = 10
-  };
+    enum : unsigned int {
+        RangeDeltaInPercents = 10
+    };
 
-  enum class Type : cs::Byte {
-    Standard,
-    HighPrecise
-  };
+    enum class Type : cs::Byte {
+        Standard,
+        HighPrecise
+    };
 
-  Timer();
-  ~Timer();
+    Timer();
+    ~Timer();
 
-  void start(int msec, Type type = Type::Standard, RunPolicy policy = RunPolicy::ThreadPolicy);
-  void stop();
-  void restart();
+    void start(int msec, Type type = Type::Standard, RunPolicy policy = RunPolicy::ThreadPolicy);
+    void stop();
+    void restart();
 
-  bool isRunning() const;
-  Type type() const;
+    bool isRunning() const;
+    Type type() const;
 
-  static void singleShot(int msec, cs::RunPolicy policy, TimerCallback callback);
-  static TimerPtr create();
+    static void singleShot(int msec, cs::RunPolicy policy, TimerCallback callback);
+    static TimerPtr create();
 
 public signals:
 
-  // generates when timer ticks
-  TimeOutSignal timeOut;
+    // generates when timer ticks
+    TimeOutSignal timeOut;
 
 protected:
+    // timer main loop
+    void loop();
+    void preciseLoop();
 
-  // timer main loop
-  void loop();
-  void preciseLoop();
-
-  // timer rehabilitation when timer degradate
-  void rehabilitation();
-  void call();
+    // timer rehabilitation when timer degradate
+    void rehabilitation();
+    void call();
 
 private:
-  bool isRunning_;
-  bool isRehabilitation_;
-  std::atomic<bool> interruption_;
+    bool isRunning_;
+    bool isRehabilitation_;
+    std::atomic<bool> interruption_;
 
-  std::thread timerThread_;
-  Type type_;
-  std::atomic<RunPolicy> policy_;
+    std::thread timerThread_;
+    Type type_;
+    std::atomic<RunPolicy> policy_;
 
-  unsigned int allowDifference_;
-  std::chrono::milliseconds ms_;
-  std::atomic<int64_t> ns_;
+    unsigned int allowDifference_;
+    std::chrono::milliseconds ms_;
+    std::atomic<int64_t> ns_;
 
-  std::chrono::milliseconds realMs_;
-  std::chrono::time_point<std::chrono::system_clock> rehabilitationStartValue_;
+    std::chrono::milliseconds realMs_;
+    std::chrono::time_point<std::chrono::system_clock> rehabilitationStartValue_;
 };
 }  // namespace cs
 
