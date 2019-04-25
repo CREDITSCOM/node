@@ -1235,16 +1235,16 @@ const csdb::Address& BlockChain::getGenesisAddress() const {
     return genesisAddress_;
 }
 
-csdb::Address BlockChain::getAddressByType(const csdb::Address& addr, ADDR_TYPE type) const {
+csdb::Address BlockChain::getAddressByType(const csdb::Address& addr, AddressType type) const {
     csdb::Address addr_res{};
     switch (type) {
-        case ADDR_TYPE::PUBLIC_KEY:
+        case AddressType::PublicKey:
             if (addr.is_public_key() || !findAddrByWalletId(addr.wallet_id(), addr_res)) {
                 addr_res = addr;
             }
 
             break;
-        case ADDR_TYPE::ID:
+        case AddressType::Id:
             uint32_t _id;
             if (findWalletId(addr, _id)) {
                 addr_res = csdb::Address::from_wallet_id(_id);
@@ -1256,7 +1256,7 @@ csdb::Address BlockChain::getAddressByType(const csdb::Address& addr, ADDR_TYPE 
 }
 
 bool BlockChain::isEqual(const csdb::Address& laddr, const csdb::Address& raddr) const {
-    if (getAddressByType(laddr, ADDR_TYPE::PUBLIC_KEY) == getAddressByType(raddr, ADDR_TYPE::PUBLIC_KEY)) {
+    if (getAddressByType(laddr, AddressType::PublicKey) == getAddressByType(raddr, AddressType::PublicKey)) {
         return true;
     }
 

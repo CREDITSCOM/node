@@ -60,12 +60,12 @@ public:
 
     // utility methods
 
-    enum class ADDR_TYPE {
-        PUBLIC_KEY,
-        ID
+    enum class AddressType {
+        PublicKey,
+        Id
     };
 
-    csdb::Address getAddressByType(const csdb::Address& addr, ADDR_TYPE type) const;
+    csdb::Address getAddressByType(const csdb::Address& addr, AddressType type) const;
     bool isEqual(const csdb::Address& laddr, const csdb::Address& raddr) const;
 
     static csdb::Address getAddressFromKey(const std::string&);

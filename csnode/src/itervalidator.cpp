@@ -144,7 +144,7 @@ bool IterValidator::deployAdditionalCheck(SolverContext& context, size_t trxInd,
     auto sci = context.smart_contracts().get_smart_contract(transaction);
 
     if (sci.has_value() && sci.value().method.empty()) {  // is deploy
-        csdb::Address deployer = context.blockchain().getAddressByType(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+        csdb::Address deployer = context.blockchain().getAddressByType(transaction.source(), BlockChain::AddressType::PublicKey);
         isValid = SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target();
     }
 
