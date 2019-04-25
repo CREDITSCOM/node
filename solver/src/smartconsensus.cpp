@@ -12,7 +12,7 @@
 #include <solvercore.hpp>
 
 namespace {
-const char* log_prefix = "Smart: ";
+const char* kLogPrefix = "Smart: ";
 }
 
 namespace cs {
@@ -23,7 +23,7 @@ SmartConsensus::SmartConsensus() {
 }
 
 SmartConsensus::~SmartConsensus() {
-    cslog() << log_prefix << "======================  SMART-ROUND {" << smartRoundNumber_ << '.' << smartTransaction_ << "} END =====================";
+    cslog() << kLogPrefix << "======================  SMART-ROUND {" << smartRoundNumber_ << '.' << smartTransaction_ << "} END =====================";
     killTimer();
     pnode_->removeSmartConsensus(id());
     cs::Connector::disconnect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
@@ -94,23 +94,23 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     }
 
     if (!primary_new_state_found || 0 == smartRoundNumber_ || std::numeric_limits<uint32_t>::max() == smartTransaction_) {
-        cserror() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart contract result packet must contain new state transaction";
+        cserror() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart contract result packet must contain new state transaction";
         return false;
     }
 
-    csdebug() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} consensus starting on R-" << cs::Conveyer::instance().currentRoundNumber() << "... ";
+    csdebug() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} consensus starting on R-" << cs::Conveyer::instance().currentRoundNumber() << "... ";
 
     smartConfidants_ = pnode_->retriveSmartConfidants(smartRoundNumber_);
     ownSmartsConfNum_ = calculateSmartsConfNum();
     refreshSmartStagesStorage();
     if (ownSmartsConfNum_ == cs::InvalidConfidantIndex) {
-        cserror() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} cannot determine own number in confidant list";
+        cserror() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} cannot determine own number in confidant list";
         return false;
     }
 
     cslog() << "======================  SMART-ROUND: {" << smartRoundNumber_ << '.' << smartTransaction_ << "} [" << static_cast<int>(ownSmartsConfNum_)
             << "] =========================";
-    csdebug() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} SMART confidants (" << smartConfidants_.size()
+    csdebug() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} SMART confidants (" << smartConfidants_.size()
               << "), proposed fee: " << executor_fee.to_string(18);
 
     // pack_.transactions(0).user_field(1) = 0;
@@ -140,13 +140,13 @@ uint8_t SmartConsensus::calculateSmartsConfNum() {
         if (e == pnode_->getNodeIdKey()) {
             ownSmartConfNumber = i;
         }
-        csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} [" << static_cast<int>(i) << "] "
+        csdebug() << kLogPrefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} [" << static_cast<int>(i) << "] "
                   << (ownSmartConfNumber != cs::InvalidConfidantIndex && i == ownSmartConfNumber ? "me" : cs::Utils::byteStreamToHex(e.data(), e.size()));
         ++i;
     }
 
     if (ownSmartConfNumber == cs::InvalidConfidantIndex) {
-        csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} This NODE is not a confidant one for this smart-contract consensus round";
+        csdebug() << kLogPrefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} This NODE is not a confidant one for this smart-contract consensus round";
     }
 
     return ownSmartConfNumber;
@@ -232,7 +232,7 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
         // csdebug() << log_prefix << "[" << i << "] - " << static_cast<int>(smartStageOneStorage_.at(i).sender);
         stagesPlot = stagesPlot + '[' + std::to_string(static_cast<int>(smartStageOneStorage_.at(i).sender)) + "] ";
     }
-    csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "}  <-- SMART-Stage-1 " << stagesPlot;
+    csdebug() << kLogPrefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "}  <-- SMART-Stage-1 " << stagesPlot;
     st2.signatures.at(stage.sender) = stage.signature;
     st2.hashes.at(stage.sender) = stage.messageHash;
     if (smartStageOneEnough()) {
@@ -272,7 +272,7 @@ void SmartConsensus::addSmartStageTwo(cs::StageTwoSmarts& stage, bool send) {
         smartStageTwoStorage_.at(stage.sender) = stage;
         stagesPlot = stagesPlot + '[' + std::to_string(static_cast<int>(smartStageTwoStorage_.at(i).sender)) + "] ";
     }
-    csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "}  <-- SMART-Stage-2 - SmartRound {" << blockPart(stage.id) << '.'
+    csdebug() << kLogPrefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "}  <-- SMART-Stage-2 - SmartRound {" << blockPart(stage.id) << '.'
               << transactionPart(stage.id) << "} " << stagesPlot;
     if (smartStageTwoEnough()) {
         killTimer();
@@ -297,13 +297,13 @@ void SmartConsensus::processStages() {
         }
         if (st.hash != hash_t) {
             ++(smartUntrusted.at(st.sender));
-            cslog() << log_prefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong hash)";
+            cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong hash)";
         }
         else {
             ++hashFrequency;
         }
     }
-    csdebug() << log_prefix << "{" << smartRoundNumber_ << "} Hash " << cs::Utils::byteStreamToHex(hash_t.data(), hash_t.size()) << ", Frequency = " << hashFrequency;
+    csdebug() << kLogPrefix << "{" << smartRoundNumber_ << "} Hash " << cs::Utils::byteStreamToHex(hash_t.data(), hash_t.size()) << ", Frequency = " << hashFrequency;
     auto& myStage2 = smartStageTwoStorage_.at(ownSmartsConfNum_);
     for (auto& st : smartStageTwoStorage_) {
         if (st.sender == ownSmartsConfNum_) {
@@ -313,11 +313,11 @@ void SmartConsensus::processStages() {
             if (st.signatures[i] != myStage2.signatures[i]) {
                 if (cscrypto::verifySignature(st.signatures[i], smartConfidants_[i], st.hashes[i].data(), sizeof(st.hashes[i]))) {
                     ++(smartUntrusted.at(i));
-                    cslog() << log_prefix << "Confidant [" << i << "] is marked as untrusted (wrong hash)";
+                    cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted (wrong hash)";
                 }
                 else {
                     ++(smartUntrusted.at(st.sender));
-                    cslog() << log_prefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong signature)";
+                    cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong signature)";
                 }
             }
         }
@@ -333,10 +333,10 @@ void SmartConsensus::processStages() {
     }
     const size_t lowerTrustedLimit = static_cast<size_t>(smartConfidants_.size() / 2. + 1.);
     if (cnt_active < lowerTrustedLimit) {
-        cslog() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart consensus is NOT achieved, the state transaction won't send to the conveyer";
+        cslog() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart consensus is NOT achieved, the state transaction won't send to the conveyer";
         return;
     }
-    csdebug() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart consensus achieved";
+    csdebug() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart consensus achieved";
 
     if (hash_t.empty()) {
         return;  // TODO: decide what to return
@@ -345,7 +345,7 @@ void SmartConsensus::processStages() {
     if (k < 0) {
         k = -k;
     }
-    csdebug() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart consensus result 1 from 3";
+    csdebug() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart consensus result 1 from 3";
     size_t idx_writer = static_cast<size_t>(k % cnt_active);
     size_t idx = 0;
 
@@ -361,7 +361,7 @@ void SmartConsensus::processStages() {
         }
     }
     csdb::Amount finalFee = calculateFinalFee(sumFee, idx);
-    csdebug() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart consensus result 2 from 3";
+    csdebug() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart consensus result 2 from 3";
     idx = 0;
     for (size_t i = st3.writer; i < cnt + st3.writer; ++i) {
         size_t c = i % cnt;
@@ -370,7 +370,7 @@ void SmartConsensus::processStages() {
             ++idx;
         }
     }
-    csdebug() << log_prefix << "{" << smartRoundNumber_ << "} smart consensus result 3 from 3";
+    csdebug() << kLogPrefix << "{" << smartRoundNumber_ << "} smart consensus result 3 from 3";
     startTimer(3);
     createFinalTransactionSet(finalFee);
     st3.packageSignature =
@@ -403,14 +403,14 @@ void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) 
 
     auto lambda = [this](const cs::StageThreeSmarts& stageFrom, cs::Bytes hash) {
         if (!cscrypto::verifySignature(stageFrom.packageSignature, smartConfidants().at(stageFrom.sender), hash.data(), hash.size())) {
-            cslog() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} ____ The signature is not valid";
+            cslog() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} ____ The signature is not valid";
             return;  // returns this function if the signature of smartco
         }
         smartStageThreeStorage_.at(stageFrom.sender) = stageFrom;
     };
 
     if (send) {
-        csdebug() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} ____ 1.";
+        csdebug() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} ____ 1.";
         pnode_->sendSmartStageThree(smartConfidants_, stage);
         smartStageThreeSent_ = true;
     }
@@ -436,18 +436,18 @@ void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) 
         smartStageThreeStorage_.at(stage.sender) = stage;
         for (auto& it : smartStageThreeTempStorage_) {
             lambda(it, finalSmartTransactionPack_.hash().toBinary());
-            csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} <-- SMART-Stage-3 [" << static_cast<int>(stage.sender)
+            csdebug() << kLogPrefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} <-- SMART-Stage-3 [" << static_cast<int>(stage.sender)
                       << "] = " << smartStage3StorageSize();
         }
     }
 
-    csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} <-- SMART-Stage-3 [" << static_cast<int>(stage.sender)
+    csdebug() << kLogPrefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} <-- SMART-Stage-3 [" << static_cast<int>(stage.sender)
               << "] = " << smartStage3StorageSize();
     if (smartStageThreeSent_ && smartStageThreeEnough()) {
         killTimer();
         cs::Connector::disconnect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
         if (finalSmartTransactionPack_.isHashEmpty()) {
-            cserror() << log_prefix << "Trying to send FinalTransactionSet that doesn't exest";
+            cserror() << kLogPrefix << "Trying to send FinalTransactionSet that doesn't exest";
             return;
         }
         sendFinalTransactionSet();
@@ -483,22 +483,22 @@ void SmartConsensus::sendFinalTransactionSet() {
     for (auto& st : smartStageThreeStorage_) {
         if (st.sender != cs::ConfidantConsts::InvalidConfidantIndex) {
             if (finalSmartTransactionPack_.addSignature(st.sender, st.packageSignature)) {
-                csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} signature of T[" << static_cast<int>(st.sender)
+                csdebug() << kLogPrefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} signature of T[" << static_cast<int>(st.sender)
                           << "] added to the Transactions Packet";
             }
             else {
-                csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} signature of T[" << static_cast<int>(st.sender) << "] isn't added";
+                csdebug() << kLogPrefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} signature of T[" << static_cast<int>(st.sender) << "] isn't added";
             }
         }
     }
-    csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} adding separate package with " << finalSmartTransactionPack_.signatures().size()
+    csdebug() << kLogPrefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} adding separate package with " << finalSmartTransactionPack_.signatures().size()
               << " signatures";
     conv.addSeparatePacket(finalSmartTransactionPack_);
 
     // TODO:
     size_t fieldsNumber = finalSmartTransactionPack_.transactions().at(0).user_field_ids().size();
-    csdetails() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} transaction user fields = " << fieldsNumber;
-    csdebug() << log_prefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} ==============================================> TRANSACTION SENT TO CONVEYER";
+    csdetails() << kLogPrefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} transaction user fields = " << fieldsNumber;
+    csdebug() << kLogPrefix << '{' << smartRoundNumber_ << '.' << smartTransaction_ << "} ==============================================> TRANSACTION SENT TO CONVEYER";
 }
 
 void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRound, uint32_t startTransaction, uint8_t requesterNumber, uint8_t requiredNumber,
@@ -582,30 +582,30 @@ bool SmartConsensus::smartStageEnough(const std::vector<T>& smartStageStorage, c
     else {
         cSize = smartConfidants_.size();
     }
-    csdebug() << log_prefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} " << funcName << " completed " << stageSize << " of " << cSize;
+    csdebug() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} " << funcName << " completed " << stageSize << " of " << cSize;
     return stageSize == cSize;
 }
 
 void SmartConsensus::startTimer(int st) {
-    csdebug() << log_prefix << "start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
+    csdebug() << kLogPrefix << "start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
     timeoutStageCounter_ = st;
     timeout_request_stage.start(
         psmarts_->getScheduler(), Consensus::T_stage_request,
         // timeout #1 handler:
         [this, st]() {
-            csdebug() << log_prefix << "(): timeout for stages-" << st << " is expired, make requests";
+            csdebug() << kLogPrefix << "(): timeout for stages-" << st << " is expired, make requests";
             requestSmartStages(st);
             // start subsequent track timeout for "wide" request
-            csdebug() << log_prefix << "(): start subsequent track timeout " << Consensus::T_stage_request << " ms to request neighbors about stages-" << st;
+            csdebug() << kLogPrefix << "(): start subsequent track timeout " << Consensus::T_stage_request << " ms to request neighbors about stages-" << st;
             timeout_request_neighbors.start(psmarts_->getScheduler(), Consensus::T_stage_request,
                                             // timeout #2 handler:
                                             [this, st]() {
-                                                csdebug() << log_prefix << "(): timeout for requested stages-" << st << " is expired, make requests to neighbors";
+                                                csdebug() << kLogPrefix << "(): timeout for requested stages-" << st << " is expired, make requests to neighbors";
                                                 requestSmartStagesNeighbors(st);
                                                 // timeout #3 handler
                                                 timeout_force_transition.start(psmarts_->getScheduler(), Consensus::T_stage_request,
                                                                                [this, st]() {
-                                                                                   csdebug() << log_prefix
+                                                                                   csdebug() << kLogPrefix
                                                                                              << "(): timeout for transition is expired, mark silent nodes as no stage-" << st;
                                                                                    markSmartOutboundNodes(st);
                                                                                },
@@ -618,13 +618,13 @@ void SmartConsensus::startTimer(int st) {
 
 void SmartConsensus::killTimer() {
     if (timeout_request_stage.cancel()) {
-        csdebug() << log_prefix << __func__ << "(): cancel track timeout of stages-" << timeoutStageCounter_;
+        csdebug() << kLogPrefix << __func__ << "(): cancel track timeout of stages-" << timeoutStageCounter_;
     }
     if (timeout_request_neighbors.cancel()) {
-        csdebug() << log_prefix << __func__ << "(): cancel track timeout to request neighbors about stages-" << timeoutStageCounter_;
+        csdebug() << kLogPrefix << __func__ << "(): cancel track timeout to request neighbors about stages-" << timeoutStageCounter_;
     }
     if (timeout_force_transition.cancel()) {
-        csdebug() << log_prefix << __func__ << "(): cancel track timeout to force transition to next state after stages-" << timeoutStageCounter_;
+        csdebug() << kLogPrefix << __func__ << "(): cancel track timeout to force transition to next state after stages-" << timeoutStageCounter_;
     }
 }
 
@@ -660,7 +660,7 @@ void SmartConsensus::requestSmartStages(int st) {
     }
 
     if (!isRequested) {
-        csdebug() << log_prefix << __func__ << ": no node to request";
+        csdebug() << kLogPrefix << __func__ << ": no node to request";
     }
 }
 
@@ -697,7 +697,7 @@ void SmartConsensus::requestSmartStagesNeighbors(int st) {
     }
 
     if (!isRequested) {
-        csdebug() << log_prefix << __func__ << ": no node to request";
+        csdebug() << kLogPrefix << __func__ << ": no node to request";
     }
 }
 
@@ -750,7 +750,7 @@ void SmartConsensus::fake_stage1(uint8_t from) {
         }
     }
     if (!find) {
-        csdebug() << log_prefix << "make stage-1 [" << static_cast<int>(from) << "] as silent";
+        csdebug() << kLogPrefix << "make stage-1 [" << static_cast<int>(from) << "] as silent";
         cs::StageOneSmarts fake;
         init_zero(fake);
         fake.sender = from;
@@ -767,7 +767,7 @@ void SmartConsensus::fake_stage2(uint8_t from) {
         }
     }
     if (!find) {
-        csdebug() << log_prefix << "make stage-2 [" << static_cast<int>(from) << "] as silent";
+        csdebug() << kLogPrefix << "make stage-2 [" << static_cast<int>(from) << "] as silent";
         cs::StageTwoSmarts fake;
         init_zero(fake);
         fake.sender = from;

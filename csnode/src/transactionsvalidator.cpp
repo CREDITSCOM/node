@@ -17,7 +17,7 @@
 namespace {
 const uint8_t kInvalidMarker = 0;
 const uint8_t kValidMarker = 1;
-const char* log_prefix = "Validator: ";
+const char* kLogPrefix = "Validator: ";
 }  // namespace
 
 namespace cs {
@@ -45,26 +45,26 @@ bool TransactionsValidator::validateTransaction(SolverContext& context, const Tr
 bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, const csdb::Transaction& trx) {
     auto& smarts = context.smart_contracts();
     if (smarts.is_closed_smart_contract(trx.target())) {
-        cslog() << log_prefix << __func__ << ": reject smart new_state transaction, related contract is closed";
+        cslog() << kLogPrefix << __func__ << ": reject smart new_state transaction, related contract is closed";
         rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
         return false;
     }
     csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(trx, context.blockchain());
     if (!initTransaction.is_valid()) {
-        cslog() << log_prefix << __func__ << ": reject new_state transaction, starter transaction is not found";
+        cslog() << kLogPrefix << __func__ << ": reject new_state transaction, starter transaction is not found";
         rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
         return false;
     }
     csdb::UserField feeField = trx.user_field(trx_uf::new_state::Fee);
     if (!feeField.is_valid()) {
-        cslog() << log_prefix << __func__ << ": reject new_state transaction, execution fee is not set properly";
+        cslog() << kLogPrefix << __func__ << ": reject new_state transaction, execution fee is not set properly";
         rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
         return false;
     }
     csdb::Amount feeForExecution(feeField.value<csdb::Amount>());
     if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double())) <
         csdb::Amount(trx.counted_fee().to_double()) + feeForExecution) {
-        cslog() << log_prefix << __func__ << ": reject new_state transaction, fee is not enough"
+        cslog() << kLogPrefix << __func__ << ": reject new_state transaction, fee is not enough"
                 << "\nInit Transaction max fee = " << initTransaction.max_fee().to_double() << "\nInit Transaction counted fee = " << initTransaction.counted_fee().to_double()
                 << "\nNew State transaction counted fee = " << trx.counted_fee().to_double() << "\nNew State transaction exec fee = " << feeForExecution.to_double();
         rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
@@ -79,7 +79,7 @@ bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, con
     walletsState_.setModified(initTrxId);
 
     if (initTrxWallState.balance_ < zeroBalance_) {
-        cslog() << log_prefix << __func__ << ": reject new_state transaction, initier is out of funds";
+        cslog() << kLogPrefix << __func__ << ": reject new_state transaction, initier is out of funds";
         rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
         return false;
     }
@@ -92,11 +92,11 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
     csdb::Amount newBalance;
 
     if (trx.source() == trx.target()) {
-        cslog() << log_prefix << __func__ << ": reject transaction[" << trxInd << "], source equals to target";
+        cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], source equals to target";
         return false;
     }
     if (csdb::Amount(trx.max_fee().to_double()) < csdb::Amount(trx.counted_fee().to_double())) {
-        cslog() << log_prefix << __func__ << ": reject transaction[" << trxInd << "], max fee is less than counted fee";
+        cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], max fee is less than counted fee";
         return false;
     }
 
@@ -120,7 +120,7 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
                             leftFromMaxFee = it->second - csdb::Amount(trx.counted_fee().to_double());
                         }
                         if (leftFromMaxFee < zeroBalance_) {
-                            cslog() << log_prefix << __func__ << ": reject contract emitted transaction, out of fee in starter transaction";
+                            cslog() << kLogPrefix << __func__ << ": reject contract emitted transaction, out of fee in starter transaction";
                             return false;
                         }
                         ok = true;
@@ -129,7 +129,7 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
                 }
             }
             if (!ok) {
-                cslog() << log_prefix << __func__ << ": reject contract emitted transaction, new_state not found in block";
+                cslog() << kLogPrefix << __func__ << ": reject contract emitted transaction, new_state not found in block";
                 return false;
             }
             newBalance = wallState.balance_ - trx.amount();
@@ -144,7 +144,7 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
         }
     }
     if (smarts.is_known_smart_contract(trx.target()) && csdb::Amount(trx.max_fee().to_double()) > wallState.balance_) {
-        cslog() << log_prefix << "transaction[" << trxInd << "] balance = " << wallState.balance_.to_double() << ", max_fee = " << trx.max_fee().to_double();
+        cslog() << kLogPrefix << "transaction[" << trxInd << "] balance = " << wallState.balance_.to_double() << ", max_fee = " << trx.max_fee().to_double();
     }
     wallState.balance_ = newBalance;
     return true;
@@ -158,7 +158,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
 
 #ifndef SPAMMER
     if (!wallState.trxTail_.isAllowed(trx.innerID())) {
-        csdebug() << log_prefix << "reject transaction, duplicated or incorrect innerID " << trx.innerID() << ", allowed " << wallState.trxTail_.printRange();
+        csdebug() << kLogPrefix << "reject transaction, duplicated or incorrect innerID " << trx.innerID() << ", allowed " << wallState.trxTail_.printRange();
         if (SmartContracts::is_new_state(trx)) {
             rejectedNewStates_.push_back(context.smart_contracts().absolute_address(trx.source()));
         }
@@ -167,7 +167,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
 #endif
 
     if (SmartContracts::is_new_state(trx)) {
-        csdebug() << log_prefix << __func__ << ": smart new_state transaction[" << trxInd << "] included in consensus";
+        csdebug() << kLogPrefix << __func__ << ": smart new_state transaction[" << trxInd << "] included in consensus";
         if (!validateNewStateAsSource(context, trx)) {
             return false;
         }
@@ -179,7 +179,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
     }
 
     if (wallState.balance_ < zeroBalance_) {
-        csdebug() << log_prefix << "transaction[" << trxInd << "] results to potentially negative balance " << wallState.balance_.to_double();
+        csdebug() << kLogPrefix << "transaction[" << trxInd << "] results to potentially negative balance " << wallState.balance_.to_double();
         // will be checked in rejected smarts
         if (context.smart_contracts().is_known_smart_contract(trx.source())) {
             return false;
@@ -253,7 +253,7 @@ size_t TransactionsValidator::makeSmartsValid(SolverContext& context, RejectedSm
         if (s.absolute_address(smarts[i].first.source()) == s.absolute_address(source) && smarts[i].second < maskSize) {
             maskIncluded[smarts[i].second] = kValidMarker;
             ++restoredCounter;
-            csdebug() << log_prefix << "balance of transation[" << smarts[i].second << "] source is replenished by other transaction";
+            csdebug() << kLogPrefix << "balance of transation[" << smarts[i].second << "] source is replenished by other transaction";
 
             WalletsState::WalletId walletId{};
             WalletsState::WalletData& wallState = walletsState_.getData(smarts[i].first.source(), walletId);

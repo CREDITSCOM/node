@@ -7,7 +7,7 @@
 #include <solvercontext.hpp>
 
 namespace {
-const char* log_prefix = "Validator: ";
+const char* kLogPrefix = "Validator: ";
 const uint8_t kInvalidMarker = 0;
 const uint8_t kValidMarker = 1;
 }  // namespace
@@ -20,15 +20,15 @@ IterValidator::IterValidator(WalletsState& wallets) {
 
 Characteristic IterValidator::formCharacteristic(SolverContext& context, Transactions& transactions, Packets& smartsPackets) {
     cs::Characteristic characteristic;
-    characteristic.mask.resize(transactions.size());
-    memset(characteristic.mask.data(), kValidMarker, characteristic.mask.size());
+    characteristic.mask.resize(transactions.size(), kValidMarker);
 
     checkTransactionsSignatures(context, transactions, characteristic.mask, smartsPackets);
 
     bool needNewIteration = false;
     size_t iterationCounter = 1;
+
     do {
-        csdebug() << log_prefix << "current iteration: " << iterationCounter;
+        csdebug() << kLogPrefix << "current iteration: " << iterationCounter;
         context.blockchain().setTransactionsFees(transactions, characteristic.mask);
         context.wallets().updateFromSource();
         pTransval_->reset(transactions.size());
@@ -38,6 +38,7 @@ Characteristic IterValidator::formCharacteristic(SolverContext& context, Transac
 
     checkRejectedSmarts(context, characteristic.mask, transactions);
     pTransval_->clearCaches();
+
     return characteristic;
 }
 
@@ -45,50 +46,56 @@ void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& chara
     // test if any of smart-emitted transaction rejected, reject all transactions from this smart
     // 1. collect rejected smart addresses
     const auto& smarts = context.smart_contracts();
-    std::set<csdb::Address> smart_rejected;
-    size_t mask_size = characteristicMask.size();
+    std::set<csdb::Address> smartRejected;
+    size_t maskSize = characteristicMask.size();
     size_t i = 0;
+
     for (const auto& tr : transactions) {
-        if (i < mask_size && *(characteristicMask.cbegin() + i) == kInvalidMarker) {
+        if (i < maskSize && *(characteristicMask.cbegin() + i) == kInvalidMarker) {
             if (smarts.is_known_smart_contract(tr.source())) {
-                smart_rejected.insert(smarts.absolute_address(tr.source()));
+                smartRejected.insert(smarts.absolute_address(tr.source()));
             }
         }
         ++i;
     }
-    if (!smart_rejected.empty()) {
-        cslog() << log_prefix << "detected rejected trxs from " << smart_rejected.size() << " smart contract(s)";
+    if (!smartRejected.empty()) {
+        cslog() << kLogPrefix << "detected rejected trxs from " << smartRejected.size() << " smart contract(s)";
+
         cs::TransactionsPacket rejected;
         // 2. reject all trxs from those smarts & collect all rejected trxs
-        size_t cnt_add_rejected = 0;
+        size_t countAddressRejected = 0;
+
         for (auto it = transactions.begin(); it != transactions.end(); ++it) {
-            if (smart_rejected.count(smarts.absolute_address(it->source())) > 0) {
+            if (smartRejected.count(smarts.absolute_address(it->source())) > 0) {
                 auto itm = characteristicMask.begin() + (it - transactions.cbegin());
                 if (*itm > 0) {
                     *itm = 0;
-                    ++cnt_add_rejected;
+                    ++countAddressRejected;
                 }
                 rejected.addTransaction(*it);
             }
         }
-        if (cnt_add_rejected > 0) {
-            cslog() << log_prefix << "additionaly rejected " << cnt_add_rejected << " trxs";
+
+        if (countAddressRejected > 0) {
+            cslog() << kLogPrefix << "additionaly rejected " << countAddressRejected << " trxs";
         }
 
         // 3. signal some trxs are rejected
         if (rejected.transactionsCount() > 0) {
-            std::vector<std::pair<cs::Sequence, uint32_t> > ref_list;
+            std::vector<std::pair<cs::Sequence, uint32_t> > referenceList;
+
             for (const auto t : rejected.transactions()) {
                 if (SmartContracts::is_new_state(t)) {
                     csdb::UserField fld = t.user_field(trx_uf::new_state::RefStart);
                     if (fld.is_valid()) {
                         SmartContractRef ref(fld);
-                        ref_list.emplace_back(std::make_pair(ref.sequence, (uint32_t)ref.transaction));
+                        referenceList.emplace_back(std::make_pair(ref.sequence, (uint32_t)ref.transaction));
                     }
                 }
             }
-            if (!ref_list.empty()) {
-                context.send_rejected_smarts(ref_list);
+
+            if (!referenceList.empty()) {
+                context.send_rejected_smarts(referenceList);
             }
         }
     }
@@ -113,7 +120,7 @@ bool IterValidator::validateTransactions(SolverContext& context, cs::Bytes& char
         }
 
         if (!isValid) {
-            csdebug() << log_prefix << "transaction[" << i << "] rejected by validator";
+            csdebug() << kLogPrefix << "transaction[" << i << "] rejected by validator";
             characteristicMask[i] = kInvalidMarker;
             needOneMoreIteration = true;
             ++blockedCounter;
@@ -131,7 +138,7 @@ bool IterValidator::validateTransactions(SolverContext& context, cs::Bytes& char
     pTransval_->validateByGraph(context, characteristicMask, transactions);
 
     if (pTransval_->getCntRemovedTrxsByGraph() > 0) {
-        cslog() << log_prefix << "num of trxs rejected by graph validation - " << pTransval_->getCntRemovedTrxsByGraph();
+        cslog() << kLogPrefix << "num of trxs rejected by graph validation - " << pTransval_->getCntRemovedTrxsByGraph();
         needOneMoreIteration = true;
     }
 
@@ -144,12 +151,12 @@ bool IterValidator::deployAdditionalCheck(SolverContext& context, size_t trxInd,
     auto sci = context.smart_contracts().get_smart_contract(transaction);
 
     if (sci.has_value() && sci.value().method.empty()) {  // is deploy
-        csdb::Address deployer = context.blockchain().getAddressByType(transaction.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+        csdb::Address deployer = context.blockchain().getAddressByType(transaction.source(), BlockChain::AddressType::PublicKey);
         isValid = SmartContracts::get_valid_smart_address(deployer, transaction.innerID(), sci.value().smartContractDeploy) == transaction.target();
     }
 
     if (!isValid) {
-        cslog() << log_prefix << ": transaction[" << trxInd << "] rejected, malformed contract address";
+        cslog() << kLogPrefix << ": transaction[" << trxInd << "] rejected, malformed contract address";
     }
 
     return isValid;
@@ -166,7 +173,7 @@ void IterValidator::checkTransactionsSignatures(SolverContext& context, const Tr
             if (!correctSignature) {
                 characteristicMask[i] = kInvalidMarker;
                 rejectedCounter++;
-                cslog() << log_prefix << "transaction[" << i << "] rejected, incorrect signature.";
+                cslog() << kLogPrefix << "transaction[" << i << "] rejected, incorrect signature.";
                 if (SmartContracts::is_new_state(transactions[i])) {
                     pTransval_->addRejectedNewState(context.smart_contracts().absolute_address(transactions[i].source()));
                 }
@@ -174,7 +181,7 @@ void IterValidator::checkTransactionsSignatures(SolverContext& context, const Tr
         }
     }
     if (rejectedCounter) {
-        cslog() << log_prefix << "wrong signatures num: " << rejectedCounter;
+        cslog() << kLogPrefix << "wrong signatures num: " << rejectedCounter;
     }
 }
 
@@ -198,12 +205,12 @@ bool IterValidator::checkTransactionSignature(SolverContext& context, const csdb
     else {
         // special rule for new_state transactions
         if (SmartContracts::is_new_state(transaction) && src != transaction.target()) {
-            csdebug() << log_prefix << "smart state transaction has different source and target";
+            csdebug() << kLogPrefix << "smart state transaction has different source and target";
             return false;
         }
         auto it = smartSourceInvalidSignatures_.find(transaction.source());
         if (it != smartSourceInvalidSignatures_.end()) {
-            csdebug() << log_prefix << "smart contract transaction has invalid signature";
+            csdebug() << kLogPrefix << "smart contract transaction has invalid signature";
             return false;
         }
         return true;
@@ -225,14 +232,14 @@ void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packe
                 smartRef.from_user_field(transaction.user_field(trx_uf::smart_gen::RefStart));
             }
             if (!smartRef.is_valid()) {
-                cslog() << log_prefix << "SmartContractRef is not properly set in transaction";
+                cslog() << kLogPrefix << "SmartContractRef is not properly set in transaction";
                 smartSourceInvalidSignatures_.insert(transaction.source());
                 continue;
             }
 
             csdb::Pool poolWithInitTr = context.blockchain().loadBlock(smartRef.sequence);
             if (!poolWithInitTr.is_valid()) {
-                cslog() << log_prefix << "failed to load block with init transaction";
+                cslog() << kLogPrefix << "failed to load block with init transaction";
                 smartSourceInvalidSignatures_.insert(transaction.source());
                 continue;
             }
@@ -250,7 +257,7 @@ void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packe
                 }
             }
             if (correctSignaturesCounter < confidants.size() / 2U + 1U) {
-                cslog() << log_prefix << "is not enough valid signatures";
+                cslog() << kLogPrefix << "is not enough valid signatures";
                 smartSourceInvalidSignatures_.insert(transaction.source());
             }
         }

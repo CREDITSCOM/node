@@ -1,8 +1,8 @@
 #include "csnode/conveyer.hpp"
 
 #include <csdb/transaction.hpp>
-#include <csnode/datastream.hpp>
 
+#include <csnode/datastream.hpp>
 #include <solver/smartcontracts.hpp>
 
 #include <exception>
@@ -12,9 +12,20 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
+namespace {
+cs::ConveyerBase* conveyerView = nullptr;
+std::once_flag onceFlag = {};
+
+static void setup(cs::ConveyerBase* conveyer) {
+    conveyerView = conveyer;
+}
+}
+
 struct cs::ConveyerBase::Impl {
+    explicit Impl(size_t queueSize, size_t transactionsSize, size_t packetsPerRound);
+
     // first storage of transactions, before sending to network
-    cs::TransactionsBlock transactionsBlock;
+    cs::PacketQueue packetQueue;
 
     // current round transactions packets storage
     cs::TransactionsPacketTable packetsTable;
@@ -28,12 +39,13 @@ struct cs::ConveyerBase::Impl {
     // cached active current round number
     std::atomic<cs::RoundNumber> currentRound = 0;
 
-public signals:
-    cs::PacketFlushSignal flushPacket;
-
     // helpers
     const cs::ConveyerMeta* validMeta() &;
 };
+
+inline cs::ConveyerBase::Impl::Impl(size_t queueSize, size_t transactionsSize, size_t packetsPerRound)
+: packetQueue(queueSize, transactionsSize, packetsPerRound) {
+}
 
 inline const cs::ConveyerMeta* cs::ConveyerBase::Impl::validMeta() & {
     cs::ConveyerMeta* meta = metaStorage.get(currentRound);
@@ -46,8 +58,10 @@ inline const cs::ConveyerMeta* cs::ConveyerBase::Impl::validMeta() & {
 }
 
 cs::ConveyerBase::ConveyerBase() {
-    pimpl_ = std::make_unique<cs::ConveyerBase::Impl>();
+    pimpl_ = std::make_unique<cs::ConveyerBase::Impl>(MaxQueueSize, MaxPacketTransactions, MaxPacketsPerRound);
     pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
+
+    std::call_once(::onceFlag, &::setup, this);
 }
 
 void cs::ConveyerBase::setRound(cs::RoundNumber round) {
@@ -64,24 +78,22 @@ void cs::ConveyerBase::setRound(cs::RoundNumber round) {
 
 cs::ConveyerBase::~ConveyerBase() = default;
 
-cs::PacketFlushSignal& cs::ConveyerBase::flushSignal() {
-    return pimpl_->flushPacket;
-}
-
 void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
     if (!transaction.is_valid()) {
         cswarning() << csname() << "Can not add no valid transaction to conveyer";
         return;
     }
 
-    csdetails() << csname() << "Add valid transaction to conveyer id: " << transaction.innerID() << ", block size: " << pimpl_->transactionsBlock.size();
     cs::Lock lock(sharedMutex_);
 
-    if (pimpl_->transactionsBlock.empty() || (pimpl_->transactionsBlock.back().transactionsCount() >= MaxPacketTransactions)) {
-        pimpl_->transactionsBlock.push_back(cs::TransactionsPacket());
-    }
+    auto id = transaction.innerID();
 
-    pimpl_->transactionsBlock.back().addTransaction(transaction);
+    if (pimpl_->packetQueue.push(transaction)) {
+        csdetails() << csname() << "Add valid transaction to conveyer id: " << id << ", queue size: " << pimpl_->packetQueue.size();
+    }
+    else {
+        cswarning() << csname() << "Add transaction failed to queue, transaction id: " << id << ", queue size: " << pimpl_->packetQueue.size();
+    }
 }
 
 void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
@@ -89,10 +101,7 @@ void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
     cs::Lock lock(sharedMutex_);
 
     // add current packet
-    pimpl_->transactionsBlock.push_back(packet);
-
-    // create new to split packets
-    pimpl_->transactionsBlock.push_back(cs::TransactionsPacket());
+    pimpl_->packetQueue.push(packet);
 }
 
 void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packet) {
@@ -111,8 +120,8 @@ const cs::TransactionsPacketTable& cs::ConveyerBase::transactionsPacketTable() c
     return pimpl_->packetsTable;
 }
 
-const cs::TransactionsBlock& cs::ConveyerBase::transactionsBlock() const {
-    return pimpl_->transactionsBlock;
+const cs::PacketQueue& cs::ConveyerBase::packetQueue() const {
+    return pimpl_->packetQueue;
 }
 
 std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::createPacket() const {
@@ -595,11 +604,16 @@ bool cs::ConveyerBase::isMetaTransactionInvalid(int64_t id) {
     return false;
 }
 
-size_t cs::ConveyerBase::blockTransactionsCount() const {
+size_t cs::ConveyerBase::packetQueueTransactionsCount() const {
     cs::SharedLock lock(sharedMutex_);
     size_t count = 0;
 
-    std::for_each(pimpl_->transactionsBlock.begin(), pimpl_->transactionsBlock.end(), [&](const auto& block) { count += block.transactionsCount(); });
+    auto begin = pimpl_->packetQueue.begin();
+    auto end = pimpl_->packetQueue.end();
+
+    std::for_each(begin, end, [&](const auto& packet) {
+        count += packet.transactionsCount();
+    });
 
     return count;
 }
@@ -610,12 +624,11 @@ std::unique_lock<cs::SharedMutex> cs::ConveyerBase::lock() const {
 
 void cs::ConveyerBase::flushTransactions() {
     cs::Lock lock(sharedMutex_);
-    std::size_t allTransactionsCount = 0;
 
-    for (auto& packet : pimpl_->transactionsBlock) {
-        const std::size_t transactionsCount = packet.transactionsCount();
+    auto packets = pimpl_->packetQueue.pop();
 
-        if ((transactionsCount != 0u)) {
+    for (auto& packet : packets) {
+        if ((packet.transactionsCount() != 0u)) {
             if (packet.isHashEmpty()) {
                 if (!packet.makeHash()) {
                     cserror() << csname() << "Transaction packet hashing failed";
@@ -624,7 +637,7 @@ void cs::ConveyerBase::flushTransactions() {
             }
 
             // try to send save in node
-            emit pimpl_->flushPacket(packet);
+            emit packetFlushed(packet);
 
             auto hash = packet.hash();
 
@@ -634,13 +647,7 @@ void cs::ConveyerBase::flushTransactions() {
             else {
                 csdebug() << csname() << "Same transaction packet already in packet table";
             }
-
-            allTransactionsCount += transactionsCount;
         }
-    }
-
-    if (!pimpl_->transactionsBlock.empty()) {
-        pimpl_->transactionsBlock.clear();
     }
 }
 
@@ -664,18 +671,7 @@ cs::TransactionsPacketTable& cs::ConveyerBase::poolTable(cs::RoundNumber round) 
     return pimpl_->packetsTable;
 }
 
-namespace {
-cs::Conveyer* conveyerView = nullptr;
-std::once_flag onceFlag = {};
-
-static void setup(cs::Conveyer* conveyer) {
-    conveyerView = conveyer;
-}
-}
-
 cs::Conveyer& cs::Conveyer::instance() {
     static cs::Conveyer conveyer;
-    std::call_once(::onceFlag, &::setup, &conveyer);
-
     return conveyer;
 }

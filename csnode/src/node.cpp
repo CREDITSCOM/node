@@ -49,16 +49,15 @@ Node::Node(const Config& config)
     std::cout << "Done\n";
     poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
+    auto& executor = executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort);
+
     cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
-
-    auto ptr_exec = &executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort);
-    cs::Connector::connect(&blockChain_.storeBlockEvent, ptr_exec, &executor::Executor::onBlockStored);
-    cs::Connector::connect(blockChain_.getStorage().read_block_event(), ptr_exec, &executor::Executor::onReadBlock);
-
+    cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &executor::Executor::onBlockStored);
+    cs::Connector::connect(blockChain_.getStorage().read_block_event(), &executor, &executor::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
-
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
+
     good_ = init(config);
 }
 
@@ -111,7 +110,7 @@ bool Node::init(const Config& config) {
 #endif
 
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
-    cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
+    cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
 
     return true;
@@ -2681,9 +2680,6 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
         blockChain_.removeLastBlock();
     }
 }
-
-/*static*/
-cs::Signal<void()> Node::stopRequested;
 
 /*static*/
 void Node::requestStop() {
