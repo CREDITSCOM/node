@@ -12,6 +12,15 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
+namespace {
+cs::ConveyerBase* conveyerView = nullptr;
+std::once_flag onceFlag = {};
+
+static void setup(cs::ConveyerBase* conveyer) {
+    conveyerView = conveyer;
+}
+}
+
 struct cs::ConveyerBase::Impl {
     explicit Impl(size_t queueSize, size_t transactionsSize, size_t packetsPerRound);
 
@@ -51,6 +60,8 @@ inline const cs::ConveyerMeta* cs::ConveyerBase::Impl::validMeta() & {
 cs::ConveyerBase::ConveyerBase() {
     pimpl_ = std::make_unique<cs::ConveyerBase::Impl>(MaxQueueSize, MaxPacketTransactions, MaxPacketsPerRound);
     pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
+
+    std::call_once(::onceFlag, &::setup, this);
 }
 
 void cs::ConveyerBase::setRound(cs::RoundNumber round) {
@@ -660,18 +671,7 @@ cs::TransactionsPacketTable& cs::ConveyerBase::poolTable(cs::RoundNumber round) 
     return pimpl_->packetsTable;
 }
 
-namespace {
-cs::Conveyer* conveyerView = nullptr;
-std::once_flag onceFlag = {};
-
-static void setup(cs::Conveyer* conveyer) {
-    conveyerView = conveyer;
-}
-}
-
 cs::Conveyer& cs::Conveyer::instance() {
     static cs::Conveyer conveyer;
-    std::call_once(::onceFlag, &::setup, &conveyer);
-
     return conveyer;
 }
