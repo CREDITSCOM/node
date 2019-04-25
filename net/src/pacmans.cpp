@@ -17,6 +17,13 @@ void IPacMan::enQueueLast() {
   size_.fetch_add(1, std::memory_order_acq_rel);
 }
 
+void IPacMan::rejectLast() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  Task &task = queue_.back();
+  task.~Task();
+  queue_.pop_back();
+}
+
 TaskPtr<IPacMan> IPacMan::getNextTask() {
   while (!size_.load(std::memory_order_acquire)) {
     std::this_thread::yield();

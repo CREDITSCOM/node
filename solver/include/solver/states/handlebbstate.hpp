@@ -16,25 +16,25 @@ namespace cs {
 
 class HandleBBState final : public DefaultStateBehavior {
 public:
-  ~HandleBBState() override {
-  }
+    ~HandleBBState() override {
+    }
 
-  /**
-   * @fn  void final::on(SolverContext& context) override;
-   *
-   * @brief   Override WriteState behavior. Repeat last block when on and does not require no hashes received when on
-   *
-   * @author  aae
-   * @date    02.10.2018
-   *
-   * @param [in,out]  context The context.
-   */
+    /**
+     * @fn  void final::on(SolverContext& context) override;
+     *
+     * @brief   Override WriteState behavior. Repeat last block when on and does not require no hashes received when on
+     *
+     * @author  aae
+     * @date    02.10.2018
+     *
+     * @param [in,out]  context The context.
+     */
 
-  void on(SolverContext& context) override;
+    void on(SolverContext& context) override;
 
-  const char* name() const override {
-    return "Handle BB";
-  }
+    const char* name() const override {
+        return "Handle BB";
+    }
 };
 
-}  // namespace slv2
+}  // namespace cs

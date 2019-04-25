@@ -4,7 +4,7 @@
 #if defined(_MSC_VER)
 #pragma warning(push)
 // 4245: 'return': conversion from 'int' to 'SOCKET', signed/unsigned mismatch
-#pragma warning(disable: 4245)
+#pragma warning(disable : 4245)
 #endif
 #include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/transport/THttpServer.h>
@@ -30,83 +30,80 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 , p_api_processor(make_shared<api::APIProcessor>(api_handler))
 , p_apiexec_processor(make_shared<apiexec::APIEXECProcessor>(apiexec_handler))
 #ifdef BINARY_TCP_API
-, server(p_api_processor, make_shared<TServerSocket>(config.port), make_shared<TBufferedTransportFactory>(),
-         make_shared<TBinaryProtocolFactory>())
+, server(p_api_processor, make_shared<TServerSocket>(config.port), make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 #ifdef AJAX_IFACE
-, ajax_server(p_api_processor, make_shared<TServerSocket>(config.ajax_port),
-              make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
+, ajax_server(p_api_processor, make_shared<TServerSocket>(config.ajax_port), make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
 #ifdef BINARY_TCP_EXECAPI
-, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.apiexec_port), make_shared<TBufferedTransportFactory>(),
-  make_shared<TBinaryProtocolFactory>())
+, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.apiexec_port), make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 {
-  cslog() << "Api port " << config.port << ", ajax port " << config.ajax_port;
+    cslog() << "Api port " << config.port << ", ajax port " << config.ajax_port;
 
 #ifdef BINARY_TCP_EXECAPI
-  exec_thread = std::thread([this]() {
-    try {
-      exec_server.run();
-    }
-    catch (...) {
-      cserror() << "Oh no! I'm dead :'-(";
-    }
-  });
+    exec_thread = std::thread([this]() {
+        try {
+            exec_server.run();
+        }
+        catch (...) {
+            cserror() << "Oh no! I'm dead :'-(";
+        }
+    });
 #endif
 
 #ifdef BINARY_TCP_API
-  thread = std::thread([this]() {
-    try {
-      server.run();
-    }
-    catch (...) {
-      cserror() << "Oh no! I'm dead :'-(";
-    }
-  });
+    thread = std::thread([this]() {
+        try {
+            server.run();
+        }
+        catch (...) {
+            cserror() << "Oh no! I'm dead :'-(";
+        }
+    });
 #endif
 #ifdef AJAX_IFACE
-  ajax_server.setConcurrentClientLimit(AJAX_CONCURRENT_API_CLIENTS);
-  ajax_thread = std::thread([this]() {
-    try {
-      ajax_server.run();
-    }
-    catch (...) {
-      cserror() << "Oh no! I'm dead in AJAX :'-(";
-    }
-  });
+    ajax_server.setConcurrentClientLimit(AJAX_CONCURRENT_API_CLIENTS);
+    ajax_thread = std::thread([this]() {
+        try {
+            ajax_server.run();
+        }
+        catch (...) {
+            cserror() << "Oh no! I'm dead in AJAX :'-(";
+        }
+    });
 #endif
 }
 
 connector::~connector() {
 #ifdef BINARY_TCP_API
-  server.stop();
-  if (thread.joinable()) {
-    thread.join();
-  }
+    server.stop();
+    if (thread.joinable()) {
+        thread.join();
+    }
 #endif
 
 #ifdef BINARY_TCP_EXECAPI
-  exec_server.stop();
-  if (exec_thread.joinable()) {
-    exec_thread.join();
-  }
+    exec_server.stop();
+    if (exec_thread.joinable()) {
+        exec_thread.join();
+    }
 #endif
 
 #ifdef AJAX_IFACE
-  ajax_server.stop();
-  if (ajax_thread.joinable()) {
-    ajax_thread.join();
-  }
+    ajax_server.stop();
+    if (ajax_thread.joinable()) {
+        ajax_thread.join();
+    }
 #endif
 }
 
 connector::ApiHandlerPtr connector::apiHandler() const {
-  return api_handler;
+    return api_handler;
 }
 
 connector::ApiExecHandlerPtr connector::apiExecHandler() const {
-  return apiexec_handler;
+    return apiexec_handler;
 }
 
 }  // namespace csconnector

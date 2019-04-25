@@ -18,14 +18,14 @@ namespace cs {
 
 class HandleRTState : public DefaultStateBehavior {
 public:
-  ~HandleRTState() override {
-  }
+    ~HandleRTState() override {
+    }
 
-  void on(SolverContext& context) override;
+    void on(SolverContext& context) override;
 
-  const char* name() const override {
-    return "Handle RT";
-  }
+    const char* name() const override {
+        return "Handle RT";
+    }
 };
 
-}  // namespace slv2
+}  // namespace cs

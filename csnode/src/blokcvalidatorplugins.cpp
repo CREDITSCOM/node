@@ -20,7 +20,7 @@
 #endif
 
 namespace {
-const char* log_prefix = "BlockValidator: ";
+const char* kLogPrefix = "BlockValidator: ";
 const cs::Sequence kGapBtwNeighbourBlocks = 1;
 const csdb::user_field_id_t kTimeStampUserFieldNum = 0;
 const uint8_t kBlockVerToSwitchCountedFees = 0;
@@ -36,7 +36,7 @@ ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block
                                                           data.data() +
                                                           prevBlock.hashingLength()));
   if (prevHash != countedPrevHash) {
-    csfatal() << log_prefix << ": prev pool's (" << prevBlock.sequence()
+    csfatal() << kLogPrefix << ": prev pool's (" << prevBlock.sequence()
               << ") hash != real prev pool's hash";
     return ErrorType::fatalError;      
   }
@@ -46,7 +46,7 @@ ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block
 ValidationPlugin::ErrorType BlockNumValidator::validateBlock(const csdb::Pool& block) {
   auto& prevBlock = getPrevBlock();
   if (block.sequence() - prevBlock.sequence() != kGapBtwNeighbourBlocks) {
-    cserror() << log_prefix << "Current block's sequence is " << block.sequence()
+    cserror() << kLogPrefix << "Current block's sequence is " << block.sequence()
               << ", previous block sequence is " << prevBlock.sequence();
     return ErrorType::error;
   }
@@ -58,19 +58,19 @@ ValidationPlugin::ErrorType TimestampValidator::validateBlock(const csdb::Pool& 
 
   auto prevBlockTimestampUf = prevBlock.user_field(kTimeStampUserFieldNum);
   if (!prevBlockTimestampUf.is_valid()) {
-    cswarning() << log_prefix << "Block with sequence " << prevBlock.sequence() << " has no timestamp";
+    cswarning() << kLogPrefix << "Block with sequence " << prevBlock.sequence() << " has no timestamp";
     return ErrorType::warning;
   }
   auto currentBlockTimestampUf = block.user_field(kTimeStampUserFieldNum);
   if (!currentBlockTimestampUf.is_valid()) {
-    cswarning() << log_prefix << "Block with sequence " << block.sequence() << " has no timestamp";
+    cswarning() << kLogPrefix << "Block with sequence " << block.sequence() << " has no timestamp";
     return ErrorType::warning;
   }
 
   auto prevBlockTimestamp = std::stoll(prevBlockTimestampUf.value<std::string>());
   auto currentBlockTimestamp = std::stoll(currentBlockTimestampUf.value<std::string>());
   if (currentBlockTimestamp < prevBlockTimestamp) {
-    cswarning() << log_prefix << "Block with sequence " << block.sequence()
+    cswarning() << kLogPrefix << "Block with sequence " << block.sequence()
                 << " has timestamp " << currentBlockTimestamp
                 << " less than " << prevBlockTimestamp
                 << " in block with sequence " << prevBlock.sequence();
@@ -89,7 +89,7 @@ ValidationPlugin::ErrorType BlockSignaturesValidator::validateBlock(const csdb::
 
   auto signatures = block.signatures();
   if (signatures.size() != numOfRealTrusted) {
-    cserror() << log_prefix << "in block " << block.sequence()
+    cserror() << kLogPrefix << "in block " << block.sequence()
               << " num of signatures (" << signatures.size()
               << ") != num of real trusted (" << numOfRealTrusted << ")";
     return ErrorType::error;
@@ -98,7 +98,7 @@ ValidationPlugin::ErrorType BlockSignaturesValidator::validateBlock(const csdb::
   auto confidants = block.confidants();
   const size_t maxTrustedNum = sizeof(realTrustedMask) * 8;
   if (confidants.size() > maxTrustedNum) {
-    cserror() << log_prefix << "in block " << block.sequence()
+    cserror() << kLogPrefix << "in block " << block.sequence()
               << " num of confidants " << confidants.size()
               << " is greated than max bits in realTrustedMask";
     return ErrorType::error;
@@ -107,12 +107,12 @@ ValidationPlugin::ErrorType BlockSignaturesValidator::validateBlock(const csdb::
   size_t checkingSignature = 0;
   auto signedData = cscrypto::calculateHash(block.to_binary().data(), block.hashingLength());
   for (size_t i = 0; i < confidants.size(); ++i) {
-    if (realTrustedMask & (1 << i)) {
+    if (realTrustedMask & (1ull << i)) {
       if (!cscrypto::verifySignature(signatures[checkingSignature],
                                      confidants[i],
                                      signedData.data(),
                                      cscrypto::kHashSize)) {
-        cserror() << log_prefix << "block " << block.sequence()
+        cserror() << kLogPrefix << "block " << block.sequence()
                   << " has invalid signatures";
         return ErrorType::error;
       }
@@ -129,7 +129,7 @@ ValidationPlugin::ErrorType SmartSourceSignaturesValidator::validateBlock(const 
 
   if (smartSignatures.empty()) {
     if (containsNewState(transactions)) {
-        cserror() << log_prefix << "no smart signatures in block "
+        cserror() << kLogPrefix << "no smart signatures in block "
                   << block.sequence() << ", which contains new state";
         return ErrorType::error;
     }
@@ -149,7 +149,7 @@ ValidationPlugin::ErrorType SmartSourceSignaturesValidator::validateBlock(const 
 bool SmartSourceSignaturesValidator::checkSignatures(const SmartSignatures& sigs,
                                                      const Packets& smartPacks) {
   if (sigs.size() != smartPacks.size()) {
-    cserror() << log_prefix << "q-ty of smart signatures != q-ty of real smart packets"; 
+    cserror() << kLogPrefix << "q-ty of smart signatures != q-ty of real smart packets"; 
     return false;
   }
 
@@ -159,7 +159,7 @@ bool SmartSourceSignaturesValidator::checkSignatures(const SmartSignatures& sigs
                            return pack.transactions()[0].source().public_key() == s.smartKey; });
 
     if (it == sigs.end()) {
-      cserror() << log_prefix << "no smart signatures for new state with key "
+      cserror() << kLogPrefix << "no smart signatures for new state with key "
                 << pack.transactions()[0].source().to_string();
       return false;
     }
@@ -169,12 +169,12 @@ bool SmartSourceSignaturesValidator::checkSignatures(const SmartSignatures& sigs
     const auto& smartSignatures = it->signatures;
     for (const auto& s : smartSignatures) {
       if (s.first >= confidants.size()) {
-        cserror() << log_prefix << "smart signature validation: no conf with index "
+        cserror() << kLogPrefix << "smart signature validation: no conf with index "
                   << s.first << " in init pool with sequence " << initPool.sequence();
         return false;
       }
       if (!cscrypto::verifySignature(s.second, confidants[s.first], pack.hash().toBinary().data(), cscrypto::kHashSize)) {
-        cserror() << log_prefix << "incorrect signature of smart "
+        cserror() << kLogPrefix << "incorrect signature of smart "
                   << pack.transactions()[0].source().to_string() << " of confidant " << s.first
                   << " from init pool with sequence " << initPool.sequence();
         return false;
@@ -216,7 +216,7 @@ Packets SmartSourceSignaturesValidator::grepNewStatesPacks(const Transactions& t
 csdb::Transaction SmartSourceSignaturesValidator::switchCountedFee(const csdb::Transaction& t) {
   auto initTrx = WalletsCache::findSmartContractInitTrx(t, getBlockChain());
   if (!initTrx.is_valid()) {
-    cserror() << log_prefix << " no init transaction for smart source transaction in blockchain";
+    cserror() << kLogPrefix << " no init transaction for smart source transaction in blockchain";
     return t;
   }
   csdb::Transaction res(t.innerID(), t.source(), t.target(), t.currency(), t.amount(), t.max_fee(),
@@ -241,7 +241,7 @@ ValidationPlugin::ErrorType BalanceChecker::validateBlock(const csdb::Pool&) {
     WalletsState::WalletId id{};
     const WalletsState::WalletData& wallState = wallets->getData(t.source(), id);
     if (wallState.balance_ < zeroBalance_) {
-      cserror() << log_prefix << "error detected in pool " << prevBlock.sequence()
+      cserror() << kLogPrefix << "error detected in pool " << prevBlock.sequence()
                 << ", wall address " << t.source().to_string()
                 << " has balance " << wallState.balance_.to_double();
       return ErrorType::error;
@@ -267,7 +267,7 @@ ValidationPlugin::ErrorType TransactionsChecker::validateBlock(const csdb::Pool&
     }
 
     if (!checkSignature(t)) {
-      cserror() << log_prefix << " in pool " << block.sequence()
+      cserror() << kLogPrefix << " in pool " << block.sequence()
                 << " transaction from " << t.source().to_string()
                 << ", with innerID " << t.innerID()
                 << " has incorrect signature";
@@ -282,7 +282,7 @@ bool TransactionsChecker::checkSignature(const csdb::Transaction& t) {
     const auto& bc = getBlockChain();
     BlockChain::WalletData dataToFetchPublicKey;
     if (!bc.findWalletData(t.source().wallet_id(), dataToFetchPublicKey)) {
-      cserror() << log_prefix << "no public key for id "
+      cserror() << kLogPrefix << "no public key for id "
                 << t.source().wallet_id() << " in blockchain";
       return false;
     }

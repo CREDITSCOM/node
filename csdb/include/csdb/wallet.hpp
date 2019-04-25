@@ -17,16 +17,16 @@ class Amount;
 class Storage;
 
 class Wallet {
-  SHARED_DATA_CLASS_DECLARE(Wallet)
+    SHARED_DATA_CLASS_DECLARE(Wallet)
 
 public:
-  static Wallet get(Address address, Storage storage = Storage());
+    static Wallet get(Address address, Storage storage = Storage());
 
-  bool is_valid() const noexcept;
-  Address address() const noexcept;
+    bool is_valid() const noexcept;
+    Address address() const noexcept;
 
-  CurrencyList currencies() const noexcept;
-  Amount amount(Currency currency) const noexcept;
+    CurrencyList currencies() const noexcept;
+    Amount amount(Currency currency) const noexcept;
 };
 
 }  // namespace csdb

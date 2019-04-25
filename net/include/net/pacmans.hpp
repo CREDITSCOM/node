@@ -76,6 +76,7 @@ public:
 
   using TaskIterator = std::list<TaskBody<Task>>::iterator;
   void releaseTask(TaskIterator&);
+  void rejectLast();
 
 private:
   std::list<TaskBody<Task>> queue_;

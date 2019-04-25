@@ -119,8 +119,28 @@ void Network::readerRoutine(const Config& config) {
       continue;
     }
     task.size = task.pack.decode(packetSize);
+
     if (!lastError) {
-      iPacMan_.enQueueLast();
+      bool reject = false;
+      if (task.size == 0) {
+        cswarning() << "Ignore incorrect packet fragment, drop";
+        reject = true;
+      }
+      else if (task.pack.isFragmented()) {
+        const auto fragment = task.pack.getFragmentId();
+        const auto count = task.pack.getFragmentsNum();
+        if (fragment >= Packet::MaxFragments || count >= Packet::MaxFragments || fragment >= count) {
+          cswarning() << "Incorrect fragment identity in message or too many fragments, drop (" << fragment << " from " << count << ")";
+          reject = true;
+        }
+      }
+
+      if (reject) {
+        iPacMan_.rejectLast();
+      }
+      else {
+        iPacMan_.enQueueLast();
+      }
 #ifdef __linux__
       static uint64_t one = 1;
       write(readerEventfd_, &one, sizeof(uint64_t));
@@ -139,9 +159,9 @@ void Network::readerRoutine(const Config& config) {
 #ifdef LOG_NET
       csdebug(logger::Net) << "<-- " << packetSize << " bytes from " << task.sender << " " << task.pack;
 #endif
-    }
-    else {
+    } else {
       cserror() << "Cannot receive packet. Error " << lastError;
+      iPacMan_.rejectLast();
     }
   }
 
@@ -542,6 +562,11 @@ void Network::sendInit() {
 }
 
 void Network::registerMessage(Packet* pack, const uint32_t size) {
+  if (size >= Packet::MaxFragments) {
+    cserror() << "Too much fragments in message to send (" << size << "), ignore";
+    return;
+  }
+
   MessagePtr msg;
 
   {

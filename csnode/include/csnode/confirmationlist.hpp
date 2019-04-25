@@ -9,22 +9,22 @@
 
 namespace cs {
 struct TrustedConfirmation {
-  bool bigBang = false;
-  cs::ConfidantsKeys confidants;
-  cs::Bytes mask;
-  cs::Signatures signatures;
+    bool bigBang = false;
+    cs::ConfidantsKeys confidants;
+    cs::Bytes mask;
+    cs::Signatures signatures;
 };
 
 class ConfirmationList {
 public:
-  void add(cs::RoundNumber rNum, bool bang, const cs::ConfidantsKeys& confidants,const cs::Bytes& confirmationsMask, const cs::Signatures& confirmation);
-  void remove(cs::RoundNumber);
-  std::optional<cs::TrustedConfirmation> find(cs::RoundNumber) const;
+    void add(cs::RoundNumber rNum, bool bang, const cs::ConfidantsKeys& confidants, const cs::Bytes& confirmationsMask, const cs::Signatures& confirmation);
+    void remove(cs::RoundNumber);
+    std::optional<cs::TrustedConfirmation> find(cs::RoundNumber) const;
 
 private:
-  // confidant confirmation
-  std::map<cs::RoundNumber, TrustedConfirmation> confirmationList_;
+    // confidant confirmation
+    std::map<cs::RoundNumber, TrustedConfirmation> confirmationList_;
 };
 }  // namespace cs
 
-#endif // CONFIRMATIONLIST_HPP
+#endif  // CONFIRMATIONLIST_HPP

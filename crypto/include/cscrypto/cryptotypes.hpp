@@ -5,8 +5,8 @@
 
 #include <array>
 #include <cinttypes>
-#include <vector>
 #include <string_view>
+#include <vector>
 
 namespace cscrypto {
 
@@ -21,5 +21,5 @@ using Hash = cscrypto::ByteArray<kHashSize>;
 using PublicKey = cscrypto::ByteArray<kPublicKeySize>;
 using Signature = cscrypto::ByteArray<kSignatureSize>;
 
-} // namespace cscrypto
-#endif // CSCRYPTO_CRYPTOTYPES_HPP
+}  // namespace cscrypto
+#endif  // CSCRYPTO_CRYPTOTYPES_HPP
