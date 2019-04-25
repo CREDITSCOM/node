@@ -39,11 +39,7 @@ cs::TransactionsBlock cs::PacketQueue::pop() {
         cachedPackets_ = 0;
     }
 
-    if (queue_.empty()) {
-        return block;
-    }
-
-    while (!queue_.empty() && cachedPackets_ != maxPacketsPerRound_) {
+    while (!queue_.empty() && cachedPackets_ < maxPacketsPerRound_) {
         block.push_back(std::move(queue_.front()));
         queue_.pop_front();
 
