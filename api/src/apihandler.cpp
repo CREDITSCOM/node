@@ -34,8 +34,9 @@ APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor
 }
 
 void APIHandler::run() {
-    if (!s_blockchain.isGood())
+    if (!s_blockchain.isGood()) {
         return;
+    }
 
 #ifdef MONITOR_NODE
     stats.run();
@@ -48,8 +49,10 @@ void APIHandler::run() {
 
 APIHandler::~APIHandler() {
     state_updater_running.clear(std::memory_order_release);
-    if (state_updater.joinable())
+
+    if (state_updater.joinable()) {
         state_updater.join();
+    }
 }
 
 template <typename ResultType>
@@ -568,8 +571,36 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
     if (!transaction.userFields.empty())
         tr.add_user_field(1, transaction.userFields);
 
-    solver.send_wallet_transaction(tr);
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
+  // check money
+  const auto source_addr = s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey);
+  BlockChain::WalletData wallData{};
+  BlockChain::WalletId wallId{};
+  if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
+    _return.status.code = ERROR_CODE;
+    _return.status.message = "wallet not found!";
+    return;
+  }
+
+  const auto max_sum = tr.amount().to_double() + kMinFee;
+  const auto balance = wallData.balance_.to_double();
+  if (max_sum > balance) {
+    cslog() << "API: reject transaction with insufficient balance, max_sum = " << max_sum << ", balance = " << balance;
+    _return.status.code = ERROR_CODE;
+    _return.status.message = "not enough money!\nmax_sum: " + std::to_string(max_sum) + "\nbalance: " + std::to_string(balance);
+    return;
+  }
+
+  // check signature
+  const auto byteStream = tr.to_byte_stream_for_sig();
+  if (!cscrypto::verifySignature(tr.signature(), s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
+    cslog() << "API: reject transaction with wrong signature";
+    _return.status.code = ERROR_CODE;
+    _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+    return;
+  }
+
+  solver.send_wallet_transaction(tr);
+  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
 
 template <typename T>
@@ -605,15 +636,15 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     }
     //
 
-    // check signature
-    const auto byteStream = send_transaction.to_byte_stream_for_sig();
-    if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).public_key(),
-                                   byteStream.data(), byteStream.size())) {
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "wrong signature! ByteStream:" + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
-        return;
-    }
-    //
+  // check signature
+  const auto byteStream = send_transaction.to_byte_stream_for_sig();
+  if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
+    _return.status.code = ERROR_CODE;
+    cslog() << "API: reject transaction with wrong signature";
+    _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+    return;
+  }
+  //
 
     std::vector<general::ByteCodeObject> origin_bytecode;
     if (!deploy) {
@@ -1705,7 +1736,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
             for (auto& t : pool.transactions()) {
                 if (!is_smart(t))
                     continue;
-                auto tIt = tokenCodes.find(s_blockchain.get_addr_by_type(t.target(), BlockChain::AddressType::PublicKey));
+                auto tIt = tokenCodes.find(s_blockchain.getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
                 if (tIt == tokenCodes.end())
                     continue;
                 const auto smart = fetch_smart(t);
@@ -1713,7 +1744,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
                     continue;
                 if (--offset >= 0)
                     continue;
-                csdb::Address target_pk = s_blockchain.get_addr_by_type(t.target(), BlockChain::AddressType::PublicKey);
+                csdb::Address target_pk = s_blockchain.getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
                 auto addrPair = TokensMaster::getTransferData(target_pk, smart.method, smart.params);
                 addTokenResult(_return, target_pk, tIt->second, pool, t, smart, addrPair, s_blockchain);
                 if (--limit == 0)

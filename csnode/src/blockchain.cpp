@@ -158,7 +158,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
     std::set<csdb::Address> indexedAddrs;
 
     auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
-        auto key = get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY);
+        auto key = getAddressByType(addr, ADDR_TYPE::PUBLIC_KEY);
         if (indexedAddrs.insert(key).second) {
 #ifdef RECREATE_INDEX
             csdb::PoolHash lapoo = lapoos[key];
@@ -1309,7 +1309,7 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
 
 csdb::PoolHash BlockChain::getPreviousPoolHash(const csdb::Address& addr, const csdb::PoolHash& ph) {
     std::lock_guard lock(dbLock_);
-    return storage_.get_previous_transaction_block(get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY), ph);
+    return storage_.get_previous_transaction_block(getAddressByType(addr, ADDR_TYPE::PUBLIC_KEY), ph);
 }
 
 std::pair<csdb::PoolHash, uint32_t> BlockChain::getLastNonEmptyBlock() {
@@ -1350,7 +1350,7 @@ bool TransactionsIterator::isValid() const {
 
 void TransactionsIterator::next() {
     while (++it_ != lapoo_.transactions().rend()) {
-        if (bc_.is_equal(it_->source(), addr_) || bc_.is_equal(it_->target(), addr_)) {
+        if (bc_.isEqual(it_->source(), addr_) || bc_.isEqual(it_->target(), addr_)) {
             break;
         }
     }
@@ -1363,7 +1363,7 @@ void TransactionsIterator::next() {
         if (lapoo_.is_valid()) {
             it_ = lapoo_.transactions().rbegin();
             // transactions() cannot be empty
-            if (!bc_.is_equal(it_->source(), addr_) && !bc_.is_equal(it_->target(), addr_)) {
+            if (!bc_.isEqual(it_->source(), addr_) && !bc_.isEqual(it_->target(), addr_)) {
                 next();  // next should be executed only once
             }
         }

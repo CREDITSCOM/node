@@ -107,7 +107,7 @@ ValidationPlugin::ErrorType BlockSignaturesValidator::validateBlock(const csdb::
   size_t checkingSignature = 0;
   auto signedData = cscrypto::calculateHash(block.to_binary().data(), block.hashingLength());
   for (size_t i = 0; i < confidants.size(); ++i) {
-    if (realTrustedMask & (1 << i)) {
+    if (realTrustedMask & (1ull << i)) {
       if (!cscrypto::verifySignature(signatures[checkingSignature],
                                      confidants[i],
                                      signedData.data(),
