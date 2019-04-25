@@ -81,8 +81,6 @@ void cs::Timer::loop() {
 }
 
 void cs::Timer::preciseLoop() {
-    size_t counter = 0;
-    static constexpr size_t maxCount = 10;
     std::chrono::high_resolution_clock::time_point previousTimePoint = std::chrono::high_resolution_clock::now();
 
     while (!interruption_) {
@@ -98,12 +96,7 @@ void cs::Timer::preciseLoop() {
         }
 
         previousTimePoint = now;
-        ++counter;
-
-        if (counter >= maxCount) {
-            counter = 0;
-            std::this_thread::yield();
-        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(HighPreciseTimerSleepTimeMs));
     }
 }
 

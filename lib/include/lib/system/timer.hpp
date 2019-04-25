@@ -25,7 +25,8 @@ using TimerPtr = std::shared_ptr<Timer>;
 class Timer {
 public:
     enum : unsigned int {
-        RangeDeltaInPercents = 10
+        RangeDeltaInPercents = 10,
+        HighPreciseTimerSleepTimeMs = 1
     };
 
     enum class Type : cs::Byte {
