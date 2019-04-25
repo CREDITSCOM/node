@@ -157,8 +157,8 @@ TEST(Conveyer, AddTransaction) {
     ConveyerTest conveyer{};
     auto transaction{CreateTestTransaction(3, 1)};
     conveyer.addTransaction(transaction);
-    auto transactions_block{conveyer.transactionsBlock()};
-    ASSERT_EQ(1, transactions_block.size());
+    auto& transactions_block = conveyer.packetQueue();
+    ASSERT_EQ(1, conveyer.packetQueue().size());
     auto packet{cs::TransactionsPacket{}};
     packet.addTransaction(transaction);
     ASSERT_EQ(packet.toBinary(), transactions_block.back().toBinary());
@@ -181,8 +181,8 @@ TEST(Conveyer, CanSuccessfullyAddTransactionsPacket) {
 
 TEST(Conveyer, CanAddTransactionToLastBlock) {
     ConveyerTest conveyer{};
-    auto& table = conveyer.transactionsBlock();
-    ASSERT_TRUE(table.empty());
+    auto& table = conveyer.packetQueue();
+    ASSERT_TRUE(table.isEmpty());
     auto transaction1 = CreateTestTransaction(1, 1), transaction2 = CreateTestTransaction(2, 1);
     conveyer.addTransaction(transaction1);
     conveyer.addTransaction(transaction2);
