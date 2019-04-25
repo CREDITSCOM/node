@@ -6,6 +6,7 @@
 #include <csdb/amount.hpp>
 #include <csdb/internal/types.hpp>
 #include <csnode/transactionstail.hpp>
+#include <csnode/walletscache.hpp>
 #include <unordered_map>
 #include <vector>
 
@@ -32,7 +33,7 @@ public:
     };
 
 public:
-    explicit WalletsState(const BlockChain& blockchain, size_t initialWalletsNum = 2 * 1024 * 1024);
+    explicit WalletsState(const BlockChain& blockchain, size_t initialWalletsNum = InitialWalletsNum);
 
     void updateFromSource();
     WalletData& getData(const WalletAddress& address, WalletId& id);
@@ -41,7 +42,7 @@ public:
 private:
     class WalletsExisting {
     public:
-        explicit WalletsExisting(const BlockChain& blockchain, size_t initialWalletsNum = 2 * 1024 * 1024);
+        explicit WalletsExisting(const BlockChain& blockchain, size_t initialWalletsNum = InitialWalletsNum);
         ~WalletsExisting();
 
         void updateFromSource();
