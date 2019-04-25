@@ -213,7 +213,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     // resend all this round data available
     csdebug() << "NODE> resend last block hash after BigBang";
 
-    globalTable.hashes = conveyer.currentRoundTable().hashes;
+    // do not pass further the hashes from unsuccessful round
+    //globalTable.hashes = conveyer.currentRoundTable().hashes;
 
     csmeta(csdebug) << "Get BigBang globalTable.hashes: " << globalTable.hashes.size();
 
@@ -226,6 +227,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         startConsensus();
     }
     else {
+        cswarning() << "NODE> non empty required hashes after BB detected";
         sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
     }
 }
