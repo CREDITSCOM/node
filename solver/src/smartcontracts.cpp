@@ -172,7 +172,8 @@ bool SmartContracts::is_new_state(const csdb::Transaction& tr) {
 /* static */
 /* Assuming deployer.is_public_key() */
 csdb::Address SmartContracts::get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId, const api::SmartContractDeploy& data) {
-    static_assert(cscrypto::kHashSize == cscrypto::kPublicKeySize);
+    static_assert(cscrypto::kHashSize <= cscrypto::kPublicKeySize);
+    const uint8_t kInnerIdSize = 6;
 
     std::vector<cscrypto::Byte> strToHash;
     std::string byteCode{};
@@ -181,18 +182,21 @@ csdb::Address SmartContracts::get_valid_smart_address(const csdb::Address& deplo
             byteCode += curr_byteCode.byteCode;
         }
     }
-    strToHash.reserve(cscrypto::kPublicKeySize + 6 + byteCode.size());
+    strToHash.reserve(cscrypto::kPublicKeySize + kInnerIdSize + byteCode.size());
 
     const auto dPk = deployer.public_key();
     const auto idPtr = reinterpret_cast<const cscrypto::Byte*>(&trId);
 
     std::copy(dPk.begin(), dPk.end(), std::back_inserter(strToHash));
-    std::copy(idPtr, idPtr + 6, std::back_inserter(strToHash));
+    std::copy(idPtr, idPtr + kInnerIdSize, std::back_inserter(strToHash));
     std::copy(byteCode.begin(), byteCode.end(), std::back_inserter(strToHash));
 
-    cscrypto::Hash result = cscrypto::calculateHash(strToHash.data(), strToHash.size());
+    cscrypto::Hash hash = cscrypto::calculateHash(strToHash.data(), strToHash.size());
+    cscrypto::PublicKey res;
+    res.fill(0);
+    std::copy(hash.data(), hash.data() + cscrypto::kHashSize, res.data());
 
-    return csdb::Address::from_public_key(reinterpret_cast<char*>(result.data()));
+    return csdb::Address::from_public_key(res);
 }
 
 /*static*/
