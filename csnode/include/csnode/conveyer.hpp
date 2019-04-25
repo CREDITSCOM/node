@@ -2,6 +2,7 @@
 #define CONVEYER_HPP
 
 #include <csnode/nodecore.hpp>
+#include <csnode/packetqueue.hpp>
 
 #include <lib/system/common.hpp>
 #include <lib/system/signals.hpp>
@@ -34,6 +35,11 @@ public:
     enum : unsigned int {
         HashTablesStorageCapacity = cs::values::defaultMetaStorageMaxSize,
         CharacteristicMetaCapacity = HashTablesStorageCapacity,
+
+        // queue
+        MaxPacketTransactions = 100,
+        MaxPacketsPerRound = 10,
+        MaxQueueSize = 1000000
     };
 
     ///
@@ -73,9 +79,9 @@ public:
     const cs::TransactionsPacketTable& transactionsPacketTable() const;
 
     ///
-    /// @brief Returns transactions block, first stage of conveyer.
+    /// @brief Returns transactions packet queue, first stage of conveyer.
     ///
-    const cs::TransactionsBlock& transactionsBlock() const;
+    const cs::PacketQueue& packetQueue() const;
 
     ///
     /// @brief Returns pair of transactions packet created in current round and smart contract packets.
@@ -278,7 +284,7 @@ public:
     /// @brief Returns summary block (first stage) transactions count that
     /// does not flushed to network. Thread safe method.
     ///
-    size_t blockTransactionsCount() const;
+    size_t packetQueueTransactionsCount() const;
 
     // sync, try do not use it :]
     std::unique_lock<cs::SharedMutex> lock() const;

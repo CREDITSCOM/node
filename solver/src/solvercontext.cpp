@@ -211,7 +211,7 @@ void SolverContext::request_stage3(uint8_t from, uint8_t required) {
 
 bool SolverContext::transaction_still_in_pool(int64_t inner_id) const {
     auto lock = cs::Conveyer::instance().lock();
-    const auto& block = cs::Conveyer::instance().transactionsBlock();
+    const auto& block = cs::Conveyer::instance().packetQueue();
 
     for (const auto& packet : block) {
         for (const auto& tr : packet.transactions()) {

@@ -1308,7 +1308,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
         else {
             cs::Conveyer& conveyer = cs::Conveyer::instance();
             auto lock = conveyer.lock();
-            for (decltype(auto) it : conveyer.transactionsBlock()) {
+            for (decltype(auto) it : conveyer.packetQueue()) {
                 const auto& transactions = it.transactions();
                 for (decltype(auto) transaction : transactions) {
                     if (transaction.innerID() == inner_id) {
