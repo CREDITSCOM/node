@@ -32,6 +32,19 @@ class Spammer;
 
 class Node {
 public:
+    enum Level {
+        Normal,
+        Confidant,
+        Main,
+        Writer
+    };
+
+    enum MessageActions {
+        Process,
+        Postpone,
+        Drop
+    };
+
     explicit Node(const Config&);
     ~Node();
 
@@ -155,24 +168,7 @@ public:
 
     std::optional<cs::TrustedConfirmation> getConfirmation(cs::RoundNumber round) const;
 
-    enum Level {
-        Normal,
-        Confidant,
-        Main,
-        Writer
-    };
-
-    enum MessageActions {
-        Process,
-        Postpone,
-        Drop
-    };
-
-    /**
-     * @class   Node
-     *
-     * @brief   This function should filter the packages only using their roundNumber
-     */
+    // this function should filter the packages only using their roundNumber
     MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes, const cs::PublicKey);
 
     const cs::PublicKey& getNodeIdKey() const {
@@ -224,7 +220,7 @@ public signals:
     SmartStageRequestSignal receivedSmartStageRequest;
     cs::Signal<void(const std::vector<std::pair<cs::Sequence, uint32_t>>&)> gotRejectedContracts;
 
-    static cs::Signal<void()> stopRequested;
+    inline static cs::Signal<void()> stopRequested;
 
 private slots:
     void onStopRequested();
