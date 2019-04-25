@@ -179,8 +179,9 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
     if (pool.transactions().size()) {
         total_transactions_count_ += pool.transactions().size();
 
-        if (lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash)
+        if (lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash) {
             previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
+        }
 
         lastNonEmptyBlock_.hash = pool.hash();
         lastNonEmptyBlock_.transCount = static_cast<uint32_t>(pool.transactions().size());
@@ -189,7 +190,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
 #endif
 
 cs::Sequence BlockChain::getLastSequence() const {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    std::lock_guard lock(dbLock_);
 
     if (deferredBlock_.is_valid()) {
         return deferredBlock_.sequence();
@@ -253,9 +254,10 @@ void BlockChain::writeGenesisBlock() {
     csdb::Pool genesis;
     csdb::Transaction transaction;
 
-    std::string str_addr = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
+    std::string strAddr = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
     std::vector<uint8_t> pub_key;
-    DecodeBase58(str_addr, pub_key);
+    DecodeBase58(strAddr, pub_key);
+
     csdb::Address test_address = csdb::Address::from_public_key(pub_key);
     transaction.set_target(test_address);
     transaction.set_source(genesisAddress_);
@@ -284,21 +286,22 @@ void BlockChain::writeGenesisBlock() {
 }
 
 void BlockChain::iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)> func) {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    std::lock_guard lock(cacheMutex_);
     walletsCacheStorage_->iterateOverWallets(func);
 }
 
 #ifdef MONITOR_NODE
 void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)> func) {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    std::lock_guard lock(cacheMutex_);
     walletsCacheStorage_->iterateOverWriters(func);
 }
 
 void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<void(const cs::WalletsCache::WalletData&)> func) {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    std::lock_guard lock(cacheMutex_);
     WalletId id;
-    if (!walletIds_->normal().find(addr, id))
+    if (!walletIds_->normal().find(addr, id)) {
         return;
+    }
     auto wd = walletsCacheUpdater_->findWallet(id);
 
     func(*wd);
@@ -306,16 +309,17 @@ void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<vo
 #endif
 
 csdb::PoolHash BlockChain::getLastHash() const {
-    std::lock_guard l(dbLock_);
+    std::lock_guard lock(dbLock_);
 
-    if (deferredBlock_.is_valid())
+    if (deferredBlock_.is_valid()) {
         return deferredBlock_.hash().clone();
+    }
 
     return storage_.last_hash();
 }
 
 size_t BlockChain::getSize() const {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    std::lock_guard lock(dbLock_);
     const auto storageSize = storage_.size();
     return deferredBlock_.is_valid() ? (storageSize + 1) : storageSize;
 }
@@ -325,16 +329,17 @@ csdb::Pool BlockChain::loadBlock(const csdb::PoolHash& ph) const {
         return csdb::Pool{};
     }
 
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    std::lock_guard l(dbLock_);
 
-    if (deferredBlock_.hash() == ph)
+    if (deferredBlock_.hash() == ph) {
         return deferredBlock_.clone();
+    }
 
     return storage_.pool_load(ph);
 }
 
 csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    std::lock_guard lock(dbLock_);
 
     if (deferredBlock_.is_valid() && deferredBlock_.sequence() == sequence) {
         // deferredBlock already composed:
@@ -348,26 +353,29 @@ csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
 }
 
 csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) const {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    std::lock_guard lock(dbLock_);
 
-    if (deferredBlock_.hash() == ph)
+    if (deferredBlock_.hash() == ph) {
         return deferredBlock_.clone();
+    }
 
     return storage_.pool_load_meta(ph, cnt);
 }
 
 csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId) const {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
-    csdb::Transaction trxn;
+    std::lock_guard l(dbLock_);
+    csdb::Transaction transaction;
+
     if (deferredBlock_.hash() == transId.pool_hash()) {
-        trxn = deferredBlock_.transaction(transId).clone();
-        trxn.set_time(deferredBlock_.get_time());
+        transaction = deferredBlock_.transaction(transId).clone();
+        transaction.set_time(deferredBlock_.get_time());
     }
     else {
-        trxn = storage_.transaction(transId);
-        trxn.set_time(storage_.pool_load(transId.pool_hash()).get_time());
+        transaction = storage_.transaction(transId);
+        transaction.set_time(storage_.pool_load(transId.pool_hash()).get_time());
     }
-    return trxn;
+
+    return transaction;
 }
 
 void BlockChain::removeLastBlock() {
@@ -375,7 +383,7 @@ void BlockChain::removeLastBlock() {
     csdb::Pool pool{};
 
     {
-        std::lock_guard<decltype(dbLock_)> l(dbLock_);
+        std::lock_guard lock(dbLock_);
 
         if (deferredBlock_.is_valid()) {
             pool = deferredBlock_;
@@ -441,8 +449,9 @@ csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
 
 void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
     try {
-        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        std::lock_guard lock(cacheMutex_);
         const csdb::Pool::NewWallets& newWallets = pool.newWallets();
+
         for (const auto& newWall : newWallets) {
             csdb::Address newWallAddress;
             if (!pool.getWalletAddress(newWall, newWallAddress)) {
@@ -574,16 +583,17 @@ const csdb::Storage& BlockChain::getStorage() const {
 }
 
 csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
-    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    std::lock_guard lock(dbLock_);
 
-    if (deferredBlock_.sequence() == seq)
+    if (deferredBlock_.sequence() == seq) {
         return deferredBlock_.hash().clone();
+    }
 
     return blockHashes_->find(seq);
 }
 
 uint64_t BlockChain::getWalletsCountWithBalance() {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    std::lock_guard lock(cacheMutex_);
 
     uint64_t count = 0;
     auto proc = [&](const WalletData::Address& addr, const WalletData& wallet) {
@@ -608,7 +618,7 @@ public:
     , blockchain_(blockchain)
     , transactions_(transactions) {
         if (isToLoadWalletsPoolsCache_) {
-            std::lock_guard<decltype(cacheMutex_)> lock(blockchain_.cacheMutex_);
+            std::lock_guard lock(blockchain_.cacheMutex_);
             blockchain.walletsPools_->addWallet(id);
         }
     }
@@ -636,7 +646,7 @@ public:
             }
 
             if (hasMyTransactions && isToLoadWalletsPoolsCache_) {
-                std::lock_guard<decltype(cacheMutex_)> lock(blockchain_.cacheMutex_);
+                std::lock_guard lock(blockchain_.cacheMutex_);
                 blockchain_.walletsPools_->loadPrevBlock(curr);
             }
         }
@@ -669,26 +679,33 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
 }
 
 bool BlockChain::findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id, WalletsPools::WalletData::PoolsHashes& hashesArray) const {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    std::lock_guard lock(cacheMutex_);
 
     if (address.is_wallet_id()) {
         id = address.wallet_id();
 
         const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
-        if (!wallDataPtr)
+
+        if (!wallDataPtr) {
             return false;
+        }
+
         WalletsCache::convert(wallDataPtr->address_, wallPubKey);
     }
-    else  // if (address.is_public_key())
+    else
     {
-        if (!walletIds_->normal().find(address, id))
+        if (!walletIds_->normal().find(address, id)) {
             return false;
+        }
+
         wallPubKey = address;
     }
 
     const WalletsPools::WalletData* wallData = walletsPools_->findWallet(id);
-    if (wallData)
+    if (wallData) {
         hashesArray = wallData->poolsHashes_;
+    }
+
     return true;
 }
 
@@ -697,12 +714,15 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address wallP
     bool isToLoadWalletsPoolsCache = hashesArray.empty() && wallPubKey != genesisAddress_ && wallPubKey != startAddress_;
     if (wallPubKey.is_public_key()) {
         WalletId _id;
-        if (!findWalletId(wallPubKey, _id))
+
+        if (!findWalletId(wallPubKey, _id)) {
             return;
+        }
+
         wallPubKey = csdb::Address::from_wallet_id(_id);
     }
-    TransactionsLoader trxLoader(wallPubKey, id, isToLoadWalletsPoolsCache, *this, transactions);
 
+    TransactionsLoader trxLoader(wallPubKey, id, isToLoadWalletsPoolsCache, *this, transactions);
     csdb::PoolHash prevHash = getLastHash();
 
     for (size_t i = hashesArray.size() - 1; i != std::numeric_limits<decltype(i)>::max(); --i) {
@@ -716,23 +736,28 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address wallP
         csdb::PoolHash currHash;
         WalletsPools::convert(poolHashData.poolHash, currHash);
 
-        if (!trxLoader.load(currHash, offset, limit, prevHash))
+        if (!trxLoader.load(currHash, offset, limit, prevHash)) {
             return;
-        if (transactions.size() >= limit)
+        }
+
+        if (transactions.size() >= limit) {
             return;
+        }
     }
 
     while (true) {
         csdb::PoolHash currHash = prevHash;
-        if (!trxLoader.load(currHash, offset, limit, prevHash))
+
+        if (!trxLoader.load(currHash, offset, limit, prevHash)) {
             break;
+        }
     }
 }
 
 template <typename WalletCacheProcessor>
 bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc) {
     try {
-        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        std::lock_guard lock(cacheMutex_);
 
         const csdb::Pool::NewWallets& newWallets = pool.newWallets();
         for (const auto& newWall : newWallets) {
@@ -756,6 +781,7 @@ bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& p
         cserror() << "Exc=...";
         return false;
     }
+
     return true;
 }
 
@@ -787,11 +813,13 @@ bool BlockChain::insertNewWalletId(const csdb::Address& newWallAddress, WalletId
 }
 
 void BlockChain::addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets) {
-    if (!walletAddress.is_public_key())
+    if (!walletAddress.is_public_key()) {
         return;
+    }
 
-    if (walletAddress == genesisAddress_)
+    if (walletAddress == genesisAddress_) {
         return;
+    }
 
     WalletId id{};
 
@@ -838,7 +866,8 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
     }
 
     try {
-        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        std::lock_guard lock(cacheMutex_);
+
         // currently block stores own round confidants, not next round:
         const auto& currentRoundConfidants = nextPool.confidants();
         walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants, *this);
@@ -864,35 +893,39 @@ bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallDa
         return findWalletData(address.wallet_id(), wallData);
     }
 
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    std::lock_guard lock(cacheMutex_);
 
-    if (!walletIds_->normal().find(address, id))
+    if (!walletIds_->normal().find(address, id)) {
         return false;
+    }
 
     return findWalletData_Unsafe(id, wallData);
 }
 
 bool BlockChain::findWalletData(WalletId id, WalletData& wallData) const {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    std::lock_guard lock(cacheMutex_);
     return findWalletData_Unsafe(id, wallData);
 }
 
 bool BlockChain::findWalletData_Unsafe(WalletId id, WalletData& wallData) const {
     const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
+
     if (wallDataPtr) {
         wallData = *wallDataPtr;
         return true;
     }
+
     return false;
 }
 
 bool BlockChain::getModifiedWallets(Mask& dest) const {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    std::lock_guard lock(cacheMutex_);
 
     bool isNewModified = (walletsCacheUpdater_->getModified().size() != dest.size()) || walletsCacheUpdater_->getModified().any();
 
     dest.resize(walletsCacheUpdater_->getModified().size(), true);
     dest |= walletsCacheUpdater_->getModified();
+
     return isNewModified;
 }
 
@@ -902,7 +935,7 @@ bool BlockChain::findWalletId(const WalletAddress& address, WalletId& id) const 
         return true;
     }
     else if (address.is_public_key()) {
-        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        std::lock_guard lock(cacheMutex_);
         return walletIds_->normal().find(address, id);
     }
 
@@ -916,7 +949,7 @@ bool BlockChain::getWalletId(const WalletAddress& address, WalletId& id) {
         return false;
     }
     else if (address.is_public_key()) {
-        std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+        std::lock_guard lock(cacheMutex_);
         return walletIds_->normal().get(address, id);
     }
 
@@ -925,14 +958,17 @@ bool BlockChain::getWalletId(const WalletAddress& address, WalletId& id) {
 }
 
 bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address& addr) const {
-    if (!walletIds_->normal().findaddr(id, addr))
+    if (!walletIds_->normal().findaddr(id, addr)) {
         return false;
+    }
+
     return true;
 }
 
 std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrusted) {
     const auto last_seq = getLastSequence();
     const auto pool_seq = pool.sequence();
+
     csdebug() << "BLOCKCHAIN> finish & store block #" << pool_seq << " to chain";
 
     if (last_seq + 1 != pool_seq) {
@@ -947,8 +983,10 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
     {
         cs::Lock lock(dbLock_);
+
         if (deferredBlock_.is_valid()) {
             deferredBlock_.set_storage(storage_);
+
             if (deferredBlock_.save()) {
                 flushed_block_seq = deferredBlock_.sequence();
             }
@@ -1002,11 +1040,13 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
 bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     csdebug() << csfunc() << ":";
-    const auto last_seq = getLastSequence();
-    const auto pool_seq = pool.sequence();
-    if (pool_seq <= last_seq) {
+
+    const auto lastSequence = getLastSequence();
+    const auto poolSequence = pool.sequence();
+
+    if (poolSequence <= lastSequence) {
         // ignore
-        csdebug() << "BLOCKCHAIN> ignore oudated block #" << pool_seq << ", last written #" << last_seq;
+        csdebug() << "BLOCKCHAIN> ignore oudated block #" << poolSequence << ", last written #" << lastSequence;
         // it is not error, so caller code nothing to do with it
         return true;
     }
@@ -1015,22 +1055,22 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         return false;
     }
 
-    if (pool_seq == last_seq) {
-        std::lock_guard<decltype(dbLock_)> l(dbLock_);
+    if (poolSequence == lastSequence) {
+        std::lock_guard lock(dbLock_);
 
         if (!deferredBlock_.signatures().empty()) {
             // ignore
-            csdebug() << "BLOCKCHAIN> ignore oudated block #" << pool_seq << ", last written #" << last_seq;
+            csdebug() << "BLOCKCHAIN> ignore oudated block #" << poolSequence << ", last written #" << lastSequence;
             // it is not error, so caller code nothing to do with it
             return true;
         }
         else {
-            csdebug() << "BLOCKCHAIN> we have to rewrite #" << pool_seq;
+            csdebug() << "BLOCKCHAIN> we have to rewrite #" << poolSequence;
             // removeLastBlock();
         }
     }
 
-    if (pool_seq == last_seq + 1) {
+    if (poolSequence == lastSequence + 1) {
         if (pool.previous_hash() != getLastHash()) {
             csdebug() << "BLOCKCHAIN> new pool\'s prev. hash does not equal to current last hash, remove own last block and cancel store operation";
             if (getLastHash().is_empty()) {
@@ -1048,37 +1088,37 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         // update wallet ids
         if (bySync) {
             // ready-to-record block does not require anything
-            csdebug() << "BLOCKCHAIN> store block #" << pool_seq << " to chain, update wallets ids";
+            csdebug() << "BLOCKCHAIN> store block #" << poolSequence << " to chain, update wallets ids";
             updateWalletIds(pool, *walletsCacheUpdater_);
         }
         else {
-            csdebug() << "BLOCKCHAIN> store block #" << pool_seq << " add new wallets to pool";
+            csdebug() << "BLOCKCHAIN> store block #" << poolSequence << " add new wallets to pool";
             addNewWalletsToPool(pool);
         }
 
         // write immediately
         if (recordBlock(pool, false).has_value()) {
-            csdebug() << "BLOCKCHAIN> block #" << pool_seq << " has recorded to chain successfully";
+            csdebug() << "BLOCKCHAIN> block #" << poolSequence << " has recorded to chain successfully";
             // unable to call because stack overflow in case of huge written blocks amount possible:
             // testCachedBlocks();
             return true;
         }
 
-        csdebug() << "BLOCKCHAIN> failed to store block #" << pool_seq << " to chain";
+        csdebug() << "BLOCKCHAIN> failed to store block #" << poolSequence << " to chain";
         removeLastBlock();
         return false;
     }
 
-    if (cachedBlocks_.count(pool_seq) > 0) {
-        csdebug() << "BLOCKCHAIN> ignore duplicated block #" << pool_seq << " in cache";
+    if (cachedBlocks_.count(poolSequence) > 0) {
+        csdebug() << "BLOCKCHAIN> ignore duplicated block #" << poolSequence << " in cache";
         // it is not error, so caller code nothing to do with it
         return true;
     }
     // cache block for future recording
     csdebug() << "BLOCKCHAIN> cached block has " << pool.signatures().size();
-    cachedBlocks_.emplace(pool_seq, BlockMeta{pool, bySync});
-    csdebug() << "BLOCKCHAIN> cache block #" << pool_seq << " for future (" << cachedBlocks_.size() << " total)";
-    cachedBlockEvent(pool_seq);
+    cachedBlocks_.emplace(poolSequence, BlockMeta{pool, bySync});
+    csdebug() << "BLOCKCHAIN> cache block #" << poolSequence << " for future (" << cachedBlocks_.size() << " total)";
+    cachedBlockEvent(poolSequence);
     // cache always successful
     return true;
 }
@@ -1199,69 +1239,91 @@ csdb::Address BlockChain::getAddressByType(const csdb::Address& addr, ADDR_TYPE 
     csdb::Address addr_res{};
     switch (type) {
         case ADDR_TYPE::PUBLIC_KEY:
-            if (addr.is_public_key() || !findAddrByWalletId(addr.wallet_id(), addr_res))
+            if (addr.is_public_key() || !findAddrByWalletId(addr.wallet_id(), addr_res)) {
                 addr_res = addr;
+            }
+
             break;
         case ADDR_TYPE::ID:
             uint32_t _id;
-            if (findWalletId(addr, _id))
+            if (findWalletId(addr, _id)) {
                 addr_res = csdb::Address::from_wallet_id(_id);
+            }
+
             break;
     }
     return addr_res;
 }
 
 bool BlockChain::isEqual(const csdb::Address& laddr, const csdb::Address& raddr) const {
-    if (getAddressByType(laddr, ADDR_TYPE::PUBLIC_KEY) == getAddressByType(raddr, ADDR_TYPE::PUBLIC_KEY))
+    if (getAddressByType(laddr, ADDR_TYPE::PUBLIC_KEY) == getAddressByType(raddr, ADDR_TYPE::PUBLIC_KEY)) {
         return true;
+    }
+
     return false;
 }
 
 #ifdef MONITOR_NODE
 uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    std::lock_guard lock(cacheMutex_);
     WalletId id;
-    if (addr.is_wallet_id())
+
+    if (addr.is_wallet_id()) {
         id = addr.wallet_id();
-    else if (!walletIds_->normal().find(addr, id))
+    }
+
+    else if (!walletIds_->normal().find(addr, id)) {
         return 0;
+    }
+
     const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
-    if (!wallDataPtr)
+
+    if (!wallDataPtr) {
         return 0;
+    }
+
     return static_cast<uint32_t>(wallDataPtr->transNum_);
 }
 #endif
 
 #ifdef TRANSACTIONS_INDEX
 csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
-    std::lock_guard<decltype(cacheMutex_)> lock(cacheMutex_);
+    std::lock_guard lock(cacheMutex_);
     WalletId id;
-    if (addr.is_wallet_id())
+
+    if (addr.is_wallet_id()) {
         id = addr.wallet_id();
-    else if (!walletIds_->normal().find(addr, id))
+    }
+    else if (!walletIds_->normal().find(addr, id)) {
         return csdb::TransactionID();
+    }
+
     const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
-    if (!wallDataPtr)
+
+    if (!wallDataPtr) {
         return csdb::TransactionID();
+    }
 
     return wallDataPtr->lastTransaction_;
 }
 
 csdb::PoolHash BlockChain::getPreviousPoolHash(const csdb::Address& addr, const csdb::PoolHash& ph) {
-    std::lock_guard<decltype(dbLock_)> lock(dbLock_);
+    std::lock_guard lock(dbLock_);
     return storage_.get_previous_transaction_block(get_addr_by_type(addr, ADDR_TYPE::PUBLIC_KEY), ph);
 }
 
 std::pair<csdb::PoolHash, uint32_t> BlockChain::getLastNonEmptyBlock() {
-    std::lock_guard<decltype(dbLock_)> lock(dbLock_);
+    std::lock_guard lock(dbLock_);
     return std::make_pair(lastNonEmptyBlock_.hash, lastNonEmptyBlock_.transCount);
 }
 
 std::pair<csdb::PoolHash, uint32_t> BlockChain::getPreviousNonEmptyBlock(const csdb::PoolHash& ph) {
-    std::lock_guard<decltype(dbLock_)> lock(dbLock_);
+    std::lock_guard lock(dbLock_);
     const auto it = previousNonEmpty_.find(ph);
-    if (it != previousNonEmpty_.end())
+
+    if (it != previousNonEmpty_.end()) {
         return std::make_pair(it->second.hash, it->second.transCount);
+    }
 
     return std::pair<csdb::PoolHash, uint32_t>();
 }
@@ -1288,8 +1350,9 @@ bool TransactionsIterator::isValid() const {
 
 void TransactionsIterator::next() {
     while (++it_ != lapoo_.transactions().rend()) {
-        if (bc_.is_equal(it_->source(), addr_) || bc_.is_equal(it_->target(), addr_))
+        if (bc_.is_equal(it_->source(), addr_) || bc_.is_equal(it_->target(), addr_)) {
             break;
+        }
     }
 
     // Oops, no more in this blockfTransactionsListGet
@@ -1300,8 +1363,9 @@ void TransactionsIterator::next() {
         if (lapoo_.is_valid()) {
             it_ = lapoo_.transactions().rbegin();
             // transactions() cannot be empty
-            if (!bc_.is_equal(it_->source(), addr_) && !bc_.is_equal(it_->target(), addr_))
+            if (!bc_.is_equal(it_->source(), addr_) && !bc_.is_equal(it_->target(), addr_)) {
                 next();  // next should be executed only once
+            }
         }
     }
 }
@@ -1314,8 +1378,10 @@ void TransactionsIterator::setFromHash(const csdb::PoolHash& ph) {
 
     while (!found) {
         lapoo_ = bc_.loadBlock(hash);
-        if (!lapoo_.is_valid())
+
+        if (!lapoo_.is_valid()) {
             break;
+        }
 
         for (it_ = lapoo_.transactions().rbegin(); it_ != lapoo_.transactions().rend(); ++it_) {
             if (bc_.isEqual(it_->source(), addr_) || bc_.isEqual(it_->target(), addr_)) {
