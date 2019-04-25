@@ -258,8 +258,8 @@ public:
 
         auto smartTrxn = *(pool.transactions().begin() + offsetTrx);
 
-        auto smartSource = blockchain_.getAddressByType(smartTrxn.source(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
-        auto smartTarget = blockchain_.getAddressByType(smartTrxn.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+        auto smartSource = blockchain_.getAddressByType(smartTrxn.source(), BlockChain::AddressType::PublicKey);
+        auto smartTarget = blockchain_.getAddressByType(smartTrxn.target(), BlockChain::AddressType::PublicKey);
 
         csdb::Transaction deployTrxn;
         const auto isdeploy = isDeploy(smartTrxn);
@@ -367,7 +367,7 @@ public:
             return;
         for (const auto& trxn : pool.transactions()) {
             if (trxn.is_valid() && (trxn.user_field(-2).type() == csdb::UserField::Type::String && trxn.user_field(1).type() == csdb::UserField::Type::String)) {
-                const auto address = blockchain_.getAddressByType(trxn.target(), BlockChain::ADDR_TYPE::PUBLIC_KEY);
+                const auto address = blockchain_.getAddressByType(trxn.target(), BlockChain::AddressType::PublicKey);
                 const auto newstate = trxn.user_field(-2).value<std::string>();
                 if (!newstate.empty()) {
                     setLastState(address, newstate);
