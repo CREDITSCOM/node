@@ -27,11 +27,12 @@ void cs::PacketQueue::push(const cs::TransactionsPacket& packet) {
     queue_.push_back(cs::TransactionsPacket{});
 }
 
-std::optional<cs::TransactionsBlock> cs::PacketQueue::pop() {
+cs::TransactionsBlock cs::PacketQueue::pop() {
     const auto round = cs::Conveyer::instance().currentRoundNumber();
+    cs::TransactionsBlock block;
 
     if (round == cachedRound_ && cachedPackets_ >= maxPacketsPerRound_) {
-        return std::nullopt;
+        return block;
     }
 
     if (round != cachedRound_) {
@@ -39,12 +40,10 @@ std::optional<cs::TransactionsBlock> cs::PacketQueue::pop() {
     }
 
     if (queue_.empty()) {
-        return std::nullopt;
+        return block;
     }
 
-    cs::TransactionsBlock block;
-
-    while (!queue_.empty() || cachedPackets_ != maxPacketsPerRound_) {
+    while (!queue_.empty() && cachedPackets_ != maxPacketsPerRound_) {
         block.push_back(std::move(queue_.front()));
         queue_.pop_front();
 
@@ -52,7 +51,7 @@ std::optional<cs::TransactionsBlock> cs::PacketQueue::pop() {
     }
 
     cachedRound_ = round;
-    return std::make_optional(std::move(block));
+    return block;
 }
 
 typename std::deque<cs::TransactionsPacket>::const_iterator cs::PacketQueue::begin() const {
