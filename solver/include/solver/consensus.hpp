@@ -53,7 +53,7 @@ public:
     constexpr static uint32_t T_coll_trans = 500;
 
     /** @brief   Max hashes count to include in stage one data */
-    constexpr static size_t MaxStageOneHashes = 250;
+    constexpr static size_t MaxStageOneHashes = 100;
 
     /** @brief   Max count of rounds to execute smart contract. After that contract is assumed failed unconditionally */
     constexpr static unsigned int MaxRoundsCancelContract = 100;
