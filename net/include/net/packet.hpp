@@ -78,7 +78,7 @@ const char* getMsgTypesString(MsgTypes messageType);
 class Packet {
 public:
     static const uint32_t MaxSize = 1 << 10;
-    static const uint32_t MaxFragments = 1 << 12;
+    static const uint32_t MaxFragments = 1 << 13; // 8'192
 
     static const uint32_t SmartRedirectTreshold = 10000;
 
@@ -214,6 +214,16 @@ public:
             static_assert(sizeof(BaseFlags) == sizeof(char), "BaseFlags should be char sized");
             const size_t headerSize = getHeadersLength();
 
+            assert(headerSize <= packetSize);
+            if (headerSize > packetSize) {
+                cserror() << "Malformed compressed packet detected";
+                return 0;
+            }
+            if (headerSize == packetSize) {
+                cserror() << "Data is empty in compressed packet";
+                return 0;
+            }
+
             // It's a part of implementation magic(
             // eg. <IPackMan> allocates Packet::MaxSize packet implicitly
             assert(data_.size() == Packet::MaxSize);
@@ -233,6 +243,7 @@ public:
             }
             else {
                 cserror() << "Decoding malformed packet content";
+                return 0;
             }
         }
 
