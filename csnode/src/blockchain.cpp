@@ -158,7 +158,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
     std::set<csdb::Address> indexedAddrs;
 
     auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
-        auto key = getAddressByType(addr, ADDR_TYPE::PUBLIC_KEY);
+        auto key = getAddressByType(addr, BlockChain::AddressType::PublicKey);
         if (indexedAddrs.insert(key).second) {
 #ifdef RECREATE_INDEX
             csdb::PoolHash lapoo = lapoos[key];
@@ -1309,7 +1309,7 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
 
 csdb::PoolHash BlockChain::getPreviousPoolHash(const csdb::Address& addr, const csdb::PoolHash& ph) {
     std::lock_guard lock(dbLock_);
-    return storage_.get_previous_transaction_block(getAddressByType(addr, ADDR_TYPE::PUBLIC_KEY), ph);
+    return storage_.get_previous_transaction_block(getAddressByType(addr, BlockChain::AddressType::PublicKey), ph);
 }
 
 std::pair<csdb::PoolHash, uint32_t> BlockChain::getLastNonEmptyBlock() {

@@ -1736,7 +1736,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
             for (auto& t : pool.transactions()) {
                 if (!is_smart(t))
                     continue;
-                auto tIt = tokenCodes.find(s_blockchain.getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
+                auto tIt = tokenCodes.find(s_blockchain.getAddressByType(t.target(), BlockChain::AddressType::PublicKey));
                 if (tIt == tokenCodes.end())
                     continue;
                 const auto smart = fetch_smart(t);
