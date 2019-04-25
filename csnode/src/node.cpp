@@ -110,7 +110,7 @@ bool Node::init(const Config& config) {
 #endif
 
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
-    cs::Connector::connect(&cs::Conveyer::instance().flushSignal(), this, &Node::onTransactionsPacketFlushed);
+    cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
 
     return true;

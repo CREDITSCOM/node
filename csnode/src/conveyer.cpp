@@ -30,9 +30,6 @@ struct cs::ConveyerBase::Impl {
     // cached active current round number
     std::atomic<cs::RoundNumber> currentRound = 0;
 
-public signals:
-    cs::PacketFlushSignal flushPacket;
-
     // helpers
     const cs::ConveyerMeta* validMeta() &;
 };
@@ -69,10 +66,6 @@ void cs::ConveyerBase::setRound(cs::RoundNumber round) {
 }
 
 cs::ConveyerBase::~ConveyerBase() = default;
-
-cs::PacketFlushSignal& cs::ConveyerBase::flushSignal() {
-    return pimpl_->flushPacket;
-}
 
 void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
     if (!transaction.is_valid()) {
@@ -623,11 +616,7 @@ void cs::ConveyerBase::flushTransactions() {
 
     auto packets = pimpl_->packetQueue.pop();
 
-    if (!packets) {
-        return;
-    }
-
-    for (auto& packet : packets.value()) {
+    for (auto& packet : packets) {
         if ((packet.transactionsCount() != 0u)) {
             if (packet.isHashEmpty()) {
                 if (!packet.makeHash()) {
@@ -637,7 +626,7 @@ void cs::ConveyerBase::flushTransactions() {
             }
 
             // try to send save in node
-            emit pimpl_->flushPacket(packet);
+            emit packetFlushed(packet);
 
             auto hash = packet.hash();
 

@@ -49,12 +49,6 @@ public:
     void setRound(cs::RoundNumber round);
 
     ///
-    /// @brief Returns transactions packet flush signal.
-    /// Generates when transactions packet should be sent to network.
-    ///
-    cs::PacketFlushSignal& flushSignal();
-
-    ///
     /// @brief Adds transaction to conveyer, start point of conveyer.
     /// @param transaction csdb Transaction, not valid transavtion would not be
     /// sent to network.
@@ -288,6 +282,9 @@ public:
 
     // sync, try do not use it :]
     std::unique_lock<cs::SharedMutex> lock() const;
+
+public signals:
+    cs::PacketFlushSignal packetFlushed;
 
 public slots:
 
