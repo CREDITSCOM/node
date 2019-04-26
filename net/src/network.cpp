@@ -20,6 +20,8 @@
 #include "network.hpp"
 #include "transport.hpp"
 
+#include <set>
+
 using boost::asio::buffer;
 
 const ip::udp::socket::message_flags NO_FLAGS = 0;
