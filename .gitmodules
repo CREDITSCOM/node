@@ -1,9 +1,6 @@
 [submodule "third-party/googletest"]
 	path = third-party/googletest
 	url = https://github.com/google/googletest.git
-[submodule "third-party/libsodium"]
-	path = third-party/libsodium
-	url = https://github.com/jedisct1/libsodium.git
 [submodule "third-party/berkeleydb"]
 	path = third-party/berkeleydb
 	url = https://gitlab.com/SychevS/berkeleydb.git
@@ -13,6 +10,3 @@
 [submodule "third-party/thrift"]
 	path = third-party/thrift
 	url = https://gitlab.com/credits_bc/third_party/thrift.git
-[submodule "third-party/blake2"]
-	path = third-party/blake2
-	url = https://gitlab.com/credits_bc/third_party/blake2.git
