@@ -395,8 +395,9 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
             iPackStream_ >> ep.ip >> ep.port;
 
-            if (!iPackStream_.good())
+            if (!iPackStream_.good()) {
                 return false;
+            }
 
             if (++ctr <= config_.getMaxNeighbours()) {
                 nh_.establishConnection(net_->resolve(ep));
