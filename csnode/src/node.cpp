@@ -2005,9 +2005,37 @@ void Node::removeSmartConsensus(uint64_t id) {
     const auto it = std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), id);
     if (it == activeSmartConsensuses_.cend()) {
         csdebug() << "The smartConsensus for {" << cs::SmartConsensus::blockPart(id) << '.' << cs::SmartConsensus::transactionPart(id) << "} is not active";
-        return;
     }
-    activeSmartConsensuses_.erase(it);
+    else {
+        activeSmartConsensuses_.erase(it);
+    }
+    auto it_1 = smartStageOneStorage_.cbegin();
+    while(it_1 != smartStageOneStorage_.cend()) {
+        if (it_1->id == id) {
+            it_1 = smartStageOneStorage_.erase(it_1);
+        }
+        else {
+            ++it_1;
+        }
+    }
+    auto it_2 = smartStageTwoStorage_.cbegin();
+    while (it_2 != smartStageTwoStorage_.cend()) {
+        if (it_2->id == id) {
+            it_2 = smartStageTwoStorage_.erase(it_2);
+        }
+        else {
+            ++it_2;
+        }
+    }
+    auto it_3 = smartStageThreeStorage_.cbegin();
+    while (it_3 != smartStageThreeStorage_.cend()) {
+        if (it_3->id == id) {
+            it_3 = smartStageThreeStorage_.erase(it_3);
+        }
+        else {
+            ++it_3;
+        }
+    }
 }
 
 void Node::checkForSavedSmartStages(uint64_t id) {
