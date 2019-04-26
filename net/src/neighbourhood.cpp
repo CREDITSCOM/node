@@ -22,11 +22,14 @@ T getSecureRandom() {
 
 bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
     bool result = false;
-    if (bp.sentLastTime)
-        return true;
 
-    if (bp.attempts > MaxResendTimes || !transport_->shouldSendPacket(bp.pack))
+    if (bp.sentLastTime) {
+        return true;
+    }
+
+    if (bp.attempts > MaxResendTimes || !transport_->shouldSendPacket(bp.pack)) {
         return result;
+    }
 
     bool sent = false;
 
@@ -76,18 +79,24 @@ bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
 
 void Neighbourhood::sendByNeighbours(const Packet* pack) {
     cs::Lock lock(nLockFlag_);
+
     if (pack->isNeighbors()) {
         for (auto& nb : neighbours_) {
             auto& bp = msgDirects_.tryStore(pack->getHash());
+
             bp.pack = *pack;
             bp.receiver = nb;
+
             transport_->sendDirect(pack, **nb);
         }
     }
     else {
         auto& bp = msgBroads_.tryStore(pack->getHash());
-        if (!bp.pack)
+
+        if (!bp.pack) {
             bp.pack = *pack;
+        }
+
         dispatch(bp);
     }
 }
@@ -324,8 +333,7 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
 /* Assuming both the mutexes have been locked */
 void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     Connection* connection = nullptr;
-    while (!node->connection.compare_exchange_strong(connection, *conn, std::memory_order_release, std::memory_order_relaxed))
-        ;
+    while (!node->connection.compare_exchange_strong(connection, *conn, std::memory_order_release, std::memory_order_relaxed));
 
     if (connection) {
         auto connPtr = findInVec(connection->id, neighbours_);
