@@ -111,14 +111,12 @@ void Network::readerRoutine(const Config& config) {
     }
 
     std::atomic_thread_fence(std::memory_order_acq_rel);
-    if (!task.pack.data_.ptr_) {
+    while (!task.pack.data_.ptr_) {
       cslog() << "net: invalid input packet!!!!!!!!!";
-      continue;
     }
     packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
-    if (!task.pack.data_.ptr_) {
+    while (!task.pack.data_.ptr_) {
       cslog() << "net: invalid input packet!!!!!!!!!";
-      continue;
     }
     task.size = task.pack.decode(packetSize);
 
@@ -236,9 +234,8 @@ void Network::writerRoutine(const Config& config) {
     for (uint64_t i = 0; i < tasks; i++) {
       auto task = oPacMan_.getNextTask();
       std::atomic_thread_fence(std::memory_order_acquire);
-      if (!task->pack.data_.ptr_) {
-        cslog() << "net: invalid packet!!!!!!!!!";
-        continue;
+      while (!task->pack.data_.ptr_) {
+        cslog() << "net: invalid packet for send!!!!!!!!!";
       }
       encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
       endpoints[j] = task->endpoint;
@@ -280,9 +277,8 @@ void Network::writerRoutine(const Config& config) {
 
     for (int i = 0; i < tasks; i++) {
       auto task = oPacMan_.getNextTask();
-      if (!task->pack.data_.ptr_) {
+      while (!task->pack.data_.ptr_) {
         cslog() << "net: invalid packet!!!!!!!!!";
-        continue;
       }
       sendPack(*sock, task, task->endpoint);
     }
@@ -318,9 +314,8 @@ void Network::processorRoutine() {
 
     for (uint64_t i = 0; i < tasks; i++) {
       auto task = iPacMan_.getNextTask();
-      if (!task->pack.data_.ptr_) {
-        cslog() << "net: invalid packet!!!!!!!!!";
-        continue;
+      while (!task->pack.data_.ptr_) {
+        cslog() << "net: invalid packet processor!!!!!!!!!";
       }
       processTask(task);
     }
