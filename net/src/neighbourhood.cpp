@@ -102,12 +102,12 @@ void Neighbourhood::sendByNeighbours(const Packet* pack) {
 }
 
 bool Neighbourhood::canHaveNewConnection() {
-    cs::Lock l(nLockFlag_);
+    cs::Lock lock(nLockFlag_);
     return neighbours_.size() < MaxNeighbours;
 }
 
 void Neighbourhood::checkPending(const uint32_t) {
-    cs::Lock l(mLockFlag_);
+    cs::Lock lock(mLockFlag_);
     for (auto conn = connections_.begin(); conn != connections_.end(); ++conn) {
         // Attempt to reconnect if the connection hasn't been established yet
         if (!(**conn)->connected && (**conn)->attempts < MaxConnectAttempts) {
@@ -117,7 +117,7 @@ void Neighbourhood::checkPending(const uint32_t) {
 }
 
 void Neighbourhood::refreshLimits() {
-    cs::Lock l(nLockFlag_);
+    cs::Lock lock(nLockFlag_);
     for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
         for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
             if (++((*conn)->syncSeqsRetries[i]) >= MaxSyncAttempts) {
@@ -350,6 +350,12 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
 
     conn->connected = true;
     conn->attempts = 0;
+
+    if (!isNewConnectionAvailable()) {
+        cswarning() << "Can not add neighbour, neighbours size is equal to max possible neighbours";
+        return;
+    }
+
     neighbours_.emplace(conn);
 }
 
@@ -380,12 +386,13 @@ void Neighbourhood::gotRegistration(Connection&& conn, RemoteNodePtr node) {
 
     connectNode(node, connPtr);
 
-    if (transport_->isGood()) {  // check if transport available
-        transport_->sendRegistrationConfirmation(**connPtr, conn.id);
+    // check if transport available
+    if (!transport_->isGood()) {
+        cserror() << "Transport is not available!";
+        return;
     }
-    else {
-        cserror() << "Transport is not available!!!";
-    }
+
+    transport_->sendRegistrationConfirmation(**connPtr, conn.id);
 }
 
 void Neighbourhood::gotConfirmation(const Connection::Id& my, const Connection::Id& real, const ip::udp::endpoint& ep, const cs::PublicKey& pk, RemoteNodePtr node) {
@@ -805,6 +812,10 @@ void Neighbourhood::registerDirect(const Packet* packPtr, ConnectionPtr conn) {
     auto& bp = msgDirects_.tryStore(packPtr->getHash());
     bp.pack = *packPtr;
     bp.receiver = conn;
+}
+
+bool Neighbourhood::isNewConnectionAvailable() const {
+    return neighbours_.size() < MaxNeighbours;
 }
 
 void Neighbourhood::releaseSyncRequestee(const cs::Sequence seq) {

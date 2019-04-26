@@ -197,6 +197,7 @@ private:
         uint32_t attempts = 0;
     };
 
+    bool isNewConnectionAvailable() const;
     bool dispatch(BroadPackInfo&);
     bool dispatch(DirectPackInfo&);
 
