@@ -49,7 +49,7 @@ private:
 class IPacMan {
 public:
     IPacMan()
-    : allocator_(1 << 20) {
+    : allocator_(1 << 20, 8) {
     }
 
     struct Task {
@@ -66,10 +66,11 @@ public:
         Task& operator=(Task&&) = delete;
     };
 
-    typedef FUQueue<Task, 1000000lu> Queue;
+    typedef FUQueue<Task, 100000lu> Queue;
 
     Task& allocNext();
     void enQueueLast();
+    void rejectLast();
 
     TaskPtr<IPacMan> getNextTask();
     void releaseTask(Queue::Element*);
@@ -99,7 +100,7 @@ public:
         Task& operator=(Task&&) = delete;
     };
 
-    typedef FUQueue<Task, 1000000lu> Queue;
+    typedef FUQueue<Task, 100000lu> Queue;
 
     Queue::Element* allocNext();
     void enQueueLast(Queue::Element*);

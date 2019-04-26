@@ -1,7 +1,9 @@
-#include <consensus.hpp>
-#include <lib/system/logger.hpp>
-#include <solvercontext.hpp>
 #include <states/trustedstage2state.hpp>
+#include <solvercontext.hpp>
+#include <consensus.hpp>
+
+#include <lib/system/logger.hpp>
+#include <csnode/conveyer.hpp>
 
 namespace cs {
 
@@ -45,7 +47,18 @@ void TrustedStage2State::on(SolverContext& context) {
     csunused(TimerBaseId);
 
     SolverContext* pctx = &context;
+
     auto dt = Consensus::T_stage_request;
+    // increase dt in case of large trx amount:
+    cs::Conveyer& conveyer = cs::Conveyer::instance();
+    const cs::Characteristic * characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
+    if (characteristic != nullptr) {
+        // count of transactions seen in build_vector on stage-1
+        size_t cnt_trx = characteristic->mask.size();
+        if (cnt_trx > dt) {
+            dt = cnt_trx; // 1 msec/transaction, 5K trx => 5 sec timeout
+        }
+    }
     csdebug() << name() << ": start track timeout " << 0 << " ms of stages-1 received";
     timeout_request_stage.start(context.scheduler(), 0,
                                 // timeout #1 handler:

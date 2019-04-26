@@ -145,7 +145,7 @@ struct RegionPage {
     uint32_t sizeLeft;
 
     ~RegionPage() {
-        delete[] regions;
+        ::operator delete(regions, std::align_val_t{cache_linesize});
     }
 };
 
@@ -236,12 +236,12 @@ public:
         }
 
         if (activePage_->sizeLeft < regSize) {
-            if (!activePage_->next.load(std::memory_order_relaxed)) {
+            if (!activePage_->next.load(std::memory_order_acquire)) {
                 auto newPage = allocatePage();
                 insertAfterActive(newPage);
             }
 
-            activePage_ = activePage_->next.load(std::memory_order_relaxed);
+            activePage_ = activePage_->next.load(std::memory_order_acquire);
             activePage_->sizeLeft = PageSize;
             activePage_->usedEnd = activePage_->regions;
         }
@@ -251,7 +251,7 @@ public:
         activePage_->usedEnd += regSize;
         activePage_->sizeLeft -= regSize;
 
-        activePage_->usedSize.fetch_add(regSize, std::memory_order_relaxed);
+        activePage_->usedSize.fetch_add(regSize, std::memory_order_acq_rel);
 
         return RegionPtr(lastReg_);
     }
@@ -268,7 +268,7 @@ public:
         lastReg_->page_->sizeLeft += diff;
         lastReg_->page_->usedEnd -= diff;
 
-        activePage_->usedSize.fetch_sub(diff, std::memory_order_relaxed);
+        activePage_->usedSize.fetch_sub(diff, std::memory_order_acq_rel);
     }
 
 #ifdef TESTING
@@ -286,7 +286,7 @@ private:
         uint32_t toSub = region->size_ + sizeof(Region);
         toSub += (-(int)toSub) & 0x3f;
 
-        if (page->usedSize.fetch_sub(toSub, std::memory_order_relaxed) == toSub) {
+        if (page->usedSize.fetch_sub(toSub, std::memory_order_acq_rel) == toSub) {
             // Since it was us who freed up all the memory, we're the only
             // ones accessing *page...
             if (activePage_ == page) {
@@ -302,7 +302,7 @@ private:
         RegionPage* result = new RegionPage();
 
         result->allocator = this;
-        result->regions = new uint8_t[PageSize];
+        result->regions = static_cast<uint8_t *>(::operator new(PageSize, std::align_val_t{cache_linesize}));
 
 #ifdef TESTING
         ++pagesNum_;
@@ -403,7 +403,6 @@ public:
                 place = allocateNextPage();
             }
         } while (!freeChunksLast_.compare_exchange_strong(place, (place == freeChunks_ ? nullptr : (place - 1)), std::memory_order_release, std::memory_order_relaxed));
-
         return new (*place) IntType(this, std::forward<Args>(args)...);
     }
 

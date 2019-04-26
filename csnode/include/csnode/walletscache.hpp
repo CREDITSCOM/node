@@ -26,13 +26,15 @@ class Transaction;
 namespace cs {
 class WalletsIds;
 
+constexpr size_t InitialWalletsNum = 1 * 1024 * 1024;
+
 class WalletsCache {
 public:
     using WalletId = csdb::internal::WalletId;
     using Mask = boost::dynamic_bitset<uint64_t>;
 
     struct Config {
-        size_t initialWalletsNum_ = 2 * 1024 * 1024;
+        size_t initialWalletsNum_ = InitialWalletsNum;
     };
 
 public:

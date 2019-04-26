@@ -20,6 +20,12 @@ void IPacMan::enQueueLast() {
     lockedLast_ = false;
 }
 
+void IPacMan::rejectLast() {
+    lastElt_->element.~Task();
+    queue_.unlockWrite(lastElt_);
+    lockedLast_ = false;
+}
+
 TaskPtr<IPacMan> IPacMan::getNextTask() {
     TaskPtr<IPacMan> result;
     result.owner_ = this;
