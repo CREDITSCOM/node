@@ -10,3 +10,6 @@
 [submodule "third-party/thrift"]
 	path = third-party/thrift
 	url = https://gitlab.com/credits_bc/third_party/thrift.git
+[submodule "cscrypto"]
+	path = cscrypto
+	url = https://gitlab.com/credits_bc/core/cscrypto.git

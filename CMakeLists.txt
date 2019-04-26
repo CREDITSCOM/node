@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 3.11)
 
 if (NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/berkeleydb/.git OR
-    NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/blake2/.git OR
     NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/googletest/.git OR
-    NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/libsodium/.git OR
     NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/thrift/.git OR
     NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/thrift-interface-definitions/.git)
   message(FATAL_ERROR "Git submodules not initialized, execute:\n  git submodule update --init")
@@ -145,7 +143,7 @@ add_subdirectory(api)
 add_subdirectory(lib)
 add_subdirectory(net)
 add_subdirectory(csnode)
-add_subdirectory(crypto)
+add_subdirectory(cscrypto)
 add_subdirectory(csdb)
 add_subdirectory(solver)
 add_subdirectory(client)
