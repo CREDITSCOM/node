@@ -2564,6 +2564,10 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
     cslog() << " Last written sequence = " << blockChain_.getLastSequence() << ", neighbours = " << transport_->getNeighboursCount();
 
+    if( Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 ) {
+        cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments;
+    }
+
     std::ostringstream line2;
 
     for (std::size_t i = 0; i < fixedWidth; ++i) {
