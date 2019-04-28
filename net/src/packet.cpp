@@ -169,7 +169,7 @@ Message::~Message() {
      // assume maxFragment "points" behind the last fragment,
      // idea is to avoid MemPtr<> destructor on damaged object
     for( int i = maxFragment_; i < Packet::MaxFragments; i++ ) {
-        if( packets_ [ i ].data_.get() != nullptr ) {
+        if( packets_[i] && packets_ [ i ].data_.get() != nullptr ) {
             csdebug() << "Net: memory corruption prevented, invalid fragment[" << i << "] is behind the max of " << maxFragment_ << " and cannot been destructed";
             memset( &packets_ [ i ], sizeof( packets_ [ i ] ), 0 );
             ++Transport::cntCorruptedFragments;
