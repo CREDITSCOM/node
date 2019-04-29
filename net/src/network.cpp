@@ -105,9 +105,10 @@ void Network::readerRoutine(const Config& config) {
         }
 
         packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
-        task.size = task.pack.decode(packetSize);
         
         if (!lastError) {
+            task.size = task.pack.decode(packetSize);   // try to decode first
+
             bool reject = false;
 
             if (task.size == 0) {
