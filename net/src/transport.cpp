@@ -1064,10 +1064,11 @@ void Transport::registerMessage(MessagePtr msg) {
     auto& ptr = uncollected_.emplace(msg);
     //DEBUG:
     Message& message = *ptr.get();
-    for( int i = message.maxFragment_; i < Packet::MaxFragments; i++ ) {
-        if( message.packets_ [ i ] && message.packets_ [ i ].data() != nullptr ) {
+    for (size_t i = message.maxFragment_; i < Packet::MaxFragments; i++) {
+        if (message.packets_[i] && message.packets_[i].data() != nullptr) {
             csdebug() << "Net: potential heap corruption detected in uncollected_ message.packets_[" << i << "]";
-            memset( &message.packets_ [ i ], 0, sizeof( message.packets_[i] ) );
+            cs::Utils::clearMemory(message.packets_[i]);
+
             ++Transport::cntDirtyAllocs;
         }
     }

@@ -22,6 +22,11 @@
 
 #include <set>
 
+// disables 10052, 10054 win socket errors
+#if defined(WIN32)
+#define DISABLE_WIN_SOCKET_ERRORS
+#endif
+
 using boost::asio::buffer;
 
 const ip::udp::socket::message_flags NO_FLAGS = 0;
@@ -43,7 +48,12 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
 #ifdef WIN32
         BOOL bNewBehavior = FALSE;
         DWORD dwBytesReturned = 0;
+        csunused(bNewBehavior);
+        csunused(dwBytesReturned);
+#ifdef DISABLE_WIN_SOCKET_ERRORS
         WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof(bNewBehavior), nullptr, 0, &dwBytesReturned, nullptr, nullptr);
+        WSAIoctl(sock.native_handle(), SIO_UDP_NETRESET, &bNewBehavior, sizeof(bNewBehavior), nullptr, 0, &dwBytesReturned, nullptr, nullptr);
+#endif
 #endif
         if (data.ipSpecified) {
             auto ep = net->resolve(data);
@@ -173,7 +183,7 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
             cnt = 0;
             std::this_thread::yield();
         }
-    } while (lastError);
+    } while (lastError == boost::asio::error::would_block);
 
     if (lastError || size < encodedSize) {
         cserror() << "Cannot send packet. Error " << lastError;
@@ -539,7 +549,7 @@ void Network::registerMessage(Packet* pack, const uint32_t size) {
     MessagePtr msg;
 
     {
-        cs::Lock l(collector_.mLock_);
+        cs::Lock lock(collector_.mLock_);
         msg = collector_.msgAllocator_.emplace();
     }
 
@@ -549,12 +559,13 @@ void Network::registerMessage(Packet* pack, const uint32_t size) {
 
     auto packEnd = msg->packets_ + size;
     auto rPtr = pack;
+
     for (auto wPtr = msg->packets_; wPtr != packEnd; ++wPtr, ++rPtr) {
         *wPtr = *rPtr;
     }
 
     {
-        cs::Lock l(collector_.mLock_);
+        cs::Lock lock(collector_.mLock_);
         collector_.map_.tryStore(pack->getHeaderHash()) = msg;
     }
 }
