@@ -45,15 +45,11 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
         sock.set_option(ip::udp::socket::receive_buffer_size(1 << 23));
 #endif
 
-#ifdef WIN32
+#ifdef DISABLE_WIN_SOCKET_ERRORS
         BOOL bNewBehavior = FALSE;
         DWORD dwBytesReturned = 0;
-        csunused(bNewBehavior);
-        csunused(dwBytesReturned);
-#ifdef DISABLE_WIN_SOCKET_ERRORS
         WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof(bNewBehavior), nullptr, 0, &dwBytesReturned, nullptr, nullptr);
         WSAIoctl(sock.native_handle(), SIO_UDP_NETRESET, &bNewBehavior, sizeof(bNewBehavior), nullptr, 0, &dwBytesReturned, nullptr, nullptr);
-#endif
 #endif
         if (data.ipSpecified) {
             auto ep = net->resolve(data);
