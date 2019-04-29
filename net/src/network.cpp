@@ -183,7 +183,7 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
             cnt = 0;
             std::this_thread::yield();
         }
-    } while (lastError);
+    } while (lastError == boost::asio::error::would_block);
 
     if (lastError || size < encodedSize) {
         cserror() << "Cannot send packet. Error " << lastError;
