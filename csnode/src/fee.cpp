@@ -101,6 +101,9 @@ void Fee::CountOneByteCost(const BlockChain& blockchain, Transactions& transacti
     CountTotalTransactionsLength(transactions, characteristicMask);
     CountOneRoundCost(blockchain);
     one_byte_cost_ = one_round_cost_ / total_transactions_length_;
+    if (one_byte_cost_ < kFixedOneByteFee) {
+      one_byte_cost_ = kFixedOneByteFee;
+    }
 }
 
 void Fee::CountTotalTransactionsLength(Transactions& transactions, const Bytes& characteristicMask) {
