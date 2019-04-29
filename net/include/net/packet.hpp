@@ -15,6 +15,14 @@
 #include <iostream>
 #include <memory>
 
+/*
+    Static min memory usage (see types below):
+
+    1 fragment = 1'024 b
+    1 message = 80 b * 4'096 fragments = 327'680 b
+    1 collector = 2'048 messages * 327'680 b = 671'088'640 b
+*/
+
 namespace ip = boost::asio::ip;
 
 enum BaseFlags : uint8_t {
@@ -77,8 +85,8 @@ const char* getMsgTypesString(MsgTypes messageType);
 
 class Packet {
 public:
-    static const uint32_t MaxSize = 1 << 10;
-    static const uint32_t MaxFragments = 1 << 13; // 8'192
+    static const uint32_t MaxSize = 1024;
+    static const uint32_t MaxFragments = 4096;
 
     static const uint32_t SmartRedirectTreshold = 10000;
 
@@ -343,11 +351,12 @@ private:
     friend class Network;
 };
 
+
 using MessagePtr = MemPtr<TypedSlot<Message>>;
 
 class PacketCollector {
 public:
-    static const uint32_t MaxParallelCollections = 1024;
+    static const uint32_t MaxParallelCollections = 2048;
 
     PacketCollector()
     : msgAllocator_(MaxParallelCollections + 1) {

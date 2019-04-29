@@ -199,7 +199,7 @@ cs::Sequence BlockChain::getLastSequence() const {
         return blockHashes_->getDbStructure().last_;
     }
     else {
-        return static_cast<cs::Sequence>(-1);
+        return 0;
     }
 }
 
@@ -270,7 +270,7 @@ void BlockChain::writeGenesisBlock() {
     genesis.add_transaction(transaction);
 
     genesis.set_previous_hash(csdb::PoolHash());
-    genesis.set_sequence(getLastSequence() + 1);
+    genesis.set_sequence(0);
     addNewWalletsToPool(genesis);
 
     csdebug() << "Genesis block completed ... trying to save";
@@ -1027,7 +1027,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         }
         pool = deferredBlock_.clone();
     }
-    csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+    csdetails() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
     emit storeBlockEvent(pool);
 
     // log cached block

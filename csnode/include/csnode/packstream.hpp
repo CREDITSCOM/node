@@ -330,7 +330,7 @@ private:
             ptr_ = static_cast<cs::Byte*>(packets_->data());
 
             if (!packets_->isFragmented()) {
-                cswarning() << "Malformed packet: fragmentation flag not set in fragmented packet, correcting";
+                csdebug() << "Fragmentation flag is not set in fragmented packet, correcting";
                 *ptr_ |= BaseFlags::Fragmented;
 
                 packets_->recalculateHeadersLength();

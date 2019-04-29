@@ -1038,7 +1038,7 @@ std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel) {
 
 template <typename... Args>
 void Node::sendDefault(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    static constexpr cs::Byte defautFlags = BaseFlags::Fragmented;
+    static constexpr cs::Byte defautFlags = 0; // BaseFlags::Fragmented;
 
     ostream_.init(defautFlags, target);
     csdetails() << "NODE> Sending default to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
@@ -1059,7 +1059,7 @@ bool Node::sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, 
 
 template <typename... Args>
 void Node::sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+    ostream_.init(BaseFlags::Neighbours | BaseFlags::Broadcast /*| BaseFlags::Fragmented*/ | BaseFlags::Compressed);
     ostream_ << msgType << round;
 
     writeDefaultStream(std::forward<Args>(args)...);
@@ -1073,7 +1073,7 @@ void Node::sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, c
 
 template <class... Args>
 void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed);
+    ostream_.init(BaseFlags::Broadcast /*| BaseFlags::Fragmented*/ | BaseFlags::Compressed);
     csdetails() << "NODE> Sending broadcast";
 
     sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
@@ -2563,6 +2563,10 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     cslog() << s;
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
     cslog() << " Last written sequence = " << blockChain_.getLastSequence() << ", neighbours = " << transport_->getNeighboursCount();
+
+    if( Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 ) {
+        cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments;
+    }
 
     std::ostringstream line2;
 
