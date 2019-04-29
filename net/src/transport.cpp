@@ -8,6 +8,11 @@
 #include "network.hpp"
 #include "transport.hpp"
 
+/*static*/
+size_t Transport::cntDirtyAllocs = 0;
+/*static*/
+size_t Transport::cntCorruptedFragments = 0;
+
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
     Node::requestStop();
@@ -1056,7 +1061,17 @@ void Transport::requestMissing(const cs::Hash& hash, const uint16_t start, const
 
 void Transport::registerMessage(MessagePtr msg) {
     cs::Lock lock(uLock_);
-    uncollected_.emplace(msg);
+    auto& ptr = uncollected_.emplace(msg);
+    //DEBUG:
+    Message& message = *ptr.get();
+    for (size_t i = message.maxFragment_; i < Packet::MaxFragments; i++) {
+        if (message.packets_[i] && message.packets_[i].data() != nullptr) {
+            csdebug() << "Net: potential heap corruption detected in uncollected_ message.packets_[" << i << "]";
+            cs::Utils::clearMemory(message.packets_[i]);
+
+            ++Transport::cntDirtyAllocs;
+        }
+    }
 }
 
 bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {

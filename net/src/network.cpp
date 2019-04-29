@@ -22,6 +22,11 @@
 
 #include <set>
 
+// disables 10052, 10054 win socket errors
+#if defined(WIN32)
+#define DISABLE_WIN_SOCKET_ERRORS
+#endif
+
 using boost::asio::buffer;
 
 const ip::udp::socket::message_flags NO_FLAGS = 0;
@@ -43,7 +48,12 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
 #ifdef WIN32
     BOOL bNewBehavior = FALSE;
     DWORD dwBytesReturned = 0;
+    csunused(bNewBehavior);
+    csunused(dwBytesReturned);
+#ifdef DISABLE_WIN_SOCKET_ERRORS
     WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof(bNewBehavior), nullptr, 0, &dwBytesReturned, nullptr, nullptr);
+    WSAIoctl(sock.native_handle(), SIO_UDP_NETRESET, &bNewBehavior, sizeof(bNewBehavior), nullptr, 0, &dwBytesReturned, nullptr, nullptr);
+#endif
 #endif
     if (data.ipSpecified) {
       auto ep = net->resolve(data);

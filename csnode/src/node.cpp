@@ -798,6 +798,8 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
 }
 
 void Node::onPingReceived(cs::Sequence sequence) {
+    // TODO: remove max difference after last sequence rework
+    static constexpr size_t maxDifference = 15'000'000;
     static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
     static std::chrono::milliseconds delta{0};
     static cs::Sequence maxSequence = 0;
@@ -806,7 +808,11 @@ void Node::onPingReceived(cs::Sequence sequence) {
     delta += std::chrono::duration_cast<std::chrono::milliseconds>(now - point);
 
     if (maxSequence < sequence) {
-        maxSequence = sequence;
+        // TODO: remove max difference checking after last sequence rework
+        if ((sequence - maxSequence) < maxDifference) {
+            maxSequence = sequence;
+        }
+
         delta = std::chrono::milliseconds(0);
     }
 
@@ -2563,6 +2569,10 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     cslog() << s;
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
     cslog() << " Last written sequence = " << blockChain_.getLastSequence() << ", neighbours = " << transport_->getNeighboursCount();
+
+    if( Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 ) {
+        cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments;
+    }
 
     std::ostringstream line2;
 

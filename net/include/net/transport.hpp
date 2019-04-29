@@ -267,6 +267,10 @@ private:
 
     static constexpr uint32_t fragmentsFixedMapSize_ = 10000;
     FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, fragmentsFixedMapSize_> fragOnRound_;
+
+public:
+    static size_t cntDirtyAllocs;
+    static size_t cntCorruptedFragments;
 };
 
 #endif  // TRANSPORT_HPP

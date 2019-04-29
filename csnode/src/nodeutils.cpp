@@ -1,15 +1,20 @@
 #include <csdb/pool.hpp>
 #include <csnode/nodeutils.hpp>
 
+namespace
+{
+  const char * log_prefix = "Node: ";
+}
+
 namespace cs {
 /*static*/
 bool NodeUtils::checkGroupSignature(const cs::ConfidantsKeys& confidants, const cs::Bytes& mask, const cs::Signatures& signatures, const cs::Hash& hash) {
     if (confidants.size() == 0) {
-        csdebug() << "The number of confidants is 0";
+        csdebug() << log_prefix << "the number of confidants is 0";
         return false;
     }
     if (confidants.size() != mask.size()) {
-        cserror() << "The number of confidants doesn't correspond the mask size";
+        cserror() << log_prefix << "the number of confidants doesn't correspond the mask size";
         return false;
     }
 
@@ -22,7 +27,7 @@ bool NodeUtils::checkGroupSignature(const cs::ConfidantsKeys& confidants, const 
     }
 
     if (signatures.size() != signatureCount) {
-        cserror() << "The number of signatures doesn't correspond the mask value";
+        cserror() << log_prefix << "the number of signatures doesn't correspond the mask value";
 
         std::string realTrustedString;
 
@@ -30,9 +35,9 @@ bool NodeUtils::checkGroupSignature(const cs::ConfidantsKeys& confidants, const 
             realTrustedString = realTrustedString + "[" + std::to_string(int(i)) + "] ";
         }
 
-        csdebug() << "Mask: " << realTrustedString << ", Signatures: ";
+        csdebug() << log_prefix << "mask: " << realTrustedString << ", signatures: ";
         for (auto& it : signatures) {
-            csdebug() << cs::Utils::byteStreamToHex(it);
+            csdebug() << '\t' << cs::Utils::byteStreamToHex(it);
         }
 
         return false;
@@ -41,27 +46,31 @@ bool NodeUtils::checkGroupSignature(const cs::ConfidantsKeys& confidants, const 
     signatureCount = 0;
     size_t cnt = 0;
     bool validSig = true;
-    csdebug() << "BlockChain> Hash: " << cs::Utils::byteStreamToHex(hash);
+    size_t cntValid = 0;
+    size_t cntInvalid = 0;
+    csdebug() << log_prefix << "hash: " << cs::Utils::byteStreamToHex(hash);
     for (auto it : mask) {
         if (it != cs::ConfidantConsts::InvalidConfidantIndex) {
             if (cscrypto::verifySignature(signatures[signatureCount], confidants[cnt], hash.data(), hash.size())) {
-                csdebug() << "BlockChain> Signature of [" << cnt << "] is valid";
+                csdetails() << log_prefix << "signature of [" << cnt << "] is valid";
                 ++signatureCount;
+                ++cntValid;
             }
             else {
-                csdebug() << "BlockChain> Signature of [" << cnt << "] is NOT VALID: " << cs::Utils::byteStreamToHex(signatures[signatureCount]);
+                csdebug() << log_prefix << "signature of [" << cnt << "] is NOT VALID: " << cs::Utils::byteStreamToHex(signatures[signatureCount]);
                 validSig = false;
                 ++signatureCount;
+                ++cntInvalid;
             }
         }
         ++cnt;
     }
     if (!validSig) {
-        csdebug() << "Some signatures are not valid";
+        csdebug() << log_prefix << "signatures (" << cntInvalid << ") are not valid";
         return false;
     }
     else {
-        csdebug() << "The signatures are valid";
+        csdebug() << log_prefix << "every " << cntValid << " signatures are valid";
         return true;
     }
 }
