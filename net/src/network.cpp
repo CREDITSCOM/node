@@ -76,8 +76,7 @@ ip::udp::socket* Network::getSocketInThread(const bool openOwn, const EndpointDa
         }
     }
     else {
-        while (!singleSockOpened_.load())
-            ;
+        while (!singleSockOpened_.load());
         result = singleSock_.load();
     }
 
@@ -93,8 +92,7 @@ void Network::readerRoutine(const Config& config) {
         return;
     }
 
-    while (!initFlag_.load())
-        ;
+    while (!initFlag_.load());
 
     boost::system::error_code lastError;
     size_t packetSize;
@@ -110,8 +108,8 @@ void Network::readerRoutine(const Config& config) {
         task.size = task.pack.decode(packetSize);
         
         if (!lastError) {
-
             bool reject = false;
+
             if (task.size == 0) {
                 cswarning() << "Ignore incorrect packet fragment, drop";
                 reject = true;
@@ -119,18 +117,14 @@ void Network::readerRoutine(const Config& config) {
             else if (task.pack.isFragmented()) {
                 const auto fragment = task.pack.getFragmentId();
                 const auto count = task.pack.getFragmentsNum();
+
                 if (fragment >= Packet::MaxFragments || count >= Packet::MaxFragments || fragment >= count) {
                     cswarning() << "Incorrect fragment identity in message or too many fragments, drop (" << fragment << " from " << count << ")";
                     reject = true;
                 }
             }
 
-            if (reject) {
-                iPacMan_.rejectLast();
-            }
-            else {
-                iPacMan_.enQueueLast();
-            }
+            reject ? iPacMan_.rejectLast() : iPacMan_.enQueueLast();
 
 #ifdef __linux__
             static uint64_t one = 1;
@@ -207,8 +201,9 @@ void Network::writerRoutine(const Config& config) {
 #ifdef __linux__
         uint64_t tasks;
         int s = read(writerEventfd_, &tasks, sizeof(uint64_t));
-        if (s != sizeof(uint64_t))
+        if (s != sizeof(uint64_t)) {
             continue;
+        }
 
         msg.resize(tasks);
         std::fill(msg.begin(), msg.end(), mmsghdr{});
@@ -278,15 +273,22 @@ void Network::processorRoutine() {
         externals.callAll();
 #ifdef __linux__
         uint64_t tasks;
+
         while (true) {
             int ret = poll(&pfd, 1, timeout);
-            if (ret != 0)
+
+            if (ret != 0) {
                 break;
+            }
+
             externals.callAll();
         }
+
         int s = read(readerEventfd_, &tasks, sizeof(uint64_t));
-        if (s != sizeof(uint64_t))
+
+        if (s != sizeof(uint64_t)) {
             continue;
+        }
 
         for (uint64_t i = 0; i < tasks; i++) {
             auto task = iPacMan_.getNextTask();
@@ -297,16 +299,22 @@ void Network::processorRoutine() {
 #ifdef WIN32
         while (true) {
             auto ret = WaitForSingleObject(readerEvent_, 50);  // timeout 50ms
-            if (ret != WAIT_TIMEOUT)
+
+            if (ret != WAIT_TIMEOUT) {
                 break;
+            }
+
             externals.callAll();
         };
 #else
         while (true) {
             struct kevent event;
             int ret = kevent(readerKq_, NULL, 0, &event, 1, &timeout);
-            if (ret)
+
+            if (ret) {
                 break;
+            }
+
             externals.callAll();
         }
 #endif
@@ -483,10 +491,8 @@ Network::Network(const Config& config, Transport* transport)
         singleSockOpened_.store(true);
     }
 
-    while (readerStatus_.load() == ThreadStatus::NonInit)
-        ;
-    while (writerStatus_.load() == ThreadStatus::NonInit)
-        ;
+    while (readerStatus_.load() == ThreadStatus::NonInit);
+    while (writerStatus_.load() == ThreadStatus::NonInit);
 
     good_ = (readerStatus_.load() == ThreadStatus::Success && writerStatus_.load() == ThreadStatus::Success);
 
