@@ -70,6 +70,12 @@ private:
         boost::asio::post(threadPool, std::forward<Func>(function));
     }
 
+    template <typename Func>
+    static void run(Func&& function) {
+        std::thread thread(std::forward<Func>(function));
+        thread.detach();
+    }
+
     template <typename T>
     friend class FutureBase;
 
@@ -305,7 +311,7 @@ public:
     // calls std::function after ms time in another thread
     static void runAfter(const std::chrono::milliseconds& ms, cs::RunPolicy policy, std::function<void()> callBack) {
         auto timePoint = std::chrono::steady_clock::now() + ms;
-        Worker::execute(std::bind(&Concurrent::runAfterHelper, timePoint, policy, std::move(callBack)));
+        Worker::run(std::bind(&Concurrent::runAfterHelper, timePoint, policy, std::move(callBack)));
     }
 
     template <typename Func>
