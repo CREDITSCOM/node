@@ -95,8 +95,11 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
         cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], source equals to target";
         return false;
     }
-    if (csdb::Amount(trx.max_fee().to_double()) < csdb::Amount(trx.counted_fee().to_double())) {
-        cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], max fee is less than counted fee";
+    const double max_fee = trx.max_fee().to_double();
+    const double counted_fee = trx.counted_fee().to_double();
+    if (csdb::Amount(max_fee) < csdb::Amount(counted_fee)) {
+        cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], max fee (" << max_fee
+            << ") is less than counted fee (" << counted_fee << ")";
         return false;
     }
 
