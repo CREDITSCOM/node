@@ -14,6 +14,7 @@
 #include <csdb/amount_commission.hpp>
 #include <csdb/transaction.hpp>
 #include <csnode/blockchain.hpp>
+#include <solver/smartcontracts.hpp>
 
 namespace cs {
 namespace {
@@ -65,6 +66,44 @@ bool Fee::TakeDecisionOnCacheUpdate(const BlockChain& blockchain) {
     }
 }
 
+namespace
+{
+    std::array< std::tuple<int, double, double>, 14 > contract_fee = {
+        std::make_tuple(1024 + 512, 0.008746170242, 0.004828886573),
+        std::make_tuple(20 * 1024, 0.03546746927, 0.005862733239),
+        std::make_tuple(50 * 1042, 0.1438276802, 0.01104468428),
+        std::make_tuple(100 * 1024, 1.936458209, 0.09641057723),
+        std::make_tuple(256 * 1024, 5.26383916, 0.3813112299),
+        std::make_tuple(512 * 1024, 38.89480285, 4.874110187),
+        std::make_tuple(768 * 1024, 105.7270358, 19.96925763),
+        std::make_tuple(1024 * 1024, 287.3958802, 103.8255221),
+        std::make_tuple(5 * 1024 * 1024, 781.2229988, 259.834061),
+        std::make_tuple(15 * 1024 * 1024, 2123.584282, 651.3469549),
+        std::make_tuple(50 * 1024 * 1024, 5772.500564, 2309.930666),
+        std::make_tuple(100 * 1024 * 1024, 15691.28339, 5165.460461),
+        std::make_tuple(500 * 1024 * 1024, 42653.3305, 9959.829026),
+        std::make_tuple(1000 * 1024 * 1024, 115943.7732, 115943.7732)
+    };
+
+    double getDeployFee(int size) {
+        for (auto it = contract_fee.cbegin(); it != contract_fee.cend(); ++it) {
+            if (size < std::get<0>(*it)) {
+                return std::get<1>(*it);
+            }
+        }
+        return 0;
+    }
+
+    double getExecuteFee(int size) {
+        for (auto it = contract_fee.cbegin(); it != contract_fee.cend(); ++it) {
+            if (size < std::get<0>(*it)) {
+                return std::get<2>(*it);
+            }
+        }
+        return 0;
+    }
+}
+
 void Fee::SetCountedFee(Transactions& transactions, const Bytes& characteristicMask) {
     const size_t maskSize = characteristicMask.size();
     size_t i = 0;
@@ -74,12 +113,23 @@ void Fee::SetCountedFee(Transactions& transactions, const Bytes& characteristicM
                 continue;
             }
         }
+        double counted_fee = 0;
         size_t size_of_transaction = transaction.to_byte_stream().size();
-        double counted_fee = one_byte_cost_ * size_of_transaction;
-        double max_comission = kFixedOneByteFee * size_of_transaction;
-        if (counted_fee > max_comission) {
-            csdebug() << "Fee> counted_fee " << counted_fee << " is restricted with max_comission value " << max_comission;
-            counted_fee = max_comission;
+        if (SmartContracts::is_smart_contract(transaction)) {
+            if (SmartContracts::is_deploy(transaction)) {
+                counted_fee = getDeployFee(size_of_transaction);
+            }
+            else {
+                counted_fee = getExecuteFee(size_of_transaction);
+            }
+        }
+        else {
+            counted_fee = one_byte_cost_ * size_of_transaction;
+            double max_comission = kFixedOneByteFee * size_of_transaction;
+            if (counted_fee > max_comission) {
+                csdebug() << "Fee> counted_fee " << counted_fee << " is restricted with max_comission value " << max_comission;
+                counted_fee = max_comission;
+            }
         }
         transaction.set_counted_fee(csdb::AmountCommission(std::max(kMinFee, counted_fee)));
         ++i;
@@ -111,14 +161,19 @@ void Fee::CountTotalTransactionsLength(Transactions& transactions, const Bytes& 
     auto maskSize = characteristicMask.size();
     if (!maskSize) {
         for (const auto& transaction : transactions) {
-            total_transactions_length_ += transaction.to_byte_stream().size();
+            if (!SmartContracts::is_smart_contract(transaction)) {
+                total_transactions_length_ += transaction.to_byte_stream().size();
+            }
         }
     }
     else {
         assert(transactions.size() == maskSize);
         for (size_t i = 0; i < transactions.size(); ++i) {
             if (i < maskSize && characteristicMask[i] == kValidMarker) {
-                total_transactions_length_ += transactions[i].to_byte_stream().size();
+                const auto& t = transactions[i];
+                if (!SmartContracts::is_smart_contract(t)) {
+                    total_transactions_length_ += t.to_byte_stream().size();
+                }
             }
         }
     }
