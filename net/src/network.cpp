@@ -126,7 +126,8 @@ void Network::readerRoutine(const Config& config) {
                 const auto count = task.pack.getFragmentsNum();
 
                 if (fragment >= Packet::MaxFragments || count >= Packet::MaxFragments || fragment >= count) {
-                    cswarning() << "Incorrect fragment identity in message or too many fragments, drop (" << fragment << " from " << count << ")";
+                    cswarning() << "Incorrect fragment identity in message or too many fragments, drop (" << fragment << " from " << count << "), sender "
+                        << task.sender;
                     reject = true;
                 }
             }

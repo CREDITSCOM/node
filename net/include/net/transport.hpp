@@ -271,6 +271,7 @@ private:
 public:
     static size_t cntDirtyAllocs;
     static size_t cntCorruptedFragments;
+    static size_t cntExtraLargeNotSent;
 };
 
 #endif  // TRANSPORT_HPP

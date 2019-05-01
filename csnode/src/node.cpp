@@ -2570,8 +2570,8 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
     cslog() << " Last written sequence = " << blockChain_.getLastSequence() << ", neighbours = " << transport_->getNeighboursCount();
 
-    if( Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 ) {
-        cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments;
+    if( Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 || Transport::cntExtraLargeNotSent > 0) {
+        cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments << " / " << Transport::cntExtraLargeNotSent;
     }
 
     std::ostringstream line2;
