@@ -12,6 +12,8 @@
 size_t Transport::cntDirtyAllocs = 0;
 /*static*/
 size_t Transport::cntCorruptedFragments = 0;
+/*static*/
+size_t Transport::cntExtraLargeNotSent = 0;
 
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
@@ -236,6 +238,10 @@ bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
 }
 
 void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
+    if (size >= Packet::MaxFragments) {
+        ++cntExtraLargeNotSent;
+        return;
+    }
     const auto packEnd = pack + size;
     for (auto ptr = pack; ptr != packEnd; ++ptr) {
         nh_.registerDirect(ptr, conn);
@@ -244,6 +250,10 @@ void Transport::deliverDirect(const Packet* pack, const uint32_t size, Connectio
 }
 
 void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
+    if (size >= Packet::MaxFragments) {
+        ++cntExtraLargeNotSent;
+        return;
+    }
     const auto packEnd = pack + size;
     for (auto ptr = pack; ptr != packEnd; ++ptr) {
         sendBroadcast(ptr);
@@ -609,6 +619,10 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
 }
 
 void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhenResend) {
+    if (packNum >= Packet::MaxFragments) {
+        ++cntExtraLargeNotSent;
+        return;
+    }
     nh_.pourByNeighbours(pack, packNum);
     if (packNum > 1) {
         net_->registerMessage(pack, packNum);
