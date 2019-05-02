@@ -30,35 +30,34 @@ namespace cs {
 
 class TrustedStage1State : public DefaultStateBehavior {
 public:
-  ~TrustedStage1State() override {
-  }
+    ~TrustedStage1State() override {
+    }
 
-  void on(SolverContext& context) override;
+    void on(SolverContext& context) override;
 
-  void off(SolverContext& context) override;
+    void off(SolverContext& context) override;
 
-  Result onSyncTransactions(SolverContext& context, cs::RoundNumber round) override;
+    Result onSyncTransactions(SolverContext& context, cs::RoundNumber round) override;
 
-  Result onHash(SolverContext& context, const csdb::PoolHash& pool_hash, const cs::PublicKey& sender) override;
+    Result onHash(SolverContext& context, const csdb::PoolHash& pool_hash, const cs::PublicKey& sender) override;
 
-  const char* name() const override {
-    return "Trusted-1";
-  }
+    const char* name() const override {
+        return "Trusted-1";
+    }
 
 protected:
-  bool enough_hashes{ false };
-  bool transactions_checked{ false };
-  bool min_time_expired{ false };
+    bool enough_hashes{false};
+    bool transactions_checked{false};
+    bool min_time_expired{false};
 
-  //TimeoutTracking min_time_tracking;
+    // TimeoutTracking min_time_tracking;
 
-  cs::StageOne stage;
+    cs::StageOne stage;
 
-  cs::Hash build_vector(SolverContext& context, TransactionsPacket& trans_pack,
-                        cs::Packets& smartsPackets);
-  cs::Hash formHashFromCharacteristic(const cs::Characteristic& characteristic);
+    cs::Hash build_vector(SolverContext& context, TransactionsPacket& trans_pack, cs::Packets& smartsPackets);
+    cs::Hash formHashFromCharacteristic(const cs::Characteristic& characteristic);
 
-  std::unique_ptr<IterValidator> pValidator_;
+    std::unique_ptr<IterValidator> pValidator_;
 };
 
-}  // namespace slv2
+}  // namespace cs

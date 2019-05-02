@@ -17,14 +17,14 @@ namespace cs {
 
 class SyncState final : public DefaultStateBehavior {
 public:
-  ~SyncState() override {
-  }
+    ~SyncState() override {
+    }
 
-  void on(SolverContext& context) override;
+    void on(SolverContext& context) override;
 
-  const char* name() const override {
-    return "Sync";
-  }
+    const char* name() const override {
+        return "Sync";
+    }
 };
 
-}  // namespace slv2
+}  // namespace cs

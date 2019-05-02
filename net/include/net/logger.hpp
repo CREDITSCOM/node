@@ -9,12 +9,12 @@
 
 namespace logger {
 #ifndef LOG_NET
-  using Net = None;
+    using Net = None;
 #else
-  BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(
-    Net,
-    logging::sources::severity_channel_logger_mt<severity_level>,
-    (logging::keywords::channel = "net")
-  );
+    BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(
+      Net,
+      logging::sources::severity_channel_logger_mt<severity_level>,
+      (logging::keywords::channel = "net")
+    );
 #endif // LOG_NET
 } // namespace logger

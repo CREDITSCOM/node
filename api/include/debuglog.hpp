@@ -10,13 +10,13 @@
 #ifdef DEBUG_LOG
 
 inline void Log() {
-  std::cerr << std::endl;
+    std::cerr << std::endl;
 }
 
 template <typename T, typename... Args>
 inline void Log(T t, Args&&... args) {
-  std::cerr << t;
-  Log(args...);
+    std::cerr << t;
+    Log(args...);
 }
 
 #else
@@ -34,8 +34,8 @@ inline void DebugLog(T, Args&&...) {
 #else
 template <typename T, typename... Args>
 inline void DebugLog(T t, Args&&... args) {
-  std::cerr << t;
-  Log(args...);
+    std::cerr << t;
+    Log(args...);
 }
 #endif
 

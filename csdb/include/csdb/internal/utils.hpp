@@ -13,54 +13,54 @@ namespace internal {
 
 template <typename Iterator>
 cs::Bytes from_hex(Iterator beg, Iterator end) {
-  auto digit_from_hex = [](char val, uint8_t &result) {
-    val = static_cast<char>(toupper(val));
+    auto digit_from_hex = [](char val, uint8_t &result) {
+        val = static_cast<char>(toupper(val));
 
-    if ((val >= '0') && (val <= '9'))
-      result = static_cast<uint8_t>(val - '0');
-    else if ((val >= 'A') && (val <= 'F'))
-      result = static_cast<uint8_t>(val - 'A' + 10);
-    else
-      return false;
+        if ((val >= '0') && (val <= '9'))
+            result = static_cast<uint8_t>(val - '0');
+        else if ((val >= 'A') && (val <= 'F'))
+            result = static_cast<uint8_t>(val - 'A' + 10);
+        else
+            return false;
 
-    return true;
-  };
+        return true;
+    };
 
-  cs::Bytes res;
-  res.reserve(std::distance(beg, end) / 2);
-  for (Iterator it = beg;;) {
-    uint8_t hi, lo;
+    cs::Bytes res;
+    res.reserve(std::distance(beg, end) / 2);
+    for (Iterator it = beg;;) {
+        uint8_t hi, lo;
 
-    if (it == end || !digit_from_hex(*it++, hi))
-      break;
+        if (it == end || !digit_from_hex(*it++, hi))
+            break;
 
-    if (it == end || !digit_from_hex(*it++, lo))
-      break;
+        if (it == end || !digit_from_hex(*it++, lo))
+            break;
 
-    res.push_back(static_cast<uint8_t>((hi << 4) | lo));
-  }
-  return res;
+        res.push_back(static_cast<uint8_t>((hi << 4) | lo));
+    }
+    return res;
 }
 
 template <typename Iterator>
 std::string to_hex(Iterator beg, Iterator end) {
-  auto digit_to_hex = [](uint8_t val) { return static_cast<char>((val < 10) ? (val + '0') : (val - 10 + 'A')); };
+    auto digit_to_hex = [](uint8_t val) { return static_cast<char>((val < 10) ? (val + '0') : (val - 10 + 'A')); };
 
-  std::string res;
-  res.reserve(std::distance(beg, end) * 2);
-  for (Iterator it = beg; it != end; it++) {
-    res.push_back(digit_to_hex((*it >> 4) & 0x0F));
-    res.push_back(digit_to_hex(*it & 0x0F));
-  }
-  return res;
+    std::string res;
+    res.reserve(std::distance(beg, end) * 2);
+    for (Iterator it = beg; it != end; it++) {
+        res.push_back(digit_to_hex((*it >> 4) & 0x0F));
+        res.push_back(digit_to_hex(*it & 0x0F));
+    }
+    return res;
 }
 
 inline cs::Bytes from_hex(const std::string &val) {
-  return from_hex(val.begin(), val.end());
+    return from_hex(val.begin(), val.end());
 }
 
 inline std::string to_hex(const cs::Bytes &val) {
-  return to_hex(val.begin(), val.end());
+    return to_hex(val.begin(), val.end());
 }
 
 /**
@@ -99,7 +99,7 @@ size_t file_size(const std::string &name);
  * @return true - файл существует
  */
 inline bool file_exists(const std::string &path) {
-  return (static_cast<uint64_t>(-1) != file_size(path));
+    return (static_cast<uint64_t>(-1) != file_size(path));
 }
 
 /**

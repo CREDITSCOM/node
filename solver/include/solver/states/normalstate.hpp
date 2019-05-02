@@ -21,14 +21,14 @@ namespace cs {
 
 class NormalState : public DefaultStateBehavior {
 public:
-  ~NormalState() override {
-  }
+    ~NormalState() override {
+    }
 
-  void on(SolverContext& context) override;
+    void on(SolverContext& context) override;
 
-  const char* name() const override {
-    return "Normal";
-  }
+    const char* name() const override {
+        return "Normal";
+    }
 };
 
-}  // namespace slv2
+}  // namespace cs

@@ -54,41 +54,40 @@ constexpr const user_field_id_t UFID_COMMENT = (-1);
  * Дополнительные поля используются в классах \ref Transaction и \ref Pool.
  */
 class UserField {
-  SHARED_DATA_CLASS_DECLARE(UserField)
+    SHARED_DATA_CLASS_DECLARE(UserField)
 public:
-  enum Type : char
-  {
-    Unknown = 0,
-    Integer = 1,
-    String = 2,
-    Amount = 3
-  };
+    enum Type : char {
+        Unknown = 0,
+        Integer = 1,
+        String = 2,
+        Amount = 3
+    };
 
-  template <typename T, typename = typename ::std::enable_if<::std::is_integral<T>::value>::type>
-  UserField(T value);
-  template <typename T, typename = typename ::std::enable_if<!::std::is_integral<T>::value>::type>
-  UserField(const T& value);
+    template <typename T, typename = typename ::std::enable_if<::std::is_integral<T>::value>::type>
+    UserField(T value);
+    template <typename T, typename = typename ::std::enable_if<!::std::is_integral<T>::value>::type>
+    UserField(const T& value);
 
-  UserField(const char* value);
+    UserField(const char* value);
 
-  bool is_valid() const noexcept;
-  Type type() const noexcept;
+    bool is_valid() const noexcept;
+    Type type() const noexcept;
 
-  template <typename T>
-  typename ::std::enable_if<!::std::is_integral<T>::value, T>::type value() const noexcept;
+    template <typename T>
+    typename ::std::enable_if<!::std::is_integral<T>::value, T>::type value() const noexcept;
 
-  template <typename T>
-  typename ::std::enable_if<::std::is_integral<T>::value, T>::type value() const noexcept;
+    template <typename T>
+    typename ::std::enable_if<::std::is_integral<T>::value, T>::type value() const noexcept;
 
-  bool operator==(const UserField& other) const noexcept;
-  inline bool operator!=(const UserField& other) const noexcept;
+    bool operator==(const UserField& other) const noexcept;
+    inline bool operator!=(const UserField& other) const noexcept;
 
 private:
-  void put(::csdb::priv::obstream&) const;
-  void put_for_sig(::csdb::priv::obstream&) const;
-  bool get(::csdb::priv::ibstream&);
-  friend class ::csdb::priv::obstream;
-  friend class ::csdb::priv::ibstream;
+    void put(::csdb::priv::obstream&) const;
+    void put_for_sig(::csdb::priv::obstream&) const;
+    bool get(::csdb::priv::ibstream&);
+    friend class ::csdb::priv::obstream;
+    friend class ::csdb::priv::ibstream;
 };
 
 inline bool UserField::operator !=(const UserField& other) const noexcept
