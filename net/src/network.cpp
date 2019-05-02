@@ -121,15 +121,10 @@ void Network::readerRoutine(const Config& config) {
                 cswarning() << "Ignore incorrect packet fragment, drop";
                 reject = true;
             }
-            else if (task.pack.isFragmented()) {
-                const auto fragment = task.pack.getFragmentId();
-                const auto count = task.pack.getFragmentsNum();
-
-                if (fragment >= Packet::MaxFragments || count >= Packet::MaxFragments || fragment >= count) {
-                    cswarning() << "Incorrect fragment identity in message or too many fragments, drop (" << fragment << " from " << count << "), sender "
-                        << task.sender;
-                    reject = true;
-                }
+            else if (!task.pack.hasValidFragmentation()) {
+                cswarning() << "Incorrect fragment identity in message or too many fragments, drop (" << task.pack.getFragmentId()
+                    << " from " << task.pack.getFragmentsNum() << "), sender " << task.sender;
+                reject = true;
             }
 
             reject ? iPacMan_.rejectLast() : iPacMan_.enQueueLast();

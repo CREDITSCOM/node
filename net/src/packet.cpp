@@ -80,6 +80,10 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
     if (!pack.isFragmented()) {
         return MessagePtr();
     }
+    
+    if (!pack.hasValidFragmentation()) {
+        return MessagePtr();
+    }
 
     newFragmentedMsg = false;
 
@@ -96,6 +100,8 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
         msg->packetsLeft_ = pack.getFragmentsNum();
         msg->packetsTotal_ = pack.getFragmentsNum();
         msg->headerHash_ = pack.getHeaderHash();
+        // to ensure not to contain dirty fragments in buffer (prevent goodPlace below from to be incorrect):
+        msg->clearFragments();
         newFragmentedMsg = true;
     }
     else {
@@ -104,7 +110,7 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
 
     {
         cs::Lock lock(msg->pLock_);
-        auto goodPlace = msg->packets_ + pack.getFragmentId();
+        auto goodPlace = msg->packets_ + pack.getFragmentId(); // valid fragmentation has already been tested
 
         if (!*goodPlace) {
             msg->maxFragment_ = std::max(pack.getFragmentsNum(), msg->maxFragment_);
@@ -158,6 +164,23 @@ void Message::composeFullData() const {
     }
 }
 
+// scans array of future fragments and clears all dirty elements, scans all elements
+size_t Message::clearBuffer(size_t from, size_t to) {
+    if (to <= from || to >= Packet::MaxFragments) {
+        return 0;
+    }
+    size_t cnt = 0;
+    for (size_t i = from; i < to; i++) {
+        // Packet's operator bool redirects call to Packet::data_::operator bool
+        if (packets_[i]) {
+            csdebug() << "Net: potential heap corruption prevented in message.packets_[" << i << "]";
+            cs::Utils::clearMemory(packets_[i]);
+            ++cnt;
+        }
+    }
+    return cnt;
+}
+
 Message::~Message() {
     /*auto pEnd = packets_ + packetsTotal_;
     for (auto ptr = packets_; ptr != pEnd; ++ptr)
@@ -165,15 +188,13 @@ Message::~Message() {
 
       memset(packets_, 0, sizeof(Packet*) * packetsTotal_);*/
 
-     //DEBUG: prevent corruption after heap is damaged,
-     // assume maxFragment "points" behind the last fragment,
-     // idea is to avoid MemPtr<> destructor on damaged object
-    for( int i = maxFragment_; i < Packet::MaxFragments; i++ ) {
-        if( packets_[i] && packets_ [ i ].data_.get() != nullptr ) {
-            csdebug() << "Net: memory corruption prevented, invalid fragment[" << i << "] is behind the max of " << maxFragment_ << " and cannot been destructed";
-            memset( &packets_ [ i ], sizeof( packets_ [ i ] ), 0 );
-            ++Transport::cntCorruptedFragments;
-        }
+    //DEBUG: prevent corruption after heap is damaged,
+    // assume maxFragment "points" behind the last fragment,
+    // idea is to avoid call to MemPtr<> destructor on incorrect object
+    size_t cnt = clearUnused();
+    if (cnt > 0) {
+        csdebug() << "Net: memory corruption prevented, invalid fragments (" << cnt << ") is behind the max of " << maxFragment_ << " and cannot been destructed";
+        Transport::cntCorruptedFragments += cnt;
     }
 }
 
