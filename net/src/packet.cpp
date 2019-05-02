@@ -31,7 +31,7 @@ bool Packet::isHeaderValid() const {
         const auto& frNum = getFragmentsNum();
         const auto& frId = getFragmentId();
 
-        if (frId >= frNum) {
+        if (!hasValidFragmentation()) {
             cserror() << "Packet " << getMsgTypesString(this->getType()) << " has invalid header: frId(" << frId << ") >= frNum(" << frNum << ")";
             return false;
         }
