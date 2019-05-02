@@ -19,6 +19,7 @@
 
 #include "network.hpp"
 #include "transport.hpp"
+#include <net/packetvalidator.hpp>
 
 #include <set>
 
@@ -342,6 +343,10 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
     if (remoteSender->isBlackListed()) {
         cswarning() << "Blacklisted";
         return;
+    }
+
+    if (!cs::PacketValidator::instance().validate(task)) {
+        cswarning() << "Packet is not validated";
     }
 
     if (!(task->pack.isHeaderValid())) {
