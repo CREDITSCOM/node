@@ -239,7 +239,7 @@ bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
 
 void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
     if (size >= Packet::MaxFragments) {
-        ++cntExtraLargeNotSent;
+        ++Transport::cntExtraLargeNotSent;
         return;
     }
     const auto packEnd = pack + size;
@@ -251,7 +251,7 @@ void Transport::deliverDirect(const Packet* pack, const uint32_t size, Connectio
 
 void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     if (size >= Packet::MaxFragments) {
-        ++cntExtraLargeNotSent;
+        ++Transport::cntExtraLargeNotSent;
         return;
     }
     const auto packEnd = pack + size;
@@ -620,7 +620,7 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
 
 void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhenResend) {
     if (packNum >= Packet::MaxFragments) {
-        ++cntExtraLargeNotSent;
+        ++Transport::cntExtraLargeNotSent;
         return;
     }
     nh_.pourByNeighbours(pack, packNum);
@@ -1078,13 +1078,10 @@ void Transport::registerMessage(MessagePtr msg) {
     auto& ptr = uncollected_.emplace(msg);
     //DEBUG:
     Message& message = *ptr.get();
-    for (size_t i = message.maxFragment_; i < Packet::MaxFragments; i++) {
-        if (message.packets_[i] && message.packets_[i].data() != nullptr) {
-            csdebug() << "Net: potential heap corruption detected in uncollected_ message.packets_[" << i << "]";
-            cs::Utils::clearMemory(message.packets_[i]);
-
-            ++Transport::cntDirtyAllocs;
-        }
+    size_t cnt = message.clearUnused();
+    if (cnt > 0) {
+        csdebug() << "Net: potential heap corruption detected in uncollected message fragments (" << cnt << ")";
+        Transport::cntDirtyAllocs += cnt;
     }
 }
 

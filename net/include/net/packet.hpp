@@ -258,6 +258,18 @@ public:
         return packetSize;
     }
 
+    // куегкты true if is not fragmented or has valid fragmebtation data
+    bool hasValidFragmentation() const {
+        if (isFragmented()) {
+            const auto fragment = getFragmentId();
+            const auto count = getFragmentsNum();
+            if (fragment >= MaxFragments || count >= MaxFragments || fragment >= count) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 private:
     bool checkFlag(const BaseFlags flag) const {
         return (*static_cast<const uint8_t*>(data_.get()) & flag) != 0;
@@ -298,7 +310,7 @@ public:
     Message(const Message&) = delete;
     Message& operator=(const Message&) = delete;
 
-//  ~Message();
+    ~Message();
 
     bool isComplete() const {
         return packetsLeft_ == 0;
@@ -330,7 +342,21 @@ public:
         return result;
     }
 
+    // scans array of future fragments and clears all dirty elements, scans only the first maxFragment elements
+    // return cleared elements count
+    size_t clearFragments() {
+        return clearBuffer(0, maxFragment_);
+    }
+
+    // scans array of future fragments and clears all dirty elements, scans only unused behind the maxFragment elements
+    // return cleared elements count
+    size_t clearUnused() {
+        return clearBuffer(maxFragment_, Packet::MaxFragments);
+    }
+
 private:
+    size_t clearBuffer(size_t from, size_t to);
+
     static RegionAllocator allocator_;
 
     void composeFullData() const;
