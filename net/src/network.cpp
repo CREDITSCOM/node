@@ -137,11 +137,10 @@ void Network::readerRoutine(const Config& config) {
         cswarning() << "Ignore incorrect packet fragment, drop";
         reject = true;
       }
-            else if (!task.pack.hasValidFragmentation()) {
-                cswarning() << "Incorrect fragment identity in message or too many fragments, drop (" << task.pack.getFragmentId()
-                    << " from " << task.pack.getFragmentsNum() << "), sender " << task.sender;
+      else if (!task.pack.hasValidFragmentation()) {
+          cswarning() << "Incorrect fragment identity in message or too many fragments, drop (" << task.pack.getFragmentId()
+              << " from " << task.pack.getFragmentsNum() << "), sender " << task.sender;
           reject = true;
-        }
       }
 
       if (reject) {
