@@ -288,15 +288,31 @@ void Node::getNodeStopRequest(const uint8_t* data, const std::size_t size) {
     uint16_t version = 0;
     istream_ >> version;
 
-    if (!istream_.good()) {
+    /*
+    if( istream_.remainsBytes() != cscrypto::kSignatureSize ) {
         cswarning() << "NODE> Get stop request parsing failed";
         return;
     }
+    cs::Signature sig;
+    istream_ >> sig;
+    */
+    if( !istream_.good() || !istream_.end() ) {
+        cswarning() << "NODE> Get stop request parsing failed";
+        return;
+    }
+    /*
+    const cs::Byte* signed_data = reinterpret_cast<uint8_t*>(&version);
+    const size_t signed_size = sizeof(version);
+    if( !cscrypto::verifySignature( sig, ssKey_, signed_data, signed_size ) ) {
+        cswarning() << "The STOP message is incorrect: signature isn't valid";
+        return;
+    }
+    */
 
     cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
 
     if (NODE_VERSION >= version) {
-        cswarning() << "NODE> Get stop request, node version is okay, continue working";
+        cswarning() << "NODE> stop request does not cover my version, continue working";
         return;
     }
 
@@ -2404,6 +2420,8 @@ void Node::roundPackRequest(cs::PublicKey respondent, cs::RoundNumber round) {
 }
 
 void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
+    csunused( data );
+    csunused( size );
     csdebug() << "NODE> getting roundPack request #" << rNum;
     if (currentRoundTableMessage_.round = rNum && currentRoundTableMessage_.message.size() != 0) {
         roundPackReply(sender);

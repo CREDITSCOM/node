@@ -2,60 +2,75 @@
 #include "pacmans.hpp"
 
 IPacMan::Task& IPacMan::allocNext() {
-    if (!lockedLast_) {
-        lastElt_ = queue_.lockWrite();
-        lockedLast_ = true;
-
-        new (&lastElt_->element) Task();
-
-        lastElt_->element.pack.data_ = allocator_.allocateNext(Packet::MaxSize);
-    }
-
-    return lastElt_->element;
+  std::lock_guard<std::mutex> lock(mutex_);
+  queue_.emplace_back();
+  auto end = queue_.end();
+  Task& task = *(--end);
+  new (&task) Task();
+  task.pack.data_ = allocator_.allocateNext(Packet::MaxSize);
+  return task;
 }
 
 void IPacMan::enQueueLast() {
-    allocator_.shrinkLast(static_cast<uint32_t>(lastElt_->element.size));
-    queue_.unlockWrite(lastElt_);
-    lockedLast_ = false;
+  Task& task = queue_.back();
+  allocator_.shrinkLast(static_cast<uint32_t>(task.size));
+  size_.fetch_add(1, std::memory_order_acq_rel);
 }
 
 void IPacMan::rejectLast() {
-    lastElt_->element.~Task();
-    queue_.unlockWrite(lastElt_);
-    lockedLast_ = false;
+  std::lock_guard<std::mutex> lock(mutex_);
+  Task &task = queue_.back();
+  task.~Task();
+  queue_.pop_back();
 }
 
 TaskPtr<IPacMan> IPacMan::getNextTask() {
-    TaskPtr<IPacMan> result;
-    result.owner_ = this;
-    result.ptr_ = queue_.lockRead();
-    return result;
+  while (!size_.load(std::memory_order_acquire)) {
+    std::this_thread::yield();
+  }
+  std::lock_guard<std::mutex> lock(mutex_);
+  TaskPtr<IPacMan> result;
+  result.owner_ = this;
+  result.it_ = queue_.begin();
+  return result;
 }
 
-void IPacMan::releaseTask(IPacMan::Queue::Element* elt) {
-    elt->element.~Task();
-    queue_.unlockRead(elt);
+void IPacMan::releaseTask(TaskIterator& it) {
+  Task &task = *it;
+  task.~Task();
+  std::lock_guard<std::mutex> lock(mutex_);
+  queue_.erase(it);
+  size_.fetch_sub(1, std::memory_order_acq_rel);
+}
+
+OPacMan::Task* OPacMan::allocNext() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  queue_.emplace_back();
+  auto end = queue_.end();
+  Task& task = *(--end);
+  new (&task) Task();
+  return &task;
+}
+
+void OPacMan::enQueueLast() {
+  size_.fetch_add(1, std::memory_order_acq_rel);
 }
 
 TaskPtr<OPacMan> OPacMan::getNextTask() {
-    TaskPtr<OPacMan> result;
-    result.owner_ = this;
-    result.ptr_ = queue_.lockRead();
-    return result;
+  while (!size_.load(std::memory_order_acquire)) {
+    std::this_thread::yield();
+  }
+  std::lock_guard<std::mutex> lock(mutex_);
+  TaskPtr<OPacMan> result;
+  result.owner_ = this;
+  result.it_ = queue_.begin();
+  return result;
 }
 
-void OPacMan::releaseTask(OPacMan::Queue::Element* elt) {
-    elt->element.~Task();
-    queue_.unlockRead(elt);
-}
-
-OPacMan::Queue::Element* OPacMan::allocNext() {
-    auto elt = queue_.lockWrite();
-    new (&elt->element) Task();
-    return elt;
-}
-
-void OPacMan::enQueueLast(Queue::Element* elt) {
-    queue_.unlockWrite(elt);
+void OPacMan::releaseTask(TaskIterator& it) {
+  Task &task = *it;
+  task.~Task();
+  std::lock_guard<std::mutex> lock(mutex_);
+  queue_.erase(it);
+  size_.fetch_sub(1, std::memory_order_acq_rel);
 }
