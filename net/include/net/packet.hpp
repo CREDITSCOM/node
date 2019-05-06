@@ -284,6 +284,7 @@ private:
 
 private:
     RegionPtr data_;
+    friend class Network;
 
     mutable bool hashed_ = false;
     mutable cs::Hash hash_;
