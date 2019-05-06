@@ -29,7 +29,58 @@ constexpr double kDefaultRoundFrequency = 3.0;
 // constexpr size_t kDefaultRoundsPerDay = 24 * 3600 * kDefaultRoundFrequency;
 constexpr uint8_t kInvalidMarker = 0;
 constexpr uint8_t kValidMarker = 1;
+
+std::array< std::tuple<int, double, double>, 14 > contract_fee = {
+    std::make_tuple(1024 + 512, 0.008746170242, 0.004828886573),
+    std::make_tuple(20 * 1024, 0.03546746927, 0.005862733239),
+    std::make_tuple(50 * 1042, 0.1438276802, 0.01104468428),
+    std::make_tuple(100 * 1024, 1.936458209, 0.09641057723),
+    std::make_tuple(256 * 1024, 5.26383916, 0.3813112299),
+    std::make_tuple(512 * 1024, 38.89480285, 4.874110187),
+    std::make_tuple(768 * 1024, 105.7270358, 19.96925763),
+    std::make_tuple(1024 * 1024, 287.3958802, 103.8255221),
+    std::make_tuple(5 * 1024 * 1024, 781.2229988, 259.834061),
+    std::make_tuple(15 * 1024 * 1024, 2123.584282, 651.3469549),
+    std::make_tuple(50 * 1024 * 1024, 5772.500564, 2309.930666),
+    std::make_tuple(100 * 1024 * 1024, 15691.28339, 5165.460461),
+    std::make_tuple(500 * 1024 * 1024, 42653.3305, 9959.829026),
+    std::make_tuple(1000 * 1024 * 1024, 115943.7732, 115943.7732)
+};
+
+double getDeployFee(int size) {
+    for (auto it = contract_fee.cbegin(); it != contract_fee.cend(); ++it) {
+        if (size < std::get<0>(*it)) {
+            return std::get<1>(*it);
+        }
+    }
+    double k = size / std::get<0>(contract_fee[13]);
+    return std::get<1>(contract_fee[13]) * k;
+}
+
+double getExecuteFee(int size) {
+    for (auto it = contract_fee.cbegin(); it != contract_fee.cend(); ++it) {
+        if (size < std::get<0>(*it)) {
+            return std::get<2>(*it);
+        }
+    }
+    double k = size / std::get<0>(contract_fee[13]);
+    return std::get<2>(contract_fee[13]) * k;
+}
 }  // namespace
+
+bool Fee::EstimateMaxFee(const csdb::Transaction& t, csdb::Amount& potentialFee) {
+  size_t numBytes = t.to_byte_stream().size();
+  if (SmartContracts::is_smart_contract(t)) {
+    if (SmartContracts::is_deploy(t)) {
+      potentialFee = getDeployFee(numBytes) + getExecuteFee(0);
+    } else {
+      potentialFee = getExecuteFee(numBytes) + getExecuteFee(0);
+    } 
+  } else {
+    potentialFee = numBytes * kFixedOneByteFee;
+  }
+  return csdb::Amount(t.max_fee().to_double()) >= potentialFee;
+}
 
 Fee::Fee()
 : num_of_last_block_(0)
@@ -63,44 +114,6 @@ bool Fee::TakeDecisionOnCacheUpdate(const BlockChain& blockchain) {
     }
     else {
         return true;
-    }
-}
-
-namespace
-{
-    std::array< std::tuple<int, double, double>, 14 > contract_fee = {
-        std::make_tuple(1024 + 512, 0.008746170242, 0.004828886573),
-        std::make_tuple(20 * 1024, 0.03546746927, 0.005862733239),
-        std::make_tuple(50 * 1042, 0.1438276802, 0.01104468428),
-        std::make_tuple(100 * 1024, 1.936458209, 0.09641057723),
-        std::make_tuple(256 * 1024, 5.26383916, 0.3813112299),
-        std::make_tuple(512 * 1024, 38.89480285, 4.874110187),
-        std::make_tuple(768 * 1024, 105.7270358, 19.96925763),
-        std::make_tuple(1024 * 1024, 287.3958802, 103.8255221),
-        std::make_tuple(5 * 1024 * 1024, 781.2229988, 259.834061),
-        std::make_tuple(15 * 1024 * 1024, 2123.584282, 651.3469549),
-        std::make_tuple(50 * 1024 * 1024, 5772.500564, 2309.930666),
-        std::make_tuple(100 * 1024 * 1024, 15691.28339, 5165.460461),
-        std::make_tuple(500 * 1024 * 1024, 42653.3305, 9959.829026),
-        std::make_tuple(1000 * 1024 * 1024, 115943.7732, 115943.7732)
-    };
-
-    double getDeployFee(int size) {
-        for (auto it = contract_fee.cbegin(); it != contract_fee.cend(); ++it) {
-            if (size < std::get<0>(*it)) {
-                return std::get<1>(*it);
-            }
-        }
-        return 0;
-    }
-
-    double getExecuteFee(int size) {
-        for (auto it = contract_fee.cbegin(); it != contract_fee.cend(); ++it) {
-            if (size < std::get<0>(*it)) {
-                return std::get<2>(*it);
-            }
-        }
-        return 0;
     }
 }
 

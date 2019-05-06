@@ -43,6 +43,14 @@ public:
      */
     void ResetTrustedCache(const BlockChain&);
 
+    /**
+     * @brief way to estimate weather max fee is enough before consensus
+     * @return true if max fee >= potentialFee
+     * @param potentialFee will contain possible amount of counted fee
+     *        for transaction and caused events
+     */
+    static bool EstimateMaxFee(const csdb::Transaction&, csdb::Amount& potentialFee);
+
     Fee();
     Fee(const Fee&) = delete;
     const Fee& operator=(const Fee&) = delete;
