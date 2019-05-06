@@ -46,27 +46,27 @@ std::array< std::tuple<int, double, double>, 14 > contract_fee = {
     std::make_tuple(500 * 1024 * 1024, 42653.3305, 9959.829026),
     std::make_tuple(1000 * 1024 * 1024, 115943.7732, 115943.7732)
 };
+}  // namespace
 
-double getDeployFee(int size) {
+double Fee::getDeployFee(int size) {
     for (auto it = contract_fee.cbegin(); it != contract_fee.cend(); ++it) {
         if (size < std::get<0>(*it)) {
             return std::get<1>(*it);
         }
     }
-    double k = size / std::get<0>(contract_fee[13]);
+    double k = static_cast<double>(size) / std::get<0>(contract_fee[13]);
     return std::get<1>(contract_fee[13]) * k;
 }
 
-double getExecuteFee(int size) {
+double Fee::getExecuteFee(int size) {
     for (auto it = contract_fee.cbegin(); it != contract_fee.cend(); ++it) {
         if (size < std::get<0>(*it)) {
             return std::get<2>(*it);
         }
     }
-    double k = size / std::get<0>(contract_fee[13]);
+    double k = static_cast<double>(size) / std::get<0>(contract_fee[13]);
     return std::get<2>(contract_fee[13]) * k;
 }
-}  // namespace
 
 bool Fee::EstimateMaxFee(const csdb::Transaction& t, csdb::Amount& potentialFee) {
   size_t numBytes = t.to_byte_stream().size();
