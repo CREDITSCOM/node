@@ -377,9 +377,6 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
     cs::RoundNumber rNum = 0;
     iPackStream_ >> rNum;
 
-    // cs::PublicKey ss_key;
-    // iPackStream_ >> ss_key;
-
     auto trStart = iPackStream_.getCurrentPtr();
 
     uint8_t numConf;
@@ -526,7 +523,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
 
     // cut my packs
     if (firstPack.getSender() == node_->getNodeIdKey()) {
-        csdebug() << "TRANSPORT> Ignore myself packs";
+        csdebug() << "TRANSPORT> Ignore own packs";
         return;
     }
 

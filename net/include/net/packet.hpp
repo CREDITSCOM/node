@@ -258,7 +258,7 @@ public:
         return packetSize;
     }
 
-    // куегкты true if is not fragmented or has valid fragmebtation data
+    // returns true if is not fragmented or has valid fragmebtation data
     bool hasValidFragmentation() const {
         if (isFragmented()) {
             const auto fragment = getFragmentId();
@@ -284,6 +284,7 @@ private:
 
 private:
     RegionPtr data_;
+    friend class Network;
 
     mutable bool hashed_ = false;
     mutable cs::Hash hash_;
