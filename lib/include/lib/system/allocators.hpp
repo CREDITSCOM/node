@@ -190,6 +190,7 @@ private:
     uint32_t size_;
 
     friend class RegionAllocator;
+    friend class Network;
 };
 
 using RegionPtr = MemPtr<Region>;
