@@ -367,10 +367,6 @@ inline void Network::processTask(TaskPtr<IPacMan> &task) {
     return;
   }
 
-  if (!cs::PacketValidator::instance().validate(task)) {
-    cswarning() << "Packet is not validated";
-  }
-
   if (!(task->pack.isHeaderValid())) {
     static constexpr size_t limit = 100;
     auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
@@ -378,6 +374,17 @@ inline void Network::processTask(TaskPtr<IPacMan> &task) {
     cswarning() << "Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
     remoteSender->addStrike();
     return;
+  }
+
+  if (!cs::PacketValidator::instance().validate(task)) {
+      bool is_network = task->pack.isNetwork();
+      uint8_t type = task->pack.getType();
+      cswarning() << "Packet "
+          << (is_network ? getNetworkCommandString(static_cast<NetworkCommand>(type)) : getMsgTypesString(static_cast<MsgTypes>(type)))
+          << " is not validated";
+
+      transport_->sendPackInform(task->pack, remoteSender);
+      return;
   }
 
   // Pure network processing
