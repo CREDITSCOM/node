@@ -51,6 +51,12 @@ public:
      */
     static bool EstimateMaxFee(const csdb::Transaction&, csdb::Amount& potentialFee);
 
+    /**
+     * @brief counts fee for deploy/execute trx based on it's size
+     */
+    static double getDeployFee(int size);
+    static double getExecuteFee(int size);
+
     Fee();
     Fee(const Fee&) = delete;
     const Fee& operator=(const Fee&) = delete;
