@@ -60,8 +60,7 @@ const cs::PublicKey& SolverCore::getWriterPublicKey() const {
             return *(trusted.cbegin() + ptr->writer);
         }
     }
-    // TODO: redesign getting ref to persistent object
-    return SolverContext::zeroKey;
+    return Zero::key;
 }
 
 bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
