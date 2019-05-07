@@ -11,7 +11,7 @@ const size_t kCommonTrSize = 152;
 std::array<std::tuple<size_t, double, double>, 14> feeLevels = {
     std::make_tuple(1024 + 512, 0.008746170242, 0.004828886573),
     std::make_tuple(20 * 1024, 0.03546746927, 0.005862733239),
-    std::make_tuple(50 * 1042, 0.1438276802, 0.01104468428), // @TODO fix 1042 -> 1024
+    std::make_tuple(50 * 1024, 0.1438276802, 0.01104468428),
     std::make_tuple(100 * 1024, 1.936458209, 0.09641057723),
     std::make_tuple(256 * 1024, 5.26383916, 0.3813112299),
     std::make_tuple(512 * 1024, 38.89480285, 4.874110187),
