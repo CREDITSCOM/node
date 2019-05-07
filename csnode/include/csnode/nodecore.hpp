@@ -51,7 +51,8 @@ using PoolsRequestedSequences = std::vector<cs::Sequence>;
 using PoolsBlock = std::vector<csdb::Pool>;
 
 enum NodeConsts : uint32_t {
-    NeighboursRequestDelay = 350
+    NeighboursRequestDelay = 350,
+    MaxRoundDeltaInStopRequest = 100 ///< Max allowed round difference in NodeStopRequest, otherwise ignore the command
 };
 
 enum ConveyerConsts : uint32_t {

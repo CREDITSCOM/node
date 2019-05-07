@@ -535,7 +535,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
         case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
             return node_->getRoundTableRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::NodeStopRequest:
-            return node_->getNodeStopRequest(data, size);
+            return node_->getNodeStopRequest(rNum, data, size);
         case MsgTypes::RoundTable:
             return node_->getRoundTable(data, size, rNum, firstPack.getSender());
         case MsgTypes::RoundTableSS:
