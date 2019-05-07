@@ -35,7 +35,6 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
-, fee_(std::make_unique<cs::Fee>())
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
     cs::Connector::connect(storage_.read_block_event(), this, &BlockChain::onReadFromDB);
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
@@ -81,7 +80,6 @@ bool BlockChain::init(const std::string& path) {
             cserror() << "Bad database version";
             return false;
         }
-        fee_->ResetTrustedCache(*this);
         std::cout << "Done\n";
     }
 
@@ -1208,27 +1206,19 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const 
 }
 
 void BlockChain::setTransactionsFees(TransactionsPacket& packet) {
-    if (fee_) {
-        fee_->CountFeesInPool(*this, packet.transactions());
-    }
+    fee::setCountedFees(packet.transactions());
 }
 
 void BlockChain::setTransactionsFees(csdb::Pool& pool) {
-    if (fee_) {
-        fee_->CountFeesInPool(*this, pool.transactions());
-    }
+    fee::setCountedFees(pool.transactions());
 }
 
 void BlockChain::setTransactionsFees(std::vector<csdb::Transaction>& transactions) {
-    if (fee_) {
-        fee_->CountFeesInPool(*this, transactions);
-    }
+    fee::setCountedFees(transactions);
 }
 
-void BlockChain::setTransactionsFees(std::vector<csdb::Transaction>& transactions, const cs::Bytes& characteristicMask) {
-    if (fee_) {
-        fee_->CountFeesInPool(*this, transactions, characteristicMask);
-    }
+void BlockChain::setTransactionsFees(std::vector<csdb::Transaction>& transactions, const cs::Bytes&) {
+    fee::setCountedFees(transactions);
 }
 
 const csdb::Address& BlockChain::getGenesisAddress() const {

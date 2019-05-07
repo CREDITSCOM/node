@@ -331,8 +331,6 @@ private:
     // (idea is it is more easy not to store block immediately then to revert it after storing)
     csdb::Pool deferredBlock_;
 
-    // fee calculator
-    std::unique_ptr<cs::Fee> fee_;
     std::unique_ptr<cs::BlockValidator> blockValidator_;
 };
 

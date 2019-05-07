@@ -1,8 +1,3 @@
-/**
- *  @file spammer.h
- *  @author Sergey Sychev
- */
-
 #ifndef SOLVER_SPAMMER_HPP
 #define SOLVER_SPAMMER_HPP
 
