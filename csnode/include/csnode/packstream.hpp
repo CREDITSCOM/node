@@ -287,7 +287,8 @@ public:
 
     Packet* getPackets() {
         if (!finished_) {
-            allocator_->shrinkLast(static_cast<uint32_t>(ptr_ - static_cast<cs::Byte*>((packetsEnd_ - 1)->data())));
+            (packetsEnd_ - 1)->setSize(static_cast<uint32_t>(ptr_ - static_cast<cs::Byte*>((packetsEnd_ - 1)->data())));
+//            allocator_->shrinkLast(static_cast<uint32_t>(ptr_ - static_cast<cs::Byte*>((packetsEnd_ - 1)->data())));
 
             if (packetsCount_ > 1) {
                 for (auto p = packets_; p != packetsEnd_; ++p) {
@@ -340,7 +341,7 @@ private:
 
                 size_t shiftedSize = static_cast<size_t>(end_ - ptr_);
                 tempBuffer = allocator_->allocateNext(static_cast<uint32_t>(shiftedSize));
-                tail = static_cast<cs::Byte*>(tempBuffer.get());
+                tail = static_cast<cs::Byte*>(tempBuffer->get());
 
                 std::copy(ptr_, end_, tail);
                 *this << static_cast<uint16_t>(0) << static_cast<decltype(packetsCount_)>(0);
@@ -564,7 +565,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(cs::BytesView& view) {
 
 template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(RegionPtr& regionPtr) {
-    std::size_t size = regionPtr.size();
+    std::size_t size = regionPtr->size();
 
     if (!isBytesAvailable(size)) {
         good_ = false;
@@ -667,7 +668,7 @@ inline cs::OPackStream& cs::OPackStream::operator<<(const csdb::PoolHash& hash) 
 
 template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const RegionPtr& regionPtr) {
-    insertBytes(reinterpret_cast<const char*>(regionPtr.get()), static_cast<uint32_t>(regionPtr.size()));
+    insertBytes(reinterpret_cast<const char*>(regionPtr->get()), static_cast<uint32_t>(regionPtr->size()));
     return *this;
 }
 #endif  // PACKSTREAM_HPP

@@ -74,7 +74,6 @@ public:
     : config_(config)
     , sendPacksFlag_()
     , remoteNodes_(maxRemoteNodes_ + 1)
-    , netPacksAllocator_(1 << 24, 1)
     , myPublicKey_(node->getNodeIdKey())
     , oLock_()
     , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())

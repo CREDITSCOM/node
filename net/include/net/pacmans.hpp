@@ -61,7 +61,7 @@ struct TaskBody {
 class IPacMan {
 public:
   IPacMan()
-  : allocator_(1 << 20) {}
+  {}
 
   struct Task {
     ip::udp::endpoint sender;

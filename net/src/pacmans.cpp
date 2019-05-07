@@ -13,7 +13,8 @@ IPacMan::Task& IPacMan::allocNext() {
 
 void IPacMan::enQueueLast() {
   Task& task = queue_.back();
-  allocator_.shrinkLast(static_cast<uint32_t>(task.size));
+  task.pack.setSize(task.size);
+//  allocator_.shrinkLast(static_cast<uint32_t>(task.size));
   size_.fetch_add(1, std::memory_order_acq_rel);
 }
 
