@@ -1106,7 +1106,7 @@ csdb::Transaction SmartContracts::create_new_state(const QueueItem& queue_item) 
                              src.currency(),
                              0,  // amount
                              csdb::AmountCommission((queue_item.avail_fee - queue_item.consumed_fee).to_double()), csdb::AmountCommission(queue_item.new_state_fee.to_double()),
-                             SolverContext::zeroSignature  // empty signature
+                             Zero::signature  // empty signature
     );
     // USRFLD1 - ref to start trx
     result.add_user_field(trx_uf::new_state::RefStart, queue_item.ref_start.to_user_field());

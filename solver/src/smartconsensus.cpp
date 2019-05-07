@@ -39,8 +39,6 @@ const std::vector<cs::PublicKey>& SmartConsensus::smartConfidants() const {
 bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t runCounter, Node* node, SmartContracts* smarts) {
     trustedChanged_ = false;
     smartStageThreeSent_ = false;
-    zeroHash.fill(0);
-    zeroSignature.fill(0);
     pnode_ = node;
     psmarts_ = smarts;
     smartConfidants_.clear();
@@ -220,7 +218,7 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
     if (smartStageOneStorage_.at(stage.sender).sender == stage.sender) {
         return;
     }
-    if (stage.hash != zeroHash) {
+    if (!std::equal(stage.hash.cbegin(), stage.hash.cend(), Zero::hash.cbegin())) {
         smartConsensusMask[stage.sender] = 0;
     }
     else {
@@ -777,17 +775,17 @@ void SmartConsensus::fake_stage2(uint8_t from) {
 
 void SmartConsensus::init_zero(cs::StageOneSmarts& stage) {
     stage.sender = cs::ConfidantConsts::InvalidConfidantIndex;
-    stage.hash = zeroHash;
-    stage.messageHash = zeroHash;
-    stage.signature = zeroSignature;
+    stage.hash = Zero::hash;
+    stage.messageHash = Zero::hash;
+    stage.signature = Zero::signature;
 }
 
 void SmartConsensus::init_zero(cs::StageTwoSmarts& stage) {
     stage.sender = cs::ConfidantConsts::InvalidConfidantIndex;
-    stage.signature = zeroSignature;
+    stage.signature = Zero::signature;
     size_t cnt = smartConfidants_.size();
-    stage.hashes.resize(cnt, zeroHash);
-    stage.signatures.resize(cnt, zeroSignature);
+    stage.hashes.resize(cnt, Zero::hash);
+    stage.signatures.resize(cnt, Zero::signature);
 }
 
 void SmartConsensus::fakeStage(uint8_t confIndex) {

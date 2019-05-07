@@ -10,9 +10,6 @@ enum Lengths {
     FragmentedHeader = 36
 };
 
-// see implementation below:
-const char* getMsgTypesString(MsgTypes messageType);
-
 const cs::Hash& Packet::getHeaderHash() const {
     if (!headerHashed_) {
         headerHash_ = generateHash(static_cast<const char*>(data_.get()) + Offsets::FragmentsNum, Lengths::FragmentedHeader);
@@ -264,47 +261,6 @@ const char* getMsgTypesString(MsgTypes messageType) {
             return "RejectedContracts";
         default:
             return "Unknown";
-    }
-}
-
-const char* getNetworkCommandString(NetworkCommand command) {
-    switch (command) {
-        default:
-            return "Unknown";
-        case NetworkCommand::Registration:
-            return "Registration";
-        case NetworkCommand::ConfirmationRequest:
-            return "ConfirmationRequest";
-        case NetworkCommand::ConfirmationResponse:
-            return "ConfirmationResponse";
-        case NetworkCommand::RegistrationConfirmed:
-            return "RegistrationConfirmed";
-        case NetworkCommand::RegistrationRefused:
-            return "RegistrationRefused";
-        case NetworkCommand::Ping:
-            return "Ping";
-        case NetworkCommand::PackInform:
-            return "PackInform";
-        case NetworkCommand::PackRequest:
-            return "PackRequest";
-        case NetworkCommand::PackRenounce:
-            return "PackRenounce";
-        case NetworkCommand::BlockSyncRequest:
-            return "BlockSyncRequest";
-        case NetworkCommand::SSRegistration:
-            return "SSRegistration";
-        case NetworkCommand::SSFirstRound:
-            return "SSFirstRound";
-        case NetworkCommand::SSRegistrationRefused:
-            return "SSRegistrationRefused";
-        case NetworkCommand::SSPingWhiteNode:
-            return "SSPingWhiteNode";
-        case NetworkCommand::SSLastBlock:
-            return "SSLastBlock";
-        case NetworkCommand::SSReRegistration:
-            return "SSReRegistration";
-        case NetworkCommand::SSSpecificBlock:
-            return "SSSpecificBlock";
     }
 }
 
