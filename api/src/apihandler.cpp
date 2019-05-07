@@ -513,9 +513,9 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
 
 #ifdef MONITOR_NODE
     s_blockchain.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) { res.createTime = wd.createTime_; });
-    if (tr.user_field(0).is_valid())
-        res.transactionsCount = s_blockchain.getTransactionsCount(tr.target());
 #endif
+	if (tr.user_field(0).is_valid())
+		res.transactionsCount = s_blockchain.getTransactionsCount(tr.target());
 
     auto pool = s_blockchain.loadBlock(tr.id().pool_hash());
     res.createTime = pool.get_time();

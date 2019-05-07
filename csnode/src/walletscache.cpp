@@ -341,9 +341,11 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
             cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
             return 0;
         }
-#ifdef MONITOR_NODE
-        WalletData& wallData_s = getWalletData(id_s, tr.source());
-        ++wallData_s.transNum_;
+
+		WalletData& wallData_s = getWalletData(id_s, tr.source());
+		++wallData_s.transNum_;
+
+#ifdef MONITOR_NODE              
         wallData_s.lastTransaction_ = tr.id();
 #endif
         //
@@ -355,8 +357,8 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
     if (!smartIniter) {
         wallData.balance_ -= tr.amount();
 
-#ifdef MONITOR_NODE
-        ++wallData.transNum_;
+		++wallData.transNum_;
+#ifdef MONITOR_NODE        
         setWalletTime(wallData.address_, tr.get_time());
 #endif
 
@@ -475,10 +477,10 @@ void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) 
     wallData.balance_ += tr.amount();
     setModified(id);
 
-#ifdef MONITOR_NODE
     if (tr.source() != tr.target())  // Already counted in loadTrxForSource
         ++wallData.transNum_;
 
+#ifdef MONITOR_NODE
     setWalletTime(wallData.address_, tr.get_time());
 #endif
 
