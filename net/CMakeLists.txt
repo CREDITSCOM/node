@@ -9,11 +9,13 @@ add_library(net
   include/net/pacmans.hpp
   include/net/transport.hpp
   include/net/logger.hpp
+  include/net/packetvalidator.hpp
   src/neighbourhood.cpp
   src/network.cpp
   src/packet.cpp
   src/pacmans.cpp
   src/transport.cpp
+  src/packetvalidator.cpp
 )
 
 add_dependencies(${PROJECT_NAME} csconnector)
