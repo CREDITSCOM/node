@@ -2,20 +2,16 @@
 
 #include <tuple>
 
-#include <csdb/amount_commission.hpp>
-#include <csdb/transaction.hpp>
 #include <solver/smartcontracts.hpp>
 
 namespace cs {
 namespace {
 const size_t kCommonTrSize = 152;
 
-std::array<std::tuple<size_t, double, double>, 16> feeLevels = {
-    std::make_tuple(kCommonTrSize, kMinFee, kMinFee),
-    std::make_tuple(kCommonTrSize * 2, kMinFee * 5, kMinFee * 3),
+std::array<std::tuple<size_t, double, double>, 14> feeLevels = {
     std::make_tuple(1024 + 512, 0.008746170242, 0.004828886573),
     std::make_tuple(20 * 1024, 0.03546746927, 0.005862733239),
-    std::make_tuple(50 * 1042, 0.1438276802, 0.01104468428),
+    std::make_tuple(50 * 1042, 0.1438276802, 0.01104468428), // @TODO fix 1042 -> 1024
     std::make_tuple(100 * 1024, 1.936458209, 0.09641057723),
     std::make_tuple(256 * 1024, 5.26383916, 0.3813112299),
     std::make_tuple(512 * 1024, 38.89480285, 4.874110187),
@@ -28,36 +24,42 @@ std::array<std::tuple<size_t, double, double>, 16> feeLevels = {
     std::make_tuple(500 * 1024 * 1024, 42653.3305, 9959.829026),
     std::make_tuple(1000 * 1024 * 1024, 115943.7732, 115943.7732)
 };
-
-const size_t kSizePos = 0;
-const size_t kDepPos = 1;
-const size_t kCommonPos = 2;
 }  // namespace
 
 namespace fee {
 
 csdb::AmountCommission getFee(const csdb::Transaction& t) {
     size_t size = t.to_byte_stream().size();
-    for (auto it = feeLevels.cbegin(); it != feeLevels.cend(); ++it) {
-        if (size < std::get<kSizePos>(*it)) {
-            if (SmartContracts::is_deploy(t)) {
-                return csdb::AmountCommission(std::get<kDepPos>(*it));
-            } else {
-                return csdb::AmountCommission(std::get<kCommonPos>(*it));
-            }
+
+    if (!SmartContracts::is_smart_contract(t)) {
+        if (size <= kCommonTrSize) {
+            return csdb::AmountCommission(kMinFee);
+        } else if (size <= kCommonTrSize + 55) { // 50 chars string in user field
+            return csdb::AmountCommission(kMinFee * 3);
         }
     }
 
-    double k = static_cast<double>(size) / std::get<kSizePos>(feeLevels[feeLevels.size() - 1]);
-    if (SmartContracts::is_deploy(t)) {
-        return csdb::AmountCommission(std::get<kDepPos>(feeLevels[feeLevels.size() -1]) * k);
-    } else {
-        return csdb::AmountCommission(std::get<kCommonPos>(feeLevels[feeLevels.size() -1]) * k);
+    for (const auto& level : feeLevels) {
+        if (size < std::get<0>(level)) {
+            if (SmartContracts::is_deploy(t)) {
+                return csdb::AmountCommission(std::get<1>(level));
+            }
+            return csdb::AmountCommission(std::get<2>(level));
+        }
     }
+
+    double k = static_cast<double>(size) / std::get<0>(feeLevels[feeLevels.size() - 1]);
+    return csdb::AmountCommission(std::get<1>(feeLevels[feeLevels.size() - 1]) * k);
 }
 
 bool estimateMaxFee(const csdb::Transaction& t, csdb::AmountCommission& countedFee) {
     countedFee = getFee(t);
+
+    if (SmartContracts::is_smart_contract(t)) {
+        countedFee = csdb::AmountCommission(countedFee.to_double() +
+                     std::get<2>(feeLevels[0])); // cheapest new state
+    }
+
     return csdb::Amount(t.max_fee().to_double()) >= csdb::Amount(countedFee.to_double());
 }
 
