@@ -11,7 +11,7 @@ namespace cs
         static PacketValidator& instance();
 
         bool validate(const Packet& pack);
-        bool validate(const TaskPtr<IPacMan>& task);
+        bool validate(const Message& msg);
 
         const cs::PublicKey& getStarterKey() const {
             return starter_key;
@@ -23,13 +23,13 @@ namespace cs
 
         PacketValidator();
 
-        bool validateStarterSignature(const Packet& pack);
+        bool validate(MsgTypes msg, const uint8_t* data, size_t size);
 
-        bool validateRegistration(const Packet& pack);
+        bool validateStarterSignature(const uint8_t* data, size_t size);
+
+        bool validateRegistration(size_t size);
         bool validateStarterRegistration(const Packet& pack);
-        bool validateStopRequest(const Packet& pack);
+        bool validateStopRequest(const uint8_t* data, size_t size);
 
-        bool validate(NetworkCommand cmd, const Packet& pack);
-        bool validate(MsgTypes msg, const Packet& pack);
     };
 }

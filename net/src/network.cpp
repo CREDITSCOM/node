@@ -149,6 +149,10 @@ void Network::readerRoutine(const Config& config) {
       }
       else {
         iPacMan_.enQueueLast();
+
+#ifdef LOG_NET
+        csdebug(logger::Net) << "<-- " << packetSize << " bytes from " << task.sender << " " << task.pack;
+#endif
       }
 #ifdef __linux__
       static uint64_t one = 1;
@@ -164,9 +168,6 @@ void Network::readerRoutine(const Config& config) {
       kevent(readerKq_, &readerEvent_, 1, NULL, 0, NULL);
 #endif
       readerLock.clear(std::memory_order_release); // release lock
-#endif
-#ifdef LOG_NET
-      csdebug(logger::Net) << "<-- " << packetSize << " bytes from " << task.sender << " " << task.pack;
 #endif
     } else {
       cserror() << "Cannot receive packet. Error " << lastError;
@@ -376,21 +377,12 @@ inline void Network::processTask(TaskPtr<IPacMan> &task) {
     return;
   }
 
-  if (!cs::PacketValidator::instance().validate(task)) {
-      bool is_network = task->pack.isNetwork();
-      uint8_t type = task->pack.getType();
-      cswarning() << "Packet "
-          << (is_network ? getNetworkCommandString(static_cast<NetworkCommand>(type)) : getMsgTypesString(static_cast<MsgTypes>(type)))
-          << " is not validated";
-
-      transport_->sendPackInform(task->pack, remoteSender);
-      return;
-  }
-
   // Pure network processing
   if (task->pack.isNetwork()) {
-    transport_->processNetworkTask(task, remoteSender);
-    return;
+      if (cs::PacketValidator::instance().validate(task->pack)) {
+          transport_->processNetworkTask(task, remoteSender);
+      }
+      return;
   }
 
   // Non-network data
@@ -406,11 +398,15 @@ inline void Network::processTask(TaskPtr<IPacMan> &task) {
       }
 
       if (msg && msg->isComplete()) {
-        transport_->processNodeMessage(**msg);
+          if (cs::PacketValidator::instance().validate(**msg)) {
+              transport_->processNodeMessage(**msg);
+          }
       }
     }
     else {
-      transport_->processNodeMessage(task->pack);
+        if (cs::PacketValidator::instance().validate(task->pack)) {
+            transport_->processNodeMessage(task->pack);
+        }
     }
   }
 

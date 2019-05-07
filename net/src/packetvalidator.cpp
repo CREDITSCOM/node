@@ -18,67 +18,81 @@ namespace cs
 
     bool PacketValidator::validate(const Packet& pack)
     {
-        if (!pack.isHeaderValid()) {
-            return false;
-        }
-        if (pack.getHeadersLength() >= pack.size()) {
-            return false;
-        }
-        if (pack.isNetwork()) {
-            if (pack.isFragmented()) {
-                return false;
+        bool result = (pack.isHeaderValid() && (pack.getHeadersLength() < pack.size()));
+        if (result) {
+            if (pack.isNetwork()) {
+                if (pack.isFragmented() || pack.getMsgSize() < 1) {
+                    result = false;
+                }
+                else {
+                    NetworkCommand cmd = (NetworkCommand) * (uint8_t*)pack.getMsgData();
+                    switch (cmd) {
+                    case NetworkCommand::Registration:
+                        result = validateRegistration(pack.getMsgSize());
+                        break;
+                    case NetworkCommand::SSRegistration:
+                        result = validateStarterRegistration(pack);
+                        break;
+                    default:
+                        break;
+                    }
+                }
             }
-            if (pack.getMsgSize() < 1) {
-                return false;
+            else {
+                if (pack.getFragmentsNum() > 1) {
+                    result = false;
+                }
+                else {
+                    result = validate(pack.getType(), pack.getMsgData(), pack.getMsgSize());
+                }
             }
-            NetworkCommand cmd = (NetworkCommand) * (uint8_t*)pack.getMsgData();
-            return validate(cmd, pack);
         }
-        MsgTypes msg = (MsgTypes) * (uint8_t*)pack.getMsgData();
-        return validate(msg, pack);
+        if (!result) {
+            cswarning() << "Net: packet " << pack << " is not validated";
+        }
+        return result;
     }
 
-    bool PacketValidator::validate(const TaskPtr<IPacMan>& task)
+    bool PacketValidator::validate(const Message& msg)
     {
-        return validate(task->pack);
-    }
-
-    bool PacketValidator::validate(NetworkCommand cmd, const Packet& pack) {
-        switch (cmd) {
-        case NetworkCommand::Registration:
-            return validateRegistration(pack);
-        case NetworkCommand::SSRegistration:
-            validateStarterRegistration(pack);
-            break;
-        default:
-            break;
+        if (!msg.isComplete()) {
+            return false;
+        }
+        if (!msg.getFirstPack().hasValidFragmentation()) {
+            return false;
+        }
+        if (msg.getFirstPack().getFragmentsNum() == 1) {
+            return validate(msg.getFirstPack());
         }
         return true;
+        // require to compose full message to validate:
+        //MsgTypes type = msg.getFirstPack().getType();
+        //return validate(type, msg.getFullData(), msg.getFullSize());
     }
 
-    bool PacketValidator::validate(MsgTypes msg, const Packet& pack) {
+    bool PacketValidator::validate(MsgTypes msg, const uint8_t* data, size_t size) {
         switch (msg) {
         case MsgTypes::BigBang:
             // still cannot validate signature, parsing required
             break;
         case MsgTypes::NodeStopRequest:
-            return validateStopRequest(pack);
+            return validateStopRequest(data, size);
         default:
             break;
         }
         return true;
     }
 
-    bool PacketValidator::validateStarterSignature(const Packet& pack) {
+    bool PacketValidator::validateStarterSignature(const uint8_t* data, size_t size) {
         if (std::equal(starter_key.cbegin(), starter_key.cend(), cs::Zero::key.cbegin())) {
             return false; // no SS key registered
         }
-        const size_t full_data_size = pack.getMsgSize() - 1; // the 1st byte is unsigned msg type
+        const size_t full_data_size = size - 1; // the 1st byte is unsigned msg type
         if (full_data_size <= cscrypto::kSignatureSize) {
             return false; // no signed data
         }
         const size_t signed_data_size = full_data_size - cscrypto::kSignatureSize;
-        const cscrypto::Byte* data_ptr = pack.getMsgData() + 1; // the 1st byte is unsigned msg type
+        const cscrypto::Byte* data_ptr = data + 1; // the 1st byte is unsigned msg type
         const cscrypto::Byte* signature_ptr = data_ptr + signed_data_size;
         return cscrypto::verifySignature(signature_ptr, starter_key.data(), data_ptr, signed_data_size);
     }
@@ -107,15 +121,15 @@ namespace cs
         return true;
     }
 
-    bool PacketValidator::validateStopRequest(const Packet& pack) {
+    bool PacketValidator::validateStopRequest(const uint8_t* data, size_t size) {
         constexpr size_t payload_size = sizeof(MsgTypes) + sizeof(cs::RoundNumber) + sizeof(uint16_t); // type + rNum + version
-        if (pack.getMsgSize() != payload_size + cscrypto::kSignatureSize) {
+        if (size != payload_size + cscrypto::kSignatureSize) {
             return false; // incorrect packet size
         }
-        return validateStarterSignature(pack);
+        return validateStarterSignature(data, size);
     }
 
-    bool PacketValidator::validateRegistration(const Packet& pack) {
+    bool PacketValidator::validateRegistration(size_t size) {
         constexpr size_t hdr = 1 + 2; // command Registration + version
         constexpr size_t ip6 = 1 + 16;
         constexpr size_t ip4 = 1 + 4;
@@ -131,9 +145,8 @@ namespace cs
             hdr + noip + id_key
         };
         constexpr size_t cnt_expected = sizeof(expected) / sizeof(expected[0]);
-        const size_t len = pack.getMsgSize();
         for (size_t i = 0; i < cnt_expected; ++i) {
-            if (expected[i] == len) {
+            if (expected[i] == size) {
                 return true;
             }
         }
