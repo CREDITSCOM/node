@@ -51,7 +51,8 @@ using PoolsRequestedSequences = std::vector<cs::Sequence>;
 using PoolsBlock = std::vector<csdb::Pool>;
 
 enum NodeConsts : uint32_t {
-    NeighboursRequestDelay = 350
+    NeighboursRequestDelay = 350,
+    MaxRoundDeltaInStopRequest = 100 ///< Max allowed round difference in NodeStopRequest, otherwise ignore the command
 };
 
 enum ConveyerConsts : uint32_t {
@@ -141,6 +142,17 @@ struct RoundTableMessage {
 // meta storages
 using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;
 using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
+
+// zero constants, used as "empty"
+struct Zero
+{
+    static cs::Hash hash;
+    static cs::Signature signature;
+    static cs::PublicKey key;
+
+    Zero();
+};
+
 }  // namespace cs
 
 #endif  // NODE_CORE_HPP

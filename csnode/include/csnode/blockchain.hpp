@@ -222,9 +222,9 @@ public slots:
 
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
-    void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>);
-    uint32_t getTransactionsCount(const csdb::Address&);
+    void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>); 
 #endif
+	uint32_t getTransactionsCount(const csdb::Address&);
 
 #ifdef TRANSACTIONS_INDEX
     csdb::TransactionID getLastTransaction(const csdb::Address&);
@@ -331,8 +331,6 @@ private:
     // (idea is it is more easy not to store block immediately then to revert it after storing)
     csdb::Pool deferredBlock_;
 
-    // fee calculator
-    std::unique_ptr<cs::Fee> fee_;
     std::unique_ptr<cs::BlockValidator> blockValidator_;
 };
 

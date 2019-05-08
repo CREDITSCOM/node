@@ -35,7 +35,7 @@ public:
     }
 
     ~Region() {
-      cslog() << "deallocate: " << data_;
+//      cslog() << "deallocate: " << data_;
       delete [] data_;
     }
 
@@ -84,7 +84,7 @@ public:
      - shrinkLast is called before the last allocation gets unuse()d */
     RegionPtr allocateNext(const uint32_t size) {
         auto ptr = new uint8_t[size];
-        cslog() << "allocate: " << ptr;
+//        cslog() << "allocate: " << ptr;
         return RegionPtr(new Region(ptr, size));
     }
 

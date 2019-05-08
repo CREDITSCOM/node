@@ -369,10 +369,7 @@ void Transport::refillNeighbourhood() {
 bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
     iPackStream_.init(task->pack.getMsgData(), task->pack.getMsgSize());
     iPackStream_.safeSkip<uint8_t>(1);
-
-    cs::PublicKey ss_key;
-    iPackStream_ >> ss_key;
-    node_->getKeySS(ss_key);
+    iPackStream_.safeSkip<cscrypto::PublicKey>(1);
 
     cs::RoundNumber rNum = 0;
     iPackStream_ >> rNum;
@@ -538,7 +535,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
         case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
             return node_->getRoundTableRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::NodeStopRequest:
-            return node_->getNodeStopRequest(data, size);
+            return node_->getNodeStopRequest(rNum, data, size);
         case MsgTypes::RoundTable:
             return node_->getRoundTable(data, size, rNum, firstPack.getSender());
         case MsgTypes::RoundTableSS:
@@ -829,21 +826,15 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
     cslog() << "Connection to the Signal Server has been established";
     nh_.addSignalServer(task->sender, ssEp_, rNode);
 
-    constexpr int MinRegistartionSize = 1 + cscrypto::kPublicKeySize;
+    constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
     size_t msg_size = task->pack.getMsgSize();
 
-    if (msg_size > MinRegistartionSize) {
+    if (msg_size > MinRegistrationSize) {
         if (!parseSSSignal(task)) {
             cswarning() << "Bad Signal Server response";
         }
     }
     else {
-        if (msg_size == MinRegistartionSize) {
-            const uint8_t* pdata = task->pack.getMsgData() + 1;
-            cs::PublicKey ss_key;
-            std::copy(pdata, pdata + cscrypto::kPublicKeySize, ss_key.data());
-            node_->getKeySS(ss_key);
-        }
         ssStatus_ = SSBootstrapStatus::RegisteredWait;
     }
 
@@ -929,12 +920,7 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
 }
 
 void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
-    ConnectionPtr conn = nh_.getConnection(sender);
-    if (!conn) {
-        return;
-    }
-
-    sendPackInform(pack, **conn);
+    sendPackInform(pack, sender);
 
     if (pack.isNeighbors()) {
         return;  // Do not redirect packs
@@ -947,6 +933,14 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
         nh_.neighbourHasPacket(sender, pack.getHash(), false);
         sendBroadcast(&pack);
     }
+}
+
+void Transport::sendPackInform(const Packet& pack, RemoteNodePtr& sender) {
+    ConnectionPtr conn = nh_.getConnection(sender);
+    if (!conn) {
+        return;
+    }
+    sendPackInform(pack, **conn);
 }
 
 void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
@@ -1147,4 +1141,45 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
 
     emit pingReceived(lastSeq);
     return true;
+}
+
+const char* getNetworkCommandString(NetworkCommand command) {
+    switch (command) {
+    default:
+        return "Unknown";
+    case NetworkCommand::Registration:
+        return "Registration";
+    case NetworkCommand::ConfirmationRequest:
+        return "ConfirmationRequest";
+    case NetworkCommand::ConfirmationResponse:
+        return "ConfirmationResponse";
+    case NetworkCommand::RegistrationConfirmed:
+        return "RegistrationConfirmed";
+    case NetworkCommand::RegistrationRefused:
+        return "RegistrationRefused";
+    case NetworkCommand::Ping:
+        return "Ping";
+    case NetworkCommand::PackInform:
+        return "PackInform";
+    case NetworkCommand::PackRequest:
+        return "PackRequest";
+    case NetworkCommand::PackRenounce:
+        return "PackRenounce";
+    case NetworkCommand::BlockSyncRequest:
+        return "BlockSyncRequest";
+    case NetworkCommand::SSRegistration:
+        return "SSRegistration";
+    case NetworkCommand::SSFirstRound:
+        return "SSFirstRound";
+    case NetworkCommand::SSRegistrationRefused:
+        return "SSRegistrationRefused";
+    case NetworkCommand::SSPingWhiteNode:
+        return "SSPingWhiteNode";
+    case NetworkCommand::SSLastBlock:
+        return "SSLastBlock";
+    case NetworkCommand::SSReRegistration:
+        return "SSReRegistration";
+    case NetworkCommand::SSSpecificBlock:
+        return "SSSpecificBlock";
+    }
 }

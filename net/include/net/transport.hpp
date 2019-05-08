@@ -68,6 +68,8 @@ enum class SSBootstrapStatus : uint8_t {
 template <>
 uint16_t getHashIndex(const ip::udp::endpoint&);
 
+const char* getNetworkCommandString(NetworkCommand command);
+
 class Transport {
 public:
     Transport(const Config& config, Node* node)
@@ -131,6 +133,7 @@ public:
     void sendRegistrationRefusal(const Connection&, const RegistrationRefuseReasons);
     void sendPackRenounce(const cs::Hash&, const Connection&);
     void sendPackInform(const Packet&, const Connection&);
+    void sendPackInform(const Packet& pack, RemoteNodePtr&);
 
     void sendPingPack(const Connection&);
 

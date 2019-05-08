@@ -19,6 +19,7 @@
 
 #include "network.hpp"
 #include "transport.hpp"
+#include <net/packetvalidator.hpp>
 
 #include <set>
 
@@ -122,12 +123,19 @@ void Network::readerRoutine(const Config& config) {
 
     std::atomic_thread_fence(std::memory_order_acq_rel);
     while (!task.pack.data_.get()) {
-      cslog() << "net: invalid input packet!!!!!!!!!";
+      cswarning() << "net: invalid input packet!!!!!!!!!";
     }
     packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
     while (!task.pack.data_.get()) {
-      cslog() << "net: invalid input packet!!!!!!!!!";
+      cswarning() << "net: invalid input packet!!!!!!!!!";
     }
+
+  if (!(task.pack.isHeaderValid())) {
+    static constexpr size_t limit = 100;
+    auto size = (task.pack.size() <= limit) ? task.pack.size() : limit;
+
+    cswarning() << "from socket Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task.pack.data()), size);
+  }
 
     if (!lastError) {
       task.size = task.pack.decode(packetSize);   // try to decode first
@@ -148,6 +156,10 @@ void Network::readerRoutine(const Config& config) {
       }
       else {
         iPacMan_.enQueueLast();
+
+#ifdef LOG_NET
+        csdebug(logger::Net) << "<-- " << packetSize << " bytes from " << task.sender << " " << task.pack;
+#endif
       }
 #ifdef __linux__
       static uint64_t one = 1;
@@ -163,9 +175,6 @@ void Network::readerRoutine(const Config& config) {
       kevent(readerKq_, &readerEvent_, 1, NULL, 0, NULL);
 #endif
       readerLock.clear(std::memory_order_release); // release lock
-#endif
-#ifdef LOG_NET
-      csdebug(logger::Net) << "<-- " << packetSize << " bytes from " << task.sender << " " << task.pack;
 #endif
     } else {
       cserror() << "Cannot receive packet. Error " << lastError;
@@ -227,7 +236,7 @@ void Network::writerRoutine(const Config& config) {
     if (s != sizeof(uint64_t)) continue;
 
     if (tasks > 200) {
-      cslog() << "strange: too many tasks " << tasks;
+      cswarning() << "strange: too many tasks " << tasks;
     }
 
     msg.resize(tasks);
@@ -243,8 +252,14 @@ void Network::writerRoutine(const Config& config) {
       auto task = oPacMan_.getNextTask();
       std::atomic_thread_fence(std::memory_order_acquire);
       while (!task->pack.data_.get()) {
-        cslog() << "net: invalid packet for send!!!!!!!!!";
+        cswarning() << "net: invalid packet for send!!!!!!!!! " << tasks;
       }
+  if (!(task->pack.isHeaderValid())) {
+    static constexpr size_t limit = 100;
+    auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
+
+    cswarning() << "socket Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
+  }
       encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
       endpoints[j] = task->endpoint;
       iovecs[j].iov_base = encoded_packets[j].data();
@@ -263,7 +278,7 @@ void Network::writerRoutine(const Config& config) {
     do {
       sended = sendmmsg(sock->native_handle(), messages, tasks, 0);
       if (sended < 0) {
-        cslog() << "sendmmsg errno = " << errno;
+        cswarning() << "sendmmsg errno = " << errno;
         if (errno != EAGAIN) break;
       }
       messages += sended;
@@ -286,7 +301,7 @@ void Network::writerRoutine(const Config& config) {
     for (int i = 0; i < tasks; i++) {
       auto task = oPacMan_.getNextTask();
       while (!task->pack.data_.get()) {
-        cslog() << "net: invalid packet!!!!!!!!!";
+        cswarning() << "net: invalid packet!!!!!!!!!";
       }
       sendPack(*sock, task, task->endpoint);
     }
@@ -323,7 +338,7 @@ void Network::processorRoutine() {
     for (uint64_t i = 0; i < tasks; i++) {
       auto task = iPacMan_.getNextTask();
       while (!task->pack.data_.get()) {
-        cslog() << "net: invalid packet processor!!!!!!!!!";
+        cswarning() << "net: invalid packet processor!!!!!!!!!";
       }
       processTask(task);
     }
@@ -377,8 +392,10 @@ inline void Network::processTask(TaskPtr<IPacMan> &task) {
 
   // Pure network processing
   if (task->pack.isNetwork()) {
-    transport_->processNetworkTask(task, remoteSender);
-    return;
+      if (cs::PacketValidator::instance().validate(task->pack)) {
+          transport_->processNetworkTask(task, remoteSender);
+      }
+      return;
   }
 
   // Non-network data
@@ -394,11 +411,15 @@ inline void Network::processTask(TaskPtr<IPacMan> &task) {
       }
 
       if (msg && msg->isComplete()) {
-        transport_->processNodeMessage(**msg);
+          if (cs::PacketValidator::instance().validate(**msg)) {
+              transport_->processNodeMessage(**msg);
+          }
       }
     }
     else {
-      transport_->processNodeMessage(task->pack);
+        if (cs::PacketValidator::instance().validate(task->pack)) {
+            transport_->processNodeMessage(task->pack);
+        }
     }
   }
 
@@ -410,11 +431,14 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
   auto qePtr = oPacMan_.allocNext();
 
   if (ep.size() > 16) {
-    cslog() << "endpoint address too big " << ep.size();
+    cswarning() << "endpoint address too big " << ep.size();
     const uint8_t *ptr = reinterpret_cast<const uint8_t *>(ep.data());
     for (int i = 0; i < ep.size(); i++) {
-      cslog() << *ptr++;
+      cswarning() << *ptr++;
     }
+  }
+  while (!p.data_.get()) {
+    cswarning() << "net: invalid packet for sendDirect!!!!!!!!! ";
   }
   qePtr->endpoint = ep;
   qePtr->pack = p;

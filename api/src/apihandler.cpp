@@ -7,6 +7,7 @@
 #include <src/priv_crypto.hpp>
 #include "csconnector/csconnector.hpp"
 #include "stdafx.h"
+#include <csnode/fee.hpp>
 
 #include <base58.h>
 
@@ -513,9 +514,9 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
 
 #ifdef MONITOR_NODE
     s_blockchain.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) { res.createTime = wd.createTime_; });
-    if (tr.user_field(0).is_valid())
-        res.transactionsCount = s_blockchain.getTransactionsCount(tr.target());
 #endif
+	if (tr.user_field(0).is_valid())
+		res.transactionsCount = s_blockchain.getTransactionsCount(tr.target());
 
     auto pool = s_blockchain.loadBlock(tr.id().pool_hash());
     res.createTime = pool.get_time();
@@ -589,6 +590,16 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
     _return.status.message = "not enough money!\nmax_sum: " + std::to_string(max_sum) + "\nbalance: " + std::to_string(balance);
     return;
   }
+  
+  // check max fee
+  {
+   csdb::AmountCommission countedFee;
+   if (!cs::fee::estimateMaxFee(tr, countedFee)) {
+       _return.status.code = ERROR_CODE;
+       _return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
+       return;
+   }
+  }
 
   // check signature
   const auto byteStream = tr.to_byte_stream_for_sig();
@@ -598,6 +609,7 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
     _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
     return;
   }
+  
 
   solver.send_wallet_transaction(tr);
   SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
@@ -635,6 +647,16 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         return;
     }
     //
+    
+    // check max fee
+    {
+     csdb::AmountCommission countedFee;
+     if (!cs::fee::estimateMaxFee(send_transaction, countedFee)) {
+         _return.status.code = ERROR_CODE;
+         _return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
+         return;
+     }
+    }
 
   // check signature
   const auto byteStream = send_transaction.to_byte_stream_for_sig();

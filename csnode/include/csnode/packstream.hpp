@@ -328,6 +328,7 @@ private:
         static constexpr size_t insertedSize = sizeof(uint16_t) + sizeof(packetsCount_);
 
         if (packetsCount_ == 1) {
+            cslog() << "Fragment packet!!!";
             ptr_ = static_cast<cs::Byte*>(packets_->data());
 
             if (!packets_->isFragmented()) {
@@ -571,7 +572,7 @@ inline cs::IPackStream& cs::IPackStream::operator>>(RegionPtr& regionPtr) {
         good_ = false;
     }
     else {
-        std::copy(ptr_, ptr_ + size, reinterpret_cast<char*>(regionPtr.get()));
+        std::copy(ptr_, ptr_ + size, reinterpret_cast<char*>(regionPtr->get()));
         ptr_ += size;
     }
 

@@ -597,6 +597,7 @@ bool cs::PoolSynchronizer::isLastRequest() const {
 
 bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::NeighboursSetElemet& nh) const {
     const auto val = nh.roundCounter();
+    if (val == 0) return false;
     return ((val % syncData_.requestRepeatRoundCount) == 0);
 }
 

@@ -18,6 +18,11 @@
 #include <sstream>
 #include <string>
 
+namespace
+{
+    const char* log_prefix = "SolverCore: ";
+}
+
 namespace cs {
 
 // initial values for SolverCore options
@@ -59,19 +64,19 @@ SolverCore::SolverCore()
 
 /*, smartProcess_(this)*/ {
     if constexpr (MonitorModeOn) {
-        cslog() << "SolverCore: opt_monitor_mode is on, so use special transition table";
+        cslog() << log_prefix << "opt_monitor_mode is on, so use special transition table";
         InitMonitorModeTransitions();
     }
     else if constexpr (WebWalletModeOn) {
-        cslog() << "SolverCore: opt_web_wallet_mode is on, so use special transition table";
+        cslog() << log_prefix << "opt_web_wallet_mode is on, so use special transition table";
         InitWebWalletModeTransitions();
     }
     else if constexpr (DebugModeOn) {
-        cslog() << "SolverCore: opt_debug_mode is on, so use special transition table";
+        cslog() << log_prefix << "opt_debug_mode is on, so use special transition table";
         InitDebugModeTransitions();
     }
     else if constexpr (true) {
-        cslog() << "SolverCore: use default transition table";
+        cslog() << log_prefix << "use default transition table";
         InitTransitions();
     }
 }
@@ -94,7 +99,7 @@ SolverCore::~SolverCore() {
 
 void SolverCore::ExecuteStart(Event start_event) {
     if (!is_finished()) {
-        cswarning() << "SolverCore: cannot start again, already started";
+        cswarning() << log_prefix << "cannot start again, already started";
         return;
     }
     req_stop = false;
@@ -127,11 +132,11 @@ void SolverCore::setState(const StatePtr& pState) {
     }
 
     if (pstate) {
-        csdebug() << "SolverCore: pstate-off";
+        csdebug() << log_prefix << "pstate-off";
         pstate->off(*pcontext);
     }
     if (Consensus::Log) {
-        csdebug() << "SolverCore: switch " << (pstate ? pstate->name() : "null") << " -> " << (pState ? pState->name() : "null");
+        csdebug() << log_prefix << "switch " << (pstate ? pstate->name() : "null") << " -> " << (pState ? pState->name() : "null");
     }
     pstate = pState;
     if (!pstate) {
@@ -140,7 +145,7 @@ void SolverCore::setState(const StatePtr& pState) {
     pstate->on(*pcontext);
 
     auto closure = [this]() {
-        csdebug() << "SolverCore: state " << pstate->name() << " is expired";
+        csdebug() << log_prefix << "state " << pstate->name() << " is expired";
         // clear flag to know timeout expired
         tag_state_expired = CallsQueueScheduler::no_tag;
         // control state switch
@@ -148,7 +153,7 @@ void SolverCore::setState(const StatePtr& pState) {
         pstate->expired(*pcontext);
         if (pstate == p1.lock()) {
             // expired state did not change to another one, do it now
-            csdebug() << "SolverCore: there is no state set on expiration of " << pstate->name();
+            csdebug() << log_prefix << "there is no state set on expiration of " << pstate->name();
             // setNormalState();
         }
     };
@@ -165,17 +170,17 @@ void SolverCore::handleTransitions(Event evt) {
         return;
     }
     if (Event::BigBang == evt) {
-        cswarning() << "SolverCore: BigBang on";
+        cswarning() << log_prefix << "BigBang on";
     }
     const auto& variants = transitions[pstate];
     if (variants.empty()) {
-        cserror() << "SolverCore: there are no transitions for " << pstate->name();
+        cserror() << log_prefix << "there are no transitions for " << pstate->name();
         return;
     }
     auto it = variants.find(evt);
     if (it == variants.cend()) {
         // such event is ignored in current state
-        csdebug() << "SolverCore: event " << static_cast<int>(evt) << " ignored in state " << pstate->name();
+        csdebug() << log_prefix << "event " << static_cast<int>(evt) << " ignored in state " << pstate->name();
         return;
     }
     setState(it->second);
@@ -183,14 +188,14 @@ void SolverCore::handleTransitions(Event evt) {
 
 bool SolverCore::stateCompleted(Result res) {
     if (Result::Failure == res) {
-        cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null");
+        cserror() << log_prefix << "error in state " << (pstate ? pstate->name() : "null");
     }
     return (Result::Finish == res);
 }
 
 bool SolverCore::stateFailed(Result res) {
     if (Result::Failure == res) {
-        cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null");
+        cserror() << log_prefix << "error in state " << (pstate ? pstate->name() : "null");
         return true;
     }
     return false;
@@ -216,7 +221,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     table.confidants = nodes;
     table.hashes = hashes;
 
-    csmeta(csdetails) << "Applying " << hashes.size() << " hashes to ROUND Table";
+    csdetails() << log_prefix << "applying " << hashes.size() << " hashes to ROUND Table";
 
     // only for new consensus
     cs::PoolMetaInfo poolMetaInfo;
@@ -229,9 +234,9 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         poolMetaInfo.confirmations = confirmation.value().signatures;
     }
 
-    csmeta(csdetails) << "Timestamp: " << poolMetaInfo.timestamp;
+    csdetails() << log_prefix << "timestamp: " << poolMetaInfo.timestamp;
     for (std::size_t i = 0; i < hashes.size(); ++i) {
-        csmeta(csdetails) << '\t' << i << ". " << hashes[i].toString();
+        csdetails() << log_prefix << '\t' << i << ". " << hashes[i].toString();
     }
 
     if (stage3.sender != cs::ConfidantConsts::InvalidConfidantIndex) {
@@ -240,7 +245,8 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
             poolMetaInfo.writerKey = confidants[stage3.writer];
         }
         else {
-            csmeta(cserror) << "stage-3 writer index: " << static_cast<int>(stage3.writer) << ", out of range is current confidants size: " << confidants.size();
+            cserror() << log_prefix << "stage-3 writer index: " << static_cast<int>(stage3.writer)
+                << ", out of range is current confidants size: " << confidants.size();
         }
     }
 
@@ -253,14 +259,14 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
 
         if (!pool.has_value()) {
-            csmeta(cserror) << "ApplyCharacteristic() failed to create block";
+            cserror() << log_prefix << "applyCharacteristic() failed to create block";
             return;
         }
 
         deferredBlock_ = std::move(pool.value());
         deferredBlock_.set_confidants(conveyer.confidants());
 
-        csmeta(csdebug) << "block #" << deferredBlock_.sequence() << " add new wallets to pool";
+        csdebug() << log_prefix << "block #" << deferredBlock_.sequence() << " add new wallets to pool";
         pnode->getBlockChain().addNewWalletsToPool(deferredBlock_);
         pnode->getBlockChain().setTransactionsFees(deferredBlock_);
     }
@@ -283,7 +289,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         csdb::Pool::NewWallets* newWallets = tmpPool.newWallets();
         csdb::Pool::NewWallets* defWallets = deferredBlock_.newWallets();
         if (!newWallets) {
-            cserror() << "newPool is read-only";
+            cserror() << log_prefix << "newPool is read-only";
             return;
         }
         for (auto& it : *defWallets) {
@@ -300,7 +306,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     }
     deferredBlock_.to_byte_stream(binSize);
     deferredBlock_.hash();
-    csdebug() << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+    csdetails() << log_prefix << "pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
     const auto lastHashBin = deferredBlock_.hash().to_binary();
     std::copy(lastHashBin.cbegin(), lastHashBin.cend(), stage3.blockHash.begin());
     stage3.blockSignature = cscrypto::generateSignature(private_key, stage3.blockHash.data(), stage3.blockHash.size());
@@ -321,14 +327,14 @@ bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) 
     }
 
     for (auto& it : blockSignatures) {
-        csdebug() << cs::Utils::byteStreamToHex(it.data(), it.size());
+        csdetails() << log_prefix << cs::Utils::byteStreamToHex(it.data(), it.size());
     }
     deferredBlock_.set_signatures(blockSignatures);
 
     auto resPool = pnode->getBlockChain().createBlock(deferredBlock_);
 
     if (!resPool.has_value()) {
-        csmeta(cserror) << "Blockchain failed to write new block";
+        cserror() << log_prefix << "Blockchain failed to write new block";
         return false;
     }
     pnode->cleanConfirmationList(deferredBlock_.sequence());
@@ -342,10 +348,10 @@ void SolverCore::removeDeferredBlock(cs::Sequence seq) {
     if (deferredBlock_.sequence() == seq) {
         pnode->getBlockChain().removeWalletsInPoolFromCache(deferredBlock_);
         deferredBlock_ = csdb::Pool();
-        csdebug() << "SolverCore: just created new block was thrown away";
+        csdebug() << log_prefix << "just created new block was thrown away";
     }
     else {
-        csdebug() << "SolverCore: we don't have the correct block to throw";
+        csdebug() << log_prefix << "we don't have the correct block to throw";
     }
 }
 
