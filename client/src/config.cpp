@@ -22,6 +22,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <conio.h>
 #else
 #include <termios.h>
 #include <unistd.h>
@@ -170,6 +171,29 @@ int getch() {
     tcsetattr(STDIN_FILENO, TCSANOW, &t_old);
     return ch;
 }
+
+static int _getch() {
+    return getch();
+}
+
+static int _kbhit() {
+    static const int STDIN = 0;
+    static bool initialized = false;
+
+    if (! initialized) {
+        // Use termios to turn off line buffering
+        termios term;
+        tcgetattr(STDIN, &term);
+        term.c_lflag &= ~ICANON;
+        tcsetattr(STDIN, TCSANOW, &term);
+        setbuf(stdin, NULL);
+        initialized = true;
+    }
+
+    int bytesWaiting;
+    ioctl(STDIN, FIONREAD, &bytesWaiting);
+    return bytesWaiting;
+}
 #endif
 
 template <typename T>
@@ -257,6 +281,31 @@ static bool getEncryptedPrivateBytes(const cscrypto::PrivateKey& sk, std::vector
 
     skBytes = sk.getEncrypted(pass.data());
     return true;
+}
+
+void Config::showKeys(const std::string& pk58) {
+    const double timeoutSeconds = 5;
+    double secondsPassed = 0;
+    std::cout << "To show your keys not encrypted press \"s\"." << std::endl;
+    std::cout << "Seconds left:" << std::endl;
+    std::clock_t start = std::clock();
+    while (secondsPassed < timeoutSeconds) {
+        secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
+        std::cout << timeoutSeconds - secondsPassed << "\r";
+        if (_kbhit()) {
+            if (_getch() == 's') {
+                std::cout << "\n\nPress any key to continue...\n" << std::endl;
+                auto sk = privateKey_.access();
+                std::string sk58tmp = EncodeBase58(sk.data(), sk.data() + sk.size());
+                std::cout << "PublicKey: " << pk58 << " PrivateKey: " << sk58tmp << std::flush;
+                cscrypto::fillWithZeros(sk58tmp.data(), sk58tmp.size());
+                _getch();
+                std::cout << "\r" << std::string(cscrypto::kPrivateKeySize * 5, 'x') << std::endl
+                          << std::flush;
+                break;
+            }
+        }
+    }
 }
 
 bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt) {
@@ -402,6 +451,8 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
         else
             return false;
     }
+
+    showKeys(pk58);
 
     return true;
 }

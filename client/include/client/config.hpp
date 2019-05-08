@@ -148,6 +148,7 @@ private:
     void readApiData(const boost::property_tree::ptree& config);
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
+    void showKeys(const std::string& pk58);
 
     template <typename T>
     bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value);
