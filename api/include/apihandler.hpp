@@ -524,7 +524,7 @@ public:
     void SendTransaction(apiexec::SendTransactionResult& _return, const general::AccessID accessId, const api::Transaction& transaction) override;
     void WalletIdGet(api::WalletIdGetResult& _return, const general::AccessID accessId, const general::Address& address) override;
     void SmartContractGet(SmartContractGetResult& _return, const general::AccessID accessId, const general::Address& address) override;
-    void WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address);
+    void WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) override;
 
     executor::Executor& getExecutor() const {
         return executor_;
@@ -726,7 +726,7 @@ private:
     // bool convertAddrToPublicKey(const csdb::Address& address);
 
     template <typename Mapper>
-    size_t get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out);
+    size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out);
 
     bool update_smart_caches_once(const csdb::PoolHash&, bool = false);
     void run();
