@@ -239,7 +239,7 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
         st2.sender = ownSmartsConfNum_;
         st2.id = id();
         addSmartStageTwo(st2, true);
-        size_t index = 0;
+        uint8_t index = 0;
         for (auto it : smartConsensusMask) {
             if (it == 255 || it == 254) {
                 fake_stage2(index);
@@ -796,7 +796,8 @@ bool SmartConsensus::smartConfidantExist(uint8_t confidantIndex) {
     return confidantIndex < smartConfidants_.size();
 }
 
-static void sendFakeStageOne(Node* pnode, cs::PublicKeys confidants, cs::Byte confidantIndex, uint64_t smartId) {
+/*static*/
+void SmartConsensus::sendFakeStageOne(Node* pnode, cs::PublicKeys confidants, cs::Byte confidantIndex, uint64_t smartId) {
     cs::StageOneSmarts fake;
     fake.sender = confidantIndex;
     fake.hash.fill(0);
@@ -804,7 +805,9 @@ static void sendFakeStageOne(Node* pnode, cs::PublicKeys confidants, cs::Byte co
     pnode->sendSmartStageOne(confidants, fake);
 }
 
-static void sendFakeStageTwo(Node* pnode, cs::PublicKeys confidants, cs::Byte confidantIndex, uint64_t smartId) {
+/*static*/
+void SmartConsensus::sendFakeStageTwo(Node* pnode, cs::PublicKeys confidants, cs::Byte confidantIndex, uint64_t smartId) {
+    csunused(smartId);
     cs::StageTwoSmarts fake;
     fake.sender = confidantIndex;
     size_t cnt = confidants.size();

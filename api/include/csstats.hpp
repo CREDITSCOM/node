@@ -105,7 +105,7 @@ private:
     template <class F>
     void matchPeriod(const Periods& periods, period_t period, F func);
 
-    std::map<std::string, Currency> currencies_indexed = {{"CS", 1}};
+    std::map<std::string, Currency> currencies_indexed = {{"CS", (Currency)1}};
 };
 }  // namespace csstats
 
