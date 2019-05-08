@@ -6,17 +6,24 @@
 // 4706 - assignment within conditional expression
 // 4373 - 'api::APIHandler::TokenTransfersListGet': virtual function overrides 'api::APINull::TokenTransfersListGet',
 //         previous versions of the compiler did not override when parameters only differed by const/volatile qualifiers
-#pragma warning(disable : 4706 4373)
+// 4245 - 'return' : conversion from 'int' to 'SOCKET', signed / unsigned mismatch
+#pragma warning(disable : 4706 4373 4245) 
 #endif
 
+#include <API.h>
+#include <APIEXEC.h>
+#include <executor_types.h>
+#include <general_types.h>
+
+#include <thrift/transport/TSocket.h>
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/transport/TBufferTransports.h>
 
-#include <csnode/blockchain.hpp>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
-#include <API.h>
-#include <executor_types.h>
-#include <general_types.h>
+#include <csnode/blockchain.hpp>
 
 #include <csstats.hpp>
 #include <deque>
@@ -27,12 +34,9 @@
 
 #include "tokens.hpp"
 
-#include <APIEXEC.h>
-#include <thrift/transport/TSocket.h>
 #include <optional>
 
 #include <csdb/currency.hpp>
-
 #include <solvercore.hpp>
 
 namespace csconnector {
@@ -752,9 +756,5 @@ bool is_deploy_transaction(const csdb::Transaction& tr);
 bool is_smart(const csdb::Transaction& tr);
 bool is_smart_state(const csdb::Transaction& tr);
 bool is_smart_deploy(const api::SmartContractInvocation& smart);
-
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
 #endif  // APIHANDLER_HPP

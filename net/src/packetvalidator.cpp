@@ -39,7 +39,7 @@ namespace cs
                 }
             }
             else {
-                if (pack.getFragmentsNum() > 1) {
+                if (pack.isFragmented() && pack.getFragmentsNum() > 1) {
                     result = false;
                 }
                 else {
@@ -100,7 +100,7 @@ namespace cs
     bool PacketValidator::validateStarterRegistration(const Packet& pack) {
         if (! std::equal(starter_key.cbegin(), starter_key.cend(), cs::Zero::key.cbegin())) {
             // re-registration with another SS is disabled for now
-            return false;
+            return true;
         }
 
         constexpr int MinPayloadSize = sizeof(MsgTypes) + cscrypto::kPublicKeySize;

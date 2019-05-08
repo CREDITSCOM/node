@@ -15,6 +15,41 @@
 
 namespace {
 const char* kLogPrefix = "Smart: ";
+
+inline void print(std::ostream& os, const ::general::Variant& var) {
+    os << "Variant(";
+    if (var.__isset.v_int) {
+        os << var.v_int;
+    }
+    else if (var.__isset.v_string) {
+        os << var.v_string;
+    }
+    else if (var.__isset.v_null) {
+        os << var.v_null;
+    }
+    else if (var.__isset.v_boolean) {
+        os << var.v_boolean;
+    }
+    else if (var.__isset.v_byte) {
+        os << (unsigned int)var.v_byte;
+    }
+    else if (var.__isset.v_short) {
+        os << var.v_short;
+    }
+    else if (var.__isset.v_long) {
+        os << var.v_long;
+    }
+    else if (var.__isset.v_float) {
+        os << var.v_float;
+    }
+    else if (var.__isset.v_double) {
+        os << var.v_double;
+    }
+    else {
+        print(os, var);
+    }
+}
+
 }
 
 namespace cs {
@@ -1431,7 +1466,7 @@ std::string SmartContracts::print_executed_method(const SmartContractRef& ref) {
             if (cnt_params > 0) {
                 os << ',';
             }
-            p.printTo(os);
+            print(os, p);
             ++cnt_params;
         }
         os << ')';
