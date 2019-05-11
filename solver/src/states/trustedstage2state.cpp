@@ -56,7 +56,7 @@ void TrustedStage2State::on(SolverContext& context) {
         // count of transactions seen in build_vector on stage-1
         size_t cnt_trx = characteristic->mask.size();
         if (cnt_trx > dt) {
-            dt = cnt_trx; // 1 msec/transaction, 5K trx => 5 sec timeout
+            dt = uint32_t(cnt_trx); // 1 msec/transaction, 5K trx => 5 sec timeout
         }
     }
     csdebug() << name() << ": start track timeout " << 0 << " ms of stages-1 received";
