@@ -383,7 +383,7 @@ using MessagePtr = MemPtr<TypedSlot<Message>>;
 
 class PacketCollector {
 public:
-    static const uint32_t MaxParallelCollections = 2048;
+    static const uint32_t MaxParallelCollections = 1024;
 
     PacketCollector()
     : msgAllocator_(MaxParallelCollections + 1) {
