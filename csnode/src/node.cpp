@@ -2282,9 +2282,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    conveyer.setRound(rNum);
-    poolSynchronizer_->sync(conveyer.currentRoundNumber());
-
     // update sub round
     subRound_ = subRound;
 
@@ -2302,6 +2299,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         csmeta(cserror) << "Illegal confidants count in round table";
         return;
     }
+
+    conveyer.setRound(rNum);
+    poolSynchronizer_->sync(conveyer.currentRoundNumber());
 
     cs::Bytes realTrusted;
     roundStream >> realTrusted;
