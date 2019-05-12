@@ -2283,17 +2283,19 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    conveyer.setRound(rNum);
-    poolSynchronizer_->sync(conveyer.currentRoundNumber());
-
-    // update sub round
-    subRound_ = subRound;
-
     cs::Bytes roundBytes;
     istream_ >> roundBytes;
+    if( ! istream_.good() ) {
+        csmeta( cserror ) << "Malformed packet with round table (1)";
+        return;
+    }
 
     cs::Bytes bytes;
     istream_ >> bytes;
+    if( ! istream_.good() ) {
+        csmeta( cserror ) << "Malformed packet with round table (2)";
+        return;
+    }
 
     cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
     cs::ConfidantsKeys confidants;
@@ -2304,6 +2306,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
+    conveyer.setRound(rNum);
+    poolSynchronizer_->sync(conveyer.currentRoundNumber());
+
     cs::Bytes realTrusted;
     roundStream >> realTrusted;
 
@@ -2312,6 +2317,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures)) {
         // return;
     }
+
+    // update sub round
+    subRound_ = subRound;
 
     currentRoundTableMessage_.round = rNum;
     currentRoundTableMessage_.sender = sender;
