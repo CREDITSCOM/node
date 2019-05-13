@@ -216,8 +216,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
     csmeta(csdebug) << "Get BigBang globalTable.hashes: " << globalTable.hashes.size();
 
-    onRoundStart(globalTable);
     conveyer.updateRoundTable(cachedRound, globalTable);
+    onRoundStart(globalTable);
 
     poolSynchronizer_->sync(globalTable.round, cs::PoolSynchronizer::roundDifferentForSync, true);
 
@@ -237,8 +237,10 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
         return;
     }
     cslog() << "NODE> get SS Round Table #" << rNum;
-    //expectedRounds_.push_back(rNum);
-    //expectedRounds_.push_back(rNum + 1);
+    /*expectedRounds_.push_back(rNum);
+    expectedRounds_.push_back(rNum + 1);
+    csdebug() << "ExpectedRounds: " << cs::Utils::roundsToString(expectedRounds_);*/
+
     cs::RoundTable roundTable;
 
     if (!readRoundData(roundTable, false)) {
@@ -2281,8 +2283,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     //        csdebug() << "Round Number " << rNum -1 << " successfully erased from expectedRounds";
     //    }
 
-    //}
-
+ /*   }
+    csdebug() << "ExpectedRounds: " << cs::Utils::roundsToString(expectedRounds_);*/
     istream_.init(data, size);
 
     // RoundTable evocation
@@ -2316,11 +2318,13 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     cs::ConfidantsKeys confidants;
     roundStream >> confidants;
 
-    if (confidants.empty()) {
+    if (confidants.size() <= Consensus::MinTrustedNodes && confidants.size() > Consensus::MaxTrustedNodes) {
         csmeta(cserror) << "Illegal confidants count in round table";
         return;
     }
-    //expectedRounds_.push_back(rNum + 1);
+ /*   expectedRounds_.push_back(rNum + 1);
+    csdebug() << "ExpectedRounds: " << cs::Utils::roundsToString(expectedRounds_);*/
+    cs::RoundNumber storedRound  = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
     poolSynchronizer_->sync(conveyer.currentRoundNumber());
 
@@ -2328,9 +2332,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     roundStream >> realTrusted;
 
     cs::Signatures poolSignatures;
-
-    if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures)) {
-        // return;
+    if(rNum > storedRound && rNum - storedRound == 1){
+        if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures)) {
+            return;
+        }
     }
 
     // update sub round
@@ -2425,6 +2430,7 @@ void Node::roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber rou
     csdebug() << "NODE> send request for round info  #" << round;
     sendDefault(respondent, MsgTypes::RoundPackRequest, round);
     //expectedRounds_.push_back(round);
+    //csdebug() << "ExpectedRounds: " << cs::Utils::roundsToString(expectedRounds_);
 }
 
 void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
