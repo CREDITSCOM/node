@@ -114,7 +114,7 @@ void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::
            << Platform::Linux
 #endif
            << NODE_VERSION;
-
+    // bc id
     uint8_t flag = (config.getNodeType() == NodeType::Router) ? 8 : 0;
     addMyOut(config, stream, flag);
 
