@@ -18,13 +18,7 @@
 
 //#define RECREATE_INDEX
 
-// uncomment this to generate new cheat db file (__integr.seq) every time it is absent in BD directory
-//#define RECREATE_CHEAT
-
 using namespace cs;
-
-void generateCheatDbFile(std::string, const BlockHashes&);
-bool validateCheatDbFile(std::string, const BlockHashes&);
 
 BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 : good_(false)
@@ -51,7 +45,7 @@ bool BlockChain::init(const std::string& path) {
     csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
         ++totalLoaded;
         if (progress.poolsProcessed % 1000 == 0) {
-            std::cout << '\r' << progress.poolsProcessed << "";
+            std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << "";
         }
         return false;
     };
@@ -70,14 +64,9 @@ bool BlockChain::init(const std::string& path) {
             return false;
         }
         writeGenesisBlock();
-        generateCheatDbFile(path, *blockHashes_);
     }
     else {
         if (!postInitFromDB()) {
-            return false;
-        }
-        if (!validateCheatDbFile(path, *blockHashes_)) {
-            cserror() << "Bad database version";
             return false;
         }
         std::cout << "Done\n";
@@ -204,51 +193,6 @@ cs::Sequence BlockChain::getLastSequence() const {
     else {
         return 0;
     }
-}
-
-const std::string CHEAT_FILENAME = "__integr.seq";
-
-std::string prepareCheatData(std::string& path, const BlockHashes& bh) {
-    if (path.size() && path.back() != '/') {
-        path.push_back('/');
-    }
-
-    path += CHEAT_FILENAME;
-
-    csdb::PoolHash genHash = bh.find(0);
-    cs::Bytes hb = genHash.to_binary();
-
-    cs::DataStream stream(hb);
-    stream << NODE_VERSION;
-
-    return EncodeBase58(hb);
-}
-
-void generateCheatDbFile(std::string path, const BlockHashes& bh) {
-    const auto cd = prepareCheatData(path, bh);
-
-    std::ofstream f(path);
-    f << cd;
-}
-
-bool validateCheatDbFile(std::string path, const BlockHashes& bh) {
-#if defined(RECREATE_CHEAT)
-    std::string origin = path;
-#endif  // RECREATE_CHEAT
-    const auto cd = prepareCheatData(path, bh);
-
-    std::ifstream f(path);
-#if defined(RECREATE_CHEAT)
-    if (!f) {
-        generateCheatDbFile(origin, bh);
-        cswarning() << "Blockchain: cannot open special mark so it was regenerated";
-        return true;
-    }
-#endif  // RECREATE_CHEAT
-    std::string rcd;
-    f >> rcd;
-
-    return rcd == cd;
 }
 
 void BlockChain::writeGenesisBlock() {
