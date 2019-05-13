@@ -142,6 +142,8 @@ bool IterValidator::validateTransactions(SolverContext& context, cs::Bytes& char
         needOneMoreIteration = true;
     }
 
+    needOneMoreIteration = false; // iterations switched off
+
     return needOneMoreIteration;
 }
 
