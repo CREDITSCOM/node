@@ -7,6 +7,7 @@ Glance coding style guide description.
 - C++17 standard
 - 4 spaces
 - only camelCase naming style
+- no exceptions
 
 ---
 
