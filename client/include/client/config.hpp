@@ -8,6 +8,7 @@
 #include <string>
 
 #include <lib/system/common.hpp>
+#include <net/neighbourhood.hpp> // using Neighbourhood::MaxNeighbours constant
 
 namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
@@ -22,7 +23,7 @@ const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
 const std::string DEFAULT_PATH_TO_PUBLIC_KEY = "NodePublic.txt";
 const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 
-const uint32_t DEFAULT_MAX_NEIGHBOURS = 4;
+const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::MaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 
 typedef short unsigned Port;
@@ -149,6 +150,8 @@ private:
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
     void showKeys(const std::string& pk58);
+    
+    void changePasswordOption(const std::string& pathToSk);
 
     template <typename T>
     bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value);

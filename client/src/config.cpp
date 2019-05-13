@@ -308,10 +308,34 @@ void Config::showKeys(const std::string& pk58) {
     }
 }
 
+void Config::changePasswordOption(const std::string& pathToSk) {
+    char choice = '\0';
+    std::cout << "Would you like to change password?\n" << std::flush;
+    while (choice != 'y' && choice != 'n') {
+        std::cout << "Enter choice (y/n) : " << std::flush;
+        std::cin >> choice;
+        std::cout << std::endl;
+    }
+    if (choice == 'y') {
+        std::cout << "Encrypting the private key file with new password..." << std::endl;
+        std::vector<uint8_t> skBytes;
+        const bool encSucc = getEncryptedPrivateBytes(privateKey_, skBytes);
+        if (encSucc) {
+            std::string sk58tmp = EncodeBase58(skBytes.data(), skBytes.data() + skBytes.size());
+            writeFile(pathToSk, sk58tmp);
+            cscrypto::fillWithZeros(const_cast<char*>(sk58tmp.data()), sk58tmp.size());
+            cslog() << "Key in " << pathToSk << " has been encrypted successfully";
+        } else {
+            cslog() << "Not encrypting the private key file due to errors";
+        }
+    }
+}
+
 bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt) {
     // First read private
     std::ifstream skFile(pathToSk);
     std::string pk58;
+    bool callShowKeys = false;
 
     if (skFile.is_open()) {
         std::string sk58;
@@ -328,6 +352,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
         }
         else if (sk.size() > cscrypto::kPrivateKeySize) {
             encFlag = true;
+            callShowKeys = true;
         }
 
         if (encFlag) {  // Check the encryption flag
@@ -346,6 +371,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
                 if (!privateKey_)
                     std::cout << "Incorrect password (or corrupted file)" << std::endl;
             }
+            changePasswordOption(pathToSk);
         }
         else {
             privateKey_ = cscrypto::PrivateKey::readFromBytes(sk);
@@ -359,6 +385,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
             cscrypto::fillWithZeros(sk58.data(), sk58.size());
 
             if (encrypt) {
+                callShowKeys = true;
                 std::cout << "Encrypting the private key file..." << std::endl;
                 std::vector<uint8_t> skBytes;
                 const bool encSucc = getEncryptedPrivateBytes(privateKey_, skBytes);
@@ -404,6 +431,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
                 if (sChoice == 'q')
                     return false;
                 else if (sChoice == '1') {
+                    callShowKeys = true;
                     if (!getEncryptedPrivateBytes(privateKey_, skBytes))
                         return false;
                 }
@@ -452,7 +480,9 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
             return false;
     }
 
-    showKeys(pk58);
+    if (callShowKeys) {
+        showKeys(pk58);
+    }
 
     return true;
 }
@@ -492,6 +522,9 @@ Config Config::readFromFile(const std::string& fileName) {
         result.ipv6_ = !(params.count(PARAM_NAME_USE_IPV6) && params.get<std::string>(PARAM_NAME_USE_IPV6) == "false");
 
         result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) : DEFAULT_MAX_NEIGHBOURS;
+        if (result.maxNeighbours_ > DEFAULT_MAX_NEIGHBOURS) {
+            result.maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS; // see neighbourhood.hpp, some containers are of static size
+        }
 
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
 

@@ -18,7 +18,6 @@
 
 #include <boost/asio/post.hpp>
 #include <boost/asio/thread_pool.hpp>
-#include <boost/bind.hpp>
 
 namespace cs {
 enum class RunPolicy : cs::Byte {
@@ -66,7 +65,7 @@ private:
 
     template <typename Func>
     static void execute(Func&& function) {
-        Threads& threadPool = ThreadPool::instance();
+        auto& threadPool = ThreadPool::instance();
         boost::asio::post(threadPool, std::forward<Func>(function));
     }
 
@@ -105,16 +104,17 @@ protected:
     FutureBase(FutureBase&) = delete;
     ~FutureBase() = default;
 
-    explicit FutureBase(RunPolicy policy, Future<Result>&& future)
+    explicit FutureBase(const RunPolicy policy, Future<Result>&& future)
     : FutureBase() {
         future_ = std::move(future);
         policy_ = policy;
     }
 
-    FutureBase(FutureBase&& watcher)
+    FutureBase(FutureBase&& watcher) noexcept
     : future_(std::move(watcher.future_))
     , policy_(watcher.policy_)
-    , state_(watcher.state_) {
+    , state_(watcher.state_)
+    , id_(watcher.id_) {
     }
 
     FutureBase& operator=(FutureBase&& watcher) noexcept {
@@ -218,8 +218,7 @@ protected:
         Worker::execute(std::move(closure));
     }
 
-public
-signals:
+public signals:
     FinishSignal finished;
     FailedSignal failed;
 };
@@ -273,8 +272,7 @@ protected:
         Worker::execute(std::move(closure));
     }
 
-public
-signals:
+public signals:
     FinishSignal finished;
     FailedSignal failed;
 };
@@ -472,12 +470,12 @@ public:
         other.lockable_ = nullptr;
     }
 
-    operator T*() {
+    explicit operator T*() {
         return &(lockable_->t);
     }
 
     T* operator->() {
-        return *this;
+        return static_cast<T*>(*this);
     }
 
     T& operator*() {

@@ -19,14 +19,14 @@ Glance coding style guide description.
 >```cpp
 >
 >void bracketsExample() {
->   foo();
+>     foo();
 >}
 >
 >if (transactions.empty()) {
->   foo();
+>     foo();
 >}
 >else {
->   bar();
+>     bar();
 >}
 
 ### Types
@@ -61,21 +61,21 @@ Glance coding style guide description.
 >```cpp
 >class A {
 >private:
->   int exampleField_;
+>     int exampleField_;
 >};
 
 - public fields starts with lower case
 
 >```cpp
 >struct A {
->   int demoField;
+>     int demoField;
 >};
 
 - method and function starts with lower case
 
 >```cpp
 >void runTransport() {
->   object->call();
+>     object->call();
 >}
 
 - namespace name starts with lower case
@@ -93,9 +93,9 @@ Glance coding style guide description.
 >
 >class Transport {
 >public:
->   enum Options {
->     Capacity = 100
->   };
+>     enum Options {
+>       Capacity = 100
+>     };
 >};
 
 - global variable starts with 'g' symbol
@@ -107,7 +107,9 @@ Glance coding style guide description.
 
 >```
 >BasedOnStyle: Google
+>IndentWidth: 4
 >ColumnLimit: 180
+>AccessModifierOffset: -4
 >AllowShortFunctionsOnASingleLine: 'false'
 >AllowShortIfStatementsOnASingleLine: 'false'
 >AllowShortLoopsOnASingleLine: 'false'
@@ -118,4 +120,3 @@ Glance coding style guide description.
 >BreakBeforeBraces: 'Custom'
 >BraceWrapping: { AfterEnum: true, BeforeElse: true, BeforeCatch: true }
 >MaxEmptyLinesToKeep: 1
->AccessModifierOffset: -4
