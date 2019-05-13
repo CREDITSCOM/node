@@ -237,6 +237,8 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
         return;
     }
     cslog() << "NODE> get SS Round Table #" << rNum;
+    //expectedRounds_.push_back(rNum);
+    //expectedRounds_.push_back(rNum + 1);
     cs::RoundTable roundTable;
 
     if (!readRoundData(roundTable, false)) {
@@ -2102,8 +2104,8 @@ void Node::sendRoundPackageToAll() {
 
     /////////////////////////////////////////////////////////////////////////// screen output
     csdebug() << "------------------------------------------  SendRoundTable  ---------------------------------------";
-
     cs::Conveyer& conveyer = cs::Conveyer::instance();
+    expectedRounds_.push_back(conveyer.currentRoundNumber() + 1);
     auto& table = conveyer.currentRoundTable();
 
     csdebug() << "Round " << conveyer.currentRoundNumber() << ", Confidants count " << table.confidants.size();
@@ -2267,6 +2269,23 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
+    //auto it = std::find(expectedRounds_.cbegin(), expectedRounds_.cend(), rNum);
+    //if (it == expectedRounds_.cend()) {
+    //    csdebug() << "Round Number " << rNum << " isn't expected, make request";
+    //    roundPackRequest(sender, rNum);
+    //    if(rNum > 10) {
+    //        return;
+    //    }
+    //}
+    //else {
+    //    auto itt = std::find(expectedRounds_.cbegin(), expectedRounds_.cend(), rNum - 1);
+    //    if (itt != expectedRounds_.cend()) {
+    //        expectedRounds_.erase(itt);
+    //        csdebug() << "Round Number " << rNum -1 << " successfully erased from expectedRounds";
+    //    }
+
+    //}
+
     istream_.init(data, size);
 
     // RoundTable evocation
@@ -2304,7 +2323,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         csmeta(cserror) << "Illegal confidants count in round table";
         return;
     }
-
+    //expectedRounds_.push_back(rNum + 1);
     conveyer.setRound(rNum);
     poolSynchronizer_->sync(conveyer.currentRoundNumber());
 
@@ -2408,6 +2427,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
 void Node::roundPackRequest(cs::PublicKey respondent, cs::RoundNumber round) {
     csdebug() << "NODE> send request for round info  #" << round;
     sendDefault(respondent, MsgTypes::RoundPackRequest, round);
+    //expectedRounds_.push_back(round);
 }
 
 void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
