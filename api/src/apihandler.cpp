@@ -1467,7 +1467,7 @@ void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensM
             else if (!transfersOnly) {
                 _return.count = it->second.transactionsCount;
             }
-            else if (transfersOnly && !filterByWallet) {
+            else if (transfersOnly && filterByWallet) {
                 auto hIt = it->second.holders.find(wallet);
                 if (hIt != it->second.holders.end()) {
                     _return.count = hIt->second.transfersCount;
