@@ -308,6 +308,29 @@ void Config::showKeys(const std::string& pk58) {
     }
 }
 
+void Config::changePasswordOption(const std::string& pathToSk) {
+    char choice = '\0';
+    std::cout << "Would you like to change password?\n" << std::flush;
+    while (choice != 'y' && choice != 'n') {
+        std::cout << "Enter choice (y/n) : " << std::flush;
+        std::cin >> choice;
+        std::cout << std::endl;
+    }
+    if (choice == 'y') {
+        std::cout << "Encrypting the private key file with new password..." << std::endl;
+        std::vector<uint8_t> skBytes;
+        const bool encSucc = getEncryptedPrivateBytes(privateKey_, skBytes);
+        if (encSucc) {
+            std::string sk58tmp = EncodeBase58(skBytes.data(), skBytes.data() + skBytes.size());
+            writeFile(pathToSk, sk58tmp);
+            cscrypto::fillWithZeros(const_cast<char*>(sk58tmp.data()), sk58tmp.size());
+            cslog() << "Key in " << pathToSk << " has been encrypted successfully";
+        } else {
+            cslog() << "Not encrypting the private key file due to errors";
+        }
+    }
+}
+
 bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt) {
     // First read private
     std::ifstream skFile(pathToSk);
@@ -348,6 +371,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
                 if (!privateKey_)
                     std::cout << "Incorrect password (or corrupted file)" << std::endl;
             }
+            changePasswordOption(pathToSk);
         }
         else {
             privateKey_ = cscrypto::PrivateKey::readFromBytes(sk);

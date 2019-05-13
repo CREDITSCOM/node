@@ -150,6 +150,8 @@ private:
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
     void showKeys(const std::string& pk58);
+    
+    void changePasswordOption(const std::string& pathToSk);
 
     template <typename T>
     bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value);
