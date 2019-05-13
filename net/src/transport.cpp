@@ -114,7 +114,7 @@ void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::
            << Platform::Linux
 #endif
            << NODE_VERSION;
-
+    // bc id
     uint8_t flag = (config.getNodeType() == NodeType::Router) ? 8 : 0;
     addMyOut(config, stream, flag);
 
@@ -401,21 +401,20 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
         for (uint8_t i = 0; i < numCirc; ++i) {
             EndpointData ep;
             ep.ipSpecified = true;
+            cs::PublicKey key;
 
-            iPackStream_ >> ep.ip >> ep.port;
+            iPackStream_ >> ep.ip >> ep.port >> key;
 
             if (!iPackStream_.good()) {
                 return false;
             }
 
-            if (++ctr <= config_.getMaxNeighbours()) {
-                nh_.establishConnection(net_->resolve(ep));
-            }
+            ++ctr;
 
-            iPackStream_.safeSkip<cs::PublicKey>();
-
-            if (!iPackStream_.good()) {
-                return false;
+            if (!std::equal(key.cbegin(), key.cend(), config_.getMyPublicKey().cbegin())) {
+                if (ctr <= config_.getMaxNeighbours()) {
+                    nh_.establishConnection(net_->resolve(ep));
+                }
             }
 
             if (!nh_.canHaveNewConnection()) {

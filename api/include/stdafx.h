@@ -17,7 +17,7 @@
 #if defined(_MSC_VER)
 #pragma warning(push)
 // 4245: 'return': conversion from 'int' to 'SOCKET', signed/unsigned mismatch
-#pragma warning(disable: 4245)
+#pragma warning(disable: 4245 4706 4373)
 #endif // _MSC_VER
 #include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/protocol/TBinaryProtocol.h>

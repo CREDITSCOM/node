@@ -18,17 +18,36 @@ const char* kLogPrefix = "Smart: ";
 
 inline void print(std::ostream& os, const ::general::Variant& var) {
     os << "Variant(";
-    if (var.__isset.v_int) {
-        os << var.v_int;
-    }
-    else if (var.__isset.v_string) {
+    bool print_default = false;
+    if (var.__isset.v_string) {
         os << var.v_string;
     }
     else if (var.__isset.v_null) {
-        os << var.v_null;
+        os << "Null";
     }
     else if (var.__isset.v_boolean) {
         os << var.v_boolean;
+    }
+    else if( var.__isset.v_array ) {
+        os << "Array";
+    }
+    else if( var.__isset.v_object ) {
+        os << "Object";
+    }
+    else if( var.__isset.v_void) {
+        os << "Void";
+    }
+    else if( var.__isset.v_list ) {
+        os << "List";
+    }
+    else if( var.__isset.v_set ) {
+        os << "Set";
+    }
+    else if( var.__isset.v_map ) {
+        os << "Map";
+    }
+    else if( var.__isset.v_int ) {
+        os << var.v_int;
     }
     else if (var.__isset.v_byte) {
         os << (unsigned int)var.v_byte;
@@ -46,7 +65,21 @@ inline void print(std::ostream& os, const ::general::Variant& var) {
         os << var.v_double;
     }
     else {
-        print(os, var);
+        /* those variants are shown by default
+          out << ", " << "v_boolean_box="; (__isset.v_boolean_box ? (out << to_string(v_boolean_box)) : (out << "<null>"));
+          out << ", " << "v_byte_box="; (__isset.v_byte_box ? (out << to_string(v_byte_box)) : (out << "<null>"));
+          out << ", " << "v_short_box="; (__isset.v_short_box ? (out << to_string(v_short_box)) : (out << "<null>"));
+          out << ", " << "v_int_box="; (__isset.v_int_box ? (out << to_string(v_int_box)) : (out << "<null>"));
+          out << ", " << "v_long_box="; (__isset.v_long_box ? (out << to_string(v_long_box)) : (out << "<null>"));
+          out << ", " << "v_float_box="; (__isset.v_float_box ? (out << to_string(v_float_box)) : (out << "<null>"));
+          out << ", " << "v_double_box="; (__isset.v_double_box ? (out << to_string(v_double_box)) : (out << "<null>"));
+        */
+        print_default = true;
+    }
+
+    if( print_default ) {
+        os << ") => ";
+        var.printTo( os );
     }
 }
 

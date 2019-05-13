@@ -1187,7 +1187,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 }
 
 template <typename Mapper>
-size_t APIHandler::get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out) {
+size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out) {
     auto locked_deployed_by_creator = lockedReference(this->deployed_by_creator);
     auto& elt = (*locked_deployed_by_creator)[deployer];
     for (auto& trid : elt) {
@@ -1201,13 +1201,21 @@ size_t APIHandler::get_mapped_deployer_smart(const csdb::Address& deployer, Mapp
 
 void APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer) {
     const csdb::Address addr = BlockChain::getAddressFromKey(deployer);
-    _return.count = get_mapped_deployer_smart(addr, [](const api::SmartContract& smart) { return smart; }, _return.smartContractsList);
+
+    _return.count = static_cast<decltype(_return.count)>(getMappedDeployerSmart(addr, [](const api::SmartContract& smart) {
+        return smart;
+    }, _return.smartContractsList));
+
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
 void APIHandler::SmartContractAddressesListGet(api::SmartContractAddressesListGetResult& _return, const general::Address& deployer) {
     const csdb::Address addr = BlockChain::getAddressFromKey(deployer);
-    get_mapped_deployer_smart(addr, [](const SmartContract& sc) { return sc.address; }, _return.addressesList);
+
+    getMappedDeployerSmart(addr, [](const SmartContract& sc) {
+        return sc.address;
+    }, _return.addressesList);
+
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 

@@ -117,7 +117,7 @@ public:  // wrappers
     }
 
     void executeByteCodeMultiple(ExecuteByteCodeMultipleResult& _return, const ::general::Address& initiatorAddress, const SmartContractBinary& invokedContract,
-                                 const std::string& method, const std::vector<std::vector<::general::Variant>>& params, const int64_t executionTime) {
+        const std::string& method, const std::vector<std::vector<::general::Variant>>& params, const int64_t executionTime) {
         if (!connect()) {
             _return.status.code = 1;
             _return.status.message = "No executor connection!";
@@ -125,7 +125,13 @@ public:  // wrappers
         }
         const auto acceess_id = generateAccessId();
         ++execCount_;
-        origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
+        try {
+            origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
+        }
+        catch( std::exception & x ) {
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
         --execCount_;
         deleteAccessId(acceess_id);
         disconnect();
@@ -137,7 +143,13 @@ public:  // wrappers
             _return.status.message = "No executor connection!";
             return;
         }
-        origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
+        try {
+            origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
+        }
+        catch( std::exception & x ) {
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
         disconnect();
     }
 
@@ -147,7 +159,13 @@ public:  // wrappers
             _return.status.message = "No executor connection!";
             return;
         }
-        origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
+        try {
+            origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
+        }
+        catch( std::exception & x ) {
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
         disconnect();
     }
 
@@ -157,7 +175,13 @@ public:  // wrappers
             _return.status.message = "No executor connection!";
             return;
         }
-        origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
+        try {
+            origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
+        }
+        catch( std::exception & x ) {
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
         disconnect();
     }
 
@@ -457,20 +481,26 @@ private:
     }
 
     std::optional<OriginExecuteResult> execute(const std::string& address, const SmartContractBinary& smartContractBinary, const std::string& method,
-                                               const std::vector<general::Variant>& params) {
+        const std::vector<general::Variant>& params) {
         constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
         OriginExecuteResult originExecuteRes{};
         if (!connect())
             return std::nullopt;
-        const auto acceess_id = generateAccessId();
+        const auto access_id = generateAccessId();
         ++execCount_;
         const auto timeBeg = std::chrono::steady_clock::now();
-        origExecutor_->executeByteCode(originExecuteRes.resp, acceess_id, address, smartContractBinary, method, params, EXECUTION_TIME, EXECUTOR_VERSION);
+        try {
+            origExecutor_->executeByteCode(originExecuteRes.resp, access_id, address, smartContractBinary, method, params, EXECUTION_TIME, EXECUTOR_VERSION);
+        }
+        catch( std::exception & x ) {
+            originExecuteRes.resp.status.code = 1;
+            originExecuteRes.resp.status.message = x.what();
+        }
         originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeBeg).count();
         --execCount_;
-        deleteAccessId(acceess_id);
+        deleteAccessId(access_id);
         disconnect();
-        originExecuteRes.acceessId = acceess_id;
+        originExecuteRes.acceessId = access_id;
         return std::make_optional<OriginExecuteResult>(std::move(originExecuteRes));
     }
 
@@ -524,7 +554,7 @@ public:
     void SendTransaction(apiexec::SendTransactionResult& _return, const general::AccessID accessId, const api::Transaction& transaction) override;
     void WalletIdGet(api::WalletIdGetResult& _return, const general::AccessID accessId, const general::Address& address) override;
     void SmartContractGet(SmartContractGetResult& _return, const general::AccessID accessId, const general::Address& address) override;
-    void WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address);
+    void WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) override;
 
     executor::Executor& getExecutor() const {
         return executor_;
@@ -726,7 +756,7 @@ private:
     // bool convertAddrToPublicKey(const csdb::Address& address);
 
     template <typename Mapper>
-    size_t get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out);
+    size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out);
 
     bool update_smart_caches_once(const csdb::PoolHash&, bool = false);
     void run();

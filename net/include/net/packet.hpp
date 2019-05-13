@@ -180,7 +180,7 @@ public:
     boost::asio::mutable_buffer encode(boost::asio::mutable_buffer tempBuffer) {
         if (data_.size() == 0) {
             cswarning() << "Encoding empty packet";
-            return boost::asio::buffer(data_.get(), data_.size());
+            return boost::asio::buffer(tempBuffer.data(), 0);
         }
 
         if (isCompressed()) {
@@ -210,7 +210,10 @@ public:
             }
         }
 
-        return boost::asio::buffer(data_.get(), data_.size());
+        char* source = static_cast<char*>(data_.get());
+        char* dest = static_cast<char*>(tempBuffer.data());
+        std::copy(source, source + data_.size(), dest);
+        return boost::asio::buffer(dest, data_.size());
     }
 
     size_t decode(size_t packetSize = 0) {
@@ -383,7 +386,7 @@ using MessagePtr = MemPtr<TypedSlot<Message>>;
 
 class PacketCollector {
 public:
-    static const uint32_t MaxParallelCollections = 2048;
+    static const uint32_t MaxParallelCollections = 1024;
 
     PacketCollector()
     : msgAllocator_(MaxParallelCollections + 1) {
