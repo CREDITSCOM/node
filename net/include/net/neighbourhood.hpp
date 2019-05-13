@@ -35,6 +35,10 @@ struct RemoteNode {
         strikes.fetch_add(1, std::memory_order_relaxed);
     }
 
+    void setBlackListed(bool b) {
+        blackListed.store(b, std::memory_order_relaxed);
+    }
+
     bool isBlackListed() {
         return blackListed.load(std::memory_order_relaxed);
     }
