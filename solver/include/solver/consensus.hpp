@@ -26,7 +26,7 @@ public:
     constexpr static unsigned int MinTrustedNodes = 3;
 
     /** @brief   The maximum trusted nodes to take part in consensus */
-    constexpr static unsigned int MaxTrustedNodes = 5;
+    constexpr static unsigned int MaxTrustedNodes = 25;
 
     /** @brief   The minimum cash for trusted nodes to participate consensus */
     constexpr static csdb::Amount MinStakeValue = csdb::Amount{50000};
