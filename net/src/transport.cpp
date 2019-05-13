@@ -92,10 +92,10 @@ void addMyOut(const Config& config, cs::OPackStream& stream, const uint8_t initF
     *flagChar |= initFlagValue | regFlag;
 }
 
-void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk) {
+void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t bch_uuid) {
     stream.init(BaseFlags::NetworkMsg);
 
-    stream << NetworkCommand::Registration << NODE_VERSION;
+    stream << NetworkCommand::Registration << NODE_VERSION << bch_uuid;
 
     addMyOut(config, stream);
     *regPackConnId = reinterpret_cast<uint64_t*>(stream.getCurrentPtr());
@@ -103,18 +103,18 @@ void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPa
     stream << static_cast<ConnectionId>(0) << pk;
 }
 
-void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::PublicKey& pk) {
+void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::PublicKey& pk, uint64_t bch_uuid) {
     stream.init(BaseFlags::NetworkMsg);
     stream << NetworkCommand::SSRegistration
 #ifdef _WIN32
-           << Platform::Windows
+        << Platform::Windows
 #elif __APPLE__
-           << Platform::MacOS
+        << Platform::MacOS
 #else
-           << Platform::Linux
+        << Platform::Linux
 #endif
-           << NODE_VERSION;
-    // bc id
+        << NODE_VERSION << bch_uuid;
+
     uint8_t flag = (config.getNodeType() == NodeType::Router) ? 8 : 0;
     addMyOut(config, stream, flag);
 
@@ -133,7 +133,7 @@ void Transport::run() {
     {
         cs::Lock lock(oLock_);
         oPackStream_.init(BaseFlags::NetworkMsg);
-        formRegPack(config_, oPackStream_, &regPackConnId_, myPublicKey_);
+        formRegPack(config_, oPackStream_, &regPackConnId_, myPublicKey_, node_->getBlockChain().uuid());
         regPack_ = *(oPackStream_.getPackets());
         oPackStream_.clear();
     }
@@ -359,7 +359,7 @@ void Transport::refillNeighbourhood() {
 
         {
             cs::Lock lock(oLock_);
-            formSSConnectPack(config_, oPackStream_, myPublicKey_);
+            formSSConnectPack(config_, oPackStream_, myPublicKey_, node_->getBlockChain().uuid());
             ssStatus_ = SSBootstrapStatus::Requested;
             net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
         }
@@ -694,6 +694,12 @@ void Transport::resetNeighbours() {
 
 /* Sending network tasks */
 void Transport::sendRegistrationRequest(Connection& conn) {
+
+    RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
+    if (ptr->isBlackListed()) {
+        return;
+    }
+
     cslog() << "Sending registration request to " << (conn.specialOut ? conn.out : conn.in);
 
     cs::Lock lock(oLock_);
@@ -732,7 +738,8 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
     cslog() << "Got registration request from " << task->sender;
 
     NodeVersion vers;
-    iPackStream_ >> vers;
+    uint64_t remote_uuid = 0;
+    iPackStream_ >> vers >> remote_uuid;
 
     if (!iPackStream_.good()) {
         return false;
@@ -770,6 +777,16 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
 
     if (vers != NODE_VERSION) {
         sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadClientVersion);
+        return true;
+    }
+
+    uint64_t local_uuid = node_->getBlockChain().uuid();
+    if (local_uuid != 0 && remote_uuid != 0 && local_uuid != remote_uuid) {
+        sendRegistrationRefusal(conn, RegistrationRefuseReasons::IncompatibleBlockchain);
+
+        RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
+        ptr->setBlackListed(true);
+
         return true;
     }
 
@@ -847,7 +864,7 @@ bool Transport::gotSSReRegistration() {
 
     {
         cs::Lock lock(oLock_);
-        formSSConnectPack(config_, oPackStream_, myPublicKey_);
+        formSSConnectPack(config_, oPackStream_, myPublicKey_, node_->getBlockChain().uuid());
         net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
     }
 
@@ -868,9 +885,25 @@ bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
 
 bool Transport::gotSSRefusal(const TaskPtr<IPacMan>&) {
     uint16_t expectedVersion;
-    iPackStream_ >> expectedVersion;
+    RegistrationRefuseReasons reason;
+    iPackStream_ >> expectedVersion >> reason;
 
-    cserror() << "The Signal Server has refused the registration due to your bad client version. The expected version is " << expectedVersion;
+    if (!iPackStream_.good() || !iPackStream_.end()) {
+        return false;
+    }
+
+    cserror() << "The Starter node has refused the registration";
+    switch (reason) {
+    case RegistrationRefuseReasons::BadClientVersion:
+        cserror() << "Your client version << " << NODE_VERSION << " is obsolete. The allowed version is " << expectedVersion << ". Please upgrade your node application";
+        break;
+    case RegistrationRefuseReasons::IncompatibleBlockchain:
+        cserror() << "Your blockchain version is incompatible. You only may join the network with empty blockchain";
+        break;
+    default:
+        cserror() << "The reason code is " << (int)reason;
+        break;
+    }
 
     return true;
 }

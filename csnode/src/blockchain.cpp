@@ -102,6 +102,11 @@ bool BlockChain::isGood() const {
 }
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
+    if (block.sequence() == 1) {
+        cs::Lock lock(dbLock_);
+        uuid_ = uuidFromBlock(block);
+        csdebug() << "Blockchain: UUID = " << uuid_;
+    }
     if (!blockValidator_->validateBlock(block, BlockValidator::ValidationLevel::hashIntergrity, BlockValidator::SeverityLevel::greaterThanWarnings)) {
         *shouldStop = true;
         return;
@@ -983,10 +988,15 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         cs::Lock lock(dbLock_);
 
         if (deferredBlock_.is_valid()) {
+
             deferredBlock_.set_storage(storage_);
 
             if (deferredBlock_.save()) {
                 flushed_block_seq = deferredBlock_.sequence();
+                if (uuid_ == 0 && flushed_block_seq == 1) {
+                    uuid_ = uuidFromBlock(deferredBlock_);
+                    csdebug() << "Blockchain: UUID = " << uuid_;
+                }
             }
             else {
                 csmeta(cserror) << "Couldn't save block: " << deferredBlock_.sequence();
@@ -1273,6 +1283,25 @@ uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
 
     return static_cast<uint32_t>(wallDataPtr->transNum_);
 }
+
+//uint64_t BlockChain::initUuid() const {
+//    // protects from subsequent calls
+//    if (uuid_ != 0) {
+//        return uuid_;
+//    }
+//    // lookup in hashes
+//    if (!blockHashes_->empty()) {
+//        const auto& hashes = blockHashes_->getHashes();
+//        if (hashes.size() > 1) {
+//            const auto tmp = uuidFromHash(hashes[1]);
+//            if (tmp != 0) {
+//                return tmp;
+//            }
+//        }
+//    }
+//    // lookup in chain
+//    return uuidFromBlock(loadBlock(1));
+//}
 
 #ifdef TRANSACTIONS_INDEX
 csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
