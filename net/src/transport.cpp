@@ -1138,9 +1138,10 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
         maxBlockCount_ = 1;
     }
 
-    nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq);
+    if (nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq)) {
+        emit pingReceived(lastSeq, pk);
+    }
 
-    emit pingReceived(lastSeq);
     return true;
 }
 

@@ -797,7 +797,7 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
     CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::onPingReceived(cs::Sequence sequence) {
+void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     // TODO: remove max difference after last sequence rework
     static constexpr size_t maxDifference = 15'000'000;
     static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
@@ -824,10 +824,7 @@ void Node::onPingReceived(cs::Sequence sequence) {
             cswarning() << "Last sequence is lower than network max sequence, trying to sync";
 
             CallsQueue::instance().insert([=] {
-                cs::Conveyer::instance().setRound(maxSequence);
-
-                auto sequenceDifference = maxSequence - lastSequence;
-                poolSynchronizer_->sync(maxSequence, sequenceDifference);
+                roundPackRequest(sender, maxSequence);
             });
         }
     }
