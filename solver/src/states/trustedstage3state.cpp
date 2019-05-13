@@ -544,7 +544,7 @@ bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
         k = -k;
     }
     // stage.realTrustedMask contains !0 on good nodes:
-    int cnt = static_cast<int>(context.cnt_trusted());
+    int cnt = std::min(static_cast<int>(context.cnt_trusted()), (int)Consensus::MaxTrustedNodes);
     int cnt_active = cnt - static_cast<int>(std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex));
     if (cnt_active * 2 < cnt + 1) {
         cswarning() << name() << ": not enough active confidants to make a decision, BigBang required";
