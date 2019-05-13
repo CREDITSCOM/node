@@ -385,6 +385,9 @@ private:
     // confirmation list
     cs::ConfirmationList confirmationList_;
     cs::RoundTableMessage currentRoundTableMessage_;
+
+    //expected rounds
+    std::vector<cs::RoundNumber> expectedRounds_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

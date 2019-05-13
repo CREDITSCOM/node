@@ -450,6 +450,9 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     }
     else {
         max_conf = static_cast<size_t>(4. + 1.85 * log(candidatesElection.size() / 4.));
+        if (max_conf > Consensus::MaxTrustedNodes) {
+            max_conf = Consensus::MaxTrustedNodes;
+        }
     }
     csdebug() << name() << ": max confidant: " << max_conf;
 
