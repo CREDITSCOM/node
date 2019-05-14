@@ -37,7 +37,7 @@ public:
 
     bool isFastMode() const;
 
-    static const cs::RoundNumber roundDifferentForSync = cs::values::defaultMetaStorageMaxSize;
+    static const cs::RoundNumber roundDifferentForSync = cs::values::kDefaultMetaStorageMaxSize;
 
 public signals:
     PoolSynchronizerRequestSignal sendRequest;

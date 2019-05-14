@@ -187,7 +187,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
                         csdebug() << "Signature of T(" << j << ") sent by T(" << static_cast<int>(it.sender) << "):" << cs::Utils::byteStreamToHex(it.signatures[j])
                                   << " from stage-2 is not equal to mine";
 
-                        if (it.hashes[j] == SolverContext::zeroHash) {
+                        if (it.hashes[j] == Zero::hash) {
                             csdebug() << name() << ": [" << static_cast<int>(it.sender) << "] marked as untrusted (silent)";
                             context.mark_untrusted(it.sender);
                             continue;
@@ -355,7 +355,7 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
             context.mark_untrusted(it.sender);
             stage.realTrustedMask.at(it.sender) = cs::ConfidantConsts::InvalidConfidantIndex;
 
-            bool is_lost = (std::equal(it.hash.cbegin(), it.hash.cend(), SolverContext::zeroHash.cbegin()));
+            bool is_lost = (std::equal(it.hash.cbegin(), it.hash.cend(), Zero::hash.cbegin()));
             csdebug() << "[" << static_cast<int>(it.sender) << "] IS "
                       << ((is_lost && stage.realTrustedMask.at(it.sender) == cs::ConfidantConsts::InvalidConfidantIndex) ? "LOST" : "LIAR") << " with hash "
                       << cs::Utils::byteStreamToHex(it.hash);
@@ -450,6 +450,9 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     }
     else {
         max_conf = static_cast<size_t>(4. + 1.85 * log(candidatesElection.size() / 4.));
+        if (max_conf > Consensus::MaxTrustedNodes) {
+            max_conf = Consensus::MaxTrustedNodes;
+        }
     }
     csdebug() << name() << ": max confidant: " << max_conf;
 

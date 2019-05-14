@@ -419,9 +419,10 @@ void Neighbourhood::gotConfirmation(const Connection::Id& my, const Connection::
     connectNode(node, *connPtr);
 }
 
-void Neighbourhood::validateConnectionId(RemoteNodePtr node, const Connection::Id id, const ip::udp::endpoint& ep, const cs::PublicKey& pk, const cs::Sequence lastSeq) {
+bool Neighbourhood::validateConnectionId(RemoteNodePtr node, const Connection::Id id, const ip::udp::endpoint& ep, const cs::PublicKey& pk, const cs::Sequence lastSeq) {
     cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
 
+    bool result = true;
     auto realPtr = findInMap(id, connections_);
     auto nConn = node->connection.load(std::memory_order_relaxed);
 
@@ -440,6 +441,8 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node, const Connection::I
             conn.specialOut = false;
             transport_->sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadId);
         }
+
+        result = !result;
     }
     else if (realPtr->get() != nConn) {
         if (nConn) {
@@ -459,6 +462,8 @@ void Neighbourhood::validateConnectionId(RemoteNodePtr node, const Connection::I
     else {
         (*realPtr)->lastSeq = lastSeq;
     }
+
+    return result;
 }
 
 void Neighbourhood::gotRefusal(const Connection::Id& id) {

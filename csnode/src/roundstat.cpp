@@ -62,7 +62,7 @@ void RoundStat::onRoundStart(RoundNumber round) {
 
         os << ", "
            //<< totalReceivedTransactions_ << " viewed transactions, "
-           << totalAcceptedTransactions_ << " stored transactions.";
+           << WithDelimiters(totalAcceptedTransactions_) << " stored transactions.";
         cslog() << os.str();
     }
 }

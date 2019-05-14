@@ -44,10 +44,10 @@ public:
         Address address_;
         csdb::Amount balance_;
         TransactionsTail trxTail_;
+		uint64_t transNum_ = 0;
 
 #ifdef MONITOR_NODE
-        uint64_t createTime_ = 0;
-        uint64_t transNum_ = 0;
+        uint64_t createTime_ = 0;        
 #endif
 #ifdef TRANSACTIONS_INDEX
         csdb::TransactionID lastTransaction_;

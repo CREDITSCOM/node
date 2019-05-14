@@ -57,6 +57,14 @@ public:
 
     bool init(const std::string& path);
     bool isGood() const;
+    // return unique id of database if at least one unique block has written, otherwise (only genesis block) 0
+    uint64_t uuid() const {
+        //if (uuid_ == 0) {
+        //    uuid_ = initUuid();
+        //}
+        cs::Lock lock(dbLock_);
+        return uuid_;
+    }
 
     // utility methods
 
@@ -191,6 +199,8 @@ public slots:
         this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter);
     }
 
+public:
+
     // load methods
 
     csdb::Pool loadBlock(const csdb::PoolHash&) const;
@@ -222,9 +232,9 @@ public slots:
 
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
-    void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>);
-    uint32_t getTransactionsCount(const csdb::Address&);
+    void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>); 
 #endif
+	uint32_t getTransactionsCount(const csdb::Address&);
 
 #ifdef TRANSACTIONS_INDEX
     csdb::TransactionID getLastTransaction(const csdb::Address&);
@@ -331,9 +341,26 @@ private:
     // (idea is it is more easy not to store block immediately then to revert it after storing)
     csdb::Pool deferredBlock_;
 
-    // fee calculator
-    std::unique_ptr<cs::Fee> fee_;
     std::unique_ptr<cs::BlockValidator> blockValidator_;
+
+    uint64_t uuidFromHash(const csdb::PoolHash& h) const {
+        if (!h.is_empty()) {
+            return *reinterpret_cast<uint64_t*>(h.to_binary().data());
+        }
+        return 0;
+    }
+
+    uint64_t uuidFromBlock(const csdb::Pool& block) const {
+        if (block.is_valid()) {
+            return uuidFromHash(block.hash());
+        }
+        return 0;
+    }
+
+    //uint64_t initUuid() const;
+
+    // may be modified once in uuid() method:
+    mutable uint64_t uuid_ = 0;
 };
 
 class TransactionsIterator {

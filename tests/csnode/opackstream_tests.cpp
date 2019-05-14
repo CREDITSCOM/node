@@ -2,29 +2,45 @@
 #include "csdb/address.hpp"
 #include "packstream.hpp"
 
+using DataPtr = std::shared_ptr<char[]>;
+
+struct StreamData {
+    boost::asio::mutable_buffer encoded;
+    DataPtr data;
+};
+
 const cs::PublicKey kPublicKey = {0x53, 0x4b, 0xd3, 0xdf, 0x77, 0x29, 0xfd, 0xcf, 0xea, 0x4a, 0xcd, 0x0e, 0xcc, 0x14, 0xaa, 0x05,
                                   0x0b, 0x77, 0x11, 0x6d, 0x8f, 0xcd, 0x80, 0x4b, 0x45, 0x36, 0x6b, 0x5c, 0xae, 0x4a, 0x06, 0x82};
 
-void DisplayRawData(const void* data, const size_t size) {
+void displayRawData(const void* data, const size_t size) {
     std::cout << "data = {";
+
     for (auto i = 0u; i < size; i++) {
         std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0') << int(static_cast<const uint8_t*>(data)[i]) << ", ";
     }
+
     std::cout << "}" << std::dec << std::endl;
 }
 
 void displayStreamData(cs::OPackStream& stream) {
     auto ptr = stream.getCurrentPtr();
     auto offset = stream.getCurrentSize();
-    DisplayRawData(ptr - offset, offset);
+    displayRawData(ptr - offset, offset);
 }
 
-auto GetStreamData(cs::OPackStream& stream) {
+auto getStreamData(cs::OPackStream& stream) {
     auto packets = stream.getPackets();
-    auto buffer_data = std::make_unique<char>(static_cast<size_t>(Packet::MaxSize));
-    boost::asio::mutable_buffer buffer(buffer_data.get(), Packet::MaxSize);
+    DataPtr bufferData(new char[Packet::MaxSize]);
+
+    boost::asio::mutable_buffer buffer(bufferData.get(), Packet::MaxSize);
     auto encoded = packets->encode(buffer);
-    return encoded;
+
+    StreamData streamData {
+        encoded,
+        bufferData
+    };
+
+    return streamData;
 }
 
 const std::size_t kPageSizeForAllocator = 1000;  // 109 is minimal stable
@@ -32,9 +48,13 @@ const std::size_t kPageSizeForAllocator = 1000;  // 109 is minimal stable
 TEST(OPackStream, InitializationWithFragmentedAndNetworkMsgFlags) {
     RegionAllocator allocator(kPageSizeForAllocator, 1);
     cs::OPackStream stream(&allocator, kPublicKey);
+
     const auto flags = BaseFlags(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
     stream.init(flags);
-    auto encoded = GetStreamData(stream);
+
+    auto streamData = getStreamData(stream);
+    auto encoded = streamData.encoded;
+
     const unsigned char encoded_expected[] = {flags, 0x00, 0x00, 0x01, 0x00};
     ASSERT_EQ(encoded.size(), sizeof encoded_expected);
     ASSERT_TRUE(0 == memcmp(encoded.data(), encoded_expected, encoded.size()));
@@ -43,12 +63,17 @@ TEST(OPackStream, InitializationWithFragmentedAndNetworkMsgFlags) {
 TEST(OPackStream, InitializationWithFragmentedFlagOnly) {
     RegionAllocator allocator(kPageSizeForAllocator, 1);
     cs::OPackStream stream(&allocator, kPublicKey);
+
     const auto flags = BaseFlags::Fragmented;
     stream.init(flags);
-    auto encoded = GetStreamData(stream);
+
+    auto streamData = getStreamData(stream);
+    auto encoded = streamData.encoded;
+
     const unsigned char encoded_expected[] = {flags, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x53, 0x4b,
                                               0xd3,  0xdf, 0x77, 0x29, 0xfd, 0xcf, 0xea, 0x4a, 0xcd, 0x0e, 0xcc, 0x14, 0xaa, 0x05, 0x0b,
                                               0x77,  0x11, 0x6d, 0x8f, 0xcd, 0x80, 0x4b, 0x45, 0x36, 0x6b, 0x5c, 0xae, 0x4a, 0x06, 0x82};
+
     ASSERT_EQ(1, stream.getPacketsCount());
     ASSERT_EQ(encoded.size(), sizeof encoded_expected);
     ASSERT_TRUE(0 == memcmp(encoded.data(), encoded_expected, encoded.size()));
@@ -57,29 +82,36 @@ TEST(OPackStream, InitializationWithFragmentedFlagOnly) {
 TEST(OPackStream, WithoutInitializationPacketsCountIsZero) {
     RegionAllocator allocator(kPageSizeForAllocator, 1);
     cs::OPackStream stream(&allocator, kPublicKey);
+
     ASSERT_EQ(0, stream.getPacketsCount());
 }
 
 TEST(OPackStream, AfterClearPacketsCountIsZero) {
     RegionAllocator allocator(kPageSizeForAllocator, 1);
     cs::OPackStream stream(&allocator, kPublicKey);
+
     stream.init(BaseFlags::Fragmented);
     stream.clear();
+
     ASSERT_EQ(0, stream.getPacketsCount());
 }
 
 /*
 TEST(OPackStream, WithoutInitializationEncodedDataIsEmpty) {
-  RegionAllocator allocator(kPageSizeForAllocator, 1);
-  cs::OPackStream stream(&allocator, kPublicKey);
-  auto encoded = GetStreamData(stream);
-  ASSERT_EQ(0, encoded.size());
+    RegionAllocator allocator(kPageSizeForAllocator, 1);
+    cs::OPackStream stream(&allocator, kPublicKey);
+
+    auto streamData = getStreamData(stream);
+    auto encoded = streamData.encoded;
+
+    ASSERT_EQ(0, encoded.size());
 }*/
 
 TEST(OPackStream, getPacketsCount) {
     RegionAllocator allocator(kPageSizeForAllocator, 1);
     cs::OPackStream oPackStream(&allocator, kPublicKey);
     oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
+
     ASSERT_EQ(1, oPackStream.getPacketsCount());
 }
 
@@ -87,13 +119,15 @@ TEST(OPackStream, getCurrentPtr) {
     RegionAllocator allocator(kPageSizeForAllocator, 1);
     cs::OPackStream oPackStream(&allocator, kPublicKey);
     oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
-    ASSERT_EQ(1, (int)(*(oPackStream.getCurrentPtr() - 2)));
+
+    ASSERT_EQ(1, static_cast<int>(*(oPackStream.getCurrentPtr() - 2)));
 }
 
 TEST(OPackStream, getCurrSize) {
     RegionAllocator allocator(kPageSizeForAllocator, 1);
     cs::OPackStream oPackStream(&allocator, kPublicKey);
     oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
+
     ASSERT_EQ(5, oPackStream.getCurrentSize());
 }
 
@@ -105,8 +139,11 @@ void TestConcreteTypeWriteToOPackStream(const T& value, const unsigned char (&ex
     stream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
     stream << value;
 
-    auto encoded = GetStreamData(stream);
+    auto streamData = getStreamData(stream);
+    auto encoded = streamData.encoded;
+
     displayStreamData(stream);
+
     ASSERT_EQ(1, stream.getPacketsCount());
     ASSERT_EQ(encoded.size(), sizeof expected_encoded_data);
     ASSERT_TRUE(0 == memcmp(encoded.data(), expected_encoded_data, encoded.size()));

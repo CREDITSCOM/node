@@ -81,14 +81,14 @@ enum MsgTypes : uint8_t {
     NodeStopRequest = 255
 };
 
-const char* getMsgTypesString(MsgTypes messageType);
-
 class Packet {
 public:
     static const uint32_t MaxSize = 1024;
     static const uint32_t MaxFragments = 4096;
 
     static const uint32_t SmartRedirectTreshold = 10000;
+
+    static const char* messageTypeToString(MsgTypes messageType);
 
     Packet() = default;
     explicit Packet(RegionPtr&& data)
@@ -180,7 +180,7 @@ public:
     boost::asio::mutable_buffer encode(boost::asio::mutable_buffer tempBuffer) {
         if (data_.size() == 0) {
             cswarning() << "Encoding empty packet";
-            return boost::asio::buffer(data_.get(), data_.size());
+            return boost::asio::buffer(tempBuffer.data(), 0);
         }
 
         if (isCompressed()) {
@@ -210,7 +210,10 @@ public:
             }
         }
 
-        return boost::asio::buffer(data_.get(), data_.size());
+        char* source = static_cast<char*>(data_.get());
+        char* dest = static_cast<char*>(tempBuffer.data());
+        std::copy(source, source + data_.size(), dest);
+        return boost::asio::buffer(dest, data_.size());
     }
 
     size_t decode(size_t packetSize = 0) {
@@ -258,7 +261,7 @@ public:
         return packetSize;
     }
 
-    // куегкты true if is not fragmented or has valid fragmebtation data
+    // returns true if is not fragmented or has valid fragmebtation data
     bool hasValidFragmentation() const {
         if (isFragmented()) {
             const auto fragment = getFragmentId();
@@ -377,7 +380,6 @@ private:
     friend class Transport;
     friend class Network;
 };
-
 
 using MessagePtr = MemPtr<TypedSlot<Message>>;
 

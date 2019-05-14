@@ -15,6 +15,74 @@
 
 namespace {
 const char* kLogPrefix = "Smart: ";
+
+inline void print(std::ostream& os, const ::general::Variant& var) {
+    os << "Variant(";
+    bool print_default = false;
+    if (var.__isset.v_string) {
+        os << var.v_string;
+    }
+    else if (var.__isset.v_null) {
+        os << "Null";
+    }
+    else if (var.__isset.v_boolean) {
+        os << var.v_boolean;
+    }
+    else if( var.__isset.v_array ) {
+        os << "Array";
+    }
+    else if( var.__isset.v_object ) {
+        os << "Object";
+    }
+    else if( var.__isset.v_void) {
+        os << "Void";
+    }
+    else if( var.__isset.v_list ) {
+        os << "List";
+    }
+    else if( var.__isset.v_set ) {
+        os << "Set";
+    }
+    else if( var.__isset.v_map ) {
+        os << "Map";
+    }
+    else if( var.__isset.v_int ) {
+        os << var.v_int;
+    }
+    else if (var.__isset.v_byte) {
+        os << (unsigned int)var.v_byte;
+    }
+    else if (var.__isset.v_short) {
+        os << var.v_short;
+    }
+    else if (var.__isset.v_long) {
+        os << var.v_long;
+    }
+    else if (var.__isset.v_float) {
+        os << var.v_float;
+    }
+    else if (var.__isset.v_double) {
+        os << var.v_double;
+    }
+    else {
+        /* those variants are shown by default
+          out << ", " << "v_boolean_box="; (__isset.v_boolean_box ? (out << to_string(v_boolean_box)) : (out << "<null>"));
+          out << ", " << "v_byte_box="; (__isset.v_byte_box ? (out << to_string(v_byte_box)) : (out << "<null>"));
+          out << ", " << "v_short_box="; (__isset.v_short_box ? (out << to_string(v_short_box)) : (out << "<null>"));
+          out << ", " << "v_int_box="; (__isset.v_int_box ? (out << to_string(v_int_box)) : (out << "<null>"));
+          out << ", " << "v_long_box="; (__isset.v_long_box ? (out << to_string(v_long_box)) : (out << "<null>"));
+          out << ", " << "v_float_box="; (__isset.v_float_box ? (out << to_string(v_float_box)) : (out << "<null>"));
+          out << ", " << "v_double_box="; (__isset.v_double_box ? (out << to_string(v_double_box)) : (out << "<null>"));
+        */
+        print_default = true;
+    }
+
+    if( print_default ) {
+        os << ") => ";
+        var.printTo( os );
+    }
+}
+
 }
 
 namespace cs {
@@ -913,6 +981,15 @@ bool SmartContracts::execute(SmartExecutionData& data) {
         auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
         if (maybe_result.has_value()) {
             data.result = maybe_result.value();
+            if (data.result.newState.empty()) {
+                if (data.result.retValue.__isset.v_string) {
+                    data.error = data.result.retValue.v_string;
+                    data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+                }
+                else {
+                    data.error = "contract execution failed, contract state is unchanged";
+                }
+            }
         }
         else {
             data.error = "contract execution failed";
@@ -1012,6 +1089,7 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
     cs::TransactionsPacket packet;
     if (!data.error.empty()) {
         cserror() << std::endl << kLogPrefix << data.error << std::endl;
+        csdebug() << kLogPrefix << "execution of smart contract is failed, new state is empty";
         // result contains empty USRFLD[state::Value]
         result.add_user_field(new_state::Value, std::string{});
         // result contains error code from ret_val
@@ -1106,7 +1184,7 @@ csdb::Transaction SmartContracts::create_new_state(const QueueItem& queue_item) 
                              src.currency(),
                              0,  // amount
                              csdb::AmountCommission((queue_item.avail_fee - queue_item.consumed_fee).to_double()), csdb::AmountCommission(queue_item.new_state_fee.to_double()),
-                             SolverContext::zeroSignature  // empty signature
+                             Zero::signature  // empty signature
     );
     // USRFLD1 - ref to start trx
     result.add_user_field(trx_uf::new_state::RefStart, queue_item.ref_start.to_user_field());
@@ -1343,7 +1421,7 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
                     const auto& a0 = m.arguments[0];
                     if (a0.name == PayableNameArg0 && a0.type == PayableArgType) {
                         const auto& a1 = m.arguments[1];
-                        if (a1.name == PayableNameArg1 && a1.type == PayableArgType) {
+                        if (/*a1.name == PayableNameArg1 &&*/ a1.type == PayableArgType) {
                             state.payable = PayableStatus::Implemented;
                         }
                     }
@@ -1431,7 +1509,7 @@ std::string SmartContracts::print_executed_method(const SmartContractRef& ref) {
             if (cnt_params > 0) {
                 os << ',';
             }
-            p.printTo(os);
+            print(os, p);
             ++cnt_params;
         }
         os << ')';

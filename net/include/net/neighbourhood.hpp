@@ -35,6 +35,10 @@ struct RemoteNode {
         strikes.fetch_add(1, std::memory_order_relaxed);
     }
 
+    void setBlackListed(bool b) {
+        blackListed.store(b, std::memory_order_relaxed);
+    }
+
     bool isBlackListed() {
         return blackListed.load(std::memory_order_relaxed);
     }
@@ -164,7 +168,7 @@ public:
 
     void pingNeighbours();
     bool isPingDone();
-    void validateConnectionId(RemoteNodePtr, const Connection::Id, const ip::udp::endpoint&, const cs::PublicKey&, const cs::Sequence);
+    bool validateConnectionId(RemoteNodePtr, const Connection::Id, const ip::udp::endpoint&, const cs::PublicKey&, const cs::Sequence);
 
     ConnectionPtr getConnection(const RemoteNodePtr);
     ConnectionPtr getNextRequestee(const cs::Hash&);

@@ -22,6 +22,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <conio.h>
 #else
 #include <termios.h>
 #include <unistd.h>
@@ -170,6 +171,29 @@ int getch() {
     tcsetattr(STDIN_FILENO, TCSANOW, &t_old);
     return ch;
 }
+
+static int _getch() {
+    return getch();
+}
+
+static int _kbhit() {
+    static const int STDIN = 0;
+    static bool initialized = false;
+
+    if (! initialized) {
+        // Use termios to turn off line buffering
+        termios term;
+        tcgetattr(STDIN, &term);
+        term.c_lflag &= ~ICANON;
+        tcsetattr(STDIN, TCSANOW, &term);
+        setbuf(stdin, NULL);
+        initialized = true;
+    }
+
+    int bytesWaiting;
+    ioctl(STDIN, FIONREAD, &bytesWaiting);
+    return bytesWaiting;
+}
 #endif
 
 template <typename T>
@@ -259,10 +283,59 @@ static bool getEncryptedPrivateBytes(const cscrypto::PrivateKey& sk, std::vector
     return true;
 }
 
+void Config::showKeys(const std::string& pk58) {
+    const double timeoutSeconds = 5;
+    double secondsPassed = 0;
+    std::cout << "To show your keys not encrypted press \"s\"." << std::endl;
+    std::cout << "Seconds left:" << std::endl;
+    std::clock_t start = std::clock();
+    while (secondsPassed < timeoutSeconds) {
+        secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
+        std::cout << timeoutSeconds - secondsPassed << "\r";
+        if (_kbhit()) {
+            if (_getch() == 's') {
+                std::cout << "\n\nPress any key to continue...\n" << std::endl;
+                auto sk = privateKey_.access();
+                std::string sk58tmp = EncodeBase58(sk.data(), sk.data() + sk.size());
+                std::cout << "PublicKey: " << pk58 << " PrivateKey: " << sk58tmp << std::flush;
+                cscrypto::fillWithZeros(sk58tmp.data(), sk58tmp.size());
+                _getch();
+                std::cout << "\r" << std::string(cscrypto::kPrivateKeySize * 5, 'x') << std::endl
+                          << std::flush;
+                break;
+            }
+        }
+    }
+}
+
+void Config::changePasswordOption(const std::string& pathToSk) {
+    char choice = '\0';
+    std::cout << "Would you like to change password?\n" << std::flush;
+    while (choice != 'y' && choice != 'n') {
+        std::cout << "Enter choice (y/n) : " << std::flush;
+        std::cin >> choice;
+        std::cout << std::endl;
+    }
+    if (choice == 'y') {
+        std::cout << "Encrypting the private key file with new password..." << std::endl;
+        std::vector<uint8_t> skBytes;
+        const bool encSucc = getEncryptedPrivateBytes(privateKey_, skBytes);
+        if (encSucc) {
+            std::string sk58tmp = EncodeBase58(skBytes.data(), skBytes.data() + skBytes.size());
+            writeFile(pathToSk, sk58tmp);
+            cscrypto::fillWithZeros(const_cast<char*>(sk58tmp.data()), sk58tmp.size());
+            cslog() << "Key in " << pathToSk << " has been encrypted successfully";
+        } else {
+            cslog() << "Not encrypting the private key file due to errors";
+        }
+    }
+}
+
 bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt) {
     // First read private
     std::ifstream skFile(pathToSk);
     std::string pk58;
+    bool callShowKeys = false;
 
     if (skFile.is_open()) {
         std::string sk58;
@@ -279,6 +352,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
         }
         else if (sk.size() > cscrypto::kPrivateKeySize) {
             encFlag = true;
+            callShowKeys = true;
         }
 
         if (encFlag) {  // Check the encryption flag
@@ -297,6 +371,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
                 if (!privateKey_)
                     std::cout << "Incorrect password (or corrupted file)" << std::endl;
             }
+            changePasswordOption(pathToSk);
         }
         else {
             privateKey_ = cscrypto::PrivateKey::readFromBytes(sk);
@@ -310,6 +385,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
             cscrypto::fillWithZeros(sk58.data(), sk58.size());
 
             if (encrypt) {
+                callShowKeys = true;
                 std::cout << "Encrypting the private key file..." << std::endl;
                 std::vector<uint8_t> skBytes;
                 const bool encSucc = getEncryptedPrivateBytes(privateKey_, skBytes);
@@ -355,6 +431,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
                 if (sChoice == 'q')
                     return false;
                 else if (sChoice == '1') {
+                    callShowKeys = true;
                     if (!getEncryptedPrivateBytes(privateKey_, skBytes))
                         return false;
                 }
@@ -403,6 +480,10 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
             return false;
     }
 
+    if (callShowKeys) {
+        showKeys(pk58);
+    }
+
     return true;
 }
 
@@ -441,6 +522,9 @@ Config Config::readFromFile(const std::string& fileName) {
         result.ipv6_ = !(params.count(PARAM_NAME_USE_IPV6) && params.get<std::string>(PARAM_NAME_USE_IPV6) == "false");
 
         result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) : DEFAULT_MAX_NEIGHBOURS;
+        if (result.maxNeighbours_ > DEFAULT_MAX_NEIGHBOURS) {
+            result.maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS; // see neighbourhood.hpp, some containers are of static size
+        }
 
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
 

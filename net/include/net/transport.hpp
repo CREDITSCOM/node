@@ -26,7 +26,7 @@ inline volatile std::sig_atomic_t gSignalStatus = 0;
 
 using ConnectionId = uint64_t;
 using Tick = uint64_t;
-using PingSignal = cs::Signal<void(cs::Sequence)>;
+using PingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
 enum class NetworkCommand : uint8_t {
     Registration = 2,
@@ -54,7 +54,8 @@ enum class RegistrationRefuseReasons : uint8_t {
     BadId,
     BadClientVersion,
     Timeout,
-    BadResponse
+    BadResponse,
+    IncompatibleBlockchain
 };
 
 enum class SSBootstrapStatus : uint8_t {
@@ -95,6 +96,8 @@ public:
         Transport::gSignalStatus = 1;
     }
 
+    static const char* networkCommandToString(NetworkCommand command);
+
     RemoteNodePtr getPackSenderEntry(const ip::udp::endpoint&);
 
     void processNetworkTask(const TaskPtr<IPacMan>&, RemoteNodePtr&);
@@ -132,6 +135,7 @@ public:
     void sendRegistrationRefusal(const Connection&, const RegistrationRefuseReasons);
     void sendPackRenounce(const cs::Hash&, const Connection&);
     void sendPackInform(const Packet&, const Connection&);
+    void sendPackInform(const Packet& pack, RemoteNodePtr&);
 
     void sendPingPack(const Connection&);
 
@@ -269,9 +273,9 @@ private:
     FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, fragmentsFixedMapSize_> fragOnRound_;
 
 public:
-    static size_t cntDirtyAllocs;
-    static size_t cntCorruptedFragments;
-    static size_t cntExtraLargeNotSent;
+    inline static size_t cntDirtyAllocs = 0;
+    inline static size_t cntCorruptedFragments = 0;
+    inline static size_t cntExtraLargeNotSent = 0;
 };
 
 #endif  // TRANSPORT_HPP

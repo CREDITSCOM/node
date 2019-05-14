@@ -139,8 +139,6 @@ private:
     uint8_t runCounter_;
     bool trustedChanged_ = false;
     bool smartStageThreeSent_ = false;
-    cs::Hash zeroHash;
-    cs::Signature zeroSignature;
     std::vector<cs::Bytes> smartStageOneMessage_;
     std::vector<cs::Bytes> smartStageTwoMessage_;
     std::vector<cs::Bytes> smartStageThreeMessage_;

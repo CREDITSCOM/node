@@ -1,11 +1,13 @@
-#ifndef __TOKENS_H__
-#define __TOKENS_H__
+#ifndef TOKENS_HPP
+#define TOKENS_HPP
+
 #include <condition_variable>
 #include <map>
 #include <mutex>
 #include <set>
 #include <string>
 #include <thread>
+#include <queue>
 #include <unordered_map>
 
 #include <boost/functional/hash.hpp>
@@ -15,6 +17,7 @@
 
 namespace api {
 class APIHandler;
+class SmartContractInvocation;
 }
 
 /*namespace std {
@@ -121,4 +124,4 @@ private:
     std::thread tokThread_;
 };
 
-#endif  // __TOKENS_H__
+#endif  // TOKENS_HPP

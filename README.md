@@ -4,7 +4,7 @@ The Node processes and stores transactions, executes and confirms smart contract
 Written on C++.
 
 ## Version
-Current node version 4.2.408
+Current node version 4.2.414
 
 
 <h2>What is CS NODE?</h2>

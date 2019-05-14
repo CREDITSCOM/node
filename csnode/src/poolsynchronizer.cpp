@@ -59,7 +59,16 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 
     const std::size_t cachedBlocksSize = blockChain_->getCachedBlocksSize();
     const cs::Sequence totalBlocks = lastWrittenSequence + cachedBlocksSize;
+
+    if (roundNum < totalBlocks) {
+        cswarning() << "Round number is lower than synchro total blocks, if same warning will occur again try to restart node";
+        csdebug() << "SYNC warning, round number " << roundNum << ", total blocks " << totalBlocks;
+        synchroFinished();
+        return;
+    }
+
     const cs::Sequence blocksRemaining = roundNum - totalBlocks;
+
     csdebug() << "SYNC:\n Round num: " << roundNum << "\n Conveyer round: " << cs::Conveyer::instance().currentRoundNumber() << "\n Last written seq: " << lastWrittenSequence
               << "\n Cached blocks: " << cachedBlocksSize << "\n Total blocks: " << totalBlocks;
     cslog() << "SYNC: Blocks remaining: " << blocksRemaining;
@@ -346,9 +355,8 @@ void cs::PoolSynchronizer::sendBlock(const NeighboursSetElemet& neighbour) {
         packet = ++(requestedSequences_.at(sequence));
     }
 
-    cslog() << "SYNC: Sending block request sequences (" << sequences.size() << "): [" << sequences.front() << ", " << sequences.back() << "], id: " << packet;
-
-    csmeta(csdebug) << "Sending block request >>>>>>> target: " << target->getOut();
+    cslog() << "SYNC: requesting for " << sequences.size() << " blocks [" << sequences.front() << ", " << sequences.back()
+        << "] from " << target->getOut() << ", repeat " << packet;
 
     emit sendRequest(target, sequences, packet);
 }
@@ -433,7 +441,10 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     }
     // Repeat request
     else if (isAvailableRequest(neighbour)) {
-        csmeta(csdetails) << "From repeat request: [" << neighbour.sequences().front() << ", " << neighbour.sequences().back() << "]";
+        if (!neighbour.sequences().empty()) {
+            csmeta(csdetails) << "From repeat request: [" << neighbour.sequences().front() << ", " << neighbour.sequences().back() << "]";
+        }
+
         neighbour.resetRoundCounter();
         return true;
     }
@@ -597,8 +608,13 @@ bool cs::PoolSynchronizer::isLastRequest() const {
 }
 
 bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::NeighboursSetElemet& nh) const {
-    const auto val = nh.roundCounter();
-    return ((val % syncData_.requestRepeatRoundCount) == 0);
+    const auto value = nh.roundCounter();
+
+    if (value != 0) {
+        return ((value % syncData_.requestRepeatRoundCount) == 0);
+    }
+
+    return false;
 }
 
 void cs::PoolSynchronizer::synchroFinished() {

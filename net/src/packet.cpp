@@ -10,8 +10,74 @@ enum Lengths {
     FragmentedHeader = 36
 };
 
-// see implementation below:
-const char* getMsgTypesString(MsgTypes messageType);
+const char* Packet::messageTypeToString(MsgTypes messageType) {
+    switch (messageType) {
+        case RoundTableSS:
+            return "RoundTableSS";
+        case Transactions:
+            return "Transactions";
+        case FirstTransaction:
+            return "FirstTransaction";
+        case NewBlock:
+            return "NewBlock";
+        case BlockHash:
+            return "BlockHash";
+        case BlockRequest:
+            return "BlockRequest";
+        case RequestedBlock:
+            return "RequestedBlock";
+        case FirstStage:
+            return "FirstStage";
+        case SecondStage:
+            return "SecondStage";
+        case ThirdStage:
+            return "ThirdStage";
+        case FirstStageRequest:
+            return "FirstStageRequest";
+        case SecondStageRequest:
+            return "SecondStageRequest";
+        case ThirdStageRequest:
+            return "ThirdStageRequest";
+        case RoundTableRequest:
+            return "RoundTableRequest";
+        case RoundTableReply:
+            return "RoundTableReply";
+        case TransactionPacket:
+            return "TransactionPacket";
+        case TransactionsPacketRequest:
+            return "TransactionsPacketRequest";
+        case TransactionsPacketReply:
+            return "TransactionsPacketReply";
+        case NewCharacteristic:
+            return "NewCharacteristic";
+        case WriterNotification:
+            return "WriterNotification";
+        case FirstSmartStage:
+            return "FirstSmartStage";
+        case SecondSmartStage:
+            return "SecondSmartStage";
+        case RoundTable:
+            return "RoundTable";
+        case ThirdSmartStage:
+            return "ThirdSmartStage";
+        case SmartFirstStageRequest:
+            return "SmartFirstStageRequest";
+        case SmartSecondStageRequest:
+            return "SmartSecondStageRequest";
+        case SmartThirdStageRequest:
+            return "SmartThirdStageRequest";
+        case HashReply:
+            return "HashReply";
+        case BigBang:
+            return "BigBang";
+        case NodeStopRequest:
+            return "NodeStopRequest";
+        case RejectedContracts:
+            return "RejectedContracts";
+        default:
+            return "Unknown";
+    }
+}
 
 const cs::Hash& Packet::getHeaderHash() const {
     if (!headerHashed_) {
@@ -32,14 +98,14 @@ bool Packet::isHeaderValid() const {
         const auto& frId = getFragmentId();
 
         if (!hasValidFragmentation()) {
-            cserror() << "Packet " << getMsgTypesString(this->getType()) << " has invalid header: frId(" << frId << ") >= frNum(" << frNum << ")";
+            cserror() << "Packet " << Packet::messageTypeToString(this->getType()) << " has invalid header: frId(" << frId << ") >= frNum(" << frNum << ")";
             return false;
         }
     }
 
     if (size() <= getHeadersLength()) {
         cserror() << "Packet size (" << size() << ") <= header length (" << getHeadersLength() << ")" << (isNetwork() ? ", network" : "") << (isFragmented() ? ", fragmeted" : "")
-                  << ", type " << getMsgTypesString(getType()) << "(" << static_cast<int>(getType()) << ")";
+                  << ", type " << Packet::messageTypeToString(getType()) << "(" << static_cast<int>(getType()) << ")";
         return false;
     }
 
@@ -62,10 +128,10 @@ uint32_t Packet::calculateHeadersLength() const {
     }
 
     if (!isNetwork()) {
-        length += PUBLIC_KEY_LENGTH + sizeof(getId());  // Sender key + ID
+        length += kPublicKeyLength + sizeof(getId());  // Sender key + ID
 
         if (!isBroadcast() && !isNeighbors()) {
-            length += PUBLIC_KEY_LENGTH;  // Receiver key
+            length += kPublicKeyLength;  // Receiver key
         }
     }
 
@@ -122,12 +188,12 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
             if (msg->packetsLeft_ != 0) {
                 // the 1st fragment contains full info:
                 if (pack.getFragmentId() == 0) {
-                    csdetails() << "COLLECT> recv pack " << getMsgTypesString(pack.getType()) << " of " << msg->packetsTotal_ << ", round " << pack.getRoundNum();
+                    csdetails() << "COLLECT> recv pack " << Packet::messageTypeToString(pack.getType()) << " of " << msg->packetsTotal_ << ", round " << pack.getRoundNum();
                 }
                 csdetails() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
             }
             else {
-                csdetails() << "COLLECT> done (" << msg->packetsTotal_ << ") " << getMsgTypesString(msg->getFirstPack().getType()) << ", round "
+                csdetails() << "COLLECT> done (" << msg->packetsTotal_ << ") " << Packet::messageTypeToString(msg->getFirstPack().getType()) << ", round "
                             << msg->getFirstPack().getRoundNum();
             }
         }
@@ -198,116 +264,6 @@ Message::~Message() {
     }
 }
 
-const char* getMsgTypesString(MsgTypes messageType) {
-    switch (messageType) {
-        case RoundTableSS:
-            return "RoundTableSS";
-        case Transactions:
-            return "Transactions";
-        case FirstTransaction:
-            return "FirstTransaction";
-        case NewBlock:
-            return "NewBlock";
-        case BlockHash:
-            return "BlockHash";
-        case BlockRequest:
-            return "BlockRequest";
-        case RequestedBlock:
-            return "RequestedBlock";
-        case FirstStage:
-            return "FirstStage";
-        case SecondStage:
-            return "SecondStage";
-        case ThirdStage:
-            return "ThirdStage";
-        case FirstStageRequest:
-            return "FirstStageRequest";
-        case SecondStageRequest:
-            return "SecondStageRequest";
-        case ThirdStageRequest:
-            return "ThirdStageRequest";
-        case RoundTableRequest:
-            return "RoundTableRequest";
-        case RoundTableReply:
-            return "RoundTableReply";
-        case TransactionPacket:
-            return "TransactionPacket";
-        case TransactionsPacketRequest:
-            return "TransactionsPacketRequest";
-        case TransactionsPacketReply:
-            return "TransactionsPacketReply";
-        case NewCharacteristic:
-            return "NewCharacteristic";
-        case WriterNotification:
-            return "WriterNotification";
-        case FirstSmartStage:
-            return "FirstSmartStage";
-        case SecondSmartStage:
-            return "SecondSmartStage";
-        case RoundTable:
-            return "RoundTable";
-        case ThirdSmartStage:
-            return "ThirdSmartStage";
-        case SmartFirstStageRequest:
-            return "SmartFirstStageRequest";
-        case SmartSecondStageRequest:
-            return "SmartSecondStageRequest";
-        case SmartThirdStageRequest:
-            return "SmartThirdStageRequest";
-        case HashReply:
-            return "HashReply";
-        case BigBang:
-            return "BigBang";
-        case NodeStopRequest:
-            return "NodeStopRequest";
-        case RejectedContracts:
-            return "RejectedContracts";
-        default:
-            return "Unknown";
-    }
-}
-
-const char* getNetworkCommandString(NetworkCommand command) {
-    switch (command) {
-        default:
-            return "Unknown";
-        case NetworkCommand::Registration:
-            return "Registration";
-        case NetworkCommand::ConfirmationRequest:
-            return "ConfirmationRequest";
-        case NetworkCommand::ConfirmationResponse:
-            return "ConfirmationResponse";
-        case NetworkCommand::RegistrationConfirmed:
-            return "RegistrationConfirmed";
-        case NetworkCommand::RegistrationRefused:
-            return "RegistrationRefused";
-        case NetworkCommand::Ping:
-            return "Ping";
-        case NetworkCommand::PackInform:
-            return "PackInform";
-        case NetworkCommand::PackRequest:
-            return "PackRequest";
-        case NetworkCommand::PackRenounce:
-            return "PackRenounce";
-        case NetworkCommand::BlockSyncRequest:
-            return "BlockSyncRequest";
-        case NetworkCommand::SSRegistration:
-            return "SSRegistration";
-        case NetworkCommand::SSFirstRound:
-            return "SSFirstRound";
-        case NetworkCommand::SSRegistrationRefused:
-            return "SSRegistrationRefused";
-        case NetworkCommand::SSPingWhiteNode:
-            return "SSPingWhiteNode";
-        case NetworkCommand::SSLastBlock:
-            return "SSLastBlock";
-        case NetworkCommand::SSReRegistration:
-            return "SSReRegistration";
-        case NetworkCommand::SSSpecificBlock:
-            return "SSSpecificBlock";
-    }
-}
-
 class PacketFlags {
 public:
     PacketFlags(const Packet& packet)
@@ -356,14 +312,14 @@ std::ostream& operator<<(std::ostream& os, const Packet& packet) {
 
     if (packet.isNetwork()) {
         const uint8_t* data = packet.getMsgData();
-        os << getNetworkCommandString(static_cast<NetworkCommand>(*data)) << "(" << int(*data) << "), ";
+        os << Transport::networkCommandToString(static_cast<NetworkCommand>(*data)) << "(" << int(*data) << "), ";
         os << "flags: " << PacketFlags(packet);
         return os;
     }
 
     if (packet.isFragmented()) {
         if (packet.getFragmentId() == 0) {
-            os << getMsgTypesString(packet.getType()) << "(" << packet.getType() << "), ";
+            os << Packet::messageTypeToString(packet.getType()) << "(" << packet.getType() << "), ";
             os << "round " << packet.getRoundNum() << ", ";
         }
         else {

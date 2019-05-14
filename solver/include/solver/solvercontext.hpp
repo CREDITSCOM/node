@@ -50,10 +50,6 @@ public:
     : core(core) {
     }
 
-    static cs::Hash zeroHash;
-    static cs::Signature zeroSignature;
-    static cs::PublicKey zeroKey;
-
     /**
      * @fn  void SolverContext::request_role(Role role)
      *
@@ -335,8 +331,8 @@ public:
         stage.sender = cs::InvalidSender;
         stage.signature.fill(0);
         size_t cnt = cnt_trusted();
-        stage.hashes.resize(cnt, SolverContext::zeroHash);
-        stage.signatures.resize(cnt, SolverContext::zeroSignature);
+        stage.hashes.resize(cnt, Zero::hash);
+        stage.signatures.resize(cnt, Zero::signature);
     }
 
     void fake_stage1(uint8_t from) {

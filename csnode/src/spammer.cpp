@@ -1,8 +1,3 @@
-/**
- *  @file spammer.cpp
- *  @author Sergey Sychev
- */
-
 #include "csnode/spammer.hpp"
 
 #include <chrono>
