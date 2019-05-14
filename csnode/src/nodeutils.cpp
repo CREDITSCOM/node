@@ -93,4 +93,16 @@ cs::Bytes NodeUtils::getTrustedMask(const csdb::Pool& block) {
     }
     return cs::Utils::bitsToMask(block.numberTrusted(), block.realTrusted());
 }
+
+std::string NodeUtils::roundsToString(const std::vector<RoundNumber>& rounds) {
+    std::string value = "(";
+
+    for (auto it : rounds) {
+        value += std::to_string(it) + "), (";
+    }
+
+    value += ")";
+
+    return value;
+}
 }  // namespace cs
