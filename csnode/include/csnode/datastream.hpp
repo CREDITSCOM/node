@@ -664,7 +664,6 @@ inline DataStream& operator>>(DataStream& stream, std::pair<T, U>& pair) {
 ///
 /// Gets amount from stream.
 ///
-template <typename T, typename U>
 inline DataStream& operator>>(DataStream& stream, csdb::Amount& amount) {
     cs::Bytes bytes;
     stream >> bytes;
