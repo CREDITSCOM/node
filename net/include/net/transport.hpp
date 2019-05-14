@@ -26,7 +26,7 @@ inline volatile std::sig_atomic_t gSignalStatus = 0;
 
 using ConnectionId = uint64_t;
 using Tick = uint64_t;
-using PingSignal = cs::Signal<void(cs::Sequence)>;
+using PingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
 enum class NetworkCommand : uint8_t {
     Registration = 2,
