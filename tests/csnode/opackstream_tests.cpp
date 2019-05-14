@@ -21,8 +21,8 @@ void displayStreamData(cs::OPackStream& stream) {
 
 auto GetStreamData(cs::OPackStream& stream) {
     auto packets = stream.getPackets();
-    auto buffer_data = std::make_unique<char>(static_cast<size_t>(Packet::MaxSize));
-    boost::asio::mutable_buffer buffer(buffer_data.get(), Packet::MaxSize);
+    auto bufferData = new char[Packet::MaxSize];
+    boost::asio::mutable_buffer buffer(bufferData, Packet::MaxSize);
     auto encoded = packets->encode(buffer);
     return encoded;
 }

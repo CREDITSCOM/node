@@ -54,7 +54,8 @@ enum class RegistrationRefuseReasons : uint8_t {
     BadId,
     BadClientVersion,
     Timeout,
-    BadResponse
+    BadResponse,
+    IncompatibleBlockchain
 };
 
 enum class SSBootstrapStatus : uint8_t {

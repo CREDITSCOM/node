@@ -1011,7 +1011,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         auto p = s_blockchain.loadBlockMeta(curph, res);
         curph = p.previous_hash();
         if (log_to_console && (cnt % 1000) == 0) {
-            std::cout << '\r' << cnt;
+            std::cout << '\r' << WithDelimiters(cnt);
         }
 
         if (p.is_valid() && locked_pending_smart_transactions->last_pull_sequence < p.sequence())
@@ -1019,7 +1019,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 
         if (curph.is_empty()) {
             if (log_to_console) {
-                std::cout << '\r' << cnt << "... Done\n";
+                std::cout << '\r' << WithDelimiters(cnt) << "... Done\n";
             }
             break;
         }
@@ -1029,7 +1029,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         // Fork detected!
         cnt = 0;
         if (log_to_console) {
-            std::cout << "API: fork detected, handling " << new_blocks.size() << " hashes...\n";
+            std::cout << "API: fork detected, handling " << WithDelimiters(new_blocks.size()) << " hashes...\n";
         }
         auto luca = locked_pending_smart_transactions->last_pull_hash;
         while (!luca.is_empty()) {
@@ -1040,13 +1040,13 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
                 break;
             }
             if (log_to_console && (cnt % 100) == 0) {
-                std::cout << '\r' << cnt;
+                std::cout << '\r' << WithDelimiters(cnt);
             }
             size_t res;
             luca = s_blockchain.loadBlockMeta(luca, res).previous_hash();
         }
         if (log_to_console) {
-            std::cout << '\r' << cnt << "... Done\n";
+            std::cout << '\r' << WithDelimiters(cnt) << "... Done\n";
         }
     }
 
@@ -1054,7 +1054,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 
     cnt = 0;
     if (log_to_console) {
-        std::cout << "API: searching for smart states in " << new_blocks.size() << " blocks...\n";
+        std::cout << "API: searching for smart states in " << WithDelimiters(new_blocks.size()) << " blocks...\n";
     }
     while (!new_blocks.empty()) {
         ++cnt;
@@ -1067,11 +1067,11 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
                 locked_pending_smart_transactions->queue.push(std::make_pair(p.sequence(), tr));
         }
         if (log_to_console && (cnt % 1000) == 0) {
-            std::cout << '\r' << cnt;
+            std::cout << '\r' << WithDelimiters(cnt);
         }
     }
     if (log_to_console) {
-        std::cout << "\rDone, handled " << cnt << " blocks...\n";
+        std::cout << "\rDone, handled " << WithDelimiters(cnt) << " blocks...\n";
     }
     log_to_console = false;
 

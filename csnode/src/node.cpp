@@ -1270,7 +1270,7 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
 
     // signature of round number + calculated hash
     stageOneInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
-    csdebug() << "Stage one Signature R-" << cs::Conveyer::instance().currentRoundNumber() << "(" << static_cast<int>(stageOneInfo.sender)
+    csdebug() << "Stage one Signature R-" << WithDelimiters(cs::Conveyer::instance().currentRoundNumber()) << "(" << static_cast<int>(stageOneInfo.sender)
               << "): " << cs::Utils::byteStreamToHex(stageOneInfo.signature.data(), stageOneInfo.signature.size());
 
     const int k1 = (corruptionLevel_ / 1) % 2;
