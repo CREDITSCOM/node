@@ -652,12 +652,26 @@ inline DataStream& operator>>(DataStream& stream, cs::BytesView& bytesView) {
 }
 
 ///
-/// Writes pair to stream.
+/// Gets pair from stream.
 ///
 template <typename T, typename U>
 inline DataStream& operator>>(DataStream& stream, std::pair<T, U>& pair) {
     stream >> pair.first;
     stream >> pair.second;
+    return stream;
+}
+
+///
+/// Gets amount from stream.
+///
+inline DataStream& operator>>(DataStream& stream, csdb::Amount& amount) {
+    cs::Bytes bytes;
+    stream >> bytes;
+
+    if (stream.isValid()) {
+        amount = csdb::Amount::fromBytes(bytes);
+    }
+
     return stream;
 }
 
@@ -800,6 +814,14 @@ template <typename T, typename U>
 inline DataStream& operator<<(DataStream& stream, const std::pair<T, U>& pair) {
     stream << pair.first;
     stream << pair.second;
+    return stream;
+}
+
+///
+/// Writes csdb Amount to stream
+///
+inline DataStream& operator<<(DataStream& stream, const csdb::Amount& amount) {
+    stream << amount.toBytes();
     return stream;
 }
 }  // namespace cs

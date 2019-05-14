@@ -441,7 +441,10 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     }
     // Repeat request
     else if (isAvailableRequest(neighbour)) {
-        csmeta(csdetails) << "From repeat request: [" << neighbour.sequences().front() << ", " << neighbour.sequences().back() << "]";
+        if (!neighbour.sequences().empty()) {
+            csmeta(csdetails) << "From repeat request: [" << neighbour.sequences().front() << ", " << neighbour.sequences().back() << "]";
+        }
+
         neighbour.resetRoundCounter();
         return true;
     }
@@ -605,8 +608,13 @@ bool cs::PoolSynchronizer::isLastRequest() const {
 }
 
 bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::NeighboursSetElemet& nh) const {
-    const auto val = nh.roundCounter();
-    return ((val % syncData_.requestRepeatRoundCount) == 0);
+    const auto value = nh.roundCounter();
+
+    if (value != 0) {
+        return ((value % syncData_.requestRepeatRoundCount) == 0);
+    }
+
+    return false;
 }
 
 void cs::PoolSynchronizer::synchroFinished() {
