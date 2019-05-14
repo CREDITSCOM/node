@@ -81,14 +81,14 @@ enum MsgTypes : uint8_t {
     NodeStopRequest = 255
 };
 
-const char* getMsgTypesString(MsgTypes messageType);
-
 class Packet {
 public:
     static const uint32_t MaxSize = 1024;
     static const uint32_t MaxFragments = 4096;
 
     static const uint32_t SmartRedirectTreshold = 10000;
+
+    static const char* messageTypeToString(MsgTypes messageType);
 
     Packet() = default;
     explicit Packet(RegionPtr&& data)
@@ -380,7 +380,6 @@ private:
     friend class Transport;
     friend class Network;
 };
-
 
 using MessagePtr = MemPtr<TypedSlot<Message>>;
 

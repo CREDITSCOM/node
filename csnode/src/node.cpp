@@ -1071,7 +1071,7 @@ void Node::sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, c
     writeDefaultStream(std::forward<Args>(args)...);
 
     csdetails() << "NODE> Sending Direct data: packets count: " << ostream_.getPacketsCount() << ", last packet size: " << ostream_.getCurrentSize() << ", out: " << target->out
-                << ", in: " << target->in << ", specialOut: " << target->specialOut << ", msgType: " << getMsgTypesString(msgType);
+                << ", in: " << target->in << ", specialOut: " << target->specialOut << ", msgType: " << Packet::messageTypeToString(msgType);
 
     transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
     ostream_.clear();
@@ -1169,7 +1169,7 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
     writeDefaultStream(std::forward<Args>(args)...);
 
     csdetails() << "NODE> Sending broadcast data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
-                << ", msgType: " << getMsgTypesString(msgType);
+                << ", msgType: " << Packet::messageTypeToString(msgType);
 
     transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
     ostream_.clear();
@@ -2283,8 +2283,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     //        csdebug() << "Round Number " << rNum -1 << " successfully erased from expectedRounds";
     //    }
 
- /*   }
-    csdebug() << "ExpectedRounds: " << cs::Utils::roundsToString(expectedRounds_);*/
+    /*   }
+       csdebug() << "ExpectedRounds: " << cs::Utils::roundsToString(expectedRounds_);*/
     istream_.init(data, size);
 
     // RoundTable evocation
@@ -2294,6 +2294,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     // sync state check
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     cs::ConfidantsKeys prevConfidants = conveyer.confidants();
+
     if (conveyer.currentRoundNumber() == rNum && subRound_ > subRound) {
         cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
         csmeta(csdetails) << "My subRound: " << static_cast<int>(subRound_) << ", Received subRound: " << static_cast<int>(subRound);
@@ -2302,15 +2303,17 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     cs::Bytes roundBytes;
     istream_ >> roundBytes;
-    if( ! istream_.good() ) {
-        csmeta( cserror ) << "Malformed packet with round table (1)";
+
+    if (!istream_.good()) {
+        csmeta(cserror) << "Malformed packet with round table (1)";
         return;
     }
 
     cs::Bytes bytes;
     istream_ >> bytes;
-    if( ! istream_.good() ) {
-        csmeta( cserror ) << "Malformed packet with round table (2)";
+
+    if (!istream_.good()) {
+        csmeta(cserror) << "Malformed packet with round table (2)";
         return;
     }
 
@@ -2322,9 +2325,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         csmeta(cserror) << "Illegal confidants count in round table";
         return;
     }
- /*   expectedRounds_.push_back(rNum + 1);
-    csdebug() << "ExpectedRounds: " << cs::Utils::roundsToString(expectedRounds_);*/
-    cs::RoundNumber storedRound  = conveyer.currentRoundNumber();
+    /*   expectedRounds_.push_back(rNum + 1);
+       csdebug() << "ExpectedRounds: " << cs::Utils::roundsToString(expectedRounds_);*/
+    cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
     poolSynchronizer_->sync(conveyer.currentRoundNumber());
 
@@ -2332,7 +2335,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     roundStream >> realTrusted;
 
     cs::Signatures poolSignatures;
-    if(rNum > storedRound && rNum - storedRound == 1){
+
+    if (rNum > storedRound && rNum - storedRound == 1) {
         if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures)) {
             return;
         }
@@ -2757,7 +2761,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
 
 /*static*/
 void Node::requestStop() {
-    /*signal*/ stopRequested();
+    emit stopRequested();
 }
 
 void Node::onStopRequested() {
