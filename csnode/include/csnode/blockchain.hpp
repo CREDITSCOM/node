@@ -199,6 +199,8 @@ public slots:
         this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter);
     }
 
+public:
+
     // load methods
 
     csdb::Pool loadBlock(const csdb::PoolHash&) const;

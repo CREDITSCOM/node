@@ -468,41 +468,35 @@ private:
         return T(bytes);
     }
 
-    inline void badState() {
+    void badState() {
         state_ = false;
     }
 
-    inline void insertBytes(const char* data, std::size_t index) {
+    void insertBytes(const char* data, std::size_t index) {
         if (bytes_) {
             bytes_->insert(bytes_->end(), data, data + index);
         }
     }
 
-    inline void insertBytes(const cs::Byte* data, std::size_t size) {
+    void insertBytes(const cs::Byte* data, std::size_t size) {
         insertBytes(reinterpret_cast<const char*>(data), size);
     }
 };
 
 ///
-/// Gets next end point from stream to end point variable.
+/// Get entities from stream operators
 ///
 inline DataStream& operator>>(DataStream& stream, boost::asio::ip::udp::endpoint& endPoint) {
     endPoint = stream.parseEndpoint();
     return stream;
 }
 
-///
-/// Gets from stream to array.
-///
 template <typename T, std::size_t size>
 inline DataStream& operator>>(DataStream& stream, std::array<T, size>& array) {
     array = stream.template parseArray<T, size>();
     return stream;
 }
 
-///
-/// Gets from stream to T variable.
-///
 template <typename T>
 inline DataStream& operator>>(DataStream& stream, T& value) {
     static_assert(std::is_trivial_v<T>, "Template parameter to must be trivial. Overload this function for non-trivial type");
@@ -510,42 +504,27 @@ inline DataStream& operator>>(DataStream& stream, T& value) {
     return stream;
 }
 
-///
-/// Gets from stream to bytes vector (stream would use data size of vector to create bytes).
-///
 inline DataStream& operator>>(DataStream& stream, cs::Bytes& data) {
     data = stream.parseVector();
     return stream;
 }
 
-///
-/// Gets from stream to std::string (stream would use data size of string to create bytes).
-///
 inline DataStream& operator>>(DataStream& stream, std::string& data) {
     data = stream.parseString();
     return stream;
 }
 
-///
-/// Gets size of bytes from stream to fixedString.
-///
 template <std::size_t size>
 inline DataStream& operator>>(DataStream& stream, FixedString<size>& fixedString) {
     fixedString = stream.template parseFixedString<size>();
     return stream;
 }
 
-///
-/// Gets hashVector structure from stream.
-///
 inline DataStream& operator>>(DataStream& stream, cs::HashVector& hashVector) {
     stream >> hashVector.sender >> hashVector.hash >> hashVector.signature;
     return stream;
 }
 
-///
-/// Gets hash matrix structure from stream.
-///
 inline DataStream& operator>>(DataStream& stream, cs::HashMatrix& matrix) {
     stream >> matrix.sender;
 
@@ -557,9 +536,6 @@ inline DataStream& operator>>(DataStream& stream, cs::HashMatrix& matrix) {
     return stream;
 }
 
-///
-/// Gets from stream to transactions packet hash.
-///
 inline DataStream& operator>>(DataStream& stream, cs::TransactionsPacketHash& hash) {
     cs::Bytes bytes;
     stream >> bytes;
@@ -571,9 +547,6 @@ inline DataStream& operator>>(DataStream& stream, cs::TransactionsPacketHash& ha
     return stream;
 }
 
-///
-/// Gets transaction packet structure from stream.
-///
 inline DataStream& operator>>(DataStream& stream, cs::TransactionsPacket& packet) {
     cs::Bytes bytes;
     stream >> bytes;
@@ -585,9 +558,6 @@ inline DataStream& operator>>(DataStream& stream, cs::TransactionsPacket& packet
     return stream;
 }
 
-///
-/// Gets transaction packet structure from stream.
-///
 inline DataStream& operator>>(DataStream& stream, csdb::PoolHash& hash) {
     cs::Bytes bytes;
     stream >> bytes;
@@ -599,9 +569,6 @@ inline DataStream& operator>>(DataStream& stream, csdb::PoolHash& hash) {
     return stream;
 }
 
-///
-/// Gets pool from stream.
-///
 inline DataStream& operator>>(DataStream& stream, csdb::Pool& pool) {
     cs::Bytes bytes;
     stream >> bytes;
@@ -613,9 +580,6 @@ inline DataStream& operator>>(DataStream& stream, csdb::Pool& pool) {
     return stream;
 }
 
-///
-/// Gets vector of entities from stream.
-///
 template <typename T, typename U>
 inline DataStream& operator>>(DataStream& stream, std::vector<T, U>& entities) {
     std::size_t size;
@@ -643,17 +607,11 @@ inline DataStream& operator>>(DataStream& stream, std::vector<T, U>& entities) {
     return stream;
 }
 
-///
-/// Gets pool from stream.
-///
 inline DataStream& operator>>(DataStream& stream, cs::BytesView& bytesView) {
     bytesView = stream.parseBytesView();
     return stream;
 }
 
-///
-/// Gets pair from stream.
-///
 template <typename T, typename U>
 inline DataStream& operator>>(DataStream& stream, std::pair<T, U>& pair) {
     stream >> pair.first;
@@ -661,9 +619,6 @@ inline DataStream& operator>>(DataStream& stream, std::pair<T, U>& pair) {
     return stream;
 }
 
-///
-/// Gets amount from stream.
-///
 inline DataStream& operator>>(DataStream& stream, csdb::Amount& amount) {
     cs::Bytes bytes;
     stream >> bytes;
@@ -676,7 +631,7 @@ inline DataStream& operator>>(DataStream& stream, csdb::Amount& amount) {
 }
 
 ///
-/// Writes array to stream.
+/// Writes entities to stream operators
 ///
 template <typename T, std::size_t size>
 inline DataStream& operator<<(DataStream& stream, const std::array<T, size>& array) {
@@ -684,9 +639,6 @@ inline DataStream& operator<<(DataStream& stream, const std::array<T, size>& arr
     return stream;
 }
 
-///
-/// Writes T to stream.
-///
 template <typename T>
 inline DataStream& operator<<(DataStream& stream, const T& value) {
     static_assert(std::is_trivial_v<T>, "Template parameter to must be trivial. Overload this function for non-trivial type");
@@ -694,50 +646,32 @@ inline DataStream& operator<<(DataStream& stream, const T& value) {
     return stream;
 }
 
-///
-/// Writes vector of bytes to stream.
-///
 inline DataStream& operator<<(DataStream& stream, const cs::Bytes& data) {
     stream.addVector(data);
     return stream;
 }
 
-///
-/// Writes address to stream.
-///
 inline DataStream& operator<<(DataStream& stream, const boost::asio::ip::udp::endpoint& endpoint) {
     stream.addEndpoint(endpoint);
     return stream;
 }
 
-///
-/// Writes hash binary to stream.
-///
 inline DataStream& operator<<(DataStream& stream, const cs::TransactionsPacketHash& hash) {
     stream << hash.toBinary();
     return stream;
 }
 
-///
-/// Writes std::string to stream.
-///
 inline DataStream& operator<<(DataStream& stream, const std::string& data) {
     stream.addString(data);
     return stream;
 }
 
-///
-/// Writes fixed string to stream.
-///
 template <std::size_t size>
 inline DataStream& operator<<(DataStream& stream, const FixedString<size>& fixedString) {
     stream.addFixedString(fixedString);
     return stream;
 }
 
-///
-/// Writes hash vector structure to stream.
-///
 inline DataStream& operator<<(DataStream& stream, const cs::HashVector& hashVector) {
     stream << hashVector.sender;
     stream << hashVector.hash;
@@ -745,9 +679,6 @@ inline DataStream& operator<<(DataStream& stream, const cs::HashVector& hashVect
     return stream;
 }
 
-///
-/// Writes hash matrix structure to stream.
-///
 inline DataStream& operator<<(DataStream& stream, const cs::HashMatrix& matrix) {
     stream << matrix.sender;
 
@@ -759,25 +690,16 @@ inline DataStream& operator<<(DataStream& stream, const cs::HashMatrix& matrix) 
     return stream;
 }
 
-///
-/// Writes hash matrix structure to stream.
-///
 inline DataStream& operator<<(DataStream& stream, const cs::TransactionsPacket& packet) {
     stream << packet.toBinary();
     return stream;
 }
 
-///
-/// Writes hash matrix structure to stream.
-///
 inline DataStream& operator<<(DataStream& stream, const csdb::PoolHash& hash) {
     stream << hash.to_binary();
     return stream;
 }
 
-///
-/// Writes pool structure to stream as byte representation.
-///
 inline DataStream& operator<<(DataStream& stream, const csdb::Pool& pool) {
     uint32_t bSize;
     auto dataPtr = const_cast<csdb::Pool&>(pool).to_byte_stream(bSize);
@@ -785,9 +707,6 @@ inline DataStream& operator<<(DataStream& stream, const csdb::Pool& pool) {
     return stream;
 }
 
-///
-/// Writes vector of entities to stream.
-///
 template <typename T, typename U>
 inline DataStream& operator<<(DataStream& stream, const std::vector<T, U>& entities) {
     stream << entities.size();
@@ -799,17 +718,11 @@ inline DataStream& operator<<(DataStream& stream, const std::vector<T, U>& entit
     return stream;
 }
 
-///
-/// Writes bytes view to stream.
-///
 inline DataStream& operator<<(DataStream& stream, const cs::BytesView& bytesView) {
     stream.addBytesView(bytesView);
     return stream;
 }
 
-///
-/// Writes pair to stream.
-///
 template <typename T, typename U>
 inline DataStream& operator<<(DataStream& stream, const std::pair<T, U>& pair) {
     stream << pair.first;
@@ -817,9 +730,6 @@ inline DataStream& operator<<(DataStream& stream, const std::pair<T, U>& pair) {
     return stream;
 }
 
-///
-/// Writes csdb Amount to stream
-///
 inline DataStream& operator<<(DataStream& stream, const csdb::Amount& amount) {
     stream << amount.toBytes();
     return stream;

@@ -211,15 +211,17 @@ public:
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;
     using SmartStageRequestSignal = cs::Signal<void(uint8_t, cs::Sequence, uint32_t, uint8_t, uint8_t, cs::PublicKey&)>;
+    using StopSignal = cs::Signal<void()>;
+    using RefectedSmartContractsSignal = cs::Signal<void(const std::vector<std::pair<cs::Sequence, uint32_t>>&)>;
 
 public signals:
     SmartsSignal<cs::StageOneSmarts> gotSmartStageOne;
     SmartsSignal<cs::StageTwoSmarts> gotSmartStageTwo;
     SmartsSignal<cs::StageThreeSmarts> gotSmartStageThree;
     SmartStageRequestSignal receivedSmartStageRequest;
-    cs::Signal<void(const std::vector<std::pair<cs::Sequence, uint32_t>>&)> gotRejectedContracts;
+    RefectedSmartContractsSignal gotRejectedContracts;
 
-    inline static cs::Signal<void()> stopRequested;
+    inline static StopSignal stopRequested;
 
 private slots:
     void onStopRequested();

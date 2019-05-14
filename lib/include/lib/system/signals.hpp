@@ -525,12 +525,12 @@ public:
     ///
     template <template <typename> typename Signal, typename T>
     static std::size_t callbacks(const Signal<T>* signal) {
-        cs::SharedLock lock(mutex_);
+        cs::Lock lock(mutex_);
         return signal->size();
     }
 
 private:
-    inline static cs::SharedMutex mutex_;
+    inline static std::mutex mutex_;
 };
 
 // forward realization

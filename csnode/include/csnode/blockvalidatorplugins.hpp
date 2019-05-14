@@ -18,6 +18,8 @@ public:
     : blockValidator_(bv) {
     }
 
+    virtual ~ValidationPlugin() = default;
+
     using ErrorType = BlockValidator::ErrorType;
     virtual ErrorType validateBlock(const csdb::Pool&) = 0;
 
