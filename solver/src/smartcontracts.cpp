@@ -1421,7 +1421,7 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
                     const auto& a0 = m.arguments[0];
                     if (a0.name == PayableNameArg0 && a0.type == PayableArgType) {
                         const auto& a1 = m.arguments[1];
-                        if (a1.name == PayableNameArg1 && a1.type == PayableArgType) {
+                        if (/*a1.name == PayableNameArg1 &&*/ a1.type == PayableArgType) {
                             state.payable = PayableStatus::Implemented;
                         }
                     }
