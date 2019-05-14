@@ -8,13 +8,6 @@
 #include "network.hpp"
 #include "transport.hpp"
 
-/*static*/
-size_t Transport::cntDirtyAllocs = 0;
-/*static*/
-size_t Transport::cntCorruptedFragments = 0;
-/*static*/
-size_t Transport::cntExtraLargeNotSent = 0;
-
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
     Node::requestStop();
@@ -92,10 +85,9 @@ void addMyOut(const Config& config, cs::OPackStream& stream, const uint8_t initF
     *flagChar |= initFlagValue | regFlag;
 }
 
-void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t bch_uuid) {
+void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t uuid) {
     stream.init(BaseFlags::NetworkMsg);
-
-    stream << NetworkCommand::Registration << NODE_VERSION << bch_uuid;
+    stream << NetworkCommand::Registration << NODE_VERSION << uuid;
 
     addMyOut(config, stream);
     *regPackConnId = reinterpret_cast<uint64_t*>(stream.getCurrentPtr());
@@ -103,7 +95,7 @@ void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPa
     stream << static_cast<ConnectionId>(0) << pk;
 }
 
-void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::PublicKey& pk, uint64_t bch_uuid) {
+void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::PublicKey& pk, uint64_t uuid) {
     stream.init(BaseFlags::NetworkMsg);
     stream << NetworkCommand::SSRegistration
 #ifdef _WIN32
@@ -113,7 +105,7 @@ void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::
 #else
         << Platform::Linux
 #endif
-        << NODE_VERSION << bch_uuid;
+        << NODE_VERSION << uuid;
 
     uint8_t flag = (config.getNodeType() == NodeType::Router) ? 8 : 0;
     addMyOut(config, stream, flag);
@@ -185,6 +177,47 @@ void Transport::run() {
     }
 
     cswarning() << "[Transport::run STOPED!]";
+}
+
+const char* Transport::networkCommandToString(NetworkCommand command) {
+    switch (command) {
+    case NetworkCommand::Registration:
+        return "Registration";
+    case NetworkCommand::ConfirmationRequest:
+        return "ConfirmationRequest";
+    case NetworkCommand::ConfirmationResponse:
+        return "ConfirmationResponse";
+    case NetworkCommand::RegistrationConfirmed:
+        return "RegistrationConfirmed";
+    case NetworkCommand::RegistrationRefused:
+        return "RegistrationRefused";
+    case NetworkCommand::Ping:
+        return "Ping";
+    case NetworkCommand::PackInform:
+        return "PackInform";
+    case NetworkCommand::PackRequest:
+        return "PackRequest";
+    case NetworkCommand::PackRenounce:
+        return "PackRenounce";
+    case NetworkCommand::BlockSyncRequest:
+        return "BlockSyncRequest";
+    case NetworkCommand::SSRegistration:
+        return "SSRegistration";
+    case NetworkCommand::SSFirstRound:
+        return "SSFirstRound";
+    case NetworkCommand::SSRegistrationRefused:
+        return "SSRegistrationRefused";
+    case NetworkCommand::SSPingWhiteNode:
+        return "SSPingWhiteNode";
+    case NetworkCommand::SSLastBlock:
+        return "SSLastBlock";
+    case NetworkCommand::SSReRegistration:
+        return "SSReRegistration";
+    case NetworkCommand::SSSpecificBlock:
+        return "SSSpecificBlock";
+    default:
+        return "Unknown";
+    }
 }
 
 template <>
@@ -901,7 +934,7 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>&) {
         cserror() << "Your blockchain version is incompatible. You only may join the network with empty blockchain";
         break;
     default:
-        cserror() << "The reason code is " << (int)reason;
+        cserror() << "The reason code is " << static_cast<int>(reason);
         break;
     }
 
@@ -1171,49 +1204,9 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
         maxBlockCount_ = 1;
     }
 
-    nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq);
-
-    emit pingReceived(lastSeq);
-    return true;
-}
-
-const char* getNetworkCommandString(NetworkCommand command) {
-    switch (command) {
-    default:
-        return "Unknown";
-    case NetworkCommand::Registration:
-        return "Registration";
-    case NetworkCommand::ConfirmationRequest:
-        return "ConfirmationRequest";
-    case NetworkCommand::ConfirmationResponse:
-        return "ConfirmationResponse";
-    case NetworkCommand::RegistrationConfirmed:
-        return "RegistrationConfirmed";
-    case NetworkCommand::RegistrationRefused:
-        return "RegistrationRefused";
-    case NetworkCommand::Ping:
-        return "Ping";
-    case NetworkCommand::PackInform:
-        return "PackInform";
-    case NetworkCommand::PackRequest:
-        return "PackRequest";
-    case NetworkCommand::PackRenounce:
-        return "PackRenounce";
-    case NetworkCommand::BlockSyncRequest:
-        return "BlockSyncRequest";
-    case NetworkCommand::SSRegistration:
-        return "SSRegistration";
-    case NetworkCommand::SSFirstRound:
-        return "SSFirstRound";
-    case NetworkCommand::SSRegistrationRefused:
-        return "SSRegistrationRefused";
-    case NetworkCommand::SSPingWhiteNode:
-        return "SSPingWhiteNode";
-    case NetworkCommand::SSLastBlock:
-        return "SSLastBlock";
-    case NetworkCommand::SSReRegistration:
-        return "SSReRegistration";
-    case NetworkCommand::SSSpecificBlock:
-        return "SSSpecificBlock";
+    if (nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq)) {
+        emit pingReceived(lastSeq, pk);
     }
+
+    return true;
 }

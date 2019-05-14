@@ -145,7 +145,7 @@ std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::
         const auto iterator = table.find(hash);
 
         if (iterator == table.end()) {
-            cserror() << csname() << "PACKET CREATION HASH NOT FOUND";
+            cswarning() << csname() << "packet creation hash not found";
             return std::nullopt;
         }
 
@@ -158,7 +158,7 @@ std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::
 
         for (const auto& transaction : transactions) {
             if (!packet.addTransaction(transaction)) {
-                cserror() << csname() << "Can not add transaction at packet creation";
+                cswarning() << csname() << "Can not add transaction at packet creation";
             }
         }
     }
@@ -344,7 +344,7 @@ bool cs::ConveyerBase::isSyncCompleted(cs::RoundNumber round) const {
     cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
     if (!meta) {
-        cserror() << csname() << "Needed hashes of " << round << " round not found";
+        cswarning() << csname() << "Needed hashes of " << round << " round not found, looks like old round packet received";
         return true;
     }
 
@@ -478,7 +478,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
         auto optionalPacket = findPacket(hash, round);
 
         if (!optionalPacket.has_value()) {
-            csmeta(cserror) << "HASH NOT FOUND " << hash.toString();
+            csmeta(cserror) << "hash not found " << hash.toString() << ", strage behaviour detected";
             removeHashesFromTable(localHashes);
             return std::nullopt;
         }
@@ -636,7 +636,6 @@ void cs::ConveyerBase::flushTransactions() {
                 }
             }
 
-            // try to send save in node
             emit packetFlushed(packet);
 
             auto hash = packet.hash();

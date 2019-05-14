@@ -221,8 +221,7 @@ private:
     friend class Connector;
 };
 
-// helper namespace
-namespace Args {
+namespace cshelper {
 template <typename T>
 struct GetArguments : GetArguments<decltype(&T::operator())> {};
 
@@ -393,11 +392,11 @@ public:
     ///
     template <template <typename> typename Signal, typename T, typename Object, typename Slot>
     static void connect(const Signal<T>* signal, const Object& slotObj, Slot&& slot) {
-        constexpr int size = Args::GetArguments<Slot>();
+        constexpr int size = cshelper::GetArguments<Slot>();
 
         cs::Lock lock(mutex_);
         auto obj = cs::Connector::checkConnection(static_cast<const ISignal*>(signal), slotObj, std::is_base_of<IConnectable, std::remove_pointer_t<Object>>());
-        const_cast<Signal<T>*>(signal)->add(Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot)), obj);
+        const_cast<Signal<T>*>(signal)->add(cshelper::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot)), obj);
     }
 
     ///
@@ -435,8 +434,8 @@ public:
             return false;
         }
 
-        constexpr int size = Args::GetArguments<Slot>();
-        std::function<T> binder = Args::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot));
+        constexpr int size = cshelper::GetArguments<Slot>();
+        std::function<T> binder = cshelper::CheckArgs<size>().connect(slotObj, std::forward<Slot>(slot));
 
         cs::Lock lock(mutex_);
         auto& content = const_cast<Signal<T>*>(signal)->content();

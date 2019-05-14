@@ -549,7 +549,7 @@ inline DataStream& operator>>(DataStream& stream, cs::HashVector& hashVector) {
 inline DataStream& operator>>(DataStream& stream, cs::HashMatrix& matrix) {
     stream >> matrix.sender;
 
-    for (std::size_t i = 0; i < hashVectorCount; ++i) {
+    for (std::size_t i = 0; i < kHashVectorCount; ++i) {
         stream >> matrix.hashVector[i];
     }
 
@@ -737,7 +737,7 @@ inline DataStream& operator<<(DataStream& stream, const cs::HashVector& hashVect
 inline DataStream& operator<<(DataStream& stream, const cs::HashMatrix& matrix) {
     stream << matrix.sender;
 
-    for (std::size_t i = 0; i < hashVectorCount; ++i) {
+    for (std::size_t i = 0; i < kHashVectorCount; ++i) {
         stream << matrix.hashVector[i];
     }
 
