@@ -185,7 +185,7 @@ public:
     ::std::string to_string(size_t min_decimal_places = 2) const noexcept;
 
     // Сериализация
-    cs::Bytes toBytes();
+    cs::Bytes toBytes() const;
     static Amount fromBytes(const cs::Bytes&);
 public:
     void put(priv::obstream&) const;

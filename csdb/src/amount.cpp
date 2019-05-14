@@ -61,7 +61,7 @@ Amount::Amount(double value) {
     return buf;
 }
 
-cs::Bytes Amount::toBytes() {
+cs::Bytes Amount::toBytes() const {
     ::csdb::priv::obstream os;
     put(os);
     return os.buffer();
