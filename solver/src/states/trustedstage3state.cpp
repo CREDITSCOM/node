@@ -10,9 +10,12 @@
 #include <algorithm>
 #include <cmath>
 
-namespace cs {
+namespace
+{
+    constexpr uint64_t TIMER_BASE_ID = 30;
+}
 
-#define TIMER_BASE_ID 30
+namespace cs {
 
 void TrustedStage3State::on(SolverContext& context) {
     DefaultStateBehavior::on(context);
@@ -46,7 +49,7 @@ void TrustedStage3State::on(SolverContext& context) {
     if (ptr == nullptr) {
         cswarning() << name() << ": stage one result not found";
     }
-    // process already received stage-2, possible to go further to stage-3
+    // process already received stage-2, possible to go further to post trusted state
     if (!context.stage2_data().empty()) {
         csdebug() << name() << ": handle early received stages-2";
         Result finish = Result::Ignore;
