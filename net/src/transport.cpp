@@ -305,6 +305,13 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
         return sender->addStrike();
     }
 
+    if (cmd != NetworkCommand::Registration) {
+        if (sender->isBlackListed()) {
+            csdebug() << "Network command is ignored from blacklisted " << task->sender;
+            return;
+        }
+    }
+
     bool result = true;
 
     switch (cmd) {
@@ -813,14 +820,15 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         return true;
     }
 
+    RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
     uint64_t local_uuid = node_->getBlockChain().uuid();
     if (local_uuid != 0 && remote_uuid != 0 && local_uuid != remote_uuid) {
         sendRegistrationRefusal(conn, RegistrationRefuseReasons::IncompatibleBlockchain);
-
-        RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
         ptr->setBlackListed(true);
-
         return true;
+    }
+    else {
+        ptr->setBlackListed(false);
     }
 
     iPackStream_ >> conn.id;
@@ -863,7 +871,26 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 
     nh_.gotRefusal(id);
 
-    cslog() << "Registration to " << task->sender << " refused. Reason: " << static_cast<int>(reason);
+    std::string reason_info;
+    switch (reason) {
+    case RegistrationRefuseReasons::BadClientVersion:
+        reason_info = "incompatible node version";
+        break;
+    case RegistrationRefuseReasons::IncompatibleBlockchain:
+        reason_info = "incompatible blockchain version";
+        break;
+    case RegistrationRefuseReasons::LimitReached:
+        reason_info = "maximum connections limit on remote node is reached";
+        break;
+    default:
+        {
+            std::ostringstream os;
+            os << "reason code " << static_cast<int>(reason);
+            reason_info = os.str();
+        }
+        break;
+    }
+    cslog() << "Registration to " << task->sender << " refused: " << reason_info;
 
     return true;
 }
