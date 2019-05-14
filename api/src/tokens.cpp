@@ -37,7 +37,7 @@ static csdb::Address tryExtractPublicKey(const std::string& str) {
     csdb::Address result;
     std::vector<uint8_t> vc;
     bool decodeSucc = DecodeBase58(str, vc);
-    if (!decodeSucc || vc.size() != PUBLIC_KEY_LENGTH)
+    if (!decodeSucc || vc.size() != cscrypto::kPublicKeySize)
         return result;
 
     return csdb::Address::from_public_key(vc);
