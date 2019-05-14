@@ -61,6 +61,21 @@ Amount::Amount(double value) {
     return buf;
 }
 
+cs::Bytes Amount::toBytes() {
+    ::csdb::priv::obstream os;
+    put(os);
+    return os.buffer();
+}
+
+Amount Amount::fromBytes(const cs::Bytes& serializedAmount) {
+    ::csdb::priv::ibstream is(serializedAmount.data(), serializedAmount.size());
+    Amount res;
+    if (!res.get(is)) {
+        return Amount();
+    }
+    return res;
+}
+
 void Amount::put(priv::obstream& os) const {
     os.put(integral_);
     os.put(fraction_);
