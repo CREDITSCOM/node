@@ -441,7 +441,10 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     }
     // Repeat request
     else if (isAvailableRequest(neighbour)) {
-        csmeta(csdetails) << "From repeat request: [" << neighbour.sequences().front() << ", " << neighbour.sequences().back() << "]";
+        if (!neighbour.sequences().empty()) {
+            csmeta(csdetails) << "From repeat request: [" << neighbour.sequences().front() << ", " << neighbour.sequences().back() << "]";
+        }
+
         neighbour.resetRoundCounter();
         return true;
     }
