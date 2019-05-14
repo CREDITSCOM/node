@@ -46,15 +46,12 @@ static ip::udp::socket bindSocket(io_context& context, Network* net, const Endpo
         sock.set_option(ip::udp::socket::receive_buffer_size(1 << 23));
 #endif
 
-#ifdef WIN32
+#ifdef DISABLE_WIN_SOCKET_ERRORS
         BOOL bNewBehavior = FALSE;
         DWORD dwBytesReturned = 0;
-        csunused(bNewBehavior);
-        csunused(dwBytesReturned);
-#ifdef DISABLE_WIN_SOCKET_ERRORS
+
         WSAIoctl(sock.native_handle(), SIO_UDP_CONNRESET, &bNewBehavior, sizeof(bNewBehavior), nullptr, 0, &dwBytesReturned, nullptr, nullptr);
         WSAIoctl(sock.native_handle(), SIO_UDP_NETRESET, &bNewBehavior, sizeof(bNewBehavior), nullptr, 0, &dwBytesReturned, nullptr, nullptr);
-#endif
 #endif
         if (data.ipSpecified) {
             auto ep = net->resolve(data);
@@ -428,7 +425,7 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
     if (ep.size() > 16) {
         cslog() << "endpoint address too big " << ep.size();
         const uint8_t* ptr = reinterpret_cast<const uint8_t*>(ep.data());
-        for (int i = 0; i < ep.size(); i++) {
+        for (size_t i = 0; i < ep.size(); i++) {
             cslog() << *ptr++;
         }
     }

@@ -317,8 +317,15 @@ public:
             general::Variant var;
             var.__set_v_string(smartTrxn.amount().to_string());
             params.emplace_back(var);
-            var.__set_v_string(smartTrxn.currency().to_string());
-            params.emplace_back(var);
+
+			if (smartTrxn.user_field(1).is_valid()) {
+				var.__set_v_string(smartTrxn.user_field(1).value<std::string>());
+				params.emplace_back(var);
+			}
+			else {
+				var.__set_v_string("");
+				params.emplace_back(var);
+			}
         }
         else if (!isdeploy) {
             sci = deserialize<api::SmartContractInvocation>(smartTrxn.user_field(0).value<std::string>());
