@@ -59,10 +59,10 @@ uint32_t Packet::calculateHeadersLength() const {
     }
 
     if (!isNetwork()) {
-        length += PUBLIC_KEY_LENGTH + sizeof(getId());  // Sender key + ID
+        length += kPublicKeyLength + sizeof(getId());  // Sender key + ID
 
         if (!isBroadcast() && !isNeighbors()) {
-            length += PUBLIC_KEY_LENGTH;  // Receiver key
+            length += kPublicKeyLength;  // Receiver key
         }
     }
 
@@ -312,7 +312,7 @@ std::ostream& operator<<(std::ostream& os, const Packet& packet) {
 
     if (packet.isNetwork()) {
         const uint8_t* data = packet.getMsgData();
-        os << getNetworkCommandString(static_cast<NetworkCommand>(*data)) << "(" << int(*data) << "), ";
+        os << Transport::networkCommandToString(static_cast<NetworkCommand>(*data)) << "(" << int(*data) << "), ";
         os << "flags: " << PacketFlags(packet);
         return os;
     }

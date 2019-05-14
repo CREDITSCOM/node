@@ -69,8 +69,6 @@ enum class SSBootstrapStatus : uint8_t {
 template <>
 uint16_t getHashIndex(const ip::udp::endpoint&);
 
-const char* getNetworkCommandString(NetworkCommand command);
-
 class Transport {
 public:
     Transport(const Config& config, Node* node)
@@ -97,6 +95,8 @@ public:
     static void stop() {
         Transport::gSignalStatus = 1;
     }
+
+    static const char* networkCommandToString(NetworkCommand command);
 
     RemoteNodePtr getPackSenderEntry(const ip::udp::endpoint&);
 
@@ -273,9 +273,9 @@ private:
     FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, fragmentsFixedMapSize_> fragOnRound_;
 
 public:
-    static size_t cntDirtyAllocs;
-    static size_t cntCorruptedFragments;
-    static size_t cntExtraLargeNotSent;
+    inline static size_t cntDirtyAllocs = 0;
+    inline static size_t cntCorruptedFragments = 0;
+    inline static size_t cntExtraLargeNotSent = 0;
 };
 
 #endif  // TRANSPORT_HPP

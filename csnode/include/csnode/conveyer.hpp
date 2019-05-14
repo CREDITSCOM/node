@@ -33,7 +33,7 @@ public:
     };
 
     enum : unsigned int {
-        HashTablesStorageCapacity = cs::values::defaultMetaStorageMaxSize,
+        HashTablesStorageCapacity = cs::values::kDefaultMetaStorageMaxSize,
         CharacteristicMetaCapacity = HashTablesStorageCapacity,
 
         // queue

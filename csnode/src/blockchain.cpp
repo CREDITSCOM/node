@@ -383,7 +383,7 @@ void BlockChain::removeLastBlock() {
 }
 
 csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
-    if (key.size() == PUBLIC_KEY_LENGTH) {
+    if (key.size() == kPublicKeyLength) {
         csdb::Address res = csdb::Address::from_public_key(key.data());
         return res;
     }
