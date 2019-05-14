@@ -188,3 +188,21 @@ TEST(DataStream, CorrectValuesSerialization) {
     ASSERT_EQ(static_cast<int>(doubleValue), static_cast<int>(expectedDoubleValue));
     ASSERT_EQ(int64Value, expectedInt64Value);
 }
+
+TEST(DataStream, CorrectAmountSerialization) {
+    csdb::Amount amount{100};
+
+    cs::Bytes bytes;
+    cs::DataStream stream(bytes);
+
+    stream << amount;
+
+    ASSERT_TRUE(stream.size() != 0);
+
+    cs::DataStream readStream(bytes.data(), bytes.size());
+    csdb::Amount expectedAmount;
+
+    readStream >> expectedAmount;
+
+    ASSERT_TRUE(amount == expectedAmount);
+}
