@@ -525,7 +525,7 @@ template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(cs::HashMatrix& hashMatrix) {
     (*this) >> hashMatrix.sender;
 
-    for (std::size_t i = 0; i < hashVectorCount; ++i) {
+    for (std::size_t i = 0; i < kHashVectorCount; ++i) {
         (*this) >> hashMatrix.hashVector[i];
     }
 
@@ -651,7 +651,7 @@ template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const cs::HashMatrix& hashMatrix) {
     (*this) << hashMatrix.sender;
 
-    for (std::size_t i = 0; i < hashVectorCount; ++i) {
+    for (std::size_t i = 0; i < kHashVectorCount; ++i) {
         (*this) << hashMatrix.hashVector[i];
     }
 

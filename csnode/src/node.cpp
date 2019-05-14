@@ -799,7 +799,7 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
     CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::onPingReceived(cs::Sequence sequence) {
+void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     // TODO: remove max difference after last sequence rework
     static constexpr size_t maxDifference = 15'000'000;
     static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
@@ -826,10 +826,7 @@ void Node::onPingReceived(cs::Sequence sequence) {
             cswarning() << "Last sequence is lower than network max sequence, trying to sync";
 
             CallsQueue::instance().insert([=] {
-                cs::Conveyer::instance().setRound(maxSequence);
-
-                auto sequenceDifference = maxSequence - lastSequence;
-                poolSynchronizer_->sync(maxSequence, sequenceDifference);
+                roundPackRequest(sender, maxSequence);
             });
         }
     }
@@ -2429,7 +2426,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     //}
 }
 
-void Node::roundPackRequest(cs::PublicKey respondent, cs::RoundNumber round) {
+void Node::roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round) {
     csdebug() << "NODE> send request for round info  #" << round;
     sendDefault(respondent, MsgTypes::RoundPackRequest, round);
     //expectedRounds_.push_back(round);
@@ -2447,7 +2444,7 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
     }
 }
 
-void Node::roundPackReply(cs::PublicKey respondent) {
+void Node::roundPackReply(const cs::PublicKey& respondent) {
     csdebug() << "NODE> sending roundPack reply to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
     sendDefault(respondent, MsgTypes::RoundTable, currentRoundTableMessage_.round, currentRoundTableMessage_.message);
 }

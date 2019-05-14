@@ -1,35 +1,33 @@
-#pragma once
+#ifndef PACKETVALIDATOR_HPP
+#define PACKETVALIDATOR_HPP
 
 #include <net/transport.hpp>
 
-namespace cs
-{
-    class PacketValidator
-    {
-    public:
+namespace cs {
+class PacketValidator {
+public:
+    static PacketValidator& instance();
 
-        static PacketValidator& instance();
+    bool validate(const Packet& pack);
+    bool validate(const Message& msg);
 
-        bool validate(const Packet& pack);
-        bool validate(const Message& msg);
+    const cs::PublicKey& getStarterKey() const {
+        return starterKey_;
+    }
 
-        const cs::PublicKey& getStarterKey() const {
-            return starter_key;
-        }
+private:
+    cs::PublicKey starterKey_;
 
-    private:
+    PacketValidator();
 
-        cs::PublicKey starter_key;
+    bool validate(MsgTypes msg, const uint8_t* data, size_t size);
 
-        PacketValidator();
+    bool validateStarterSignature(const uint8_t* data, size_t size);
 
-        bool validate(MsgTypes msg, const uint8_t* data, size_t size);
+    bool validateRegistration(size_t size);
+    bool validateStarterRegistration(const Packet& pack);
+    bool validateStopRequest(const uint8_t* data, size_t size);
+};
+}  // namespace cs
 
-        bool validateStarterSignature(const uint8_t* data, size_t size);
-
-        bool validateRegistration(size_t size);
-        bool validateStarterRegistration(const Packet& pack);
-        bool validateStopRequest(const uint8_t* data, size_t size);
-
-    };
-}
+#endif // PACKETVALIDATOR_HPP

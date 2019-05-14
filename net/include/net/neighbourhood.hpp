@@ -168,7 +168,7 @@ public:
 
     void pingNeighbours();
     bool isPingDone();
-    void validateConnectionId(RemoteNodePtr, const Connection::Id, const ip::udp::endpoint&, const cs::PublicKey&, const cs::Sequence);
+    bool validateConnectionId(RemoteNodePtr, const Connection::Id, const ip::udp::endpoint&, const cs::PublicKey&, const cs::Sequence);
 
     ConnectionPtr getConnection(const RemoteNodePtr);
     ConnectionPtr getNextRequestee(const cs::Hash&);

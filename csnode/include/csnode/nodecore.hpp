@@ -14,11 +14,6 @@
 #include <lib/system/common.hpp>
 #include <lib/system/metastorage.hpp>
 
-// time in ms only
-const std::size_t TIME_TO_AWAIT_ACTIVITY = 50;
-const std::size_t ROUND_DELAY = 1000;
-const std::size_t TIME_TO_AWAIT_SS_ROUND = 10000;
-
 namespace std {
 // transactions packet hash specialization
 template <>
@@ -60,12 +55,12 @@ enum ConveyerConsts : uint32_t {
     TransactionsPacketInterval = 1000
 };
 
-enum ConfidantConsts : uint8_t {
+enum ConfidantConsts : Byte {
     FirstWriterIndex = std::numeric_limits<uint8_t>::min(),
     InvalidConfidantIndex = std::numeric_limits<uint8_t>::max(),
 };
 
-enum SpoilingConsts : uint8_t {
+enum SpoilingConsts : Byte {
     SpoilByRoundNumber,
     SpoilByPublicKey,
 };
@@ -100,11 +95,11 @@ struct HashVector {
     cs::Signature signature;
 };
 
-constexpr std::size_t hashVectorCount = 5;
+constexpr std::size_t kHashVectorCount = 5;
 
 struct HashMatrix {
     cs::Byte sender;
-    cs::HashVector hashVector[hashVectorCount];
+    cs::HashVector hashVector[kHashVectorCount];
     cs::Signature signature;
 };
 
@@ -144,15 +139,13 @@ using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;
 using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
 
 // zero constants, used as "empty"
-struct Zero
-{
-    static cs::Hash hash;
-    static cs::Signature signature;
-    static cs::PublicKey key;
+struct Zero {
+    inline static cs::Hash hash;
+    inline static cs::Signature signature;
+    inline static cs::PublicKey key;
 
     Zero();
 };
-
 }  // namespace cs
 
 #endif  // NODE_CORE_HPP
