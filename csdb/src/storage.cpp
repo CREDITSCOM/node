@@ -140,12 +140,12 @@ private:
     std::mutex write_lock;
     std::condition_variable write_cond_var;
 
+private signals:
+    ReadBlockSignal read_block_event;
+
     // TODO: Добавить кеш для хранения последних вычитанных пулов транзакций
 
     friend class ::csdb::Storage;
-
-private signals:
-    ReadBlockSignal read_block_event;
 };
 
 void Storage::priv::set_last_error(Storage::Error error, const ::std::string& message) {
@@ -204,6 +204,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
         }
 
         bool test_failed = false;
+
         emit read_block_event(p, &test_failed);
 
         if (test_failed) {
@@ -337,10 +338,6 @@ Database::Error Storage::db_last_error() const {
         return d->db->last_error_message();
     }
     return ::std::string{"Database not specified"};
-}
-
-ReadBlockSignal* Storage::read_block_event() const {
-    return &d->read_block_event;
 }
 
 bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
@@ -641,9 +638,9 @@ Wallet Storage::wallet(const Address& addr) const {
     return Wallet::get(addr);
 }
 
-bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& InnerId /*input*/, Transaction& trx /*output*/) const {
+bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& innerId /*input*/, Transaction& trx /*output*/) const {
     Pool curPool;
-    cs::Sequence curIdx = cs::numeric_cast<cs::Sequence>(InnerId);
+    cs::Sequence curIdx = cs::numeric_cast<cs::Sequence>(innerId);
     bool is_in_blockchain = false;
 
     auto nextIt = [this, &curPool, &curIdx]() -> bool {
@@ -677,7 +674,7 @@ bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& 
 
     do {
         const Transaction trx_curr = curPool.transaction(curIdx);
-        if (trx_curr.source() == addr && trx_curr.innerID() == InnerId) {
+        if (trx_curr.source() == addr && trx_curr.innerID() == innerId) {
             is_in_blockchain = true;
             trx = trx_curr;
             break;
@@ -685,6 +682,10 @@ bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& 
     } while (nextIt());
 
     return is_in_blockchain;
+}
+
+const ReadBlockSignal& Storage::readBlockEvent() const {
+    return d->read_block_event;
 }
 
 std::vector<Transaction> Storage::transactions(const Address& addr, size_t limit, const TransactionID& offset) const {
