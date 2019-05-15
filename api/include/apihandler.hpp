@@ -317,8 +317,15 @@ public:
             general::Variant var;
             var.__set_v_string(smartTrxn.amount().to_string());
             params.emplace_back(var);
-            var.__set_v_string(smartTrxn.currency().to_string());
-            params.emplace_back(var);
+
+			if (smartTrxn.user_field(1).is_valid()) {
+				var.__set_v_string(smartTrxn.user_field(1).value<std::string>());
+				params.emplace_back(var);
+			}
+			else {
+				var.__set_v_string("");
+				params.emplace_back(var);
+			}
         }
         else if (!isdeploy) {
             sci = deserialize<api::SmartContractInvocation>(smartTrxn.user_field(0).value<std::string>());
@@ -344,18 +351,29 @@ public:
         const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
 
         ExecuteResult res;
-        if (optInnerTransactions.has_value())
-            res.trxns = optInnerTransactions.value();
-        deleteInnerSendTransactions(optOriginRes.value().acceessId);
-        constexpr double FEE_IN_SECOND = kMinFee * 4.0;
-        const double fee = std::min(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SECOND);
-        res.fee = csdb::Amount(fee);
-        res.newState = optOriginRes.value().resp.invokedContractState;
-        for (const auto& [itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
-            const csdb::Address addr = BlockChain::getAddressFromKey(itAddress);
-            res.states[addr] = itState;
+        const auto resp = optOriginRes.value().resp;
+        if (resp.status.code != 0) {
+            if (!resp.status.message.empty()) {
+                res.retValue.__set_v_string(resp.status.message);
+            }
+            else {
+                res.retValue = resp.ret_val;
+            }
         }
-        res.retValue = optOriginRes.value().resp.ret_val;
+        else {
+            if (optInnerTransactions.has_value())
+                res.trxns = optInnerTransactions.value();
+            deleteInnerSendTransactions(optOriginRes.value().acceessId);
+            constexpr double FEE_IN_SECOND = kMinFee * 4.0;
+            const double fee = std::min(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SECOND);
+            res.fee = csdb::Amount(fee);
+            res.newState = optOriginRes.value().resp.invokedContractState;
+            for (const auto& [itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
+                const csdb::Address addr = BlockChain::getAddressFromKey(itAddress);
+                res.states[addr] = itState;
+            }
+            res.retValue = optOriginRes.value().resp.ret_val;
+        }
         return res;
     }
 

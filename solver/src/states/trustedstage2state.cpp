@@ -5,9 +5,12 @@
 #include <lib/system/logger.hpp>
 #include <csnode/conveyer.hpp>
 
-namespace cs {
+namespace
+{
+    constexpr uint64_t TIMER_BASE_ID = 20;
+}
 
-#define TIMER_BASE_ID 20
+namespace cs {
 
 void TrustedStage2State::on(SolverContext& context) {
     DefaultStateBehavior::on(context);

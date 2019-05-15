@@ -8,13 +8,6 @@
 #include "network.hpp"
 #include "transport.hpp"
 
-/*static*/
-size_t Transport::cntDirtyAllocs = 0;
-/*static*/
-size_t Transport::cntCorruptedFragments = 0;
-/*static*/
-size_t Transport::cntExtraLargeNotSent = 0;
-
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
     Node::requestStop();
@@ -92,10 +85,9 @@ void addMyOut(const Config& config, cs::OPackStream& stream, const uint8_t initF
     *flagChar |= initFlagValue | regFlag;
 }
 
-void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t bch_uuid) {
+void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t uuid) {
     stream.init(BaseFlags::NetworkMsg);
-
-    stream << NetworkCommand::Registration << NODE_VERSION << bch_uuid;
+    stream << NetworkCommand::Registration << NODE_VERSION << uuid;
 
     addMyOut(config, stream);
     *regPackConnId = reinterpret_cast<uint64_t*>(stream.getCurrentPtr());
@@ -103,7 +95,7 @@ void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPa
     stream << static_cast<ConnectionId>(0) << pk;
 }
 
-void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::PublicKey& pk, uint64_t bch_uuid) {
+void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::PublicKey& pk, uint64_t uuid) {
     stream.init(BaseFlags::NetworkMsg);
     stream << NetworkCommand::SSRegistration
 #ifdef _WIN32
@@ -113,7 +105,7 @@ void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::
 #else
         << Platform::Linux
 #endif
-        << NODE_VERSION << bch_uuid;
+        << NODE_VERSION << uuid;
 
     uint8_t flag = (config.getNodeType() == NodeType::Router) ? 8 : 0;
     addMyOut(config, stream, flag);
@@ -185,6 +177,47 @@ void Transport::run() {
     }
 
     cswarning() << "[Transport::run STOPED!]";
+}
+
+const char* Transport::networkCommandToString(NetworkCommand command) {
+    switch (command) {
+    case NetworkCommand::Registration:
+        return "Registration";
+    case NetworkCommand::ConfirmationRequest:
+        return "ConfirmationRequest";
+    case NetworkCommand::ConfirmationResponse:
+        return "ConfirmationResponse";
+    case NetworkCommand::RegistrationConfirmed:
+        return "RegistrationConfirmed";
+    case NetworkCommand::RegistrationRefused:
+        return "RegistrationRefused";
+    case NetworkCommand::Ping:
+        return "Ping";
+    case NetworkCommand::PackInform:
+        return "PackInform";
+    case NetworkCommand::PackRequest:
+        return "PackRequest";
+    case NetworkCommand::PackRenounce:
+        return "PackRenounce";
+    case NetworkCommand::BlockSyncRequest:
+        return "BlockSyncRequest";
+    case NetworkCommand::SSRegistration:
+        return "SSRegistration";
+    case NetworkCommand::SSFirstRound:
+        return "SSFirstRound";
+    case NetworkCommand::SSRegistrationRefused:
+        return "SSRegistrationRefused";
+    case NetworkCommand::SSPingWhiteNode:
+        return "SSPingWhiteNode";
+    case NetworkCommand::SSLastBlock:
+        return "SSLastBlock";
+    case NetworkCommand::SSReRegistration:
+        return "SSReRegistration";
+    case NetworkCommand::SSSpecificBlock:
+        return "SSSpecificBlock";
+    default:
+        return "Unknown";
+    }
 }
 
 template <>
@@ -270,6 +303,13 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
 
     if (!iPackStream_.good()) {
         return sender->addStrike();
+    }
+
+    if (cmd != NetworkCommand::Registration) {
+        if (sender->isBlackListed()) {
+            csdebug() << "Network command is ignored from blacklisted " << task->sender;
+            return;
+        }
     }
 
     bool result = true;
@@ -545,7 +585,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
 
     // cut slow packs
     if ((rNum + getRoundTimeout(type)) < cs::Conveyer::instance().currentRoundNumber()) {
-        csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << ", type " << getMsgTypesString(type) << ", fragments " << firstPack.getFragmentsNum();
+        csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << ", type " << Packet::messageTypeToString(type) << ", fragments " << firstPack.getFragmentsNum();
         return;
     }
 
@@ -596,7 +636,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
         case MsgTypes::RoundPackRequest:
             return node_->getRoundPackRequest(data, size, rNum, firstPack.getSender());
         default:
-            cserror() << "TRANSPORT> Unknown message type " << getMsgTypesString(type) << " pack round " << rNum;
+            cserror() << "TRANSPORT> Unknown message type " << Packet::messageTypeToString(type) << " pack round " << rNum;
             break;
     }
 }
@@ -780,14 +820,15 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         return true;
     }
 
+    RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
     uint64_t local_uuid = node_->getBlockChain().uuid();
     if (local_uuid != 0 && remote_uuid != 0 && local_uuid != remote_uuid) {
         sendRegistrationRefusal(conn, RegistrationRefuseReasons::IncompatibleBlockchain);
-
-        RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
         ptr->setBlackListed(true);
-
         return true;
+    }
+    else {
+        ptr->setBlackListed(false);
     }
 
     iPackStream_ >> conn.id;
@@ -830,7 +871,26 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 
     nh_.gotRefusal(id);
 
-    cslog() << "Registration to " << task->sender << " refused. Reason: " << static_cast<int>(reason);
+    std::string reason_info;
+    switch (reason) {
+    case RegistrationRefuseReasons::BadClientVersion:
+        reason_info = "incompatible node version";
+        break;
+    case RegistrationRefuseReasons::IncompatibleBlockchain:
+        reason_info = "incompatible blockchain version";
+        break;
+    case RegistrationRefuseReasons::LimitReached:
+        reason_info = "maximum connections limit on remote node is reached";
+        break;
+    default:
+        {
+            std::ostringstream os;
+            os << "reason code " << static_cast<int>(reason);
+            reason_info = os.str();
+        }
+        break;
+    }
+    cslog() << "Registration to " << task->sender << " refused: " << reason_info;
 
     return true;
 }
@@ -901,7 +961,7 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>&) {
         cserror() << "Your blockchain version is incompatible. You only may join the network with empty blockchain";
         break;
     default:
-        cserror() << "The reason code is " << (int)reason;
+        cserror() << "The reason code is " << static_cast<int>(reason);
         break;
     }
 
@@ -1176,45 +1236,4 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     }
 
     return true;
-}
-
-const char* getNetworkCommandString(NetworkCommand command) {
-    switch (command) {
-    default:
-        return "Unknown";
-    case NetworkCommand::Registration:
-        return "Registration";
-    case NetworkCommand::ConfirmationRequest:
-        return "ConfirmationRequest";
-    case NetworkCommand::ConfirmationResponse:
-        return "ConfirmationResponse";
-    case NetworkCommand::RegistrationConfirmed:
-        return "RegistrationConfirmed";
-    case NetworkCommand::RegistrationRefused:
-        return "RegistrationRefused";
-    case NetworkCommand::Ping:
-        return "Ping";
-    case NetworkCommand::PackInform:
-        return "PackInform";
-    case NetworkCommand::PackRequest:
-        return "PackRequest";
-    case NetworkCommand::PackRenounce:
-        return "PackRenounce";
-    case NetworkCommand::BlockSyncRequest:
-        return "BlockSyncRequest";
-    case NetworkCommand::SSRegistration:
-        return "SSRegistration";
-    case NetworkCommand::SSFirstRound:
-        return "SSFirstRound";
-    case NetworkCommand::SSRegistrationRefused:
-        return "SSRegistrationRefused";
-    case NetworkCommand::SSPingWhiteNode:
-        return "SSPingWhiteNode";
-    case NetworkCommand::SSLastBlock:
-        return "SSLastBlock";
-    case NetworkCommand::SSReRegistration:
-        return "SSReRegistration";
-    case NetworkCommand::SSSpecificBlock:
-        return "SSSpecificBlock";
-    }
 }

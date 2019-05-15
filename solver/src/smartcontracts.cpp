@@ -981,6 +981,15 @@ bool SmartContracts::execute(SmartExecutionData& data) {
         auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
         if (maybe_result.has_value()) {
             data.result = maybe_result.value();
+            if (data.result.newState.empty()) {
+                if (data.result.retValue.__isset.v_string) {
+                    data.error = data.result.retValue.v_string;
+                    data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+                }
+                else {
+                    data.error = "contract execution failed, contract state is unchanged";
+                }
+            }
         }
         else {
             data.error = "contract execution failed";
@@ -1080,6 +1089,7 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
     cs::TransactionsPacket packet;
     if (!data.error.empty()) {
         cserror() << std::endl << kLogPrefix << data.error << std::endl;
+        csdebug() << kLogPrefix << "execution of smart contract is failed, new state is empty";
         // result contains empty USRFLD[state::Value]
         result.add_user_field(new_state::Value, std::string{});
         // result contains error code from ret_val
@@ -1411,7 +1421,7 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
                     const auto& a0 = m.arguments[0];
                     if (a0.name == PayableNameArg0 && a0.type == PayableArgType) {
                         const auto& a1 = m.arguments[1];
-                        if (a1.name == PayableNameArg1 && a1.type == PayableArgType) {
+                        if (/*a1.name == PayableNameArg1 &&*/ a1.type == PayableArgType) {
                             state.payable = PayableStatus::Implemented;
                         }
                     }

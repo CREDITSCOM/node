@@ -207,7 +207,7 @@ api::Amount convertAmount(const csdb::Amount& amount) {
 
 api::TransactionId convert_transaction_id(const csdb::TransactionID& trid) {
     api::TransactionId result_id;
-    result_id.index = trid.index();
+    result_id.index = (uint32_t) trid.index();
     result_id.poolHash = fromByteArray(trid.pool_hash().to_binary());
     return result_id;
 }
@@ -782,7 +782,7 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
     else
         smart_transaction_flow(_return, transaction);
 
-    _return.roundNum = cs::Conveyer::instance().currentRoundTable().round;
+    _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
@@ -804,7 +804,7 @@ void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offs
     }
 
     PoolListGetStable(_return, fromByteArray(hash.to_binary()), const_limit);
-    _return.count = sequence + 1;
+    _return.count = uint32_t(sequence + 1);
 }
 
 void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const PoolHash& hash, const int64_t offset, const int64_t limit) {
@@ -1246,7 +1246,7 @@ void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::P
             hash = pool.previous_hash();
 
             if (!limSet) {
-                _return.count = pool.sequence() + 1;
+                _return.count = uint32_t(pool.sequence() + 1);
                 limSet = true;
             }
         }
@@ -1255,7 +1255,7 @@ void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::P
             hash = csdb::PoolHash::from_binary(toByteArray(cch->second.prevHash));
 
             if (!limSet) {
-                _return.count = cch->second.poolNumber + 1;
+                _return.count = uint32_t(cch->second.poolNumber + 1);
                 limSet = true;
             }
         }
@@ -1295,7 +1295,7 @@ void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, 
 
     auto locked_smart_origin = lockedReference(this->smart_origin);
 
-    _return.count = locked_smart_origin->size();
+    _return.count = (uint32_t) locked_smart_origin->size();
 
     for (auto p : *locked_smart_origin) {
         if (offset) {
@@ -1370,7 +1370,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
             }
         }
     }
-    _return.roundNum = cs::Conveyer::instance().currentRoundTable().round;
+    _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
@@ -1415,7 +1415,7 @@ void addTokenResult(api::TokenTransfersResult& _return, const csdb::Address& tok
     transfer.initiator = fromByteArray(handler.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
 
     transfer.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
-    transfer.transaction.index = tr.id().index();
+    transfer.transaction.index = (uint32_t) tr.id().index();
     transfer.time = atoll(pool.user_field(0).value<std::string>().c_str());
     _return.transfers.push_back(transfer);
 }
@@ -1425,7 +1425,7 @@ void addTokenResult(api::TokenTransactionsResult& _return, const csdb::Address& 
     api::TokenTransaction trans;
     trans.token = fromByteArray(token.public_key());
     trans.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
-    trans.transaction.index = tr.id().index();
+    trans.transaction.index = (uint32_t) tr.id().index();
     trans.time = atoll(pool.user_field(0).value<std::string>().c_str());
     trans.initiator = fromByteArray(handler.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
     trans.method = smart.method;
@@ -1439,9 +1439,9 @@ void putTokenInfo(api::TokenInfo& ti, const general::Address& addr, const Token&
     ti.name = token.name;
     ti.totalSupply = token.totalSupply;
     ti.owner = fromByteArray(token.owner.public_key());
-    ti.transfersCount = token.transfersCount;
-    ti.transactionsCount = token.transactionsCount;
-    ti.holdersCount = token.realHoldersCount;
+    ti.transfersCount = (uint32_t) token.transfersCount;
+    ti.transactionsCount = (uint32_t) token.transactionsCount;
+    ti.holdersCount = (uint32_t) token.realHoldersCount;
     ti.standart = (decltype(api::TokenInfo::standart))(uint32_t)(token.standart);
 }
 
@@ -1870,7 +1870,7 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
         auto tIt = tm.find(addr);
         if (tIt != tm.end()) {
             found = true;
-            _return.count = tIt->second.realHoldersCount;
+            _return.count = (uint32_t) tIt->second.realHoldersCount;
 
             applyToSortedMap(tIt->second.holders, comparator, [&offset, &limit, &_return, &token](const HMap::value_type& t) {
                 if (TokensMaster::isZeroAmount(t.second.balance))
@@ -1883,7 +1883,7 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
                 th.holder = fromByteArray(t.first.public_key());
                 th.token = token;
                 th.balance = t.second.balance;
-                th.transfersCount = t.second.transfersCount;
+                th.transfersCount = (uint32_t) t.second.transfersCount;
 
                 _return.holders.push_back(th);
 
@@ -1930,7 +1930,7 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
     };
 
     tm.applyToInternal([&offset, &limit, &_return, comparator](const TokensMap& tm, const HoldersMap&) {
-        _return.count = tm.size();
+        _return.count = (uint32_t) tm.size();
 
         applyToSortedMap(tm, comparator, [&offset, &limit, &_return](const TokensMap::value_type& t) {
             if (--offset >= 0)
@@ -2028,7 +2028,7 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
         _return.wallets.push_back(wi);
     }
 
-    _return.count = s_blockchain.getWalletsCountWithBalance();
+    _return.count = (uint32_t) s_blockchain.getWalletsCountWithBalance();
 }
 
 void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {

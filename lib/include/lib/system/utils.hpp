@@ -378,16 +378,6 @@ public:
         return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
     }
 
-    static std::string roundsToString(const std::vector<cs::RoundNumber> rounds) {
-        std::string value = "(";
-        for(auto it : rounds) {
-            value += it + "), (";
-        }
-        value += ")";
-        return value;
-
-    }
-
     ///
     /// Splits vector on equals parts
     ///

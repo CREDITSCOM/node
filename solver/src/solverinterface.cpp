@@ -425,4 +425,9 @@ void SolverCore::gotRoundInfoReply(bool next_round_started, const cs::PublicKey&
     csdebug() << "SolverCore: round info reply means next round is not started, become writer";
     handleTransitions(SolverCore::Event::SetWriter);
 }
+
+bool SolverCore::isContractLocked(const csdb::Address& address) const {
+    return psmarts->is_contract_locked(address);
+}
+
 }  // namespace cs
