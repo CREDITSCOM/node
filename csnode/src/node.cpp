@@ -2325,8 +2325,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         csmeta(cserror) << "Illegal confidants count in round table";
         return;
     }
-    /*   expectedRounds_.push_back(rNum + 1);
-       csdebug() << "ExpectedRounds: " << cs::Utils::roundsToString(expectedRounds_);*/
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
     poolSynchronizer_->sync(conveyer.currentRoundNumber());
@@ -2334,11 +2332,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         cs::RoundTable roundTable;
         roundTable.round = rNum;
         roundTable.confidants = confidants;
-        //roundTable.hashes = std::move(hashes);
-        //roundTable.general = sender;
-        //csdebug() << "NODE> confidants: " << roundTable.confidants.size();
-
-        // first change conveyer state
         conveyer.setTable(roundTable);
     }
     cs::Bytes realTrusted;
@@ -2346,10 +2339,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     cs::Signatures poolSignatures;
 
-    if (rNum > storedRound && rNum - storedRound == 1) {
-        if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures)) {
-            return;
-        }
+    if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures) && storedRound == getBlockChain().getLastSequence()) {
+        return;
     }
 
     // update sub round
