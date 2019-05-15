@@ -266,7 +266,7 @@ public:
         if (isFragmented()) {
             const auto fragment = getFragmentId();
             const auto count = getFragmentsNum();
-            if (fragment >= MaxFragments || count >= MaxFragments || fragment >= count) {
+            if (count == 0 || fragment >= MaxFragments || count >= MaxFragments || fragment >= count) {
                 return false;
             }
         }
