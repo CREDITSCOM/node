@@ -76,9 +76,10 @@ inline void print(std::ostream& os, const ::general::Variant& var) {
         */
         print_default = true;
     }
+    os << ')';
 
     if( print_default ) {
-        os << ") => ";
+        os << ": ";
         var.printTo( os );
     }
 }
