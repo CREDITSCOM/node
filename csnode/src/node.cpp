@@ -2328,12 +2328,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
     poolSynchronizer_->sync(conveyer.currentRoundNumber());
-    if (poolSynchronizer_->isSyncroStarted()) {
-        cs::RoundTable roundTable;
-        roundTable.round = rNum;
-        roundTable.confidants = confidants;
-        conveyer.setTable(roundTable);
-    }
     cs::Bytes realTrusted;
     roundStream >> realTrusted;
 
