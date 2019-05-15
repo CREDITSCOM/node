@@ -56,14 +56,14 @@ public:
     // void getSmartResult(const cs::TransactionsPacket pack);
     void refreshSmartStagesStorage();
     void processStages();
-    csdb::Amount calculateFinalFee(const csdb::Amount& finalFee, size_t realTrustedAmount);
+    std::vector <csdb::Amount> calculateFinalFee(const std::vector <csdb::Amount>& finalFee, size_t realTrustedAmount);
 
     bool smartStageOneEnough();
     bool smartStageTwoEnough();
     bool smartStageThreeEnough();
     cs::Sequence smartRoundNumber();
 
-    void createFinalTransactionSet(const csdb::Amount finalFee);
+    void createFinalTransactionSet(const std::vector<csdb::Amount>& finalFees);
     size_t smartStage3StorageSize();
     void sendFinalTransactionSet();
     bool smartConfidantExist(uint8_t);
@@ -128,7 +128,7 @@ private:
     uint8_t ownSmartsConfNum_ = cs::ConfidantConsts::InvalidConfidantIndex;
     cs::TransactionsPacket currentSmartTransactionPack_;
     cs::TransactionsPacket finalSmartTransactionPack_;
-    csdb::Transaction tmpNewState_;
+    std::vector <csdb::Transaction> tmpNewStates_;
     cs::StageOneSmarts st1;
     cs::StageTwoSmarts st2;
     cs::StageThreeSmarts st3;

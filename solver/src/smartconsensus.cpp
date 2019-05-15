@@ -11,6 +11,8 @@
 #include <csnode/datastream.hpp>
 #include <solvercore.hpp>
 
+#include <cscrypto/cscrypto.hpp>
+
 namespace {
 const char* kLogPrefix = "Smart: ";
 }
@@ -47,16 +49,16 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     smartTransaction_ = std::numeric_limits<uint32_t>::max();
     timeoutStageCounter_ = 0;
     // csdb::Address abs_addr;
-    csdb::Amount executor_fee{0};
+    std::vector <csdb::Amount> executor_fees;
     cs::TransactionsPacket tmpPacket;
-    bool primary_new_state_found = false;
+    /*bool primary_new_state_found = false;*/
 
     for (const auto& tr : pack.transactions()) {
         // only the 1st new_state is specifically handled
-        if (SmartContracts::is_new_state(tr) && !primary_new_state_found) {
-            primary_new_state_found = true;
+        if (SmartContracts::is_new_state(tr)/* && !primary_new_state_found*/) {
+            /*primary_new_state_found = true;*/
             // abs_addr = smarts->absolute_address(tr.source());
-
+            csdb::Transaction tmpNewState;
             csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
             if (fld.is_valid()) {
                 SmartContractRef ref(fld);
@@ -67,31 +69,31 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             }
             csdb::UserField fld2 = tr.user_field(trx_uf::new_state::Fee);
             if (fld2.is_valid()) {
-                executor_fee += fld2.value<csdb::Amount>();
+                executor_fees.push_back(fld2.value<csdb::Amount>());
             }
             // break;
             // creating fee free copy of state transaction
-            tmpNewState_.set_amount(tr.amount());
-            tmpNewState_.set_source(tr.source());
-            tmpNewState_.set_target(tr.target());
-            tmpNewState_.set_currency(tr.currency());
-            tmpNewState_.set_counted_fee(tr.counted_fee());
-            tmpNewState_.set_currency(tr.currency());
-            tmpNewState_.set_innerID(tr.innerID());
+            tmpNewState.set_amount(tr.amount());
+            tmpNewState.set_source(tr.source());
+            tmpNewState.set_target(tr.target());
+            tmpNewState.set_currency(tr.currency());
+            tmpNewState.set_counted_fee(tr.counted_fee());
+            tmpNewState.set_currency(tr.currency());
+            tmpNewState.set_innerID(tr.innerID());
 
-            tmpNewState_.add_user_field(trx_uf::new_state::Count, tr.user_field(trx_uf::new_state::Count));
-            tmpNewState_.add_user_field(trx_uf::new_state::RefStart, tr.user_field(trx_uf::new_state::RefStart));
-            tmpNewState_.add_user_field(trx_uf::new_state::RetVal, tr.user_field(trx_uf::new_state::RetVal));
-            tmpNewState_.add_user_field(trx_uf::new_state::Value, tr.user_field(trx_uf::new_state::Value));
-
-            tmpPacket.addTransaction(tmpNewState_);
+            tmpNewState.add_user_field(trx_uf::new_state::Count, tr.user_field(trx_uf::new_state::Count));
+            tmpNewState.add_user_field(trx_uf::new_state::RefStart, tr.user_field(trx_uf::new_state::RefStart));
+            tmpNewState.add_user_field(trx_uf::new_state::RetVal, tr.user_field(trx_uf::new_state::RetVal));
+            tmpNewState.add_user_field(trx_uf::new_state::Value, tr.user_field(trx_uf::new_state::Value));
+            tmpNewStates_.push_back(tmpNewState);
+            tmpPacket.addTransaction(tmpNewStates_.back());
         }
         else {
             tmpPacket.addTransaction(tr);
         }
     }
 
-    if (!primary_new_state_found || 0 == smartRoundNumber_ || std::numeric_limits<uint32_t>::max() == smartTransaction_) {
+    if (/*!primary_new_state_found || */0 == smartRoundNumber_ || std::numeric_limits<uint32_t>::max() == smartTransaction_) {
         cserror() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart contract result packet must contain new state transaction";
         return false;
     }
@@ -108,8 +110,12 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
 
     cslog() << "======================  SMART-ROUND: {" << smartRoundNumber_ << '.' << smartTransaction_ << "} [" << static_cast<int>(ownSmartsConfNum_)
             << "] =========================";
+    std::string strFees;
+    for (auto it : executor_fees) {
+        strFees += (it.to_string(18) + ", ");
+    }
     csdebug() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} SMART confidants (" << smartConfidants_.size()
-              << "), proposed fee: " << executor_fee.to_string(18);
+              << "), proposed fee(s): " << strFees;
 
     // pack_.transactions(0).user_field(1) = 0;
 
@@ -118,7 +124,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     tmpPacket.makeHash();
     auto tmp = tmpPacket.hash().toBinary();
     std::copy(tmp.cbegin(), tmp.cend(), st1.hash.begin());
-    st1.fee = executor_fee;
+    st1.fees = executor_fees;
     // signals subscription
     cs::Connector::connect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
     cs::Connector::connect(&pnode_->gotSmartStageTwo, this, &cs::SmartConsensus::addSmartStageTwo);
@@ -127,6 +133,10 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     st1.id = id();
     pnode_->addSmartConsensus(st1.id);
     st1.sender = ownSmartsConfNum_;
+    if (!st1.fillBinary()) {
+        return false;
+    }
+    st1.signature = cscrypto::generateSignature(pnode_->getSolver()->getPrivateKey(),st1.messageHash.data(), st1.messageHash.size());
     addSmartStageOne(st1, true);
     return true;
 }
@@ -289,9 +299,14 @@ void SmartConsensus::processStages() {
     // perform the evaluation og stages 1 & 2 to find out who is traitor
     int hashFrequency = 1;
     const auto& hash_t = smartStageOneStorage_.at(ownSmartsConfNum_).hash;
+    size_t currentSmartsNumber = smartStageOneStorage_.at(ownSmartsConfNum_).fees.size();
     for (auto& st : smartStageOneStorage_) {
         if (st.sender == ownSmartsConfNum_) {
             continue;
+        }
+        if (st.fees.size() != currentSmartsNumber) {
+            ++(smartUntrusted.at(st.sender));
+            cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (different fee-vector size)";
         }
         if (st.hash != hash_t) {
             ++(smartUntrusted.at(st.sender));
@@ -347,18 +362,26 @@ void SmartConsensus::processStages() {
     size_t idx_writer = static_cast<size_t>(k % cnt_active);
     size_t idx = 0;
 
-    csdb::Amount sumFee(0);
+    std::vector <csdb::Amount> sumFees;
+    size_t feesNumber = smartStageOneStorage_.at(ownSmartsConfNum_).fees.size();
+    sumFees.resize(feesNumber);
+    for (size_t i = 0; i < feesNumber; ++i) {
+        sumFees[i] = csdb::Amount{0};
+    }
     // here will the fee be calculated too
     for (size_t i = 0; i < cnt; ++i) {
         if (st3.realTrustedMask.at(i) != InvalidConfidantIndex) {
-            sumFee += smartStageOneStorage_.at(i).fee;
+            for (size_t j = 0; j < feesNumber; ++j) {
+                sumFees[j] += smartStageOneStorage_.at(i).fees[j];
+            }
+
             if (idx == idx_writer) {
                 st3.writer = static_cast<uint8_t>(i);
             }
             ++idx;
         }
     }
-    csdb::Amount finalFee = calculateFinalFee(sumFee, idx);
+    std::vector <csdb::Amount> finalFees = calculateFinalFee(sumFees, idx);
     csdebug() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} smart consensus result 2 from 3";
     idx = 0;
     for (size_t i = st3.writer; i < cnt + st3.writer; ++i) {
@@ -370,7 +393,7 @@ void SmartConsensus::processStages() {
     }
     csdebug() << kLogPrefix << "{" << smartRoundNumber_ << "} smart consensus result 3 from 3";
     startTimer(3);
-    createFinalTransactionSet(finalFee);
+    createFinalTransactionSet(finalFees);
     st3.packageSignature =
         cscrypto::generateSignature(pnode_->getSolver()->getPrivateKey(), finalSmartTransactionPack_.hash().toBinary().data(), finalSmartTransactionPack_.hash().toBinary().size());
     csmeta(cslog) << "done";
@@ -381,17 +404,27 @@ void SmartConsensus::processStages() {
 }
 
 // TODO: finalize the function
-csdb::Amount SmartConsensus::calculateFinalFee(const csdb::Amount& finalFee, size_t realTrustedAmount) {
-    csdb::Amount fee{0};
+std::vector <csdb::Amount> SmartConsensus::calculateFinalFee(const std::vector <csdb::Amount>& finalFees, size_t realTrustedAmount) {
+    csdebug() << __func__;
+    std::vector <csdb::Amount> fees;
+    fees.resize(finalFees.size());
+    for (size_t i = 0; i < finalFees.size(); ++i) {
+        fees[i] = csdb::Amount{ 0 };
+    }
+    csdebug() << __func__ << ": 1";
     uint32_t trustedNumber = static_cast<uint32_t>(realTrustedAmount);
-    fee += finalFee;
-    fee /= (trustedNumber * trustedNumber);
-    // csdebug() << "Fee 4 = " << fee.to_string(17);
-    // fee /= 1000;
-    // csdebug() << "Fee 5 = " << fee.to_string(17);
-    fee = fee * static_cast<int32_t>(realTrustedAmount);  // the overloaded operator *= doesn't work correct
-    csdebug() << "Final fee = " << fee.to_string(17);
-    return fee;
+    for (size_t j = 0; j < finalFees.size(); ++j) {
+        fees[j] += finalFees[j];
+        fees[j] /= (trustedNumber * trustedNumber);
+        fees[j] = fees[j] * static_cast<int32_t>(realTrustedAmount);  // the overloaded operator *= doesn't work correct
+    }
+    csdebug() << __func__ << ": 2";
+    std::string strFees;
+    for (auto it : fees) {
+        strFees += (it.to_string(18) + ", ");
+    }
+    csdebug() << "Final fee(s) = " << strFees;
+    return fees;
 }
 
 void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) {
@@ -457,13 +490,15 @@ size_t SmartConsensus::smartStage3StorageSize() {
                          [](const cs::StageThreeSmarts& it) { return it.sender != cs::ConfidantConsts::InvalidConfidantIndex; });
 }
 
-void SmartConsensus::createFinalTransactionSet(const csdb::Amount finalFee) {
-    bool primary_new_state_found = false;
+void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& finalFees) {
+    /*bool primary_new_state_found = false;*/
+    size_t counter = 0;
     for (const auto& tr : currentSmartTransactionPack_.transactions()) {
-        if (!primary_new_state_found && SmartContracts::is_new_state(tr)) {
-            primary_new_state_found = true;
-            tmpNewState_.add_user_field(trx_uf::new_state::Fee, finalFee);
-            finalSmartTransactionPack_.addTransaction(tmpNewState_);
+        if (/*!primary_new_state_found && */SmartContracts::is_new_state(tr)) {
+            /*primary_new_state_found = true;*/
+            tmpNewStates_[counter].add_user_field(trx_uf::new_state::Fee, finalFees[counter]);
+            finalSmartTransactionPack_.addTransaction(tmpNewStates_[counter]);
+            ++counter;
         }
         else {
             finalSmartTransactionPack_.addTransaction(tr);
