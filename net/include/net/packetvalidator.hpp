@@ -21,6 +21,7 @@ private:
     PacketValidator();
 
     bool validate(MsgTypes msg, const uint8_t* data, size_t size);
+    bool validateFirstFragment(MsgTypes msg, const uint8_t* data, size_t size);
 
     bool validateStarterSignature(const uint8_t* data, size_t size);
 
