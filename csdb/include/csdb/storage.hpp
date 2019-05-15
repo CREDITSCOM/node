@@ -50,6 +50,7 @@ using ReadBlockSignal = cs::Signal<void(const csdb::Pool& block, bool* test_fail
 class Storage final {
 private:
     class priv;
+
     bool write_queue_search(const PoolHash& hash, Pool& res_pool) const;
     bool write_queue_pop(Pool& res_pool);
 
@@ -78,10 +79,10 @@ public:
     ~Storage();
 
 public:
-    inline Storage(const Storage&) noexcept = default;
-    inline Storage(Storage&&) noexcept = default;
-    inline Storage& operator=(const Storage&) noexcept = default;
-    inline Storage& operator=(Storage&&) noexcept = default;
+    Storage(const Storage&) = default;
+    Storage(Storage&&) = default;
+    Storage& operator=(const Storage&) = default;
+    Storage& operator=(Storage&&) = default;
 
     explicit Storage(WeakPtr ptr) noexcept;
     WeakPtr weak_ptr() const noexcept;
@@ -101,8 +102,6 @@ public:
      * @return true, если операцию необходимо прервать.
      */
     typedef ::std::function<bool(const OpenProgress&)> OpenCallback;
-
-    ReadBlockSignal* read_block_event() const;
 
     /**
      * @brief Открывает хранилище по набору параметров.
@@ -266,7 +265,10 @@ public:
      * \параметр addr должен точно совпадать с полем source у транзакции в блокчейне (если addr - id, source должен быть также id)
      * \используется для входного параметра addr в виде id кошелька
      */
-    bool get_from_blockchain(const Address& addr /*input*/, const int64_t& InnerId /*input*/, Transaction& trx /*output*/) const;
+    bool get_from_blockchain(const Address& addr /*input*/, const int64_t& innerId /*input*/, Transaction& trx /*output*/) const;
+
+public signals:
+    const ReadBlockSignal& readBlockEvent() const;
 
 private:
   static cs::Bytes get_trans_index_key(const Address&, const PoolHash&);

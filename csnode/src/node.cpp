@@ -50,10 +50,10 @@ Node::Node(const Config& config)
 
     auto& executor = executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort);
 
-    cs::Connector::connect(blockChain_.getStorage().read_block_event(), &stat_, &cs::RoundStat::onReadBlock);
+    cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &executor::Executor::onBlockStored);
-    cs::Connector::connect(blockChain_.getStorage().read_block_event(), &executor, &executor::Executor::onReadBlock);
+    cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &executor::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
 
@@ -75,7 +75,7 @@ bool Node::init(const Config& config) {
         blockChain_, solver_,
         csconnector::Config{config.getApiSettings().port, config.getApiSettings().ajaxPort, config.getApiSettings().executorPort, config.getApiSettings().apiexecPort});
     std::cout << "Done\n";
-    cs::Connector::connect(blockChain_.getStorage().read_block_event(), api_.get(), &csconnector::connector::onReadFromDB);
+    cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
 #endif  // NODE_API
 
@@ -129,8 +129,7 @@ void Node::stop() {
     solver_->finish();
     cswarning() << "[SOLVER STOPPED]";
 
-    auto bcStorage = blockChain_.getStorage();
-    bcStorage.close();
+    blockChain_.close();
 
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
 }
@@ -2325,21 +2324,16 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         csmeta(cserror) << "Illegal confidants count in round table";
         return;
     }
-    /*   expectedRounds_.push_back(rNum + 1);
-       csdebug() << "ExpectedRounds: " << cs::Utils::roundsToString(expectedRounds_);*/
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
     poolSynchronizer_->sync(conveyer.currentRoundNumber());
-
     cs::Bytes realTrusted;
     roundStream >> realTrusted;
 
     cs::Signatures poolSignatures;
 
-    if (rNum > storedRound && rNum - storedRound == 1) {
-        if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures)) {
-            return;
-        }
+    if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures) && storedRound == getBlockChain().getLastSequence()) {
+        return;
     }
 
     // update sub round
