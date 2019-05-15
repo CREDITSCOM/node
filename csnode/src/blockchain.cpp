@@ -30,7 +30,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
-    cs::Connector::connect(storage_.read_block_event(), this, &BlockChain::onReadFromDB);
+    cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
     blockHashes_ = std::make_unique<cs::BlockHashes>();
 }
@@ -88,6 +88,11 @@ bool BlockChain::init(const std::string& path) {
 
 bool BlockChain::isGood() const {
     return good_;
+}
+
+uint64_t BlockChain::uuid() const {
+    cs::Lock lock(dbLock_);
+    return uuid_;
 }
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
@@ -525,10 +530,6 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
     return true;
 }
 
-const csdb::Storage& BlockChain::getStorage() const {
-    return storage_;
-}
-
 csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
     std::lock_guard lock(dbLock_);
 
@@ -804,6 +805,16 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
         csdb::Pool::NewWalletInfo::AddressId addressId = {confWalletsIndexStart + i, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
         addNewWalletToPool(csdb::Address::from_public_key(confidants[i]), addressId, *newWallets);
     }
+}
+
+void BlockChain::close() {
+    cs::Lock lock(dbLock_);
+    storage_.close();
+}
+
+bool BlockChain::getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const {
+    cs::Lock lock(dbLock_);
+    return storage_.get_from_blockchain(addr, innerId, result);
 }
 
 bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
@@ -1113,6 +1124,10 @@ void BlockChain::testCachedBlocks() {
             break;
         }
     }
+}
+
+const cs::ReadBlockSignal& BlockChain::readBlockEvent() const {
+    return storage_.readBlockEvent();
 }
 
 std::size_t BlockChain::getCachedBlocksSize() const {

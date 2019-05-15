@@ -115,7 +115,7 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
 
     // as event receiver:
     cs::Connector::connect(&bc.storeBlockEvent, this, &SmartContracts::on_store_block);
-    cs::Connector::connect(bc.getStorage().read_block_event(), this, &SmartContracts::on_read_block);
+    cs::Connector::connect(&bc.readBlockEvent(), this, &SmartContracts::on_read_block);
     // as event source:
     cs::Connector::connect(&signal_payable_invoke, &bc, &BlockChain::onPayableContractReplenish);
     cs::Connector::connect(&signal_payable_timeout, &bc, &BlockChain::onPayableContractTimeout);
