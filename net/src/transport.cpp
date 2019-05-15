@@ -1210,7 +1210,12 @@ void Transport::sendPingPack(const Connection& conn) {
     cs::Sequence seq = node_->getBlockChain().getLastSequence();
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
-    oPackStream_ << NetworkCommand::Ping << conn.id << seq << myPublicKey_ << node_->getBlockChain().uuid();
+    oPackStream_ << NetworkCommand::Ping << conn.id << seq << myPublicKey_;
+
+#if defined(PING_WITH_BCHID)
+        oPackStream_ << node_->getBlockChain().uuid();
+#endif
+
     sendDirect(oPackStream_.getPackets(), conn);
     oPackStream_.clear();
 }
@@ -1220,20 +1225,24 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     cs::Sequence lastSeq = 0u;
 
     cs::PublicKey pk;
+    iPackStream_ >> id >> lastSeq >> pk;
+
+#if defined(PING_WITH_BCHID)
     uint64_t remote_bch_uuid = 0;
-    iPackStream_ >> id >> lastSeq >> pk >> remote_bch_uuid;
+        iPackStream_ >> remote_bch_uuid;
+        uint64_t local_bch_uuid = node_->getBlockChain().uuid();
+        if (local_bch_uuid != 0 && remote_bch_uuid != 0) {
+            if (local_bch_uuid != remote_bch_uuid) {
+                // remote is incompatible
+                return false;
+            }
+        }
+#endif
 
     if (!iPackStream_.good() || !iPackStream_.end()) {
         return false;
     }
 
-    uint64_t local_bch_uuid = node_->getBlockChain().uuid();
-    if (local_bch_uuid != 0 && remote_bch_uuid != 0) {
-        if (local_bch_uuid != remote_bch_uuid) {
-            // remote is incompatible
-            return false;
-        }
-    }
 
     if (lastSeq > maxBlock_) {
         maxBlock_ = lastSeq;
