@@ -2580,7 +2580,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
         line1 << '=';
     }
 
-    line1 << " R-" << cs::Conveyer::instance().currentRoundNumber() << "." << cs::numeric_cast<int>(subRound_) << " ";
+    line1 << " R-" << WithDelimiters(cs::Conveyer::instance().currentRoundNumber()) << "." << cs::numeric_cast<int>(subRound_) << " ";
 
     if (Level::Normal == myLevel_) {
         line1 << "NORMAL";
@@ -2600,7 +2600,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
     cslog() << s;
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
-    cslog() << " Last written sequence = " << blockChain_.getLastSequence() << ", neighbours = " << transport_->getNeighboursCount();
+    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSequence()) << ", neighbours = " << transport_->getNeighboursCount();
 
     if( Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 || Transport::cntExtraLargeNotSent > 0) {
         cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments << " / " << Transport::cntExtraLargeNotSent;
