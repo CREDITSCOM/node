@@ -55,7 +55,7 @@ bool BlockChain::init(const std::string& path) {
         return false;
     }
 
-    cslog() << "\rDB is opened, loaded " << totalLoaded << " blocks";
+    cslog() << "\rDB is opened, loaded " << WithDelimiters(totalLoaded) << " blocks";
 
     if (storage_.last_hash().is_empty()) {
         csdebug() << "Last hash is empty...";

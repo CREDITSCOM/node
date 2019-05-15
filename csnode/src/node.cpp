@@ -82,7 +82,7 @@ bool Node::init(const Config& config) {
     if (!blockChain_.init(config.getPathToDB())) {
         return false;
     }
-    cslog() << "Blockchain is ready, contains " << stat_.total_transactions() << " transactions";
+    cslog() << "Blockchain is ready, contains " << WithDelimiters(stat_.total_transactions()) << " transactions";
 
 #ifdef NODE_API
     api_->run();
