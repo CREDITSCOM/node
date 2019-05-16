@@ -1366,7 +1366,7 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     }
     executor::GetContractMethodsResult result;
     std::string error;
-    const auto& executor_instance = exec_handler_ptr->getExecutor();
+    auto& executor_instance = exec_handler_ptr->getExecutor();
     executor_instance.getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
     if (result.status.code != 0) {
         execution_allowed = executor_instance.isConnect();
