@@ -811,7 +811,7 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
         auto lastSequence = blockChain_.getLastSequence();
 
         if (lastSequence < sequence) {
-            cswarning() << "Last sequence is lower than network max sequence, trying to sync";
+            cswarning() << "Last sequence is lower than network max sequence, trying to request round table";
 
             CallsQueue::instance().insert([=] {
                 roundPackRequest(sender, sequence);
@@ -1484,7 +1484,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     // cach stage three
     csmeta(csdetails) << "bytes size " << bytes.size();
     stageThreeInfo.message = std::move(bytes);
-    stageThreeSent = true;
+    stageThreeSent_ = true;
     csmeta(csdetails) << "done";
 }
 
@@ -1553,11 +1553,11 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
 
     csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
 
-    solver_->gotStageThree(std::move(stage), (stageThreeSent ? 2 : 0));
+    solver_->gotStageThree(std::move(stage), (stageThreeSent_ ? 2 : 0));
 }
 
 void Node::adjustStageThreeStorage() {
-    stageThreeSent = false;
+    stageThreeSent_ = false;
 }
 
 void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required /*, uint8_t iteration*/) {
@@ -2516,7 +2516,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     stageTwoMessage_.resize(roundTable.confidants.size());
     stageThreeMessage_.clear();
     stageThreeMessage_.resize(roundTable.confidants.size());
-    stageThreeSent = false;
+    stageThreeSent_ = false;
 
     constexpr int padWidth = 30;
 
