@@ -390,6 +390,7 @@ private:
 
     //expected rounds
     std::vector<cs::RoundNumber> expectedRounds_;
+    cs::Sequence maxHeighboursSequence_ = 0;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);
