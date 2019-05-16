@@ -802,7 +802,9 @@ void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offs
     catch (...) {
         return;
     }
-
+    if (hash.is_empty()) {
+        return;
+    }
     PoolListGetStable(_return, fromByteArray(hash.to_binary()), const_limit);
     _return.count = uint32_t(sequence + 1);
 }
