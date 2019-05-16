@@ -284,14 +284,14 @@ static bool getEncryptedPrivateBytes(const cscrypto::PrivateKey& sk, std::vector
 }
 
 void Config::showKeys(const std::string& pk58) {
-    const double timeoutSeconds = 5;
+    const double kTimeoutSeconds = 5;
     double secondsPassed = 0;
     std::cout << "To show your keys not encrypted press \"s\"." << std::endl;
     std::cout << "Seconds left:" << std::endl;
     std::clock_t start = std::clock();
-    while (secondsPassed < timeoutSeconds) {
+    while (secondsPassed < kTimeoutSeconds) {
         secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
-        std::cout << timeoutSeconds - secondsPassed << "\r";
+        std::cout << kTimeoutSeconds - secondsPassed << "\r";
         if (_kbhit()) {
             if (_getch() == 's') {
                 std::cout << "\n\nPress any key to continue...\n" << std::endl;
@@ -309,24 +309,29 @@ void Config::showKeys(const std::string& pk58) {
 }
 
 void Config::changePasswordOption(const std::string& pathToSk) {
-    char choice = '\0';
-    std::cout << "Would you like to change password?\n" << std::flush;
-    while (choice != 'y' && choice != 'n') {
-        std::cout << "Enter choice (y/n) : " << std::flush;
-        std::cin >> choice;
-        std::cout << std::endl;
-    }
-    if (choice == 'y') {
-        std::cout << "Encrypting the private key file with new password..." << std::endl;
-        std::vector<uint8_t> skBytes;
-        const bool encSucc = getEncryptedPrivateBytes(privateKey_, skBytes);
-        if (encSucc) {
-            std::string sk58tmp = EncodeBase58(skBytes.data(), skBytes.data() + skBytes.size());
-            writeFile(pathToSk, sk58tmp);
-            cscrypto::fillWithZeros(const_cast<char*>(sk58tmp.data()), sk58tmp.size());
-            cslog() << "Key in " << pathToSk << " has been encrypted successfully";
-        } else {
-            cslog() << "Not encrypting the private key file due to errors";
+    std::cout << "To change password press \"p\".\n" << std::flush;
+    std::cout << "Seconds left:" << std::endl;
+    const double kTimeoutSeconds = 5;
+    double secondsPassed = 0;
+    std::clock_t start = std::clock();
+    while (secondsPassed < kTimeoutSeconds) {
+        secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
+        std::cout << kTimeoutSeconds - secondsPassed << "\r";
+        if (_kbhit()) {
+            if (_getch() == 'p') {
+                std::cout << "Encrypting the private key file with new password..." << std::endl;
+                std::vector<uint8_t> skBytes;
+                const bool encSucc = getEncryptedPrivateBytes(privateKey_, skBytes);
+                if (encSucc) {
+                    std::string sk58tmp = EncodeBase58(skBytes.data(), skBytes.data() + skBytes.size());
+                    writeFile(pathToSk, sk58tmp);
+                    cscrypto::fillWithZeros(const_cast<char*>(sk58tmp.data()), sk58tmp.size());
+                    cslog() << "Key in " << pathToSk << " has been encrypted successfully";
+                } else {
+                    cslog() << "Not encrypting the private key file due to errors";
+                }
+                break;
+            }
         }
     }
 }
