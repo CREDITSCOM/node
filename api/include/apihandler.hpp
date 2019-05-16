@@ -128,6 +128,12 @@ public:  // wrappers
         try {
             origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
         }
+        catch (::apache::thrift::protocol::TProtocolException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            origExecutor_ = std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_));
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
         catch( std::exception & x ) {
             _return.status.code = 1;
             _return.status.message = x.what();
@@ -146,6 +152,12 @@ public:  // wrappers
         try {
             origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
         }
+        catch (::apache::thrift::protocol::TProtocolException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            origExecutor_ = std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_));
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
         catch( std::exception & x ) {
             _return.status.code = 1;
             _return.status.message = x.what();
@@ -162,6 +174,12 @@ public:  // wrappers
         try {
             origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
         }
+        catch (::apache::thrift::protocol::TProtocolException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            origExecutor_ = std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_));
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
         catch( std::exception & x ) {
             _return.status.code = 1;
             _return.status.message = x.what();
@@ -177,6 +195,12 @@ public:  // wrappers
         }
         try {
             origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::protocol::TProtocolException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            origExecutor_ = std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_));
+            _return.status.code = 1;
+            _return.status.message = x.what();
         }
         catch( std::exception & x ) {
             _return.status.code = 1;
@@ -509,6 +533,12 @@ private:
         const auto timeBeg = std::chrono::steady_clock::now();
         try {
             origExecutor_->executeByteCode(originExecuteRes.resp, access_id, address, smartContractBinary, method, params, EXECUTION_TIME, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::protocol::TProtocolException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            origExecutor_ = std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_));
+            originExecuteRes.resp.status.code = 1;
+            originExecuteRes.resp.status.message = x.what();
         }
         catch( std::exception & x ) {
             originExecuteRes.resp.status.code = 1;
