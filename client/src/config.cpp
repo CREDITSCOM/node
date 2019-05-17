@@ -279,7 +279,7 @@ static bool getEncryptedPrivateBytes(const cscrypto::PrivateKey& sk, std::vector
         pGood = true;
     }
 
-    skBytes = sk.getEncrypted(pass.data());
+    skBytes = sk.getEncrypted(pass.data(), pass.size());
     return true;
 }
 
@@ -366,7 +366,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
                 if (!readPasswordFromCin(pass))
                     return false;
                 std::cout << "Trying to open file..." << std::endl;
-                privateKey_ = cscrypto::PrivateKey::readFromEncrypted(sk, pass.data());
+                privateKey_ = cscrypto::PrivateKey::readFromEncrypted(sk, pass.data(), pass.size());
 
                 if (!privateKey_)
                     std::cout << "Incorrect password (or corrupted file)" << std::endl;

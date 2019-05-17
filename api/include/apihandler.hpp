@@ -129,14 +129,15 @@ public:  // wrappers
 			std::shared_lock slk(shErrMt);
             origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
         }
-        catch (::apache::thrift::protocol::TProtocolException & x) {
+        catch (::apache::thrift::transport::TTransportException & x) {
             // sets stop_ flag to true forever, replace with new instance
-            origExecutor_ = std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_));
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
             _return.status.code = 1;
             _return.status.message = x.what();
         }
         catch( std::exception & x ) {
-			reCreationOriginExecutor();
             _return.status.code = 1;
             _return.status.message = x.what();
         }
@@ -155,14 +156,15 @@ public:  // wrappers
 			std::shared_lock slk(shErrMt);
             origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
         }
-        catch (::apache::thrift::protocol::TProtocolException & x) {
+        catch (::apache::thrift::transport::TTransportException & x) {
             // sets stop_ flag to true forever, replace with new instance
-            origExecutor_ = std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_));
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
             _return.status.code = 1;
             _return.status.message = x.what();
         }
         catch( std::exception & x ) {
-			reCreationOriginExecutor();
             _return.status.code = 1;
             _return.status.message = x.what();
         }
@@ -179,14 +181,15 @@ public:  // wrappers
 			std::shared_lock slk(shErrMt);
             origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
         }
-        catch (::apache::thrift::protocol::TProtocolException & x) {
+        catch (::apache::thrift::transport::TTransportException & x) {
             // sets stop_ flag to true forever, replace with new instance
-            origExecutor_ = std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_));
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
             _return.status.code = 1;
             _return.status.message = x.what();
         }
         catch( std::exception & x ) {
-			reCreationOriginExecutor();
             _return.status.code = 1;
             _return.status.message = x.what();
         }
@@ -203,14 +206,15 @@ public:  // wrappers
 			std::shared_lock slk(shErrMt);
             origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
         }
-        catch (::apache::thrift::protocol::TProtocolException & x) {
+        catch (::apache::thrift::transport::TTransportException & x) {
             // sets stop_ flag to true forever, replace with new instance
-            origExecutor_ = std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_));
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
             _return.status.code = 1;
             _return.status.message = x.what();
         }
         catch( std::exception & x ) {
-			reCreationOriginExecutor();
             _return.status.code = 1;
             _return.status.message = x.what();
         }
@@ -543,14 +547,15 @@ private:
 			std::shared_lock slk(shErrMt);
             origExecutor_->executeByteCode(originExecuteRes.resp, access_id, address, smartContractBinary, method, params, EXECUTION_TIME, EXECUTOR_VERSION);
         }
-        catch (::apache::thrift::protocol::TProtocolException & x) {
+        catch (::apache::thrift::transport::TTransportException & x) {
             // sets stop_ flag to true forever, replace with new instance
-            origExecutor_ = std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_));
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
             originExecuteRes.resp.status.code = 1;
             originExecuteRes.resp.status.message = x.what();
         }
         catch( std::exception & x ) {
-			reCreationOriginExecutor();
             originExecuteRes.resp.status.code = 1;
             originExecuteRes.resp.status.message = x.what();
         }
