@@ -126,6 +126,7 @@ public:  // wrappers
         const auto acceess_id = generateAccessId();
         ++execCount_;
         try {
+			std::shared_lock slk(shErrMt);
             origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::protocol::TProtocolException & x) {
@@ -135,6 +136,7 @@ public:  // wrappers
             _return.status.message = x.what();
         }
         catch( std::exception & x ) {
+			reCreationOriginExecutor();
             _return.status.code = 1;
             _return.status.message = x.what();
         }
@@ -150,6 +152,7 @@ public:  // wrappers
             return;
         }
         try {
+			std::shared_lock slk(shErrMt);
             origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::protocol::TProtocolException & x) {
@@ -159,6 +162,7 @@ public:  // wrappers
             _return.status.message = x.what();
         }
         catch( std::exception & x ) {
+			reCreationOriginExecutor();
             _return.status.code = 1;
             _return.status.message = x.what();
         }
@@ -172,6 +176,7 @@ public:  // wrappers
             return;
         }
         try {
+			std::shared_lock slk(shErrMt);
             origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::protocol::TProtocolException & x) {
@@ -181,6 +186,7 @@ public:  // wrappers
             _return.status.message = x.what();
         }
         catch( std::exception & x ) {
+			reCreationOriginExecutor();
             _return.status.code = 1;
             _return.status.message = x.what();
         }
@@ -194,6 +200,7 @@ public:  // wrappers
             return;
         }
         try {
+			std::shared_lock slk(shErrMt);
             origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::protocol::TProtocolException & x) {
@@ -203,6 +210,7 @@ public:  // wrappers
             _return.status.message = x.what();
         }
         catch( std::exception & x ) {
+			reCreationOriginExecutor();
             _return.status.code = 1;
             _return.status.message = x.what();
         }
@@ -532,6 +540,7 @@ private:
         ++execCount_;
         const auto timeBeg = std::chrono::steady_clock::now();
         try {
+			std::shared_lock slk(shErrMt);
             origExecutor_->executeByteCode(originExecuteRes.resp, access_id, address, smartContractBinary, method, params, EXECUTION_TIME, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::protocol::TProtocolException & x) {
@@ -541,6 +550,7 @@ private:
             originExecuteRes.resp.status.message = x.what();
         }
         catch( std::exception & x ) {
+			reCreationOriginExecutor();
             originExecuteRes.resp.status.code = 1;
             originExecuteRes.resp.status.message = x.what();
         }
@@ -570,6 +580,16 @@ private:
     void disconnect() {
         executorTransport_->close();
     }
+
+	//
+	using OriginExecutor = executor::ContractExecutorConcurrentClient;
+	using BinaryProtocol = apache::thrift::protocol::TBinaryProtocol;
+	std::shared_mutex shErrMt;
+	void reCreationOriginExecutor() {
+		std::lock_guard glk(shErrMt);
+		origExecutor_.reset(new OriginExecutor(::apache::thrift::stdcxx::make_shared<BinaryProtocol>(executorTransport_)));
+	}
+	//	
 
 private:
     const BlockChain& blockchain_;
