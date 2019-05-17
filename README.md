@@ -7,7 +7,7 @@
 [Telegram](https://t.me/creditscom) \|
 [Discord](https://discord.gg/7asxjXy) \|
 
-
+[![AGPL License](https://img.shields.io/github/license/CREDITSCOM/node.svg?color=green&style=plastic)](LICENSE)
 # Credits Node
 A node is a client-side application that is installed on the user equipment.
 The Node processes and stores transactions, executes and confirms smart contract rules requests processing from third-party systems and provides data when requested.
