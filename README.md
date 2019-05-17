@@ -4,7 +4,7 @@
 [Guides](https://developers.credits.com/en/Articles/Guides) \|
 [News](https://credits.com/en/Home/News)
 
-![Twitter](https://img.shields.io/twitter/follow/creditscom.svg?label=twitter&style=social)
+[![Twitter](https://img.shields.io/twitter/follow/creditscom.svg?label=twitter&style=social)](https://twitter.com/creditscom)
 [![AGPL License](https://img.shields.io/github/license/CREDITSCOM/node.svg?color=green&label=License&style=plastic)](LICENSE)
 ![Version](https://img.shields.io/github/tag/CREDITSCOM/node.svg?label=Versoin&style=plastic)
 # Credits Node
