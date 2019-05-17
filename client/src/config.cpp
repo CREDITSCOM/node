@@ -244,17 +244,15 @@ static bool readPasswordFromCin(T& mem) {
     return ferror(stdin) == 0;
 }
 
-static bool getEncryptedPrivateBytes(const cscrypto::PrivateKey& sk, std::vector<uint8_t>& skBytes) {
+static bool encryptWithPassword(const cscrypto::PrivateKey& sk, std::vector<uint8_t>& skBytes) {
     bool pGood = false;
     cscrypto::MemGuard<char, 256> pass;
 
     while (!pGood) {
-        if (!std::cin.good())
-            return false;
-        // Encrypted
         std::cout << "Enter password: " << std::flush;
-        if (!readPasswordFromCin(pass))
+        if (!readPasswordFromCin(pass)) {
             return false;
+        }
         const auto pLen = strlen(pass.data());
 
         if (pLen < MIN_PASSWORD_LENGTH) {
@@ -281,6 +279,62 @@ static bool getEncryptedPrivateBytes(const cscrypto::PrivateKey& sk, std::vector
 
     skBytes = sk.getEncrypted(pass.data(), std::strlen(pass.data()));
     return true;
+}
+
+static bool getBufFromFile(std::string& buf) {
+    std::string pathToFile;
+    std::fstream f;
+    while (!f.is_open()) {
+        std::cout << "\nEnter path to file (will be used as cipher key): " << std::flush;
+        std::getline(std::cin, pathToFile);
+        f.open(pathToFile, std::fstream::binary | std::fstream::in);
+        if (!f.is_open()) {
+            std::cout << "Can't open file " << pathToFile
+                      << ", try another? (y/n): " << std::flush;
+            char choice = '\0';
+            std::cin >> choice;
+            if (choice != 'y') {
+                return false;
+            }
+        }
+    }
+    std::stringstream ss;
+    ss << f.rdbuf();
+    buf = ss.str();
+    return true;
+}
+
+static bool encryptWithFile(const cscrypto::PrivateKey& sk, std::vector<uint8_t>& skBytes) {
+    std::string buf;
+    if (!getBufFromFile(buf)) {
+        return false;
+    }
+    skBytes = sk.getEncrypted(buf.data(), buf.size());
+    return true;
+}
+
+static bool usePassword() {
+    char choice = '\0';
+    while (choice != 'p' && choice != 'f') {
+        std::cout << "\nTo use password for encrytion/decryption press \"p\", to use file press \"f\": "
+                  << std::flush;
+        std::cin >> choice;
+        std::cout << std::endl;
+    }
+    if (choice == 'p') {
+        return true;
+    }
+    return false;
+}
+
+static bool getEncryptedPrivateBytes(const cscrypto::PrivateKey& sk, std::vector<uint8_t>& skBytes) {
+    if (!std::cin.good()) {
+        return false;
+    }
+    if (usePassword()) {
+        return encryptWithPassword(sk, skBytes);
+    }
+    return encryptWithFile(sk, skBytes);
 }
 
 void Config::showKeys(const std::string& pk58) {
@@ -366,15 +420,26 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
             while (!privateKey_) {
                 if (!std::cin.good())
                     return false;
-                std::cout << "Enter password: " << std::flush;
-                cscrypto::MemGuard<char, 256> pass;
-                if (!readPasswordFromCin(pass))
-                    return false;
-                std::cout << "Trying to open file..." << std::endl;
-                privateKey_ = cscrypto::PrivateKey::readFromEncrypted(sk, pass.data(), std::strlen(pass.data()));
+                if (usePassword()) {
+                    std::cout << "Enter password: " << std::flush;
+                    cscrypto::MemGuard<char, 256> pass;
+                    if (!readPasswordFromCin(pass)) {
+                        return false;
+                    }
+                    std::cout << "Trying to open file..." << std::endl;
+                    privateKey_ = cscrypto::PrivateKey::readFromEncrypted(sk, pass.data(), std::strlen(pass.data()));
+                }
+                else {
+                    std::string buf;
+                    if (!getBufFromFile(buf)) {
+                        return false;
+                    }
+                    privateKey_ = cscrypto::PrivateKey::readFromEncrypted(sk, buf.data(), buf.size());
+                }
 
-                if (!privateKey_)
+                if (!privateKey_) {
                     std::cout << "Incorrect password (or corrupted file)" << std::endl;
+                }
             }
             changePasswordOption(pathToSk);
         }
