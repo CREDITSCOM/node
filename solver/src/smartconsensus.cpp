@@ -752,6 +752,7 @@ void SmartConsensus::fake_stage1(uint8_t from) {
         cs::StageOneSmarts fake;
         init_zero(fake);
         fake.sender = from;
+        fake.id = id();
         addSmartStageOne(fake, false);
     }
 }
@@ -769,6 +770,7 @@ void SmartConsensus::fake_stage2(uint8_t from) {
         cs::StageTwoSmarts fake;
         init_zero(fake);
         fake.sender = from;
+        fake.id = id();
         addSmartStageTwo(fake, false);
     }
 }
