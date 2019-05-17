@@ -52,7 +52,6 @@ add_library(csnode
   include/csnode/blockhashes.hpp
   include/csnode/poolsynchronizer.hpp
   include/csnode/fee.hpp
-  include/csnode/spammer.hpp
   include/csnode/transactionsvalidator.hpp
   include/csnode/walletsstate.hpp
   include/csnode/roundstat.hpp
@@ -74,7 +73,6 @@ add_library(csnode
   src/blockhashes.cpp
   src/poolsynchronizer.cpp
   src/fee.cpp
-  src/spammer.cpp
   src/transactionsvalidator.cpp
   src/walletsstate.cpp
   src/roundstat.cpp
