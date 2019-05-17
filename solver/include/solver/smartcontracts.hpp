@@ -46,7 +46,7 @@ constexpr uint8_t ExecuteTransaction = 248;
 // bug in SmartContracts
 constexpr uint8_t InternalBug = 247;
 // executor is disconnected or unavailable, value is hard-coded in ApiExec module
-constexpr uint8_t NoExecutor = 1;
+constexpr uint8_t ExecutionError = 1;
 }  // namespace error
 
 // transactions user fields

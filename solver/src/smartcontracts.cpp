@@ -711,23 +711,21 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
 
 bool SmartContracts::test_executor_availability() {
     if (!execution_allowed) {
-        try {
-            execution_allowed = exec_handler_ptr->getExecutor().isConnect();
-            if (execution_allowed) {
-                cslog() << std::endl << kLogPrefix << "connection to executor is restored" << std::endl;
-                // update all currently running contracts locks, missed while executor was unavailable
-                for (const auto& exe_item : exe_queue) {
-                    if (exe_item.status == SmartContractStatus::Running || exe_item.status == SmartContractStatus::Finished) {
-                        if (!is_metadata_actual(exe_item.abs_addr)) {
-                            auto maybe_deploy = find_deploy_info(exe_item.abs_addr);
-                            if (maybe_deploy.has_value()) {
-                                auto it_state = known_contracts.find(exe_item.abs_addr);
-                                if (it_state != known_contracts.end()) {
-                                    if (!update_metadata(maybe_deploy.value(), it_state->second)) {
-                                        if (!execution_allowed) {
-                                            // the problem has got back
-                                            break;
-                                        }
+        execution_allowed = exec_handler_ptr && exec_handler_ptr->getExecutor().isConnect();
+        if (execution_allowed) {
+            cslog() << std::endl << kLogPrefix << "connection to executor is restored" << std::endl;
+            // update all currently running contracts locks, missed while executor was unavailable
+            for (const auto& exe_item : exe_queue) {
+                if (exe_item.status == SmartContractStatus::Running || exe_item.status == SmartContractStatus::Finished) {
+                    if (!is_metadata_actual(exe_item.abs_addr)) {
+                        auto maybe_deploy = find_deploy_info(exe_item.abs_addr);
+                        if (maybe_deploy.has_value()) {
+                            auto it_state = known_contracts.find(exe_item.abs_addr);
+                            if (it_state != known_contracts.end()) {
+                                if (!update_metadata(maybe_deploy.value(), it_state->second)) {
+                                    if (!execution_allowed) {
+                                        // the problem has got back
+                                        break;
                                     }
                                 }
                             }
@@ -735,10 +733,6 @@ bool SmartContracts::test_executor_availability() {
                     }
                 }
             }
-        }
-        catch (std::exception&) {
-        }
-        catch (...) {
         }
     }
     return execution_allowed;
@@ -977,37 +971,24 @@ bool SmartContracts::execute(SmartExecutionData& data) {
         return false;
     }
     cslog() << std::endl
-            << kLogPrefix << "executing {" << data.contract_ref.sequence << '.' << data.contract_ref.transaction << "} - " << print_executed_method(data.contract_ref) << std::endl;
-    try {
-        auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
-        if (maybe_result.has_value()) {
-            data.result = maybe_result.value();
-            if (data.result.newState.empty()) {
-                if (data.result.retValue.__isset.v_string) {
-                    data.error = data.result.retValue.v_string;
-                    data.result.retValue.__set_v_byte(error::ExecuteTransaction);
-                }
-                else {
-                    data.error = "contract execution failed, contract state is unchanged";
-                }
+            << kLogPrefix << "executing {" << data.contract_ref.sequence << '.' << data.contract_ref.transaction << "} - " << print_executed_method(data.contract_ref)
+            << std::endl;
+    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
+    if (maybe_result.has_value()) {
+        data.result = maybe_result.value();
+        if (data.result.newState.empty()) {
+            if (data.result.retValue.__isset.v_string) {
+                data.error = data.result.retValue.v_string;
+                data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+            }
+            else {
+                data.error = "contract execution failed, contract state is unchanged";
             }
         }
-        else {
-            data.error = "contract execution failed";
-            data.result.retValue.__set_v_byte(error::ExecuteTransaction);
-        }
     }
-    catch (std::exception& x) {
-        data.error = x.what();
-        data.result.retValue.__set_v_byte(error::StdException);
-        return false;
-    }
-    catch (...) {
-        std::ostringstream os;
-        os << kLogPrefix << " unexpected exception while executing contract #" << data.contract_ref.sequence << "." << data.contract_ref.transaction;
-        data.error = os.str();
-        data.result.retValue.__set_v_byte(error::Exception);
-        return false;
+    else {
+        data.error = "contract execution failed";
+        data.result.retValue.__set_v_byte(error::ExecuteTransaction);
     }
     return true;
 }
@@ -1386,28 +1367,21 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     }
     executor::GetContractMethodsResult result;
     std::string error;
-    try {
-        exec_handler_ptr->getExecutor().getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
-        if (result.status.code == error::NoExecutor) {
-            cslog() << std::endl << kLogPrefix << "unable to connect to executor" << std::endl;
-            execution_allowed = false;
-        }
-    }
-    catch (std::exception& x) {
-        error = x.what();
-    }
-    catch (...) {
-        error = " exception while executing byte code";
-    }
-
-    if (!error.empty()) {
-        cserror() << kLogPrefix << "" << error;
-        // remain payable status & using unknown for future calls
-        return false;
-    }
-
+    auto& executor_instance = exec_handler_ptr->getExecutor();
+    executor_instance.getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
     if (result.status.code != 0) {
-        cserror() << kLogPrefix << "" << result.status.message;
+        execution_allowed = executor_instance.isConnect();
+        if (!result.status.message.empty()) {
+            cswarning() << kLogPrefix << result.status.message;
+        }
+        else {
+            if (!execution_allowed) {
+                cswarning() << kLogPrefix << "unable to connect to executor";
+            }
+            else {
+                cswarning() << kLogPrefix << "execution error " << int(result.status.code);
+            }
+        }
         // remain payable status & using unknown for future calls
         return false;
     }
