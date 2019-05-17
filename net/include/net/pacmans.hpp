@@ -24,11 +24,18 @@ public:
   TaskPtr(const TaskPtr&) = delete;
   TaskPtr& operator=(const TaskPtr&) = delete;
   TaskPtr& operator=(TaskPtr&&) = delete;
-
+/*
   ~TaskPtr() {
     if (valid_) {
       owner_->releaseTask(it_);
-//      valid_ = false;
+      valid_ = false;
+    }
+  }
+*/
+  void release() {
+    if (valid_) {
+      owner_->releaseTask(it_);
+      valid_ = false;
     }
   }
 
@@ -48,7 +55,7 @@ private:
 
   friend Pacman;
 };
-
+/*
 template<typename Task>
 struct TaskBody {
   operator Task&() {
@@ -57,7 +64,7 @@ struct TaskBody {
 
   char data[sizeof(Task)];
 };
-
+*/
 class IPacMan {
 public:
   IPacMan()
@@ -74,12 +81,12 @@ public:
 
   TaskPtr<IPacMan> getNextTask();
 
-  using TaskIterator = std::list<TaskBody<Task>>::iterator;
+  using TaskIterator = std::list<Task>::iterator;
   void releaseTask(TaskIterator&);
   void rejectLast();
 
 private:
-  std::list<TaskBody<Task>> queue_;
+  std::list<Task> queue_;
   std::mutex mutex_;
   std::atomic<size_t> size_ = {0};
   RegionAllocator allocator_;
@@ -97,11 +104,11 @@ public:
 
   TaskPtr<OPacMan> getNextTask();
 
-  using TaskIterator = std::list<TaskBody<Task>>::iterator;
+  using TaskIterator = std::list<Task>::iterator;
   void releaseTask(TaskIterator&);
 
 private:
-  std::list<TaskBody<Task>> queue_;
+  std::list<Task> queue_;
   std::mutex mutex_;
   std::atomic<size_t> size_ = {0};
 };

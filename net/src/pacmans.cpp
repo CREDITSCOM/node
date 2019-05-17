@@ -6,7 +6,7 @@ IPacMan::Task& IPacMan::allocNext() {
   queue_.emplace_back();
   auto end = queue_.end();
   Task& task = *(--end);
-  new (&task) Task();
+//  new (&task) Task();
   task.pack.data_ = allocator_.allocateNext(Packet::MaxSize);
   return task;
 }
@@ -20,8 +20,8 @@ void IPacMan::enQueueLast() {
 
 void IPacMan::rejectLast() {
   std::lock_guard<std::mutex> lock(mutex_);
-  Task &task = queue_.back();
-  task.~Task();
+//  Task &task = queue_.back();
+//  task.~Task();
   queue_.pop_back();
 }
 
@@ -37,8 +37,8 @@ TaskPtr<IPacMan> IPacMan::getNextTask() {
 }
 
 void IPacMan::releaseTask(TaskIterator& it) {
-  Task &task = *it;
-  task.~Task();
+//  Task &task = *it;
+//  task.~Task();
   std::lock_guard<std::mutex> lock(mutex_);
   queue_.erase(it);
   size_.fetch_sub(1, std::memory_order_acq_rel);
@@ -49,7 +49,7 @@ OPacMan::Task* OPacMan::allocNext() {
   queue_.emplace_back();
   auto end = queue_.end();
   Task& task = *(--end);
-  new (&task) Task();
+//  new (&task) Task();
   return &task;
 }
 
@@ -69,8 +69,8 @@ TaskPtr<OPacMan> OPacMan::getNextTask() {
 }
 
 void OPacMan::releaseTask(TaskIterator& it) {
-  Task &task = *it;
-  task.~Task();
+//  Task &task = *it;
+//  task.~Task();
   std::lock_guard<std::mutex> lock(mutex_);
   queue_.erase(it);
   size_.fetch_sub(1, std::memory_order_acq_rel);
