@@ -11,7 +11,6 @@
 #include <csnode/nodecore.hpp>
 #include <csnode/nodeutils.hpp>
 #include <csnode/poolsynchronizer.hpp>
-#include <csnode/spammer.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/progressbar.hpp>
@@ -103,11 +102,6 @@ bool Node::init(const Config& config) {
     solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
     solver_->startDefault();
 
-#ifdef SPAMMER
-    runSpammer();
-    std::cout << "Spammer is init\n";
-#endif
-
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
@@ -132,14 +126,6 @@ void Node::stop() {
     blockChain_.close();
 
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
-}
-
-void Node::runSpammer() {
-    if (!spammer_) {
-        cswarning() << "SolverCore: starting transaction spammer";
-        spammer_ = std::make_unique<cs::Spammer>();
-        spammer_->StartSpamming(*this);
-    }
 }
 
 /* Requests */
