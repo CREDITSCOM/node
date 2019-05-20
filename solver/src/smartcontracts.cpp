@@ -540,7 +540,7 @@ void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
             else {
                 SmartContractRef contract_ref(fld_contract_ref);
                 // update state
-                update_contract_state(new_state);
+                update_contract_state(new_state, false);
                 const csdb::Address abs_addr = absolute_address(new_state.target());
                 const cs::PublicKey& key = abs_addr.public_key();
                 cslog() << kLogPrefix << '{' << contract_ref.sequence << '.' << contract_ref.transaction << "} (" << EncodeBase58(key.data(), key.data() + key.size())
@@ -823,7 +823,7 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
         size_t tr_idx = 0;
         for (const auto& tr : block.transactions()) {
             if (is_new_state(tr)) {
-                update_contract_state(tr);
+                update_contract_state(tr, true);
             }
             else {
                 csdb::Address abs_addr = absolute_address(tr.target());
@@ -1261,7 +1261,7 @@ void SmartContracts::on_reject(const std::vector<std::pair<cs::Sequence, uint32_
     }
 }
 
-bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
+bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool reading_db) {
     using namespace trx_uf;
     csdb::UserField fld = t.user_field(new_state::Value);
     if (!fld.is_valid()) {
@@ -1291,27 +1291,43 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
                         }
                     }
                     else {
-                        // handle replenish during startup reading
-                        if (!replenish_contract.empty()) {
+                        // new_state after replenish contract transaction
+                        if (reading_db) {
+                            // handle replenish during startup reading
                             const auto it = std::find(replenish_contract.cbegin(), replenish_contract.cend(), ref);
                             if (it != replenish_contract.cend()) {
                                 replenish_contract.erase(it);
                             }
+                            else {
+                                csdebug() << kLogPrefix << "(error in blockchain) cannot find replenish transaction new_state refers to";
+                            }
                         }
-                        // handle replenish from on-the-air blocks
-                        if (item.payable != PayableStatus::Implemented) {
-                            cserror() << kLogPrefix << "non-payable contract state is updated by replenish transaction";
+                        else {
+                            // handle replenish from on-the-air blocks
+                            if (item.payable != PayableStatus::Implemented) {
+                                cserror() << kLogPrefix << "non-payable contract state is updated by replenish transaction";
+                            }
                         }
                         item.ref_execute = ref;
                     }
                 }
                 else {
-                    cswarning() << kLogPrefix << "new_state transaction does not refer to starter one";
+                    if (reading_db) {
+                        csdebug() << kLogPrefix << "(error in blockchain) cannot find starter transaction new_state refer to";
+                    }
+                    else {
+                        cswarning() << kLogPrefix << "new_state transaction does not refer to starter one";
+                    }
                 }
             }
         }
         else {
-            cserror() << kLogPrefix << "failed to convert optimized address";
+            if (reading_db) {
+                csdebug() << kLogPrefix << "(error in blockchain) cannot find contract by address from new_state";
+            }
+            else {
+                cserror() << kLogPrefix << "failed to convert optimized address";
+            }
         }
     }
     else {
