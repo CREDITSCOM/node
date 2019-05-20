@@ -24,7 +24,7 @@ The node consists of the following elements:</p>
 
 <h2>Build dependencies</h2>
 <ul>
-<li>Boost 1.68 and higher static prebuild, compiler with C++17 support</li>
+<li><a href="https://www.boost.org/users/history/version_1_68_0.html">Boost 1.68</a> and higher static prebuild, compiler with C++17 support</li>
 </ul>
 
 <h2>How to Build</h2>
