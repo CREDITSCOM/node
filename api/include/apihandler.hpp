@@ -126,7 +126,16 @@ public:  // wrappers
         const auto acceess_id = generateAccessId();
         ++execCount_;
         try {
+			std::shared_lock slk(shErrMt);
             origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
+            _return.status.code = 1;
+            _return.status.message = x.what();
         }
         catch( std::exception & x ) {
             _return.status.code = 1;
@@ -144,7 +153,16 @@ public:  // wrappers
             return;
         }
         try {
+			std::shared_lock slk(shErrMt);
             origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
+            _return.status.code = 1;
+            _return.status.message = x.what();
         }
         catch( std::exception & x ) {
             _return.status.code = 1;
@@ -160,7 +178,16 @@ public:  // wrappers
             return;
         }
         try {
+			std::shared_lock slk(shErrMt);
             origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
+            _return.status.code = 1;
+            _return.status.message = x.what();
         }
         catch( std::exception & x ) {
             _return.status.code = 1;
@@ -176,7 +203,16 @@ public:  // wrappers
             return;
         }
         try {
+			std::shared_lock slk(shErrMt);
             origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
+            _return.status.code = 1;
+            _return.status.message = x.what();
         }
         catch( std::exception & x ) {
             _return.status.code = 1;
@@ -508,7 +544,16 @@ private:
         ++execCount_;
         const auto timeBeg = std::chrono::steady_clock::now();
         try {
+			std::shared_lock slk(shErrMt);
             origExecutor_->executeByteCode(originExecuteRes.resp, access_id, address, smartContractBinary, method, params, EXECUTION_TIME, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
+            originExecuteRes.resp.status.code = 1;
+            originExecuteRes.resp.status.message = x.what();
         }
         catch( std::exception & x ) {
             originExecuteRes.resp.status.code = 1;
@@ -540,6 +585,16 @@ private:
     void disconnect() {
         executorTransport_->close();
     }
+
+	//
+	using OriginExecutor = executor::ContractExecutorConcurrentClient;
+	using BinaryProtocol = apache::thrift::protocol::TBinaryProtocol;
+	std::shared_mutex shErrMt;
+	void reCreationOriginExecutor() {
+		std::lock_guard glk(shErrMt);
+		origExecutor_.reset(new OriginExecutor(::apache::thrift::stdcxx::make_shared<BinaryProtocol>(executorTransport_)));
+	}
+	//	
 
 private:
     const BlockChain& blockchain_;
