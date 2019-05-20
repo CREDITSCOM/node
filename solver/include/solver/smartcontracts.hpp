@@ -487,7 +487,7 @@ private:
     csdb::Transaction create_new_state(const QueueItem& queue_item) const;
 
     // update in contracts table appropriate item's state
-    bool update_contract_state(const csdb::Transaction& t);
+    bool update_contract_state(const csdb::Transaction& t, bool reading_db);
 
     // get deploy info from cached deploy transaction reference
     std::optional<api::SmartContractInvocation> find_deploy_info(const csdb::Address& abs_addr) const;
