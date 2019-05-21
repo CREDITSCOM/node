@@ -39,9 +39,10 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 , exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.apiexec_port), make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 {
-    cslog() << "Api port " << config.port << ", ajax port " << config.ajax_port;
 
 #ifdef BINARY_TCP_EXECAPI
+    exec_server_port = config.apiexec_port;
+    cslog() << "Starting executor API on port " << config.apiexec_port;
     exec_thread = std::thread([this]() {
         try {
             exec_server.run();
@@ -53,6 +54,18 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 #endif
 
 #ifdef BINARY_TCP_API
+    server_port = config.port;
+#endif
+
+#ifdef AJAX_IFACE
+    ajax_server_port = config.ajax_port;
+#endif
+}
+
+void connector::run() {
+
+#ifdef BINARY_TCP_API
+    cslog() << "Starting public API on port " << server_port;
     thread = std::thread([this]() {
         try {
             server.run();
@@ -60,9 +73,11 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
         catch (...) {
             cserror() << "Oh no! I'm dead :'-(";
         }
-    });
+        });
 #endif
+
 #ifdef AJAX_IFACE
+    cslog() << "Starting AJAX server on port " << ajax_server_port;
     ajax_server.setConcurrentClientLimit(AJAX_CONCURRENT_API_CLIENTS);
     ajax_thread = std::thread([this]() {
         try {
@@ -71,8 +86,10 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
         catch (...) {
             cserror() << "Oh no! I'm dead in AJAX :'-(";
         }
-    });
+        });
 #endif
+
+    api_handler->run();
 }
 
 connector::~connector() {

@@ -212,14 +212,14 @@ public:
     using SmartsSignal = cs::Signal<void(T&, bool)>;
     using SmartStageRequestSignal = cs::Signal<void(uint8_t, cs::Sequence, uint32_t, uint8_t, uint8_t, cs::PublicKey&)>;
     using StopSignal = cs::Signal<void()>;
-    using RefectedSmartContractsSignal = cs::Signal<void(const std::vector<std::pair<cs::Sequence, uint32_t>>&)>;
+    using RejectedSmartContractsSignal = cs::Signal<void(const std::vector<std::pair<cs::Sequence, uint32_t>>&)>;
 
 public signals:
     SmartsSignal<cs::StageOneSmarts> gotSmartStageOne;
     SmartsSignal<cs::StageTwoSmarts> gotSmartStageTwo;
     SmartsSignal<cs::StageThreeSmarts> gotSmartStageThree;
     SmartStageRequestSignal receivedSmartStageRequest;
-    RefectedSmartContractsSignal gotRejectedContracts;
+    RejectedSmartContractsSignal gotRejectedContracts;
 
     inline static StopSignal stopRequested;
 
@@ -361,7 +361,7 @@ private:
     std::vector<cs::Bytes> stageOneMessage_;
     std::vector<cs::Bytes> stageTwoMessage_;
     std::vector<cs::Bytes> stageThreeMessage_;
-    bool stageThreeSent = false;
+    bool stageThreeSent_ = false;
 
     std::vector<cs::Bytes> smartStageOneMessage_;
     std::vector<cs::Bytes> smartStageTwoMessage_;
@@ -390,6 +390,7 @@ private:
 
     //expected rounds
     std::vector<cs::RoundNumber> expectedRounds_;
+    cs::Sequence maxHeighboursSequence_ = 0;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

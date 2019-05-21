@@ -816,7 +816,9 @@ void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offs
     catch (...) {
         return;
     }
-
+    if (hash.is_empty()) {
+        return;
+    }
     PoolListGetStable(_return, fromByteArray(hash.to_binary()), const_limit);
     _return.count = uint32_t(sequence + 1);
 }
@@ -1428,7 +1430,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
             return;
         }
         auto addr_id = csdb::Address::from_wallet_id(wallId);
-        if (s_blockchain.getStorage().get_from_blockchain(addr_id, inner_id, transactionTmp))  // find in blockchain
+        if (s_blockchain.getTransaction(addr_id, inner_id, transactionTmp))  // find in blockchain
             _return.states[inner_id] = VALID;
         else {
             cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -1472,7 +1474,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
 void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, const general::Address& address, const int64_t id) {
     csdb::Transaction trx;
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
-    if (!s_blockchain.getStorage().get_from_blockchain(addr, id, trx)) {
+    if (!s_blockchain.getTransaction(addr, id, trx)) {
         SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
         return;
     }

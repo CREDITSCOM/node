@@ -37,8 +37,14 @@ bool PacketValidator::validate(const Packet& pack) {
             }
         }
         else {
-            if (pack.isFragmented() && pack.getFragmentsNum() > 1) {
-                result = false;
+            if (pack.isFragmented()) {
+                if (pack.getFragmentsNum() > 1) {
+                    // unable validate fragmented pack
+                    result = true;
+                }
+                else {
+                    result = validateFirstFragment(pack.getType(), pack.getMsgData(), pack.getMsgSize());
+                }
             }
             else {
                 result = validate(pack.getType(), pack.getMsgData(), pack.getMsgSize());
@@ -58,10 +64,8 @@ bool PacketValidator::validate(const Message& msg) {
     if (!msg.getFirstPack().hasValidFragmentation()) {
         return false;
     }
-    if (msg.getFirstPack().getFragmentsNum() == 1) {
-        return validate(msg.getFirstPack());
-    }
-    return true;
+    return validate(msg.getFirstPack());
+
     // require to compose full message to validate:
     // MsgTypes type = msg.getFirstPack().getType();
     // return validate(type, msg.getFullData(), msg.getFullSize());
@@ -77,6 +81,10 @@ bool PacketValidator::validate(MsgTypes msg, const uint8_t* data, size_t size) {
         default:
             break;
     }
+    return true;
+}
+
+bool PacketValidator::validateFirstFragment(MsgTypes msg, const uint8_t* data, size_t size) {
     return true;
 }
 
