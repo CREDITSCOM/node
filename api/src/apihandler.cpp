@@ -32,6 +32,20 @@ APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor
 , executorTransport_(
       new ::apache::thrift::transport::TBufferedTransport(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", config.executor_port)))
 , tm(this) {
+#ifdef MONITOR_NODE
+	if (static bool firstTime = true; firstTime) {
+		stats_.second.resize(::csstats::collectionPeriods.size());
+		auto nowGlobal = std::chrono::system_clock::now();
+		auto lastTimePoint = nowGlobal - std::chrono::seconds(::csstats::collectionPeriods[::csstats::PeriodIndex::Month]);
+
+		for (auto time = nowGlobal; time > lastTimePoint; time -= std::chrono::seconds(::csstats::updateTimeSec)) {
+			::csstats::PeriodStats cut;
+			cut.timeStamp = time;
+			stats_.first.push_back(cut);
+		}
+		firstTime = false;
+	}
+#endif
 }
 
 void APIHandler::run() {
@@ -40,7 +54,7 @@ void APIHandler::run() {
     }
 
 #ifdef MONITOR_NODE
-    stats.run();
+    stats.run(stats_);
 #endif
     tm.run();  // Run this AFTER updating all the caches for maximal efficiency
 
@@ -876,6 +890,87 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
 void APIHandler::store_block_slot(const csdb::Pool&) {
     newBlockCv_.notify_all();
 }
+
+void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
+	const ::csstats::Periods periods = ::csstats::collectionPeriods;
+
+	static unsigned int currentCutIndex = 0;
+	static auto startCutTime = stats_.first[currentCutIndex].timeStamp;
+	static auto endCutTime = stats_.first[currentCutIndex + 1].timeStamp;
+
+	auto now = std::chrono::system_clock::now();
+	auto poolTime_t = atoll(pool.user_field(0).value<std::string>().c_str()) / 1000;
+	auto poolTime = std::chrono::system_clock::from_time_t(poolTime_t);
+
+	using Seconds = std::chrono::seconds;
+	Seconds poolAgeSec = std::chrono::duration_cast<Seconds>(now - poolTime);
+
+	if (startCutTime <= poolTime && poolTime < endCutTime) {
+		::csstats::PeriodStats& periodStats = stats_.first[currentCutIndex];
+		++periodStats.poolsCount;
+
+		size_t transactionsCount = pool.transactions_count();
+		periodStats.transactionsCount += (uint32_t)transactionsCount;
+
+		for (size_t i = 0; i < transactionsCount; ++i) {
+			const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+
+#ifdef MONITOR_NODE
+			if (is_smart(transaction) || is_smart_state(transaction))
+				++periodStats.transactionsSmartCount;
+#endif
+
+			if (is_deploy_transaction(transaction))
+				++periodStats.smartContractsCount;
+
+			Currency currency = 1;
+
+			const auto& amount = transaction.amount();
+
+			periodStats.balancePerCurrency[currency].integral += amount.integral();
+			periodStats.balancePerCurrency[currency].fraction += amount.fraction();
+		}
+	}
+	else if ((currentCutIndex + 1) < stats_.first.size()) {
+		startCutTime = stats_.first[currentCutIndex].timeStamp;
+		endCutTime = stats_.first[currentCutIndex + 1].timeStamp;
+		++currentCutIndex;
+	}
+
+	auto period = (csstats::Period)poolAgeSec.count();
+	for (size_t periodIndex = 0; periodIndex < periods.size(); ++periodIndex) {
+		if (period < periods[periodIndex]) {
+			csstats::PeriodStats& periodStats = stats_.second[periodIndex];
+			periodStats.poolsCount++;
+
+			size_t transactionsCount = pool.transactions_count();
+			periodStats.transactionsCount += (uint32_t)transactionsCount;
+
+			for (size_t i = 0; i < transactionsCount; ++i) {
+				const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+
+				if (transaction.source() == s_blockchain.getGenesisAddress())
+					continue;
+#ifdef MONITOR_NODE
+				if (is_smart(transaction) || is_smart_state(transaction))
+					++periodStats.transactionsSmartCount;
+#endif
+
+				if (is_deploy_transaction(transaction))
+					++periodStats.smartContractsCount;
+
+				//Currency currency = currencies_indexed[transaction.currency().to_string()];
+				Currency currency = 1;
+
+				const auto& amount = transaction.amount();
+
+				periodStats.balancePerCurrency[currency].integral += amount.integral();
+				periodStats.balancePerCurrency[currency].fraction += amount.fraction();
+			}
+		}
+	}
+}
+//
 
 void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
     if (!pool.is_valid()) {

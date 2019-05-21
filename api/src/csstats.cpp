@@ -27,14 +27,15 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
     auto startTime = std::chrono::high_resolution_clock::now();
     auto blockHash = blockchain.getLastHash();
 
+	static auto lastHash = blockHash;
+
     PeriodStats periodStats;
     periodStats.timeStamp = std::chrono::system_clock::now();
 
     {
         auto future_last_hash = blockHash;
-        if (blockHash.is_empty()) {
+        if (blockHash.is_empty())
             cserror() << "Stats: no bricks in the wall (last hash is empty)";
-        }
 
         while (blockHash != lastHash && !blockHash.is_empty()) {
             csdb::Pool pool = blockchain.loadBlock(blockHash);
@@ -124,7 +125,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
     return stats;
 }
 
-AllStats csstats::collectAllStats(const Periods& periods) {
+/*AllStats csstats::collectAllStats(const Periods& periods) {
     assert(std::is_sorted(std::begin(periods), std::end(periods), [](const Period& l, const Period& r) { return l < r; }));
 
     cstrace() << "STATS>  Collecting All stats: started";
@@ -251,7 +252,7 @@ AllStats csstats::collectAllStats(const Periods& periods) {
     cstrace() << "Collecting All stats: finished (took " << milliseconds.count() << "ms)";
 
     return stats;
-}
+}*/
 
 csstats::csstats(BlockChain& blockchain)
 : blockchain(blockchain) {
@@ -259,20 +260,16 @@ csstats::csstats(BlockChain& blockchain)
               << "update interval is " << updateTimeSec << " sec";
 }
 
-void csstats::run() {
+void csstats::run(const ::csstats::AllStats& allStats) {
 #ifndef STATS
-
     return;
-
 #else
     ScopedLock lock(mutex);
 
-    AllStats allStats = collectAllStats(::csstats::collectionPeriods);
+	//lastHash = blockchain.getLastHash();
 
     thread = std::thread([this, allStats]() {
         cstrace() << "STATS> csstats thread started";
-
-        // AllStats allStats = collectAllStats(::csstats::collectionPeriods);
 
         currentStats = std::move(allStats.second);
         statsCut = std::move(allStats.first);

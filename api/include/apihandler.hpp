@@ -672,6 +672,7 @@ public:
     }
 
 private:
+	::csstats::AllStats stats_;
     executor::Executor& executor_;
 
     struct smart_trxns_queue {
@@ -797,6 +798,7 @@ private:
 private slots:
     void update_smart_caches_slot(const csdb::Pool& pool);
     void store_block_slot(const csdb::Pool& pool);
+	void collect_all_stats_slot(const csdb::Pool& pool);
 };
 }  // namespace api
 

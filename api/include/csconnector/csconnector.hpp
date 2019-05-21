@@ -48,6 +48,9 @@ public:
     void onReadFromDB(csdb::Pool pool, bool* should_stop) {
         if (!*should_stop) {
             api_handler->update_smart_caches_slot(pool);
+#ifdef MONITOR_NODE
+			api_handler->collect_all_stats_slot(pool);
+#endif
         }
     }
 
