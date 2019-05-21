@@ -609,6 +609,20 @@ void SmartContracts::test_exe_queue() {
             if (!execution_allowed && !test_executor_availability()) {
                 cslog() << kLogPrefix << "skip {" << it->ref_start.sequence << '.' << it->ref_start.transaction << "}, execution is not allowed (executor is not connected)";
                 it->is_executor = false;
+                bool fake_sent = false;
+                const auto& confidants = pnode->retriveSmartConfidants(it->ref_start.sequence);
+                for (auto itconf = confidants.cbegin(); itconf != confidants.cend(); ++itconf) {
+                    if (std::equal(itconf->cbegin(), itconf->cend(), node_id.cbegin())) {
+                        cslog() << kLogPrefix << "unable to execute contract, so send fake stage-1";
+                        SmartConsensus::sendFakeStageOne(pnode, confidants, cs::Byte(itconf - confidants.cbegin()),
+                            SmartConsensus::createId(it->ref_start.sequence, it->ref_start.transaction, 0));
+                        fake_sent = true;
+                        break;
+                    }
+                }
+                if (!fake_sent) {
+                    cslog() << kLogPrefix << "unable to execute contract and failed to send fake stage-1";
+                }
             }
             else {
                 csdebug() << kLogPrefix << "execute {" << it->ref_start.sequence << '.' << it->ref_start.transaction << "} now";
