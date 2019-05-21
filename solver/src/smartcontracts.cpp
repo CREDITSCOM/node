@@ -607,21 +607,26 @@ void SmartContracts::test_exe_queue() {
         if (it->is_executor) {
             // final decision to execute contract is here, based on executor availability
             if (!execution_allowed && !test_executor_availability()) {
-                cslog() << kLogPrefix << "skip {" << it->ref_start.sequence << '.' << it->ref_start.transaction << "}, execution is not allowed (executor is not connected)";
+                cslog() << kLogPrefix << "skip {" << it->ref_start.sequence << '.' << it->ref_start.transaction
+                    << "}, execution is not allowed (executor is not connected)";
                 it->is_executor = false;
                 bool fake_sent = false;
                 const auto& confidants = pnode->retriveSmartConfidants(it->ref_start.sequence);
                 for (auto itconf = confidants.cbegin(); itconf != confidants.cend(); ++itconf) {
                     if (std::equal(itconf->cbegin(), itconf->cend(), node_id.cbegin())) {
-                        cslog() << kLogPrefix << "unable to execute contract, so send fake stage-1";
-                        SmartConsensus::sendFakeStageOne(pnode, confidants, cs::Byte(itconf - confidants.cbegin()),
-                            SmartConsensus::createId(it->ref_start.sequence, it->ref_start.transaction, 0));
+                        cslog() << kLogPrefix << "unable to execute {"
+                            << it->ref_start.sequence << '.' << it->ref_start.transaction << "}, so send fake stage-1 & stage-2";
+                        cs::Byte own_conf_num = cs::Byte(itconf - confidants.cbegin());
+                        uint64_t id = SmartConsensus::createId(it->ref_start.sequence, it->ref_start.transaction, 0);
+                        SmartConsensus::sendFakeStageOne(pnode, confidants, own_conf_num, id);
+                        SmartConsensus::sendFakeStageTwo(pnode, confidants, own_conf_num, id);
                         fake_sent = true;
                         break;
                     }
                 }
                 if (!fake_sent) {
-                    cslog() << kLogPrefix << "unable to execute contract and failed to send fake stage-1";
+                    cslog() << kLogPrefix << "unable to execute {"
+                        << it->ref_start.sequence << '.' << it->ref_start.transaction << "} and failed to send fake stage-1 & stage-2";
                 }
             }
             else {
