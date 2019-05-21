@@ -330,9 +330,20 @@ private:
     // async watchers
     std::list<cs::FutureWatcherPtr<SmartExecutionData>> executions_;
 
-    struct QueueItem {
+    struct ExecutionItem {
         // reference to smart in block chain (block/transaction) that spawns execution
         SmartContractRef ref_start;
+        // max fee taken from contract starter transaction
+        csdb::Amount avail_fee;
+        // new_state fee prediction
+        csdb::Amount new_state_fee;
+        // current fee
+        csdb::Amount consumed_fee;
+    };
+
+    struct QueueItem {
+        // list of execution items
+        std::vector<ExecutionItem> executions;
         // current status (running/waiting)
         SmartContractStatus status;
         // enqueue round
@@ -343,12 +354,6 @@ private:
         cs::Sequence seq_finish;
         // smart contract wallet/pub.key absolute address
         csdb::Address abs_addr;
-        // max fee taken from contract starter transaction
-        csdb::Amount avail_fee;
-        // new_state fee prediction
-        csdb::Amount new_state_fee;
-        // current fee
-        csdb::Amount consumed_fee;
         // actively taking part in smart consensus, perform a call to executor
         bool is_executor;
         // is rejected by consensus
@@ -359,23 +364,24 @@ private:
         std::vector<csdb::Address> uses;
 
         QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
-        : ref_start(ref_contract)
-        , status(SmartContractStatus::Waiting)
+        : status(SmartContractStatus::Waiting)
         , seq_enqueue(0)
         , seq_start(0)
         , seq_finish(0)
         , abs_addr(absolute_address)
-        , consumed_fee(0)
         , is_executor(false)
         , is_rejected(false) {
-            avail_fee = csdb::Amount(tr_start.max_fee().to_double());
+
+            add(ref_contract, tr_start);
+        }
+
+        void add(const SmartContractRef& ref_contract, csdb::Transaction tr_start) {
             csdb::Amount tr_start_fee = csdb::Amount(tr_start.counted_fee().to_double());
-
-            // apply starter fee consumed
-            avail_fee -= tr_start_fee;
-
             // TODO: here new_state_fee prediction may be calculated, currently it is equal to starter fee
-            new_state_fee = tr_start_fee;
+            csdb::Amount new_state_fee = tr_start_fee;
+            // apply starter fee consumed
+            csdb::Amount avail_fee = csdb::Amount(tr_start.max_fee().to_double()) - tr_start_fee - new_state_fee;
+            //consumed_fee = 0;
 
             csdb::UserField fld_using{};
             if (SmartContracts::is_start(tr_start)) {
@@ -384,10 +390,6 @@ private:
             else if (SmartContracts::is_deploy(tr_start)) {
                 fld_using = tr_start.user_field(trx_uf::deploy::Using);
             }
-
-            // apply reserved new_state fee
-            avail_fee -= new_state_fee;
-
             // get using contracts and reserve more fee for new_states
             if (fld_using.is_valid()) {
                 uses = std::move(SmartContracts::get_using_contracts(fld_using));
@@ -397,6 +399,8 @@ private:
                     avail_fee -= new_state_fee;
                 }
             }
+
+            executions.emplace_back(ref_contract, avail_fee, new_state_fee, csdb::Amount{ 0 });
         }
     };
 
@@ -416,7 +420,7 @@ private:
     queue_iterator find_in_queue(const SmartContractRef& item) {
         auto it = exe_queue.begin();
         for (; it != exe_queue.end(); ++it) {
-            if (it->ref_start == item) {
+            if(std::find(it->executions.cbegin(), it->executions.cend(), item) != it->executions.cend()) {
                 break;
             }
         }
@@ -446,9 +450,7 @@ private:
     // return next element in queue, the only exception is end() which returns unmodified
     queue_iterator remove_from_queue(queue_iterator it);
 
-    void remove_from_queue(const SmartContractRef& item) {
-        remove_from_queue(find_in_queue(item));
-    }
+    void remove_from_queue(const SmartContractRef& item);
 
     SmartContractStatus get_smart_contract_status(const csdb::Address& addr) const;
 

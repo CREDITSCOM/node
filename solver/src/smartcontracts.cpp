@@ -455,70 +455,84 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
         return;
     }
     SmartContractRef new_item(block.hash().clone(), block.sequence(), trx_idx);
-
-    if (!exe_queue.empty()) {
-        auto it = find_in_queue(new_item);
-        // test duplicated contract call
-        if (it != exe_queue.cend()) {
-            cserror() << kLogPrefix << "attempt to queue duplicated {" << it->ref_start.sequence << '.' << it->ref_start.transaction << "}, already queued on round #"
-                      << it->seq_enqueue;
-            return;
-        }
-    }
-
-    // enqueue to end
     csdb::Transaction t = block.transaction(trx_idx);
     csdb::Address abs_addr = absolute_address(t.target());
-    bool payable = false;
-    if (SmartContracts::is_deploy(t)) {
-        // pre-register in known_contracts
-        auto maybe_invoke_info = get_smart_contract_impl(t);
-        if (maybe_invoke_info.has_value()) {
-            const auto& invoke_info = maybe_invoke_info.value();
-            StateItem& state = known_contracts[abs_addr];
-            state.ref_deploy = new_item;
-            if (update_metadata(invoke_info, state)) {
-                payable = (state.payable == PayableStatus::Implemented);
-            }
+
+    auto it = find_in_queue(new_item);
+    if (it != exe_queue.cend()) {
+        csdebug() << kLogPrefix << "attempt to queue duplicated {" << new_item.sequence << '.' << new_item.transaction << "}, already queued on round #"
+                    << it->seq_enqueue;
+        return;
+    }
+
+    for (it = exe_queue.begin(); it != exe_queue.end(); ++it) {
+        if (it->seq_enqueue == new_item.sequence && it->abs_addr == abs_addr) {
+            break;
         }
     }
-    else {
-        // "lazy" metadata update, also covers cases of reading contracts from DB
-        if (!is_metadata_actual(abs_addr)) {
+
+    if (it == exe_queue.end()) {
+        // enqueue to end
+        bool payable = false;
+        if (SmartContracts::is_deploy(t)) {
+            // pre-register in known_contracts
             auto maybe_invoke_info = get_smart_contract_impl(t);
             if (maybe_invoke_info.has_value()) {
+                const auto& invoke_info = maybe_invoke_info.value();
                 StateItem& state = known_contracts[abs_addr];
-                update_metadata(maybe_invoke_info.value(), state);
+                state.ref_deploy = new_item;
+                if (update_metadata(invoke_info, state)) {
+                    payable = (state.payable == PayableStatus::Implemented);
+                }
             }
         }
-        payable = is_payable(abs_addr);
+        else {
+            // "lazy" metadata update, also covers cases of reading contracts from DB
+            if (!is_metadata_actual(abs_addr)) {
+                auto maybe_invoke_info = get_smart_contract_impl(t);
+                if (maybe_invoke_info.has_value()) {
+                    StateItem& state = known_contracts[abs_addr];
+                    update_metadata(maybe_invoke_info.value(), state);
+                }
+            }
+            payable = is_payable(abs_addr);
+        }
+        cslog() << std::endl << kLogPrefix << "enqueue " << print_executed_method(new_item) << std::endl;
+        it = exe_queue.emplace(exe_queue.cend(), QueueItem(new_item, abs_addr, t));
+    }
+    else {
+        // add to existing queue item
+        it->add(new_item, t);
     }
 
-    cslog() << std::endl << kLogPrefix << "enqueue " << print_executed_method(new_item) << std::endl;
-    auto& queue_item = exe_queue.emplace_back(QueueItem(new_item, abs_addr, t));
-
-    // in addition to contract "subcalls" set by transaction take more from contract metadata:
-    const std::string method = get_executed_method_name(new_item);
-    const size_t cnt_0 = queue_item.uses.size();
-    add_uses_from(abs_addr, method, queue_item.uses);  // if failed, execution_allowed wil be set to false
-    const size_t cnt = queue_item.uses.size();
-    if (cnt > 0) {
-        for (const auto& u : queue_item.uses) {
-            if (!in_known_contracts(u)) {
-                cslog() << kLogPrefix << "call to unknown contract declared in executing item, stop execution";
-                exe_queue.pop_back();
-                return;
+    if (!it->executions.empty()) {
+        // in addition to contract "subcalls" set by transaction take more from contract metadata:
+        const std::string method = get_executed_method_name(new_item);
+        const size_t cnt_0 = it->uses.size();
+        add_uses_from(abs_addr, method, it->uses);  // if failed, execution_allowed wil be set to false
+        const size_t cnt = it->uses.size();
+        if (cnt > 0) {
+            for (const auto& u : it->uses) {
+                if (!in_known_contracts(u)) {
+                    cslog() << kLogPrefix << "call to unknown contract declared in executing item, cancel {"
+                        << new_item.sequence << '.' << new_item.transaction << '}';
+                    remove_from_queue(new_item);
+                    // also may remove "it" if empty
+                    return;
+                }
             }
         }
-    }
-    if (cnt > cnt_0) {
-        for (size_t i = cnt_0; i < cnt; ++i) {
-            queue_item.avail_fee -= queue_item.new_state_fee;  // reserve more fee for future new_state
+
+        auto& execution = it->executions.back();
+        if (cnt > cnt_0) {
+            for (size_t i = cnt_0; i < cnt; ++i) {
+                execution.avail_fee -= queue_item.new_state_fee;  // reserve more fee for future new_state
+            }
         }
+        execution.consumed_fee += smart_round_fee(block);  // setup costs of initial round
     }
 
-    update_status(queue_item, new_item.sequence, SmartContractStatus::Waiting);
-    queue_item.consumed_fee += smart_round_fee(block);  // setup costs of initial round
+    update_status(*it, new_item.sequence, SmartContractStatus::Waiting);
     queue_item.is_executor = contains_me(block.confidants());
     test_exe_queue();
 }
@@ -949,13 +963,14 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
 // return next element in queue
 SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts::queue_iterator it) {
     if (it != exe_queue.cend()) {
-        cslog() << std::endl
-                << kLogPrefix << "remove from queue completed {" << it->ref_start.sequence << '.' << it->ref_start.transaction << "} " << print_executed_method(it->ref_start)
-                << std::endl;
+        cslog() << kLogPrefix << "remove from queue completed executions";
+        for (const auto item : it->executions) {
+            cslog() << "\t{" << item.ref_start.sequence << '.' << item.ref_start.transaction << "} " << print_executed_method(item.ref_start);
+        }
         const cs::Sequence seq = bc.getLastSequence();
         const cs::Sequence seq_cancel = it->seq_start + Consensus::MaxRoundsCancelContract + 1;
         if (seq > it->seq_start + Consensus::MaxRoundsExecuteContract && seq < seq_cancel) {
-            cslog() << kLogPrefix << seq_cancel - seq << " round(s) remains until unconditional {" << it->ref_start.sequence << '.' << it->ref_start.transaction << "} timeout";
+            cslog() << kLogPrefix << seq_cancel - seq << " round(s) remains until unconditional timeout";
         }
         // its too early to unlock contract(s), wait until states will updated
         // unlock only closed (after timeout) contracts
@@ -973,6 +988,22 @@ SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts:
     }
 
     return it;
+}
+
+void SmartContracts::remove_from_queue(const SmartContractRef& item) {
+    queue_iterator it = find_in_queue(item);
+    if (it == exe_queue.end()) {
+        return;
+    }
+    auto execution = std::find(it->executions.cbegin(), it->executions.cend(), item);
+    if (execution != it->executions.cend()) {
+        cslog() << kLogPrefix << "remove from queue completed {"
+            << execution->ref_start.sequence << '.' << execution->ref_start.transaction << "} " << print_executed_method(execution->ref_start);
+        it->executions.erase(execution);
+    }
+    if (it->executions.empty()) {
+        remove_from_queue(it);
+    }
 }
 
 bool SmartContracts::execute(SmartExecutionData& data) {
