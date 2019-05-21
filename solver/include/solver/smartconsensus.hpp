@@ -84,9 +84,14 @@ public:
         return runCounter_;
     }
 
+    // uint64_t[5 bytes] + uint16_t[2 bytes] + uint8_t[1 byte]
+    static inline uint64_t createId(uint64_t seq, uint16_t idx, uint8_t cnt) {
+        return (((seq & 0xFFFFFFFFFF) << 24) | (uint64_t(idx) << 8) | static_cast<uint64_t>(cnt));
+    }
+
     // smartRoundNumber[5 bytes] + smartTransaction[2 bytes] + runCounter[1 byte]
     uint64_t id() const {
-        return (((smartRoundNumber_ & 0xFFFFFFFFFF) << 24) | ((0x0000FFFF & smartTransaction_) << 8) | static_cast<uint64_t>(runCounter_));
+        return SmartConsensus::createId(smartRoundNumber_, uint16_t(smartTransaction_), runCounter_);
     }
 
     static inline cs::Sequence blockPart(uint64_t id) {
