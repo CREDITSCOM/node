@@ -1194,7 +1194,9 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
             });
 
             auto execTrans = s_blockchain.loadTransaction(trId);
-            if (execTrans.is_valid() && is_smart(execTrans)) {
+
+            if ((execTrans.is_valid() && is_smart(execTrans)) || 
+					execTrans.amount().to_double()) { // payable
                 const auto smart = fetch_smart(execTrans);
 
                 {
