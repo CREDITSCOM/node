@@ -483,7 +483,18 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
 
             if (flag == 'g') {
                 std::vector<uint8_t> skBytes;
-                privateKey_ = cscrypto::generateKeyPair(publicKey_);
+                auto ms = cscrypto::keys_derivation::generateMaterSeed();
+                privateKey_ = cscrypto::keys_derivation::derivePrivateKey(ms, 0);
+                publicKey_ = cscrypto::getMatchingPublic(privateKey_);
+
+                std::cout << "\nSave this phrase to restore your keys in futute, and press any key to continue:" << std::endl;
+                auto words = cscrypto::mnemonic::masterSeedToWords(ms);
+                for (auto w : words) {
+                    std::cout << w << " ";
+                }
+                std::cout << std::flush;
+                _getch();
+                std::cout << "\r" << std::string(ms.size() * 10, 'x') << std::endl << std::flush;
 
                 std::cout << "Choose your private key file encryption type (enter number):" << std::endl;
                 std::cout << "[1] Encrypt with password (recommended)" << std::endl;
