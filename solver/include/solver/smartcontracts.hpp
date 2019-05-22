@@ -277,9 +277,9 @@ signals:
 
 public slots:
     // called when execute_async() completed
-    void on_execution_completed(std::vector<SmartExecutionData> data_list) {
+    void on_execution_completed(const std::vector<SmartExecutionData>& data_list) {
         cs::Lock lock(public_access_lock);
-        on_execution_completed_impl(std::move(data_list));
+        on_execution_completed_impl(data_list);
     }
 
     // called when next block is stored
@@ -568,7 +568,7 @@ private:
 
     std::optional<api::SmartContractInvocation> get_smart_contract_impl(const csdb::Transaction& tr);
 
-    void on_execution_completed_impl(std::vector<SmartExecutionData>&& data_list);
+    void on_execution_completed_impl(const std::vector<SmartExecutionData>& data_list);
 
     // exe_queue item modifiers
 

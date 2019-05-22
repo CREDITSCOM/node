@@ -1168,7 +1168,7 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
     return true;
 }
 
-void SmartContracts::on_execution_completed_impl(std::vector<SmartExecutionData>&& data_list) {
+void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutionData>& data_list) {
     using namespace trx_uf;
     if (data_list.empty()) {
         // actually is checked before
