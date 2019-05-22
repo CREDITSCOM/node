@@ -31,12 +31,8 @@ namespace fee {
 csdb::AmountCommission getFee(const csdb::Transaction& t) {
     size_t size = t.to_byte_stream().size();
 
-    if (!SmartContracts::is_smart_contract(t)) {
-        if (size <= kCommonTrSize) {
-            return csdb::AmountCommission(kMinFee);
-        } else if (size <= kCommonTrSize + 55) { // 50 chars string in user field
-            return csdb::AmountCommission(kMinFee * 3);
-        }
+    if (!SmartContracts::is_smart_contract(t) && size <= kCommonTrSize) {
+        return csdb::AmountCommission(kMinFee);
     }
 
     for (const auto& level : feeLevels) {
