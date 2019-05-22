@@ -142,13 +142,6 @@ inline std::ostream& operator <<(std::ostream& os, const SmartContractRef& ref) 
     return os;
 }
 
-struct SmartExecutionData {
-    SmartContractRef contract_ref;
-    csdb::Amount executor_fee;
-    executor::Executor::ExecuteResult result;
-    std::string error;
-};
-
 inline bool operator==(const SmartContractRef& l, const SmartContractRef& r) {
     return (l.transaction == r.transaction && l.sequence == r.sequence /*&& l.hash == r.hash*/);
 }
@@ -161,6 +154,21 @@ inline bool operator<(const SmartContractRef& l, const SmartContractRef& r) {
         return false;
     }
     return (l.transaction < r.transaction);
+}
+
+struct SmartExecutionData {
+    SmartContractRef contract_ref;
+    csdb::Amount executor_fee;
+    executor::Executor::ExecuteResult result;
+    std::string error;
+};
+
+inline bool operator==(const SmartExecutionData& l, const SmartContractRef& r) {
+    return (l.contract_ref == r);
+}
+
+inline bool operator==(const SmartExecutionData& l, const SmartExecutionData& r) {
+    return (l.contract_ref == r.contract_ref);
 }
 
 enum class SmartContractStatus
@@ -269,7 +277,7 @@ signals:
 
 public slots:
     // called when execute_async() completed
-    void on_execution_completed(std::vector<SmartExecutionData>&& data_list) {
+    void on_execution_completed(std::vector<SmartExecutionData> data_list) {
         cs::Lock lock(public_access_lock);
         on_execution_completed_impl(std::move(data_list));
     }
@@ -334,7 +342,8 @@ private:
     std::vector<SmartContractRef> replenish_contract;
 
     // async watchers
-    using Watcher = cs::FutureWatcherPtr< std::vector< SmartExecutionData > >;
+    using WatcherElem = std::vector<SmartExecutionData>;
+    using Watcher = cs::FutureWatcherPtr<WatcherElem>;
     std::list<Watcher> executions_;
 
     // specifies a one contract call
@@ -349,6 +358,10 @@ private:
         csdb::Amount consumed_fee;
         // using contracts, must store absolute addresses (keys, not ids)
         std::vector<csdb::Address> uses;
+
+        bool operator ==(const SmartContractRef& r) const {
+            return ref_start == r;
+        }
     };
 
     // defines an item of execution queue which is a one or more simultaneous calls to specific contract
@@ -384,6 +397,8 @@ private:
             add(ref_contract, tr_start);
         }
 
+        // add contract execution to existing exe queue item
+        // caller is responsible the execution to refer to the same contract, call to other method of the same contract is allowed
         void add(const SmartContractRef& ref_contract, csdb::Transaction tr_start);
     };
 
@@ -403,13 +418,12 @@ private:
     Node* pnode;
 
     queue_iterator find_in_queue(const SmartContractRef& item) {
-        auto it = exe_queue.begin();
-        for (; it != exe_queue.end(); ++it) {
-            if(std::find(it->executions.cbegin(), it->executions.cend(), item) != it->executions.cend()) {
-                break;
+        for (auto it = exe_queue.begin(); it != exe_queue.end(); ++it) {
+            if (std::find(it->executions.cbegin(), it->executions.cend(), item) != it->executions.cend()) {
+                return it;
             }
         }
-        return it;
+        return exe_queue.end();
     }
 
     execution_iterator find_in_queue_item(queue_iterator qit, const SmartContractRef& item) {

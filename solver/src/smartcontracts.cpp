@@ -28,6 +28,9 @@ inline void print(std::ostream& os, const ::general::Variant& var) {
     else if (var.__isset.v_boolean) {
         os << var.v_boolean;
     }
+    else if (var.__isset.v_boolean_box) {
+        os << var.v_boolean_box;
+    }
     else if( var.__isset.v_array ) {
         os << "Array";
     }
@@ -49,31 +52,41 @@ inline void print(std::ostream& os, const ::general::Variant& var) {
     else if( var.__isset.v_int ) {
         os << var.v_int;
     }
+    else if (var.__isset.v_int_box) {
+        os << var.v_int_box;
+    }
     else if (var.__isset.v_byte) {
         os << (unsigned int)var.v_byte;
+    }
+    else if (var.__isset.v_byte_box) {
+        os << (unsigned int)var.v_byte_box;
     }
     else if (var.__isset.v_short) {
         os << var.v_short;
     }
+    else if (var.__isset.v_short_box) {
+        os << var.v_short_box;
+    }
     else if (var.__isset.v_long) {
         os << var.v_long;
+    }
+    else if (var.__isset.v_long_box) {
+        os << var.v_long_box;
     }
     else if (var.__isset.v_float) {
         os << var.v_float;
     }
+    else if (var.__isset.v_float_box) {
+        os << var.v_float_box;
+    }
     else if (var.__isset.v_double) {
         os << var.v_double;
     }
+    else if (var.__isset.v_double_box) {
+        os << var.v_double_box;
+    }
     else {
-        /* those variants are shown by default
-          out << ", " << "v_boolean_box="; (__isset.v_boolean_box ? (out << to_string(v_boolean_box)) : (out << "<null>"));
-          out << ", " << "v_byte_box="; (__isset.v_byte_box ? (out << to_string(v_byte_box)) : (out << "<null>"));
-          out << ", " << "v_short_box="; (__isset.v_short_box ? (out << to_string(v_short_box)) : (out << "<null>"));
-          out << ", " << "v_int_box="; (__isset.v_int_box ? (out << to_string(v_int_box)) : (out << "<null>"));
-          out << ", " << "v_long_box="; (__isset.v_long_box ? (out << to_string(v_long_box)) : (out << "<null>"));
-          out << ", " << "v_float_box="; (__isset.v_float_box ? (out << to_string(v_float_box)) : (out << "<null>"));
-          out << ", " << "v_double_box="; (__isset.v_double_box ? (out << to_string(v_double_box)) : (out << "<null>"));
-        */
+        /* other variant types are shown by default */
         print_default = true;
     }
     os << ')';
@@ -114,7 +127,7 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
     // apply starter fee consumed
     csdb::Amount avail_fee = csdb::Amount(tr_start.max_fee().to_double()) - tr_start_fee - new_state_fee;
     //consumed_fee = 0;
-    auto& execution = executions.emplace_back(ref_contract, avail_fee, new_state_fee, csdb::Amount{ 0 });
+    auto& execution = executions.emplace_back(ExecutionItem{ ref_contract, avail_fee, new_state_fee, csdb::Amount{ 0 } });
 
     csdb::UserField fld_using{};
     if (SmartContracts::is_start(tr_start)) {
@@ -533,12 +546,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
     }
 
     if (!it->executions.empty()) {
-        std::vector<ExecutionItem>::iterator execution = it->executions.begin();
-        for (; execution != it->executions.end(); ++execution) {
-            if (execution->ref_start == new_item) {
-                break;
-            }
-        }
+        execution_iterator execution = find_in_queue_item(it, new_item);
         if (execution == it->executions.end()) {
             // smth. strange, failed to find newly created item
             // nothing to do with it
@@ -1060,7 +1068,7 @@ void SmartContracts::remove_from_queue(const SmartContractRef& item) {
     if (it == exe_queue.end()) {
         return;
     }
-    auto execution = std::find(it->executions.cbegin(), it->executions.cend(), item);
+    auto execution = find_in_queue_item(it, item);
     if (execution != it->executions.cend()) {
         cslog() << kLogPrefix << "remove from queue completed {"
             << execution->ref_start.sequence << '.' << execution->ref_start.transaction << "} " << print_executed_method(execution->ref_start);
@@ -1186,12 +1194,7 @@ void SmartContracts::on_execution_completed_impl(std::vector<SmartExecutionData>
 
         // create partial new_state transaction
         if (it != exe_queue.end()) {
-            auto execution = it->executions.begin();
-            for (; execution != it->executions.end(); ++execution) {
-                if (execution->ref_start == data_item.contract_ref) {
-                    break;
-                }
-            }
+            auto execution = find_in_queue_item(it, data_item.contract_ref);
             csdebug() << kLogPrefix << "execution of {" << data_item.contract_ref.sequence << '.' << data_item.contract_ref.transaction << "} has completed";
             if (execution != it->executions.end()) {
                 execution->consumed_fee = data_item.result.fee;  // executor overrides fee for now
@@ -1259,16 +1262,19 @@ void SmartContracts::on_execution_completed_impl(std::vector<SmartExecutionData>
                 if (!data_item.result.states.empty()) {
                     csdebug() << kLogPrefix << "add " << data_item.result.states.size() << " subsequent new state(s) along with " << data_item.contract_ref << " state";
                     for (const auto& [addr, state] : data_item.result.states) {
-                        csdb::Transaction t = create_new_state(*it);
-                        if (t.is_valid()) {
-                            // re-assign some fields
-                            t.set_innerID(next_inner_id(addr));
-                            t.set_source(addr);
-                            t.set_target(addr);
-                            t.add_user_field(trx_uf::new_state::Value, state);
-                            t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
-                            t.add_user_field(trx_uf::new_state::RetVal, serialize(::general::Variant{}));
-                            packet.addTransaction(t);
+                        auto execution = find_in_queue_item(it, data_item.contract_ref);
+                        if (execution != it->executions.end()) {
+                            csdb::Transaction t = create_new_state(*execution);
+                            if (t.is_valid()) {
+                                // re-assign some fields
+                                t.set_innerID(next_inner_id(addr));
+                                t.set_source(addr);
+                                t.set_target(addr);
+                                t.add_user_field(trx_uf::new_state::Value, state);
+                                t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
+                                t.add_user_field(trx_uf::new_state::RetVal, serialize(::general::Variant{}));
+                                packet.addTransaction(t);
+                            }
                         }
                     }
                 }
@@ -1338,26 +1344,32 @@ void SmartContracts::on_reject(const std::vector<std::pair<cs::Sequence, uint32_
 
     for (const auto ref : ref_list) {
         // find rejected contract in queue
-        queue_iterator it = exe_queue.end();
-        for (auto i = exe_queue.begin(); i != exe_queue.end(); ++i) {
-            if (i->ref_start.sequence == ref.first && i->ref_start.transaction == ref.second) {
-                it = i;
+        QueueItem * queue_item = nullptr;
+        ExecutionItem * exe_item = nullptr;
+        for (auto it = exe_queue.begin(); it != exe_queue.end(); ++it) {
+            for (auto it_exe = it->executions.begin(); it_exe != it->executions.end(); ++it_exe) {
+                if (it_exe->ref_start.sequence == ref.first && it_exe->ref_start.transaction == ref.second) {
+                    queue_item = &(*it);
+                    exe_item = &(*it_exe);
+                    break;
+                }
+            }
+            if (queue_item != nullptr) {
                 break;
             }
         }
-        if (it == exe_queue.end()) {
+        if (queue_item == nullptr) {
             cserror() << kLogPrefix << "cannot find in queue source contract for rejected transactions";
         }
         else {
-            if (it->is_rejected) {
+            if (queue_item->is_rejected || exe_item == nullptr) {
                 // already in new consensus
                 continue;
             }
-            it->is_rejected = true;
-            csdebug() << kLogPrefix << "send to conveyer {" << it->ref_start.sequence << '.' << it->ref_start.transaction
-                      << "} failed status (emitted transactions or state are rejected)";
+            queue_item->is_rejected = true;
+            csdebug() << kLogPrefix << "send to conveyer " << exe_item->ref_start << " failed status (emitted transactions or state are rejected)";
             // send to consensus
-            csdb::Transaction tr = create_new_state(*it);
+            csdb::Transaction tr = create_new_state(*exe_item);
             // result contains empty USRFLD[state::Value]
             tr.add_user_field(trx_uf::new_state::Value, std::string{});
             // result contains error code "rejected by consensus"
@@ -1369,8 +1381,8 @@ void SmartContracts::on_reject(const std::vector<std::pair<cs::Sequence, uint32_
                 empty_states_pack.addTransaction(tr);
             }
             else {
-                cserror() << kLogPrefix << "failed to store {" << it->ref_start.sequence << '.' << it->ref_start.transaction << "} failure, remove from execution queue";
-                update_status(*it, bc.getLastSequence(), SmartContractStatus::Closed);
+                cserror() << kLogPrefix << "failed to store " << exe_item->ref_start << " failure, remove from execution queue";
+                update_status(*queue_item, bc.getLastSequence(), SmartContractStatus::Closed);
                 retest_queue_required = true;
             }
         }
@@ -1697,20 +1709,20 @@ void SmartContracts::update_status(QueueItem& item, cs::RoundNumber r, SmartCont
     switch (status) {
         case SmartContractStatus::Waiting:
             item.seq_enqueue = r;
-            csdebug() << kLogPrefix << '{' << item.ref_start.sequence << '.' << item.ref_start.transaction << "} is waiting from #" << r;
+            csdebug() << kLogPrefix << '{' << item.seq_enqueue << ".*} is waiting from #" << r;
             break;
         case SmartContractStatus::Running:
             item.seq_start = r;
             update_lock_status(item, true);
-            csdebug() << kLogPrefix << '{' << item.ref_start.sequence << '.' << item.ref_start.transaction << "} is running from #" << r;
+            csdebug() << kLogPrefix << '{' << item.seq_enqueue << ".*} is running from #" << r;
             break;
         case SmartContractStatus::Finished:
             item.seq_finish = r;
-            csdebug() << kLogPrefix << '{' << item.ref_start.sequence << '.' << item.ref_start.transaction << "} is finished on #" << r;
+            csdebug() << kLogPrefix << '{' << item.seq_enqueue << ".*} is finished on #" << r;
             break;
         case SmartContractStatus::Closed:
             update_lock_status(item, false);
-            csdebug() << kLogPrefix << '{' << item.ref_start.sequence << '.' << item.ref_start.transaction << "} is closed";
+            csdebug() << kLogPrefix << '{' << item.seq_enqueue << ".*} is closed";
             break;
         default:
             break;
