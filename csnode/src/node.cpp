@@ -1566,7 +1566,6 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required /
 void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
     csdebug() << __func__;
     csmeta(csdetails) << "started";
-
     if (myLevel_ != Level::Confidant) {
         return;
     }
@@ -2086,7 +2085,14 @@ void Node::sendRoundTable() {
                           lastSentSignatures_.trustedConfirmation);
 
     conveyer.setRound(lastSentRoundData_.table.round);
-
+    
+    for (int i = 0; i < lastTrustedMask_.size(); ++i) {
+        if (lastTrustedMask_[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+            //csdebug() << "NODE> Node ban!!!";
+            solver_->addToGraylist(conveyer.confidants()[i], Consensus::GrayListPunishment);
+        }
+    }
+    
     subRound_ = 0;
 
     cs::RoundTable table;
@@ -2128,6 +2134,8 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
     stream << poolMetaInfo.sequenceNumber;
     stream << poolMetaInfo.previousHash;
 
+    lastTrustedMask_.clear();
+    lastTrustedMask_ = poolMetaInfo.realTrustedMask;
     cs::Bytes trustedList;
     cs::DataStream tStream(trustedList);
     tStream << newRoundTable.round;
@@ -2279,6 +2287,13 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     cs::Bytes realTrusted;
     roundStream >> realTrusted;
+
+    for (int i=0; i<realTrusted.size(); ++i) {
+        if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+            //csdebug() << "NODE> Node ban!!!";
+            solver_->addToGraylist(prevConfidants[i], Consensus::GrayListPunishment);
+        }
+    }
 
     cs::Signatures poolSignatures;
 

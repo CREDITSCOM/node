@@ -77,7 +77,25 @@ bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
     return true;
 }
 
+void SolverCore::addToGraylist(const cs::PublicKey & sender, uint32_t rounds) {
+    if (grayList_.find(sender) == grayList_.cend()) {
+        grayList_.emplace(sender, rounds);
+        csdebug() << "Node " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " is in gray list now";
+    }
+    else {
+        uint32_t remainingRounds = grayList_[sender];
+        grayList_.emplace(sender, rounds*2 + remainingRounds);
+        csdebug() << "Node " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " will continue its being in gray list now";
+    }
+}
+
 void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender) {
+    // GrayList check
+    if (grayList_.count(sender) > 0) {
+        csdebug() << "The sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " is in gray list";
+        return;
+    }
+
     // DPOS check start -> comment if unnecessary
     if (!checkNodeCache(sender)) {
         csdebug() << "The sender's cash value is too low -> Don't allowed to be a confidant";
@@ -122,6 +140,7 @@ void SolverCore::nextRound() {
     realTrustedChanged_ = false;
     tempRealTrusted_.clear();
     currentStage3iteration_ = 0;
+    updateGrayList(cs::Conveyer::instance().currentRoundNumber());
 
     if (!pstate) {
         return;
@@ -363,6 +382,26 @@ void SolverCore::realTrustedSetValue(cs::Byte position, cs::Byte value) {
 
 void SolverCore::realTrustedSet(cs::Bytes realTrusted) {
     tempRealTrusted_ = realTrusted;
+}
+
+void SolverCore::updateGrayList(cs::RoundNumber round) {
+    csdebug() << __func__;
+    if (lastGrayUpdated_ >= round) {
+        csdebug() << "Gray list will update only if the round number changes";
+        return;
+    }
+    for (auto& it : grayList_) {
+        --it.second;
+    }
+    auto it = grayList_.cbegin();
+    while (it != grayList_.cend()) {
+        if (it->second == 0) {
+            csdebug() << "Node with PK " << cs::Utils::byteStreamToHex(it->first.data(), it->first.size()) << " freed from grayList trap";
+            grayList_.erase(it);
+        }
+        ++it;
+    }
+
 }
 
 cs::Bytes SolverCore::getRealTrusted() {
