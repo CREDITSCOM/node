@@ -1566,7 +1566,6 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required /
 void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
     csdebug() << __func__;
     csmeta(csdetails) << "started";
-
     if (myLevel_ != Level::Confidant) {
         return;
     }
@@ -2039,7 +2038,16 @@ void Node::sendRoundTable() {
                           lastSentSignatures_.trustedConfirmation);
 
     conveyer.setRound(lastSentRoundData_.table.round);
-
+    
+    const auto& confidants = conveyer.confidants();
+    if (!confidants.empty() && lastTrustedMask_.size() == confidants.size()) {
+        for (int i = 0; i < lastTrustedMask_.size(); ++i) {
+            if (lastTrustedMask_[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+                //csdebug() << "NODE> Node ban!!!";
+                solver_->addToGraylist(confidants[i], Consensus::GrayListPunishment);
+            }
+        }
+    }
     subRound_ = 0;
 
     cs::RoundTable table;
@@ -2081,6 +2089,8 @@ void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::
     stream << poolMetaInfo.sequenceNumber;
     stream << poolMetaInfo.previousHash;
 
+    lastTrustedMask_.clear();
+    lastTrustedMask_ = poolMetaInfo.realTrustedMask;
     cs::Bytes trustedList;
     cs::DataStream tStream(trustedList);
     tStream << newRoundTable.round;
@@ -2193,7 +2203,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     // sync state check
     cs::Conveyer& conveyer = cs::Conveyer::instance();
-    cs::ConfidantsKeys prevConfidants = conveyer.confidants();
 
     if (conveyer.currentRoundNumber() == rNum && subRound_ > subRound) {
         cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
@@ -2232,6 +2241,19 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     cs::Bytes realTrusted;
     roundStream >> realTrusted;
+
+    const auto ptrRT = conveyer.roundTable(rNum - 1);
+    if (ptrRT != nullptr) {
+        const cs::ConfidantsKeys& prevConfidants = ptrRT->confidants;
+        if (!prevConfidants.empty() && realTrusted.size() == prevConfidants.size()) {
+            for (int i = 0; i < realTrusted.size(); ++i) {
+                if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+                    //csdebug() << "NODE> Node ban!!!";
+                    solver_->addToGraylist(prevConfidants[i], Consensus::GrayListPunishment);
+                }
+            }
+        }
+    }
 
     cs::Signatures poolSignatures;
 

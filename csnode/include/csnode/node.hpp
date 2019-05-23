@@ -388,6 +388,7 @@ private:
     //expected rounds
     std::vector<cs::RoundNumber> expectedRounds_;
     cs::Sequence maxHeighboursSequence_ = 0;
+    cs::Bytes lastTrustedMask_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);
