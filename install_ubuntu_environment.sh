@@ -1,11 +1,10 @@
 #!/bin/bash
 
 # install Cmake
-sudo apt-get remove cmake
 git clone https://gitlab.kitware.com/cmake/cmake.git
 cd cmake
 ./bootstrap --prefix=/usr/local
-make
+make -j4
 cd..
 
 #install boost_1_68_0
@@ -15,7 +14,7 @@ cd boost_1_68_0/
 sudo apt-get update
 sudo apt-get install g++ python-dev autotools-dev libicu-dev build-essential libbz2-dev
 ./bootstrap.sh --prefix=/usr/local
-sudo ./b2 install
+sudo ./b2 -j4 install
 cd ..
 
 #install flex and bison
