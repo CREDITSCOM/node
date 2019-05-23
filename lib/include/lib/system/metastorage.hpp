@@ -7,7 +7,7 @@
 
 /// nested namespace
 namespace cs::values {
-constexpr std::size_t defaultMetaStorageMaxSize = 5;
+constexpr std::size_t kDefaultMetaStorageMaxSize = 5;
 }
 
 namespace cs {
@@ -51,7 +51,7 @@ public:
 
     // default initialization
     inline MetaStorage() noexcept
-    : buffer_(cs::values::defaultMetaStorageMaxSize) {
+    : buffer_(cs::values::kDefaultMetaStorageMaxSize) {
     }
 
     // storage interface

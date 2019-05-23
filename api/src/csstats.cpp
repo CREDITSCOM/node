@@ -233,12 +233,12 @@ AllStats csstats::collectAllStats(const Periods& periods) {
 
         ++cnt;
         if (log_to_console && (cnt % 1000) == 0) {
-            std::cout << '\r' << cnt;
+            std::cout << '\r' << WithDelimiters(cnt);
         }
     }
 
     if (log_to_console) {
-        std::cout << '\r' << cnt << "... Done\n";
+        std::cout << '\r' << WithDelimiters(cnt) << "... Done\n";
         log_to_console = false;
     }
 

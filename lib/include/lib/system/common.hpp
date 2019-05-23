@@ -9,10 +9,10 @@
 
 #include <cscrypto/cscrypto.hpp>
 
-constexpr std::size_t HASH_LENGTH = cscrypto::kHashSize;
-constexpr std::size_t PUBLIC_KEY_LENGTH = cscrypto::kPublicKeySize;
-constexpr std::size_t PRIVATE_KEY_LENGTH = cscrypto::kPrivateKeySize;
-constexpr std::size_t SIGNATURE_LENGTH = cscrypto::kSignatureSize;
+constexpr std::size_t kHashLength = cscrypto::kHashSize;
+constexpr std::size_t kPublicKeyLength = cscrypto::kPublicKeySize;
+constexpr std::size_t kPrivateKeyLength = cscrypto::kPrivateKeySize;
+constexpr std::size_t kSignatureLength = cscrypto::kSignatureSize;
 
 constexpr double kMinFee = 0.0001428 * 3.0;
 

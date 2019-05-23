@@ -42,6 +42,7 @@ using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 
 /** @brief   The write block or remove block signal emits when block is flushed to disk */
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
+using ReadBlockSignal = csdb::ReadBlockSignal;
 }  // namespace cs
 
 class BlockChain {
@@ -52,25 +53,26 @@ public:
     using WalletData = cs::WalletsCache::WalletData;
     using Mask = boost::dynamic_bitset<uint64_t>;
 
+    enum class AddressType {
+        PublicKey,
+        Id
+    };
+
     explicit BlockChain(csdb::Address genesisAddress, csdb::Address startAddress);
     ~BlockChain();
 
     bool init(const std::string& path);
     bool isGood() const;
 
-    // utility methods
+    // return unique id of database if at least one unique block has written, otherwise (only genesis block) 0
+    uint64_t uuid() const;
 
-    enum class AddressType {
-        PublicKey,
-        Id
-    };
+    // utility methods
 
     csdb::Address getAddressByType(const csdb::Address& addr, AddressType type) const;
     bool isEqual(const csdb::Address& laddr, const csdb::Address& raddr) const;
 
     static csdb::Address getAddressFromKey(const std::string&);
-
-    const csdb::Storage& getStorage() const;
 
     // create/save block and related methods
 
@@ -122,7 +124,9 @@ public:
 
     void addNewWalletsToPool(csdb::Pool& pool);
 
-    // block cache
+    // storage adaptor
+    void close();
+    bool getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const;
 
 public:
     /**
@@ -177,6 +181,8 @@ public signals:
     /** @brief The remove block event. Raised when the next block is flushed to storage */
     cs::ChangeBlockSignal removeBlockEvent;
 
+    const cs::ReadBlockSignal& readBlockEvent() const;
+
 public slots:
 
     // prototype is void (csdb::Transaction)
@@ -190,6 +196,8 @@ public slots:
     void onContractEmittedAccepted(const csdb::Transaction& emitted, const csdb::Transaction& starter) {
         this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter);
     }
+
+public:
 
     // load methods
 
@@ -332,6 +340,25 @@ private:
     csdb::Pool deferredBlock_;
 
     std::unique_ptr<cs::BlockValidator> blockValidator_;
+
+    uint64_t uuidFromHash(const csdb::PoolHash& h) const {
+        if (!h.is_empty()) {
+            return *reinterpret_cast<uint64_t*>(h.to_binary().data());
+        }
+        return 0;
+    }
+
+    uint64_t uuidFromBlock(const csdb::Pool& block) const {
+        if (block.is_valid()) {
+            return uuidFromHash(block.hash());
+        }
+        return 0;
+    }
+
+    //uint64_t initUuid() const;
+
+    // may be modified once in uuid() method:
+    mutable uint64_t uuid_ = 0;
 };
 
 class TransactionsIterator {

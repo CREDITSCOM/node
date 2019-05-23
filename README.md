@@ -1,14 +1,23 @@
+<img src="https://raw.githubusercontent.com/CREDITSCOM/Documentation/master/Src/Logo_Credits_horizontal_black.png" align="center">
+
+[Documentation](https://developers.credits.com/en/Articles/Platform) \|
+[Guides](https://developers.credits.com/en/Articles/Guides) \|
+[News](https://credits.com/en/Home/News)
+
+[![Twitter](https://img.shields.io/twitter/follow/creditscom.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=creditscom)
+[![AGPL License](https://img.shields.io/github/license/CREDITSCOM/node.svg?color=green&label=License&style=plastic)](LICENSE)
+![Version](https://img.shields.io/github/tag/CREDITSCOM/node.svg?label=Versoin&style=plastic)
 # Credits Node
 A node is a client-side application that is installed on the user equipment.
 The Node processes and stores transactions, executes and confirms smart contract rules requests processing from third-party systems and provides data when requested.
 Written on C++.
 
 ## Version
-Current node version 4.2.408
+Current node version 4.2.414.3
 
 
-<h2>What is CS NODE?</h2>
-<p>CSNODE is the main module that provide an opportunity to run a node and participate in CREDITS blockhain network. The node performs processing and storage of transactions, execution and confirmation of the terms of smart contracts, processing requests from third-party systems, and provides data upon request. Each node on the network has the same functionality.
+<h2>What is Credits Node?</h2>
+<p>Credits Node is the main module that provide an opportunity to run a node and participate in CREDITS blockhain network. The node performs processing and storage of transactions, execution and confirmation of the terms of smart contracts, processing requests from third-party systems, and provides data upon request. Each node on the network has the same functionality.
 The node consists of the following elements:</p>
 <ul>
 <li>API</li> 
@@ -16,50 +25,45 @@ The node consists of the following elements:</p>
 <li>Storage(CSDB)</li> 
 <li>Transport protocol</li> 
 </ul>
+
+<h2>Build dependencies</h2>
+<ul>
+<li>Boost 1.68 and higher static prebuild, compiler with C++17 support</li>
+</ul>
+
 <h2>How to Build</h2>
-<ol type='1'>
-<li>Clone the repository:
 
-`git clone https://github.com/CREDITSCOM/CSNode.git`</li>
-<li>Make a directory build64:
+>```sh
+>git clone https://github.com/CREDITSCOM/node.git
+>cd node
+>git submodule update --init --recursive
+>mkdir build
+>cd build
+>cmake -DCMAKE_BUILD_TYPE=Release -A x64 ..
+>make
 
-`mkdir build64`</li>
-<li>Change directory:
-
-`cd build64`</li>
-<li>Run a CMAKE command:
-
-`cmake .. -A x64`</li>
-<li>Open a project in Visual Studio:
-
-`explorer Project.sln`</li>
-</ol>
-<p>Also, you can use the assembly for a specific program
-
-`cmake -G "Development Environment x64"`
-</p>
 <h2>System requirements:</h2>
 <h4>Minimum system requirements:</h4>
 Operating system: Windows® 7 / Windows® 8 / Windows® 10 64-bit (with the last update package)
 Processor (CPU): with frequency of 1 GHz (or faster) with PAE, NX and SSE2 support;
-Memory (RAM): 2–4 Gb
-HDD: 1 Gb
+Memory (RAM): 4 Gb
+HDD: 1 Tb
 Internet connection: 3 Mbit/s
 <h4>Recommended system requirements:</h4>
 
 Operating system: Windows® 7 / Windows® 8 / Windows® 10 64-bit (with the last update package)
 Processor (CPU): Intel® Core ™ i3 or AMD Phenom ™ X3 8650
-Memory (RAM): 4–8 Gb
-SSD: 1 Gb
+Memory (RAM): 8 Gb
+HDD: 3 Tb
 Internet connection: 5 Mbit/s.
 
 <h2>Contribution</h2>
 <p>Thank you for considering to help out with the source code! We welcome contributions from anyone on the internet, and are grateful for even the smallest of fixes!
-If you'd like to contribute to CS-NODE, please fork, fix, commit and send a pull request for the maintainers to review and merge into the main code base. If you wish to submit more complex changes though, please check up with the core devs first on our <a href="https://developers.credits.com/">Developers portal</a> and <a href="https://github.com/CREDITSCOM/Documentation/blob/master/Contribution.md"> Contribution file</a> to ensure those changes are in line with the general philosophy of the project and/or get some early feedback which can make both your efforts much lighter as well as our review and merge procedures quick and simple.
+If you'd like to contribute to Credits Node, please fork, fix, commit and send a pull request for the maintainers to review and merge into the main code base. If you wish to submit more complex changes though, please check up with the core devs first on our <a href="https://developers.credits.com/">Developers portal</a> and <a href="https://github.com/CREDITSCOM/Documentation/blob/master/Contribution.md"> Contribution file</a> to ensure those changes are in line with the general philosophy of the project and/or get some early feedback which can make both your efforts much lighter as well as our review and merge procedures quick and simple.
 Please make sure your contributions adhere to our coding guidelines:</p>
 <ul>
-<li>Code must adhere to the <a href="https://google.github.io/styleguide/cppguide.html">Google C++ Style Guide</a></li>
-<li>Code must be well documented adhering to the Google’s guidelines</li>
+<li>Code must adhere to the <a href="https://google.github.io/styleguide/cppguide.html">Credits coding style</a></li>
+
 <li>Pull requests need to be based on and opened against the master branch</li>
 <li>Commit messages should be prefixed with the package(s) they modify</li>
 </ul>

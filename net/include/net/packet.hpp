@@ -81,14 +81,14 @@ enum MsgTypes : uint8_t {
     NodeStopRequest = 255
 };
 
-const char* getMsgTypesString(MsgTypes messageType);
-
 class Packet {
 public:
     static const uint32_t MaxSize = 1024;
     static const uint32_t MaxFragments = 4096;
 
     static const uint32_t SmartRedirectTreshold = 10000;
+
+    static const char* messageTypeToString(MsgTypes messageType);
 
     Packet() = default;
     explicit Packet(RegionPtr&& data)
@@ -216,7 +216,6 @@ public:
         char* source = static_cast<char*>(data_->get());
         char* dest = static_cast<char*>(tempBuffer.data());
 
-        // copy header
         std::copy(source, source + data_->size(), dest);
         return boost::asio::buffer(dest, data_->size());
     }
@@ -271,7 +270,7 @@ public:
         if (isFragmented()) {
             const auto fragment = getFragmentId();
             const auto count = getFragmentsNum();
-            if (fragment >= MaxFragments || count >= MaxFragments || fragment >= count) {
+            if (count == 0 || fragment >= MaxFragments || count >= MaxFragments || fragment >= count) {
                 return false;
             }
         }
@@ -386,12 +385,11 @@ private:
     friend class Network;
 };
 
-
 using MessagePtr = MemPtr<TypedSlot<Message>>;
 
 class PacketCollector {
 public:
-    static const uint32_t MaxParallelCollections = 2048;
+    static const uint32_t MaxParallelCollections = 1024;
 
     PacketCollector()
     : msgAllocator_(MaxParallelCollections + 1) {

@@ -18,13 +18,7 @@
 
 //#define RECREATE_INDEX
 
-// uncomment this to generate new cheat db file (__integr.seq) every time it is absent in BD directory
-//#define RECREATE_CHEAT
-
 using namespace cs;
-
-void generateCheatDbFile(std::string, const BlockHashes&);
-bool validateCheatDbFile(std::string, const BlockHashes&);
 
 BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 : good_(false)
@@ -36,7 +30,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
-    cs::Connector::connect(storage_.read_block_event(), this, &BlockChain::onReadFromDB);
+    cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
     blockHashes_ = std::make_unique<cs::BlockHashes>();
 }
@@ -51,7 +45,7 @@ bool BlockChain::init(const std::string& path) {
     csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
         ++totalLoaded;
         if (progress.poolsProcessed % 1000 == 0) {
-            std::cout << '\r' << progress.poolsProcessed << "";
+            std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << "";
         }
         return false;
     };
@@ -61,7 +55,7 @@ bool BlockChain::init(const std::string& path) {
         return false;
     }
 
-    cslog() << "\rDB is opened, loaded " << totalLoaded << " blocks";
+    cslog() << "\rDB is opened, loaded " << WithDelimiters(totalLoaded) << " blocks";
 
     if (storage_.last_hash().is_empty()) {
         csdebug() << "Last hash is empty...";
@@ -70,14 +64,9 @@ bool BlockChain::init(const std::string& path) {
             return false;
         }
         writeGenesisBlock();
-        generateCheatDbFile(path, *blockHashes_);
     }
     else {
         if (!postInitFromDB()) {
-            return false;
-        }
-        if (!validateCheatDbFile(path, *blockHashes_)) {
-            cserror() << "Bad database version";
             return false;
         }
         std::cout << "Done\n";
@@ -101,7 +90,17 @@ bool BlockChain::isGood() const {
     return good_;
 }
 
+uint64_t BlockChain::uuid() const {
+    cs::Lock lock(dbLock_);
+    return uuid_;
+}
+
 void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
+    if (block.sequence() == 1) {
+        cs::Lock lock(dbLock_);
+        uuid_ = uuidFromBlock(block);
+        csdebug() << "Blockchain: UUID = " << uuid_;
+    }
     if (!blockValidator_->validateBlock(block, BlockValidator::ValidationLevel::hashIntergrity, BlockValidator::SeverityLevel::greaterThanWarnings)) {
         *shouldStop = true;
         return;
@@ -199,51 +198,6 @@ cs::Sequence BlockChain::getLastSequence() const {
     else {
         return 0;
     }
-}
-
-const std::string CHEAT_FILENAME = "__integr.seq";
-
-std::string prepareCheatData(std::string& path, const BlockHashes& bh) {
-    if (path.size() && path.back() != '/') {
-        path.push_back('/');
-    }
-
-    path += CHEAT_FILENAME;
-
-    csdb::PoolHash genHash = bh.find(0);
-    cs::Bytes hb = genHash.to_binary();
-
-    cs::DataStream stream(hb);
-    stream << NODE_VERSION;
-
-    return EncodeBase58(hb);
-}
-
-void generateCheatDbFile(std::string path, const BlockHashes& bh) {
-    const auto cd = prepareCheatData(path, bh);
-
-    std::ofstream f(path);
-    f << cd;
-}
-
-bool validateCheatDbFile(std::string path, const BlockHashes& bh) {
-#if defined(RECREATE_CHEAT)
-    std::string origin = path;
-#endif  // RECREATE_CHEAT
-    const auto cd = prepareCheatData(path, bh);
-
-    std::ifstream f(path);
-#if defined(RECREATE_CHEAT)
-    if (!f) {
-        generateCheatDbFile(origin, bh);
-        cswarning() << "Blockchain: cannot open special mark so it was regenerated";
-        return true;
-    }
-#endif  // RECREATE_CHEAT
-    std::string rcd;
-    f >> rcd;
-
-    return rcd == cd;
 }
 
 void BlockChain::writeGenesisBlock() {
@@ -434,7 +388,7 @@ void BlockChain::removeLastBlock() {
 }
 
 csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
-    if (key.size() == PUBLIC_KEY_LENGTH) {
+    if (key.size() == kPublicKeyLength) {
         csdb::Address res = csdb::Address::from_public_key(key.data());
         return res;
     }
@@ -574,10 +528,6 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
 
     csmeta(csdetails) << "last hash: " << pool.hash().to_string();
     return true;
-}
-
-const csdb::Storage& BlockChain::getStorage() const {
-    return storage_;
 }
 
 csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
@@ -857,6 +807,16 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
     }
 }
 
+void BlockChain::close() {
+    cs::Lock lock(dbLock_);
+    storage_.close();
+}
+
+bool BlockChain::getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const {
+    cs::Lock lock(dbLock_);
+    return storage_.get_from_blockchain(addr, innerId, result);
+}
+
 bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
     if (!walletsCacheUpdater_) {
         cserror() << "!walletsCacheUpdater";
@@ -983,10 +943,15 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         cs::Lock lock(dbLock_);
 
         if (deferredBlock_.is_valid()) {
+
             deferredBlock_.set_storage(storage_);
 
             if (deferredBlock_.save()) {
                 flushed_block_seq = deferredBlock_.sequence();
+                if (uuid_ == 0 && flushed_block_seq == 1) {
+                    uuid_ = uuidFromBlock(deferredBlock_);
+                    csdebug() << "Blockchain: UUID = " << uuid_;
+                }
             }
             else {
                 csmeta(cserror) << "Couldn't save block: " << deferredBlock_.sequence();
@@ -1161,6 +1126,10 @@ void BlockChain::testCachedBlocks() {
     }
 }
 
+const cs::ReadBlockSignal& BlockChain::readBlockEvent() const {
+    return storage_.readBlockEvent();
+}
+
 std::size_t BlockChain::getCachedBlocksSize() const {
     return cachedBlocks_.size();
 }
@@ -1273,6 +1242,25 @@ uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
 
     return static_cast<uint32_t>(wallDataPtr->transNum_);
 }
+
+//uint64_t BlockChain::initUuid() const {
+//    // protects from subsequent calls
+//    if (uuid_ != 0) {
+//        return uuid_;
+//    }
+//    // lookup in hashes
+//    if (!blockHashes_->empty()) {
+//        const auto& hashes = blockHashes_->getHashes();
+//        if (hashes.size() > 1) {
+//            const auto tmp = uuidFromHash(hashes[1]);
+//            if (tmp != 0) {
+//                return tmp;
+//            }
+//        }
+//    }
+//    // lookup in chain
+//    return uuidFromBlock(loadBlock(1));
+//}
 
 #ifdef TRANSACTIONS_INDEX
 csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {

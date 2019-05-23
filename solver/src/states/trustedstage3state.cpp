@@ -10,9 +10,12 @@
 #include <algorithm>
 #include <cmath>
 
-namespace cs {
+namespace
+{
+    constexpr uint64_t TIMER_BASE_ID = 30;
+}
 
-#define TIMER_BASE_ID 30
+namespace cs {
 
 void TrustedStage3State::on(SolverContext& context) {
     DefaultStateBehavior::on(context);
@@ -46,7 +49,7 @@ void TrustedStage3State::on(SolverContext& context) {
     if (ptr == nullptr) {
         cswarning() << name() << ": stage one result not found";
     }
-    // process already received stage-2, possible to go further to stage-3
+    // process already received stage-2, possible to go further to post trusted state
     if (!context.stage2_data().empty()) {
         csdebug() << name() << ": handle early received stages-2";
         Result finish = Result::Ignore;
@@ -450,6 +453,9 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     }
     else {
         max_conf = static_cast<size_t>(4. + 1.85 * log(candidatesElection.size() / 4.));
+        if (max_conf > Consensus::MaxTrustedNodes) {
+            max_conf = Consensus::MaxTrustedNodes;
+        }
     }
     csdebug() << name() << ": max confidant: " << max_conf;
 
@@ -541,7 +547,7 @@ bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
         k = -k;
     }
     // stage.realTrustedMask contains !0 on good nodes:
-    int cnt = static_cast<int>(context.cnt_trusted());
+    int cnt = std::min(static_cast<int>(context.cnt_trusted()), (int)Consensus::MaxTrustedNodes);
     int cnt_active = cnt - static_cast<int>(std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex));
     if (cnt_active * 2 < cnt + 1) {
         cswarning() << name() << ": not enough active confidants to make a decision, BigBang required";

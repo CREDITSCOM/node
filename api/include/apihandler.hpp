@@ -6,17 +6,24 @@
 // 4706 - assignment within conditional expression
 // 4373 - 'api::APIHandler::TokenTransfersListGet': virtual function overrides 'api::APINull::TokenTransfersListGet',
 //         previous versions of the compiler did not override when parameters only differed by const/volatile qualifiers
-#pragma warning(disable : 4706 4373)
+// 4245 - 'return' : conversion from 'int' to 'SOCKET', signed / unsigned mismatch
+#pragma warning(disable : 4706 4373 4245) 
 #endif
 
+#include <API.h>
+#include <APIEXEC.h>
+#include <executor_types.h>
+#include <general_types.h>
+
+#include <thrift/transport/TSocket.h>
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/transport/TBufferTransports.h>
 
-#include <csnode/blockchain.hpp>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
-#include <API.h>
-#include <executor_types.h>
-#include <general_types.h>
+#include <csnode/blockchain.hpp>
 
 #include <csstats.hpp>
 #include <deque>
@@ -27,12 +34,9 @@
 
 #include "tokens.hpp"
 
-#include <APIEXEC.h>
-#include <thrift/transport/TSocket.h>
 #include <optional>
 
 #include <csdb/currency.hpp>
-
 #include <solvercore.hpp>
 
 namespace csconnector {
@@ -113,7 +117,7 @@ public:  // wrappers
     }
 
     void executeByteCodeMultiple(ExecuteByteCodeMultipleResult& _return, const ::general::Address& initiatorAddress, const SmartContractBinary& invokedContract,
-                                 const std::string& method, const std::vector<std::vector<::general::Variant>>& params, const int64_t executionTime) {
+        const std::string& method, const std::vector<std::vector<::general::Variant>>& params, const int64_t executionTime) {
         if (!connect()) {
             _return.status.code = 1;
             _return.status.message = "No executor connection!";
@@ -121,7 +125,22 @@ public:  // wrappers
         }
         const auto acceess_id = generateAccessId();
         ++execCount_;
-        origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
+        try {
+			std::shared_lock slk(shErrMt);
+            origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
+        catch( std::exception & x ) {
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
         --execCount_;
         deleteAccessId(acceess_id);
         disconnect();
@@ -133,7 +152,22 @@ public:  // wrappers
             _return.status.message = "No executor connection!";
             return;
         }
-        origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
+        try {
+			std::shared_lock slk(shErrMt);
+            origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
+        catch( std::exception & x ) {
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
         disconnect();
     }
 
@@ -143,7 +177,22 @@ public:  // wrappers
             _return.status.message = "No executor connection!";
             return;
         }
-        origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
+        try {
+			std::shared_lock slk(shErrMt);
+            origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
+        catch( std::exception & x ) {
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
         disconnect();
     }
 
@@ -153,7 +202,22 @@ public:  // wrappers
             _return.status.message = "No executor connection!";
             return;
         }
-        origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
+        try {
+			std::shared_lock slk(shErrMt);
+            origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
+        catch( std::exception & x ) {
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
         disconnect();
     }
 
@@ -289,8 +353,15 @@ public:
             general::Variant var;
             var.__set_v_string(smartTrxn.amount().to_string());
             params.emplace_back(var);
-            var.__set_v_string(smartTrxn.currency().to_string());
-            params.emplace_back(var);
+
+			if (smartTrxn.user_field(1).is_valid()) {
+				var.__set_v_string(smartTrxn.user_field(1).value<std::string>());
+				params.emplace_back(var);
+			}
+			else {
+				var.__set_v_string("");
+				params.emplace_back(var);
+			}
         }
         else if (!isdeploy) {
             sci = deserialize<api::SmartContractInvocation>(smartTrxn.user_field(0).value<std::string>());
@@ -316,18 +387,29 @@ public:
         const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
 
         ExecuteResult res;
-        if (optInnerTransactions.has_value())
-            res.trxns = optInnerTransactions.value();
-        deleteInnerSendTransactions(optOriginRes.value().acceessId);
-        constexpr double FEE_IN_SECOND = kMinFee * 4.0;
-        const double fee = std::min(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SECOND);
-        res.fee = csdb::Amount(fee);
-        res.newState = optOriginRes.value().resp.invokedContractState;
-        for (const auto& [itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
-            const csdb::Address addr = BlockChain::getAddressFromKey(itAddress);
-            res.states[addr] = itState;
+        const auto resp = optOriginRes.value().resp;
+        if (resp.status.code != 0) {
+            if (!resp.status.message.empty()) {
+                res.retValue.__set_v_string(resp.status.message);
+            }
+            else {
+                res.retValue = resp.ret_val;
+            }
         }
-        res.retValue = optOriginRes.value().resp.ret_val;
+        else {
+            if (optInnerTransactions.has_value())
+                res.trxns = optInnerTransactions.value();
+            deleteInnerSendTransactions(optOriginRes.value().acceessId);
+            constexpr double FEE_IN_SECOND = kMinFee * 4.0;
+            const double fee = std::min(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SECOND);
+            res.fee = csdb::Amount(fee);
+            res.newState = optOriginRes.value().resp.invokedContractState;
+            for (const auto& [itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
+                const csdb::Address addr = BlockChain::getAddressFromKey(itAddress);
+                res.states[addr] = itState;
+            }
+            res.retValue = optOriginRes.value().resp.ret_val;
+        }
         return res;
     }
 
@@ -453,20 +535,35 @@ private:
     }
 
     std::optional<OriginExecuteResult> execute(const std::string& address, const SmartContractBinary& smartContractBinary, const std::string& method,
-                                               const std::vector<general::Variant>& params) {
+        const std::vector<general::Variant>& params) {
         constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
         OriginExecuteResult originExecuteRes{};
         if (!connect())
             return std::nullopt;
-        const auto acceess_id = generateAccessId();
+        const auto access_id = generateAccessId();
         ++execCount_;
         const auto timeBeg = std::chrono::steady_clock::now();
-        origExecutor_->executeByteCode(originExecuteRes.resp, acceess_id, address, smartContractBinary, method, params, EXECUTION_TIME, EXECUTOR_VERSION);
+        try {
+			std::shared_lock slk(shErrMt);
+            origExecutor_->executeByteCode(originExecuteRes.resp, access_id, address, smartContractBinary, method, params, EXECUTION_TIME, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException & x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
+            originExecuteRes.resp.status.code = 1;
+            originExecuteRes.resp.status.message = x.what();
+        }
+        catch( std::exception & x ) {
+            originExecuteRes.resp.status.code = 1;
+            originExecuteRes.resp.status.message = x.what();
+        }
         originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeBeg).count();
         --execCount_;
-        deleteAccessId(acceess_id);
+        deleteAccessId(access_id);
         disconnect();
-        originExecuteRes.acceessId = acceess_id;
+        originExecuteRes.acceessId = access_id;
         return std::make_optional<OriginExecuteResult>(std::move(originExecuteRes));
     }
 
@@ -488,6 +585,16 @@ private:
     void disconnect() {
         executorTransport_->close();
     }
+
+	//
+	using OriginExecutor = executor::ContractExecutorConcurrentClient;
+	using BinaryProtocol = apache::thrift::protocol::TBinaryProtocol;
+	std::shared_mutex shErrMt;
+	void reCreationOriginExecutor() {
+		std::lock_guard glk(shErrMt);
+		origExecutor_.reset(new OriginExecutor(::apache::thrift::stdcxx::make_shared<BinaryProtocol>(executorTransport_)));
+	}
+	//	
 
 private:
     const BlockChain& blockchain_;
@@ -520,7 +627,7 @@ public:
     void SendTransaction(apiexec::SendTransactionResult& _return, const general::AccessID accessId, const api::Transaction& transaction) override;
     void WalletIdGet(api::WalletIdGetResult& _return, const general::AccessID accessId, const general::Address& address) override;
     void SmartContractGet(SmartContractGetResult& _return, const general::AccessID accessId, const general::Address& address) override;
-    void WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address);
+    void WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) override;
 
     executor::Executor& getExecutor() const {
         return executor_;
@@ -722,7 +829,7 @@ private:
     // bool convertAddrToPublicKey(const csdb::Address& address);
 
     template <typename Mapper>
-    size_t get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out);
+    size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out);
 
     bool update_smart_caches_once(const csdb::PoolHash&, bool = false);
     void run();
@@ -752,9 +859,5 @@ bool is_deploy_transaction(const csdb::Transaction& tr);
 bool is_smart(const csdb::Transaction& tr);
 bool is_smart_state(const csdb::Transaction& tr);
 bool is_smart_deploy(const api::SmartContractInvocation& smart);
-
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
 #endif  // APIHANDLER_HPP

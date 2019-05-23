@@ -46,7 +46,7 @@ constexpr uint8_t ExecuteTransaction = 248;
 // bug in SmartContracts
 constexpr uint8_t InternalBug = 247;
 // executor is disconnected or unavailable, value is hard-coded in ApiExec module
-constexpr uint8_t NoExecutor = 1;
+constexpr uint8_t ExecutionError = 1;
 }  // namespace error
 
 // transactions user fields
@@ -487,7 +487,7 @@ private:
     csdb::Transaction create_new_state(const QueueItem& queue_item) const;
 
     // update in contracts table appropriate item's state
-    bool update_contract_state(const csdb::Transaction& t);
+    bool update_contract_state(const csdb::Transaction& t, bool reading_db);
 
     // get deploy info from cached deploy transaction reference
     std::optional<api::SmartContractInvocation> find_deploy_info(const csdb::Address& abs_addr) const;

@@ -3,6 +3,11 @@
 #include <solvercontext.hpp>
 #include <sstream>
 
+namespace
+{
+    constexpr uint64_t TIMER_BASE_ID = 50;
+}
+
 namespace cs {
 
 void WaitingState::on(SolverContext &context) {
@@ -71,7 +76,7 @@ void WaitingState::on(SolverContext &context) {
                             }
                             activate_new_round(*pctx);
                         },
-                        true /*replace existing*/);
+                        true /*replace existing*/, TIMER_BASE_ID);
 }
 
 void WaitingState::off(SolverContext & /*context*/) {

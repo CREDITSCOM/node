@@ -321,3 +321,80 @@ TEST(Signals, UnexpectedDisconnect) {
     ASSERT_EQ(isCalled, false);
     ASSERT_EQ(cs::Connector::callbacks(&a.signal), 0);
 }
+
+class Checker {
+public:
+    Checker(bool& f)
+    : flag(f) {
+    }
+
+    Checker(const Checker& checker)
+    : flag(checker.flag) {
+        flag = true;
+    }
+
+    Checker& operator=(const Checker&) {
+        flag = true;
+        return *this;
+    }
+
+    size_t value = 0;
+    bool& flag;
+};
+
+TEST(Signals, NonArgumentsCopy) {
+    static bool isCopied = false;
+    constexpr size_t expectedValue = 10;
+
+    class A {
+    public signals:
+        cs::Signal<void(Checker&)> signal;
+    };
+
+    class B {
+    public slots:
+        void onSignal(Checker& checker) {
+            cs::Console::writeLine("B slot called");
+            checker.value = expectedValue;
+        }
+    };
+
+    A a;
+    B b;
+    Checker checker(isCopied);
+
+    cs::Connector::connect(&a.signal, &b, &B::onSignal);
+
+    emit a.signal(checker);
+
+    ASSERT_EQ(isCopied, false);
+    ASSERT_EQ(checker.value, expectedValue);
+}
+
+TEST(Signals, ArgumentsCopy) {
+    static bool isCopied = false;
+
+    class A {
+    public signals:
+        cs::Signal<void(Checker)> signal;
+    };
+
+    class B {
+    public slots:
+        void onSignal(Checker checker) {
+            cs::Console::writeLine("B slot called");
+            checker.value = 10;
+        }
+    };
+
+    A a;
+    B b;
+    Checker checker(isCopied);
+
+    cs::Connector::connect(&a.signal, &b, &B::onSignal);
+
+    emit a.signal(checker);
+
+    ASSERT_EQ(isCopied, true);
+    ASSERT_EQ(checker.value, 0);
+}

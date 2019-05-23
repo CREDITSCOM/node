@@ -27,7 +27,6 @@ class SolverCore;
 
 namespace cs {
 class PoolSynchronizer;
-class Spammer;
 }  // namespace cs
 
 class Node {
@@ -54,7 +53,6 @@ public:
 
     void run();
     void stop();
-    void runSpammer();
 
     static void requestStop();
 
@@ -71,9 +69,9 @@ public:
     void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
     void sendHash(cs::RoundNumber round);
     void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
-    void roundPackRequest(cs::PublicKey respondent, cs::RoundNumber round);
+    void roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round);
     void getRoundPackRequest(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
-    void roundPackReply(cs::PublicKey respondent);
+    void roundPackReply(const cs::PublicKey& respondent);
     void sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respondent);
     void getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
 
@@ -211,15 +209,17 @@ public:
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;
     using SmartStageRequestSignal = cs::Signal<void(uint8_t, cs::Sequence, uint32_t, uint8_t, uint8_t, cs::PublicKey&)>;
+    using StopSignal = cs::Signal<void()>;
+    using RejectedSmartContractsSignal = cs::Signal<void(const std::vector<std::pair<cs::Sequence, uint32_t>>&)>;
 
 public signals:
     SmartsSignal<cs::StageOneSmarts> gotSmartStageOne;
     SmartsSignal<cs::StageTwoSmarts> gotSmartStageTwo;
     SmartsSignal<cs::StageThreeSmarts> gotSmartStageThree;
     SmartStageRequestSignal receivedSmartStageRequest;
-    cs::Signal<void(const std::vector<std::pair<cs::Sequence, uint32_t>>&)> gotRejectedContracts;
+    RejectedSmartContractsSignal gotRejectedContracts;
 
-    inline static cs::Signal<void()> stopRequested;
+    inline static StopSignal stopRequested;
 
 private slots:
     void onStopRequested();
@@ -227,7 +227,7 @@ private slots:
 public slots:
     void processTimer();
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
-    void onPingReceived(cs::Sequence sequence);
+    void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
 
 private:
@@ -315,7 +315,6 @@ private:
     // appidional dependencies
     cs::SolverCore* solver_;
     Transport* transport_;
-    std::unique_ptr<cs::Spammer> spammer_;
 
 #ifdef NODE_API
     std::unique_ptr<csconnector::connector> api_;
@@ -359,7 +358,7 @@ private:
     std::vector<cs::Bytes> stageOneMessage_;
     std::vector<cs::Bytes> stageTwoMessage_;
     std::vector<cs::Bytes> stageThreeMessage_;
-    bool stageThreeSent = false;
+    bool stageThreeSent_ = false;
 
     std::vector<cs::Bytes> smartStageOneMessage_;
     std::vector<cs::Bytes> smartStageTwoMessage_;
@@ -385,6 +384,11 @@ private:
     // confirmation list
     cs::ConfirmationList confirmationList_;
     cs::RoundTableMessage currentRoundTableMessage_;
+
+    //expected rounds
+    std::vector<cs::RoundNumber> expectedRounds_;
+    cs::Sequence maxHeighboursSequence_ = 0;
+    cs::Bytes lastTrustedMask_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

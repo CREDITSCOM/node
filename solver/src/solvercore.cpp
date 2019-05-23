@@ -9,7 +9,6 @@
 #pragma warning(pop)
 
 #include <csnode/datastream.hpp>
-#include <csnode/spammer.hpp>
 #include <csnode/walletsstate.hpp>
 #include <lib/system/logger.hpp>
 
@@ -29,7 +28,7 @@ namespace cs {
 
 // To track timeout for active state
 constexpr const bool TimeoutsEnabled = false;
-// To enable make a transition to the same state
+// To enable perform a transition to the same state
 constexpr const bool RepeatStateEnabled = true;
 // Special mode: uses debug transition table
 constexpr const bool DebugModeOn = false;
@@ -337,7 +336,7 @@ bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) 
         cserror() << log_prefix << "Blockchain failed to write new block";
         return false;
     }
-    pnode->cleanConfirmationList(deferredBlock_.sequence());
+    //pnode->cleanConfirmationList(deferredBlock_.sequence());
     deferredBlock_ = csdb::Pool();
 
     csmeta(csdetails) << "end";
@@ -359,7 +358,4 @@ uint8_t SolverCore::subRound() {
     return (pnode->subRound());
 }
 
-bool SolverCore::isContractLocked(const csdb::Address& address) const {
-    return psmarts->is_contract_locked(address);
-}
 }  // namespace cs

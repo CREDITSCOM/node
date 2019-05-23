@@ -18,17 +18,36 @@ const char* kLogPrefix = "Smart: ";
 
 inline void print(std::ostream& os, const ::general::Variant& var) {
     os << "Variant(";
-    if (var.__isset.v_int) {
-        os << var.v_int;
-    }
-    else if (var.__isset.v_string) {
+    bool print_default = false;
+    if (var.__isset.v_string) {
         os << var.v_string;
     }
     else if (var.__isset.v_null) {
-        os << var.v_null;
+        os << "Null";
     }
     else if (var.__isset.v_boolean) {
         os << var.v_boolean;
+    }
+    else if( var.__isset.v_array ) {
+        os << "Array";
+    }
+    else if( var.__isset.v_object ) {
+        os << "Object";
+    }
+    else if( var.__isset.v_void) {
+        os << "Void";
+    }
+    else if( var.__isset.v_list ) {
+        os << "List";
+    }
+    else if( var.__isset.v_set ) {
+        os << "Set";
+    }
+    else if( var.__isset.v_map ) {
+        os << "Map";
+    }
+    else if( var.__isset.v_int ) {
+        os << var.v_int;
     }
     else if (var.__isset.v_byte) {
         os << (unsigned int)var.v_byte;
@@ -46,7 +65,22 @@ inline void print(std::ostream& os, const ::general::Variant& var) {
         os << var.v_double;
     }
     else {
-        print(os, var);
+        /* those variants are shown by default
+          out << ", " << "v_boolean_box="; (__isset.v_boolean_box ? (out << to_string(v_boolean_box)) : (out << "<null>"));
+          out << ", " << "v_byte_box="; (__isset.v_byte_box ? (out << to_string(v_byte_box)) : (out << "<null>"));
+          out << ", " << "v_short_box="; (__isset.v_short_box ? (out << to_string(v_short_box)) : (out << "<null>"));
+          out << ", " << "v_int_box="; (__isset.v_int_box ? (out << to_string(v_int_box)) : (out << "<null>"));
+          out << ", " << "v_long_box="; (__isset.v_long_box ? (out << to_string(v_long_box)) : (out << "<null>"));
+          out << ", " << "v_float_box="; (__isset.v_float_box ? (out << to_string(v_float_box)) : (out << "<null>"));
+          out << ", " << "v_double_box="; (__isset.v_double_box ? (out << to_string(v_double_box)) : (out << "<null>"));
+        */
+        print_default = true;
+    }
+    os << ')';
+
+    if( print_default ) {
+        os << ": ";
+        var.printTo( os );
     }
 }
 
@@ -82,7 +116,7 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
 
     // as event receiver:
     cs::Connector::connect(&bc.storeBlockEvent, this, &SmartContracts::on_store_block);
-    cs::Connector::connect(bc.getStorage().read_block_event(), this, &SmartContracts::on_read_block);
+    cs::Connector::connect(&bc.readBlockEvent(), this, &SmartContracts::on_read_block);
     // as event source:
     cs::Connector::connect(&signal_payable_invoke, &bc, &BlockChain::onPayableContractReplenish);
     cs::Connector::connect(&signal_payable_timeout, &bc, &BlockChain::onPayableContractTimeout);
@@ -506,7 +540,7 @@ void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
             else {
                 SmartContractRef contract_ref(fld_contract_ref);
                 // update state
-                update_contract_state(new_state);
+                update_contract_state(new_state, false);
                 const csdb::Address abs_addr = absolute_address(new_state.target());
                 const cs::PublicKey& key = abs_addr.public_key();
                 cslog() << kLogPrefix << '{' << contract_ref.sequence << '.' << contract_ref.transaction << "} (" << EncodeBase58(key.data(), key.data() + key.size())
@@ -677,23 +711,21 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
 
 bool SmartContracts::test_executor_availability() {
     if (!execution_allowed) {
-        try {
-            execution_allowed = exec_handler_ptr->getExecutor().isConnect();
-            if (execution_allowed) {
-                cslog() << std::endl << kLogPrefix << "connection to executor is restored" << std::endl;
-                // update all currently running contracts locks, missed while executor was unavailable
-                for (const auto& exe_item : exe_queue) {
-                    if (exe_item.status == SmartContractStatus::Running || exe_item.status == SmartContractStatus::Finished) {
-                        if (!is_metadata_actual(exe_item.abs_addr)) {
-                            auto maybe_deploy = find_deploy_info(exe_item.abs_addr);
-                            if (maybe_deploy.has_value()) {
-                                auto it_state = known_contracts.find(exe_item.abs_addr);
-                                if (it_state != known_contracts.end()) {
-                                    if (!update_metadata(maybe_deploy.value(), it_state->second)) {
-                                        if (!execution_allowed) {
-                                            // the problem has got back
-                                            break;
-                                        }
+        execution_allowed = exec_handler_ptr && exec_handler_ptr->getExecutor().isConnect();
+        if (execution_allowed) {
+            cslog() << std::endl << kLogPrefix << "connection to executor is restored" << std::endl;
+            // update all currently running contracts locks, missed while executor was unavailable
+            for (const auto& exe_item : exe_queue) {
+                if (exe_item.status == SmartContractStatus::Running || exe_item.status == SmartContractStatus::Finished) {
+                    if (!is_metadata_actual(exe_item.abs_addr)) {
+                        auto maybe_deploy = find_deploy_info(exe_item.abs_addr);
+                        if (maybe_deploy.has_value()) {
+                            auto it_state = known_contracts.find(exe_item.abs_addr);
+                            if (it_state != known_contracts.end()) {
+                                if (!update_metadata(maybe_deploy.value(), it_state->second)) {
+                                    if (!execution_allowed) {
+                                        // the problem has got back
+                                        break;
                                     }
                                 }
                             }
@@ -701,10 +733,6 @@ bool SmartContracts::test_executor_availability() {
                     }
                 }
             }
-        }
-        catch (std::exception&) {
-        }
-        catch (...) {
         }
     }
     return execution_allowed;
@@ -795,7 +823,7 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
         size_t tr_idx = 0;
         for (const auto& tr : block.transactions()) {
             if (is_new_state(tr)) {
-                update_contract_state(tr);
+                update_contract_state(tr, true);
             }
             else {
                 csdb::Address abs_addr = absolute_address(tr.target());
@@ -943,28 +971,24 @@ bool SmartContracts::execute(SmartExecutionData& data) {
         return false;
     }
     cslog() << std::endl
-            << kLogPrefix << "executing {" << data.contract_ref.sequence << '.' << data.contract_ref.transaction << "} - " << print_executed_method(data.contract_ref) << std::endl;
-    try {
-        auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
-        if (maybe_result.has_value()) {
-            data.result = maybe_result.value();
-        }
-        else {
-            data.error = "contract execution failed";
-            data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+            << kLogPrefix << "executing {" << data.contract_ref.sequence << '.' << data.contract_ref.transaction << "} - " << print_executed_method(data.contract_ref)
+            << std::endl;
+    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
+    if (maybe_result.has_value()) {
+        data.result = maybe_result.value();
+        if (data.result.newState.empty()) {
+            if (data.result.retValue.__isset.v_string) {
+                data.error = data.result.retValue.v_string;
+                data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+            }
+            else {
+                data.error = "contract execution failed, contract state is unchanged";
+            }
         }
     }
-    catch (std::exception& x) {
-        data.error = x.what();
-        data.result.retValue.__set_v_byte(error::StdException);
-        return false;
-    }
-    catch (...) {
-        std::ostringstream os;
-        os << kLogPrefix << " unexpected exception while executing contract #" << data.contract_ref.sequence << "." << data.contract_ref.transaction;
-        data.error = os.str();
-        data.result.retValue.__set_v_byte(error::Exception);
-        return false;
+    else {
+        data.error = "contract execution failed";
+        data.result.retValue.__set_v_byte(error::ExecuteTransaction);
     }
     return true;
 }
@@ -1047,6 +1071,7 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
     cs::TransactionsPacket packet;
     if (!data.error.empty()) {
         cserror() << std::endl << kLogPrefix << data.error << std::endl;
+        csdebug() << kLogPrefix << "execution of smart contract is failed, new state is empty";
         // result contains empty USRFLD[state::Value]
         result.add_user_field(new_state::Value, std::string{});
         // result contains error code from ret_val
@@ -1236,7 +1261,7 @@ void SmartContracts::on_reject(const std::vector<std::pair<cs::Sequence, uint32_
     }
 }
 
-bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
+bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool reading_db) {
     using namespace trx_uf;
     csdb::UserField fld = t.user_field(new_state::Value);
     if (!fld.is_valid()) {
@@ -1266,27 +1291,43 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t) {
                         }
                     }
                     else {
-                        // handle replenish during startup reading
-                        if (!replenish_contract.empty()) {
+                        // new_state after replenish contract transaction
+                        if (reading_db) {
+                            // handle replenish during startup reading
                             const auto it = std::find(replenish_contract.cbegin(), replenish_contract.cend(), ref);
                             if (it != replenish_contract.cend()) {
                                 replenish_contract.erase(it);
                             }
+                            else {
+                                csdebug() << kLogPrefix << "(error in blockchain) cannot find replenish transaction new_state refers to";
+                            }
                         }
-                        // handle replenish from on-the-air blocks
-                        if (item.payable != PayableStatus::Implemented) {
-                            cserror() << kLogPrefix << "non-payable contract state is updated by replenish transaction";
+                        else {
+                            // handle replenish from on-the-air blocks
+                            if (item.payable != PayableStatus::Implemented) {
+                                cserror() << kLogPrefix << "non-payable contract state is updated by replenish transaction";
+                            }
                         }
                         item.ref_execute = ref;
                     }
                 }
                 else {
-                    cswarning() << kLogPrefix << "new_state transaction does not refer to starter one";
+                    if (reading_db) {
+                        csdebug() << kLogPrefix << "(error in blockchain) cannot find starter transaction new_state refer to";
+                    }
+                    else {
+                        cswarning() << kLogPrefix << "new_state transaction does not refer to starter one";
+                    }
                 }
             }
         }
         else {
-            cserror() << kLogPrefix << "failed to convert optimized address";
+            if (reading_db) {
+                csdebug() << kLogPrefix << "(error in blockchain) cannot find contract by address from new_state";
+            }
+            else {
+                cserror() << kLogPrefix << "failed to convert optimized address";
+            }
         }
     }
     else {
@@ -1342,28 +1383,21 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     }
     executor::GetContractMethodsResult result;
     std::string error;
-    try {
-        exec_handler_ptr->getExecutor().getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
-        if (result.status.code == error::NoExecutor) {
-            cslog() << std::endl << kLogPrefix << "unable to connect to executor" << std::endl;
-            execution_allowed = false;
-        }
-    }
-    catch (std::exception& x) {
-        error = x.what();
-    }
-    catch (...) {
-        error = " exception while executing byte code";
-    }
-
-    if (!error.empty()) {
-        cserror() << kLogPrefix << "" << error;
-        // remain payable status & using unknown for future calls
-        return false;
-    }
-
+    auto& executor_instance = exec_handler_ptr->getExecutor();
+    executor_instance.getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
     if (result.status.code != 0) {
-        cserror() << kLogPrefix << "" << result.status.message;
+        execution_allowed = executor_instance.isConnect();
+        if (!result.status.message.empty()) {
+            cswarning() << kLogPrefix << result.status.message;
+        }
+        else {
+            if (!execution_allowed) {
+                cswarning() << kLogPrefix << "unable to connect to executor";
+            }
+            else {
+                cswarning() << kLogPrefix << "execution error " << int(result.status.code);
+            }
+        }
         // remain payable status & using unknown for future calls
         return false;
     }
@@ -1378,7 +1412,7 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
                     const auto& a0 = m.arguments[0];
                     if (a0.name == PayableNameArg0 && a0.type == PayableArgType) {
                         const auto& a1 = m.arguments[1];
-                        if (a1.name == PayableNameArg1 && a1.type == PayableArgType) {
+                        if (/*a1.name == PayableNameArg1 &&*/ a1.type == PayableArgType) {
                             state.payable = PayableStatus::Implemented;
                         }
                     }

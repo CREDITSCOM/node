@@ -1,5 +1,5 @@
-#include <API.h>
 #include <apihandler.hpp>
+
 #include <csnode/conveyer.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -207,7 +207,7 @@ api::Amount convertAmount(const csdb::Amount& amount) {
 
 api::TransactionId convert_transaction_id(const csdb::TransactionID& trid) {
     api::TransactionId result_id;
-    result_id.index = trid.index();
+    result_id.index = (uint32_t) trid.index();
     result_id.poolHash = fromByteArray(trid.pool_hash().to_binary());
     return result_id;
 }
@@ -676,9 +676,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
         input_smart.smartContractDeploy.sourceCode.clear();
 
-        decltype(auto) smart_origin = lockedReference(this->smart_origin);
-        auto it = smart_origin->find(smart_addr);
-        if (it != smart_origin->end())
+        decltype(auto) locked_smart_origin = lockedReference(this->smart_origin);
+        auto it = locked_smart_origin->find(smart_addr);
+        if (it != locked_smart_origin->end())
             origin_bytecode = fetch_smart(s_blockchain.loadTransaction(it->second)).smartContractDeploy.byteCodeObjects;
         else {
             SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
@@ -782,7 +782,7 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
     else
         smart_transaction_flow(_return, transaction);
 
-    _return.roundNum = cs::Conveyer::instance().currentRoundTable().round;
+    _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
@@ -802,9 +802,11 @@ void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offs
     catch (...) {
         return;
     }
-
+    if (hash.is_empty()) {
+        return;
+    }
     PoolListGetStable(_return, fromByteArray(hash.to_binary()), const_limit);
-    _return.count = sequence + 1;
+    _return.count = uint32_t(sequence + 1);
 }
 
 void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const PoolHash& hash, const int64_t offset, const int64_t limit) {
@@ -866,8 +868,8 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
     }
     _return.smartContract = fetch_smart_body(s_blockchain.loadTransaction(smartrid));
     const csdb::Address adrs = BlockChain::getAddressFromKey(address);
-    auto smart_state(lockedReference(this->smart_state));
-    _return.smartContract.objectState = (*smart_state)[adrs].getState().state;
+    auto locked_smart_state(lockedReference(this->smart_state));
+    _return.smartContract.objectState = (*locked_smart_state)[adrs].getState().state;
 
     SetResponseStatus(_return.status, !_return.smartContract.address.empty() ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
     return;
@@ -881,23 +883,23 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
     if (!pool.is_valid()) {
         return;
     }
-    auto pending_smart_transactions = lockedReference(this->pending_smart_transactions);
-    pending_smart_transactions->last_pull_hash = pool.hash();
-    if (pending_smart_transactions->last_pull_sequence < pool.sequence()) {
-        pending_smart_transactions->last_pull_sequence = pool.sequence();
+    auto locked_pending_smart_transactions = lockedReference(this->pending_smart_transactions);
+    locked_pending_smart_transactions->last_pull_hash = pool.hash();
+    if (locked_pending_smart_transactions->last_pull_sequence < pool.sequence()) {
+        locked_pending_smart_transactions->last_pull_sequence = pool.sequence();
     }
     auto& trs = pool.transactions();
     for (auto i_tr = trs.rbegin(); i_tr != trs.rend(); ++i_tr) {
         auto& tr = *i_tr;
         if (is_smart(tr) || is_smart_state(tr)) {
-            pending_smart_transactions->queue.push(std::make_pair(pool.sequence(), tr));
+            locked_pending_smart_transactions->queue.push(std::make_pair(pool.sequence(), tr));
         }
     }
 
-    if (!pending_smart_transactions->queue.empty()) {
-        auto elt = std::move(pending_smart_transactions->queue.front());
+    if (!locked_pending_smart_transactions->queue.empty()) {
+        auto elt = std::move(locked_pending_smart_transactions->queue.front());
         auto& tr = elt.second;
-        pending_smart_transactions->queue.pop();
+        locked_pending_smart_transactions->queue.pop();
         auto address = s_blockchain.getAddressByType(tr.target(), BlockChain::AddressType::PublicKey);
 
         auto source_pk = s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey);
@@ -909,8 +911,8 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
             csdb::TransactionID trId(scr.hash, scr.transaction);
 
             std::string newState;
-            auto smart_state(lockedReference(this->smart_state));
-            (*smart_state)[address].updateState([&](const SmartState& oldState) {
+            auto locked_smart_state(lockedReference(this->smart_state));
+            (*locked_smart_state)[address].updateState([&](const SmartState& oldState) {
                 newState = tr.user_field(smart_state_idx).value<std::string>();
                 return SmartState{newState.empty() ? oldState.state : newState, newState.empty(), tr.id().clone(), trId.clone()};
             });
@@ -944,7 +946,7 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
                 if (is_smart_deploy(smart))
                     tm.checkNewDeploy(target_pk, caller_pk, smart);
 
-                auto newState = tr.user_field(smart_state_idx).value<std::string>();
+                newState = tr.user_field(smart_state_idx).value<std::string>();
                 if (!newState.empty()) {
                     tm.checkNewState(target_pk, caller_pk, smart, newState);
                 }
@@ -964,15 +966,15 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
             if (is_smart_deploy(smart)) {
                 {
                     if (!smart.smartContractDeploy.byteCodeObjects.empty()) {
-                        auto smart_origin = lockedReference(this->smart_origin);
-                        (*smart_origin)[address] = tr.id().clone();
+                        auto locked_smart_origin = lockedReference(this->smart_origin);
+                        (*locked_smart_origin)[address] = tr.id().clone();
 
                         executor_.updateDeployTrxns(address, tr.id().clone());
                     }
                 }
                 {
-                    auto deployed_by_creator = lockedReference(this->deployed_by_creator);
-                    (*deployed_by_creator)[source_pk].push_back(tr.id().clone());
+                    auto locked_deployed_by_creator = lockedReference(this->deployed_by_creator);
+                    (*locked_deployed_by_creator)[source_pk].push_back(tr.id().clone());
                 }
             }
         }
@@ -981,7 +983,7 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
         auto sp = lockedReference(this->smarts_pending);
         auto so = lockedReference(this->smart_operations);
         for (auto it = sp->begin(); it != sp->end(); it = sp->erase(it)) {
-            if ((it->first + Consensus::MaxRoundsCancelContract) > pending_smart_transactions->last_pull_sequence)
+            if ((it->first + Consensus::MaxRoundsCancelContract) > locked_pending_smart_transactions->last_pull_sequence)
                 break;
 
             for (auto& sm : it->second) {
@@ -994,7 +996,7 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
 }
 
 bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init) {
-    auto pending_smart_transactions = lockedReference(this->pending_smart_transactions);
+    auto locked_pending_smart_transactions = lockedReference(this->pending_smart_transactions);
     std::vector<csdb::PoolHash> new_blocks;
     auto curph = start;
 
@@ -1004,34 +1006,34 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
     if (log_to_console) {
         std::cout << "API: analizing blockchain...\n";
     }
-    while (curph != pending_smart_transactions->last_pull_hash) {
+    while (curph != locked_pending_smart_transactions->last_pull_hash) {
         ++cnt;
         new_blocks.push_back(curph);
         size_t res;
         auto p = s_blockchain.loadBlockMeta(curph, res);
         curph = p.previous_hash();
         if (log_to_console && (cnt % 1000) == 0) {
-            std::cout << '\r' << cnt;
+            std::cout << '\r' << WithDelimiters(cnt);
         }
 
-        if (p.is_valid() && pending_smart_transactions->last_pull_sequence < p.sequence())
-            pending_smart_transactions->last_pull_sequence = p.sequence();
+        if (p.is_valid() && locked_pending_smart_transactions->last_pull_sequence < p.sequence())
+            locked_pending_smart_transactions->last_pull_sequence = p.sequence();
 
         if (curph.is_empty()) {
             if (log_to_console) {
-                std::cout << '\r' << cnt << "... Done\n";
+                std::cout << '\r' << WithDelimiters(cnt) << "... Done\n";
             }
             break;
         }
     }
 
-    if (curph.is_empty() && !pending_smart_transactions->last_pull_hash.is_empty()) {
+    if (curph.is_empty() && !locked_pending_smart_transactions->last_pull_hash.is_empty()) {
         // Fork detected!
         cnt = 0;
         if (log_to_console) {
-            std::cout << "API: fork detected, handling " << new_blocks.size() << " hashes...\n";
+            std::cout << "API: fork detected, handling " << WithDelimiters(new_blocks.size()) << " hashes...\n";
         }
-        auto luca = pending_smart_transactions->last_pull_hash;
+        auto luca = locked_pending_smart_transactions->last_pull_hash;
         while (!luca.is_empty()) {
             ++cnt;
             auto fIt = std::find(new_blocks.begin(), new_blocks.end(), luca);
@@ -1040,21 +1042,21 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
                 break;
             }
             if (log_to_console && (cnt % 100) == 0) {
-                std::cout << '\r' << cnt;
+                std::cout << '\r' << WithDelimiters(cnt);
             }
             size_t res;
             luca = s_blockchain.loadBlockMeta(luca, res).previous_hash();
         }
         if (log_to_console) {
-            std::cout << '\r' << cnt << "... Done\n";
+            std::cout << '\r' << WithDelimiters(cnt) << "... Done\n";
         }
     }
 
-    pending_smart_transactions->last_pull_hash = start;
+    locked_pending_smart_transactions->last_pull_hash = start;
 
     cnt = 0;
     if (log_to_console) {
-        std::cout << "API: searching for smart states in " << new_blocks.size() << " blocks...\n";
+        std::cout << "API: searching for smart states in " << WithDelimiters(new_blocks.size()) << " blocks...\n";
     }
     while (!new_blocks.empty()) {
         ++cnt;
@@ -1064,21 +1066,21 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         for (auto i_tr = trs.rbegin(); i_tr != trs.rend(); ++i_tr) {
             auto& tr = *i_tr;
             if (is_smart(tr) || is_smart_state(tr))
-                pending_smart_transactions->queue.push(std::make_pair(p.sequence(), tr));
+                locked_pending_smart_transactions->queue.push(std::make_pair(p.sequence(), tr));
         }
         if (log_to_console && (cnt % 1000) == 0) {
-            std::cout << '\r' << cnt;
+            std::cout << '\r' << WithDelimiters(cnt);
         }
     }
     if (log_to_console) {
-        std::cout << "\rDone, handled " << cnt << " blocks...\n";
+        std::cout << "\rDone, handled " << WithDelimiters(cnt) << " blocks...\n";
     }
     log_to_console = false;
 
-    if (!pending_smart_transactions->queue.empty()) {
-        auto elt = std::move(pending_smart_transactions->queue.front());
+    if (!locked_pending_smart_transactions->queue.empty()) {
+        auto elt = std::move(locked_pending_smart_transactions->queue.front());
         auto& tr = elt.second;
-        pending_smart_transactions->queue.pop();
+        locked_pending_smart_transactions->queue.pop();
         auto address = s_blockchain.getAddressByType(tr.target(), BlockChain::AddressType::PublicKey);
 
         auto source_pk = s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey);
@@ -1090,8 +1092,8 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
             csdb::TransactionID trId(scr.hash, scr.transaction);
 
             std::string newState;
-            auto smart_state(lockedReference(this->smart_state));
-            (*smart_state)[address].updateState([&](const SmartState& oldState) {
+            auto locked_smart_state(lockedReference(this->smart_state));
+            (*locked_smart_state)[address].updateState([&](const SmartState& oldState) {
                 newState = tr.user_field(smart_state_idx).value<std::string>();
                 return SmartState{newState.empty() ? oldState.state : newState, newState.empty(), tr.id().clone(), trId.clone()};
             });
@@ -1125,7 +1127,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
                 if (is_smart_deploy(smart))
                     tm.checkNewDeploy(target_pk, caller_pk, smart);
 
-                auto newState = tr.user_field(smart_state_idx).value<std::string>();
+                newState = tr.user_field(smart_state_idx).value<std::string>();
                 if (!newState.empty())
                     tm.checkNewState(target_pk, caller_pk, smart, newState);
             }
@@ -1153,15 +1155,15 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
             if (is_smart_deploy(smart)) {
                 {
                     if (!smart.smartContractDeploy.byteCodeObjects.empty()) {
-                        auto smart_origin = lockedReference(this->smart_origin);
-                        (*smart_origin)[address] = tr.id().clone();
+                        auto locked_smart_origin = lockedReference(this->smart_origin);
+                        (*locked_smart_origin)[address] = tr.id().clone();
 
                         executor_.updateDeployTrxns(address, tr.id().clone());
                     }
                 }
                 {
-                    auto deployed_by_creator = lockedReference(this->deployed_by_creator);
-                    (*deployed_by_creator)[source_pk].push_back(tr.id().clone());
+                    auto locked_deployed_by_creator = lockedReference(this->deployed_by_creator);
+                    (*locked_deployed_by_creator)[source_pk].push_back(tr.id().clone());
                 }
             }
 
@@ -1172,7 +1174,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         auto sp = lockedReference(this->smarts_pending);
         auto so = lockedReference(this->smart_operations);
         for (auto it = sp->begin(); it != sp->end(); it = sp->erase(it)) {
-            if ((it->first + Consensus::MaxRoundsCancelContract) > pending_smart_transactions->last_pull_sequence)
+            if ((it->first + Consensus::MaxRoundsCancelContract) > locked_pending_smart_transactions->last_pull_sequence)
                 break;
 
             for (auto& sm : it->second) {
@@ -1187,9 +1189,9 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 }
 
 template <typename Mapper>
-size_t APIHandler::get_mapped_deployer_smart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out) {
-    auto deployed_by_creator = lockedReference(this->deployed_by_creator);
-    auto& elt = (*deployed_by_creator)[deployer];
+size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out) {
+    auto locked_deployed_by_creator = lockedReference(this->deployed_by_creator);
+    auto& elt = (*locked_deployed_by_creator)[deployer];
     for (auto& trid : elt) {
         auto tr = s_blockchain.loadTransaction(trid);
         auto smart = fetch_smart_body(tr);
@@ -1201,13 +1203,21 @@ size_t APIHandler::get_mapped_deployer_smart(const csdb::Address& deployer, Mapp
 
 void APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer) {
     const csdb::Address addr = BlockChain::getAddressFromKey(deployer);
-    _return.count = get_mapped_deployer_smart(addr, [](const api::SmartContract& smart) { return smart; }, _return.smartContractsList);
+
+    _return.count = static_cast<decltype(_return.count)>(getMappedDeployerSmart(addr, [](const api::SmartContract& smart) {
+        return smart;
+    }, _return.smartContractsList));
+
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
 void APIHandler::SmartContractAddressesListGet(api::SmartContractAddressesListGetResult& _return, const general::Address& deployer) {
     const csdb::Address addr = BlockChain::getAddressFromKey(deployer);
-    get_mapped_deployer_smart(addr, [](const SmartContract& sc) { return sc.address; }, _return.addressesList);
+
+    getMappedDeployerSmart(addr, [](const SmartContract& sc) {
+        return sc.address;
+    }, _return.addressesList);
+
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
@@ -1238,7 +1248,7 @@ void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::P
             hash = pool.previous_hash();
 
             if (!limSet) {
-                _return.count = pool.sequence() + 1;
+                _return.count = uint32_t(pool.sequence() + 1);
                 limSet = true;
             }
         }
@@ -1247,7 +1257,7 @@ void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::P
             hash = csdb::PoolHash::from_binary(toByteArray(cch->second.prevHash));
 
             if (!limSet) {
-                _return.count = cch->second.poolNumber + 1;
+                _return.count = uint32_t(cch->second.poolNumber + 1);
                 limSet = true;
             }
         }
@@ -1285,11 +1295,11 @@ void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, 
     int64_t offset = _offset;
     int64_t limit = _limit;
 
-    auto smart_origin = lockedReference(this->smart_origin);
+    auto locked_smart_origin = lockedReference(this->smart_origin);
 
-    _return.count = smart_origin->size();
+    _return.count = (uint32_t) locked_smart_origin->size();
 
-    for (auto p : *smart_origin) {
+    for (auto p : *locked_smart_origin) {
         if (offset) {
             --offset;
         }
@@ -1325,7 +1335,7 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
             return;
         }
         auto addr_id = csdb::Address::from_wallet_id(wallId);
-        if (s_blockchain.getStorage().get_from_blockchain(addr_id, inner_id, transactionTmp))  // find in blockchain
+        if (s_blockchain.getTransaction(addr_id, inner_id, transactionTmp))  // find in blockchain
             _return.states[inner_id] = VALID;
         else {
             cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -1362,14 +1372,14 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
             }
         }
     }
-    _return.roundNum = cs::Conveyer::instance().currentRoundTable().round;
+    _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
 void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, const general::Address& address, const int64_t id) {
     csdb::Transaction trx;
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
-    if (!s_blockchain.getStorage().get_from_blockchain(addr, id, trx)) {
+    if (!s_blockchain.getTransaction(addr, id, trx)) {
         SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
         return;
     }
@@ -1407,7 +1417,7 @@ void addTokenResult(api::TokenTransfersResult& _return, const csdb::Address& tok
     transfer.initiator = fromByteArray(handler.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
 
     transfer.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
-    transfer.transaction.index = tr.id().index();
+    transfer.transaction.index = (uint32_t) tr.id().index();
     transfer.time = atoll(pool.user_field(0).value<std::string>().c_str());
     _return.transfers.push_back(transfer);
 }
@@ -1417,7 +1427,7 @@ void addTokenResult(api::TokenTransactionsResult& _return, const csdb::Address& 
     api::TokenTransaction trans;
     trans.token = fromByteArray(token.public_key());
     trans.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
-    trans.transaction.index = tr.id().index();
+    trans.transaction.index = (uint32_t) tr.id().index();
     trans.time = atoll(pool.user_field(0).value<std::string>().c_str());
     trans.initiator = fromByteArray(handler.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
     trans.method = smart.method;
@@ -1431,9 +1441,9 @@ void putTokenInfo(api::TokenInfo& ti, const general::Address& addr, const Token&
     ti.name = token.name;
     ti.totalSupply = token.totalSupply;
     ti.owner = fromByteArray(token.owner.public_key());
-    ti.transfersCount = token.transfersCount;
-    ti.transactionsCount = token.transactionsCount;
-    ti.holdersCount = token.realHoldersCount;
+    ti.transfersCount = (uint32_t) token.transfersCount;
+    ti.transactionsCount = (uint32_t) token.transactionsCount;
+    ti.holdersCount = (uint32_t) token.realHoldersCount;
     ti.standart = (decltype(api::TokenInfo::standart))(uint32_t)(token.standart);
 }
 
@@ -1459,7 +1469,7 @@ void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensM
             else if (!transfersOnly) {
                 _return.count = it->second.transactionsCount;
             }
-            else if (transfersOnly && !filterByWallet) {
+            else if (transfersOnly && filterByWallet) {
                 auto hIt = it->second.holders.find(wallet);
                 if (hIt != it->second.holders.end()) {
                     _return.count = hIt->second.transfersCount;
@@ -1528,10 +1538,10 @@ api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& a
         abs_addr = s_blockchain.getAddressByType(addr, BlockChain::AddressType::PublicKey);
     }
 
-    decltype(auto) smart_origin = lockedReference(this->smart_origin);
+    decltype(auto) locked_smart_origin = lockedReference(this->smart_origin);
 
-    auto it = smart_origin->find(abs_addr);
-    if ((present = (it != smart_origin->end()))) {
+    auto it = locked_smart_origin->find(abs_addr);
+    if ((present = (it != locked_smart_origin->end()))) {
         return fetch_smart(s_blockchain.loadTransaction(it->second));
     }
     return api::SmartContractInvocation{};
@@ -1862,7 +1872,7 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
         auto tIt = tm.find(addr);
         if (tIt != tm.end()) {
             found = true;
-            _return.count = tIt->second.realHoldersCount;
+            _return.count = (uint32_t) tIt->second.realHoldersCount;
 
             applyToSortedMap(tIt->second.holders, comparator, [&offset, &limit, &_return, &token](const HMap::value_type& t) {
                 if (TokensMaster::isZeroAmount(t.second.balance))
@@ -1875,7 +1885,7 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
                 th.holder = fromByteArray(t.first.public_key());
                 th.token = token;
                 th.balance = t.second.balance;
-                th.transfersCount = t.second.transfersCount;
+                th.transfersCount = (uint32_t) t.second.transfersCount;
 
                 _return.holders.push_back(th);
 
@@ -1922,7 +1932,7 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
     };
 
     tm.applyToInternal([&offset, &limit, &_return, comparator](const TokensMap& tm, const HoldersMap&) {
-        _return.count = tm.size();
+        _return.count = (uint32_t) tm.size();
 
         applyToSortedMap(tm, comparator, [&offset, &limit, &_return](const TokensMap::value_type& t) {
             if (--offset >= 0)
@@ -2020,7 +2030,7 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
         _return.wallets.push_back(wi);
     }
 
-    _return.count = s_blockchain.getWalletsCountWithBalance();
+    _return.count = (uint32_t) s_blockchain.getWalletsCountWithBalance();
 }
 
 void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
