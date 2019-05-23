@@ -29,6 +29,8 @@ The node consists of the following elements:</p>
 
 <h2>How to Build</h2>
 
+On Windows<br/>
+
 >```sh
 >git clone https://github.com/CREDITSCOM/node.git
 >cd node
@@ -36,6 +38,17 @@ The node consists of the following elements:</p>
 >mkdir build
 >cd build
 >cmake -DCMAKE_BUILD_TYPE=Release -A x64 ..
+>make
+
+On Linux<br/>
+
+>```sh
+>git clone https://github.com/CREDITSCOM/node.git
+>cd node
+>git submodule update --init --recursive
+>mkdir build
+>cd build
+>cmake -DCMAKE_BUILD_TYPE=Release ..
 >make
 
 <h2>System requirements:</h2>
