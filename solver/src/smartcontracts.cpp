@@ -537,12 +537,17 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
             }
             payable = is_payable(abs_addr);
         }
-        cslog() << std::endl << kLogPrefix << "enqueue " << print_executed_method(new_item) << std::endl;
+        std::cout << std::endl; // emphasize with empty line
+        cslog() << kLogPrefix << "enqueue " << print_executed_method(new_item);
+        std::cout << std::endl; // emphasize with empty line
         it = exe_queue.emplace(exe_queue.cend(), QueueItem(new_item, abs_addr, t));
     }
     else {
         // add to existing queue item
         it->add(new_item, t);
+        std::cout << std::endl; // emphasize with empty line
+        cslog() << kLogPrefix << "add " << new_item << " to already enqueued contract";
+        std::cout << std::endl; // emphasize with empty line
     }
 
     if (!it->executions.empty()) {
@@ -580,7 +585,6 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
 
     update_status(*it, new_item.sequence, SmartContractStatus::Waiting);
     it->is_executor = contains_me(block.confidants());
-    test_exe_queue();
 }
 
 void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
@@ -603,8 +607,10 @@ void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
                 update_contract_state(new_state, false);
                 const csdb::Address abs_addr = absolute_address(new_state.target());
                 const cs::PublicKey& key = abs_addr.public_key();
+                std::cout << std::endl; // emphasize with empty line
                 cslog() << kLogPrefix << '{' << contract_ref.sequence << '.' << contract_ref.transaction << "} (" << EncodeBase58(key.data(), key.data() + key.size())
                         << ") state has been updated";
+                std::cout << std::endl; // emphasize with empty line
                 update_lock_status(abs_addr, false);
                 remove_from_queue(contract_ref);
             }
@@ -669,7 +675,7 @@ void SmartContracts::test_exe_queue() {
             continue;
         }
 
-        csdebug() << kLogPrefix << "set running status to {" << it->seq_enqueue << ".*}";
+        csdebug() << kLogPrefix << "set running status to {" << it->seq_enqueue << ".*} containing " << it->executions.size() << " jobs";
         update_status(*it, bc.getLastSequence(), SmartContractStatus::Running);
         // call to executor only if is trusted relatively to this contract
         if (it->is_executor) {
@@ -850,7 +856,7 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
                         csdebug() << kLogPrefix << "contract is deployed by #" << block.sequence() << "." << tr_idx;
                     }
                     else {
-                        csdebug() << kLogPrefix << "contract is called by #" << block.sequence() << "." << tr_idx;
+                        csdebug() << kLogPrefix << "contract is invoked by #" << block.sequence() << "." << tr_idx;
                     }
                     enqueue(block, tr_idx);
                 }
@@ -883,6 +889,8 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
             ++tr_idx;
         }
     }
+
+    test_exe_queue();
 }
 
 void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*/) {
@@ -1085,17 +1093,13 @@ bool SmartContracts::execute(SmartExecutionData& data) {
         data.result.retValue.__set_v_byte(error::ExecuteTransaction);
         return false;
     }
-    csdebug() << kLogPrefix << "execute contract #" << data.contract_ref.sequence << "." << data.contract_ref.transaction;
-
     csdb::Pool block = bc.loadBlock(data.contract_ref.sequence);
     if (!block.is_valid()) {
         data.error = "load block with starter transaction failed";
         data.result.retValue.__set_v_byte(error::InternalBug);
         return false;
     }
-    cslog() << std::endl
-            << kLogPrefix << "executing {" << data.contract_ref.sequence << '.' << data.contract_ref.transaction << "} - " << print_executed_method(data.contract_ref)
-            << std::endl;
+    cslog() << kLogPrefix << "executing " << data.contract_ref << "::" << print_executed_method(data.contract_ref) << std::endl;
     auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
     if (maybe_result.has_value()) {
         data.result = maybe_result.value();
@@ -1163,7 +1167,7 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
     // run async and watch result
     auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runnable);
     cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execution_completed);
-    executions_.push_back(std::move(watcher));
+    executions_.push_back(watcher);
 
     return true;
 }
@@ -1195,7 +1199,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
         // create partial new_state transaction
         if (it != exe_queue.end()) {
             auto execution = find_in_queue_item(it, data_item.contract_ref);
-            csdebug() << kLogPrefix << "execution of {" << data_item.contract_ref.sequence << '.' << data_item.contract_ref.transaction << "} has completed";
+            csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " has completed";
             if (execution != it->executions.end()) {
                 execution->consumed_fee = data_item.result.fee;  // executor overrides fee for now
                 result = create_new_state(*execution);
@@ -1323,7 +1327,6 @@ csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item) co
     result.add_user_field(trx_uf::new_state::RefStart, item.ref_start.to_user_field());
     // USRFLD2 - total fee
     result.add_user_field(trx_uf::new_state::Fee, item.consumed_fee);
-    csdebug() << kLogPrefix << item.ref_start << "new_state fee " << result.counted_fee().to_double() << ", contract execution fee " << item.consumed_fee.to_double();
     return result;
 }
 
@@ -1427,6 +1430,16 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
     }
     std::string state_value = fld.value<std::string>();
     if (!state_value.empty()) {
+        if (!reading_db) {
+            std::cout << std::endl; // emphasize with empty line
+            if (state_value.empty()) {
+                cslog() << kLogPrefix << "last contract state remains unchanged, execution failed";
+            }
+            else {
+                cslog() << kLogPrefix << "contract state is updated, new size is " << state_value.size();
+            }
+            std::cout << std::endl; // emphasize with empty line
+        }
         // create or get contract state item
         csdb::Address abs_addr = absolute_address(t.target());
         if (abs_addr.is_valid()) {
