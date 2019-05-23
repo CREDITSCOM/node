@@ -67,7 +67,7 @@ namespace cs {
         return Bytes();
     }
 
-    bool StageTwoSmarts::fromBinary(Bytes message, StageTwoSmarts & stage)
+    bool StageTwoSmarts::fromBinary(Bytes /*msg*/, StageTwoSmarts & /*stage*/)
     {
         return false;
     }
@@ -77,7 +77,7 @@ namespace cs {
         return Bytes();
     }
 
-    bool StageThreeSmarts::fromBinary(Bytes message, StageThreeSmarts & stage)
+    bool StageThreeSmarts::fromBinary(Bytes /*msg*/, StageThreeSmarts & /*stage*/)
     {
         return false;
     }
