@@ -48,6 +48,7 @@ add_library(${PROJECT_NAME} STATIC
 	src/timeouttracking.cpp
 	src/smartcontracts.cpp
 	src/smartconsensus.cpp
+	src/stage.cpp
 
 	src/states/defaultstatebehavior.cpp
 	src/states/handlebbstate.cpp
