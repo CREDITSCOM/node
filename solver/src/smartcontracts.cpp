@@ -1180,10 +1180,6 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
         return;
     }
 
-    // create (multi-)packet:
-    // new_state[0] + [ emitted_list[0] ] + ... + new_state[n-1] + [ emitted_list[n-1] ]
-    cs::TransactionsPacket packet;
-
     // any of data item "points" to the same queue item
     auto it = find_in_queue(data_list.front().contract_ref);
     if (it != exe_queue.end()) {
@@ -1193,19 +1189,36 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
         }
         update_status(*it, bc.getLastSequence(), SmartContractStatus::Finished);
     }
+    else {
+        return;
+    }
+
+    // create (multi-)packet:
+    // new_state[0] + [ emitted_list[0] ] + [ susequent_state_list[0] ] + ... + new_state[n-1] + [ emitted_list[n-1] ] + [ subsequent_state_list[n-1] ]
+    cs::TransactionsPacket integral_packet;
 
     for (const auto& data_item : data_list) {
-        csdb::Transaction result{};
-
+        ExecutionItem* execution = nullptr;
         // create partial new_state transaction
         if (it != exe_queue.end()) {
-            auto execution = find_in_queue_item(it, data_item.contract_ref);
+            auto it_exe = find_in_queue_item(it, data_item.contract_ref);
             csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " has completed";
-            if (execution != it->executions.end()) {
-                execution->consumed_fee = data_item.result.fee;  // executor overrides fee for now
-                result = create_new_state(*execution);
+            if (it_exe != it->executions.end()) {
+                execution = &(*it_exe);
             }
         }
+        if (execution == nullptr) {
+            // wtf data without execution item?
+            continue;
+        }
+
+        execution->consumed_fee = data_item.result.fee;  // executor calculates fee for now
+        cs::TransactionsPacket& packet = execution->result;
+        if (packet.transactionsCount() > 0) {
+            packet.clear();
+        }
+        csdb::Transaction result = create_new_state(*execution);
+
         // create partial failure if new_state is not created
         if(!result.is_valid()) {
             cserror() << kLogPrefix << "cannot find in queue just completed contract, so cannot create new_state";
@@ -1285,22 +1298,25 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                 }
             }
         }
+        // add all transactions to integral packet
+        for (const auto& t : packet.transactions()) {
+            integral_packet.addTransaction(t);
+        }
     }
 
-    if (it != exe_queue.end()) {
-        std::ostringstream os;
-        for (const auto e : it->executions) {
-            os << e.ref_start << ' ';
-        }
-        csdebug() << kLogPrefix << "starting " << os.str() << "consensus";
-        if (!start_consensus(*it, packet)) {
-            cserror() << kLogPrefix << os.str() << "consensus failed, remove item from queue";
-            remove_from_queue(it);
-        }
+    // 'it' already has tested
+    std::ostringstream os;
+    for (const auto e : it->executions) {
+        os << e.ref_start << ' ';
+    }
+    csdebug() << kLogPrefix << "starting " << os.str() << "consensus";
+    if (!start_consensus(*it, integral_packet)) {
+        cserror() << kLogPrefix << os.str() << "consensus failed, remove item from queue";
+        remove_from_queue(it);
     }
 
     // inform slots if any, packet does not contain smart consensus' data!
-    emit signal_smart_executed(packet);
+    emit signal_smart_executed(integral_packet);
 
     checkAllExecutions();
 }
@@ -1336,7 +1352,6 @@ csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item) co
 }
 
 // get & handle rejected transactions
-// usually ordinary consensus may not reject smart-related transactions
 void SmartContracts::on_reject(
     const std::vector<Node::RefExecution>& failed,
     const std::vector<Node::RefExecution>& restart) {
@@ -1348,14 +1363,45 @@ void SmartContracts::on_reject(
     cs::Lock lock(public_access_lock);
 
     // handle failed calls
+    csdebug() << kLogPrefix << "get reject & restart contract signal";
     if (failed.empty()) {
         csdebug() << kLogPrefix << "rejected contract list is empty";
     }
     else {
         csdebug() << kLogPrefix << "" << failed.size() << " contract(s) are rejected";
 
-        // will contain empty states of rejected smart contract calls, groupped by exe_queue item:
-        std::map<QueueItem*, cs::TransactionsPacket> empty_states_pack;
+        // group failed_list by block sequence
+        std::map< cs::Sequence, std::list<uint16_t> > grouped_failed;
+        for (const auto& item : failed) {
+            grouped_failed[item.first].emplace_back(item.second);
+        }
+
+        for (const auto& [sequence, executions] : grouped_failed) {
+            if (executions.empty()) {
+                // actually impossible
+                continue;
+            }
+            bool found_flag = false;
+            for (auto it_queue = exe_queue.begin(); it_queue != exe_queue.end(); ++it_queue) {
+                if (it_queue->seq_enqueue == sequence) {
+                    for (auto it_exe = it_queue->executions.begin(); it_exe != it_queue->executions.end(); ++it_exe) {
+                        if (std::find(executions.cbegin(), executions.cend(), it_exe->ref_start.transaction) != executions.cend()) {
+                            // found (maybe partially) rejected queue item
+
+
+                            // go to next sequence
+                            found_flag = true;
+                            break;
+                        }
+                    }
+                }
+                if (found_flag) {
+                    // go to next sequence
+                    break;
+                }
+            }
+        }
+
         // fix rejected calls by empty new_states, collect them in empty_states_pack
         for (const auto [seq, tr_idx] : failed) {
             // find rejected contract in queue

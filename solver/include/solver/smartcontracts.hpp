@@ -362,6 +362,8 @@ private:
         csdb::Amount consumed_fee;
         // using contracts, must store absolute addresses (keys, not ids)
         std::vector<csdb::Address> uses;
+        // execution result includes contract new_state, emitted transactions if any, subsequent contracts states if any
+        cs::TransactionsPacket result;
 
         bool operator ==(const SmartContractRef& r) const {
             return ref_start == r;
