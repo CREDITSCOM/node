@@ -87,7 +87,7 @@ void addMyOut(const Config& config, cs::OPackStream& stream, const uint8_t initF
 
 void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t uuid) {
     stream.init(BaseFlags::NetworkMsg);
-    stream << NetworkCommand::Registration << NODE_VERSION;
+    stream << NetworkCommand::Registration << NODE_VERSION << uuid;
 
     addMyOut(config, stream);
     *regPackConnId = reinterpret_cast<uint64_t*>(stream.getCurrentPtr());
@@ -105,7 +105,7 @@ void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::
 #else
         << Platform::Linux
 #endif
-        << NODE_VERSION;
+        << NODE_VERSION << uuid;
 
     uint8_t flag = (config.getNodeType() == NodeType::Router) ? 8 : 0;
     addMyOut(config, stream, flag);
@@ -778,7 +778,8 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
     cslog() << "Got registration request from " << task->sender;
 
     NodeVersion vers;
-    iPackStream_ >> vers;
+    uint64_t remote_uuid = 0;
+    iPackStream_ >> vers >> remote_uuid;
 
     if (!iPackStream_.good()) {
         return false;
@@ -817,6 +818,17 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
     if (vers != NODE_VERSION) {
         sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadClientVersion);
         return true;
+    }
+
+    RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
+    uint64_t local_uuid = node_->getBlockChain().uuid();
+    if (local_uuid != 0 && remote_uuid != 0 && local_uuid != remote_uuid) {
+       sendRegistrationRefusal(conn, RegistrationRefuseReasons::IncompatibleBlockchain);
+       ptr->setBlackListed(true);
+       return true;
+    }
+    else {
+       ptr->setBlackListed(false);
     }
 
     iPackStream_ >> conn.id;

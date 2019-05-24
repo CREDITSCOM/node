@@ -135,7 +135,7 @@ bool PacketValidator::validateStopRequest(const uint8_t* data, size_t size) {
 }
 
 bool PacketValidator::validateRegistration(size_t size) {
-    constexpr size_t hdr = 1 + 2 ;  // command Registration + version
+    constexpr size_t hdr = 1 + 2 + 8;  // command Registration + version
     constexpr size_t ip6 = 1 + 16;
     constexpr size_t ip4 = 1 + 4;
     constexpr size_t noip = 1;
