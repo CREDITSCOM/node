@@ -305,7 +305,7 @@ class Concurrent {
 public:
     // runs function in another thread, returns future watcher
     // than generates finished signal by run policy
-    // if does not store watcher object, then main thread will wait async entity in blocking mode
+    // you should not store watcher, it does by run method, just use finished/failed signal to subscribe
     template <typename Func, typename... Args>
     static FutureWatcherPtr<std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>> run(RunPolicy policy, Func&& function, Args&&... args) {
         using ReturnType = std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>;
