@@ -327,9 +327,6 @@ private:
     // contract replenish transactions stored during reading from DB on stratup
     std::vector<SmartContractRef> replenish_contract;
 
-    // async watchers
-    std::list<cs::FutureWatcherPtr<SmartExecutionData>> executions_;
-
     struct QueueItem {
         // reference to smart in block chain (block/transaction) that spawns execution
         SmartContractRef ref_start;
@@ -451,8 +448,6 @@ private:
     }
 
     SmartContractStatus get_smart_contract_status(const csdb::Address& addr) const;
-
-    void checkAllExecutions();
 
     void test_exe_queue();
 

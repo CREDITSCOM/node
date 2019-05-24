@@ -2249,7 +2249,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     // sync state check
     cs::Conveyer& conveyer = cs::Conveyer::instance();
-    cs::ConfidantsKeys prevConfidants = conveyer.confidants();
 
     if (conveyer.currentRoundNumber() == rNum && subRound_ > subRound) {
         cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
@@ -2289,11 +2288,15 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     cs::Bytes realTrusted;
     roundStream >> realTrusted;
 
-    if (!prevConfidants.empty() && realTrusted.size() == prevConfidants.size()) {
-        for (int i = 0; i < realTrusted.size(); ++i) {
-            if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
-                //csdebug() << "NODE> Node ban!!!";
-                solver_->addToGraylist(prevConfidants[i], Consensus::GrayListPunishment);
+    const auto ptrRT = conveyer.roundTable(rNum - 1);
+    if (ptrRT != nullptr) {
+        const cs::ConfidantsKeys& prevConfidants = ptrRT->confidants;
+        if (!prevConfidants.empty() && realTrusted.size() == prevConfidants.size()) {
+            for (int i = 0; i < realTrusted.size(); ++i) {
+                if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+                    //csdebug() << "NODE> Node ban!!!";
+                    solver_->addToGraylist(prevConfidants[i], Consensus::GrayListPunishment);
+                }
             }
         }
     }
