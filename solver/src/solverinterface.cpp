@@ -83,8 +83,7 @@ void SolverCore::addToGraylist(const cs::PublicKey & sender, uint32_t rounds) {
         csdebug() << "Node " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " is in gray list now";
     }
     else {
-        uint32_t remainingRounds = grayList_[sender];
-        grayList_.emplace(sender, rounds*2 + remainingRounds);
+        grayList_[sender] += rounds * 2;
         csdebug() << "Node " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " will continue its being in gray list now";
     }
 }
@@ -390,16 +389,19 @@ void SolverCore::updateGrayList(cs::RoundNumber round) {
         csdebug() << "Gray list will update only if the round number changes";
         return;
     }
-    for (auto& it : grayList_) {
-        --it.second;
-    }
-    auto it = grayList_.cbegin();
-    while (it != grayList_.cend()) {
-        if (it->second == 0) {
+    const auto delta = round - lastGrayUpdated_;
+    lastGrayUpdated_ = round;
+
+    auto it = grayList_.begin();
+    while (it != grayList_.end()) {
+        if (it->second <= delta) {
             csdebug() << "Node with PK " << cs::Utils::byteStreamToHex(it->first.data(), it->first.size()) << " freed from grayList trap";
-            grayList_.erase(it);
+            it = grayList_.erase(it);
         }
-        ++it;
+        else {
+            it->second -= delta;
+            ++it;
+        }
     }
 
 }
