@@ -98,7 +98,8 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
         return false;
     }
 
-    csdebug() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} consensus starting on R-" << cs::Conveyer::instance().currentRoundNumber() << "... ";
+    csdebug() << kLogPrefix << "{" << smartRoundNumber_ << '.' << smartTransaction_ << "} consensus for " << tmpNewStates_.size()
+        << " job(s) starting on R-" << cs::Conveyer::instance().currentRoundNumber() << "... ";
 
     smartConfidants_ = pnode_->retriveSmartConfidants(smartRoundNumber_);
     ownSmartsConfNum_ = calculateSmartsConfNum();

@@ -44,6 +44,8 @@ public:
         Drop
     };
 
+    using RefExecution = std::pair<cs::Sequence, uint32_t>;
+
     explicit Node(const Config&);
     ~Node();
 
@@ -105,7 +107,7 @@ public:
     void removeSmartConsensus(uint64_t id);
     void checkForSavedSmartStages(uint64_t id);
 
-    void sendSmartReject(const std::vector<std::pair<cs::Sequence, uint32_t>>& referenceList);
+    void sendSmartReject(const std::vector<RefExecution>& rejectList, const std::vector<RefExecution>& restartList);
     void getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
 
     csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
@@ -210,7 +212,9 @@ public:
     using SmartsSignal = cs::Signal<void(T&, bool)>;
     using SmartStageRequestSignal = cs::Signal<void(uint8_t, cs::Sequence, uint32_t, uint8_t, uint8_t, cs::PublicKey&)>;
     using StopSignal = cs::Signal<void()>;
-    using RejectedSmartContractsSignal = cs::Signal<void(const std::vector<std::pair<cs::Sequence, uint32_t>>&)>;
+
+    // args: [failed list, restart list]
+    using RejectedSmartContractsSignal = cs::Signal<void(const std::vector<RefExecution>&, const std::vector<RefExecution>&)>;
 
 public signals:
     SmartsSignal<cs::StageOneSmarts> gotSmartStageOne;

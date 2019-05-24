@@ -82,7 +82,7 @@ void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& chara
 
         // 3. signal some trxs are rejected
         if (rejected.transactionsCount() > 0) {
-            std::vector<std::pair<cs::Sequence, uint32_t> > referenceList;
+            std::vector<SolverContext::RefExecution> referenceList;
 
             for (const auto t : rejected.transactions()) {
                 if (SmartContracts::is_new_state(t)) {
@@ -95,7 +95,7 @@ void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& chara
             }
 
             if (!referenceList.empty()) {
-                context.send_rejected_smarts(referenceList);
+                context.send_rejected_smarts(referenceList, std::vector<SolverContext::RefExecution>{});
             }
         }
     }

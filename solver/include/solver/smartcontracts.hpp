@@ -233,7 +233,11 @@ public:
 
     // get & handle rejected transactions from smart contract(s)
     // usually ordinary consensus may reject smart-related transactions
-    void on_reject(const std::vector<std::pair<cs::Sequence, uint32_t>>& ref_list);
+    // failed list refers to rejected calls
+    // restart list contains items that considered to execute again
+    void on_reject(
+        const std::vector<Node::RefExecution>& failed,
+        const std::vector<Node::RefExecution>& restart);
 
     csdb::Address absolute_address(const csdb::Address& optimized_address) const {
         return bc.getAddressByType(optimized_address, BlockChain::AddressType::PublicKey);
@@ -395,6 +399,18 @@ private:
         , is_rejected(false) {
 
             add(ref_contract, tr_start);
+        }
+
+        // executions & pconsensus remains empty
+        QueueItem(const QueueItem& src)
+            : status(src.status)
+            , seq_enqueue(src.seq_enqueue)
+            , seq_start(src.seq_start)
+            , seq_finish(src.seq_finish)
+            , abs_addr(src.abs_addr)
+            , is_executor(src.is_executor)
+            , is_rejected(src.is_rejected)
+        {
         }
 
         // add contract execution to existing exe queue item

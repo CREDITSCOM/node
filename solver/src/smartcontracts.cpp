@@ -638,6 +638,7 @@ void SmartContracts::test_exe_queue() {
             // the senseless item in the queue
             csdebug() << kLogPrefix << "empty {" << it->seq_enqueue << ".*} in queue, remove it";
             it = remove_from_queue(it);
+            continue;
         }
         if (it->status == SmartContractStatus::Running) {
             // some contract is already running
@@ -1287,9 +1288,13 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
     }
 
     if (it != exe_queue.end()) {
-        csdebug() << kLogPrefix << "starting {" << it->seq_enqueue << ".*} consensus";
+        std::ostringstream os;
+        for (const auto e : it->executions) {
+            os << e.ref_start << ' ';
+        }
+        csdebug() << kLogPrefix << "starting " << os.str() << "consensus";
         if (!start_consensus(*it, packet)) {
-            cserror() << kLogPrefix << '{' << it->seq_enqueue << ".*} consensus failed, remove item from queue";
+            cserror() << kLogPrefix << os.str() << "consensus failed, remove item from queue";
             remove_from_queue(it);
         }
     }
@@ -1332,93 +1337,122 @@ csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item) co
 
 // get & handle rejected transactions
 // usually ordinary consensus may not reject smart-related transactions
-void SmartContracts::on_reject(const std::vector<std::pair<cs::Sequence, uint32_t> >& ref_list) {
+void SmartContracts::on_reject(
+    const std::vector<Node::RefExecution>& failed,
+    const std::vector<Node::RefExecution>& restart) {
+
     cs::Lock lock(public_access_lock);
 
-    bool retest_queue_required = false;
-    // will contain "unchanged" states of rejected smart contract calls:
-    cs::TransactionsPacket empty_states_pack;
-    const auto cnt = ref_list.size();
-    if (cnt == 0) {
+    // handle failed calls
+    if (failed.empty()) {
         cserror() << kLogPrefix << "rejected contract list is empty";
-        return;
     }
-    csdebug() << kLogPrefix << "" << cnt << " contract(s) are rejected";
+    else {
+        csdebug() << kLogPrefix << "" << failed.size() << " contract(s) are rejected";
 
-    for (const auto ref : ref_list) {
-        // find rejected contract in queue
-        QueueItem * queue_item = nullptr;
-        ExecutionItem * exe_item = nullptr;
-        for (auto it = exe_queue.begin(); it != exe_queue.end(); ++it) {
-            for (auto it_exe = it->executions.begin(); it_exe != it->executions.end(); ++it_exe) {
-                if (it_exe->ref_start.sequence == ref.first && it_exe->ref_start.transaction == ref.second) {
-                    queue_item = &(*it);
-                    exe_item = &(*it_exe);
+        // will contain empty states of rejected smart contract calls, groupped by exe_queue item:
+        std::map<QueueItem*, cs::TransactionsPacket> empty_states_pack;
+        // fix rejected calls by empty new_states, collect them in empty_states_pack
+        for (const auto [seq, tr_idx] : failed) {
+            // find rejected contract in queue
+            for (auto it = exe_queue.begin(); it != exe_queue.end(); ++it) {
+                bool break_flag = false;
+                for (auto it_exe = it->executions.begin(); it_exe != it->executions.end(); ++it_exe) {
+                    if (it_exe->ref_start.sequence == seq && it_exe->ref_start.transaction == tr_idx) {
+                        // rejected job found
+                        csdebug() << kLogPrefix << it_exe->ref_start << " is rejected";
+                        // send to consensus
+                        csdb::Transaction tr = create_new_state(*it_exe);
+                        // result contains empty USRFLD[state::Value]
+                        tr.add_user_field(trx_uf::new_state::Value, std::string{});
+                        // result contains error code "rejected by consensus"
+                        using namespace cs::trx_uf;
+                        ::general::Variant err_code;
+                        err_code.__set_v_byte(error::ConsensusRejected);
+                        tr.add_user_field(trx_uf::new_state::RetVal, serialize(err_code));
+                        if (tr.is_valid()) {
+                            if (it->is_executor) {
+                                empty_states_pack[&(*it)].addTransaction(tr);
+                            }
+                        }
+                        it->executions.erase(it_exe);
+                        // it_exe is invalid now!
+                        if (it->executions.empty()) {
+                            update_status(*it, bc.getLastSequence(), SmartContractStatus::Closed);
+                        }
+                        break_flag = true;
+                        break;
+                    }
+                    if (break_flag) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // start smart-consensus for rejected calls empty states, in common multiple consensuses
+        if (!empty_states_pack.empty()) {
+            for (const auto& [origin_item, packet] : empty_states_pack) {
+                csdebug() << kLogPrefix << "restarting consensus to validate empty new_state(s) of rejected call(s)";
+                // create new queue_item as copy of original item
+                auto& new_item = exe_queue.emplace_back(*origin_item);
+                new_item.executions.clear();
+                new_item.is_rejected = true;
+                start_consensus(new_item, packet);
+            }
+        }
+    }
+
+    // handle restart calls
+    if (restart.empty()) {
+        cserror() << kLogPrefix << "restart contract list is empty";
+    }
+    else {
+        csdebug() << kLogPrefix << "" << failed.size() << " contract(s) are restarted";
+
+        // will contain calls to restarted smart contract calls, groupped by exe_queue item:
+        std::map<QueueItem*, std::list<ExecutionItem>> restart_pack;
+        for (const auto [seq, tr_idx] : restart) {
+            // find restart contract in queue
+            for (auto it = exe_queue.begin(); it != exe_queue.end(); ++it) {
+                bool break_flag = false;
+                for (auto it_exe = it->executions.begin(); it_exe != it->executions.end(); ++it_exe) {
+                    if (it_exe->ref_start.sequence == seq && it_exe->ref_start.transaction == tr_idx) {
+                        // restart job found
+                        csdebug() << kLogPrefix << it_exe->ref_start << " is restarted";
+                        restart_pack[&(*it)].emplace_back(*it_exe);
+                        it->executions.erase(it_exe);
+                        // it_exe is invalid now!
+                        if (it->executions.empty()) {
+                            update_status(*it, bc.getLastSequence(), SmartContractStatus::Closed);
+                        }
+                    }
+                    break_flag = true;
+                    break;
+                }
+                if (break_flag) {
                     break;
                 }
             }
-            if (queue_item != nullptr) {
-                break;
-            }
         }
-        if (queue_item == nullptr) {
-            cserror() << kLogPrefix << "cannot find in queue source contract for rejected transactions";
-        }
-        else {
-            if (queue_item->is_rejected || exe_item == nullptr) {
-                // already in new consensus
-                continue;
-            }
-            queue_item->is_rejected = true;
-            csdebug() << kLogPrefix << "send to conveyer " << exe_item->ref_start << " failed status (emitted transactions or state are rejected)";
-            // send to consensus
-            csdb::Transaction tr = create_new_state(*exe_item);
-            // result contains empty USRFLD[state::Value]
-            tr.add_user_field(trx_uf::new_state::Value, std::string{});
-            // result contains error code "rejected by consensus"
-            using namespace cs::trx_uf;
-            ::general::Variant err_code;
-            err_code.__set_v_byte(error::ConsensusRejected);
-            tr.add_user_field(trx_uf::new_state::RetVal, serialize(err_code));
-            if (tr.is_valid()) {
-                empty_states_pack.addTransaction(tr);
-            }
-            else {
-                cserror() << kLogPrefix << "failed to store " << exe_item->ref_start << " failure, remove from execution queue";
-                update_status(*queue_item, bc.getLastSequence(), SmartContractStatus::Closed);
-                retest_queue_required = true;
+
+        // enqueue restarted items again as separate exe_queue item(s)
+        if (!restart_pack.empty()) {
+            for (const auto& [origin_item, executions] : restart_pack) {
+                csdebug() << kLogPrefix << "restarting " << executions.size() << " contract(s)";
+                if (!executions.empty()) {
+                    auto& new_item = exe_queue.emplace_back(*origin_item);
+                    new_item.executions.clear();
+                    for (const auto& e : executions) {
+                        new_item.executions.emplace_back(e);
+                    }
+                    update_status(new_item, bc.getLastSequence(), SmartContractStatus::Waiting);
+                }
             }
         }
     }
 
-    if (empty_states_pack.transactionsCount() > 0) {
-        // find in queue the first contract in pack and start new smart-consensus
-        const auto& transactions = empty_states_pack.transactions();
-        csdb::Address abs_addr = absolute_address(transactions.front().source());
-        queue_iterator it = find_first_in_queue(abs_addr);
-        if (it == exe_queue.end()) {
-            // nothing else to do then simple put transaction into blockchain
-            empty_states_pack.makeHash();
-            csdebug() << kLogPrefix << "restarting consensus to validate empty new_state of " << empty_states_pack.transactionsCount()
-                      << " contract(s) failed, so put empty new_state unsigned";
-            Conveyer::instance().addSeparatePacket(empty_states_pack);
-        }
-        else {
-            // replace if any previous
-            if (it->is_executor) {
-                csdebug() << kLogPrefix << "restarting consensus to validate empty new_state of " << empty_states_pack.transactionsCount() << " contract(s)";
-                start_consensus(*it, empty_states_pack);
-            }
-            else {
-                csdebug() << kLogPrefix << "restarting consensus to validate empty new_state of " << empty_states_pack.transactionsCount()
-                          << " contract(s) required, wait for new_state(s)";
-            }
-        }
-    }
-
-    if (retest_queue_required) {
-        test_exe_queue();
-    }
+    test_exe_queue();
 }
 
 bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool reading_db) {
