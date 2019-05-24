@@ -59,17 +59,20 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             /*primary_new_state_found = true;*/
             // abs_addr = smarts->absolute_address(tr.source());
             csdb::Transaction tmpNewState;
-            csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
-            if (fld.is_valid()) {
-                SmartContractRef ref(fld);
-                if (ref.is_valid()) {
-                    smartRoundNumber_ = ref.sequence;
-                    smartTransaction_ = static_cast<decltype(smartTransaction_)>(ref.transaction);
+            csdb::UserField fld;
+            if (smartRoundNumber_ == 0) {
+                fld = tr.user_field(trx_uf::new_state::RefStart);
+                if (fld.is_valid()) {
+                    SmartContractRef ref(fld);
+                    if (ref.is_valid()) {
+                        smartRoundNumber_ = ref.sequence;
+                        smartTransaction_ = static_cast<decltype(smartTransaction_)>(ref.transaction);
+                    }
                 }
             }
-            csdb::UserField fld2 = tr.user_field(trx_uf::new_state::Fee);
-            if (fld2.is_valid()) {
-                executor_fees.push_back(fld2.value<csdb::Amount>());
+            fld = tr.user_field(trx_uf::new_state::Fee);
+            if (fld.is_valid()) {
+                executor_fees.push_back(fld.value<csdb::Amount>());
             }
             // break;
             // creating fee free copy of state transaction

@@ -402,20 +402,25 @@ private:
         }
 
         // executions & pconsensus remains empty
-        QueueItem(const QueueItem& src)
-            : status(src.status)
-            , seq_enqueue(src.seq_enqueue)
-            , seq_start(src.seq_start)
-            , seq_finish(src.seq_finish)
-            , abs_addr(src.abs_addr)
-            , is_executor(src.is_executor)
-            , is_rejected(src.is_rejected)
+        QueueItem fork()
         {
+            QueueItem tmp;
+            tmp.status = status;
+            tmp.seq_enqueue = seq_enqueue;
+            tmp.seq_start = seq_start;
+            tmp.seq_finish = seq_finish;
+            tmp.abs_addr = abs_addr;
+            tmp.is_executor = is_executor;
+            tmp.is_rejected = is_rejected;
+            return tmp;
         }
 
         // add contract execution to existing exe queue item
         // caller is responsible the execution to refer to the same contract, call to other method of the same contract is allowed
         void add(const SmartContractRef& ref_contract, csdb::Transaction tr_start);
+
+    private:
+        QueueItem() = default;
     };
 
     // execution queue

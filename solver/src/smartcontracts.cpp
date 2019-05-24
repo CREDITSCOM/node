@@ -1341,11 +1341,15 @@ void SmartContracts::on_reject(
     const std::vector<Node::RefExecution>& failed,
     const std::vector<Node::RefExecution>& restart) {
 
+    if (failed.empty() && restart.empty()) {
+        return;
+    }
+
     cs::Lock lock(public_access_lock);
 
     // handle failed calls
     if (failed.empty()) {
-        cserror() << kLogPrefix << "rejected contract list is empty";
+        csdebug() << kLogPrefix << "rejected contract list is empty";
     }
     else {
         csdebug() << kLogPrefix << "" << failed.size() << " contract(s) are rejected";
@@ -1395,7 +1399,7 @@ void SmartContracts::on_reject(
             for (const auto& [origin_item, packet] : empty_states_pack) {
                 csdebug() << kLogPrefix << "restarting consensus to validate empty new_state(s) of rejected call(s)";
                 // create new queue_item as copy of original item
-                auto& new_item = exe_queue.emplace_back(*origin_item);
+                auto& new_item = exe_queue.emplace_back(origin_item->fork());
                 new_item.executions.clear();
                 new_item.is_rejected = true;
                 start_consensus(new_item, packet);
@@ -1405,7 +1409,7 @@ void SmartContracts::on_reject(
 
     // handle restart calls
     if (restart.empty()) {
-        cserror() << kLogPrefix << "restart contract list is empty";
+        csdebug() << kLogPrefix << "restart contract list is empty";
     }
     else {
         csdebug() << kLogPrefix << "" << failed.size() << " contract(s) are restarted";
@@ -1441,7 +1445,7 @@ void SmartContracts::on_reject(
             for (const auto& [origin_item, executions] : restart_pack) {
                 csdebug() << kLogPrefix << "restarting " << executions.size() << " contract(s)";
                 if (!executions.empty()) {
-                    auto& new_item = exe_queue.emplace_back(*origin_item);
+                    auto& new_item = exe_queue.emplace_back(origin_item->fork());
                     new_item.executions.clear();
                     for (const auto& e : executions) {
                         new_item.executions.emplace_back(e);
