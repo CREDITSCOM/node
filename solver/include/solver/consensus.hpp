@@ -38,7 +38,7 @@ public:
     constexpr static uint8_t GeneralNotSelected = 100;
 
     /** @brief   Min duration (msec) to collect hashes in stage-1 of consensus */
-    constexpr static uint32_t T_min_stage1 = 170;
+    constexpr static uint32_t T_min_stage1 = 10000;
 
     /** @brief   Numbet of rounds to prevent node from consensus participation */
     constexpr static uint32_t GrayListPunishment = 100;
