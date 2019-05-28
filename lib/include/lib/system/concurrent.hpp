@@ -89,6 +89,8 @@ using Future = std::future<T>;
 
 template <typename Result>
 class FutureBase {
+    friend class Concurrent;
+
 public:
     using Id = uint64_t;
 
@@ -141,6 +143,8 @@ public:
     }
 
 protected:
+    using CompletedSignal = cs::Signal<void(Id)>;
+
     Future<Result> future_;
     RunPolicy policy_;
     WatcherState state_ = WatcherState::Idle;
@@ -149,12 +153,16 @@ protected:
     inline static Id producedId = 0;
     constexpr static std::chrono::milliseconds kAwaiterTime{10};
 
+    void setCompletedState() {
+        future_ = Future<Result>();
+        state_ = WatcherState::Compeleted;
+
+        emit completed(id_);
+    }
+
     template <typename Func>
     void callSignal(Func&& func) {
         Worker::execute(policy_, std::forward<Func>(func));
-
-        future_ = Future<Result>();
-        state_ = WatcherState::Compeleted;
     }
 
     template <typename Awaiter>
@@ -165,6 +173,11 @@ protected:
 
         std::this_thread::sleep_for(kAwaiterTime);
     }
+
+protected signals:
+
+    // internal utility signal, clients should used finished/failed signlas from FutureWatcher
+    CompletedSignal completed;
 };
 
 // object to get future result from concurrent
@@ -202,6 +215,8 @@ protected:
                 auto lambda = [this, res = std::move(result)]() {
                     Super::await(finished);
                     emit finished(std::move(res));
+
+                    Super::setCompletedState();
                 };
 
                 Super::callSignal(std::bind(std::move(lambda)));
@@ -256,6 +271,8 @@ protected:
                 auto signal = [=] {
                     Super::await(finished);
                     emit finished();
+
+                    Super::setCompletedState();
                 };
 
                 Super::callSignal(std::move(signal));
@@ -282,16 +299,50 @@ template <typename T>
 using FutureWatcherPtr = std::shared_ptr<FutureWatcher<T>>;
 
 class Concurrent {
+    template<typename T>
+    using Executions = std::list<T>;
+
 public:
     // runs function in another thread, returns future watcher
     // than generates finished signal by run policy
-    // if does not store watcher object, then main thread will wait async entity in blocking mode
+    // you should not store watcher, it does by run method, just use finished/failed signal to subscribe
     template <typename Func, typename... Args>
     static FutureWatcherPtr<std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>> run(RunPolicy policy, Func&& function, Args&&... args) {
         using ReturnType = std::invoke_result_t<std::decay_t<Func>, std::decay_t<Args>...>;
         using WatcherType = FutureWatcher<ReturnType>;
 
-        return std::make_shared<WatcherType>(policy, std::async(std::launch::async, std::forward<Func>(function), std::forward<Args>(args)...));
+        // running executions
+        static Executions<FutureWatcherPtr<ReturnType>> executions;
+        using ExecutionsIterator = typename decltype(executions)::iterator;
+
+        // run async and store it at executions
+        auto watcher = std::make_shared<WatcherType>(policy, std::async(std::launch::async, std::forward<Func>(function), std::forward<Args>(args)...));
+
+        {
+            cs::Lock lock(executionsMutex_);
+            executions.push_back(watcher);
+        }
+
+        // watcher will be removed after lambda called
+        cs::Connector::connect(&watcher->completed, [](typename FutureWatcher<ReturnType>::Id id) {
+            ExecutionsIterator iter;
+
+            {
+                cs::Lock lock(executionsMutex_);
+                iter = std::find_if(executions.begin(), executions.end(), [=](const auto& watcher) {
+                    return (watcher->id() == id) && (watcher->state() == WatcherState::Compeleted);
+                });
+            }
+
+            if (iter != executions.end()) {
+                cs::Concurrent::run([=]() {
+                    cs::Lock lock(executionsMutex_);
+                    executions.erase(iter);
+                });
+            }
+        });
+
+        return watcher;
     }
 
     // runs function entity in thread pool
@@ -322,6 +373,8 @@ private:
         std::this_thread::sleep_until(timePoint);
         Worker::execute(policy, std::move(callBack));
     }
+
+    inline static std::mutex executionsMutex_;
 };
 
 template <typename T>

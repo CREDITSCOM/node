@@ -189,3 +189,137 @@ TEST(Concurrent, VoidFutureWatcherNonBindedRun) {
     ASSERT_NE(mainId, concurrentId);
     ASSERT_EQ(called, true);
 }
+
+TEST(Concurrent, FutureWatcherCorrectDestructionThreadPool) {
+    static std::atomic<bool> isDone = false;
+    static std::atomic<bool> isDestroyed = false;
+    static std::atomic<int> destroyCount = 0;
+
+    class Destroyer {
+    public:
+        [[maybe_unused]]
+        Destroyer() = default;
+
+        [[maybe_unused]]
+        Destroyer(Destroyer&&) = default;
+
+        [[maybe_unused]]
+        ~Destroyer() {
+            isDestroyed.store(true, std::memory_order::memory_order_release);
+            ++destroyCount;
+        }
+    };
+
+    class Demo {
+    public:
+        std::shared_ptr<Destroyer> execution() {
+            cs::Console::writeLine("Demo execution done");
+            return std::make_shared<Destroyer>();
+        }
+
+    public slots:
+        void onFinished(std::shared_ptr<Destroyer>) {
+            cs::Console::writeLine("Demo finished slot done");
+            isDone.store(true, std::memory_order::memory_order_release);
+        }
+    };
+
+    Demo demo;
+
+    {
+        auto watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPolicy, &Demo::execution, &demo);
+        cs::Connector::connect(&watcher->finished, &demo, &Demo::onFinished);
+    }
+
+    while (!isDone);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    cs::Console::writeLine("Is done ok, destroy count ", destroyCount.load(std::memory_order::memory_order_acquire));
+
+    ASSERT_TRUE(destroyCount.load(std::memory_order::memory_order_acquire) == 1);
+    ASSERT_TRUE(isDone);
+
+    isDone = false;
+
+    {
+        auto watcher = cs::Concurrent::run(cs::RunPolicy::ThreadPolicy, &Demo::execution, &demo);
+        cs::Connector::connect(&watcher->finished, &demo, &Demo::onFinished);
+    }
+
+    while (!isDone);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    cs::Console::writeLine("Is done ok, destroy count ", destroyCount.load(std::memory_order::memory_order_acquire));
+
+    ASSERT_TRUE(destroyCount.load(std::memory_order::memory_order_acquire) == 2);
+    ASSERT_TRUE(isDone);
+}
+
+TEST(Concurrent, FutureWatcherCorrectDestructionCallsQueue) {
+    static std::atomic<bool> isDone = false;
+    static std::atomic<bool> isDestroyed = false;
+    static std::atomic<int> destroyCount = 0;
+
+    class Destroyer {
+    public:
+        [[maybe_unused]]
+        Destroyer() = default;
+
+        [[maybe_unused]]
+        Destroyer(Destroyer&&) = default;
+
+        [[maybe_unused]]
+        ~Destroyer() {
+            isDestroyed.store(true, std::memory_order::memory_order_release);
+            ++destroyCount;
+        }
+    };
+
+    class Demo {
+    public:
+        std::shared_ptr<Destroyer> execution() {
+            cs::Console::writeLine("Demo execution done");
+            return std::make_shared<Destroyer>();
+        }
+
+    public slots:
+        void onFinished(std::shared_ptr<Destroyer>) {
+            cs::Console::writeLine("Demo finished slot done");
+            isDone.store(true, std::memory_order::memory_order_release);
+        }
+    };
+
+    Demo demo;
+
+    {
+        auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, &Demo::execution, &demo);
+        cs::Connector::connect(&watcher->finished, &demo, &Demo::onFinished);
+    }
+
+    while (!isDone) {
+        CallsQueue::instance().callAll();
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    cs::Console::writeLine("Is done ok, destroy count ", destroyCount.load(std::memory_order::memory_order_acquire));
+
+    ASSERT_TRUE(destroyCount.load(std::memory_order::memory_order_acquire) == 1);
+    ASSERT_TRUE(isDone);
+
+    isDone = false;
+
+    {
+        auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, &Demo::execution, &demo);
+        cs::Connector::connect(&watcher->finished, &demo, &Demo::onFinished);
+    }
+
+    while (!isDone) {
+        CallsQueue::instance().callAll();
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    cs::Console::writeLine("Is done ok, destroy count ", destroyCount.load(std::memory_order::memory_order_acquire));
+
+    ASSERT_TRUE(destroyCount.load(std::memory_order::memory_order_acquire) == 2);
+    ASSERT_TRUE(isDone);
+}

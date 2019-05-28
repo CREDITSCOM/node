@@ -4,7 +4,7 @@
 
 #include <cscrypto/cscrypto.hpp>
 #include <csnode/blockchain.hpp>
-#include <lib/system/utils.hpp>
+#include <lib/system/random.hpp>
 
 Neighbourhood::Neighbourhood(Transport* net)
 : transport_(net)
@@ -780,7 +780,7 @@ ConnectionPtr Neighbourhood::getRandomSyncNeighbour() {
     ConnectionPtr candidate = *(neighbours_.begin() + candidateNumber);
 
     if (!candidate->syncNeighbourRetries) {
-        candidate->syncNeighbourRetries = cs::Utils::generateRandomValue<uint32_t>(1, MaxSyncAttempts * 3);
+        candidate->syncNeighbourRetries = cs::Random::generateRandomValue<uint32_t>(1, MaxSyncAttempts * 3);
     }
 
     --(candidate->syncNeighbourRetries);
@@ -858,7 +858,7 @@ int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) 
         return -1;
     }
 
-    const int randomNumber = cs::Utils::generateRandomValue<int>(0, static_cast<int>(neighbourCount));
+    const int randomNumber = cs::Random::generateRandomValue<int>(0, static_cast<int>(neighbourCount));
     const ConnectionPtr nb = *(neighbours_.begin() + randomNumber);
 
     if (!nb) {

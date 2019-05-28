@@ -346,21 +346,6 @@ csdb::UserField SmartContracts::set_using_contracts(const std::vector<csdb::Addr
     return csdb::UserField(stream.convert<std::string>());
 }
 
-void SmartContracts::checkAllExecutions() {
-    using Watcher = cs::FutureWatcherPtr<SmartExecutionData>;
-    std::vector<std::list<Watcher>::iterator> iterators;
-
-    for (auto iter = executions_.begin(); iter != executions_.end(); ++iter) {
-        if ((*iter)->state() == cs::WatcherState::Compeleted) {
-            iterators.push_back(iter);
-        }
-    }
-
-    for (auto iter : iterators) {
-        executions_.erase(iter);
-    }
-}
-
 std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address& abs_addr) const {
     using namespace trx_uf;
     const auto item = known_contracts.find(abs_addr);
@@ -1034,7 +1019,6 @@ bool SmartContracts::execute_async(const cs::SmartContractRef& item, csdb::Amoun
     // run async and watch result
     auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runnable);
     cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execution_completed);
-    executions_.push_back(std::move(watcher));
 
     return true;
 }
@@ -1141,8 +1125,6 @@ void SmartContracts::on_execution_completed_impl(const SmartExecutionData& data)
 
     // inform slots if any, packet does not contain smart consensus' data!
     emit signal_smart_executed(packet);
-
-    checkAllExecutions();
 }
 
 uint64_t SmartContracts::next_inner_id(const csdb::Address& addr) const {

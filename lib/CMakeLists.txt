@@ -20,6 +20,7 @@ add_library(lib
   include/lib/system/progressbar.hpp
   include/lib/system/concurrent.hpp
   include/lib/system/scopeguard.hpp
+  include/lib/system/random.hpp
 )
 
 

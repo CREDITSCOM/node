@@ -2086,13 +2086,15 @@ void Node::sendRoundTable() {
 
     conveyer.setRound(lastSentRoundData_.table.round);
     
-    for (int i = 0; i < lastTrustedMask_.size(); ++i) {
-        if (lastTrustedMask_[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
-            //csdebug() << "NODE> Node ban!!!";
-            solver_->addToGraylist(conveyer.confidants()[i], Consensus::GrayListPunishment);
+    const auto& confidants = conveyer.confidants();
+    if (!confidants.empty() && lastTrustedMask_.size() == confidants.size()) {
+        for (int i = 0; i < lastTrustedMask_.size(); ++i) {
+            if (lastTrustedMask_[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+                //csdebug() << "NODE> Node ban!!!";
+                solver_->addToGraylist(confidants[i], Consensus::GrayListPunishment);
+            }
         }
     }
-    
     subRound_ = 0;
 
     cs::RoundTable table;
@@ -2248,7 +2250,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     // sync state check
     cs::Conveyer& conveyer = cs::Conveyer::instance();
-    cs::ConfidantsKeys prevConfidants = conveyer.confidants();
 
     if (conveyer.currentRoundNumber() == rNum && subRound_ > subRound) {
         cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
@@ -2288,10 +2289,16 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     cs::Bytes realTrusted;
     roundStream >> realTrusted;
 
-    for (int i=0; i<realTrusted.size(); ++i) {
-        if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
-            //csdebug() << "NODE> Node ban!!!";
-            solver_->addToGraylist(prevConfidants[i], Consensus::GrayListPunishment);
+    const auto ptrRT = conveyer.roundTable(rNum - 1);
+    if (ptrRT != nullptr) {
+        const cs::ConfidantsKeys& prevConfidants = ptrRT->confidants;
+        if (!prevConfidants.empty() && realTrusted.size() == prevConfidants.size()) {
+            for (int i = 0; i < realTrusted.size(); ++i) {
+                if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+                    //csdebug() << "NODE> Node ban!!!";
+                    solver_->addToGraylist(prevConfidants[i], Consensus::GrayListPunishment);
+                }
+            }
         }
     }
 
