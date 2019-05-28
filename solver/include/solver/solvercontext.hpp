@@ -574,7 +574,8 @@ public:
     bool transaction_still_in_pool(int64_t inner_id) const;
     void request_round_info(uint8_t respondent1, uint8_t respondent2);
 
-    void send_rejected_smarts(std::vector<std::pair<cs::Sequence, uint32_t> >& ref_list);
+    using RefExecution = std::pair<cs::Sequence, uint32_t>;
+    void send_rejected_smarts(const std::vector<RefExecution>& reject_list);
 
 private:
   SolverCore& core;

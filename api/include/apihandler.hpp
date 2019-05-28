@@ -316,7 +316,7 @@ public:
         return false;
     }
 
-    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, const uint64_t& offsetTrx, const csdb::Amount& feeLimit) {
+    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, const uint64_t& offsetTrx, const csdb::Amount& feeLimit, const std::string& force_new_state) {
         csunused(feeLimit);
         static std::mutex m;
         std::lock_guard lk(m);  // temporary solution
@@ -341,9 +341,15 @@ public:
         executor::SmartContractBinary smartContractBinary;
         smartContractBinary.contractAddress = smartTarget.to_api_addr();
         smartContractBinary.object.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
-        auto optState = getState(smartTarget);
-        if (optState.has_value())
-            smartContractBinary.object.instance = optState.value();
+        // may contain temporary last new state not yet written into block chain (to allow "speculative" multi-executions af the same contract)
+        if (!force_new_state.empty()) {
+            smartContractBinary.object.instance = force_new_state;
+        }
+        else {
+            auto optState = getState(smartTarget);
+            if (optState.has_value())
+                smartContractBinary.object.instance = optState.value();
+        }
         smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr())) ? true : false;
 
         std::string method;
