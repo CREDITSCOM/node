@@ -50,7 +50,8 @@ public:
         FAILURE,
         NOT_IMPLEMENTED,
         NOT_FOUND,
-        MAX
+        MAX,
+		INPROGRESS
     };
 
     static void SetResponseStatus(general::APIResponse& response, APIRequestStatusType status, const std::string& details = "");
@@ -473,8 +474,8 @@ public:
     bool isLockSmart(const general::Address& address, const general::AccessID& accessId) {
         std::lock_guard lk(mtx_);
         if (auto addrLock = lockSmarts.find(address); addrLock != lockSmarts.end() && addrLock->second == accessId)
-            return false;
-        return true;
+            return true;
+        return false;
     }
 
 public slots:
@@ -806,6 +807,13 @@ private:
     cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
     cs::SpinLockable<std::map<csdb::Address, smart_state_entry>> smart_state;
     cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smart_last_trxn;
+
+	//
+	using TrxInPrgss = std::pair<csdb::Address, int64_t>;
+	using CVInPrgss = std::pair<std::condition_variable, bool>;
+	cs::SpinLockable<std::map<TrxInPrgss, CVInPrgss>> trxInprogress;
+	//
+
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployed_by_creator;
     cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
     std::map<csdb::PoolHash, api::Pool> poolCache;
