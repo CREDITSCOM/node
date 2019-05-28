@@ -129,17 +129,25 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
     //consumed_fee = 0;
     auto& execution = executions.emplace_back(ExecutionItem{ ref_contract, avail_fee, new_state_fee, csdb::Amount{ 0 } });
 
-    csdb::UserField fld_using{};
-    if (SmartContracts::is_start(tr_start)) {
-        fld_using = tr_start.user_field(trx_uf::start::Using);
+    if (SmartContracts::is_executable(tr_start)) {
+        const csdb::UserField fld = tr_start.user_field(trx_uf::start::Methods);  // start::Methods == deploy::Code, so does not matter what type of executable is
+        if (fld.is_valid()) {
+            std::string data = fld.value<std::string>();
+            if (!data.empty()) {
+                auto invoke = deserialize<api::SmartContractInvocation>(std::move(data));
+                if (!invoke.usedContracts.empty()) {
+                    for (const auto item : invoke.usedContracts) {
+                        const csdb::Address addr = BlockChain::getAddressFromKey(item);
+                        if (addr.is_valid()) {
+                            execution.uses.push_back(addr);
+                        }
+                    }
+                }
+            }
+        }
     }
-    else if (SmartContracts::is_deploy(tr_start)) {
-        fld_using = tr_start.user_field(trx_uf::deploy::Using);
-    }
-    // get using contracts and reserve more fee for new_states
-    if (fld_using.is_valid()) {
-        execution.uses = std::move(SmartContracts::get_using_contracts(fld_using));
-        // reserve new_state fee for every using contract also
+    // reserve new_state fee for every using contract also
+    if (!execution.uses.empty()) {
         for (const auto& it : execution.uses) {
             csunused(it);
             execution.avail_fee -= new_state_fee;
@@ -318,72 +326,6 @@ csdb::Transaction SmartContracts::get_transaction(BlockChain& storage, const Sma
         return csdb::Transaction{};
     }
     return block.transactions().at(contract.transaction);
-}
-
-/*static*/
-bool SmartContracts::uses_contracts(const csdb::Transaction& tr) {
-    if (!SmartContracts::is_start(tr)) {
-        return false;
-    }
-    return tr.user_field(trx_uf::start::Using).is_valid();
-}
-
-/*static*/
-std::vector<csdb::Address> SmartContracts::get_using_contracts(const csdb::UserField& fld) {
-    std::vector<csdb::Address> list;
-    if (!fld.is_valid()) {
-        return list;
-    }
-    std::string data = fld.value<std::string>();
-    cs::DataStream stream(data.c_str(), data.size());
-    uint16_t cnt = 0;
-    stream >> cnt;
-    for (uint16_t i = 0; i < cnt; ++i) {
-        uint8_t wallet_id_flag = 0;
-        stream >> wallet_id_flag;
-        if (wallet_id_flag == 0) {
-            cs::PublicKey key;
-            if (!stream.isAvailable(key.size())) {
-                cserror() << kLogPrefix << "read using contracts from malformed user field, abort!";
-                list.clear();
-                return list;
-            }
-            stream >> key;
-            list.emplace_back(csdb::Address::from_public_key(key));
-        }
-        else {
-            csdb::internal::WalletId id;
-            if (!stream.isAvailable(sizeof(id))) {
-                cserror() << kLogPrefix << "read using contracts from malformed user field, abort!";
-                list.clear();
-                return list;
-            }
-            stream >> id;
-            list.emplace_back(csdb::Address::from_wallet_id(id));
-        }
-    }
-    if (!stream.isValid() || stream.isAvailable(1)) {
-        cserror() << kLogPrefix << "read using contracts from malformed user field, abort!";
-        list.clear();
-    }
-    return list;
-}
-
-/*static*/
-csdb::UserField SmartContracts::set_using_contracts(const std::vector<csdb::Address>& addr_list) {
-    cs::Bytes data;
-    cs::DataStream stream(data);
-    uint16_t cnt = (uint16_t)addr_list.size();
-    stream << cnt;
-    for (const auto addr : addr_list) {
-        if (addr.is_wallet_id()) {
-            stream << (uint8_t)1 << addr.wallet_id();
-        }
-        else {
-            stream << (uint8_t)0 << addr.public_key();
-        }
-    }
-    return csdb::UserField(stream.convert<std::string>());
 }
 
 std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address& abs_addr) const {

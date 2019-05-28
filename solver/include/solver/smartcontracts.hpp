@@ -55,9 +55,6 @@ namespace trx_uf {
     namespace deploy {
         // byte-code (string)
         constexpr csdb::user_field_id_t Code = 0;
-        // executed contract may perform subsequent contracts call,
-        // serialized into string: count (byte) + count * contract absolute address
-        constexpr csdb::user_field_id_t Using = 1;
         // count of user fields
         constexpr size_t Count = 2;
     }  // namespace deploy
@@ -67,9 +64,6 @@ namespace trx_uf {
         constexpr csdb::user_field_id_t Methods = 0;
         // reference to last state transaction
         constexpr csdb::user_field_id_t RefState = 1;
-        // executed contract may perform subsequent contracts call,
-        // serialized into string: count (byte) + count * contract absolute address
-        constexpr csdb::user_field_id_t Using = 2;
         // count of user fields, may vary from 1 (source is person) to 2 (source is another contract)
         // constexpr size_t Count = {1,2};
     }  // namespace start
@@ -219,12 +213,6 @@ public:
 
     /* Assuming deployer.is_public_key(), not a WalletId */
     static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId, const api::SmartContractDeploy&);
-
-    // to/from user filed serializations
-
-    static bool uses_contracts(const csdb::Transaction& tr);
-    static std::vector<csdb::Address> get_using_contracts(const csdb::UserField& fld);
-    static csdb::UserField set_using_contracts(const std::vector<csdb::Address>& using_list);
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
