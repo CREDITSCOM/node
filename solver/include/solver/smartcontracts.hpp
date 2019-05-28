@@ -51,50 +51,50 @@ constexpr uint8_t ExecutionError = 1;
 
 // transactions user fields
 namespace trx_uf {
-// deploy transaction fields
-namespace deploy {
-// byte-code (string)
-constexpr csdb::user_field_id_t Code = 0;
-// executed contract may perform subsequent contracts call,
-// serialized into string: count (byte) + count * contract absolute address
-constexpr csdb::user_field_id_t Using = 1;
-// count of user fields
-constexpr size_t Count = 2;
-}  // namespace deploy
-// start transaction fields
-namespace start {
-// methods with args (string)
-constexpr csdb::user_field_id_t Methods = 0;
-// reference to last state transaction
-constexpr csdb::user_field_id_t RefState = 1;
-// executed contract may perform subsequent contracts call,
-// serialized into string: count (byte) + count * contract absolute address
-constexpr csdb::user_field_id_t Using = 2;
-// count of user fields, may vary from 1 (source is person) to 2 (source is another contract)
-// constexpr size_t Count = {1,2};
-}  // namespace start
-// new state transaction fields
-namespace new_state {
-// new state value, new byte-code (string)
-constexpr csdb::user_field_id_t Value = ~1;  // see apihandler.cpp #9 for currently used value ~1
-// reference to start transaction
-constexpr csdb::user_field_id_t RefStart = 1;
-// fee value
-constexpr csdb::user_field_id_t Fee = 2;
-// return value
-constexpr csdb::user_field_id_t RetVal = 3;
-// count of user fields
-constexpr size_t Count = 4;
-}  // namespace new_state
-// smart-gen transaction field
-namespace smart_gen {
-// reference to start transaction
-constexpr csdb::user_field_id_t RefStart = 0;
-}  // namespace smart_gen
-// ordinary transaction field
-namespace ordinary {
-// no fields defined
-}
+    // deploy transaction fields
+    namespace deploy {
+        // byte-code (string)
+        constexpr csdb::user_field_id_t Code = 0;
+        // executed contract may perform subsequent contracts call,
+        // serialized into string: count (byte) + count * contract absolute address
+        constexpr csdb::user_field_id_t Using = 1;
+        // count of user fields
+        constexpr size_t Count = 2;
+    }  // namespace deploy
+    // start transaction fields
+    namespace start {
+        // methods with args (string)
+        constexpr csdb::user_field_id_t Methods = 0;
+        // reference to last state transaction
+        constexpr csdb::user_field_id_t RefState = 1;
+        // executed contract may perform subsequent contracts call,
+        // serialized into string: count (byte) + count * contract absolute address
+        constexpr csdb::user_field_id_t Using = 2;
+        // count of user fields, may vary from 1 (source is person) to 2 (source is another contract)
+        // constexpr size_t Count = {1,2};
+    }  // namespace start
+    // new state transaction fields
+    namespace new_state {
+        // new state value, new byte-code (string)
+        constexpr csdb::user_field_id_t Value = ~1;  // see apihandler.cpp #9 for currently used value ~1
+        // reference to start transaction
+        constexpr csdb::user_field_id_t RefStart = 1;
+        // fee value
+        constexpr csdb::user_field_id_t Fee = 2;
+        // return value
+        constexpr csdb::user_field_id_t RetVal = 3;
+        // count of user fields
+        constexpr size_t Count = 4;
+    }  // namespace new_state
+    // smart-gen transaction field
+    namespace smart_gen {
+        // reference to start transaction
+        constexpr csdb::user_field_id_t RefStart = 0;
+    }  // namespace smart_gen
+    // ordinary transaction field
+    namespace ordinary {
+        // no fields defined
+    }
 }  // namespace trx_uf
 
 struct SmartContractRef {
@@ -234,10 +234,7 @@ public:
     // get & handle rejected transactions from smart contract(s)
     // usually ordinary consensus may reject smart-related transactions
     // failed list refers to rejected calls
-    // restart list contains items that considered to execute again
-    void on_reject(
-        const std::vector<Node::RefExecution>& failed,
-        const std::vector<Node::RefExecution>& restart);
+    void on_reject(const std::vector<Node::RefExecution>& reject_list);
 
     csdb::Address absolute_address(const csdb::Address& optimized_address) const {
         return bc.getAddressByType(optimized_address, BlockChain::AddressType::PublicKey);
@@ -326,15 +323,17 @@ private:
     // defines current contract state, the contracts cache is a container of every contract state
     struct StateItem {
         // is temporary locked from execution until current execution completed
-        bool is_locked{false};
+        bool is_locked{ false };
         // payable() method is implemented
-        PayableStatus payable{PayableStatus::Unknown};
+        PayableStatus payable{ PayableStatus::Unknown };
         // reference to deploy transaction
         SmartContractRef ref_deploy;
         // reference to last successful execution which state is stored by item, may be equal to ref_deploy
         SmartContractRef ref_execute;
         // current state which is result of last successful execution / deploy
         std::string state;
+        // last innerID value
+        int64_t last_inner_id{ 0 };
         // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
         std::map<std::string, std::map<csdb::Address, std::string>> uses;
     };
@@ -391,6 +390,22 @@ private:
         // actual consensus
         std::unique_ptr<SmartConsensus> pconsensus;
 
+        QueueItem() = default;
+        
+        QueueItem(const QueueItem& src) {
+            status = src.status;
+            seq_enqueue = src.seq_enqueue;
+            seq_start = src.seq_start;
+            seq_finish = src.seq_finish;
+            abs_addr = src.abs_addr;
+            is_executor = src.is_executor;
+            is_rejected = src.is_rejected;
+            if (!src.executions.empty()) {
+                executions.assign(src.executions.cbegin(), src.executions.cend());
+            }
+        }
+
+
         QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
         : status(SmartContractStatus::Waiting)
         , seq_enqueue(0)
@@ -420,9 +435,6 @@ private:
         // add contract execution to existing exe queue item
         // caller is responsible the execution to refer to the same contract, call to other method of the same contract is allowed
         void add(const SmartContractRef& ref_contract, csdb::Transaction tr_start);
-
-    private:
-        QueueItem() = default;
     };
 
     // execution queue
@@ -518,7 +530,7 @@ private:
 
     // makes a transaction to store new_state of smart contract invoked by src
     // caller is responsible to test src is a smart-contract-invoke transaction
-    csdb::Transaction create_new_state(const ExecutionItem& queue_item) const;
+    csdb::Transaction create_new_state(const ExecutionItem& queue_item);
 
     // update in contracts table appropriate item's state
     bool update_contract_state(const csdb::Transaction& t, bool reading_db);
@@ -611,6 +623,9 @@ private:
 
     // returns 0 if any error
     uint64_t next_inner_id(const csdb::Address& addr) const;
+
+    // stores value as last transaction's inner id for specified contract
+    void update_inner_id(const csdb::Address& addr, uint64_t val);
 
     // tests conditions to allow contract execution if disabled
     bool test_executor_availability();

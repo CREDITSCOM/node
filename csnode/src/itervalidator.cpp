@@ -46,58 +46,24 @@ void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& chara
     // test if any of smart-emitted transaction rejected, reject all transactions from this smart
     // 1. collect rejected smart addresses
     const auto& smarts = context.smart_contracts();
-    std::set<csdb::Address> smartRejected;
+    std::vector<SolverContext::RefExecution> rejectList;
     size_t maskSize = characteristicMask.size();
     size_t i = 0;
-
     for (const auto& tr : transactions) {
         if (i < maskSize && *(characteristicMask.cbegin() + i) == kInvalidMarker) {
-            if (smarts.is_known_smart_contract(tr.source())) {
-                smartRejected.insert(smarts.absolute_address(tr.source()));
+            if (SmartContracts::is_new_state(tr)) {
+                csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
+                if (fld.is_valid()) {
+                    SmartContractRef ref(fld);
+                    rejectList.emplace_back(std::make_pair(ref.sequence, (uint32_t)ref.transaction));
+                }
             }
         }
         ++i;
     }
-    if (!smartRejected.empty()) {
-        cslog() << kLogPrefix << "detected rejected trxs from " << smartRejected.size() << " smart contract(s)";
-
-        cs::TransactionsPacket rejected;
-        // 2. reject all trxs from those smarts & collect all rejected trxs
-        size_t countAddressRejected = 0;
-
-        for (auto it = transactions.begin(); it != transactions.end(); ++it) {
-            if (smartRejected.count(smarts.absolute_address(it->source())) > 0) {
-                auto itm = characteristicMask.begin() + (it - transactions.cbegin());
-                if (*itm > 0) {
-                    *itm = 0;
-                    ++countAddressRejected;
-                }
-                rejected.addTransaction(*it);
-            }
-        }
-
-        if (countAddressRejected > 0) {
-            cslog() << kLogPrefix << "additionaly rejected " << countAddressRejected << " trxs";
-        }
-
-        // 3. signal some trxs are rejected
-        if (rejected.transactionsCount() > 0) {
-            std::vector<SolverContext::RefExecution> referenceList;
-
-            for (const auto t : rejected.transactions()) {
-                if (SmartContracts::is_new_state(t)) {
-                    csdb::UserField fld = t.user_field(trx_uf::new_state::RefStart);
-                    if (fld.is_valid()) {
-                        SmartContractRef ref(fld);
-                        referenceList.emplace_back(std::make_pair(ref.sequence, (uint32_t)ref.transaction));
-                    }
-                }
-            }
-
-            if (!referenceList.empty()) {
-                context.send_rejected_smarts(referenceList, std::vector<SolverContext::RefExecution>{});
-            }
-        }
+    if (!rejectList.empty()) {
+        cslog() << kLogPrefix << "reject " << rejectList.size() << " new_state(s) of smart contract(s)";
+        context.send_rejected_smarts(rejectList);
     }
 }
 

@@ -874,9 +874,11 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
             }
             else {
                 // test is emitted by contract
-                const auto it = known_contracts.find(absolute_address(tr.source()));
+                csdb::Address abs_addr = absolute_address(tr.source());
+                const auto it = known_contracts.find(abs_addr);
                 if (it != known_contracts.cend()) {
                     // is emitted by contract
+                    update_inner_id(abs_addr, tr.innerID());
                     const auto& state = it->second;
                     csdb::Transaction starter = get_transaction(state.ref_execute);
                     if (state.payable == PayableStatus::Implemented && starter.is_valid()) {
@@ -945,7 +947,13 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
                         }
                     }
                 }
+                // update in cache innerID
+                abs_addr = absolute_address(tr.source());
+                if (in_known_contracts(abs_addr)) {
+                    update_inner_id(abs_addr, tr.innerID());
+                }
             }
+
             ++tr_idx;
         }
     }
@@ -1045,7 +1053,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
 // return next element in queue
 SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts::queue_iterator it) {
     if (it != exe_queue.cend()) {
-        cslog() << kLogPrefix << "remove from queue completed executions";
+        cslog() << kLogPrefix << "remove from queue completed item {" << it->seq_enqueue << ".*}";
         for (const auto item : it->executions) {
             cslog() << "\t{" << item.ref_start.sequence << '.' << item.ref_start.transaction << "} " << print_executed_method(item.ref_start);
         }
@@ -1101,7 +1109,8 @@ bool SmartContracts::execute(SmartExecutionData& data) {
         return false;
     }
     cslog() << kLogPrefix << "executing " << data.contract_ref << "::" << print_executed_method(data.contract_ref) << std::endl;
-    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee);
+    // using data.result.newState to pass previous (not yet cached) new state in case of multi-call to conrtract:
+    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee, data.result.newState);
     if (maybe_result.has_value()) {
         data.result = maybe_result.value();
         if (data.result.newState.empty()) {
@@ -1150,16 +1159,30 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
 
     // create runnable object
     auto runnable = [this, data_list{std::move(data_list)}]() mutable {
-        for (auto& data : data_list) {
-            if (!execute(data)) {
-                if (data.error.empty()) {
-                    data.error = "failed to invoke contract";
+        if (!data_list.empty()) {
+
+            // actually, multi-execution list always refers to the same contract, so we need not to distinct different contracts last state
+            std::string last_state;
+            for (auto& data : data_list) {
+                // use data.result.newStatef member to pass last contract's state in multi-call
+                data.result.newState = last_state;
+                if (!execute(data)) {
+                    if (data.error.empty()) {
+                        data.error = "failed to invoke contract";
+                    }
+                    // last_state is not updated
                 }
-            }
-            else if (data.result.fee > data.executor_fee) {
-                // out of fee detected
-                data.error = "contract execution is out of funds";
-                data.result.retValue.__set_v_byte(error::OutOfFunds);
+                else {
+                    if (!data.result.newState.empty()) {
+                        // remember last state for the next execution
+                        last_state = data.result.newState;
+                    }
+                }
+                if (data.result.fee > data.executor_fee) {
+                    // out of fee detected
+                    data.error = "contract execution is out of funds";
+                    data.result.retValue.__set_v_byte(error::OutOfFunds);
+                }
             }
         }
         return data_list;
@@ -1257,7 +1280,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             if (it != exe_queue.end()) {
                 // put emitted transactions
                 if (!data_item.result.trxns.empty()) {
-                    int64_t next_emitted_id = result.innerID() + 1;  // may or may not be useful below
+                    int64_t next_emitted_id = result.innerID() + 1;  // may or may not be useful next block of code
                     for (const auto& tr : data_item.result.trxns) {
                         if (tr.innerID() == 0) {
                             // auto inner id generating
@@ -1280,9 +1303,9 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                 if (!data_item.result.states.empty()) {
                     csdebug() << kLogPrefix << "add " << data_item.result.states.size() << " subsequent new state(s) along with " << data_item.contract_ref << " state";
                     for (const auto& [addr, state] : data_item.result.states) {
-                        auto execution = find_in_queue_item(it, data_item.contract_ref);
-                        if (execution != it->executions.end()) {
-                            csdb::Transaction t = create_new_state(*execution);
+                        auto it_call = find_in_queue_item(it, data_item.contract_ref);
+                        if (it_call != it->executions.end()) {
+                            csdb::Transaction t = create_new_state(*it_call);
                             if (t.is_valid()) {
                                 // re-assign some fields
                                 t.set_innerID(next_inner_id(addr));
@@ -1321,22 +1344,47 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
     checkAllExecutions();
 }
 
+void SmartContracts::update_inner_id(const csdb::Address& addr, uint64_t val) {
+    csdb::Address abs_addr = SmartContracts::absolute_address(addr);
+    const auto it = known_contracts.find(abs_addr);
+    if (it != known_contracts.cend()) {
+        if (it->second.last_inner_id < val) {
+            it->second.last_inner_id = val;
+            csdebug() << kLogPrefix << abs_addr.to_string() << " innerID updated to " << val;
+        }
+    }
+}
+
 uint64_t SmartContracts::next_inner_id(const csdb::Address& addr) const {
+    csdb::Address abs_addr = SmartContracts::absolute_address(addr);
+    
+    // lookup in contracts cache
+    const auto it = known_contracts.find(abs_addr);
+    if (it != known_contracts.cend()) {
+        if (it->second.last_inner_id > 0) {
+            return it->second.last_inner_id + 1;
+        }
+        return it->second.is_locked;
+    }
+
+    // lookup in blockchain
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
-    if (!bc.findWalletData(SmartContracts::absolute_address(addr), wallData, wallId)) {
+    if (!bc.findWalletData(abs_addr, wallData, wallId)) {
         return 0;
     }
     return wallData.trxTail_.empty() ? 1 : wallData.trxTail_.getLastTransactionId() + 1;
 }
 
-csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item) const {
+csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item) {
     csdb::Transaction src = get_transaction(item.ref_start);
     if (!src.is_valid()) {
         return csdb::Transaction{};
     }
 
-    csdb::Transaction result(next_inner_id(src.target()),  // see: APIHandler::WalletDataGet(...) in apihandler.cpp
+    const auto id = next_inner_id(src.target());
+    update_inner_id(absolute_address(src.target()), id);
+    csdb::Transaction result(id,  // see: APIHandler::WalletDataGet(...) in apihandler.cpp
                              src.target(),                 // contracts is source
                              src.target(),                 // contracts is target also
                              src.currency(),
@@ -1352,27 +1400,31 @@ csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item) co
 }
 
 // get & handle rejected transactions
-void SmartContracts::on_reject(
-    const std::vector<Node::RefExecution>& failed,
-    const std::vector<Node::RefExecution>& restart) {
+// the aim is
+//  - to store completed executions
+//  - repeat consensus for rejected executions fixing empty new_states
+//  - re-execute valid but "compromised" by rejected items executions
+void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_list) {
 
-    if (failed.empty() && restart.empty()) {
+    if (reject_list.empty()) {
         return;
     }
+
+    cs::RoundNumber current_sequence = bc.getLastSequence();
 
     cs::Lock lock(public_access_lock);
 
     // handle failed calls
-    csdebug() << kLogPrefix << "get reject & restart contract signal";
-    if (failed.empty()) {
+    csdebug() << kLogPrefix << "get reject contract(s) signal";
+    if (reject_list.empty()) {
         csdebug() << kLogPrefix << "rejected contract list is empty";
     }
     else {
-        csdebug() << kLogPrefix << "" << failed.size() << " contract(s) are rejected";
+        csdebug() << kLogPrefix << "" << reject_list.size() << " contract(s) are rejected";
 
-        // group failed_list by block sequence
+        // group reject_list by block sequence
         std::map< cs::Sequence, std::list<uint16_t> > grouped_failed;
-        for (const auto& item : failed) {
+        for (const auto& item : reject_list) {
             grouped_failed[item.first].emplace_back(item.second);
         }
 
@@ -1381,123 +1433,92 @@ void SmartContracts::on_reject(
                 // actually impossible
                 continue;
             }
-            bool found_flag = false;
-            for (auto it_queue = exe_queue.begin(); it_queue != exe_queue.end(); ++it_queue) {
+            // to store newly created items:
+            decltype(exe_queue) new_queue_items;
+            auto it_queue = exe_queue.begin();
+            while (it_queue != exe_queue.end()) {
                 if (it_queue->seq_enqueue == sequence) {
-                    for (auto it_exe = it_queue->executions.begin(); it_exe != it_queue->executions.end(); ++it_exe) {
+                    auto it_exe = it_queue->executions.begin();
+                    while (it_exe != it_queue->executions.end()) {
                         if (std::find(executions.cbegin(), executions.cend(), it_exe->ref_start.transaction) != executions.cend()) {
                             // found (maybe partially) rejected queue item
+                            if (it_queue->is_rejected) {
+                                // has alredy done before
+                                break;
+                            }
+                            // it_exe here points to the first rejected call in multi-call
+                            // replace all rejected items with empty new state
+                            std::vector<ExecutionItem> reject;
+                            reject.emplace_back(*it_exe);
+                            it_exe = it_queue->executions.erase(it_exe);
+                            // schedule re-execution of subsequent non-rejected items
+                            std::vector<ExecutionItem> restart;
 
+                            // starting inner sub-cycle
+                            while (it_exe != it_queue->executions.end()) {
+                                if (std::find(executions.cbegin(), executions.cend(), it_exe->ref_start.transaction) != executions.cend()) {
+                                    // do not clear result, new_state is required
+                                    reject.emplace_back(*it_exe);
+                                }
+                                else {
+                                    // empty result pack required
+                                    it_exe->result.clear();
+                                    restart.emplace_back(*it_exe);
+                                }
+                                it_exe = it_queue->executions.erase(it_exe);
+                            }
 
-                            // go to next sequence
-                            found_flag = true;
+                            // it_exe now is equal to it_queue->executions.end(), do not use it!!!
+
+                            // finally create 1 otr 2 new queue items
+                            if (!reject.empty()) {
+                                QueueItem& new_rejected_item = new_queue_items.emplace_back(it_queue->fork());
+                                new_rejected_item.executions.assign(reject.cbegin(), reject.cend());
+                                update_status(new_rejected_item, current_sequence, SmartContractStatus::Finished);
+                                new_rejected_item.is_rejected = true;
+                                cs::TransactionsPacket integral_pack;
+                                for (auto& e : new_rejected_item.executions) {
+                                    for (auto& t : e.result.transactions()) {
+                                        // lookup proper new state, erase other transactions in result
+                                        if (SmartContracts::is_new_state(t) && SmartContracts::absolute_address(t.target()) == new_rejected_item.abs_addr) {
+                                            t.add_user_field(trx_uf::new_state::Value, std::string{});
+                                            t.add_user_field(trx_uf::new_state::RetVal, error::ConsensusRejected);
+                                            integral_pack.addTransaction(t);
+                                            e.result.clear();
+                                            e.result.addTransaction(t);
+                                            break;
+                                        }
+                                    }
+                                }
+                                start_consensus(new_rejected_item, integral_pack);
+                            }
+                            if (!restart.empty()) {
+                                QueueItem& new_restart_item = new_queue_items.emplace_back(it_queue->fork());
+                                new_restart_item.executions.assign(restart.cbegin(), restart.cend());
+                                update_status(new_restart_item, current_sequence, SmartContractStatus::Waiting);
+                            }
+                            csdebug() << kLogPrefix << "{" << sequence << "*.} is splitted onto " << it_queue->executions.size() << " completed + "
+                                << reject.size() << " rejected + " << restart.size() << " restart calls";
                             break;
                         }
+                        if (it_exe == it_queue->executions.end()) {
+                            break;
+                        }
+                        ++it_exe;
                     }
                 }
-                if (found_flag) {
-                    // go to next sequence
+                if (it_queue->executions.empty()) {
+                    // all jobs are rejected/restarted
+                    it_queue = exe_queue.erase(it_queue);
+                }
+                if (it_queue == exe_queue.end()) {
                     break;
                 }
+                ++it_queue;
             }
-        }
-
-        // fix rejected calls by empty new_states, collect them in empty_states_pack
-        for (const auto [seq, tr_idx] : failed) {
-            // find rejected contract in queue
-            for (auto it = exe_queue.begin(); it != exe_queue.end(); ++it) {
-                bool break_flag = false;
-                for (auto it_exe = it->executions.begin(); it_exe != it->executions.end(); ++it_exe) {
-                    if (it_exe->ref_start.sequence == seq && it_exe->ref_start.transaction == tr_idx) {
-                        // rejected job found
-                        csdebug() << kLogPrefix << it_exe->ref_start << " is rejected";
-                        // send to consensus
-                        csdb::Transaction tr = create_new_state(*it_exe);
-                        // result contains empty USRFLD[state::Value]
-                        tr.add_user_field(trx_uf::new_state::Value, std::string{});
-                        // result contains error code "rejected by consensus"
-                        using namespace cs::trx_uf;
-                        ::general::Variant err_code;
-                        err_code.__set_v_byte(error::ConsensusRejected);
-                        tr.add_user_field(trx_uf::new_state::RetVal, serialize(err_code));
-                        if (tr.is_valid()) {
-                            if (it->is_executor) {
-                                empty_states_pack[&(*it)].addTransaction(tr);
-                            }
-                        }
-                        it->executions.erase(it_exe);
-                        // it_exe is invalid now!
-                        if (it->executions.empty()) {
-                            update_status(*it, bc.getLastSequence(), SmartContractStatus::Closed);
-                        }
-                        break_flag = true;
-                        break;
-                    }
-                    if (break_flag) {
-                        break;
-                    }
-                }
-            }
-        }
-
-        // start smart-consensus for rejected calls empty states, in common multiple consensuses
-        if (!empty_states_pack.empty()) {
-            for (const auto& [origin_item, packet] : empty_states_pack) {
-                csdebug() << kLogPrefix << "restarting consensus to validate empty new_state(s) of rejected call(s)";
-                // create new queue_item as copy of original item
-                auto& new_item = exe_queue.emplace_back(origin_item->fork());
-                new_item.executions.clear();
-                new_item.is_rejected = true;
-                start_consensus(new_item, packet);
-            }
-        }
-    }
-
-    // handle restart calls
-    if (restart.empty()) {
-        csdebug() << kLogPrefix << "restart contract list is empty";
-    }
-    else {
-        csdebug() << kLogPrefix << "" << failed.size() << " contract(s) are restarted";
-
-        // will contain calls to restarted smart contract calls, groupped by exe_queue item:
-        std::map<QueueItem*, std::list<ExecutionItem>> restart_pack;
-        for (const auto [seq, tr_idx] : restart) {
-            // find restart contract in queue
-            for (auto it = exe_queue.begin(); it != exe_queue.end(); ++it) {
-                bool break_flag = false;
-                for (auto it_exe = it->executions.begin(); it_exe != it->executions.end(); ++it_exe) {
-                    if (it_exe->ref_start.sequence == seq && it_exe->ref_start.transaction == tr_idx) {
-                        // restart job found
-                        csdebug() << kLogPrefix << it_exe->ref_start << " is restarted";
-                        restart_pack[&(*it)].emplace_back(*it_exe);
-                        it->executions.erase(it_exe);
-                        // it_exe is invalid now!
-                        if (it->executions.empty()) {
-                            update_status(*it, bc.getLastSequence(), SmartContractStatus::Closed);
-                        }
-                    }
-                    break_flag = true;
-                    break;
-                }
-                if (break_flag) {
-                    break;
-                }
-            }
-        }
-
-        // enqueue restarted items again as separate exe_queue item(s)
-        if (!restart_pack.empty()) {
-            for (const auto& [origin_item, executions] : restart_pack) {
-                csdebug() << kLogPrefix << "restarting " << executions.size() << " contract(s)";
-                if (!executions.empty()) {
-                    auto& new_item = exe_queue.emplace_back(origin_item->fork());
-                    new_item.executions.clear();
-                    for (const auto& e : executions) {
-                        new_item.executions.emplace_back(e);
-                    }
-                    update_status(new_item, bc.getLastSequence(), SmartContractStatus::Waiting);
-                }
+            // add new items if any
+            if (!new_queue_items.empty()) {
+                exe_queue.insert(exe_queue.end(), new_queue_items.cbegin(), new_queue_items.cend());
             }
         }
     }
@@ -1529,6 +1550,10 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         if (abs_addr.is_valid()) {
             StateItem& item = known_contracts[abs_addr];
             // update last state (with non-empty one)
+            const auto new_id = t.innerID();
+            if (new_id > item.last_inner_id) {
+                item.last_inner_id = new_id;
+            }
             item.state = std::move(state_value);
             // determine it is the result of whether deploy or execute
             fld = t.user_field(new_state::RefStart);

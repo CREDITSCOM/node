@@ -575,7 +575,7 @@ public:
     void request_round_info(uint8_t respondent1, uint8_t respondent2);
 
     using RefExecution = std::pair<cs::Sequence, uint32_t>;
-    void send_rejected_smarts(const std::vector<RefExecution>& reject_list, const std::vector<RefExecution>& restart_list);
+    void send_rejected_smarts(const std::vector<RefExecution>& reject_list);
 
 private:
   SolverCore& core;

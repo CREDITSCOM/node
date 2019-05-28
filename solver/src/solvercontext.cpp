@@ -228,9 +228,9 @@ void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2)
     core.pnode->sendRoundTableRequest(respondent2);
 }
 
-void SolverContext::send_rejected_smarts(const std::vector<RefExecution>& reject_list, const std::vector<RefExecution>& restart_list) {
-    csdebug() << kLogPrefix << "sending " << reject_list.size() << " rejected and " << restart_list.size() << " restart contract calls";
-    core.pnode->sendSmartReject(reject_list, restart_list);
+void SolverContext::send_rejected_smarts(const std::vector<RefExecution>& reject_list) {
+    csdebug() << kLogPrefix << "sending " << reject_list.size() << " rejected contract calls";
+    core.pnode->sendSmartReject(reject_list);
 }
 
 }  // namespace cs

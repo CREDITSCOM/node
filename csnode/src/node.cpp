@@ -1644,18 +1644,18 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
     csmeta(csdetails) << "done";
 }
 
-void Node::sendSmartReject(const std::vector<RefExecution>& rejectList, const std::vector<RefExecution>& restartList) {
-    if (rejectList.empty() && restartList.empty()) {
-        csmeta(cserror) << "must not send empty both rejected and restart contracts pack";
+void Node::sendSmartReject(const std::vector<RefExecution>& rejectList) {
+    if (rejectList.empty()) {
+        csmeta(cserror) << "must not send empty rejected contracts pack";
         return;
     }
 
     cs::Bytes data;
     cs::DataStream stream(data);
 
-    stream << rejectList << restartList;
+    stream << rejectList;
 
-    csdebug() << "Node: sending " << rejectList.size() << " rejected and " << restartList.size() << " restart contract(s) to related smart confidants";
+    csdebug() << "Node: sending " << rejectList.size() << " rejected contract(s) to related smart confidants";
     sendBroadcast(MsgTypes::RejectedContracts, cs::Conveyer::instance().currentRoundNumber(), data);
 }
 
@@ -1671,8 +1671,7 @@ void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::Roun
     cs::DataStream stream(bytes.data(), bytes.size());
 
     std::vector<RefExecution> rejectList;
-    std::vector<RefExecution> restartList;
-    stream >> rejectList >> restartList;
+    stream >> rejectList;
 
     if (!stream.isValid() || stream.isAvailable(1)) {
         return;
@@ -1681,13 +1680,13 @@ void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::Roun
         return;
     }
 
-    if (rejectList.empty() && restartList.empty()) {
-        csmeta(cserror) << "empty rejected & restart contracts pack received";
+    if (rejectList.empty()) {
+        csmeta(cserror) << "empty rejected contracts pack received";
         return;
     }
 
-    csdebug() << "Node: " << rejectList.size() << " rejected and " << restartList.size() << " restart contract(s) received";
-    emit gotRejectedContracts(rejectList, restartList);
+    csdebug() << "Node: " << rejectList.size() << " rejected contract(s) received";
+    emit gotRejectedContracts(rejectList);
 }
 
 void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs::StageOneSmarts& stageOneInfo) {
