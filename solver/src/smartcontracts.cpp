@@ -1324,7 +1324,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
     }
 
     // inform slots if any, packet does not contain smart consensus' data!
-    emit signal_smart_executed(packet);
+    emit signal_smart_executed(integral_packet);
 }
 
 void SmartContracts::update_inner_id(const csdb::Address& addr, uint64_t val) {
