@@ -624,20 +624,19 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
 	solver.send_wallet_transaction(tr);
 
 	//
-	const static unsigned int WAIT_SECONDS_TIME{ 30 };
+	/*const static unsigned int WAIT_SECONDS_TIME{ 10 };
 	const auto pair = std::pair(tr.source(), tr.innerID());
-	auto& cvTrxn = [this, &pair]() -> decltype(auto) {
-		return (*lockedReference(this->trxInprogress))[pair];
-	}();
+	auto lockRef{ lockedReference(this->trxInProgress) };
+	auto& cvTrxn = (*lockRef)[pair];
 	static std::mutex mt;
 	std::unique_lock lock(mt);
 	const auto resWait = cvTrxn.first.wait_for(lock, std::chrono::seconds(WAIT_SECONDS_TIME), [&cvflg = (cvTrxn.second = false)]{ return cvflg; });
-	lockedReference(this->trxInprogress)->erase(pair);
+	lockedReference(this->trxInProgress)->erase(pair);
 	//
 
 	if (!resWait) // time is over
 		SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS, get_delimited_transaction_sighex(tr));
-	else
+	else*/
 		SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
 
@@ -1188,13 +1187,13 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 			if (is_smart(tr) || is_smart_state(tr)) {
 				locked_pending_smart_transactions->queue.push(std::make_pair(p.sequence(), tr));
 			}
-			else { // simple transactions
-				auto ltrxInprogress(lockedReference(this->trxInprogress));
-				if (auto it = ltrxInprogress->find(std::pair(tr.source(), tr.innerID())); it != ltrxInprogress->end()) {
+			/*else { // simple transactions
+				auto lockRef{ lockedReference(this->trxInProgress) };
+				if (auto it = lockRef->find(std::pair(tr.source(), tr.innerID())); it != lockRef->end()) {
 					(it->second).second = true;
 					(it->second).first.notify_all();
 				}
-			}
+			}*/
         }
         if (log_to_console && (cnt % 1000) == 0)
             std::cout << '\r' << WithDelimiters(cnt);
