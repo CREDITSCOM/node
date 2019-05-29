@@ -815,9 +815,9 @@ private:
     cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smart_last_trxn;
 
 	//
-	using TrxInPrgss = std::pair<csdb::Address, int64_t>;
+	/*using TrxInPrgss = std::pair<csdb::Address, int64_t>;
 	using CVInPrgss = std::pair<std::condition_variable, bool>;
-	cs::SpinLockable<std::map<TrxInPrgss, CVInPrgss>> trxInprogress;
+	cs::SpinLockable<std::map<TrxInPrgss, CVInPrgss>> trxInProgress;*/
 	//
 
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployed_by_creator;
