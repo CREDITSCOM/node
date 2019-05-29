@@ -41,7 +41,7 @@ public:
         }
     }
 
-    MemPtr(MemPtr&& rhs)
+    MemPtr(MemPtr&& rhs) noexcept
     : ptr_(rhs.ptr_) {
         rhs.ptr_ = nullptr;
     }
@@ -107,8 +107,12 @@ public:
         return ptr_->size();
     }
 
-    operator bool() const {
+    explicit operator bool() const {
         return ptr_;
+    }
+
+    bool isNull() const {
+        return !static_cast<bool>(*this);
     }
 
     bool operator!=(const MemPtr& rhs) const {

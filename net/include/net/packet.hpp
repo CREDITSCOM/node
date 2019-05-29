@@ -174,7 +174,7 @@ public:
     void recalculateHeadersLength();
 
     explicit operator bool() {
-        return data_;
+        return !data_.isNull();
     }
 
     boost::asio::mutable_buffer encode(boost::asio::mutable_buffer tempBuffer) {
