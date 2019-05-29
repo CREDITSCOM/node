@@ -344,10 +344,12 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 
 		WalletData& wallData_s = getWalletData(id_s, tr.source());
 		++wallData_s.transNum_;
+        wallData_s.trxTail_.push(tr.innerID());
 
 #ifdef MONITOR_NODE              
         wallData_s.lastTransaction_ = tr.id();
 #endif
+        setModified(id_s);
         //
     }
     else {
@@ -356,8 +358,9 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 
     if (!smartIniter) {
         wallData.balance_ -= tr.amount();
-
 		++wallData.transNum_;
+        wallData.trxTail_.push(tr.innerID());
+
 #ifdef MONITOR_NODE        
         setWalletTime(wallData.address_, tr.get_time());
 #endif
@@ -367,7 +370,6 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 #endif
     }
 
-    wallData.trxTail_.push(tr.innerID());
     setModified(id);
     return tr.counted_fee().to_double();
 }
