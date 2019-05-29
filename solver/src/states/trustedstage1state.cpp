@@ -85,7 +85,12 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
 
     csdebug() << name() << ": packet of " << packet.transactionsCount() << " transactions in" << typeid(conveyer).name();
     if (!smartContractPackets.empty()) {
-        csdebug() << name() << ": smart contract packets size " << smartContractPackets.size();
+        csdebug() << name() << ": smart contract packets count " << smartContractPackets.size();
+        if (!smartContractPackets.empty()) {
+            for (const auto& p : smartContractPackets) {
+                csdetails() << name() << ": packet hash " << p.hash().toString();
+            }
+        }
     }
 
     // review & validate transactions
