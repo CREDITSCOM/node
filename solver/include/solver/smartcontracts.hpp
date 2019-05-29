@@ -150,6 +150,18 @@ inline bool operator<(const SmartContractRef& l, const SmartContractRef& r) {
     return (l.transaction < r.transaction);
 }
 
+// helper to print <sequence,transaction>
+struct RefFormatter {
+    cs::Sequence seq;
+    uint32_t idx;
+};
+
+// print RefFormatter to ostream as {*.*}
+inline std::ostream& operator<<(std::ostream& os, const RefFormatter& format) {
+    os << '{' << format.seq << '.' << format.idx << '}';
+    return os;
+}
+
 struct SmartExecutionData {
     SmartContractRef contract_ref;
     csdb::Amount executor_fee;
@@ -606,7 +618,7 @@ private:
     uint64_t next_inner_id(const csdb::Address& addr) const;
 
     // stores value as last transaction's inner id for specified contract
-    void update_inner_id(const csdb::Address& addr, uint64_t val);
+    void update_inner_id(const csdb::Address& addr, int64_t val);
 
     // tests conditions to allow contract execution if disabled
     bool test_executor_availability();
