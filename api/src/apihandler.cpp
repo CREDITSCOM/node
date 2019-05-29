@@ -624,13 +624,14 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
 	solver.send_wallet_transaction(tr);
 
 	//
+	const static unsigned int WAIT_SECONDS_TIME{ 30 };
 	const auto pair = std::pair(tr.source(), tr.innerID());
 	auto& cvTrxn = [this, &pair]() -> decltype(auto) {
 		return (*lockedReference(this->trxInprogress))[pair];
 	}();
 	static std::mutex mt;
 	std::unique_lock lock(mt);
-	const auto resWait = cvTrxn.first.wait_for(lock, std::chrono::seconds(30), [&cvflg = (cvTrxn.second = false)]{ return cvflg; });
+	const auto resWait = cvTrxn.first.wait_for(lock, std::chrono::seconds(WAIT_SECONDS_TIME), [&cvflg = (cvTrxn.second = false)]{ return cvflg; });
 	lockedReference(this->trxInprogress)->erase(pair);
 	//
 
