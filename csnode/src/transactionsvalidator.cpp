@@ -159,7 +159,6 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
     WalletsState::WalletData& wallState = walletsState_.getData(trx.source(), walletId);
     walletsState_.setModified(walletId);
 
-#ifndef SPAMMER
     if (!wallState.trxTail_.isAllowed(trx.innerID())) {
         csdebug() << kLogPrefix << "reject transaction, duplicated or incorrect innerID " << trx.innerID() << ", allowed " << wallState.trxTail_.printRange();
         if (SmartContracts::is_new_state(trx)) {
@@ -167,7 +166,6 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
         }
         return false;
     }
-#endif
 
     if (SmartContracts::is_new_state(trx)) {
         csdebug() << kLogPrefix << __func__ << ": smart new_state transaction[" << trxInd << "] included in consensus";
