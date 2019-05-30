@@ -463,8 +463,12 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     const cs::Characteristic& characteristic = meta->characteristic;
     cs::TransactionsPacketTable& currentHashTable = poolTable(round);
 
-    csmeta(csdetails) << "characteristic: " << cs::Utils::byteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
     csmeta(csdebug) << "characteristic bytes size " << characteristic.mask.size();
+
+    if (!characteristic.mask.empty()) {
+        csmeta(csdetails) << "characteristic: " << cs::Utils::byteStreamToHex(characteristic.mask.data(), characteristic.mask.size());
+    }
+
     csmeta(csdebug) << "viewing hashes count " << localHashes.size();
     csmeta(csdebug) << "viewing hash table size " << currentHashTable.size();
 
@@ -478,7 +482,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
         auto optionalPacket = findPacket(hash, round);
 
         if (!optionalPacket.has_value()) {
-            csmeta(cserror) << "hash not found " << hash.toString() << ", strage behaviour detected";
+            csmeta(cserror) << "hash not found " << hash.toString() << ", strange behaviour detected";
             removeHashesFromTable(localHashes);
             return std::nullopt;
         }
@@ -644,7 +648,7 @@ void cs::ConveyerBase::flushTransactions() {
                 pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
             }
             else {
-                csdebug() << csname() << "Same transaction packet already in packet table";
+                csdebug() << csname() << "Same transaction packet already in packet table " << hash.toString();
             }
         }
     }
@@ -652,6 +656,7 @@ void cs::ConveyerBase::flushTransactions() {
 
 void cs::ConveyerBase::removeHashesFromTable(const cs::PacketsHashes& hashes) {
     for (const auto& hash : hashes) {
+        csdetails() << csname() << " remove hash " << hash.toString();
         pimpl_->packetsTable.erase(hash);
     }
 }
