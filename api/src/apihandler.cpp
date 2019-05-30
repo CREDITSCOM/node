@@ -375,13 +375,23 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         sti.startTransaction = convert_transaction_id(scr.getTransactionID());
 
         auto retVal = transaction.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
-
-        auto varRetVal = deserialize<::general::Variant>(std::move(retVal));
         result.trxn.type = api::TransactionType::TT_SmartState;
         if (!(retVal.size() == 1 && retVal[0] == 0)) {
-            result.trxn.__set_smartInfo(api::SmartTransInfo{});
-            sti.__set_returnValue(deserialize<::general::Variant>(std::move(retVal)));
+            auto var = deserialize<::general::Variant>(std::move(retVal));
+            // override retValue with text message if new state is empty
+            if (sti.success) {
+                sti.__set_returnValue(var);
+            }
+            else {
+                if (var.__isset.v_byte) {
+                    var.__set_v_string(cs::SmartContracts::get_error_message(var.v_byte));
+                }
+                sti.__set_returnValue(var);
+            }
             result.trxn.smartInfo.__set_v_smartState(sti);
+        }
+        else {
+            result.trxn.__set_smartInfo(api::SmartTransInfo{});
         }
     }
     else {

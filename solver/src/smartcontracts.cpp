@@ -238,6 +238,34 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
 }
 
 /*static*/
+std::string SmartContracts::get_error_message(uint8_t code) {
+    using namespace cs::error;
+    switch (code) {
+    case TimeExpired:
+        return "timeout during operation";
+    case OutOfFunds:
+        return "insufficient funds to complete operation";
+    case StdException:
+        return "connection error while executing contract";
+    case Exception:
+        return "common error while executing contract";
+    case UnpayableReplenish:
+        return "replenished contract does not implement payable()";
+    case ConsensusRejected:
+        return "the trusted consensus have rejected new_state (or emitted transactions)";
+    case ExecuteTransaction:
+        return "common error in executor";
+    case InternalBug:
+        return "internal bug in node detected";
+    case ExecutionError:
+        return "executor is disconnected or unavailable, or incompatible";
+    }
+    std::ostringstream os;
+    os << "Error code " << (unsigned int)code;
+    return os.str();
+}
+
+/*static*/
 bool SmartContracts::is_smart_contract(const csdb::Transaction& tr) {
     if (!tr.is_valid()) {
         return false;
