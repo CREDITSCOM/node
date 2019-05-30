@@ -120,6 +120,7 @@ void APIHandlerBase::SetResponseStatus(general::APIResponse& response, APIReques
         {1, "Failure"},
         {2, "Not Implemented"},
         {3, "Not found"},
+		{4, "Transaction in progress"}
     };
     response.code = statuses[static_cast<uint8_t>(status)].code;
     response.message = statuses[static_cast<uint8_t>(status)].message + details;
