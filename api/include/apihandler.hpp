@@ -622,7 +622,7 @@ private:
     std::condition_variable cvErrorConnect_;
     std::atomic_bool isConnect_{false};
 
-    const uint16_t EXECUTOR_VERSION = 0;
+    const uint16_t EXECUTOR_VERSION = 1;
 };
 }  // namespace executor
 namespace apiexec {
