@@ -50,8 +50,8 @@ public:
         FAILURE,
         NOT_IMPLEMENTED,
         NOT_FOUND,
-        MAX,
-		INPROGRESS
+		INPROGRESS,
+        MAX		
     };
 
     static void SetResponseStatus(general::APIResponse& response, APIRequestStatusType status, const std::string& details = "");
