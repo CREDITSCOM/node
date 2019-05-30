@@ -179,6 +179,7 @@ public:
 
     explicit operator bool() {
         return data_.get();
+//        return !data_.isNull();
     }
 
     boost::asio::mutable_buffer encode(boost::asio::mutable_buffer tempBuffer) {

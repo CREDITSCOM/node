@@ -368,7 +368,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     else if (is_smart_state(transaction)) {
         api::SmartStateTransInfo sti;
         sti.success = !(transaction.user_field(cs::trx_uf::new_state::Value).value<std::string>().empty());
-        sti.executionFee = convertAmount(transaction.user_field(cs::trx_uf::new_state::Value).value<csdb::Amount>());
+        sti.executionFee = convertAmount(transaction.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>());
 
         cs::SmartContractRef scr;
         scr.from_user_field(transaction.user_field(cs::trx_uf::new_state::RefStart));
@@ -582,51 +582,62 @@ std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
 }
 
 void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
-    auto tr = make_transaction(transaction);
-    if (!transaction.userFields.empty())
-        tr.add_user_field(1, transaction.userFields);
+	auto tr = make_transaction(transaction);
+	if (!transaction.userFields.empty())
+		tr.add_user_field(1, transaction.userFields);
 
-  // check money
-  const auto source_addr = s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey);
-  BlockChain::WalletData wallData{};
-  BlockChain::WalletId wallId{};
-  if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
-    _return.status.code = ERROR_CODE;
-    _return.status.message = "wallet not found!";
-    return;
-  }
+	// check money
+	const auto source_addr = s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey);
+	BlockChain::WalletData wallData{};
+	BlockChain::WalletId wallId{};
+	if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
+		_return.status.code = ERROR_CODE;
+		_return.status.message = "wallet not found!";
+		return;
+	}
 
-  const auto max_sum = tr.amount().to_double() + kMinFee;
-  const auto balance = wallData.balance_.to_double();
-  if (max_sum > balance) {
-    cslog() << "API: reject transaction with insufficient balance, max_sum = " << max_sum << ", balance = " << balance;
-    _return.status.code = ERROR_CODE;
-    _return.status.message = "not enough money!\nmax_sum: " + std::to_string(max_sum) + "\nbalance: " + std::to_string(balance);
-    return;
-  }
+	const auto max_sum = tr.amount().to_double() + kMinFee;
+	const auto balance = wallData.balance_.to_double();
+	if (max_sum > balance) {
+		cslog() << "API: reject transaction with insufficient balance, max_sum = " << max_sum << ", balance = " << balance;
+		_return.status.code = ERROR_CODE;
+		_return.status.message = "not enough money!\nmax_sum: " + std::to_string(max_sum) + "\nbalance: " + std::to_string(balance);
+		return;
+	}
   
-  // check max fee
-  {
-   csdb::AmountCommission countedFee;
-   if (!cs::fee::estimateMaxFee(tr, countedFee)) {
-       _return.status.code = ERROR_CODE;
-       _return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
-       return;
-   }
-  }
+	// check max fee
+	if (csdb::AmountCommission countedFee; !cs::fee::estimateMaxFee(tr, countedFee)) {
+		_return.status.code = ERROR_CODE;
+		_return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
+		return;
+	}
 
-  // check signature
-  const auto byteStream = tr.to_byte_stream_for_sig();
-  if (!cscrypto::verifySignature(tr.signature(), s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
-    cslog() << "API: reject transaction with wrong signature";
-    _return.status.code = ERROR_CODE;
-    _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
-    return;
-  }
-  
+	// check signature
+	const auto byteStream = tr.to_byte_stream_for_sig();
+	if (!cscrypto::verifySignature(tr.signature(), s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
+		cslog() << "API: reject transaction with wrong signature";
+		_return.status.code = ERROR_CODE;
+		_return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+		return;
+	} 
 
-  solver.send_wallet_transaction(tr);
-  SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
+	solver.send_wallet_transaction(tr);
+
+	//
+	/*const static unsigned int WAIT_SECONDS_TIME{ 10 };
+	const auto pair = std::pair(tr.source(), tr.innerID());
+	auto lockRef{ lockedReference(this->trxInProgress) };
+	auto& cvTrxn = (*lockRef)[pair];
+	static std::mutex mt;
+	std::unique_lock lock(mt);
+	const auto resWait = cvTrxn.first.wait_for(lock, std::chrono::seconds(WAIT_SECONDS_TIME), [&cvflg = (cvTrxn.second = false)]{ return cvflg; });
+	lockedReference(this->trxInProgress)->erase(pair);
+	//
+
+	if (!resWait) // time is over
+		SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS, get_delimited_transaction_sighex(tr));
+	else*/
+		SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
 
 template <typename T>
@@ -723,12 +734,16 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         // -- prevent start transaction from flow to solver, so move it here:
         std::string contract_state;
         if (!deploy) {
-            contract_state_entry.waitTillFront([&](SmartState& ss) {
+            auto resWait = contract_state_entry.waitTillFront([&](SmartState& ss) {
                 if (ss.state.empty())
                     return false;
                 contract_state = ss.state;
                 return true;
             });
+			if (!resWait) { // time is over
+				SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
+				return;
+			}
         }
         // --
         auto source_pk = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
@@ -758,13 +773,17 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     solver.send_wallet_transaction(send_transaction);
 
     if (deploy) {
-        contract_state_entry.waitTillFront([&](SmartState& ss) { return !ss.state.empty(); });
+		auto resWait = contract_state_entry.waitTillFront([&](SmartState& ss) { return !ss.state.empty(); });
+		if (!resWait) { // time is over
+			SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
+			return;
+		}
     }
     else {
         std::string new_state;
         csdb::TransactionID trId;
 
-        contract_state_entry.waitTillFront([&](SmartState& ss) {
+        auto resWait = contract_state_entry.waitTillFront([&](SmartState& ss) {
             auto execTrans = s_blockchain.loadTransaction(ss.initer);
             if (execTrans.is_valid() && execTrans.signature() == send_transaction.signature()) {
                 new_state = ss.lastEmpty ? std::string() : ss.state;
@@ -773,6 +792,11 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             }
             return false;
         });
+
+		if (!resWait) { // time is over
+			SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
+			return;
+		}
 
         if (new_state.empty()) {
             _return.status.code = ERROR_CODE;
@@ -1160,12 +1184,19 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         auto& trs = p.transactions();
         for (auto i_tr = trs.rbegin(); i_tr != trs.rend(); ++i_tr) {
             auto& tr = *i_tr;
-            if (is_smart(tr) || is_smart_state(tr))
-                locked_pending_smart_transactions->queue.push(std::make_pair(p.sequence(), tr));
+			if (is_smart(tr) || is_smart_state(tr)) {
+				locked_pending_smart_transactions->queue.push(std::make_pair(p.sequence(), tr));
+			}
+			/*else { // simple transactions
+				auto lockRef{ lockedReference(this->trxInProgress) };
+				if (auto it = lockRef->find(std::pair(tr.source(), tr.innerID())); it != lockRef->end()) {
+					(it->second).second = true;
+					(it->second).first.notify_all();
+				}
+			}*/
         }
-        if (log_to_console && (cnt % 1000) == 0) {
+        if (log_to_console && (cnt % 1000) == 0)
             std::cout << '\r' << WithDelimiters(cnt);
-        }
     }
     if (log_to_console) {
         std::cout << "\rDone, handled " << WithDelimiters(cnt) << " blocks...\n";
@@ -2237,7 +2268,7 @@ void apiexec::APIEXECHandler::SmartContractGet(SmartContractGetResult& _return, 
         return;
     }
     _return.contractState = opt_state.value();
-    _return.stateCanModify = solver_.isContractLocked(addr) && executor_.isLockSmart(address, accessId) ? true : false;
+	_return.stateCanModify = (solver_.isContractLocked(addr) && executor_.isLockSmart(address, accessId)) ? true : false;
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }

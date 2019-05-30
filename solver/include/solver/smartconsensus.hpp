@@ -56,14 +56,14 @@ public:
     // void getSmartResult(const cs::TransactionsPacket pack);
     void refreshSmartStagesStorage();
     void processStages();
-    csdb::Amount calculateFinalFee(const csdb::Amount& finalFee, size_t realTrustedAmount);
+    std::vector <csdb::Amount> calculateFinalFee(const std::vector <csdb::Amount>& finalFee, size_t realTrustedAmount);
 
     bool smartStageOneEnough();
     bool smartStageTwoEnough();
     bool smartStageThreeEnough();
     cs::Sequence smartRoundNumber();
 
-    void createFinalTransactionSet(const csdb::Amount finalFee);
+    void createFinalTransactionSet(const std::vector<csdb::Amount>& finalFees);
     size_t smartStage3StorageSize();
     void sendFinalTransactionSet();
     bool smartConfidantExist(uint8_t);
@@ -84,9 +84,14 @@ public:
         return runCounter_;
     }
 
+    // uint64_t[5 bytes] + uint16_t[2 bytes] + uint8_t[1 byte]
+    static inline uint64_t createId(uint64_t seq, uint16_t idx, uint8_t cnt) {
+        return (((seq & 0xFFFFFFFFFF) << 24) | (uint64_t(idx) << 8) | static_cast<uint64_t>(cnt));
+    }
+
     // smartRoundNumber[5 bytes] + smartTransaction[2 bytes] + runCounter[1 byte]
     uint64_t id() const {
-        return (((smartRoundNumber_ & 0xFFFFFFFFFF) << 24) | ((0x0000FFFF & smartTransaction_) << 8) | static_cast<uint64_t>(runCounter_));
+        return SmartConsensus::createId(smartRoundNumber_, uint16_t(smartTransaction_), runCounter_);
     }
 
     static inline cs::Sequence blockPart(uint64_t id) {
@@ -128,7 +133,7 @@ private:
     uint8_t ownSmartsConfNum_ = cs::ConfidantConsts::InvalidConfidantIndex;
     cs::TransactionsPacket currentSmartTransactionPack_;
     cs::TransactionsPacket finalSmartTransactionPack_;
-    csdb::Transaction tmpNewState_;
+    std::vector <csdb::Transaction> tmpNewStates_;
     cs::StageOneSmarts st1;
     cs::StageTwoSmarts st2;
     cs::StageThreeSmarts st3;

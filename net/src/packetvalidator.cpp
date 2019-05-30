@@ -84,7 +84,7 @@ bool PacketValidator::validate(MsgTypes msg, const uint8_t* data, size_t size) {
     return true;
 }
 
-bool PacketValidator::validateFirstFragment(MsgTypes msg, const uint8_t* data, size_t size) {
+bool PacketValidator::validateFirstFragment(MsgTypes /*msg*/, const uint8_t* /*data*/, size_t /*size*/) {
     return true;
 }
 
