@@ -1390,7 +1390,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
     istream_.init(data, size);
 
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound != subRound_) {
@@ -1483,7 +1483,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     }
 
     istream_.init(data, size);
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound != subRound_) {
@@ -1893,8 +1893,8 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
     istream_.init(data, size);
 
     uint8_t requesterNumber = 0;
-    cs::Sequence smartRound;
-    uint32_t startTransaction;
+    cs::Sequence smartRound = 0;
+    uint32_t startTransaction = 0;
     istream_ >> smartRound >> startTransaction >> requesterNumber;
 
     uint8_t requiredNumber = 0;
@@ -2048,9 +2048,8 @@ void Node::sendRoundTable() {
     
     const auto& confidants = conveyer.confidants();
     if (!confidants.empty() && lastTrustedMask_.size() == confidants.size()) {
-        for (int i = 0; i < lastTrustedMask_.size(); ++i) {
+        for (size_t i = 0; i < lastTrustedMask_.size(); ++i) {
             if (lastTrustedMask_[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
-                //csdebug() << "NODE> Node ban!!!";
                 solver_->addToGraylist(confidants[i], Consensus::GrayListPunishment);
             }
         }
@@ -2253,9 +2252,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     if (ptrRT != nullptr) {
         const cs::ConfidantsKeys& prevConfidants = ptrRT->confidants;
         if (!prevConfidants.empty() && realTrusted.size() == prevConfidants.size()) {
-            for (int i = 0; i < realTrusted.size(); ++i) {
+            for (size_t i = 0; i < realTrusted.size(); ++i) {
                 if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
-                    //csdebug() << "NODE> Node ban!!!";
                     solver_->addToGraylist(prevConfidants[i], Consensus::GrayListPunishment);
                 }
             }
@@ -2327,7 +2325,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     csdetails() << "NODE> get hash of round " << rNum << ", data size " << size;
 
     istream_.init(data, size);
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound > subRound_) {
@@ -2641,7 +2639,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     cs::Signature signature;
     istream_ >> signature;
 
-    uint8_t senderNumber;
+    uint8_t senderNumber = 0;
     istream_ >> senderNumber;
 
     csdb::PoolHash hash;

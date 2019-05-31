@@ -171,6 +171,7 @@ public:
     ///
     template <typename T>
     inline static void clearMemory(T& object) {
+        static_assert(std::is_copy_assignable_v<T> || std::is_trivially_copyable_v<T>, "T type should be trivially copyable or has user copy assign operator");
         std::memset(&object, 0, sizeof(T));
     }
 
@@ -295,7 +296,7 @@ public:
 #ifdef _MSC_VER
         cs::Byte cnt = static_cast<cs::Byte>(__popcnt64(value));
 #else
-        cs::Byte cnt = __builtin_popcountl(value);
+        cs::Byte cnt = static_cast<cs::Byte>(__builtin_popcountl(value));
 #endif
         return cnt;
     }

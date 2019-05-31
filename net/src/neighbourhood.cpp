@@ -743,7 +743,7 @@ ConnectionPtr Neighbourhood::getNextSyncRequestee(const cs::Sequence seq, bool& 
         for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
             if (!candidate->syncSeqs[i]) {
                 candidate->syncSeqs[i] = seq;
-                candidate->syncSeqsRetries[i] = static_cast<cs::Sequence>(rand()) % (MaxSyncAttempts / 2);
+                candidate->syncSeqsRetries[i] = cs::Random::generateValue<cs::Sequence>(1, MaxSyncAttempts / 2);
                 break;
             }
         }
@@ -780,7 +780,7 @@ ConnectionPtr Neighbourhood::getRandomSyncNeighbour() {
     ConnectionPtr candidate = *(neighbours_.begin() + candidateNumber);
 
     if (!candidate->syncNeighbourRetries) {
-        candidate->syncNeighbourRetries = cs::Random::generateRandomValue<uint32_t>(1, MaxSyncAttempts * 3);
+        candidate->syncNeighbourRetries = cs::Random::generateValue<uint32_t>(1, MaxSyncAttempts * 3);
     }
 
     --(candidate->syncNeighbourRetries);
@@ -858,7 +858,7 @@ int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) 
         return -1;
     }
 
-    const int randomNumber = cs::Random::generateRandomValue<int>(0, static_cast<int>(neighbourCount));
+    const int randomNumber = cs::Random::generateValue<int>(0, static_cast<int>(neighbourCount));
     const ConnectionPtr nb = *(neighbours_.begin() + randomNumber);
 
     if (!nb) {

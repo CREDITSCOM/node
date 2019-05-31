@@ -484,8 +484,9 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
             if (flag == 'g') {
                 std::vector<uint8_t> skBytes;
                 auto ms = cscrypto::keys_derivation::generateMaterSeed();
-                privateKey_ = cscrypto::keys_derivation::derivePrivateKey(ms, 0);
-                publicKey_ = cscrypto::getMatchingPublic(privateKey_);
+                auto keys = cscrypto::keys_derivation::deriveKeyPair(ms, 0);
+                privateKey_ = keys.second;
+                publicKey_ = keys.first;
 
                 std::cout << "\nSave this phrase to restore your keys in futute, and press any key to continue:" << std::endl;
                 auto words = cscrypto::mnemonic::masterSeedToWords(ms);

@@ -127,7 +127,7 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
     // apply starter fee consumed
     csdb::Amount avail_fee = csdb::Amount(tr_start.max_fee().to_double()) - tr_start_fee - new_state_fee;
     //consumed_fee = 0;
-    auto& execution = executions.emplace_back(ExecutionItem{ ref_contract, avail_fee, new_state_fee, csdb::Amount{ 0 } });
+    auto& execution = executions.emplace_back(ExecutionItem{ ref_contract, avail_fee, new_state_fee, csdb::Amount{ 0 }, {}, {} });
 
     if (SmartContracts::is_executable(tr_start)) {
         const csdb::UserField fld = tr_start.user_field(trx_uf::start::Methods);  // start::Methods == deploy::Code, so does not matter what type of executable is
@@ -235,6 +235,34 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
     if (cnt > new_cnt) {
         cslog() << kLogPrefix << "" << cnt - new_cnt << " smart contract state(s) is/are optimizied out";
     }
+}
+
+/*static*/
+std::string SmartContracts::get_error_message(uint8_t code) {
+    using namespace cs::error;
+    switch (code) {
+    case TimeExpired:
+        return "timeout during operation";
+    case OutOfFunds:
+        return "insufficient funds to complete operation";
+    case StdException:
+        return "connection error while executing contract";
+    case Exception:
+        return "common error while executing contract";
+    case UnpayableReplenish:
+        return "replenished contract does not implement payable()";
+    case ConsensusRejected:
+        return "the trusted consensus have rejected new_state (or emitted transactions)";
+    case ExecuteTransaction:
+        return "common error in executor";
+    case InternalBug:
+        return "internal bug in node detected";
+    case ExecutionError:
+        return "executor is disconnected or unavailable, or incompatible";
+    }
+    std::ostringstream os;
+    os << "Error code " << (unsigned int)code;
+    return os.str();
 }
 
 /*static*/
@@ -441,7 +469,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
 
     if (it == exe_queue.end()) {
         // enqueue to end
-        bool payable = false;
+        [[maybe_unused]] bool payable = false;
         if (SmartContracts::is_deploy(t)) {
             // pre-register in known_contracts
             auto maybe_invoke_info = get_smart_contract_impl(t);
@@ -1269,7 +1297,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
     emit signal_smart_executed(integral_packet);
 }
 
-void SmartContracts::update_inner_id(const csdb::Address& addr, uint64_t val) {
+void SmartContracts::update_inner_id(const csdb::Address& addr, int64_t val) {
     csdb::Address abs_addr = SmartContracts::absolute_address(addr);
     const auto it = known_contracts.find(abs_addr);
     if (it != known_contracts.cend()) {

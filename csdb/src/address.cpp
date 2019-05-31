@@ -6,6 +6,8 @@
 #include "csdb/internal/types.hpp"
 #include "csdb/internal/utils.hpp"
 
+#include <lib/system/logger.hpp>
+
 #include "priv_crypto.hpp"
 
 namespace csdb {
@@ -101,12 +103,13 @@ Address Address::from_string(const ::std::string& val) {
     else {
         try {
             if (!val.empty()) {
-                WalletId id = std::stol(val);
+                WalletId id = static_cast<WalletId>(std::stol(val));
                 res = from_wallet_id(id);
                 res.d->is_wallet_id_ = true;
             }
         }
         catch (...) {
+            cserror() << "Address from string exception occured, check address to string convertion";
         }
     }
 

@@ -95,6 +95,9 @@ public:
     : data_(std::move(data)) {
     }
 
+    Packet(const Packet&) = default;
+    Packet& operator=(const Packet&) = default;
+
     bool isNetwork() const {
         return checkFlag(BaseFlags::NetworkMsg);
     }
