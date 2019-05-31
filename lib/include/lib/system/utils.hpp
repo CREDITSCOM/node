@@ -31,25 +31,9 @@
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/structures.hpp>
-
-#define cswatch(x) cslog() << (#x) << " is " << (x)
-#define csunused(x) (void)(x)
+#include <lib/system/reflection.hpp>
 
 using namespace std::literals::string_literals;
-
-// compile time and rtti reflection in action, works only in methods.
-// if class/struct is not polimorphic - compile-time reflection, otherwise - run-time.
-#define className typeid(*this).name
-#define classNameString() std::string(className()) + " "s
-
-#define funcName() __func__
-
-// pseudo definitions
-#define csname() className() << "> "
-#define csfunc() funcName() << "(): "
-
-#define csreflection() className() << ", method " << csfunc()
-#define csmeta(...) __VA_ARGS__() << csreflection()
 
 namespace cs {
 enum class Direction : uint8_t {
@@ -86,12 +70,6 @@ inline static std::ostream& operator<<(std::ostream& os, const std::array<T, Siz
     printHex(os, reinterpret_cast<const char*>(&*address.begin()), address.size());
     return os;
 }
-
-template <typename T>
-struct is_vector : public std::false_type {};
-
-template <typename T, typename A>
-struct is_vector<std::vector<T, A>> : public std::true_type {};
 
 ///
 /// Static utils helper class
@@ -392,11 +370,6 @@ constexpr int getMax(const bool) {
 
 constexpr int getMin(const bool) {
     return static_cast<int>(std::numeric_limits<bool>::min());
-}
-
-template <typename T>
-constexpr bool isVector() {
-    return cs::is_vector<T>::value;
 }
 
 template <typename TBytes>
