@@ -45,17 +45,17 @@ Characteristic IterValidator::formCharacteristic(SolverContext& context, Transac
 void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& characteristicMask, const Transactions& transactions) {
     // test if any of smart-emitted transaction rejected, reject all transactions from this smart
     // 1. collect rejected smart addresses
-    const auto& smarts = context.smart_contracts();
+    [[maybe_unused]] const auto& smarts = context.smart_contracts();
     std::vector<SolverContext::RefExecution> rejectList;
     size_t maskSize = characteristicMask.size();
     size_t i = 0;
     for (const auto& tr : transactions) {
-        if (i < maskSize && *(characteristicMask.cbegin() + i) == kInvalidMarker) {
+        if (i < maskSize && *(characteristicMask.cbegin() + static_cast<std::ptrdiff_t>(i)) == kInvalidMarker) {
             if (SmartContracts::is_new_state(tr)) {
                 csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
                 if (fld.is_valid()) {
                     SmartContractRef ref(fld);
-                    rejectList.emplace_back(std::make_pair(ref.sequence, (uint32_t)ref.transaction));
+                    rejectList.emplace_back(std::make_pair(ref.sequence, static_cast<uint32_t>(ref.transaction)));
                 }
             }
         }

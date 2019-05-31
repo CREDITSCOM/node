@@ -1046,7 +1046,7 @@ void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
 }
 
 bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
-    uint8_t isDirect;
+    uint8_t isDirect = 0;
     cs::Hash hHash;
     iPackStream_ >> isDirect >> hHash;
 

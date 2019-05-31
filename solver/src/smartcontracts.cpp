@@ -127,7 +127,7 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
     // apply starter fee consumed
     csdb::Amount avail_fee = csdb::Amount(tr_start.max_fee().to_double()) - tr_start_fee - new_state_fee;
     //consumed_fee = 0;
-    auto& execution = executions.emplace_back(ExecutionItem{ ref_contract, avail_fee, new_state_fee, csdb::Amount{ 0 } });
+    auto& execution = executions.emplace_back(ExecutionItem{ ref_contract, avail_fee, new_state_fee, csdb::Amount{ 0 }, {}, {} });
 
     if (SmartContracts::is_executable(tr_start)) {
         const csdb::UserField fld = tr_start.user_field(trx_uf::start::Methods);  // start::Methods == deploy::Code, so does not matter what type of executable is
@@ -469,7 +469,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
 
     if (it == exe_queue.end()) {
         // enqueue to end
-        bool payable = false;
+        [[maybe_unused]] bool payable = false;
         if (SmartContracts::is_deploy(t)) {
             // pre-register in known_contracts
             auto maybe_invoke_info = get_smart_contract_impl(t);
