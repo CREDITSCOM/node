@@ -373,7 +373,8 @@ public:
 		for (const auto& smart : smarts) {
 			executor::MethodHeader header;
 			api::SmartContractInvocation sci;
-			if (!smart.user_field(0).is_valid() && smart.amount().to_double()) {  // payable
+            const auto fld = smart.user_field(0);
+            if (!fld.is_valid() && smart.amount().to_double()) {  // payable
 				header.methodName = "payable";
 				general::Variant var;
 				var.__set_v_string(smart.amount().to_string());
@@ -382,12 +383,12 @@ public:
 				header.params.emplace_back(var);
 			}
 			else if (!isdeploy) {
-				sci = deserialize<api::SmartContractInvocation>(smart.user_field(0).value<std::string>());
-				header.methodName = sci.method;
-				header.params = sci.params;
+                sci = deserialize<api::SmartContractInvocation>(fld.value<std::string>());
+                header.methodName = sci.method;
+                header.params = sci.params;
 
-				for (const auto& addrLock : sci.usedContracts)
-					addToLockSmart(addrLock, getFutureAccessId());
+                for (const auto& addrLock : sci.usedContracts)
+                    addToLockSmart(addrLock, getFutureAccessId());
 			}
 			methodHeader.push_back(header);
 		}
@@ -396,9 +397,12 @@ public:
 
 		for (const auto& smart : smarts) {
 			if (!isdeploy) {
-				auto sci = deserialize<api::SmartContractInvocation>(smart.user_field(0).value<std::string>());
-				for (const auto& addrLock : sci.usedContracts)
-					deleteFromLockSmart(addrLock, getFutureAccessId());
+                const auto fld = smart.user_field(0);
+                if (fld.is_valid()) {
+                    auto sci = deserialize<api::SmartContractInvocation>(smart.user_field(0).value<std::string>());
+                    for (const auto& addrLock : sci.usedContracts)
+                        deleteFromLockSmart(addrLock, getFutureAccessId());
+                }
 			}
 		}
 

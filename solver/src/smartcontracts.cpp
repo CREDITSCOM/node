@@ -159,7 +159,9 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
 SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& calls_queue_scheduler)
 : scheduler(calls_queue_scheduler)
 , bc(blockchain)
-, execution_allowed(true) {
+, execution_allowed(true)
+, force_execution(false)
+{
     // signals subscription (MUST occur AFTER the BlockChains has already subscribed to storage)
 
     // as event receiver:
@@ -184,6 +186,7 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
         exec_handler_ptr = connector_ptr->apiExecHandler();
     }
     node_id = id;
+    force_execution = pnode->alwaysExecuteContracts();
 
     // currently, blockchain is read in such manner that does not require absolute/optimized consolidation post-factum
     // anyway this tested code may become useful in future
@@ -635,9 +638,9 @@ void SmartContracts::test_exe_queue() {
         csdebug() << kLogPrefix << "set running status to {" << it->seq_enqueue << ".*} containing " << it->executions.size() << " jobs";
         update_status(*it, bc.getLastSequence(), SmartContractStatus::Running);
         // call to executor only if is trusted relatively to this contract
-        if (it->is_executor) {
+        if (it->is_executor || force_execution) {
             // final decision to execute contract is here, based on executor availability
-            if (!execution_allowed && !test_executor_availability()) {
+            if (it->is_executor && !execution_allowed && !test_executor_availability()) {
                 cslog() << kLogPrefix << "skip {" << it->seq_enqueue << ".*}, execution is not allowed (executor is not connected)";
                 it->is_executor = false;
                 // notify partners that unable to play trusted role
@@ -1300,8 +1303,8 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
         os << e.ref_start << ' ';
     }
     csdebug() << kLogPrefix << "starting " << os.str() << "consensus";
-    if (!start_consensus(*it, integral_packet)) {
-        cserror() << kLogPrefix << os.str() << "consensus failed, remove item from queue";
+    if (!it->is_executor || !start_consensus(*it, integral_packet)) {
+        cserror() << kLogPrefix << os.str() << "consensus is not started, remove item from queue";
         remove_from_queue(it);
     }
 
