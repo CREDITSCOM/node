@@ -216,6 +216,10 @@ public:
     // args: [failed list, restart list]
     using RejectedSmartContractsSignal = cs::Signal<void(const std::vector<RefExecution>&)>;
 
+    bool alwaysExecuteContracts() {
+        return alwaysExecuteContracts_;
+    }
+
 public signals:
     SmartsSignal<cs::StageOneSmarts> gotSmartStageOne;
     SmartsSignal<cs::StageTwoSmarts> gotSmartStageTwo;
@@ -393,6 +397,8 @@ private:
     std::vector<cs::RoundNumber> expectedRounds_;
     cs::Sequence maxHeighboursSequence_ = 0;
     cs::Bytes lastTrustedMask_;
+
+    bool alwaysExecuteContracts_ = false;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

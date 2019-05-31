@@ -142,6 +142,10 @@ public:
 
     void dumpJSONKeys(const std::string& fName) const;
 
+    bool alwaysExecuteContracts() const {
+        return alwaysExecuteContracts_;
+    }
+
 private:
     static Config readFromFile(const std::string& fileName);
     void setLoggerSettings(const boost::property_tree::ptree& config);
@@ -186,6 +190,8 @@ private:
 
     PoolSyncData poolSyncData_;
     ApiData apiData_;
+
+    bool alwaysExecuteContracts_ = false;
 };
 
 #endif  // CONFIG_HPP

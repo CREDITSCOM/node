@@ -291,6 +291,9 @@ signals:
     // emits on every contract emitted transaction is appeared in blockchain, args are (emitted_transaction, starter_transaction):
     cs::Signal<void(const csdb::Transaction&, const csdb::Transaction&)> signal_emitted_accepted;
 
+    // flag to always execute contracts even in normal state
+    bool force_execution;
+
 public slots:
     // called when execute_async() completed
     void on_execution_completed(const std::vector<SmartExecutionData>& data_list) {
