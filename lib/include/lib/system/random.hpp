@@ -27,7 +27,7 @@ public:
     /// Generates random value from random generator [min, max] for integer type
     ///
     template <typename R>
-    inline static R generateRandomValue(int min, int max) {
+    inline static R generateValue(int min, int max) {
         return randomValueImpl<R, decltype(min)>(min, max);
     }
 
@@ -35,7 +35,7 @@ public:
     /// Generates random value from random generator [min, max] for floating point type
     ///
     template <typename R>
-    inline static R generateRandomValue(double min, double max) {
+    inline static R generateValue(double min, double max) {
         return randomValueImpl<R, decltype(min)>(min, max);
     }
 
