@@ -28,26 +28,26 @@ class Transaction;
 namespace cs {
 
 // smart contract related error codes
-namespace error {
-// timeout during operation
-constexpr uint8_t TimeExpired = 254;
-// insufficient funds to complete operation
-constexpr uint8_t OutOfFunds = 253;
-// std::exception thrown
-constexpr uint8_t StdException = 252;
-// other exception thrown
-constexpr uint8_t Exception = 251;
-// replenished contract does not implement payable()
-constexpr uint8_t UnpayableReplenish = 250;
-// the trusted consensus have rejected new_state (and emitted transactions)
-constexpr uint8_t ConsensusRejected = 249;
-// error in Executor::ExecuteTransaction()
-constexpr uint8_t ExecuteTransaction = 248;
-// bug in SmartContracts
-constexpr uint8_t InternalBug = 247;
-// executor is disconnected or unavailable, value is hard-coded in ApiExec module
-constexpr uint8_t ExecutionError = 1;
-}  // namespace error
+    namespace error {
+        // timeout during operation
+        constexpr uint8_t TimeExpired = 254;
+        // insufficient funds to complete operation
+        constexpr uint8_t OutOfFunds = 253;
+        // std::exception thrown
+        constexpr uint8_t StdException = 252;
+        // other exception thrown
+        constexpr uint8_t Exception = 251;
+        // replenished contract does not implement payable()
+        constexpr uint8_t UnpayableReplenish = 250; // -6
+        // the trusted consensus have rejected new_state (and emitted transactions)
+        constexpr uint8_t ConsensusRejected = 249; // -7
+        // error in Executor::ExecuteTransaction()
+        constexpr uint8_t ExecuteTransaction = 248; // -8
+        // bug in SmartContracts
+        constexpr uint8_t InternalBug = 247; // -9
+        // executor is disconnected or unavailable, value is hard-coded in ApiExec module
+        constexpr uint8_t ExecutionError = 1;
+    }  // namespace error
 
 // transactions user fields
 namespace trx_uf {
@@ -167,6 +167,19 @@ struct SmartExecutionData {
     csdb::Amount executor_fee;
     executor::Executor::ExecuteResult result;
     std::string error;
+    std::string explicit_last_state;
+
+    void setError(uint8_t code, const char* message) {
+        if (!result.smartsRes.empty()) {
+            result.smartsRes.clear();
+        }
+        general::Variant ret_val;
+        ret_val.__set_v_byte(code);
+        using container_type = decltype(executor::Executor::ExecuteResult::smartsRes);
+        using element_type = container_type::value_type;
+        result.smartsRes.emplace_back(element_type{ ret_val, std::string{}, 0 });
+        error = message;
+    }
 };
 
 inline bool operator==(const SmartExecutionData& l, const SmartContractRef& r) {
@@ -209,6 +222,8 @@ public:
     ~SmartContracts();
 
     void init(const cs::PublicKey&, Node* node);
+
+    static std::string get_error_message(uint8_t code);
 
     // test transaction methods
 
