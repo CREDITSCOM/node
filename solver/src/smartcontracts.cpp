@@ -921,7 +921,7 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
 // tests max fee amount and round-based timeout on executed smart contracts;
 // is invoked on every new block
 void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
-    if (exe_queue.empty()) {
+    /*if (exe_queue.empty()) {
         return;
     }
 
@@ -1003,7 +1003,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
             }
         }  // if block for Running only contract
 
-    }  // for each exe_queue item
+    }  // for each exe_queue item*/
 }
 
 // return next element in queue
@@ -1053,7 +1053,7 @@ void SmartContracts::remove_from_queue(const SmartContractRef& item) {
 }
 
 bool SmartContracts::execute(SmartExecutionData& data) {
-    if (!exec_handler_ptr) {
+    /*if (!exec_handler_ptr) {
         data.error = "contract executor is unavailable";
         data.result.retValue.__set_v_byte(error::ExecuteTransaction);
         return false;
@@ -1082,13 +1082,13 @@ bool SmartContracts::execute(SmartExecutionData& data) {
     else {
         data.error = "contract execution failed";
         data.result.retValue.__set_v_byte(error::ExecuteTransaction);
-    }
+    }*/
     return true;
 }
 
 // returns false if execution canceled, so caller may call to remove_from_queue()
 bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions) {
-    std::vector<SmartExecutionData> data_list;
+    /*std::vector<SmartExecutionData> data_list;
     for (const auto& execution : executions) {
         SmartExecutionData& execution_data = data_list.emplace_back();
         execution_data.contract_ref = execution.ref_start;
@@ -1146,13 +1146,13 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
 
     // run async and watch result
     auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runnable);
-    cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execution_completed);
+    cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execution_completed);*/
 
     return true;
 }
 
 void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutionData>& data_list) {
-    using namespace trx_uf;
+    /*using namespace trx_uf;
     if (data_list.empty()) {
         // actually is checked before
         return;
@@ -1294,7 +1294,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
     }
 
     // inform slots if any, packet does not contain smart consensus' data!
-    emit signal_smart_executed(integral_packet);
+    emit signal_smart_executed(integral_packet);*/
 }
 
 void SmartContracts::update_inner_id(const csdb::Address& addr, int64_t val) {

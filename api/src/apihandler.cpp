@@ -212,8 +212,8 @@ cs::Bytes toByteArray(const std::string& s) {
     return res;
 }
 
-api::Amount convertAmount(const csdb::Amount& amount) {
-    api::Amount result;
+general::Amount convertAmount(const csdb::Amount& amount) {
+	general::Amount result;
     result.integral = amount.integral();
     result.fraction = amount.fraction();
     assert(result.fraction >= 0);
@@ -671,7 +671,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     BlockChain::WalletId wallId{};
     if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
         _return.status.code = ERROR_CODE;
-        _return.status.message = "wallet not found!";
+        _return.status.message = "not enough money!";
         return;
     }
 
@@ -761,20 +761,25 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         auto target_pk = s_blockchain.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
         executor::ExecuteByteCodeResult api_resp;
         const std::vector<general::ByteCodeObject>& bytecode = deploy ? input_smart.smartContractDeploy.byteCodeObjects : origin_bytecode;
-        if (!deploy || !input_smart.smartContractDeploy.byteCodeObjects.empty()) {
-            executor_.executeByteCode(api_resp, source_pk.to_api_addr(), target_pk.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params,
-                                      MAX_EXECUTION_TIME);
-
-            if (api_resp.status.code) {
-                _return.status.code = api_resp.status.code;
-                _return.status.message = api_resp.status.message;
-                contract_state_entry.yield();
-                return;
-            }
-            _return.__isset.smart_contract_result = api_resp.__isset.ret_val;
-            if (_return.__isset.smart_contract_result)
-                _return.__set_smart_contract_result(api_resp.ret_val);
-        }
+		if (!deploy || !input_smart.smartContractDeploy.byteCodeObjects.empty()) {
+			std::vector<executor::MethodHeader> methodHeader;
+			{
+				executor::MethodHeader tmp;
+				tmp.methodName = input_smart.method;
+				tmp.params = input_smart.params;
+				methodHeader.push_back(tmp);
+			}
+			executor_.executeByteCode(api_resp, source_pk.to_api_addr(), target_pk.to_api_addr(), bytecode, contract_state, methodHeader, MAX_EXECUTION_TIME);
+			if (api_resp.status.code) {
+				_return.status.code = api_resp.status.code;
+				_return.status.message = api_resp.status.message;
+				contract_state_entry.yield();
+				return;
+			}
+			_return.__isset.smart_contract_result = api_resp.__isset.results;
+			if (_return.__isset.smart_contract_result && !api_resp.results.empty())
+				_return.__set_smart_contract_result(api_resp.results[0].ret_val);
+		}
 
         SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
         contract_state_entry.yield();
@@ -2285,14 +2290,16 @@ void apiexec::APIEXECHandler::SmartContractGet(SmartContractGetResult& _return, 
 }
 
 void apiexec::APIEXECHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) {
-    const csdb::Address addr = BlockChain::getAddressFromKey(address);
-    BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!blockchain_.findWalletData(addr, wallData, wallId)) {
-        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
-        return;
-    }
-    _return.balance.integral = wallData.balance_.integral();
-    _return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+	const csdb::Address addr = BlockChain::getAddressFromKey(address);
+	BlockChain::WalletData wallData{};
+	BlockChain::WalletId wallId{};
+	if (!blockchain_.findWalletData(addr, wallData, wallId)) {
+		_return.balance.integral = 0;
+		_return.balance.fraction = 0;
+	}
+	else {
+		_return.balance.integral = wallData.balance_.integral();
+		_return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());
+	}
+	SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }

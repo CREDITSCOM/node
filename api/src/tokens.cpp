@@ -191,16 +191,23 @@ std::string getVariantAs(const general::Variant& var) {
 
 template <typename RetType>
 void executeAndCall(api::APIHandler* p_api, const general::Address& addr, const general::Address& addr_smart, const std::vector<general::ByteCodeObject>& byteCodeObjects,
-                    const std::string& state, const std::string& method, const std::vector<general::Variant>& params, const uint32_t timeout,
-                    const std::function<void(const RetType&)> handler) {
-    executor::ExecuteByteCodeResult result;
+	const std::string& state, const std::string& method, const std::vector<general::Variant>& params, const uint32_t timeout,
+	const std::function<void(const RetType&)> handler) {
+	executor::ExecuteByteCodeResult result;
 
-    if (byteCodeObjects.empty())
-        return;
-    p_api->getExecutor().executeByteCode(result, addr, addr_smart, byteCodeObjects, state, method, params, timeout);
+	if (byteCodeObjects.empty())
+		return;
+	std::vector<executor::MethodHeader> methodHeader;
+	{
+		executor::MethodHeader tmp;
+		tmp.methodName = method;
+		tmp.params = params;
+		methodHeader.push_back(tmp);
+	}
+	p_api->getExecutor().executeByteCode(result, addr, addr_smart, byteCodeObjects, state, methodHeader, timeout);
 
-    if (!result.status.code)
-        handler(getVariantAs<RetType>(result.ret_val));
+	if (!result.status.code && !result.results.empty())
+		handler(getVariantAs<RetType>(result.results[0].ret_val));
 }
 
 void TokensMaster::refreshTokenState(const csdb::Address& token, const std::string& newState) {
