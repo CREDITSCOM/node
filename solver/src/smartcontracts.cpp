@@ -921,7 +921,7 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
 // tests max fee amount and round-based timeout on executed smart contracts;
 // is invoked on every new block
 void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
-    /*if (exe_queue.empty()) {
+    if (exe_queue.empty()) {
         return;
     }
 
@@ -963,8 +963,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
                     for (const auto& execution : item.executions) {
                         SmartExecutionData& data = data_list.emplace_back();
                         data.contract_ref = execution.ref_start;
-                        data.error = "contract execution timeout";
-                        data.result.retValue.__set_v_byte(error::TimeExpired);
+                        data.setError(error::TimeExpired, "contract execution timeout");
                     }
                     if (!data_list.empty()) {
                         on_execution_completed_impl(std::move(data_list));
@@ -988,8 +987,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
                         for (const auto& e: item.executions) {
                             SmartExecutionData& data = data_list.emplace_back();
                             data.contract_ref = e.ref_start;
-                            data.error = "contract execution is out of funds";
-                            data.result.retValue.__set_v_byte(error::OutOfFunds);
+                            data.setError(error::OutOfFunds, "contract execution is out of funds");
                         }
                         if (!data_list.empty()) {
                             on_execution_completed_impl(std::move(data_list));
@@ -1003,7 +1001,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
             }
         }  // if block for Running only contract
 
-    }  // for each exe_queue item*/
+    }  // for each exe_queue item
 }
 
 // return next element in queue
@@ -1053,42 +1051,55 @@ void SmartContracts::remove_from_queue(const SmartContractRef& item) {
 }
 
 bool SmartContracts::execute(SmartExecutionData& data) {
-    /*if (!exec_handler_ptr) {
-        data.error = "contract executor is unavailable";
-        data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+    if (!data.result.smartsRes.empty()) {
+        data.result.smartsRes.clear();
+    }
+    if (!exec_handler_ptr) {
+        data.setError(error::ExecuteTransaction, "contract executor is unavailable");
         return false;
     }
-    csdb::Pool block = bc.loadBlock(data.contract_ref.sequence);
-    if (!block.is_valid()) {
-        data.error = "load block with starter transaction failed";
-        data.result.retValue.__set_v_byte(error::InternalBug);
+    csdb::Transaction transaction = get_transaction(data.contract_ref);
+    if (!transaction.is_valid()) {
+        data.setError(error::InternalBug, "load starter transaction failed");
         return false;
     }
     cslog() << kLogPrefix << "executing " << data.contract_ref << "::" << print_executed_method(data.contract_ref) << std::endl;
     // using data.result.newState to pass previous (not yet cached) new state in case of multi-call to conrtract:
-    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee, data.result.newState);
+    std::vector<csdb::Transaction> smarts;
+    smarts.emplace_back(transaction);
+    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(smarts, data.executor_fee, data.explicit_last_state);
     if (maybe_result.has_value()) {
         data.result = maybe_result.value();
-        if (data.result.newState.empty()) {
-            if (data.result.retValue.__isset.v_string) {
-                data.error = data.result.retValue.v_string;
-                data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+        if (!data.result.smartsRes.empty()) {
+            auto& result = data.result.smartsRes.front();
+            if (result.newState.empty()) {
+                if (result.retValue.__isset.v_string) {
+                    data.error = result.retValue.v_string;
+                    result.retValue.__set_v_byte(error::ExecuteTransaction);
+                }
+                else {
+                    data.error = "contract execution failed, new contract state is empty";
+                    // let retValue to be unchanged
+                }
             }
-            else {
-                data.error = "contract execution failed, contract state is unchanged";
-            }
+            //else {
+                // resutlt.newState is set, nothing to do here
+            //}
+        }
+        else {
+            // smart result is empty!
+            data.setError(error::ExecuteTransaction, "contract execution failed, contract state is unchanged");
         }
     }
     else {
-        data.error = "contract execution failed";
-        data.result.retValue.__set_v_byte(error::ExecuteTransaction);
-    }*/
+        data.setError(error::ExecuteTransaction, "contract execution failed");
+    }
     return true;
 }
 
 // returns false if execution canceled, so caller may call to remove_from_queue()
 bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions) {
-    /*std::vector<SmartExecutionData> data_list;
+    std::vector<SmartExecutionData> data_list;
     for (const auto& execution : executions) {
         SmartExecutionData& execution_data = data_list.emplace_back();
         execution_data.contract_ref = execution.ref_start;
@@ -1121,7 +1132,7 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
             std::string last_state;
             for (auto& data : data_list) {
                 // use data.result.newStatef member to pass last contract's state in multi-call
-                data.result.newState = last_state;
+                data.explicit_last_state = last_state;
                 if (!execute(data)) {
                     if (data.error.empty()) {
                         data.error = "failed to invoke contract";
@@ -1129,15 +1140,15 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
                     // last_state is not updated
                 }
                 else {
-                    if (!data.result.newState.empty()) {
+                    // execute never returns empty data.result.smartsRes list
+                    if (!data.result.smartsRes.empty()) {
                         // remember last state for the next execution
-                        last_state = data.result.newState;
+                        last_state = data.result.smartsRes.front().newState;
                     }
                 }
                 if (data.result.fee > data.executor_fee) {
                     // out of fee detected
-                    data.error = "contract execution is out of funds";
-                    data.result.retValue.__set_v_byte(error::OutOfFunds);
+                    data.setError(error::OutOfFunds, "contract execution is out of funds");
                 }
             }
         }
@@ -1146,13 +1157,13 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
 
     // run async and watch result
     auto watcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runnable);
-    cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execution_completed);*/
+    cs::Connector::connect(&watcher->finished, this, &SmartContracts::on_execution_completed);
 
     return true;
 }
 
 void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutionData>& data_list) {
-    /*using namespace trx_uf;
+    using namespace trx_uf;
     if (data_list.empty()) {
         // actually is checked before
         return;
@@ -1214,22 +1225,23 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             }
         }
 
-        // finalize new_state transaction
+        // finalize new_state transaction, data_item.result.smartsRes always non-empty
         if (!data_item.error.empty()) {
             cserror() << std::endl << kLogPrefix << data_item.error << std::endl;
             csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " is failed, new state is empty";
             // result contains empty USRFLD[state::Value]
             result.add_user_field(new_state::Value, std::string{});
             // result contains error code from ret_val
-            result.add_user_field(new_state::RetVal, serialize(data_item.result.retValue));
+            result.add_user_field(new_state::RetVal, serialize(data_item.result.smartsRes.front().retValue));
             packet.addTransaction(result);
         }
         else {
-            csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " is successful, new state size = " << data_item.result.newState.size();
+            const auto& execution_result = data_item.result.smartsRes.front();
+            csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " is successful, new state size = " << execution_result.newState.size();
 
             // put new state
-            result.add_user_field(new_state::Value, data_item.result.newState);
-            result.add_user_field(new_state::RetVal, serialize(data_item.result.retValue));
+            result.add_user_field(new_state::Value, execution_result.newState);
+            result.add_user_field(new_state::RetVal, serialize(execution_result.retValue));
             packet.addTransaction(result);
 
             if (it != exe_queue.end()) {
@@ -1294,7 +1306,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
     }
 
     // inform slots if any, packet does not contain smart consensus' data!
-    emit signal_smart_executed(integral_packet);*/
+    emit signal_smart_executed(integral_packet);
 }
 
 void SmartContracts::update_inner_id(const csdb::Address& addr, int64_t val) {

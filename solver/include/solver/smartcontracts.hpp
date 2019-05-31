@@ -167,6 +167,19 @@ struct SmartExecutionData {
     csdb::Amount executor_fee;
     executor::Executor::ExecuteResult result;
     std::string error;
+    std::string explicit_last_state;
+
+    void setError(uint8_t code, const char* message) {
+        if (!result.smartsRes.empty()) {
+            result.smartsRes.clear();
+        }
+        general::Variant ret_val;
+        ret_val.__set_v_byte(code);
+        using container_type = decltype(executor::Executor::ExecuteResult::smartsRes);
+        using element_type = container_type::value_type;
+        result.smartsRes.emplace_back(element_type{ ret_val, std::string{}, 0 });
+        error = message;
+    }
 };
 
 inline bool operator==(const SmartExecutionData& l, const SmartContractRef& r) {
