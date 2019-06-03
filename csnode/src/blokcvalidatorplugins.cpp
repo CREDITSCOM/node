@@ -29,8 +29,24 @@ const uint8_t kBlockVerToSwitchCountedFees = 0;
 namespace cs {
 
 ValidationPlugin::ErrorType
-SmartStateValidator::validateBlock(const csdb::Pool& pool) {
+SmartStateValidator::validateBlock(const csdb::Pool& block) {
+    const auto& transactions = block.transactions();
+    for (const auto& t : transactions) {
+        if (SmartContracts::is_new_state(t) && !checkNewState(t)) {
+            cserror() << kLogPrefix << "incorrect new state in block "
+                      << block.sequence();
+            return ErrorType::error;
+        }
+    }
     return ErrorType::noError;
+}
+
+bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
+    auto initTrx = WalletsCache::findSmartContractInitTrx(t, getBlockChain());
+    if (!initTrx.is_valid()) {
+        cserror() << kLogPrefix << "init trx for new state is not valid";
+        return false;
+    }
 }
 
 ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block) {

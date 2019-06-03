@@ -42,6 +42,9 @@ class SmartStateValidator : public ValidationPlugin {
 public:
     SmartStateValidator(BlockValidator& bv) : ValidationPlugin(bv) {}
     ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+    bool checkNewState(const csdb::Transaction&);
 };
 
 class HashValidator : public ValidationPlugin {
