@@ -64,6 +64,8 @@ const std::string ARG_NAME_PUBLIC_KEY_FILE = "public-key-file";
 const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
 const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
 
+const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
+
 const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
 
@@ -645,6 +647,10 @@ Config Config::readFromFile(const std::string& fileName) {
             if (result.bList_.empty()) {
                 throw std::length_error("No hosts specified");
             }
+        }
+
+        if (params.count(PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS) > 0) {
+            result.alwaysExecuteContracts_ = params.get<bool>(PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS);
         }
 
         result.setLoggerSettings(config);

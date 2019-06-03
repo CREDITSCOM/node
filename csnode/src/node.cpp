@@ -56,6 +56,8 @@ Node::Node(const Config& config)
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
 
+    alwaysExecuteContracts_ = config.alwaysExecuteContracts();
+
     good_ = init(config);
 }
 
