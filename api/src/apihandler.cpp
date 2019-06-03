@@ -29,8 +29,6 @@ APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor
 #ifdef MONITOR_NODE
 , stats(blockchain)
 #endif
-//, executorTransport_(
-//      new ::apache::thrift::transport::TBufferedTransport(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", config.executor_port)))
 , tm(this) {
 #ifdef MONITOR_NODE
 	if (static bool firstTime = true; firstTime) {
