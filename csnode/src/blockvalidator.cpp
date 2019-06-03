@@ -17,6 +17,7 @@ BlockValidator::BlockValidator(const BlockChain& bc)
     plugins_.insert(std::make_pair(smartSignatures, std::make_unique<SmartSourceSignaturesValidator>(*this)));
     plugins_.insert(std::make_pair(balances, std::make_unique<BalanceChecker>(*this)));
     plugins_.insert(std::make_pair(transactionsSignatures, std::make_unique<TransactionsChecker>(*this)));
+    plugins_.insert(std::make_pair(smartStates, std::make_unique<SmartStateValidator>(*this)));
 }
 
 BlockValidator::~BlockValidator() {

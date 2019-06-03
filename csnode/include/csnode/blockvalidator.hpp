@@ -25,7 +25,8 @@ public:
         blockSignatures = 1 << 3,
         smartSignatures = 1 << 4,
         balances = 1 << 5,
-        transactionsSignatures = 1 << 6
+        transactionsSignatures = 1 << 6,
+        smartStates = 1 << 7
     };
 
     enum SeverityLevel : uint8_t {

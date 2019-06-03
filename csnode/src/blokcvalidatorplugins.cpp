@@ -28,6 +28,11 @@ const uint8_t kBlockVerToSwitchCountedFees = 0;
 
 namespace cs {
 
+ValidationPlugin::ErrorType
+SmartStateValidator::validateBlock(const csdb::Pool& pool) {
+    return ErrorType::noError;
+}
+
 ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block) {
   auto prevHash = block.previous_hash();
   auto& prevBlock = getPrevBlock();
