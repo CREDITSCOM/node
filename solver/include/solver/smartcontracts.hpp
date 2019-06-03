@@ -334,8 +334,6 @@ private:
         SmartContractRef ref_execute;
         // current state which is result of last successful execution / deploy
         std::string state;
-        // last innerID value
-        int64_t last_inner_id{ 0 };
         // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
         std::map<std::string, std::map<csdb::Address, std::string>> uses;
     };
@@ -524,8 +522,8 @@ private:
     bool execute_async(const std::vector<ExecutionItem>& executions);
 
     // makes a transaction to store new_state of smart contract invoked by src
-    // caller is responsible to test src is a smart-contract-invoke transaction
-    csdb::Transaction create_new_state(const ExecutionItem& queue_item);
+    // caller is responsible to test src is a smart-contract-invoke transaction and proper new_id value
+    csdb::Transaction create_new_state(const ExecutionItem& queue_item, int64_t new_id);
 
     // update in contracts table appropriate item's state
     bool update_contract_state(const csdb::Transaction& t, bool reading_db);
@@ -618,9 +616,6 @@ private:
 
     // returns 0 if any error
     uint64_t next_inner_id(const csdb::Address& addr) const;
-
-    // stores value as last transaction's inner id for specified contract
-    void update_inner_id(const csdb::Address& addr, int64_t val);
 
     // tests conditions to allow contract execution if disabled
     bool test_executor_availability();
