@@ -22,6 +22,7 @@ add_library(lib
   include/lib/system/scopeguard.hpp
   include/lib/system/random.hpp
   include/lib/system/reflection.hpp
+  include/lib/system/console.hpp
 )
 
 

@@ -13,6 +13,7 @@
 
 #include <lib/system/utils.hpp>
 #include <lib/system/random.hpp>
+#include <lib/system/console.hpp>
 
 static cs::TransactionsPacket packet;
 

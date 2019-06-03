@@ -3,8 +3,8 @@
 #include <string>
 #include <atomic>
 
-#include "lib/system/timer.hpp"
-#include "lib/system/utils.hpp"
+#include <lib/system/timer.hpp>
+#include <lib/system/console.hpp>
 
 TEST(Timer, BaseTimerUsage) {
     static std::atomic<bool> isCalled = false;

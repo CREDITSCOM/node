@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 
-#include "lib/system/timer.hpp"
+#include <lib/system/timer.hpp>
+#include <lib/system/console.hpp>
 
 #include <string>
 
