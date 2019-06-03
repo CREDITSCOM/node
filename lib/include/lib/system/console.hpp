@@ -11,14 +11,12 @@ void print(const T& container, std::false_type) {
     for (const auto& element : container) {
         std::cout << element << " ";
     }
-
-    std::cout << "[end]" << std::endl;
 }
 
 template <typename T>
 void print(const T& container, std::true_type) {
     for (const auto& [key, value] : container) {
-        std::cout << "Key " << key << ", value " << value << std::endl;
+        std::cout << "[Key " << key << ", value " << value << "] ";
     }
 
     std::cout << std::endl;
