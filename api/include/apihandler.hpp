@@ -769,7 +769,6 @@ private:
 #ifdef MONITOR_NODE
     csstats::csstats stats;
 #endif
-    ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executorTransport_;
 
     struct SmartOperation {
         enum class State : uint8_t {
