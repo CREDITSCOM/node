@@ -285,6 +285,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     }
 
     result.id = convert_transaction_id(transaction.id());
+    result.__isset.id = true;
+    result.__isset.trxn = true;
     result.trxn.id = transaction.innerID();
     result.trxn.amount = convertAmount(amount);
     result.trxn.currency = DEFAULT_CURRENCY;
@@ -390,6 +392,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
             }
         }
         result.trxn.smartInfo.__set_v_smartState(sti);
+        result.trxn.__isset.smartInfo = true;
     }
     else {
         result.trxn.type = api::TransactionType::TT_Normal;
