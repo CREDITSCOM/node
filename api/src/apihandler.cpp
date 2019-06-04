@@ -1053,6 +1053,8 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
             auto execTrans = s_blockchain.loadTransaction(trId);
             if (execTrans.is_valid() && is_smart(execTrans)) {
                 const auto smart = fetch_smart(execTrans);
+				if(!smart.method.empty())
+					mExecuteCount_[smart.method]++;
 
                 {
                     auto retVal = tr.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
@@ -1243,6 +1245,9 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
             if ((execTrans.is_valid() && is_smart(execTrans)) || 
 					execTrans.amount().to_double()) { // payable
                 const auto smart = fetch_smart(execTrans);
+
+				if (!smart.method.empty())
+					mExecuteCount_[smart.method]++;
 
                 {
                     auto retVal = tr.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
@@ -1787,6 +1792,15 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, con
 
     _return.variables = variablesResult.contractVariables;
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void APIHandler::ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) {
+	if (auto itCount = mExecuteCount_.find(executeMethod); itCount != mExecuteCount_.end()) {
+		_return.executeCount = itCount->second;
+		SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+	}
+	else
+		SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
 }
 
 void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const general::Address& address) {
