@@ -883,9 +883,9 @@ void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const PoolHash& hash, c
 
 void APIHandler::StatsGet(api::StatsGetResult& _return) {
 #ifdef MONITOR_NODE
-    csstats::StatsPerPeriod stats = this->stats.getStats();
+    csstats::StatsPerPeriod stats_inst = this->stats.getStats();
 
-    for (auto& s : stats) {
+    for (auto& s : stats_inst) {
         api::PeriodStats ps = {};
         ps.periodDuration = s.periodSec;
         ps.poolsCount = s.poolsCount;
@@ -1854,7 +1854,7 @@ void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return, int64_
         return;
 
     _return.result = false;
-    _return.total_trxns_count = s_blockchain.getTransactionsCount();
+    _return.total_trxns_count = (uint32_t) s_blockchain.getTransactionsCount();
 
     auto tPair = s_blockchain.getLastNonEmptyBlock();
     while (limit > 0 && tPair.second) {
@@ -1897,7 +1897,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
         }
     });
 
-    _return.count = totalTransfers;
+    _return.count = uint32_t(totalTransfers);
 
     csdb::PoolHash pooh = s_blockchain.getLastNonEmptyBlock().first;
     while (limit && !pooh.is_empty() && tokenTransPools.size()) {
@@ -2193,8 +2193,8 @@ void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
                 const cs::Bytes addr_b(addr.begin(), addr.end());
                 wi.address = fromByteArray(addr_b);
 
-                wi.timesWriter = wd.times;
-                wi.timesTrusted = wd.times_trusted;
+                wi.timesWriter = uint32_t(wd.times);
+                wi.timesTrusted = uint32_t(wd.times_trusted);
                 wi.feeCollected.integral = wd.totalFee.integral();
                 wi.feeCollected.fraction = wd.totalFee.fraction();
 
