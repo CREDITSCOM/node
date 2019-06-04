@@ -24,18 +24,33 @@ public:
     virtual ErrorType validateBlock(const csdb::Pool&) = 0;
 
 protected:
+    Node& getNode() {
+        return blockValidator_.node_;    
+    }
+
     const BlockChain& getBlockChain() {
         return blockValidator_.bc_;
     }
+
     auto getWallets() {
         return blockValidator_.wallets_;
     }
+
     auto& getPrevBlock() {
         return blockValidator_.prevBlock_;
     }
 
 private:
     BlockValidator& blockValidator_;
+};
+
+class SmartStateValidator : public ValidationPlugin {
+public:
+    SmartStateValidator(BlockValidator& bv) : ValidationPlugin(bv) {}
+    ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+    bool checkNewState(const csdb::Transaction&);
 };
 
 class HashValidator : public ValidationPlugin {

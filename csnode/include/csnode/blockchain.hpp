@@ -35,7 +35,6 @@ class BlockHashes;
 class WalletsIds;
 class Fee;
 class TransactionsPacket;
-class BlockValidator;
 
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
 using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
@@ -338,8 +337,6 @@ private:
     // block storage to defer storing it in blockchain until confirmation from other nodes got
     // (idea is it is more easy not to store block immediately then to revert it after storing)
     csdb::Pool deferredBlock_;
-
-    std::unique_ptr<cs::BlockValidator> blockValidator_;
 
     uint64_t uuidFromHash(const csdb::PoolHash& h) const {
         if (!h.is_empty()) {

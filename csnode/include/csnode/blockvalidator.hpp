@@ -6,6 +6,7 @@
 
 #include <csdb/pool.hpp>
 
+class Node;
 class BlockChain;
 
 namespace cs {
@@ -25,7 +26,8 @@ public:
         blockSignatures = 1 << 3,
         smartSignatures = 1 << 4,
         balances = 1 << 5,
-        transactionsSignatures = 1 << 6
+        transactionsSignatures = 1 << 6,
+        smartStates = 1 << 7
     };
 
     enum SeverityLevel : uint8_t {
@@ -34,7 +36,7 @@ public:
         onlyFatalErrors
     };
 
-    explicit BlockValidator(const BlockChain&);
+    explicit BlockValidator(Node&);
     ~BlockValidator();
     bool validateBlock(const csdb::Pool&, ValidationFlags = hashIntergrity, SeverityLevel = greaterThanWarnings);
 
@@ -53,7 +55,9 @@ private:
 
     bool return_(ErrorType, SeverityLevel);
 
+    Node& node_;
     const BlockChain& bc_;
+
     std::map<ValidationLevel, std::unique_ptr<ValidationPlugin>> plugins_;
 
     friend class ValidationPlugin;
