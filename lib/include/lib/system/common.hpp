@@ -45,7 +45,6 @@ using SharedMutex = std::shared_mutex;
 using SpinLock = boost::detail::spinlock;
 
 // RAII locks
-// TODO: simple lock_guard and shared_lock using next?
 template <typename T>
 class Lock : public std::lock_guard<T> {
 public:

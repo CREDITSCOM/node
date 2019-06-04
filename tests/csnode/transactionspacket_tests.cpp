@@ -12,6 +12,7 @@
 #include <csdb/transaction.hpp>
 
 #include <lib/system/utils.hpp>
+#include <lib/system/random.hpp>
 
 static cs::TransactionsPacket packet;
 
@@ -44,8 +45,8 @@ TEST(TransactionsPacket, addTransactions) {
     transaction.set_currency(1);
     transaction.set_amount(csdb::Amount(10000, 0));
 
-    const size_t randomTransactionsCount = cs::Utils::generateRandomValue<size_t>(3, 30);
-    const size_t startInnerID = cs::Utils::generateRandomValue<size_t>(1, 2789);
+    const size_t randomTransactionsCount = cs::Random::generateValue<size_t>(3, 30);
+    const size_t startInnerID = cs::Random::generateValue<size_t>(1, 2789);
 
     const auto oldtransactionsCount = packet.transactionsCount();
 
@@ -133,7 +134,7 @@ TEST(TransactionsPacket, makeTransactionsPacketFromByteStream) {
 
 TEST(TransactionsPacket, signaturesSerialization) {
     constexpr size_t maxTransactionsCount = 100;
-    const size_t count = cs::Utils::generateRandomValue<size_t>(0, maxTransactionsCount);
+    const size_t count = cs::Random::generateValue<size_t>(0, maxTransactionsCount);
     cs::Console::writeLine("Generated transactions count ", count);
 
     cs::TransactionsPacket pack;
@@ -180,7 +181,7 @@ TEST(TransactionPacketHash, fromBinary) {
     transaction.set_source(startAddress);
     transaction.set_currency(1);
     transaction.set_amount(csdb::Amount(10000, 0));
-    transaction.set_innerID(cs::Utils::generateRandomValue<int64_t>(1, 2789));
+    transaction.set_innerID(cs::Random::generateValue<int64_t>(1, 2789));
 
     cs::TransactionsPacket testPacket;
     testPacket.addTransaction(transaction);

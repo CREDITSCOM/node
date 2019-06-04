@@ -50,7 +50,8 @@ public:
         FAILURE,
         NOT_IMPLEMENTED,
         NOT_FOUND,
-        MAX
+		INPROGRESS,
+        MAX		
     };
 
     static void SetResponseStatus(general::APIResponse& response, APIRequestStatusType status, const std::string& details = "");
@@ -315,7 +316,7 @@ public:
         return false;
     }
 
-    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, const uint64_t& offsetTrx, const csdb::Amount& feeLimit) {
+    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, const uint64_t& offsetTrx, const csdb::Amount& feeLimit, const std::string& force_new_state) {
         csunused(feeLimit);
         static std::mutex m;
         std::lock_guard lk(m);  // temporary solution
@@ -340,9 +341,15 @@ public:
         executor::SmartContractBinary smartContractBinary;
         smartContractBinary.contractAddress = smartTarget.to_api_addr();
         smartContractBinary.object.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
-        auto optState = getState(smartTarget);
-        if (optState.has_value())
-            smartContractBinary.object.instance = optState.value();
+        // may contain temporary last new state not yet written into block chain (to allow "speculative" multi-executions af the same contract)
+        if (!force_new_state.empty()) {
+            smartContractBinary.object.instance = force_new_state;
+        }
+        else {
+            auto optState = getState(smartTarget);
+            if (optState.has_value())
+                smartContractBinary.object.instance = optState.value();
+        }
         smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr())) ? true : false;
 
         std::string method;
@@ -473,8 +480,8 @@ public:
     bool isLockSmart(const general::Address& address, const general::AccessID& accessId) {
         std::lock_guard lk(mtx_);
         if (auto addrLock = lockSmarts.find(address); addrLock != lockSmarts.end() && addrLock->second == accessId)
-            return false;
-        return true;
+            return true;
+        return false;
     }
 
 public slots:
@@ -583,7 +590,13 @@ private:
     }
 
     void disconnect() {
-        executorTransport_->close();
+        try {
+            executorTransport_->close();
+        }
+        catch (::apache::thrift::transport::TTransportException&) {
+            isConnect_ = false;
+            cvErrorConnect_.notify_one();
+        }
     }
 
 	//
@@ -727,6 +740,7 @@ public:
     }
 
 private:
+	::csstats::AllStats stats_;
     executor::Executor& executor_;
 
     struct smart_trxns_queue {
@@ -805,6 +819,13 @@ private:
     cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
     cs::SpinLockable<std::map<csdb::Address, smart_state_entry>> smart_state;
     cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smart_last_trxn;
+
+	//
+	/*using TrxInPrgss = std::pair<csdb::Address, int64_t>;
+	using CVInPrgss = std::pair<std::condition_variable, bool>;
+	cs::SpinLockable<std::map<TrxInPrgss, CVInPrgss>> trxInProgress;*/
+	//
+
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployed_by_creator;
     cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
     std::map<csdb::PoolHash, api::Pool> poolCache;
@@ -852,6 +873,7 @@ private:
 private slots:
     void update_smart_caches_slot(const csdb::Pool& pool);
     void store_block_slot(const csdb::Pool& pool);
+	void collect_all_stats_slot(const csdb::Pool& pool);
 };
 }  // namespace api
 

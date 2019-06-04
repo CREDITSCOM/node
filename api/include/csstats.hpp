@@ -81,7 +81,7 @@ public:
 
     ~csstats();
 
-    void run();
+	void run(const ::csstats::AllStats& allStats);
 
 private:
     std::thread thread;
@@ -92,7 +92,6 @@ private:
 
     StatsPerPeriod currentStats;
     StatsCut statsCut;
-    csdb::PoolHash lastHash;
 
     std::mutex currentStatsMutex;
     std::chrono::system_clock::time_point lastUpdateTime = std::chrono::system_clock::from_time_t(0);
@@ -100,7 +99,7 @@ private:
     BlockChain& blockchain;
 
     StatsPerPeriod collectStats(const Periods& periods);
-    AllStats collectAllStats(const Periods& periods);
+    //AllStats collectAllStats(const Periods& periods);
 
     template <class F>
     void matchPeriod(const Periods& periods, period_t period, F func);

@@ -44,6 +44,8 @@ public:
         Drop
     };
 
+    using RefExecution = std::pair<cs::Sequence, uint32_t>;
+
     explicit Node(const Config&);
     ~Node();
 
@@ -90,7 +92,7 @@ public:
     void sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester, cs::Bytes& message);
 
     // smart-contracts consensus communicatioin
-    void sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, cs::StageOneSmarts& stageOneInfo);
+    void sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs::StageOneSmarts& stageOneInfo);
     void getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
     void sendSmartStageTwo(const cs::ConfidantsKeys& smartConfidants, cs::StageTwoSmarts& stageTwoInfo);
     void getSmartStageTwo(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
@@ -105,7 +107,7 @@ public:
     void removeSmartConsensus(uint64_t id);
     void checkForSavedSmartStages(uint64_t id);
 
-    void sendSmartReject(const std::vector<std::pair<cs::Sequence, uint32_t>>& referenceList);
+    void sendSmartReject(const std::vector<RefExecution>& rejectList);
     void getSmartReject(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
 
     csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil);
@@ -210,14 +212,16 @@ public:
     using SmartsSignal = cs::Signal<void(T&, bool)>;
     using SmartStageRequestSignal = cs::Signal<void(uint8_t, cs::Sequence, uint32_t, uint8_t, uint8_t, cs::PublicKey&)>;
     using StopSignal = cs::Signal<void()>;
-    using RefectedSmartContractsSignal = cs::Signal<void(const std::vector<std::pair<cs::Sequence, uint32_t>>&)>;
+
+    // args: [failed list, restart list]
+    using RejectedSmartContractsSignal = cs::Signal<void(const std::vector<RefExecution>&)>;
 
 public signals:
     SmartsSignal<cs::StageOneSmarts> gotSmartStageOne;
     SmartsSignal<cs::StageTwoSmarts> gotSmartStageTwo;
     SmartsSignal<cs::StageThreeSmarts> gotSmartStageThree;
     SmartStageRequestSignal receivedSmartStageRequest;
-    RefectedSmartContractsSignal gotRejectedContracts;
+    RejectedSmartContractsSignal gotRejectedContracts;
 
     inline static StopSignal stopRequested;
 
@@ -358,7 +362,7 @@ private:
     std::vector<cs::Bytes> stageOneMessage_;
     std::vector<cs::Bytes> stageTwoMessage_;
     std::vector<cs::Bytes> stageThreeMessage_;
-    bool stageThreeSent = false;
+    bool stageThreeSent_ = false;
 
     std::vector<cs::Bytes> smartStageOneMessage_;
     std::vector<cs::Bytes> smartStageTwoMessage_;
@@ -388,6 +392,7 @@ private:
     //expected rounds
     std::vector<cs::RoundNumber> expectedRounds_;
     cs::Sequence maxHeighboursSequence_ = 0;
+    cs::Bytes lastTrustedMask_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

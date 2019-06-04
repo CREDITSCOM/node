@@ -41,7 +41,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 {
 
 #ifdef BINARY_TCP_EXECAPI
-    exec_server_port = config.apiexec_port;
+    exec_server_port = uint16_t(config.apiexec_port);
     cslog() << "Starting executor API on port " << config.apiexec_port;
     exec_thread = std::thread([this]() {
         try {
@@ -54,11 +54,11 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 #endif
 
 #ifdef BINARY_TCP_API
-    server_port = config.port;
+    server_port = uint16_t(config.port);
 #endif
 
 #ifdef AJAX_IFACE
-    ajax_server_port = config.ajax_port;
+    ajax_server_port = uint16_t(config.ajax_port);
 #endif
 }
 

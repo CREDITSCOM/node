@@ -151,7 +151,7 @@ void Network::readerRoutine(const Config& config) {
             }
 #ifdef __linux__
             static uint64_t one = 1;
-            write(readerEventfd_, &one, sizeof(uint64_t));
+            [[maybe_unused]] auto res = write(readerEventfd_, &one, sizeof(uint64_t));
 #endif
 #if defined(WIN32) || defined(__APPLE__)
             while (readerLock.test_and_set(std::memory_order_acquire))  // acquire lock
@@ -174,6 +174,7 @@ void Network::readerRoutine(const Config& config) {
     cswarning() << "readerRoutine STOPPED!!!\n";
 }
 
+[[maybe_unused]]
 static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const ip::udp::endpoint& ep) {
     boost::system::error_code lastError;
     size_t size = 0;
@@ -221,9 +222,10 @@ void Network::writerRoutine(const Config& config) {
     while (stopWriterRoutine == false) {  // changed from true
 #ifdef __linux__
         uint64_t tasks;
-        int s = read(writerEventfd_, &tasks, sizeof(uint64_t));
-        if (s != sizeof(uint64_t))
+        auto s = read(writerEventfd_, &tasks, sizeof(uint64_t));
+        if (s != sizeof(uint64_t)) {
             continue;
+        }
 
         if (tasks > 200) {
             cslog() << "strange: too many tasks " << tasks;
@@ -231,44 +233,63 @@ void Network::writerRoutine(const Config& config) {
 
         msg.resize(tasks);
         std::fill(msg.begin(), msg.end(), mmsghdr{});
+
         iovecs.resize(tasks);
         std::fill(iovecs.begin(), iovecs.end(), iovec{});
+
         packets_buffer.resize(tasks);
+
         endpoints.resize(tasks);
         encoded_packets.clear();
 
-        int j = 0;
+        uint64_t j = 0;
+
         for (uint64_t i = 0; i < tasks; i++) {
             auto task = oPacMan_.getNextTask();
+
             std::atomic_thread_fence(std::memory_order_acquire);
+
             while (!task->pack.data_.ptr_) {
                 cslog() << "net: invalid packet for send!!!!!!!!!";
             }
+
             encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
             endpoints[j] = task->endpoint;
+
             iovecs[j].iov_base = encoded_packets[j].data();
             iovecs[j].iov_len = encoded_packets[j].size();
+
             msg[j].msg_hdr.msg_iov = &iovecs[j];
             msg[j].msg_hdr.msg_iovlen = 1;
             msg[j].msg_hdr.msg_name = endpoints[j].data();
-            msg[j].msg_hdr.msg_namelen = endpoints[j].size();
+            msg[j].msg_hdr.msg_namelen = static_cast<decltype(msg[j].msg_hdr.msg_namelen)>(endpoints[j].size());
+
             ++j;
         }
-        if (j == 0)
+
+        if (j == 0) {
             continue;
+        }
+
         tasks = j;
 
         int sended = 0;
         struct mmsghdr* messages = msg.data();
+
         do {
-            sended = sendmmsg(sock->native_handle(), messages, tasks, 0);
+            sended = sendmmsg(sock->native_handle(), messages, static_cast<unsigned int>(tasks), 0);
+
             if (sended < 0) {
                 cslog() << "sendmmsg errno = " << errno;
-                if (errno != EAGAIN)
+
+                if (errno != EAGAIN) {
                     break;
+                }
             }
+
             messages += sended;
-            tasks -= sended;
+            tasks -= static_cast<decltype(tasks)>(sended);
+
         } while (tasks);
 #endif
 #if defined(WIN32) || defined(__APPLE__)
@@ -315,21 +336,28 @@ void Network::processorRoutine() {
         externals.callAll();
 #ifdef __linux__
         uint64_t tasks;
+
         while (true) {
             int ret = poll(&pfd, 1, timeout);
-            if (ret != 0)
+
+            if (ret != 0) {
                 break;
+            }
+
             externals.callAll();
         }
-        int s = read(readerEventfd_, &tasks, sizeof(uint64_t));
-        if (s != sizeof(uint64_t))
+
+        if (auto s = read(readerEventfd_, &tasks, sizeof(uint64_t)); s != sizeof(uint64_t)) {
             continue;
+        }
 
         for (uint64_t i = 0; i < tasks; i++) {
             auto task = iPacMan_.getNextTask();
+
             while (!task->pack.data_.ptr_) {
                 cslog() << "net: invalid packet processor!!!!!!!!!";
             }
+
             processTask(task);
         }
 #endif
@@ -436,7 +464,7 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
     oPacMan_.enQueueLast();
 #ifdef __linux__
     static uint64_t one = 1;
-    write(writerEventfd_, &one, sizeof(uint64_t));
+    [[maybe_unused]] auto res = write(writerEventfd_, &one, sizeof(uint64_t));
 #endif
 #if defined(WIN32) || defined(__APPLE__)
     while (writerLock.test_and_set(std::memory_order_acquire))  // acquire lock
