@@ -14,88 +14,99 @@
 #include <sstream>
 
 namespace {
-const char* kLogPrefix = "Smart: ";
+    const char* kLogPrefix = "Smart: ";
 
-inline void print(std::ostream& os, const ::general::Variant& var) {
-    os << "Variant(";
-    bool print_default = false;
-    if (var.__isset.v_string) {
-        os << var.v_string;
-    }
-    else if (var.__isset.v_null) {
-        os << "Null";
-    }
-    else if (var.__isset.v_boolean) {
-        os << var.v_boolean;
-    }
-    else if (var.__isset.v_boolean_box) {
-        os << var.v_boolean_box;
-    }
-    else if( var.__isset.v_array ) {
-        os << "Array";
-    }
-    else if( var.__isset.v_object ) {
-        os << "Object";
-    }
-    else if( var.__isset.v_void) {
-        os << "Void";
-    }
-    else if( var.__isset.v_list ) {
-        os << "List";
-    }
-    else if( var.__isset.v_set ) {
-        os << "Set";
-    }
-    else if( var.__isset.v_map ) {
-        os << "Map";
-    }
-    else if( var.__isset.v_int ) {
-        os << var.v_int;
-    }
-    else if (var.__isset.v_int_box) {
-        os << var.v_int_box;
-    }
-    else if (var.__isset.v_byte) {
-        os << (unsigned int)var.v_byte;
-    }
-    else if (var.__isset.v_byte_box) {
-        os << (unsigned int)var.v_byte_box;
-    }
-    else if (var.__isset.v_short) {
-        os << var.v_short;
-    }
-    else if (var.__isset.v_short_box) {
-        os << var.v_short_box;
-    }
-    else if (var.__isset.v_long) {
-        os << var.v_long;
-    }
-    else if (var.__isset.v_long_box) {
-        os << var.v_long_box;
-    }
-    else if (var.__isset.v_float) {
-        os << var.v_float;
-    }
-    else if (var.__isset.v_float_box) {
-        os << var.v_float_box;
-    }
-    else if (var.__isset.v_double) {
-        os << var.v_double;
-    }
-    else if (var.__isset.v_double_box) {
-        os << var.v_double_box;
-    }
-    else {
-        /* other variant types are shown by default */
-        print_default = true;
-    }
-    os << ')';
+    inline void print(std::ostream& os, const ::general::Variant& var) {
+        os << "Variant(";
+        bool print_default = false;
+        if (var.__isset.v_string) {
+            os << var.v_string;
+        }
+        else if (var.__isset.v_null) {
+            os << "Null";
+        }
+        else if (var.__isset.v_boolean) {
+            os << var.v_boolean;
+        }
+        else if (var.__isset.v_boolean_box) {
+            os << var.v_boolean_box;
+        }
+        else if (var.__isset.v_array) {
+            os << "Array";
+        }
+        else if (var.__isset.v_object) {
+            os << "Object";
+        }
+        else if (var.__isset.v_void) {
+            os << "Void";
+        }
+        else if (var.__isset.v_list) {
+            os << "List";
+        }
+        else if (var.__isset.v_set) {
+            os << "Set";
+        }
+        else if (var.__isset.v_map) {
+            os << "Map";
+        }
+        else if (var.__isset.v_int) {
+            os << var.v_int;
+        }
+        else if (var.__isset.v_int_box) {
+            os << var.v_int_box;
+        }
+        else if (var.__isset.v_byte) {
+            os << (unsigned int)var.v_byte;
+        }
+        else if (var.__isset.v_byte_box) {
+            os << (unsigned int)var.v_byte_box;
+        }
+        else if (var.__isset.v_short) {
+            os << var.v_short;
+        }
+        else if (var.__isset.v_short_box) {
+            os << var.v_short_box;
+        }
+        else if (var.__isset.v_long) {
+            os << var.v_long;
+        }
+        else if (var.__isset.v_long_box) {
+            os << var.v_long_box;
+        }
+        else if (var.__isset.v_float) {
+            os << var.v_float;
+        }
+        else if (var.__isset.v_float_box) {
+            os << var.v_float_box;
+        }
+        else if (var.__isset.v_double) {
+            os << var.v_double;
+        }
+        else if (var.__isset.v_double_box) {
+            os << var.v_double_box;
+        }
+        else {
+            /* other variant types are shown by default */
+            print_default = true;
+        }
+        os << ')';
 
-    if( print_default ) {
-        os << ": ";
-        var.printTo( os );
+        if (print_default) {
+            os << ": ";
+            var.printTo(os);
+        }
     }
-}
+
+    // serializes val passed to special transaction user field new_state::RetVal
+    inline void set_return_value(csdb::Transaction& new_state_transaction, const ::general::Variant& val) {
+        new_state_transaction.add_user_field(cs::trx_uf::new_state::RetVal, serialize(val));
+    }
+
+    inline void set_return_value(csdb::Transaction& new_state_transaction, uint8_t val) {
+        ::general::Variant variant;
+        variant.__set_v_byte(val);
+        set_return_value(new_state_transaction, variant);
+    }
 
 }
 
@@ -837,7 +848,6 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
                 const auto it = known_contracts.find(abs_addr);
                 if (it != known_contracts.cend()) {
                     // is emitted by contract
-                    update_inner_id(abs_addr, tr.innerID());
                     const auto& state = it->second;
                     csdb::Transaction starter = get_transaction(state.ref_execute);
                     if (state.payable == PayableStatus::Implemented && starter.is_valid()) {
@@ -905,11 +915,6 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
                             replenish_contract.emplace_back(block.hash(), block.sequence(), tr_idx);
                         }
                     }
-                }
-                // update in cache innerID
-                abs_addr = absolute_address(tr.source());
-                if (in_known_contracts(abs_addr)) {
-                    update_inner_id(abs_addr, tr.innerID());
                 }
             }
 
@@ -1188,6 +1193,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
     // create (multi-)packet:
     // new_state[0] + [ emitted_list[0] ] + [ susequent_state_list[0] ] + ... + new_state[n-1] + [ emitted_list[n-1] ] + [ subsequent_state_list[n-1] ]
     cs::TransactionsPacket integral_packet;
+    int64_t next_id = 0; // "lazy" initialization assumed
 
     for (const auto& data_item : data_list) {
         ExecutionItem* execution = nullptr;
@@ -1209,7 +1215,21 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
         if (packet.transactionsCount() > 0) {
             packet.clear();
         }
-        csdb::Transaction result = create_new_state(*execution);
+
+        if (next_id > 0) {
+            ++next_id;
+        }
+        else {
+            // 1st-time init
+            auto starter = get_transaction(execution->ref_start);
+            if (starter.is_valid()) {
+                next_id = next_inner_id(absolute_address(starter.target()));
+            }
+            else {
+                next_id = 1;
+            }
+        }
+        csdb::Transaction result = create_new_state(*execution, next_id);
 
         // create partial failure if new_state is not created
         if(!result.is_valid()) {
@@ -1220,9 +1240,9 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             }
             QueueItem fake(data_item.contract_ref, absolute_address(tmp.target()), tmp);
             if (!fake.executions.empty()) {
-                result = create_new_state(fake.executions.front());
+                result = create_new_state(fake.executions.front(), next_id); // use the same next_id again
             }
-            else {
+            else {  
                 // wtf!
                 cserror() << kLogPrefix << "failed to create new_state transaction, even empty";
             }
@@ -1235,7 +1255,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             // result contains empty USRFLD[state::Value]
             result.add_user_field(new_state::Value, std::string{});
             // result contains error code from ret_val
-            result.add_user_field(new_state::RetVal, serialize(data_item.result.smartsRes.front().retValue));
+            set_return_value(result, data_item.result.smartsRes.front().retValue);
             packet.addTransaction(result);
         }
         else {
@@ -1244,7 +1264,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
 
             // put new state
             result.add_user_field(new_state::Value, execution_result.newState);
-            result.add_user_field(new_state::RetVal, serialize(execution_result.retValue));
+            set_return_value(result, execution_result.retValue);
             packet.addTransaction(result);
 
             if (it != exe_queue.end()) {
@@ -1275,7 +1295,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                     for (const auto& [addr, state] : data_item.result.states) {
                         auto it_call = find_in_queue_item(it, data_item.contract_ref);
                         if (it_call != it->executions.end()) {
-                            csdb::Transaction t = create_new_state(*it_call);
+                            csdb::Transaction t = create_new_state(*it_call, ++next_id);
                             if (t.is_valid()) {
                                 // re-assign some fields
                                 t.set_innerID(next_inner_id(addr));
@@ -1283,7 +1303,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                                 t.set_target(addr);
                                 t.add_user_field(trx_uf::new_state::Value, state);
                                 t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
-                                t.add_user_field(trx_uf::new_state::RetVal, serialize(::general::Variant{}));
+                                set_return_value(t, ::general::Variant{});
                                 packet.addTransaction(t);
                             }
                         }
@@ -1312,47 +1332,29 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
     emit signal_smart_executed(integral_packet);
 }
 
-void SmartContracts::update_inner_id(const csdb::Address& addr, int64_t val) {
-    csdb::Address abs_addr = SmartContracts::absolute_address(addr);
-    const auto it = known_contracts.find(abs_addr);
-    if (it != known_contracts.cend()) {
-        if (it->second.last_inner_id < val) {
-            it->second.last_inner_id = val;
-            csdebug() << kLogPrefix << abs_addr.to_string() << " innerID updated to " << val;
-        }
-    }
-}
-
 uint64_t SmartContracts::next_inner_id(const csdb::Address& addr) const {
     csdb::Address abs_addr = SmartContracts::absolute_address(addr);
     
-    // lookup in contracts cache
-    const auto it = known_contracts.find(abs_addr);
-    if (it != known_contracts.cend()) {
-        if (it->second.last_inner_id > 0) {
-            return it->second.last_inner_id + 1;
-        }
-        return it->second.is_locked;
-    }
-
     // lookup in blockchain
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
-    if (!bc.findWalletData(abs_addr, wallData, wallId)) {
-        return 0;
+    uint64_t id = 1;
+    if (bc.findWalletData(abs_addr, wallData, wallId)) {
+        if (!wallData.trxTail_.empty()) {
+            id = wallData.trxTail_.getLastTransactionId() + 1;
+        }
     }
-    return wallData.trxTail_.empty() ? 1 : wallData.trxTail_.getLastTransactionId() + 1;
+    //csdebug() << kLogPrefix << "next innerID " << id << " (from storage)";
+    return id;
 }
 
-csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item) {
+csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item, int64_t new_id) {
     csdb::Transaction src = get_transaction(item.ref_start);
     if (!src.is_valid()) {
         return csdb::Transaction{};
     }
 
-    const auto id = next_inner_id(src.target());
-    update_inner_id(absolute_address(src.target()), id);
-    csdb::Transaction result(id,  // see: APIHandler::WalletDataGet(...) in apihandler.cpp
+    csdb::Transaction result(new_id,
                              src.target(),                 // contracts is source
                              src.target(),                 // contracts is target also
                              src.currency(),
@@ -1450,7 +1452,7 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                                         // lookup proper new state, erase other transactions in result
                                         if (SmartContracts::is_new_state(t) && SmartContracts::absolute_address(t.target()) == new_rejected_item.abs_addr) {
                                             t.add_user_field(trx_uf::new_state::Value, std::string{});
-                                            t.add_user_field(trx_uf::new_state::RetVal, error::ConsensusRejected);
+                                            set_return_value(t, error::ConsensusRejected);
                                             integral_pack.addTransaction(t);
                                             e.result.clear();
                                             e.result.addTransaction(t);
@@ -1517,11 +1519,6 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         csdb::Address abs_addr = absolute_address(t.target());
         if (abs_addr.is_valid()) {
             StateItem& item = known_contracts[abs_addr];
-            // update last state (with non-empty one)
-            const auto new_id = t.innerID();
-            if (new_id > item.last_inner_id) {
-                item.last_inner_id = new_id;
-            }
             item.state = std::move(state_value);
             // determine it is the result of whether deploy or execute
             fld = t.user_field(new_state::RefStart);
@@ -1593,7 +1590,18 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
                 }
             }
         }
-        csdebug() << kLogPrefix << "contract state is not updated, new state is empty meaning execution is failed";
+        std::string error_message("execution is failed");
+        fld = t.user_field(new_state::RetVal);
+        if (fld.is_valid()) {
+            ::general::Variant var = deserialize <::general::Variant>(fld.value<std::string>());
+            if (var.__isset.v_byte) {
+                error_message = SmartContracts::get_error_message(var.v_byte);
+            }
+            else if (var.__isset.v_string) {
+                error_message = var.v_string;
+            }
+        }
+        csdebug() << kLogPrefix << "contract state is not updated, " << error_message;
         return false;
     }
     return true;

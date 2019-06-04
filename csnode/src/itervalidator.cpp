@@ -45,7 +45,6 @@ Characteristic IterValidator::formCharacteristic(SolverContext& context, Transac
 void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& characteristicMask, const Transactions& transactions) {
     // test if any of smart-emitted transaction rejected, reject all transactions from this smart
     // 1. collect rejected smart addresses
-    const auto& smarts = context.smart_contracts();
     std::vector<SolverContext::RefExecution> rejectList;
     size_t maskSize = characteristicMask.size();
     size_t i = 0;

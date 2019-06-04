@@ -285,6 +285,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     }
 
     result.id = convert_transaction_id(transaction.id());
+    result.__isset.id = true;
+    result.__isset.trxn = true;
     result.trxn.id = transaction.innerID();
     result.trxn.amount = convertAmount(amount);
     result.trxn.currency = DEFAULT_CURRENCY;
@@ -365,33 +367,32 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         result.trxn.__set_smartContract(sci);
     }
     else if (is_smart_state(transaction)) {
+        result.trxn.type = api::TransactionType::TT_SmartState;
         api::SmartStateTransInfo sti;
         sti.success = !(transaction.user_field(cs::trx_uf::new_state::Value).value<std::string>().empty());
         sti.executionFee = convertAmount(transaction.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>());
-
         cs::SmartContractRef scr;
         scr.from_user_field(transaction.user_field(cs::trx_uf::new_state::RefStart));
         sti.startTransaction = convert_transaction_id(scr.getTransactionID());
 
-        auto retVal = transaction.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
-        result.trxn.type = api::TransactionType::TT_SmartState;
-        if (!(retVal.size() == 1 && retVal[0] == 0)) {
-            auto var = deserialize<::general::Variant>(std::move(retVal));
+        auto fld = transaction.user_field(cs::trx_uf::new_state::RetVal);
+        if (fld.is_valid()) {
+            auto retVal = fld.value<std::string>();
+            auto variant = deserialize<::general::Variant>(std::move(retVal));
             // override retValue with text message if new state is empty
             if (sti.success) {
-                sti.__set_returnValue(var);
+                sti.__set_returnValue(variant);
             }
             else {
-                if (var.__isset.v_byte) {
-                    var.__set_v_string(cs::SmartContracts::get_error_message(var.v_byte));
+                if (variant.__isset.v_byte) {
+                    // if not success and variant is of byte type there is an error code
+                    variant.__set_v_string(cs::SmartContracts::get_error_message(variant.v_byte));
                 }
-                sti.__set_returnValue(var);
+                sti.__set_returnValue(variant);
             }
-            result.trxn.smartInfo.__set_v_smartState(sti);
         }
-        else {
-            result.trxn.__set_smartInfo(api::SmartTransInfo{});
-        }
+        result.trxn.smartInfo.__set_v_smartState(sti);
+        result.trxn.__isset.smartInfo = true;
     }
     else {
         result.trxn.type = api::TransactionType::TT_Normal;
@@ -814,7 +815,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
         if (new_state.empty()) {
             _return.status.code = ERROR_CODE;
-            _return.status.message = "state is empty!";
+            _return.status.message = "state is not updated, execution failed";
             return;
         }
         else {

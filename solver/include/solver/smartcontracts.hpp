@@ -280,7 +280,7 @@ public:
     // flag to allow execution, also depends on executor presence
     CallsQueueScheduler& scheduler;
 
-public
+    public
 signals:
     // emits on contract execution
     SmartContractExecutedSignal signal_smart_executed;
@@ -350,8 +350,6 @@ private:
         SmartContractRef ref_execute;
         // current state which is result of last successful execution / deploy
         std::string state;
-        // last innerID value
-        int64_t last_inner_id{ 0 };
         // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
         std::map<std::string, std::map<csdb::Address, std::string>> uses;
     };
@@ -404,7 +402,7 @@ private:
         std::unique_ptr<SmartConsensus> pconsensus;
 
         QueueItem() = default;
-        
+
         QueueItem(const QueueItem& src) {
             status = src.status;
             seq_enqueue = src.seq_enqueue;
@@ -420,13 +418,13 @@ private:
 
 
         QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
-        : status(SmartContractStatus::Waiting)
-        , seq_enqueue(0)
-        , seq_start(0)
-        , seq_finish(0)
-        , abs_addr(absolute_address)
-        , is_executor(false)
-        , is_rejected(false) {
+            : status(SmartContractStatus::Waiting)
+            , seq_enqueue(0)
+            , seq_start(0)
+            , seq_finish(0)
+            , abs_addr(absolute_address)
+            , is_executor(false)
+            , is_rejected(false) {
 
             add(ref_contract, tr_start);
         }
@@ -540,8 +538,8 @@ private:
     bool execute_async(const std::vector<ExecutionItem>& executions);
 
     // makes a transaction to store new_state of smart contract invoked by src
-    // caller is responsible to test src is a smart-contract-invoke transaction
-    csdb::Transaction create_new_state(const ExecutionItem& queue_item);
+    // caller is responsible to test src is a smart-contract-invoke transaction and proper new_id value
+    csdb::Transaction create_new_state(const ExecutionItem& queue_item, int64_t new_id);
 
     // update in contracts table appropriate item's state
     bool update_contract_state(const csdb::Transaction& t, bool reading_db);
@@ -632,11 +630,8 @@ private:
 
     void test_contracts_locks();
 
-    // returns 0 if any error
+    // returns 1 if any error
     uint64_t next_inner_id(const csdb::Address& addr) const;
-
-    // stores value as last transaction's inner id for specified contract
-    void update_inner_id(const csdb::Address& addr, int64_t val);
 
     // tests conditions to allow contract execution if disabled
     bool test_executor_availability();
