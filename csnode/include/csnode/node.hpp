@@ -27,6 +27,7 @@ class SolverCore;
 
 namespace cs {
 class PoolSynchronizer;
+class BlockValidator;
 }  // namespace cs
 
 class Node {
@@ -233,6 +234,7 @@ public slots:
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
     void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
+    void validateBlock(csdb::Pool block, bool* shouldStop);
 
 private:
     bool init(const Config& config);
@@ -393,6 +395,7 @@ private:
     std::vector<cs::RoundNumber> expectedRounds_;
     cs::Sequence maxHeighboursSequence_ = 0;
     cs::Bytes lastTrustedMask_;
+    std::unique_ptr<cs::BlockValidator> blockValidator_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

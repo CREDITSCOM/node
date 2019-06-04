@@ -11,6 +11,7 @@
 #include <csnode/nodecore.hpp>
 #include <csnode/nodeutils.hpp>
 #include <csnode/poolsynchronizer.hpp>
+#include <csnode/blockvalidator.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/progressbar.hpp>
@@ -40,7 +41,8 @@ Node::Node(const Config& config)
 , allocator_(1 << 24, 5)
 , packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_)
-, stat_() {
+, stat_()
+, blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
     std::cout << "Start transport... ";
     transport_ = new Transport(config, this);
@@ -55,6 +57,7 @@ Node::Node(const Config& config)
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &executor::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
+    cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     good_ = init(config);
 }
@@ -2691,4 +2694,13 @@ void Node::onStopRequested() {
     else {
         stop();
     }
+}
+
+void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
+    if (!blockValidator_->validateBlock(block, cs::BlockValidator::ValidationLevel::hashIntergrity,
+                                        cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
+      *shouldStop = true;
+      return;
+    }
+    *shouldStop = false;
 }
