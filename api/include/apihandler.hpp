@@ -375,13 +375,21 @@ public:
 			api::SmartContractInvocation sci;
             const auto fld = smart.user_field(0);
             if (!fld.is_valid() && smart.amount().to_double()) {  // payable
+                // add method name
 				header.methodName = "payable";
 				general::Variant var;
+                // add arg[0]
 				var.__set_v_string(smart.amount().to_string());
 				header.params.emplace_back(var);
-				var.__set_v_string(smart.currency().to_string());
-				header.params.emplace_back(var);
-			}
+                // add arg[1]
+                if (smart.user_field(1).is_valid()) {
+                    var.__set_v_string(smart.user_field(1).value<std::string>());
+                }
+                else {
+                    var.__set_v_string("");
+                }
+                header.params.emplace_back(var);
+            }
 			else if (!isdeploy) {
                 sci = deserialize<api::SmartContractInvocation>(fld.value<std::string>());
                 header.methodName = sci.method;
@@ -508,7 +516,7 @@ private:
     explicit Executor(const BlockChain& p_blockchain, const cs::SolverCore& solver, const int p_exec_port)
     : blockchain_(p_blockchain)
     , solver_(solver)
-    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", p_exec_port)))
+    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost"/*"192.168.0.64"*/, p_exec_port)))
     , origExecutor_(
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
         std::thread th([&]() {
@@ -598,7 +606,13 @@ private:
     }
 
     void disconnect() {
-        executorTransport_->close();
+        try {
+            executorTransport_->close();
+        }
+        catch (::apache::thrift::transport::TTransportException& x) {
+            isConnect_ = false;
+            cvErrorConnect_.notify_one();
+        }
     }
 
 	//
