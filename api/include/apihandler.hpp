@@ -606,7 +606,13 @@ private:
     }
 
     void disconnect() {
-        executorTransport_->close();
+        try {
+            executorTransport_->close();
+        }
+        catch (::apache::thrift::transport::TTransportException& x) {
+            isConnect_ = false;
+            cvErrorConnect_.notify_one();
+        }
     }
 
 	//
