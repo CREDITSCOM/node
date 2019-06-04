@@ -36,7 +36,7 @@ public:
         onlyFatalErrors
     };
 
-    explicit BlockValidator(const Node&);
+    explicit BlockValidator(Node&);
     ~BlockValidator();
     bool validateBlock(const csdb::Pool&, ValidationFlags = hashIntergrity, SeverityLevel = greaterThanWarnings);
 
@@ -55,7 +55,7 @@ private:
 
     bool return_(ErrorType, SeverityLevel);
 
-    const Node& node_;
+    Node& node_;
     const BlockChain& bc_;
 
     std::map<ValidationLevel, std::unique_ptr<ValidationPlugin>> plugins_;

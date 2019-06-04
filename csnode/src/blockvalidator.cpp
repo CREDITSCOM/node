@@ -8,7 +8,7 @@
 
 namespace cs {
 
-BlockValidator::BlockValidator(const Node& node)
+BlockValidator::BlockValidator(Node& node)
 : node_(node)
 , bc_(node_.getBlockChain())
 , wallets_(::std::make_shared<WalletsState>(node_.getBlockChain())) {

@@ -2699,8 +2699,6 @@ void Node::onStopRequested() {
 void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
     if (!blockValidator_->validateBlock(block, cs::BlockValidator::ValidationLevel::hashIntergrity,
                                         cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
-      *shouldStop = true;
-      return;
+        *shouldStop = true;
     }
-    *shouldStop = false;
 }

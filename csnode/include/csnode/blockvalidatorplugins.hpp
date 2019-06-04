@@ -24,12 +24,18 @@ public:
     virtual ErrorType validateBlock(const csdb::Pool&) = 0;
 
 protected:
+    Node& getNode() {
+        return blockValidator_.node_;    
+    }
+
     const BlockChain& getBlockChain() {
         return blockValidator_.bc_;
     }
+
     auto getWallets() {
         return blockValidator_.wallets_;
     }
+
     auto& getPrevBlock() {
         return blockValidator_.prevBlock_;
     }

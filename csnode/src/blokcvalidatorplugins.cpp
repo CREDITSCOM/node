@@ -33,20 +33,58 @@ SmartStateValidator::validateBlock(const csdb::Pool& block) {
     const auto& transactions = block.transactions();
     for (const auto& t : transactions) {
         if (SmartContracts::is_new_state(t) && !checkNewState(t)) {
-            cserror() << kLogPrefix << "incorrect new state in block "
+            cserror() << kLogPrefix << "error occured during new state check in block "
                       << block.sequence();
-            return ErrorType::error;
+            return ErrorType::warning;
         }
     }
     return ErrorType::noError;
 }
 
 bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
-    auto initTrx = WalletsCache::findSmartContractInitTrx(t, getBlockChain());
-    if (!initTrx.is_valid()) {
-        cserror() << kLogPrefix << "init trx for new state is not valid";
+    SmartContractRef ref = t.user_field(trx_uf::new_state::RefStart);
+    if (!ref.is_valid()) {
+        cserror() << kLogPrefix << "ref to start trx is not valid";
         return false;
     }
+    auto block = getBlockChain().loadBlock(ref.sequence);
+    if (!block.is_valid()) {
+        cserror() << "load block with init trx failed";
+        return false;
+    }
+    auto connectorPtr = getNode().getConnector();
+    if (connectorPtr == nullptr) {
+        cserror() << kLogPrefix << "unavailable connector ptr";
+        return false;
+    }
+    auto executorPtr = connectorPtr->apiExecHandler();
+    if (executorPtr == nullptr) {
+        cserror() << kLogPrefix << "unavailable executor ptr";
+        return false;
+    }
+
+    auto result = executorPtr->getExecutor().executeTransaction(block, ref.transaction,
+                  csdb::Amount(block.transactions()[ref.transaction].max_fee().to_double()), "");
+    if (!result.has_value()) {
+        cserror() << kLogPrefix << "execution of transaction failed";
+        return false;
+    }
+
+    std::string newState = t.user_field(trx_uf::new_state::Value).value<std::string>();
+    std::string realNewState = result.value().newState;
+    if (newState.empty()) {
+        if (!realNewState.empty()) {
+            csdebug() << kLogPrefix << "new state of trx is empty, but real new state is not";
+        }
+        return true;
+    }
+    else {
+        if (newState != realNewState) {
+            cserror() << "new state of trx in blockchain doesn't match real new state";
+            return false;
+        }
+    }
+    return true;
 }
 
 ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block) {
