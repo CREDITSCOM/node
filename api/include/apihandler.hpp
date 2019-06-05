@@ -609,7 +609,7 @@ private:
         try {
             executorTransport_->close();
         }
-        catch (::apache::thrift::transport::TTransportException& x) {
+        catch (::apache::thrift::transport::TTransportException&) {
             isConnect_ = false;
             cvErrorConnect_.notify_one();
         }
