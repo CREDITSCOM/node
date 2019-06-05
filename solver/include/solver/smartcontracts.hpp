@@ -28,26 +28,26 @@ class Transaction;
 namespace cs {
 
 // smart contract related error codes
-namespace error {
-// timeout during operation
-constexpr uint8_t TimeExpired = 254;
-// insufficient funds to complete operation
-constexpr uint8_t OutOfFunds = 253;
-// std::exception thrown
-constexpr uint8_t StdException = 252;
-// other exception thrown
-constexpr uint8_t Exception = 251;
-// replenished contract does not implement payable()
-constexpr uint8_t UnpayableReplenish = 250;
-// the trusted consensus have rejected new_state (and emitted transactions)
-constexpr uint8_t ConsensusRejected = 249;
-// error in Executor::ExecuteTransaction()
-constexpr uint8_t ExecuteTransaction = 248;
-// bug in SmartContracts
-constexpr uint8_t InternalBug = 247;
-// executor is disconnected or unavailable, value is hard-coded in ApiExec module
-constexpr uint8_t ExecutionError = 1;
-}  // namespace error
+    namespace error {
+        // timeout during operation
+        constexpr uint8_t TimeExpired = 254;
+        // insufficient funds to complete operation
+        constexpr uint8_t OutOfFunds = 253;
+        // std::exception thrown
+        constexpr uint8_t StdException = 252;
+        // other exception thrown
+        constexpr uint8_t Exception = 251;
+        // replenished contract does not implement payable()
+        constexpr uint8_t UnpayableReplenish = 250; // -6
+        // the trusted consensus have rejected new_state (and emitted transactions)
+        constexpr uint8_t ConsensusRejected = 249; // -7
+        // error in Executor::ExecuteTransaction()
+        constexpr uint8_t ExecuteTransaction = 248; // -8
+        // bug in SmartContracts
+        constexpr uint8_t InternalBug = 247; // -9
+        // executor is disconnected or unavailable, value is hard-coded in ApiExec module
+        constexpr uint8_t ExecutionError = 1;
+    }  // namespace error
 
 // transactions user fields
 namespace trx_uf {
@@ -210,6 +210,8 @@ public:
 
     void init(const cs::PublicKey&, Node* node);
 
+    static std::string get_error_message(uint8_t code);
+
     // test transaction methods
 
     // smart contract related transaction of any type
@@ -332,8 +334,6 @@ private:
         SmartContractRef ref_execute;
         // current state which is result of last successful execution / deploy
         std::string state;
-        // last innerID value
-        int64_t last_inner_id{ 0 };
         // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
         std::map<std::string, std::map<csdb::Address, std::string>> uses;
     };
@@ -522,8 +522,8 @@ private:
     bool execute_async(const std::vector<ExecutionItem>& executions);
 
     // makes a transaction to store new_state of smart contract invoked by src
-    // caller is responsible to test src is a smart-contract-invoke transaction
-    csdb::Transaction create_new_state(const ExecutionItem& queue_item);
+    // caller is responsible to test src is a smart-contract-invoke transaction and proper new_id value
+    csdb::Transaction create_new_state(const ExecutionItem& queue_item, int64_t new_id);
 
     // update in contracts table appropriate item's state
     bool update_contract_state(const csdb::Transaction& t, bool reading_db);
@@ -616,9 +616,6 @@ private:
 
     // returns 0 if any error
     uint64_t next_inner_id(const csdb::Address& addr) const;
-
-    // stores value as last transaction's inner id for specified contract
-    void update_inner_id(const csdb::Address& addr, int64_t val);
 
     // tests conditions to allow contract execution if disabled
     bool test_executor_availability();

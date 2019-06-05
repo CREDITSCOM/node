@@ -164,7 +164,7 @@ void Network::readerRoutine(const Config& config) {
       }
 #ifdef __linux__
       static uint64_t one = 1;
-      write(readerEventfd_, &one, sizeof(uint64_t));
+      [[maybe_unused]] auto res = write(readerEventfd_, &one, sizeof(uint64_t));
 #endif
 #if defined(WIN32) || defined(__APPLE__)
       while (readerLock.test_and_set(std::memory_order_acquire)) // acquire lock
@@ -186,6 +186,7 @@ void Network::readerRoutine(const Config& config) {
   cswarning() << "readerRoutine STOPPED!!!\n";
 }
 
+[[maybe_unused]]
 static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const ip::udp::endpoint& ep) {
   boost::system::error_code lastError;
   size_t size = 0;
@@ -257,12 +258,12 @@ void Network::writerRoutine(const Config& config) {
         continue;
       }
 
-  if (!(task->pack.isHeaderValid())) {
-    static constexpr size_t limit = 100;
-    auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
+      if (!(task->pack.isHeaderValid())) {
+        static constexpr size_t limit = 100;
+        auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
+        cswarning() << "socket Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
+      }
 
-    cswarning() << "socket Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
-  }
       encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
       endpoints[j] = task->endpoint;
       iovecs[j].iov_base = encoded_packets[j].data();
@@ -455,7 +456,7 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
   oPacMan_.enQueueLast();
 #ifdef __linux__
   static uint64_t one = 1;
-  write(writerEventfd_, &one, sizeof(uint64_t));
+  [[maybe_unused]] auto res = write(writerEventfd_, &one, sizeof(uint64_t));
 #endif
 #if defined(WIN32) || defined(__APPLE__)
   while (writerLock.test_and_set(std::memory_order_acquire)) // acquire lock

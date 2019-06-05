@@ -192,7 +192,7 @@ void SmartConsensus::refreshSmartStagesStorage() {
         smartStageThreeStorage_.at(i).sender = cs::ConfidantConsts::InvalidConfidantIndex;
     }
 
-    memset(&st1, 0, sizeof(st1));
+    st1 = decltype(st1){};
 
     st2.signatures.clear();
     st2.signatures.resize(cSize);
@@ -207,17 +207,17 @@ void SmartConsensus::refreshSmartStagesStorage() {
     st3.writer = cs::ConfidantConsts::InvalidConfidantIndex;
     st3.id = 0;
 
-    memset(st3.signature.data(), 0, st3.signature.size());
-    memset(st2.signature.data(), 0, st3.signature.size());
-
-    // smartStagesStorageClear(cSize);
+    st2.signature.fill(0);
+    st3.signature.fill(0);
 
     smartUntrusted.clear();
     smartUntrusted.resize(cSize);
     smartConsensusMask.clear();
     smartConsensusMask.resize(cSize);
+
     std::fill(smartConsensusMask.begin(), smartConsensusMask.end(), cs::ConfidantConsts::InvalidConfidantIndex);
     std::fill(smartUntrusted.begin(), smartUntrusted.end(), 0);
+
     startTimer(1);
 }
 

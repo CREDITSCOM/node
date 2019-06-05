@@ -240,7 +240,7 @@ size_t Message::clearBuffer(size_t from, size_t to) {
         // Packet's operator bool redirects call to Packet::data_::operator bool
         if (packets_[i]) {
             csdebug() << "Net: potential heap corruption prevented in message.packets_[" << i << "]";
-            cs::Utils::clearMemory(packets_[i]);
+            packets_[i] = Packet{};
             ++cnt;
         }
     }

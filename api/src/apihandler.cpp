@@ -287,6 +287,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     }
 
     result.id = convert_transaction_id(transaction.id());
+    result.__isset.id = true;
+    result.__isset.trxn = true;
     result.trxn.id = transaction.innerID();
     result.trxn.amount = convertAmount(amount);
     result.trxn.currency = DEFAULT_CURRENCY;
@@ -367,23 +369,32 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         result.trxn.__set_smartContract(sci);
     }
     else if (is_smart_state(transaction)) {
+        result.trxn.type = api::TransactionType::TT_SmartState;
         api::SmartStateTransInfo sti;
         sti.success = !(transaction.user_field(cs::trx_uf::new_state::Value).value<std::string>().empty());
         sti.executionFee = convertAmount(transaction.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>());
-
         cs::SmartContractRef scr;
         scr.from_user_field(transaction.user_field(cs::trx_uf::new_state::RefStart));
         sti.startTransaction = convert_transaction_id(scr.getTransactionID());
 
-        auto retVal = transaction.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
-
-        auto varRetVal = deserialize<::general::Variant>(std::move(retVal));
-        result.trxn.type = api::TransactionType::TT_SmartState;
-        if (!(retVal.size() == 1 && retVal[0] == 0)) {
-            result.trxn.__set_smartInfo(api::SmartTransInfo{});
-            sti.__set_returnValue(deserialize<::general::Variant>(std::move(retVal)));
-            result.trxn.smartInfo.__set_v_smartState(sti);
+        auto fld = transaction.user_field(cs::trx_uf::new_state::RetVal);
+        if (fld.is_valid()) {
+            auto retVal = fld.value<std::string>();
+            auto variant = deserialize<::general::Variant>(std::move(retVal));
+            // override retValue with text message if new state is empty
+            if (sti.success) {
+                sti.__set_returnValue(variant);
+            }
+            else {
+                if (variant.__isset.v_byte) {
+                    // if not success and variant is of byte type there is an error code
+                    variant.__set_v_string(cs::SmartContracts::get_error_message(variant.v_byte));
+                }
+                sti.__set_returnValue(variant);
+            }
         }
+        result.trxn.smartInfo.__set_v_smartState(sti);
+        result.trxn.__isset.smartInfo = true;
     }
     else {
         result.trxn.type = api::TransactionType::TT_Normal;
@@ -872,9 +883,9 @@ void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const PoolHash& hash, c
 
 void APIHandler::StatsGet(api::StatsGetResult& _return) {
 #ifdef MONITOR_NODE
-    csstats::StatsPerPeriod stats = this->stats.getStats();
+    csstats::StatsPerPeriod stats_inst = this->stats.getStats();
 
-    for (auto& s : stats) {
+    for (auto& s : stats_inst) {
         api::PeriodStats ps = {};
         ps.periodDuration = s.periodSec;
         ps.poolsCount = s.poolsCount;
@@ -1843,7 +1854,7 @@ void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return, int64_
         return;
 
     _return.result = false;
-    _return.total_trxns_count = s_blockchain.getTransactionsCount();
+    _return.total_trxns_count = (uint32_t) s_blockchain.getTransactionsCount();
 
     auto tPair = s_blockchain.getLastNonEmptyBlock();
     while (limit > 0 && tPair.second) {
@@ -1886,7 +1897,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
         }
     });
 
-    _return.count = totalTransfers;
+    _return.count = uint32_t(totalTransfers);
 
     csdb::PoolHash pooh = s_blockchain.getLastNonEmptyBlock().first;
     while (limit && !pooh.is_empty() && tokenTransPools.size()) {
@@ -2182,8 +2193,8 @@ void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
                 const cs::Bytes addr_b(addr.begin(), addr.end());
                 wi.address = fromByteArray(addr_b);
 
-                wi.timesWriter = wd.times;
-                wi.timesTrusted = wd.times_trusted;
+                wi.timesWriter = uint32_t(wd.times);
+                wi.timesTrusted = uint32_t(wd.times_trusted);
                 wi.feeCollected.integral = wd.totalFee.integral();
                 wi.feeCollected.fraction = wd.totalFee.fraction();
 

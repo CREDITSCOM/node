@@ -11,6 +11,7 @@
 #include <csnode/nodecore.hpp>
 #include <csnode/nodeutils.hpp>
 #include <csnode/poolsynchronizer.hpp>
+#include <csnode/blockvalidator.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/progressbar.hpp>
@@ -38,7 +39,8 @@ Node::Node(const Config& config)
 , nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(genesisAddress_, startAddress_)
 , ostream_(&packStreamAllocator_, nodeIdKey_)
-, stat_() {
+, stat_()
+, blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
     std::cout << "Start transport... ";
     transport_ = new Transport(config, this);
@@ -53,6 +55,7 @@ Node::Node(const Config& config)
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &executor::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
+    cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     good_ = init(config);
 }
@@ -1389,7 +1392,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
     istream_.init(data, size);
 
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound != subRound_) {
@@ -1482,7 +1485,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     }
 
     istream_.init(data, size);
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound != subRound_) {
@@ -1892,8 +1895,8 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
     istream_.init(data, size);
 
     uint8_t requesterNumber = 0;
-    cs::Sequence smartRound;
-    uint32_t startTransaction;
+    cs::Sequence smartRound = 0;
+    uint32_t startTransaction = 0;
     istream_ >> smartRound >> startTransaction >> requesterNumber;
 
     uint8_t requiredNumber = 0;
@@ -2047,9 +2050,8 @@ void Node::sendRoundTable() {
     
     const auto& confidants = conveyer.confidants();
     if (!confidants.empty() && lastTrustedMask_.size() == confidants.size()) {
-        for (int i = 0; i < lastTrustedMask_.size(); ++i) {
+        for (size_t i = 0; i < lastTrustedMask_.size(); ++i) {
             if (lastTrustedMask_[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
-                //csdebug() << "NODE> Node ban!!!";
                 solver_->addToGraylist(confidants[i], Consensus::GrayListPunishment);
             }
         }
@@ -2252,9 +2254,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     if (ptrRT != nullptr) {
         const cs::ConfidantsKeys& prevConfidants = ptrRT->confidants;
         if (!prevConfidants.empty() && realTrusted.size() == prevConfidants.size()) {
-            for (int i = 0; i < realTrusted.size(); ++i) {
+            for (size_t i = 0; i < realTrusted.size(); ++i) {
                 if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
-                    //csdebug() << "NODE> Node ban!!!";
                     solver_->addToGraylist(prevConfidants[i], Consensus::GrayListPunishment);
                 }
             }
@@ -2326,7 +2327,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     csdetails() << "NODE> get hash of round " << rNum << ", data size " << size;
 
     istream_.init(data, size);
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound > subRound_) {
@@ -2640,7 +2641,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     cs::Signature signature;
     istream_ >> signature;
 
-    uint8_t senderNumber;
+    uint8_t senderNumber = 0;
     istream_ >> senderNumber;
 
     csdb::PoolHash hash;
@@ -2691,5 +2692,12 @@ void Node::onStopRequested() {
     }
     else {
         stop();
+    }
+}
+
+void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
+    if (!blockValidator_->validateBlock(block, cs::BlockValidator::ValidationLevel::hashIntergrity,
+                                        cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
+        *shouldStop = true;
     }
 }

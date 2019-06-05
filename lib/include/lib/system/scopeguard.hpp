@@ -2,6 +2,7 @@
 #define SCOPE_GUARD_HPP
 
 #include <utility>
+#include <lib/system/logger.hpp>
 
 namespace cs {
 struct ScopeGuardBase {
@@ -44,6 +45,7 @@ struct ScopeGuard : public ScopeGuardBase {
                 func_();
             }
             catch (...) {
+                cserror() << "Scope guard callable exception, " << typeid(Func).name() << " func type";
             }
         }
     }

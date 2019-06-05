@@ -1,6 +1,7 @@
-#include <lib/system/utils.hpp>
 #include "gtest/gtest.h"
-#include "lib/system/concurrent.hpp"
+
+#include <lib/system/concurrent.hpp>
+#include <lib/system/console.hpp>
 
 #include <atomic>
 #include <iostream>

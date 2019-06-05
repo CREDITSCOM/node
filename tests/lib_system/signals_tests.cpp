@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 
-#include "lib/system/timer.hpp"
+#include <lib/system/timer.hpp>
+#include <lib/system/console.hpp>
 
 #include <string>
 
@@ -291,6 +292,9 @@ TEST(Signals, ConstObjectConnection) {
     const B b;
 
     cs::Connector::connect(&a.signal, &b, &B::onSignal);
+
+    emit a.signal();
+    ASSERT_TRUE(isCalled);
 }
 
 TEST(Signals, UnexpectedDisconnect) {
@@ -381,7 +385,7 @@ TEST(Signals, ArgumentsCopy) {
 
     class B {
     public slots:
-        void onSignal(Checker checker) {
+        void onSignal([[maybe_unused]] Checker checker) {
             cs::Console::writeLine("B slot called");
             checker.value = 10;
         }

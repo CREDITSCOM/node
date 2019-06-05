@@ -350,15 +350,14 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             gotSSLastBlock(task, node_->getBlockChain().getLastSequence(), node_->getBlockChain().getLastHash(), node_->canBeTrusted());
             break;
         case NetworkCommand::SSSpecificBlock: {
-            try {
-                cs::RoundNumber round = 0;
-                iPackStream_ >> round;
-                gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round), node_->canBeTrusted());  // TODO:
-            }
-            catch (std::out_of_range&) {
-            }
+            cs::RoundNumber round = 0;
+            iPackStream_ >> round;
+
+            gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round), node_->canBeTrusted());
+
             break;
         }
+
         case NetworkCommand::PackInform:
             gotPackInform(task, sender);
             break;
@@ -1046,7 +1045,7 @@ void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
 }
 
 bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
-    uint8_t isDirect;
+    uint8_t isDirect = 0;
     cs::Hash hHash;
     iPackStream_ >> isDirect >> hHash;
 

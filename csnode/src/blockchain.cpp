@@ -7,7 +7,6 @@
 
 #include <csnode/blockchain.hpp>
 #include <csnode/blockhashes.hpp>
-#include <csnode/blockvalidator.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/datastream.hpp>
 #include <csnode/fee.hpp>
@@ -28,8 +27,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , walletIds_(new WalletsIds)
 , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
-, cacheMutex_()
-, blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
+, cacheMutex_() {
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
     blockHashes_ = std::make_unique<cs::BlockHashes>();
@@ -100,10 +98,6 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         cs::Lock lock(dbLock_);
         uuid_ = uuidFromBlock(block);
         csdebug() << "Blockchain: UUID = " << uuid_;
-    }
-    if (!blockValidator_->validateBlock(block, BlockValidator::ValidationLevel::hashIntergrity, BlockValidator::SeverityLevel::greaterThanWarnings)) {
-        *shouldStop = true;
-        return;
     }
     if (!updateWalletIds(block, *walletsCacheUpdater_.get())) {
         cserror() << "Blockchain: updateWalletIds() failed on block #" << block.sequence();

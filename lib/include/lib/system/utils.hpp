@@ -31,25 +31,9 @@
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/structures.hpp>
-
-#define cswatch(x) cslog() << (#x) << " is " << (x)
-#define csunused(x) (void)(x)
+#include <lib/system/reflection.hpp>
 
 using namespace std::literals::string_literals;
-
-// compile time and rtti reflection in action, works only in methods.
-// if class/struct is not polimorphic - compile-time reflection, otherwise - run-time.
-#define className typeid(*this).name
-#define classNameString() std::string(className()) + " "s
-
-#define funcName() __func__
-
-// pseudo definitions
-#define csname() className() << "> "
-#define csfunc() funcName() << "(): "
-
-#define csreflection() className() << ", method " << csfunc()
-#define csmeta(...) __VA_ARGS__() << csreflection()
 
 namespace cs {
 enum class Direction : uint8_t {
@@ -86,12 +70,6 @@ inline static std::ostream& operator<<(std::ostream& os, const std::array<T, Siz
     printHex(os, reinterpret_cast<const char*>(&*address.begin()), address.size());
     return os;
 }
-
-template <typename T>
-struct is_vector : public std::false_type {};
-
-template <typename T, typename A>
-struct is_vector<std::vector<T, A>> : public std::true_type {};
 
 ///
 /// Static utils helper class
@@ -193,6 +171,7 @@ public:
     ///
     template <typename T>
     inline static void clearMemory(T& object) {
+        static_assert(std::is_copy_assignable_v<T> || std::is_trivially_copyable_v<T>, "T type should be trivially copyable or has user copy assign operator");
         std::memset(&object, 0, sizeof(T));
     }
 
@@ -317,7 +296,7 @@ public:
 #ifdef _MSC_VER
         cs::Byte cnt = static_cast<cs::Byte>(__popcnt64(value));
 #else
-        cs::Byte cnt = __builtin_popcountl(value);
+        cs::Byte cnt = static_cast<cs::Byte>(__builtin_popcountl(value));
 #endif
         return cnt;
     }
@@ -394,24 +373,11 @@ constexpr int getMin(const bool) {
     return static_cast<int>(std::numeric_limits<bool>::min());
 }
 
-template <typename T>
-constexpr bool isVector() {
-    return cs::is_vector<T>::value;
-}
-
 template <typename TBytes>
 inline constexpr cs::BytesView bytesView_cast(const TBytes& bytes) {
     static_assert(std::is_same_v<typename TBytes::value_type, cs::Byte>, "Only bytes storages can use bytesView_cast func");
     return cs::BytesView(bytes.data(), bytes.size());
 }
-
-class Console {
-public:
-    template <typename... Args>
-    static void writeLine(Args&&... args) {
-        (std::cout << ... << std::forward<Args>(args)) << std::endl;
-    }
-};
 }  // namespace cs
 
 inline constexpr cs::Byte operator"" _b(unsigned long long arg) noexcept {

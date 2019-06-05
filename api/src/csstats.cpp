@@ -34,8 +34,10 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
 
     {
         auto future_last_hash = blockHash;
-        if (blockHash.is_empty())
+
+        if (blockHash.is_empty()) {
             cserror() << "Stats: no bricks in the wall (last hash is empty)";
+        }
 
         while (blockHash != lastHash && !blockHash.is_empty()) {
             csdb::Pool pool = blockchain.loadBlock(blockHash);
@@ -261,6 +263,7 @@ csstats::csstats(BlockChain& blockchain)
 }
 
 void csstats::run(const ::csstats::AllStats& allStats) {
+    csunused(allStats);
 #ifndef STATS
     return;
 #else
