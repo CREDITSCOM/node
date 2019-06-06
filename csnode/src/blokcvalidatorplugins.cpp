@@ -35,7 +35,7 @@ SmartStateValidator::validateBlock(const csdb::Pool& block) {
         if (SmartContracts::is_new_state(t) && !checkNewState(t)) {
             cserror() << kLogPrefix << "error occured during new state check in block "
                       << block.sequence();
-            return ErrorType::warning;
+            return ErrorType::error;
         }
     }
     return ErrorType::noError;
@@ -80,7 +80,7 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
     }
     else {
         if (newState != realNewState) {
-            cserror() << "new state of trx in blockchain doesn't match real new state";
+            cserror() << kLogPrefix << "new state of trx in blockchain doesn't match real new state";
             return false;
         }
     }
