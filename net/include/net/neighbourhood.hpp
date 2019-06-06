@@ -165,6 +165,7 @@ public:
     // thread safe
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);
     void forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)> func);
+    bool forRandomNeighbour(std::function<void(ConnectionPtr)> func);
 
     void pingNeighbours();
     bool isPingDone();
@@ -211,6 +212,7 @@ private:
     void disconnectNode(ConnectionPtr*);
 
     int getRandomSyncNeighbourNumber(const std::size_t attemptCount = 0);
+    ConnectionPtr getRandomNeighbour();
 
     Transport* transport_;
 
