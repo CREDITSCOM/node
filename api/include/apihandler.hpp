@@ -379,7 +379,7 @@ public:
 				header.methodName = "payable";
 				general::Variant var;
                 // add arg[0]
-				var.__set_v_string(smart.amount().to_string());
+				var.__set_v_big_decimal(smart.amount().to_string());
 				header.params.emplace_back(var);
                 // add arg[1]
                 if (smart.user_field(1).is_valid()) {
