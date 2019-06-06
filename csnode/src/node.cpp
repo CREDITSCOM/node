@@ -1070,12 +1070,12 @@ void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, 
 template <class... Args>
 bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
     ConnectionPtr target = transport_->getRandomNeighbour();
-
     if (target) {
         sendToNeighbour(target, msgType, round, std::forward<Args>(args)...);
+        return true;
     }
 
-    return target;
+    return false;
 }
 
 template <class... Args>
