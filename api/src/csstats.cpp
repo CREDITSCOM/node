@@ -262,6 +262,7 @@ csstats::csstats(BlockChain& blockchain)
 
 void csstats::run(const ::csstats::AllStats& allStats) {
 #ifndef STATS
+    csunused(allStats);
     return;
 #else
     ScopedLock lock(mutex);

@@ -1230,6 +1230,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             }
         }
         csdb::Transaction result = create_new_state(*execution, next_id);
+        csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " new_state";
 
         // create partial failure if new_state is not created
         if(!result.is_valid()) {
@@ -1270,15 +1271,13 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             if (it != exe_queue.end()) {
                 // put emitted transactions
                 if (!data_item.result.trxns.empty()) {
-                    int64_t next_emitted_id = result.innerID() + 1;  // may or may not be useful next block of code
                     for (const auto& tr : data_item.result.trxns) {
                         if (tr.innerID() == 0) {
                             // auto inner id generating
-                            csdebug() << kLogPrefix << "zero innerID in emitted transaction, generate new";
                             csdb::Transaction tmp = tr.clone();
-                            tmp.set_innerID(next_emitted_id);
+                            tmp.set_innerID(++next_id);
+                            csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " emitted transaction";
                             packet.addTransaction(tmp);
-                            ++next_emitted_id;
                         }
                         else {
                             packet.addTransaction(tr);
@@ -1296,6 +1295,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                         auto it_call = find_in_queue_item(it, data_item.contract_ref);
                         if (it_call != it->executions.end()) {
                             csdb::Transaction t = create_new_state(*it_call, ++next_id);
+                            csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " secondary contract new_state";
                             if (t.is_valid()) {
                                 // re-assign some fields
                                 t.set_innerID(next_inner_id(addr));
@@ -1762,8 +1762,13 @@ std::string SmartContracts::print_executed_method(const SmartContractRef& ref) {
         return os.str();
     }
     if (is_payable_target(t)) {
+        // cuurently, the 2nd arg is user_field[1]
+        std::string arg = t.user_field(1).value<std::string>();
+        if (arg.empty()) {
+            arg = "<empty>";
+        }
         std::ostringstream os;
-        os << PayableName << "(" << PayableNameArg0 << " = " << t.amount().to_double() << ", " << PayableNameArg1 << " = 1)";
+        os << PayableName << "(" << PayableNameArg0 << " = " << t.amount().to_double() << ", bundle = " << arg;
         return os.str();
     }
     return std::string("???");
