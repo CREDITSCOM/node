@@ -328,7 +328,6 @@ private:
         static constexpr size_t insertedSize = sizeof(uint16_t) + sizeof(packetsCount_);
 
         if (packetsCount_ == 1) {
-            cslog() << "Fragment packet!!!";
             ptr_ = static_cast<cs::Byte*>(packets_->data());
 
             if (!packets_->isFragmented()) {
