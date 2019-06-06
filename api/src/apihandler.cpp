@@ -664,44 +664,46 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
     send_transaction.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
 
-    // check money
-    const auto source_addr = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
-    BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "not enough money!";
-        return;
-    }
+	if (!input_smart.forgetNewState) {
+		// check money
+		const auto source_addr = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
+		BlockChain::WalletData wallData{};
+		BlockChain::WalletId wallId{};
+		if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
+			_return.status.code = ERROR_CODE;
+			_return.status.message = "not enough money!";
+			return;
+		}
 
-    const auto max_fee = send_transaction.max_fee().to_double();
-    const auto balance = wallData.balance_.to_double();
-    if (max_fee > balance) {
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
-        return;
-    }
-    //
-    
-    // check max fee
-    {
-     csdb::AmountCommission countedFee;
-     if (!cs::fee::estimateMaxFee(send_transaction, countedFee)) {
-         _return.status.code = ERROR_CODE;
-         _return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
-         return;
-     }
-    }
+		const auto max_fee = send_transaction.max_fee().to_double();
+		const auto balance = wallData.balance_.to_double();
+		if (max_fee > balance) {
+			_return.status.code = ERROR_CODE;
+			_return.status.message = "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
+			return;
+		}
+		//
 
-  // check signature
-  const auto byteStream = send_transaction.to_byte_stream_for_sig();
-  if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
-    _return.status.code = ERROR_CODE;
-    cslog() << "API: reject transaction with wrong signature";
-    _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
-    return;
-  }
-  //
+		// check max fee
+		{
+			csdb::AmountCommission countedFee;
+			if (!cs::fee::estimateMaxFee(send_transaction, countedFee)) {
+				_return.status.code = ERROR_CODE;
+				_return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
+				return;
+			}
+		}
+
+		// check signature
+		const auto byteStream = send_transaction.to_byte_stream_for_sig();
+		if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
+			_return.status.code = ERROR_CODE;
+			cslog() << "API: reject transaction with wrong signature";
+			_return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+			return;
+		}
+		//
+	}
 
     std::vector<general::ByteCodeObject> origin_bytecode;
     if (!deploy) {
