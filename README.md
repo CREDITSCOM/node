@@ -62,7 +62,7 @@ Internet connection: 5 Mbit/s.
 If you'd like to contribute to Credits Node, please fork, fix, commit and send a pull request for the maintainers to review and merge into the main code base. If you wish to submit more complex changes though, please check up with the core devs first on our <a href="https://developers.credits.com/">Developers portal</a> and <a href="https://github.com/CREDITSCOM/Documentation/blob/master/Contribution.md"> Contribution file</a> to ensure those changes are in line with the general philosophy of the project and/or get some early feedback which can make both your efforts much lighter as well as our review and merge procedures quick and simple.
 Please make sure your contributions adhere to our coding guidelines:</p>
 <ul>
-<li>Code must adhere to the <a href="https://google.github.io/styleguide/cppguide.html">Credits coding style</a></li>
+<li>Code must adhere to the <a href="https://github.com/CREDITSCOM/node/blob/master/codingstyle.md">Credits coding style</a></li>
 
 <li>Pull requests need to be based on and opened against the master branch</li>
 <li>Commit messages should be prefixed with the package(s) they modify</li>

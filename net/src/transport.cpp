@@ -710,6 +710,10 @@ void Transport::forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> fun
     nh_.forEachNeighbourWithoutSS(std::move(func));
 }
 
+bool Transport::forRandomNeighbour(std::function<void(ConnectionPtr)> func) {
+    return nh_.forRandomNeighbour(std::move(func));
+}
+
 const Connections Transport::getNeighbours() const {
     return nh_.getNeigbours();
 }
@@ -733,8 +737,8 @@ void Transport::resetNeighbours() {
 
 /* Sending network tasks */
 void Transport::sendRegistrationRequest(Connection& conn) {
-
     RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
+
     if (ptr->isBlackListed()) {
         return;
     }
