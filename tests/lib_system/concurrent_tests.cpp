@@ -2,6 +2,7 @@
 
 #include <lib/system/concurrent.hpp>
 #include <lib/system/console.hpp>
+#include <lib/system/random.hpp>
 
 #include <atomic>
 #include <iostream>
@@ -323,4 +324,90 @@ TEST(Concurrent, FutureWatcherCorrectDestructionCallsQueue) {
 
     ASSERT_TRUE(destroyCount.load(std::memory_order::memory_order_acquire) == 2);
     ASSERT_TRUE(isDone);
+}
+
+TEST(Concurrent, FutureWatcherHighMultithreading) {
+    static std::vector<size_t> results;
+    static std::vector<size_t> container;
+    static std::mutex mutex;
+
+    const size_t counts = 20;
+    const auto adder = [](const auto& vector) {
+        size_t sum = 0;
+
+        std::for_each(vector.begin(), vector.end(), [&](const auto element) {
+            sum += element;
+        });
+
+        return sum;
+    };
+
+    for (size_t i = 0; i < 1000000; ++i) {
+        container.push_back(cs::Random::generateValue<size_t>(0, 50000));
+    }
+
+    class Wrapper {
+    public slots:
+        static void onFinished(size_t result) {
+            std::lock_guard lock(mutex);
+
+            cs::Console::writeLine("On finished thread id ", std::this_thread::get_id());
+            results.push_back(result);
+        }
+    };
+
+    const auto runner = [=](const auto& vector) {
+        cs::Console::writeLine("Concurrent run thread id ", std::this_thread::get_id());
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        return adder(vector);
+    };
+
+    auto parts = cs::Utils::splitVector(container, counts);
+
+    for (const auto& part : parts) {
+        auto futureWatcher = cs::Concurrent::run(cs::RunPolicy::CallQueuePolicy, runner, part);
+        cs::Connector::connect(&futureWatcher->finished, &Wrapper::onFinished);
+    }
+
+    cs::Console::writeLine("Main thread id ", std::this_thread::get_id());
+
+    while (results.size() != counts) {
+        CallsQueue::instance().callAll();
+    }
+
+    // calculate results
+    auto currentCallsQueueSum = adder(results);
+    auto expectedSum = adder(container);
+
+    cs::Console::writeLine("Current sum by calls queue", currentCallsQueueSum);
+    cs::Console::writeLine("Expected sum ", expectedSum);
+
+    ASSERT_EQ(currentCallsQueueSum, expectedSum);
+
+    // to thread pool
+    cs::Console::writeLine("Start thread pool concurrent tests");
+    results.clear();
+
+    for (const auto& part : parts) {
+        auto futureWatcher = cs::Concurrent::run(cs::RunPolicy::ThreadPolicy, runner, part);
+        cs::Connector::connect(&futureWatcher->finished, &Wrapper::onFinished);
+    }
+
+    cs::Console::writeLine("Main thread id ", std::this_thread::get_id());
+
+    while (true) {
+        std::lock_guard lock(mutex);
+
+        if (results.size() == counts) {
+            break;
+        }
+    }
+
+    auto currentThreadPoolSum = adder(results);
+
+    cs::Console::writeLine("Current sum by thread pool ", currentThreadPoolSum);
+    cs::Console::writeLine("Expected sum ", expectedSum);
+
+    ASSERT_EQ(currentThreadPoolSum, expectedSum);
 }
