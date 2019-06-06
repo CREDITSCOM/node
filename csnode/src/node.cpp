@@ -1075,7 +1075,7 @@ bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber r
         sendToNeighbour(target, msgType, round, std::forward<Args>(args)...);
     }
 
-    return target;
+    return (bool)target;
 }
 
 template <class... Args>

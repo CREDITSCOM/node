@@ -243,7 +243,7 @@ public:
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
-        return std::move(get_smart_contract_impl(tr));
+        return get_smart_contract_impl(tr);
     }
 
     // get & handle rejected transactions from smart contract(s)
