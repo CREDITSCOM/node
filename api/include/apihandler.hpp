@@ -609,7 +609,7 @@ private:
         try {
             executorTransport_->close();
         }
-        catch (::apache::thrift::transport::TTransportException& x) {
+        catch (::apache::thrift::transport::TTransportException&) {
             isConnect_ = false;
             cvErrorConnect_.notify_one();
         }
@@ -721,6 +721,7 @@ public:
 
     void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<::general::ByteCodeObject>& byteCodeObjects) override;
 
+	void ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) override;
     ////////new
     void iterateOverTokenTransactions(const csdb::Address&, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)>);
     ////////new
@@ -846,6 +847,8 @@ private:
     std::map<csdb::PoolHash, api::Pool> poolCache;
     std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
     std::thread state_updater;
+
+	std::map<std::string, int64_t> mExecuteCount_;
 
     api::SmartContract fetch_smart_body(const csdb::Transaction&);
 

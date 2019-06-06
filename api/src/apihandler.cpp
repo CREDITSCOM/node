@@ -664,44 +664,46 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
     send_transaction.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
 
-    // check money
-    const auto source_addr = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
-    BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "not enough money!";
-        return;
-    }
+	if (!input_smart.forgetNewState) {
+		// check money
+		const auto source_addr = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
+		BlockChain::WalletData wallData{};
+		BlockChain::WalletId wallId{};
+		if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
+			_return.status.code = ERROR_CODE;
+			_return.status.message = "not enough money!";
+			return;
+		}
 
-    const auto max_fee = send_transaction.max_fee().to_double();
-    const auto balance = wallData.balance_.to_double();
-    if (max_fee > balance) {
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
-        return;
-    }
-    //
-    
-    // check max fee
-    {
-     csdb::AmountCommission countedFee;
-     if (!cs::fee::estimateMaxFee(send_transaction, countedFee)) {
-         _return.status.code = ERROR_CODE;
-         _return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
-         return;
-     }
-    }
+		const auto max_fee = send_transaction.max_fee().to_double();
+		const auto balance = wallData.balance_.to_double();
+		if (max_fee > balance) {
+			_return.status.code = ERROR_CODE;
+			_return.status.message = "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
+			return;
+		}
+		//
 
-  // check signature
-  const auto byteStream = send_transaction.to_byte_stream_for_sig();
-  if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
-    _return.status.code = ERROR_CODE;
-    cslog() << "API: reject transaction with wrong signature";
-    _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
-    return;
-  }
-  //
+		// check max fee
+		{
+			csdb::AmountCommission countedFee;
+			if (!cs::fee::estimateMaxFee(send_transaction, countedFee)) {
+				_return.status.code = ERROR_CODE;
+				_return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
+				return;
+			}
+		}
+
+		// check signature
+		const auto byteStream = send_transaction.to_byte_stream_for_sig();
+		if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
+			_return.status.code = ERROR_CODE;
+			cslog() << "API: reject transaction with wrong signature";
+			_return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+			return;
+		}
+		//
+	}
 
     std::vector<general::ByteCodeObject> origin_bytecode;
     if (!deploy) {
@@ -1054,6 +1056,8 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
             auto execTrans = s_blockchain.loadTransaction(trId);
             if (execTrans.is_valid() && is_smart(execTrans)) {
                 const auto smart = fetch_smart(execTrans);
+				if(!smart.method.empty())
+					mExecuteCount_[smart.method]++;
 
                 {
                     auto retVal = tr.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
@@ -1244,6 +1248,9 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
             if ((execTrans.is_valid() && is_smart(execTrans)) || 
 					execTrans.amount().to_double()) { // payable
                 const auto smart = fetch_smart(execTrans);
+
+				if (!smart.method.empty())
+					mExecuteCount_[smart.method]++;
 
                 {
                     auto retVal = tr.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
@@ -1788,6 +1795,15 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, con
 
     _return.variables = variablesResult.contractVariables;
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void APIHandler::ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) {
+	if (auto itCount = mExecuteCount_.find(executeMethod); itCount != mExecuteCount_.end()) {
+		_return.executeCount = itCount->second;
+		SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+	}
+	else
+		SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
 }
 
 void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const general::Address& address) {
