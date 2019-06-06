@@ -1073,9 +1073,15 @@ bool SmartContracts::execute(SmartExecutionData& data) {
     }
     cslog() << kLogPrefix << "executing " << data.contract_ref << "::" << print_executed_method(data.contract_ref) << std::endl;
     // using data.result.newState to pass previous (not yet cached) new state in case of multi-call to conrtract:
-    std::vector<csdb::Transaction> smarts;
-    smarts.emplace_back(transaction);
-    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(smarts, data.executor_fee, data.explicit_last_state);
+    std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
+    auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
+    info.transaction = transaction;
+    
+    info.feeLimit = data.executor_fee;
+    info.convention = is_payable_target(transaction)
+        ? executor::Executor::MethodNameConvention::PayableLegacy
+        : executor::Executor::MethodNameConvention::Default;
+    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(smarts, data.explicit_last_state);
     if (maybe_result.has_value()) {
         data.result = maybe_result.value();
         if (!data.result.smartsRes.empty()) {

@@ -322,19 +322,43 @@ public:
         return false;
     }
 
-	std::optional<ExecuteResult> executeTransaction(const std::vector<csdb::Transaction>& smarts, const csdb::Amount& feeLimit, const std::string& force_new_state) {
-		csunused(feeLimit);
+    // Convention how to pass the method name
+    enum class MethodNameConvention {
+        // By default, the method name can be obtained from SmartContractInvocation object deserialized from user_field[0]
+        // If method name is empty, the constructor must be called
+        Default = 0,
+        // Call to payable(string, string) requested
+        PayableLegacy,
+        // Call to payable(string, byte[]) requested
+        Payable
+    };
+
+    struct ExecuteTransactionInfo {
+        // transaction to execute contract
+        csdb::Transaction transaction;
+        // pass method name convention
+        MethodNameConvention convention;
+        // max allowed fee
+        csdb::Amount feeLimit;
+    };
+
+	std::optional<ExecuteResult> executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {
 		static std::mutex m;
 		std::lock_guard lk(m);  // temporary solution
 
-		if (smarts.empty()) return {};
-
-		// all smarts must have the same initiator and address
-		const auto source = smarts[0].source();
-		const auto target = smarts[0].target();
+        if (smarts.empty()) {
+            return std::nullopt;
+        }
+        const auto& head_transaction = smarts[0].transaction;
+        if (!head_transaction.is_valid()) {
+            return std::nullopt;
+        }
+        // all smarts must have the same initiator and address
+		const auto source = head_transaction.source();
+		const auto target = head_transaction.target();
 		for (const auto& smart : smarts) {
-			if (source != smart.source() || target != smart.target())
-				return {};
+			if (source != smart.transaction.source() || target != smart.transaction.target())
+				return std::nullopt;
 		}
 
 		auto smartSource = blockchain_.getAddressByType(source, BlockChain::AddressType::PublicKey);
@@ -342,15 +366,17 @@ public:
 
 		// get deploy transaction
 		csdb::Transaction deployTrxn;
-		const auto isdeploy = isDeploy(smarts[0]);
+		const auto isdeploy = isDeploy(head_transaction);
 		if (!isdeploy) {  // execute
 			const auto optDeployId = getDeployTrxn(smartTarget);
-			if (!optDeployId.has_value())
-				return {};
+            if (!optDeployId.has_value()) {
+                return std::nullopt;
+            }
 			deployTrxn = blockchain_.loadTransaction(optDeployId.value());
 		}
-		else
-			deployTrxn = smarts[0];
+        else {
+            deployTrxn = head_transaction;
+        }
 
 		// fill smartContractBinary 
 		const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
@@ -358,46 +384,58 @@ public:
 		smartContractBinary.contractAddress = smartTarget.to_api_addr();
 		smartContractBinary.object.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
         // may contain temporary last new state not yet written into block chain (to allow "speculative" multi-executions af the same contract)
-        if (!force_new_state.empty()) {
-            smartContractBinary.object.instance = force_new_state;
+        if (!forceContractState.empty()) {
+            smartContractBinary.object.instance = forceContractState;
         }
         else {
             auto optState = getState(smartTarget);
-            if (optState.has_value())
+            if (optState.has_value()) {
                 smartContractBinary.object.instance = optState.value();
+            }
         }
 		smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr())) ? true : false;
 
 		// fill methodHeader 
 		std::vector<executor::MethodHeader> methodHeader;
-		for (const auto& smart : smarts) {
+		for (const auto& smart_item : smarts) {
 			executor::MethodHeader header;
-			api::SmartContractInvocation sci;
-            const auto fld = smart.user_field(0);
-            if (!fld.is_valid() && smart.amount().to_double()) {  // payable
+            const csdb::Transaction& smart = smart_item.transaction;
+            if (smart_item.convention != MethodNameConvention::Default) {
+                // call to payable
                 // add method name
-				header.methodName = "payable";
-				general::Variant var;
+                header.methodName = "payable";
+                general::Variant var;
                 // add arg[0]
 				var.__set_v_big_decimal(smart.amount().to_string());
 				header.params.emplace_back(var);
                 // add arg[1]
+                std::string val;
                 if (smart.user_field(1).is_valid()) {
-                    var.__set_v_string(smart.user_field(1).value<std::string>());
+                    val = smart.user_field(1).value<std::string>();
+                }
+                if (smart_item.convention == MethodNameConvention::PayableLegacy) {
+                    var.__set_v_string(val);
                 }
                 else {
-                    var.__set_v_string("");
+                    var.__set_v_byte_array(val);
                 }
                 header.params.emplace_back(var);
             }
-			else if (!isdeploy) {
-                sci = deserialize<api::SmartContractInvocation>(fld.value<std::string>());
-                header.methodName = sci.method;
-                header.params = sci.params;
+            else {
+                api::SmartContractInvocation sci;
+                const auto fld = smart.user_field(0);
+                if (!fld.is_valid()) { 
+                    return std::nullopt;
+                }
+                else if (!isdeploy) {
+                    sci = deserialize<api::SmartContractInvocation>(fld.value<std::string>());
+                    header.methodName = sci.method;
+                    header.params = sci.params;
 
-                for (const auto& addrLock : sci.usedContracts)
-                    addToLockSmart(addrLock, getFutureAccessId());
-			}
+                    for (const auto& addrLock : sci.usedContracts)
+                        addToLockSmart(addrLock, getFutureAccessId());
+                }
+            }
 			methodHeader.push_back(header);
 		}
 
@@ -405,11 +443,13 @@ public:
 
 		for (const auto& smart : smarts) {
 			if (!isdeploy) {
-                const auto fld = smart.user_field(0);
-                if (fld.is_valid()) {
-                    auto sci = deserialize<api::SmartContractInvocation>(smart.user_field(0).value<std::string>());
-                    for (const auto& addrLock : sci.usedContracts)
-                        deleteFromLockSmart(addrLock, getFutureAccessId());
+                if (smart.convention == MethodNameConvention::Default) {
+                    const auto fld = smart.transaction.user_field(0);
+                    if (fld.is_valid()) {
+                        auto sci = deserialize<api::SmartContractInvocation>(smart.transaction.user_field(0).value<std::string>());
+                        for (const auto& addrLock : sci.usedContracts)
+                            deleteFromLockSmart(addrLock, getFutureAccessId());
+                    }
                 }
 			}
 		}
