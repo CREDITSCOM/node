@@ -60,6 +60,7 @@ struct ApiData {
     uint16_t ajaxPort = 8081;
     uint16_t executorPort = 9080;
     uint16_t apiexecPort = 9070;
+    std::string executorHost{ "localhost" };
 };
 
 class Config {
