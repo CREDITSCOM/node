@@ -223,8 +223,8 @@ public:  // wrappers
     }
 
 public:
-    static Executor& getInstance(const BlockChain* p_blockchain = nullptr, const cs::SolverCore* solver = nullptr, const int p_exec_port = 0) {  // singlton
-        static Executor executor(*p_blockchain, *solver, p_exec_port);
+    static Executor& getInstance(const BlockChain* p_blockchain = nullptr, const cs::SolverCore* solver = nullptr, const int p_exec_port = 0, const std::string p_exec_ip = std::string{}) {  // singlton
+        static Executor executor(*p_blockchain, *solver, p_exec_port, p_exec_ip);
         return executor;
     }
 
@@ -404,22 +404,21 @@ public:
                 // call to payable
                 // add method name
                 header.methodName = "payable";
-                general::Variant var;
                 // add arg[0]
-				var.__set_v_big_decimal(smart.amount().to_string());
-				header.params.emplace_back(var);
+                general::Variant& var0 = header.params.emplace_back(::general::Variant{});
+				var0.__set_v_big_decimal(smart.amount().to_string());				
                 // add arg[1]
                 std::string val;
                 if (smart.user_field(1).is_valid()) {
                     val = smart.user_field(1).value<std::string>();
                 }
+                general::Variant& var1 = header.params.emplace_back(::general::Variant{});
                 if (smart_item.convention == MethodNameConvention::PayableLegacy) {
-                    var.__set_v_string(val);
+                    var1.__set_v_string(val);
                 }
                 else {
-                    var.__set_v_byte_array(val);
-                }
-                header.params.emplace_back(var);
+                    var1.__set_v_byte_array(val);
+                }                
             }
             else {
                 api::SmartContractInvocation sci;
@@ -553,10 +552,11 @@ public slots:
 
 private:
     std::map<general::Address, general::AccessID> lockSmarts;
-    explicit Executor(const BlockChain& p_blockchain, const cs::SolverCore& solver, const int p_exec_port)
+    explicit Executor(const BlockChain& p_blockchain, const cs::SolverCore& solver, const int p_exec_port, const std::string p_exec_ip)
     : blockchain_(p_blockchain)
     , solver_(solver)
-    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost"/*"192.168.0.64"*/, p_exec_port)))
+    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
+        ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(p_exec_ip, p_exec_port)))
     , origExecutor_(
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
         std::thread th([&]() {

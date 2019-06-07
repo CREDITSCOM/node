@@ -311,10 +311,12 @@ private:
     using trx_innerid_t = int64_t;  // see csdb/transaction.hpp near #101
 
     const char* PayableName = "payable";
-    const char* PayableRetType = "void";
-    const char* PayableArgType = "java.lang.String";
-    const char* PayableNameArg0 = "amount";
-    const char* PayableNameArg1 = "currency";
+    const char* PayableArg0 = ""; // amount
+    const char* PayableArg1 = ""; // userData, currency
+    const char* TypeVoid = "void";
+    const char* TypeString = "java.lang.String";
+    const char* TypeByteArray = "byte[]";
+    const char* TypeBigDecimal = "java.math.BigDecimal";
 
     const char* UsesContract = "Contract";
     const char* UsesContractAddr = "address";
@@ -335,7 +337,8 @@ private:
     {
         Unknown = -1,
         Absent = 0,
-        Implemented = 1
+        Implemented = 1,
+        ImplementedVer1 = 2
     };
 
     // defines current contract state, the contracts cache is a container of every contract state
@@ -635,6 +638,10 @@ private:
 
     // tests conditions to allow contract execution if disabled
     bool test_executor_availability();
+
+    bool implements_payable(PayableStatus val) {
+        return (val == PayableStatus::Implemented || val == PayableStatus::ImplementedVer1);
+    }
 };
 
 }  // namespace cs
