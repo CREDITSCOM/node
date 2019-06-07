@@ -1797,7 +1797,7 @@ std::string SmartContracts::print_executed_method(const SmartContractRef& ref) {
             arg = "<empty>";
         }
         std::ostringstream os;
-        os << PayableName << "(" << PayableArg0 << " = " << t.amount().to_double() << ", bundle = " << arg;
+        os << PayableName << "(" << PayableArg0 << " = " << t.amount().to_double() << ", bundle = " << arg << ')';
         return os.str();
     }
     return std::string("???");
