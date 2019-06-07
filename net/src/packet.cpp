@@ -4,7 +4,7 @@
 #include "packet.hpp"
 #include "transport.hpp"  // for NetworkCommand
 
-RegionAllocator Message::allocator_(1 << 26, 4);
+RegionAllocator Message::allocator_;
 
 enum Lengths {
     FragmentedHeader = 36
@@ -81,7 +81,7 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
 
 const cs::Hash& Packet::getHeaderHash() const {
     if (!headerHashed_) {
-        headerHash_ = generateHash(static_cast<const char*>(data_.get()) + Offsets::FragmentsNum, Lengths::FragmentedHeader);
+        headerHash_ = generateHash(static_cast<const char*>(data_->get()) + Offsets::FragmentsNum, Lengths::FragmentedHeader);
         headerHashed_ = true;
     }
     return headerHash_;
@@ -215,7 +215,7 @@ void Message::composeFullData() const {
 
         fullData_ = allocator_.allocateNext(totalSize);
 
-        uint8_t* data = static_cast<uint8_t*>(fullData_.get());
+        uint8_t* data = static_cast<uint8_t*>(fullData_->get());
         pack = packets_;
 
         for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {

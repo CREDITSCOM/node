@@ -6,10 +6,133 @@
 #include <cstdint>
 #include <cstdlib>
 #include <thread>
+#include <memory>
 
 #include "cache.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
+
+/* Now, RegionAllocator provides a basic allocation strategy, where we
+   malloc() several memory pages of predefined size and a page can be
+   reused if and only if all of its memory has been unuse()d.
+   Thread safety: one allocator, many users */
+class RegionAllocator;
+
+class Region {
+public:
+    using Allocator = RegionAllocator;
+    using Type = void;
+
+    void* get() {
+        return data_;
+    }
+    const void* get() const {
+        return data_;
+    }
+
+    uint32_t size() const {
+        return size_;
+    }
+
+    ~Region() {
+//      cslog() << "deallocate: " << data_;
+      delete [] data_;
+    }
+
+    void setSize(uint32_t size) {
+      size_ = size;
+    }
+
+private:
+    Region(uint8_t* data, const uint32_t size)
+    : data_(data)
+    , size_(size) {
+    }
+
+    Region(const Region&) = delete;
+    Region(Region&&) = delete;
+    Region& operator=(const Region&) = delete;
+    Region& operator=(Region&&) = delete;
+
+    uint8_t* data_;
+    uint32_t size_;
+
+    friend class RegionAllocator;
+    friend class Network;
+};
+
+using RegionPtr = std::shared_ptr<Region>;
+
+/* ActivePage points to a page with some free memory.
+   - If its free memory isn't enough to complete an alloc request,
+     ActivePage->nextPage becomes the next ActivePage;
+   - If there is no ActivePage->nextPage, we allocate another page.
+   - Whenever memory is freed on a page, if it is now empty, it
+     becomes the ActivePage->nextPage */
+class RegionAllocator {
+public:
+    RegionAllocator() = default;
+
+    RegionAllocator(const RegionAllocator&) = delete;
+    RegionAllocator(RegionAllocator&&) = delete;
+    RegionAllocator& operator=(const RegionAllocator&) = delete;
+    RegionAllocator& operator=(RegionAllocator&&) = delete;
+
+    /* Assumptions:
+     - allocateNext and shrinkLast are only called from the thread
+       that constructed the object
+     - shrinkLast is called before the last allocation gets unuse()d */
+    RegionPtr allocateNext(const uint32_t size) {
+        auto ptr = new uint8_t[size];
+//        cslog() << "allocate: " << ptr;
+        return RegionPtr(new Region(ptr, size));
+    }
+
+//    friend class Region;
+};
+
+/* Not, TypedAllocator is a completely different thing. It allocates
+   big chunks of data, uses it for objects of fixed size and keeps
+   track of freed objects for reuse. */
+template <typename T>
+class TypedAllocator;
+
+template <typename T>
+class TypedSlot {
+public:
+    using Allocator = TypedAllocator<T>;
+    using Type = T;
+
+    template <typename... Args>
+    TypedSlot(Allocator* allocator, Args&&... args)
+    : allocator_(allocator)
+    , element_(std::forward<Args>(args)...) {
+    }
+
+    void use() {
+        users_.fetch_add(1, std::memory_order_acq_rel);
+    }
+
+    inline void unuse();
+
+    T* get() {
+        return &element_;
+    }
+    const T* get() const {
+        return &element_;
+    }
+
+    uint32_t size() const {
+        return sizeof(T);
+    }
+
+private:
+    std::atomic<uint32_t> users_ = {0};
+    Allocator* allocator_;
+    T element_;
+
+    friend Allocator;
+};
 
 /* First of all, here is a base unmovable smart pointer to a memory
    region.
@@ -129,257 +252,6 @@ private:
 
     friend typename MemRegion::Allocator;
     friend class Network;
-};
-
-/* Now, RegionAllocator provides a basic allocation strategy, where we
-   malloc() several memory pages of predefined size and a page can be
-   reused if and only if all of its memory has been unuse()d.
-   Thread safety: one allocator, many users */
-class RegionAllocator;
-
-struct RegionPage {
-    RegionAllocator* allocator;
-
-    __cacheline_aligned std::atomic<RegionPage*> next = {nullptr};
-    __cacheline_aligned std::atomic<uint32_t> usedSize = {0};
-
-    uint8_t* regions;
-
-    uint8_t* usedEnd;
-    uint32_t sizeLeft;
-
-    ~RegionPage() {
-        ::operator delete(regions, std::align_val_t{cache_linesize});
-    }
-};
-
-class Region {
-public:
-    using Allocator = RegionAllocator;
-    using Type = void;
-
-    void use() {
-        users_.fetch_add(1, std::memory_order_acq_rel);
-    }
-
-    inline void unuse();
-
-    void* get() {
-        return data_;
-    }
-    const void* get() const {
-        return data_;
-    }
-
-    uint32_t size() const {
-        return size_;
-    }
-
-private:
-    Region(RegionPage* page, void* data, const uint32_t size)
-    : page_(page)
-    , data_(data)
-    , size_(size) {
-    }
-
-    Region(const Region&) = delete;
-    Region(Region&&) = delete;
-    Region& operator=(const Region&) = delete;
-    Region& operator=(Region&&) = delete;
-
-    __cacheline_aligned std::atomic<uint32_t> users_ = {0};
-    RegionPage* page_;
-
-    void* data_;
-    uint32_t size_;
-
-    friend class RegionAllocator;
-    friend class Network;
-};
-
-using RegionPtr = MemPtr<Region>;
-
-/* ActivePage points to a page with some free memory.
-   - If its free memory isn't enough to complete an alloc request,
-     ActivePage->nextPage becomes the next ActivePage;
-   - If there is no ActivePage->nextPage, we allocate another page.
-   - Whenever memory is freed on a page, if it is now empty, it
-     becomes the ActivePage->nextPage */
-class RegionAllocator {
-public:
-    const uint32_t PageSize;
-
-    RegionAllocator(const uint32_t _pageSize, const uint32_t _initPages = 10)
-    : PageSize(_pageSize) {
-        activePage_ = allocatePage();
-        auto lastPage = activePage_;
-
-        for (uint32_t i = 1; i < _initPages; ++i) {
-            lastPage->next.store(allocatePage());
-            lastPage = lastPage->next;
-        }
-
-        lastPage->next.store(nullptr);
-    }
-
-    RegionAllocator(const RegionAllocator&) = delete;
-    RegionAllocator(RegionAllocator&&) = delete;
-    RegionAllocator& operator=(const RegionAllocator&) = delete;
-    RegionAllocator& operator=(RegionAllocator&&) = delete;
-
-    /* Assumptions:
-     - allocateNext and shrinkLast are only called from the thread
-       that constructed the object
-     - shrinkLast is called before the last allocation gets unuse()d */
-    RegionPtr allocateNext(const uint32_t size) {
-        uint32_t regSize = size + sizeof(Region);
-        regSize += (-(int)regSize) & 0x3f;
-
-        if (!activePage_->usedSize.load(std::memory_order_acquire)) {
-            activePage_->sizeLeft = PageSize;
-            activePage_->usedEnd = activePage_->regions;
-        }
-
-        if (activePage_->sizeLeft < regSize) {
-            if (!activePage_->next.load(std::memory_order_acquire)) {
-                auto newPage = allocatePage();
-                insertAfterActive(newPage);
-            }
-
-            activePage_ = activePage_->next.load(std::memory_order_acquire);
-            activePage_->sizeLeft = PageSize;
-            activePage_->usedEnd = activePage_->regions;
-        }
-
-        // So there is enough left
-        lastReg_ = new (activePage_->usedEnd) Region(activePage_, activePage_->usedEnd + sizeof(Region), size);
-        activePage_->usedEnd += regSize;
-        activePage_->sizeLeft -= regSize;
-
-        activePage_->usedSize.fetch_add(regSize, std::memory_order_acq_rel);
-
-        return RegionPtr(lastReg_);
-    }
-
-    void shrinkLast(const uint32_t size) {
-        assert(lastReg_->size_ >= size);
-        int32_t prevSize = lastReg_->size_ + sizeof(Region);
-        prevSize += (-prevSize) & 0x3f;
-        int32_t newSize = size + sizeof(Region);
-        newSize += (-newSize) & 0x3f;
-        int32_t diff = prevSize - newSize;
-
-        lastReg_->size_ = size;
-        lastReg_->page_->sizeLeft += diff;
-        lastReg_->page_->usedEnd -= diff;
-
-        activePage_->usedSize.fetch_sub(diff, std::memory_order_acq_rel);
-    }
-
-#ifdef TESTING
-    uint32_t getPagesNum() const {
-        return pagesNum_;
-    }
-#endif
-
-private:
-    // Can be called from any thread using the allocated memory
-    void freeMem(Region* region) {
-        auto page = region->page_;
-        region->~Region();
-
-        uint32_t toSub = region->size_ + sizeof(Region);
-        toSub += (-(int)toSub) & 0x3f;
-
-        if (page->usedSize.fetch_sub(toSub, std::memory_order_acq_rel) == toSub) {
-            // Since it was us who freed up all the memory, we're the only
-            // ones accessing *page...
-            if (activePage_ == page) {
-                return;
-            }
-
-            // ... as long as it's not active, of course
-            insertAfterActive(page);
-        }
-    }
-
-    RegionPage* allocatePage() {
-        RegionPage* result = new RegionPage();
-
-        result->allocator = this;
-        result->regions = static_cast<uint8_t *>(::operator new(PageSize, std::align_val_t{cache_linesize}));
-
-#ifdef TESTING
-        ++pagesNum_;
-#endif
-
-        return result;
-    }
-
-    void insertAfterActive(RegionPage* page) {
-        auto actNext = activePage_->next.load(std::memory_order_acquire);
-        do {
-            page->next.store(actNext, std::memory_order_relaxed);
-        } while (!activePage_->next.compare_exchange_strong(actNext, page, std::memory_order_acquire, std::memory_order_relaxed));
-    }
-
-    RegionPage* activePage_;
-    Region* lastReg_;
-
-#ifdef TESTING
-    uint32_t pagesNum_ = 0;
-#endif
-
-    friend class Region;
-};
-
-inline void Region::unuse() {
-    if (users_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-        page_->allocator->freeMem(this);
-    }
-}
-
-/* Not, TypedAllocator is a completely different thing. It allocates
-   big chunks of data, uses it for objects of fixed size and keeps
-   track of freed objects for reuse. */
-template <typename T>
-class TypedAllocator;
-
-template <typename T>
-class TypedSlot {
-public:
-    using Allocator = TypedAllocator<T>;
-    using Type = T;
-
-    template <typename... Args>
-    TypedSlot(Allocator* allocator, Args&&... args)
-    : allocator_(allocator)
-    , element_(std::forward<Args>(args)...) {
-    }
-
-    void use() {
-        users_.fetch_add(1, std::memory_order_acq_rel);
-    }
-
-    inline void unuse();
-
-    T* get() {
-        return &element_;
-    }
-    const T* get() const {
-        return &element_;
-    }
-
-    uint32_t size() const {
-        return sizeof(T);
-    }
-
-private:
-    std::atomic<uint32_t> users_ = {0};
-    Allocator* allocator_;
-    T element_;
-
-    friend Allocator;
 };
 
 template <typename T>

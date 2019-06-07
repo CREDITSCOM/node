@@ -826,12 +826,12 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
     RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
     uint64_t local_uuid = node_->getBlockChain().uuid();
     if (local_uuid != 0 && remote_uuid != 0 && local_uuid != remote_uuid) {
-        sendRegistrationRefusal(conn, RegistrationRefuseReasons::IncompatibleBlockchain);
-        ptr->setBlackListed(true);
-        return true;
+       sendRegistrationRefusal(conn, RegistrationRefuseReasons::IncompatibleBlockchain);
+       ptr->setBlackListed(true);
+       return true;
     }
     else {
-        ptr->setBlackListed(false);
+       ptr->setBlackListed(false);
     }
 
     iPackStream_ >> conn.id;

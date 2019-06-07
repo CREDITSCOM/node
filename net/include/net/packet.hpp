@@ -117,7 +117,7 @@ public:
 
     const cs::Hash& getHash() const {
         if (!hashed_) {
-            hash_ = generateHash(data_.get(), data_.size());
+            hash_ = generateHash(data_->get(), data_->size());
             hashed_ = true;
         }
         return hash_;
@@ -156,18 +156,22 @@ public:
     }
 
     void* data() {
-        return data_.get();
+        return data_->get();
     }
     const void* data() const {
-        return data_.get();
+        return data_->get();
     }
 
     size_t size() const {
-        return data_.size();
+        return data_->size();
+    }
+
+    void setSize(uint32_t size) {
+        data_->setSize(size);
     }
 
     const uint8_t* getMsgData() const {
-        return static_cast<const uint8_t*>(data_.get()) + getHeadersLength();
+        return static_cast<const uint8_t*>(data_->get()) + getHeadersLength();
     }
     size_t getMsgSize() const {
         return size() - getHeadersLength();
@@ -177,11 +181,12 @@ public:
     void recalculateHeadersLength();
 
     explicit operator bool() {
-        return !data_.isNull();
+        return data_.get();
+//        return !data_.isNull();
     }
 
     boost::asio::mutable_buffer encode(boost::asio::mutable_buffer tempBuffer) {
-        if (data_.size() == 0) {
+        if (data_->size() == 0) {
             cswarning() << "Encoding empty packet";
             return boost::asio::buffer(tempBuffer.data(), 0);
         }
@@ -193,13 +198,13 @@ public:
             // Packet::MaxSize is a part of implementation magic(
             assert(tempBuffer.size() == Packet::MaxSize);
 
-            char* source = static_cast<char*>(data_.get());
+            char* source = static_cast<char*>(data_->get());
             char* dest = static_cast<char*>(tempBuffer.data());
 
             // copy header
             std::copy(source, source + headerSize, dest);
 
-            int sourceSize = static_cast<int>(data_.size() - headerSize);
+            int sourceSize = static_cast<int>(data_->size() - headerSize);
             int destSize = static_cast<int>(tempBuffer.size() - headerSize);
 
             int compressedSize = LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize);
@@ -212,11 +217,11 @@ public:
                 *source &= ~BaseFlags::Compressed;
             }
         }
-
-        char* source = static_cast<char*>(data_.get());
+        char* source = static_cast<char*>(data_->get());
         char* dest = static_cast<char*>(tempBuffer.data());
-        std::copy(source, source + data_.size(), dest);
-        return boost::asio::buffer(dest, data_.size());
+
+        std::copy(source, source + data_->size(), dest);
+        return boost::asio::buffer(dest, data_->size());
     }
 
     size_t decode(size_t packetSize = 0) {
@@ -240,9 +245,9 @@ public:
 
             // It's a part of implementation magic(
             // eg. <IPackMan> allocates Packet::MaxSize packet implicitly
-            assert(data_.size() == Packet::MaxSize);
+            assert(data_->size() == Packet::MaxSize);
 
-            char* source = static_cast<char*>(data_.get());
+            char* source = static_cast<char*>(data_->get());
             char dest[Packet::MaxSize];
 
             int sourceSize = static_cast<int>(packetSize - headerSize);
@@ -278,14 +283,14 @@ public:
 
 private:
     bool checkFlag(const BaseFlags flag) const {
-        return (*static_cast<const uint8_t*>(data_.get()) & flag) != 0;
+        return (*static_cast<const uint8_t*>(data_->get()) & flag) != 0;
     }
 
     uint32_t calculateHeadersLength() const;
 
     template <typename T>
     const T& getWithOffset(const uint32_t offset) const {
-        return *(reinterpret_cast<const T*>(static_cast<const uint8_t*>(data_.get()) + offset));
+        return *(reinterpret_cast<const T*>(static_cast<const uint8_t*>(data_->get()) + offset));
     }
 
 private:
@@ -330,14 +335,14 @@ public:
         if (!fullData_) {
             composeFullData();
         }
-        return static_cast<const uint8_t*>(fullData_.get()) + packets_->getHeadersLength();
+        return static_cast<const uint8_t*>(fullData_->get()) + packets_->getHeadersLength();
     }
 
     size_t getFullSize() const {
         if (!fullData_) {
             composeFullData();
         }
-        return fullData_.size() - packets_->getHeadersLength();
+        return fullData_->size() - packets_->getHeadersLength();
     }
 
     Packet extractData() const {
