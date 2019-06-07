@@ -1102,20 +1102,23 @@ bool SmartContracts::execute(SmartExecutionData& data) {
     if (maybe_result.has_value()) {
         data.result = maybe_result.value();
         if (!data.result.smartsRes.empty()) {
-            auto& result = data.result.smartsRes.front();
-            if (result.newState.empty()) {
-                if (result.retValue.__isset.v_string) {
-                    data.error = result.retValue.v_string;
-                    result.retValue.__set_v_byte(error::ExecuteTransaction);
-                }
-                else {
-                    data.error = "contract execution failed, new contract state is empty";
-                    // let retValue to be unchanged
+            if (data.result.response.code == 0) {
+                auto& result = data.result.smartsRes.front();
+                if (result.response.code == 0) {
+                    // nothing do
+                } else {
+                    data.error = result.response.message;
+                    if (data.error.empty()) {
+                        data.error = "contract execution failed, new contract state is empty";
+                    }
                 }
             }
-            //else {
-                // resutlt.newState is set, nothing to do here
-            //}
+            else {
+                data.error = data.result.response.message;
+                if (data.error.empty()) {
+                    data.setError(error::ExecuteTransaction, "contract execution failed, contract state is unchanged");
+                }
+            }
         }
         else {
             // smart result is empty!

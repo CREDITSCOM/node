@@ -288,12 +288,14 @@ public:
 			general::Variant retValue;
 			std::string		 newState;
 			int64_t			 executionCost;
-		};
+            ::general::APIResponse response;
+        };
 	public:
 		std::vector<SmartRes> smartsRes;
 		std::map<csdb::Address, std::string> states;
 		std::vector<csdb::Transaction> trxns;
 		csdb::Amount fee;
+        ::general::APIResponse response;
 	};
 
     void addInnerSendTransaction(const general::AccessID& accessId, const csdb::Transaction& transaction) {
@@ -460,6 +462,8 @@ public:
 
 		// fill res 
 		ExecuteResult res;
+        res.response = optOriginRes.value().resp.status;
+
 		if (optInnerTransactions.has_value())
 			res.trxns = optInnerTransactions.value();
 		deleteInnerSendTransactions(optOriginRes.value().acceessId);
@@ -471,7 +475,7 @@ public:
 			res.states[addr] = itState;
 		}
 		for (const auto& result : optOriginRes.value().resp.results)
-			res.smartsRes.push_back({ result.ret_val, result.invokedContractState, result.executionCost });
+			res.smartsRes.push_back({ result.ret_val, result.invokedContractState, result.executionCost, result.status });
 
 		return res;
 	}
