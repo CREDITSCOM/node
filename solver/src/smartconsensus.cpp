@@ -383,7 +383,9 @@ void SmartConsensus::processStages() {
     for (size_t i = 0; i < cnt; ++i) {
         if (st3.realTrustedMask.at(i) != InvalidConfidantIndex) {
             for (size_t j = 0; j < feesNumber; ++j) {
-                sumFees[j] += smartStageOneStorage_.at(i).fees[j];
+                if (smartStageOneStorage_.at(i).fees.size() > j) {
+                   sumFees[j] += smartStageOneStorage_.at(i).fees[j];
+                }
             }
 
             if (idx == idx_writer) {
@@ -757,6 +759,9 @@ void SmartConsensus::markSmartOutboundNodes(int st) {
             for (auto& it : smartStageOneStorage_) {
                 if (it.sender == cs::ConfidantConsts::InvalidConfidantIndex) {
                     fake_stage1(count);
+                    if (smartUntrusted.size() > count) {
+                        ++(smartUntrusted[count]);
+                    }
                 }
                 ++count;
             }
@@ -766,6 +771,9 @@ void SmartConsensus::markSmartOutboundNodes(int st) {
             for (auto& it : smartStageTwoStorage_) {
                 if (it.sender == cs::ConfidantConsts::InvalidConfidantIndex) {
                     fake_stage2(count);
+                    if (smartUntrusted.size() > count) {
+                        ++(smartUntrusted[count]);
+                    }
                 }
                 ++count;
             }
