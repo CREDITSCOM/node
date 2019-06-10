@@ -353,7 +353,12 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             cs::RoundNumber round = 0;
             iPackStream_ >> round;
 
-            gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round), node_->canBeTrusted());
+            if (node_->getBlockChain().getLastSequence() < round) {
+                gotSSLastBlock(task, node_->getBlockChain().getLastSequence(), node_->getBlockChain().getLastHash(), false);
+            }
+            else {
+                gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round), node_->canBeTrusted());
+            }
 
             break;
         }
