@@ -1158,15 +1158,13 @@ RegionPtr Node::compressPoolsBlock(const cs::PoolsBlock& poolsBlock, std::size_t
     const auto maxSize = LZ4_compressBound(binSize);
     auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(maxSize));
 
-    const int compressedSize = LZ4_compress_default(data, static_cast<char*>(memPtr->get()), binSize, cs::numeric_cast<int>(memPtr->size()));
+    const int compressedSize = LZ4_compress_default(data, static_cast<char*>(memPtr->data()), binSize, cs::numeric_cast<int>(memPtr->size()));
 
     if (!compressedSize) {
         csmeta(cserror) << "Compress poools block error";
     }
 
-    memPtr->setSize(compressedSize);
-//    allocator_.shrinkLast(cs::numeric_cast<uint32_t>(compressedSize));
-
+    memPtr->setSize(static_cast<uint32_t>(compressedSize));
     realBinSize = cs::numeric_cast<std::size_t>(binSize);
 
     return memPtr;
@@ -1187,7 +1185,7 @@ cs::PoolsBlock Node::decompressPoolsBlock(const uint8_t* data, const size_t size
     bytes.resize(realBinSize);
     char* bytesData = reinterpret_cast<char*>(bytes.data());
 
-    const int uncompressedSize = LZ4_decompress_safe(static_cast<char*>(memPtr->get()), bytesData, cs::numeric_cast<int>(compressSize), cs::numeric_cast<int>(realBinSize));
+    const int uncompressedSize = LZ4_decompress_safe(static_cast<char*>(memPtr->data()), bytesData, cs::numeric_cast<int>(compressSize), cs::numeric_cast<int>(realBinSize));
 
     if (uncompressedSize < 0) {
         csmeta(cserror) << "Decompress poools block error";

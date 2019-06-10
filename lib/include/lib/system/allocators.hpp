@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
 #ifndef ALLOCATORS_HPP
 #define ALLOCATORS_HPP
+
 #include <atomic>
 #include <cassert>
 #include <cstdint>
@@ -19,14 +20,17 @@
 class RegionAllocator;
 
 class Region {
+    class RegionPrivate {};
 public:
     using Allocator = RegionAllocator;
     using Type = void;
+    using RegionPtr = std::shared_ptr<Region>;
 
-    void* get() {
+    void* data() {
         return data_;
     }
-    const void* get() const {
+
+    const void* data() const {
         return data_;
     }
 
@@ -35,18 +39,21 @@ public:
     }
 
     ~Region() {
-//      cslog() << "deallocate: " << data_;
-      delete [] data_;
+        delete [] data_;
     }
 
     void setSize(uint32_t size) {
-      size_ = size;
+        size_ = size;
+    }
+
+    explicit Region(cs::Byte* data, const uint32_t size, RegionPrivate)
+    : data_(data)
+    , size_(size) {
     }
 
 private:
-    Region(uint8_t* data, const uint32_t size)
-    : data_(data)
-    , size_(size) {
+    static RegionPtr create(cs::Byte* data, const uint32_t size) {
+        return std::make_shared<Region>(data, size, RegionPrivate());
     }
 
     Region(const Region&) = delete;
@@ -54,14 +61,14 @@ private:
     Region& operator=(const Region&) = delete;
     Region& operator=(Region&&) = delete;
 
-    uint8_t* data_;
+    cs::Byte* data_;
     uint32_t size_;
 
     friend class RegionAllocator;
     friend class Network;
 };
 
-using RegionPtr = std::shared_ptr<Region>;
+using RegionPtr = Region::RegionPtr;
 
 /* ActivePage points to a page with some free memory.
    - If its free memory isn't enough to complete an alloc request,
@@ -83,12 +90,24 @@ public:
        that constructed the object
      - shrinkLast is called before the last allocation gets unuse()d */
     RegionPtr allocateNext(const uint32_t size) {
-        auto ptr = new uint8_t[size];
-//        cslog() << "allocate: " << ptr;
-        return RegionPtr(new Region(ptr, size));
+        auto ptr = new cs::Byte[size];
+        return Region::create(ptr, size);
+    }
+};
+
+class MockAllocator : public RegionAllocator {
+public:
+    uint64_t allocations() const {
+        return allocations_;
     }
 
-//    friend class Region;
+    RegionPtr allocateNext(const uint32_t size) {
+        ++allocations_;
+        return RegionAllocator::allocateNext(size);
+    }
+
+private:
+    uint64_t allocations_ = 0;
 };
 
 /* Not, TypedAllocator is a completely different thing. It allocates
@@ -285,8 +304,9 @@ public:
 
     void remove(IntType* toFree) {
         toFree->~IntType();
+
         {
-            cs::Lock l(freeFlag_);
+            cs::Lock lock(freeFlag_);
             IntType** place = freeChunksLast_.load(std::memory_order_acquire);
             IntType** nextPlace;
 

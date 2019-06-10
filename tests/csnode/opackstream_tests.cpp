@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
+
 #include "csdb/address.hpp"
 #include "packstream.hpp"
+
+#include <lib/system/utils.hpp>
 
 using DataPtr = std::shared_ptr<char[]>;
 
@@ -43,10 +46,10 @@ auto getStreamData(cs::OPackStream& stream) {
     return streamData;
 }
 
-const std::size_t kPageSizeForAllocator = 1000;  // 109 is minimal stable
+[[maybe_unused]] const std::size_t kPageSizeForAllocator = 1000;  // 109 is minimal stable
 
 TEST(OPackStream, InitializationWithFragmentedAndNetworkMsgFlags) {
-    RegionAllocator allocator(kPageSizeForAllocator, 1);
+    RegionAllocator allocator;
     cs::OPackStream stream(&allocator, kPublicKey);
 
     const auto flags = BaseFlags(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
@@ -61,7 +64,7 @@ TEST(OPackStream, InitializationWithFragmentedAndNetworkMsgFlags) {
 }
 
 TEST(OPackStream, InitializationWithFragmentedFlagOnly) {
-    RegionAllocator allocator(kPageSizeForAllocator, 1);
+    RegionAllocator allocator;
     cs::OPackStream stream(&allocator, kPublicKey);
 
     const auto flags = BaseFlags::Fragmented;
@@ -80,35 +83,24 @@ TEST(OPackStream, InitializationWithFragmentedFlagOnly) {
 }
 
 TEST(OPackStream, WithoutInitializationPacketsCountIsZero) {
-    RegionAllocator allocator(kPageSizeForAllocator, 1);
+    RegionAllocator allocator;
     cs::OPackStream stream(&allocator, kPublicKey);
 
-    ASSERT_EQ(0, stream.getPacketsCount());
+    ASSERT_EQ(0_sz, stream.getPacketsCount());
 }
 
 TEST(OPackStream, AfterClearPacketsCountIsZero) {
-    RegionAllocator allocator(kPageSizeForAllocator, 1);
+    RegionAllocator allocator;
     cs::OPackStream stream(&allocator, kPublicKey);
 
     stream.init(BaseFlags::Fragmented);
     stream.clear();
 
-    ASSERT_EQ(0, stream.getPacketsCount());
+    ASSERT_EQ(0_sz, stream.getPacketsCount());
 }
 
-/*
-TEST(OPackStream, WithoutInitializationEncodedDataIsEmpty) {
-    RegionAllocator allocator(kPageSizeForAllocator, 1);
-    cs::OPackStream stream(&allocator, kPublicKey);
-
-    auto streamData = getStreamData(stream);
-    auto encoded = streamData.encoded;
-
-    ASSERT_EQ(0, encoded.size());
-}*/
-
 TEST(OPackStream, getPacketsCount) {
-    RegionAllocator allocator(kPageSizeForAllocator, 1);
+    RegionAllocator allocator;
     cs::OPackStream oPackStream(&allocator, kPublicKey);
     oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
 
@@ -116,7 +108,7 @@ TEST(OPackStream, getPacketsCount) {
 }
 
 TEST(OPackStream, getCurrentPtr) {
-    RegionAllocator allocator(kPageSizeForAllocator, 1);
+    RegionAllocator allocator;
     cs::OPackStream oPackStream(&allocator, kPublicKey);
     oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
 
@@ -124,7 +116,7 @@ TEST(OPackStream, getCurrentPtr) {
 }
 
 TEST(OPackStream, getCurrSize) {
-    RegionAllocator allocator(kPageSizeForAllocator, 1);
+    RegionAllocator allocator;
     cs::OPackStream oPackStream(&allocator, kPublicKey);
     oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
 
@@ -133,7 +125,7 @@ TEST(OPackStream, getCurrSize) {
 
 template <class T, size_t ArraySize>
 void TestConcreteTypeWriteToOPackStream(const T& value, const unsigned char (&expected_encoded_data)[ArraySize]) {
-    RegionAllocator allocator(kPageSizeForAllocator, 1);
+    RegionAllocator allocator;
 
     cs::OPackStream stream(&allocator, kPublicKey);
     stream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
