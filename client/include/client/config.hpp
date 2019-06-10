@@ -69,7 +69,7 @@ public:
     Config(const Config&) = default;
     Config(Config&&) = default;
 
-    static Config read(po::variables_map&);
+    static Config read(po::variables_map&, bool seedEnter = false);
 
     const EndpointData& getInputEndpoint() const {
         return inputEp_;
@@ -153,6 +153,7 @@ private:
     void readApiData(const boost::property_tree::ptree& config);
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
+    bool enterWithSeed();
     void showKeys(const std::string& pk58);
     
     void changePasswordOption(const std::string& pathToSk);

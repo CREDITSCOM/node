@@ -70,6 +70,8 @@ const uint32_t MAX_PASSWORD_LENGTH = 128;
 const std::map<std::string, NodeType> NODE_TYPES_MAP = {{"client", NodeType::Client}, {"router", NodeType::Router}};
 const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"signal_server", BootstrapType::SignalServer}, {"list", BootstrapType::IpList}};
 
+static const size_t DEFAULT_NODE_KEY_ID = 0;
+
 static EndpointData readEndpoint(const boost::property_tree::ptree& config, const std::string& propName) {
     const boost::property_tree::ptree& epTree = config.get_child(propName);
 
@@ -144,14 +146,20 @@ void Config::dumpJSONKeys(const std::string& fName) const {
     cscrypto::fillWithZeros(const_cast<char*>(sk58.data()), sk58.size());
 }
 
-Config Config::read(po::variables_map& vm) {
+Config Config::read(po::variables_map& vm, bool seedEnter) {
     Config result = readFromFile(getArgFromCmdLine(vm, ARG_NAME_CONFIG_FILE, DEFAULT_PATH_TO_CONFIG));
 
     result.pathToDb_ = getArgFromCmdLine(vm, ARG_NAME_DB_PATH, DEFAULT_PATH_TO_DB);
 
-    if (result.good_)
+    if (!result.good_) return result;
+
+    if (!seedEnter) {
         result.good_ = result.readKeys(getArgFromCmdLine(vm, ARG_NAME_PUBLIC_KEY_FILE, DEFAULT_PATH_TO_PUBLIC_KEY),
                                        getArgFromCmdLine(vm, ARG_NAME_PRIVATE_KEY_FILE, DEFAULT_PATH_TO_PRIVATE_KEY), vm.count(ARG_NAME_ENCRYPT_KEY_FILE));
+    }
+    else {
+        result.good_ = result.enterWithSeed();
+    }
 
     return result;
 }
@@ -337,6 +345,52 @@ static bool getEncryptedPrivateBytes(const cscrypto::PrivateKey& sk, std::vector
     return encryptWithFile(sk, skBytes);
 }
 
+static bool findWordInDictionary(const char* word, size_t& index) {
+    using cscrypto::mnemonic::langs::en;
+    bool found = false;
+    for (size_t i = 0; i < en.size(); ++i) {
+        if (std::strcmp(word, en[i]) == 0) {
+            found = true;
+            index = i;
+        }
+    }
+    return found;
+}
+
+bool Config::enterWithSeed() {
+    std::cout << "Type seed phrase (24 words devided with spaces):" << std::endl << std::flush;
+    std::string seedPhrase;
+    std::getline(std::cin, seedPhrase);
+    std::stringstream ss(seedPhrase);
+    cscrypto::mnemonic::WordList words;
+    bool allValid = true;
+    
+    for (auto it = words.begin(); it != words.end(); ++it) {
+        if (!ss) {
+            allValid = false;
+            break;
+        }
+        std::string word;
+        ss >> word;
+        size_t index;
+        if (!findWordInDictionary(word.c_str(), index)) {
+            allValid = false;
+            break;
+        }
+        *it = cscrypto::mnemonic::langs::en[index];
+    }
+
+    if (!allValid) {
+        cslog() << "Invalid seed phrase";
+        return false;
+    }
+    auto ms = cscrypto::mnemonic::wordsToMasterSeed(words);
+    auto keys = cscrypto::keys_derivation::deriveKeyPair(ms, DEFAULT_NODE_KEY_ID);
+    publicKey_ = keys.first;
+    privateKey_ = keys.second;
+    return true;
+}
+
 void Config::showKeys(const std::string& pk58) {
     const double kTimeoutSeconds = 5;
     double secondsPassed = 0;
@@ -484,7 +538,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
             if (flag == 'g') {
                 std::vector<uint8_t> skBytes;
                 auto ms = cscrypto::keys_derivation::generateMaterSeed();
-                auto keys = cscrypto::keys_derivation::deriveKeyPair(ms, 0);
+                auto keys = cscrypto::keys_derivation::deriveKeyPair(ms, DEFAULT_NODE_KEY_ID);
                 privateKey_ = keys.second;
                 publicKey_ = keys.first;
 
