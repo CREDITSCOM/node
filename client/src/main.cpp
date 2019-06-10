@@ -145,7 +145,8 @@ int main(int argc, char* argv[]) {
 
     using namespace boost::program_options;
     options_description desc("Allowed options");
-    desc.add_options()("help", "produce this message")("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")(
+    desc.add_options()("help", "produce this message")("seed", "enter with seed instead of keys")(
+        "version", "show node version")("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")(
         "config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")")(
         "public-key-file", po::value<std::string>(), "path to public key file (default: \"NodePublic.txt\")")("private-key-file", po::value<std::string>(),
                                                                                                               "path to private key file (default: \"NodePrivate.txt\")")(
@@ -178,12 +179,17 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    if (vm.count("version")) {
+        cslog() << "Node version is " << Config::getNodeVersion();
+        return 0;
+    }
+
     if (!cscrypto::cryptoInit()) {
         std::cout << "Couldn't initialize the crypto library" << std::endl;
         panic();
     }
 
-    auto config = Config::read(vm);
+    auto config = Config::read(vm, vm.count("seed"));
 
     if (!config.isGood()) {
         panic();
