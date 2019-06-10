@@ -634,6 +634,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
             return node_->getRoundTableReply(data, size, firstPack.getSender());
         case MsgTypes::RoundPackRequest:
             return node_->getRoundPackRequest(data, size, rNum, firstPack.getSender());
+        case MsgTypes::EmptyRoundPack:
+            return node_->getEmptyRoundPack(data, size, rNum, firstPack.getSender());
         default:
             cserror() << "TRANSPORT> Unknown message type " << Packet::messageTypeToString(type) << " pack round " << rNum;
             break;
