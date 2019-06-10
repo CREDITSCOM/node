@@ -286,7 +286,7 @@ static bool getBufFromFile(std::string& buf) {
     std::fstream f;
     while (!f.is_open()) {
         std::cout << "\nEnter path to file (will be used as cipher key): " << std::flush;
-        std::getline(std::cin, pathToFile);
+        std::cin >> pathToFile;
         f.open(pathToFile, std::fstream::binary | std::fstream::in);
         if (!f.is_open()) {
             std::cout << "Can't open file " << pathToFile

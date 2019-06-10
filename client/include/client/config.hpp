@@ -140,6 +140,10 @@ public:
         return privateKey_;
     }
 
+    static NodeVersion getNodeVersion() {
+        return NODE_VERSION;
+    }
+
     void dumpJSONKeys(const std::string& fName) const;
 
 private:
