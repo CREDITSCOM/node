@@ -7,7 +7,7 @@
 [![Twitter](https://img.shields.io/twitter/follow/creditscom.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=creditscom)
 [![AGPL License](https://img.shields.io/github/license/CREDITSCOM/node.svg?color=green&label=License&style=plastic)](LICENSE)
 ![Version](https://img.shields.io/github/tag/CREDITSCOM/node.svg?label=Versoin&style=plastic)
-[![Build Status](https://161.156.96.18:8443/buildStatus/icon?job=client_linux_x64&lastBuild)](https://161.156.96.18:8443/job/client_linux_x64/lastBuild/)
+
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=CREDITSCOM_node&metric=alert_status)](https://sonarcloud.io/dashboard?id=CREDITSCOM_node)
 # Credits Node
 A node is a client-side application that is installed on the user equipment.
