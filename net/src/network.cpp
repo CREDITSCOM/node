@@ -401,11 +401,6 @@ void Network::processorRoutine() {
 inline void Network::processTask(TaskPtr<IPacMan>& task) {
     auto remoteSender = transport_->getPackSenderEntry(task->sender);
 
-    if (remoteSender->isBlackListed()) {
-        cswarning() << "Blacklisted";
-        return;
-    }
-
     if (!(task->pack.isHeaderValid())) {
         static constexpr size_t limit = 100;
         auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
@@ -415,11 +410,17 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         return;
     }
 
-    // Pure network processing
+    // Pure network processing, prior blacklist inspection to allow re-registration
     if (task->pack.isNetwork()) {
         if (cs::PacketValidator::instance().validate(task->pack)) {
             transport_->processNetworkTask(task, remoteSender);
         }
+        return;
+    }
+
+    // test blacklist, the only way to remove from the list is to re-register again
+    if (remoteSender->isBlackListed()) {
+        csdebug() << "Message is ignored from blacklisted " << task->sender;
         return;
     }
 
