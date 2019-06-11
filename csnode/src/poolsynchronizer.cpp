@@ -293,8 +293,9 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const cs::Sequence lastWri
 
     ProgressBar bar;
     std::cout << "\n";
-    cslog() << "SYNC: Blocks remaining: " << remaining;
-    csdebug() << "SYNC: Cached blocks size in blockchain: " << cachedBlocksSize;
+    cslog() << "SYNC: store " << WithDelimiters(lastWrittenSequence)
+        << " (+ " << WithDelimiters(cachedBlocksSize)
+        << " in cache), remaining " << WithDelimiters(remaining);
     cslog() << "SYNC: " << bar.string(syncStatus) << "\n";
 
     return remaining == 0;

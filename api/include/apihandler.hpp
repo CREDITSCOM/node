@@ -408,18 +408,24 @@ public:
                 header.methodName = "payable";
                 // add arg[0]
                 general::Variant& var0 = header.params.emplace_back(::general::Variant{});
-				var0.__set_v_big_decimal(smart.amount().to_string());				
+                std::string str_val = smart.amount().to_string();
+                if (smart_item.convention == MethodNameConvention::PayableLegacy) {
+                    var0.__set_v_string(str_val);
+                }
+                else {
+                    var0.__set_v_big_decimal(str_val);
+                }
                 // add arg[1]
-                std::string val;
+                str_val.clear();
                 if (smart.user_field(1).is_valid()) {
-                    val = smart.user_field(1).value<std::string>();
+                    str_val = smart.user_field(1).value<std::string>();
                 }
                 general::Variant& var1 = header.params.emplace_back(::general::Variant{});
                 if (smart_item.convention == MethodNameConvention::PayableLegacy) {
-                    var1.__set_v_string(val);
+                    var1.__set_v_string(str_val);
                 }
                 else {
-                    var1.__set_v_byte_array(val);
+                    var1.__set_v_byte_array(str_val);
                 }                
             }
             else {
