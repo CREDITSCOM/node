@@ -22,7 +22,7 @@ static void setup(cs::ConveyerBase* conveyer) {
 }
 
 struct cs::ConveyerBase::Impl {
-    explicit Impl(size_t queueSize, size_t transactionsSize, size_t packetsPerRound);
+    explicit Impl(size_t queueSize, size_t transactionsSize, size_t packetsPerRound, size_t metaSize);
 
     // first storage of transactions, before sending to network
     cs::PacketQueue packetQueue;
@@ -43,8 +43,9 @@ struct cs::ConveyerBase::Impl {
     const cs::ConveyerMeta* validMeta() &;
 };
 
-inline cs::ConveyerBase::Impl::Impl(size_t queueSize, size_t transactionsSize, size_t packetsPerRound)
-: packetQueue(queueSize, transactionsSize, packetsPerRound) {
+inline cs::ConveyerBase::Impl::Impl(size_t queueSize, size_t transactionsSize, size_t packetsPerRound, size_t metaSize)
+: packetQueue(queueSize, transactionsSize, packetsPerRound)
+, metaStorage(metaSize) {
 }
 
 inline const cs::ConveyerMeta* cs::ConveyerBase::Impl::validMeta() & {
@@ -58,7 +59,7 @@ inline const cs::ConveyerMeta* cs::ConveyerBase::Impl::validMeta() & {
 }
 
 cs::ConveyerBase::ConveyerBase() {
-    pimpl_ = std::make_unique<cs::ConveyerBase::Impl>(MaxQueueSize, MaxPacketTransactions, MaxPacketsPerRound);
+    pimpl_ = std::make_unique<cs::ConveyerBase::Impl>(MaxQueueSize, MaxPacketTransactions, MaxPacketsPerRound, MetaCapacity);
     pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
 
     std::call_once(::onceFlag, &::setup, this);
