@@ -250,8 +250,8 @@ void Network::writerRoutine(const Config& config) {
         for (uint64_t i = 0; i < tasks; i++) {
             auto task = oPacMan_.getNextTask();
             std::atomic_thread_fence(std::memory_order_acquire);
-            if (!task->pack.data_.get()) {
-                cswarning() << "net: invalid packet for send!!!!!!!!! " << task->pack.data_.get();
+            if (!task->pack.region_.data()) {
+                cswarning() << "net: invalid packet for send!!!!!!!!! " << task->pack.region_.data();
                 continue;
             }
 
@@ -351,7 +351,7 @@ void Network::processorRoutine() {
 
         for (uint64_t i = 0; i < tasks; i++) {
             auto task = iPacMan_.getNextTask();
-            if (!task->pack.data_.get()) {
+            if (!task->pack.region_.get()) {
                 cswarning() << "net: invalid packet processor!!!!!!!!!";
                 continue;
             }
