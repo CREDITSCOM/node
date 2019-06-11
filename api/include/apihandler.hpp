@@ -287,6 +287,7 @@ public:
 		struct SmartRes {
 			general::Variant retValue;
 			std::string		 newState;
+            // measured in milliseconds actual cost of execution
 			int64_t			 executionCost;
             ::general::APIResponse response;
         };
@@ -294,7 +295,8 @@ public:
 		std::vector<SmartRes> smartsRes;
 		std::map<csdb::Address, std::string> states;
 		std::vector<csdb::Transaction> trxns;
-		csdb::Amount fee;
+        // measured in milliseconds total cost of executions
+		long selfMeasuredCost;
         ::general::APIResponse response;
 	};
 
@@ -473,9 +475,10 @@ public:
 		if (optInnerTransactions.has_value())
 			res.trxns = optInnerTransactions.value();
 		deleteInnerSendTransactions(optOriginRes.value().acceessId);
-		constexpr double FEE_IN_SECOND = kMinFee * 4.0;
-		const double fee = std::min(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SECOND);
-		res.fee = csdb::Amount(fee);
+		//constexpr double FEE_IN_SEC = kMinFee * 4.0;
+		//const double fee = std::max(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SEC);
+		//res.fee = csdb::Amount(fee);
+        res.selfMeasuredCost = (long) optOriginRes.value().timeExecute;
 		for (const auto&[itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
 			auto addr = BlockChain::getAddressFromKey(itAddress);
 			res.states[addr] = itState;
@@ -589,6 +592,7 @@ private:
     struct OriginExecuteResult {
         ExecuteByteCodeResult resp;
         general::AccessID acceessId;
+        // measured execution duration in milliseconds
         long long timeExecute;
     };
 
@@ -632,7 +636,7 @@ private:
             originExecuteRes.resp.status.code = 1;
             originExecuteRes.resp.status.message = x.what();
         }
-        originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeBeg).count();
+        originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - timeBeg).count();
         --execCount_;
         deleteAccessId(access_id);
         disconnect();

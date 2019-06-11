@@ -7,7 +7,7 @@
 #include <csdb/currency.hpp>
 #include <csnode/datastream.hpp>
 #include <lib/system/logger.hpp>
-
+#include <csnode/fee.hpp>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -1105,7 +1105,24 @@ bool SmartContracts::execute(SmartExecutionData& data) {
             if (data.result.response.code == 0) {
                 auto& result = data.result.smartsRes.front();
                 if (result.response.code == 0) {
-                    // nothing do
+                    // calculate execution fee
+                    csdb::Amount total_fee(0);
+                    for (const auto r : data.result.smartsRes) {
+                        total_fee += fee::getExecutionFee(r.executionCost);
+                    }
+#if defined(USE_SELF_MEASURED_FEE)
+                    if (total_fee.to_double() < DBL_EPSILON) {
+                        total_fee = fee::getExecutionFee(data.result.selfMeasuredCost);
+                    }
+#endif
+                    if (total_fee > data.executor_fee) {
+                        // out of fee detected
+                        data.setError(error::OutOfFunds, "contract execution is out of funds");
+                    }
+                    else {
+                        // update with actual value
+                        data.executor_fee = total_fee;
+                    }
                 } else {
                     data.error = result.response.message;
                     if (data.error.empty()) {
@@ -1180,10 +1197,6 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
                         last_state = data.result.smartsRes.front().newState;
                     }
                 }
-                if (data.result.fee > data.executor_fee) {
-                    // out of fee detected
-                    data.setError(error::OutOfFunds, "contract execution is out of funds");
-                }
             }
         }
         return data_list;
@@ -1236,7 +1249,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             continue;
         }
 
-        execution->consumed_fee = data_item.result.fee;  // executor calculates fee for now
+        execution->consumed_fee = data_item.executor_fee;
         cs::TransactionsPacket& packet = execution->result;
         if (packet.transactionsCount() > 0) {
             packet.clear();
