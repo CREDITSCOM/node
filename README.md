@@ -8,6 +8,7 @@
 [![AGPL License](https://img.shields.io/github/license/CREDITSCOM/node.svg?color=green&label=License&style=plastic)](LICENSE)
 ![Version](https://img.shields.io/github/tag/CREDITSCOM/node.svg?label=Versoin&style=plastic)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=CREDITSCOM_node&metric=alert_status)](https://sonarcloud.io/dashboard?id=CREDITSCOM_node)
+[![Build Status](https://161.156.96.18:8443/buildStatus/icon?job=client_linux_x64)](https://161.156.96.18:8443/job/client_linux_x64/)
 # Credits Node
 A node is a client-side application that is installed on the user equipment.
 The Node processes and stores transactions, executes and confirms smart contract rules requests processing from third-party systems and provides data when requested.
