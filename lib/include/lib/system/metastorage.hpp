@@ -7,7 +7,7 @@
 
 /// nested namespace
 namespace cs::values {
-constexpr std::size_t kDefaultMetaStorageMaxSize = 100; // equals to Consensus::MaxRoundsCancelContract to strongly prevent duplicated new_state transactions
+constexpr std::size_t kDefaultMetaStorageMaxSize = 5;
 }
 
 namespace cs {
