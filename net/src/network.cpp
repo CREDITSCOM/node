@@ -117,13 +117,16 @@ void Network::readerRoutine(const Config& config) {
         }
 
         std::atomic_thread_fence(std::memory_order_acq_rel);
+
         if (!task.pack.region_.get()) {
-            cswarning() << "net: invalid input packet!!!!!!!!!";
+            cswarning() << "net: invalid input packet";
             continue;
         }
+
         packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
+
         while (!task.pack.region_.get()) {
-            cswarning() << "net: invalid input packet!!!!!!!!!";
+            cswarning() << "net: invalid input packet";
         }
 
         if (!(task.pack.isHeaderValid())) {
@@ -182,23 +185,25 @@ void Network::readerRoutine(const Config& config) {
     cswarning() << "readerRoutine STOPPED!!!\n";
 }
 
-[[maybe_unused]] static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const ip::udp::endpoint& ep) {
+[[maybe_unused]]
+static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const ip::udp::endpoint& ep) {
     boost::system::error_code lastError;
     size_t size = 0;
     size_t encodedSize = 0;
 
-    uint32_t cnt = 0;
+    uint32_t count = 0;
 
     // net code was built on this constant (Packet::MaxSize)
     // and is used it implicitly in a lot of places(
     char packetBuffer[Packet::MaxSize];
     boost::asio::mutable_buffer encodedPacket = task->pack.encode(buffer(packetBuffer, sizeof(packetBuffer)));
     encodedSize = encodedPacket.size();
+
     do {
         size = sock.send_to(encodedPacket, ep, NO_FLAGS, lastError);
 
-        if (++cnt == 10) {
-            cnt = 0;
+        if (++count == 10) {
+            count = 0;
             std::this_thread::yield();
         }
     } while (lastError == boost::asio::error::would_block);
