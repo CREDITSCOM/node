@@ -1391,7 +1391,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
     istream_.init(data, size);
 
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound != subRound_) {
@@ -1484,7 +1484,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     }
 
     istream_.init(data, size);
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound != subRound_) {
@@ -1894,8 +1894,8 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
     istream_.init(data, size);
 
     uint8_t requesterNumber = 0;
-    cs::Sequence smartRound;
-    uint32_t startTransaction;
+    cs::Sequence smartRound = 0;
+    uint32_t startTransaction = 0;
     istream_ >> smartRound >> startTransaction >> requesterNumber;
 
     uint8_t requiredNumber = 0;
@@ -2328,7 +2328,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     csdetails() << "NODE> get hash of round " << rNum << ", data size " << size;
 
     istream_.init(data, size);
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound > subRound_) {
@@ -2642,7 +2642,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     cs::Signature signature;
     istream_ >> signature;
 
-    uint8_t senderNumber;
+    uint8_t senderNumber = 0;
     istream_ >> senderNumber;
 
     csdb::PoolHash hash;

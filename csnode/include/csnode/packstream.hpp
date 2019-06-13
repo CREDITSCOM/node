@@ -92,7 +92,7 @@ public:
 
     template <typename T, typename A>
     IPackStream& operator>>(std::vector<T, A>& vector) {
-        std::size_t size;
+        std::size_t size = 0;
         (*this) >> size;
 
         if (size == 0) {

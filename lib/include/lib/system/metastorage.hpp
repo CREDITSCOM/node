@@ -7,7 +7,7 @@
 
 /// nested namespace
 namespace cs::values {
-constexpr std::size_t kDefaultMetaStorageMaxSize = 100; // equals to Consensus::MaxRoundsCancelContract to strongly prevent duplicated new_state transactions
+constexpr std::size_t kDefaultMetaStorageMaxSize = 5;
 }
 
 namespace cs {
@@ -52,6 +52,10 @@ public:
     // default initialization
     inline MetaStorage() noexcept
     : buffer_(cs::values::kDefaultMetaStorageMaxSize) {
+    }
+
+    MetaStorage(std::size_t size) noexcept
+    : buffer_(size) {
     }
 
     // storage interface
