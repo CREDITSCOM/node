@@ -32,6 +32,7 @@ struct Config {
 #endif
     int executor_port = 9080;
     int apiexec_port = 9070;
+    std::string executor_ip{ "localhost" };
 };
 
 class connector {

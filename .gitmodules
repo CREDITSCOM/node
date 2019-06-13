@@ -6,7 +6,7 @@
 	url = https://github.com/CREDITSCOM/berkeleydb.git
 [submodule "third-party/thrift-interface-definitions"]
 	path = third-party/thrift-interface-definitions
-	url = https://github.com/CREDITSCOM/thrift-interface-definitions.git
+	url = https://gitlab.com/main-credits-dev/thrift-interface-definitions.git
 [submodule "third-party/thrift"]
 	path = third-party/thrift
 	url = https://github.com/CREDITSCOM/thrift.git

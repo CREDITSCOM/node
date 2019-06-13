@@ -6,6 +6,7 @@
 
 #include <csdb/amount_commission.hpp>
 #include <csdb/transaction.hpp>
+#include <csdb/amount.hpp>
 
 namespace cs {
 namespace fee {
@@ -27,6 +28,16 @@ bool estimateMaxFee(const csdb::Transaction&, csdb::AmountCommission& countedFee
 /// @return counted fee for transaction
 ///
 csdb::AmountCommission getFee(const csdb::Transaction&);
+
+/// <summary>   Gets execution fee. </summary>
+///
+/// <remarks>   Alexander Avramenko, 11.06.2019. </remarks>
+///
+/// <param name="duration_msec">    The measured duration in milliseconds. </param>
+///
+/// <returns>   The execution fee. </returns>
+
+csdb::Amount getExecutionFee(long long duration_msec);
 
 } // namespace fee
 } // namespace cs

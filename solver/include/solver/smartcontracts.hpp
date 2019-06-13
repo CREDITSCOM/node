@@ -167,6 +167,19 @@ struct SmartExecutionData {
     csdb::Amount executor_fee;
     executor::Executor::ExecuteResult result;
     std::string error;
+    std::string explicit_last_state;
+
+    void setError(uint8_t code, const char* message) {
+        if (!result.smartsRes.empty()) {
+            result.smartsRes.clear();
+        }
+        general::Variant ret_val;
+        ret_val.__set_v_byte(code);
+        using container_type = decltype(executor::Executor::ExecuteResult::smartsRes);
+        using element_type = container_type::value_type;
+        result.smartsRes.emplace_back(element_type{ ret_val, std::string{}, 0 });
+        error = message;
+    }
 };
 
 inline bool operator==(const SmartExecutionData& l, const SmartContractRef& r) {
@@ -230,7 +243,7 @@ public:
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
-        return std::move(get_smart_contract_impl(tr));
+        return get_smart_contract_impl(tr);
     }
 
     // get & handle rejected transactions from smart contract(s)
@@ -267,7 +280,7 @@ public:
     // flag to allow execution, also depends on executor presence
     CallsQueueScheduler& scheduler;
 
-public
+    public
 signals:
     // emits on contract execution
     SmartContractExecutedSignal signal_smart_executed;
@@ -277,6 +290,9 @@ signals:
     SmartContractSignal signal_payable_timeout;
     // emits on every contract emitted transaction is appeared in blockchain, args are (emitted_transaction, starter_transaction):
     cs::Signal<void(const csdb::Transaction&, const csdb::Transaction&)> signal_emitted_accepted;
+
+    // flag to always execute contracts even in normal state
+    bool force_execution;
 
 public slots:
     // called when execute_async() completed
@@ -295,10 +311,12 @@ private:
     using trx_innerid_t = int64_t;  // see csdb/transaction.hpp near #101
 
     const char* PayableName = "payable";
-    const char* PayableRetType = "void";
-    const char* PayableArgType = "java.lang.String";
-    const char* PayableNameArg0 = "amount";
-    const char* PayableNameArg1 = "currency";
+    const char* PayableArg0 = ""; // amount
+    const char* PayableArg1 = ""; // userData, currency
+    const char* TypeVoid = "void";
+    const char* TypeString = "java.lang.String";
+    const char* TypeByteArray = "byte[]";
+    const char* TypeBigDecimal = "java.math.BigDecimal";
 
     const char* UsesContract = "Contract";
     const char* UsesContractAddr = "address";
@@ -319,7 +337,8 @@ private:
     {
         Unknown = -1,
         Absent = 0,
-        Implemented = 1
+        Implemented = 1,
+        ImplementedVer1 = 2
     };
 
     // defines current contract state, the contracts cache is a container of every contract state
@@ -386,7 +405,7 @@ private:
         std::unique_ptr<SmartConsensus> pconsensus;
 
         QueueItem() = default;
-        
+
         QueueItem(const QueueItem& src) {
             status = src.status;
             seq_enqueue = src.seq_enqueue;
@@ -402,13 +421,13 @@ private:
 
 
         QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
-        : status(SmartContractStatus::Waiting)
-        , seq_enqueue(0)
-        , seq_start(0)
-        , seq_finish(0)
-        , abs_addr(absolute_address)
-        , is_executor(false)
-        , is_rejected(false) {
+            : status(SmartContractStatus::Waiting)
+            , seq_enqueue(0)
+            , seq_start(0)
+            , seq_finish(0)
+            , abs_addr(absolute_address)
+            , is_executor(false)
+            , is_rejected(false) {
 
             add(ref_contract, tr_start);
         }
@@ -614,11 +633,15 @@ private:
 
     void test_contracts_locks();
 
-    // returns 0 if any error
+    // returns 1 if any error
     uint64_t next_inner_id(const csdb::Address& addr) const;
 
     // tests conditions to allow contract execution if disabled
     bool test_executor_availability();
+
+    bool implements_payable(PayableStatus val) {
+        return (val == PayableStatus::Implemented || val == PayableStatus::ImplementedVer1);
+    }
 };
 
 }  // namespace cs

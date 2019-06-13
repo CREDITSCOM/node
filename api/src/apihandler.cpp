@@ -29,8 +29,6 @@ APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor
 #ifdef MONITOR_NODE
 , stats(blockchain)
 #endif
-, executorTransport_(
-      new ::apache::thrift::transport::TBufferedTransport(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", config.executor_port)))
 , tm(this) {
 #ifdef MONITOR_NODE
 	if (static bool firstTime = true; firstTime) {
@@ -212,8 +210,8 @@ cs::Bytes toByteArray(const std::string& s) {
     return res;
 }
 
-api::Amount convertAmount(const csdb::Amount& amount) {
-    api::Amount result;
+general::Amount convertAmount(const csdb::Amount& amount) {
+	general::Amount result;
     result.integral = amount.integral();
     result.fraction = amount.fraction();
     assert(result.fraction >= 0);
@@ -567,8 +565,9 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
     BlockChain::WalletData wallData{};
     BlockChain::WalletId id{};
 
-    if (!s_blockchain.findWalletData(source, wallData, id))
-        return csdb::Transaction{};
+	if (!transaction.smartContract.forgetNewState && // not for getter
+		!s_blockchain.findWalletData(source, wallData, id))
+			return csdb::Transaction{};
 
     send_transaction.set_currency(csdb::Currency(1));
     send_transaction.set_source(source);
@@ -666,44 +665,46 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
     send_transaction.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
 
-    // check money
-    const auto source_addr = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
-    BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "wallet not found!";
-        return;
-    }
+	if (!input_smart.forgetNewState) {
+		// check money
+		const auto source_addr = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
+		BlockChain::WalletData wallData{};
+		BlockChain::WalletId wallId{};
+		if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
+			_return.status.code = ERROR_CODE;
+			_return.status.message = "not enough money!";
+			return;
+		}
 
-    const auto max_fee = send_transaction.max_fee().to_double();
-    const auto balance = wallData.balance_.to_double();
-    if (max_fee > balance) {
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
-        return;
-    }
-    //
-    
-    // check max fee
-    {
-     csdb::AmountCommission countedFee;
-     if (!cs::fee::estimateMaxFee(send_transaction, countedFee)) {
-         _return.status.code = ERROR_CODE;
-         _return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
-         return;
-     }
-    }
+		const auto max_fee = send_transaction.max_fee().to_double();
+		const auto balance = wallData.balance_.to_double();
+		if (max_fee > balance) {
+			_return.status.code = ERROR_CODE;
+			_return.status.message = "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
+			return;
+		}
+		//
 
-  // check signature
-  const auto byteStream = send_transaction.to_byte_stream_for_sig();
-  if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
-    _return.status.code = ERROR_CODE;
-    cslog() << "API: reject transaction with wrong signature";
-    _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
-    return;
-  }
-  //
+		// check max fee
+		{
+			csdb::AmountCommission countedFee;
+			if (!cs::fee::estimateMaxFee(send_transaction, countedFee)) {
+				_return.status.code = ERROR_CODE;
+				_return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
+				return;
+			}
+		}
+
+		// check signature
+		const auto byteStream = send_transaction.to_byte_stream_for_sig();
+		if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
+			_return.status.code = ERROR_CODE;
+			cslog() << "API: reject transaction with wrong signature";
+			_return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+			return;
+		}
+		//
+	}
 
     std::vector<general::ByteCodeObject> origin_bytecode;
     if (!deploy) {
@@ -762,20 +763,25 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         auto target_pk = s_blockchain.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
         executor::ExecuteByteCodeResult api_resp;
         const std::vector<general::ByteCodeObject>& bytecode = deploy ? input_smart.smartContractDeploy.byteCodeObjects : origin_bytecode;
-        if (!deploy || !input_smart.smartContractDeploy.byteCodeObjects.empty()) {
-            executor_.executeByteCode(api_resp, source_pk.to_api_addr(), target_pk.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params,
-                                      MAX_EXECUTION_TIME);
-
-            if (api_resp.status.code) {
-                _return.status.code = api_resp.status.code;
-                _return.status.message = api_resp.status.message;
-                contract_state_entry.yield();
-                return;
-            }
-            _return.__isset.smart_contract_result = api_resp.__isset.ret_val;
-            if (_return.__isset.smart_contract_result)
-                _return.__set_smart_contract_result(api_resp.ret_val);
-        }
+		if (!deploy || !input_smart.smartContractDeploy.byteCodeObjects.empty()) {
+			std::vector<executor::MethodHeader> methodHeader;
+			{
+				executor::MethodHeader tmp;
+				tmp.methodName = input_smart.method;
+				tmp.params = input_smart.params;
+				methodHeader.push_back(tmp);
+			}
+			executor_.executeByteCode(api_resp, source_pk.to_api_addr(), target_pk.to_api_addr(), bytecode, contract_state, methodHeader, MAX_EXECUTION_TIME);
+			if (api_resp.status.code) {
+				_return.status.code = api_resp.status.code;
+				_return.status.message = api_resp.status.message;
+				contract_state_entry.yield();
+				return;
+			}
+			_return.__isset.smart_contract_result = api_resp.__isset.results;
+			if (_return.__isset.smart_contract_result && !api_resp.results.empty())
+				_return.__set_smart_contract_result(api_resp.results[0].ret_val);
+		}
 
         SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
         contract_state_entry.yield();
@@ -812,7 +818,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
         if (new_state.empty()) {
             _return.status.code = ERROR_CODE;
-            _return.status.message = "state is empty!";
+            _return.status.message = "state is not updated, execution failed";
             return;
         }
         else {
@@ -1051,6 +1057,8 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
             auto execTrans = s_blockchain.loadTransaction(trId);
             if (execTrans.is_valid() && is_smart(execTrans)) {
                 const auto smart = fetch_smart(execTrans);
+				if(!smart.method.empty())
+					mExecuteCount_[smart.method]++;
 
                 {
                     auto retVal = tr.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
@@ -1241,6 +1249,9 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
             if ((execTrans.is_valid() && is_smart(execTrans)) || 
 					execTrans.amount().to_double()) { // payable
                 const auto smart = fetch_smart(execTrans);
+
+				if (!smart.method.empty())
+					mExecuteCount_[smart.method]++;
 
                 {
                     auto retVal = tr.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
@@ -1787,6 +1798,15 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, con
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
+void APIHandler::ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) {
+	if (auto itCount = mExecuteCount_.find(executeMethod); itCount != mExecuteCount_.end()) {
+		_return.executeCount = itCount->second;
+		SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+	}
+	else
+		SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+}
+
 void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     tm.applyToInternal([&_return, &addr](const TokensMap& tokens, const HoldersMap& holders) {
@@ -2286,14 +2306,16 @@ void apiexec::APIEXECHandler::SmartContractGet(SmartContractGetResult& _return, 
 }
 
 void apiexec::APIEXECHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) {
-    const csdb::Address addr = BlockChain::getAddressFromKey(address);
-    BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!blockchain_.findWalletData(addr, wallData, wallId)) {
-        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
-        return;
-    }
-    _return.balance.integral = wallData.balance_.integral();
-    _return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+	const csdb::Address addr = BlockChain::getAddressFromKey(address);
+	BlockChain::WalletData wallData{};
+	BlockChain::WalletId wallId{};
+	if (!blockchain_.findWalletData(addr, wallData, wallId)) {
+		_return.balance.integral = 0;
+		_return.balance.fraction = 0;
+	}
+	else {
+		_return.balance.integral = wallData.balance_.integral();
+		_return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());
+	}
+	SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }

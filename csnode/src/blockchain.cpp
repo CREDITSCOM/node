@@ -1072,9 +1072,9 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         return true;
     }
     // cache block for future recording
-    csdebug() << "BLOCKCHAIN> cached block has " << pool.signatures().size();
     cachedBlocks_.emplace(poolSequence, BlockMeta{pool, bySync});
-    csdebug() << "BLOCKCHAIN> cache block #" << poolSequence << " for future (" << cachedBlocks_.size() << " total)";
+    csdebug() << "BLOCKCHAIN> cache block #" << poolSequence << " signed by " << pool.signatures().size()
+        << " nodes for future (" << cachedBlocks_.size() << " total)";
     cachedBlockEvent(poolSequence);
     // cache always successful
     return true;

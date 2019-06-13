@@ -57,12 +57,15 @@ const std::string PARAM_NAME_API_PORT = "port";
 const std::string PARAM_NAME_AJAX_PORT = "ajax_port";
 const std::string PARAM_NAME_EXECUTOR_PORT = "executor_port";
 const std::string PARAM_NAME_APIEXEC_PORT = "apiexec_port";
+const std::string PARAM_NAME_EXECUTOR_IP = "executor_ip";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
 const std::string ARG_NAME_PUBLIC_KEY_FILE = "public-key-file";
 const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
 const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
+
+const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
 
 const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
@@ -701,6 +704,10 @@ Config Config::readFromFile(const std::string& fileName) {
             }
         }
 
+        if (params.count(PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS) > 0) {
+            result.alwaysExecuteContracts_ = params.get<bool>(PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS);
+        }
+
         result.setLoggerSettings(config);
         result.readPoolSynchronizerData(config);
         result.readApiData(config);
@@ -781,6 +788,9 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_PORT, apiData_.ajaxPort);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_PORT, apiData_.executorPort);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_APIEXEC_PORT, apiData_.apiexecPort);
+    if (data.count(PARAM_NAME_EXECUTOR_IP) > 0) {
+        apiData_.executorHost = data.get<std::string>(PARAM_NAME_EXECUTOR_IP);
+    }
 }
 
 template <typename T>
