@@ -62,16 +62,44 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
         cserror() << kLogPrefix << "unavailable executor ptr";
         return false;
     }
-
-    auto result = executorPtr->getExecutor().executeTransaction(block, ref.transaction,
-                  csdb::Amount(block.transactions()[ref.transaction].max_fee().to_double()), "");
-    if (!result.has_value()) {
+    if (ref.transaction >= block.transactions().size()) {
+        cserror() << kLogPrefix << "incorrect reference to start transaction";
+        return false;
+    }
+    std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
+    auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
+    info.transaction = block.transactions().at(ref.transaction);
+    info.feeLimit = csdb::Amount(info.transaction.max_fee().to_double()); // specify limit as SmartContracts::execute() does
+    info.convention = executor::Executor::MethodNameConvention::Default;
+    if (!is_smart(info.transaction)) {
+        // to specify Payable or PayableLegacy convention call correctly we require access to smarts object
+        info.convention = executor::Executor::MethodNameConvention::PayableLegacy;
+        // the most frequent fast test
+        //auto item = known_contracts.find(absolute_address(transaction.target()));
+        //if (item != known_contracts.end()) {
+        //    StateItem& state = item->second;
+        //    if (state.payable == PayableStatus::Implemented) {
+        //        info.convention = executor::Executor::MethodNameConvention::PayableLegacy;
+        //    }
+        //    else if (state.payable == PayableStatus::ImplementedVer1) {
+        //        info.convention = executor::Executor::MethodNameConvention::Payable;
+        //    }
+        //}
+    }
+    auto opt_result = executorPtr->getExecutor().executeTransaction(smarts, std::string{} /*no force new_state required*/);
+    if (!opt_result.has_value()) {
         cserror() << kLogPrefix << "execution of transaction failed";
         return false;
     }
+    const auto& result = opt_result.value();
+    if (result.smartsRes.empty()) {
+        cserror() << kLogPrefix << "execution result is incorrect, it must not be empty";
+        return false;
+    }
+    auto& main_result = result.smartsRes.front();
 
     std::string newState = t.user_field(trx_uf::new_state::Value).value<std::string>();
-    std::string realNewState = result.value().newState;
+    const std::string& realNewState = main_result.newState;
     if (newState.empty()) {
         if (!realNewState.empty()) {
             csdebug() << kLogPrefix << "new state of trx is empty, but real new state is not";

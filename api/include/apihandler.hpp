@@ -100,9 +100,9 @@ class ContractExecutorConcurrentClient;
 namespace executor {
 class Executor {
 public:  // wrappers
-    void executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject>& code,
-                         const std::string& state, const std::string& method, const std::vector<general::Variant>& params, const int64_t& timeout) {
-        csunused(timeout);
+	void executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject>& code,
+			const std::string& state, std::vector<MethodHeader>& methodHeader, const int64_t& timeout) {
+		csunused(timeout);
         static std::mutex m;
         std::lock_guard lk(m);  // temporary solution
 
@@ -112,7 +112,7 @@ public:  // wrappers
             smartContractBinary.object.byteCodeObjects = code;
             smartContractBinary.object.instance = state;
             smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smart_address)) ? true : false;
-            if (auto optOriginRes = execute(address, smartContractBinary, method, params))
+			if (auto optOriginRes = execute(address, smartContractBinary, methodHeader))
                 resp = optOriginRes.value().resp;
         }
     }
@@ -223,8 +223,8 @@ public:  // wrappers
     }
 
 public:
-    static Executor& getInstance(const BlockChain* p_blockchain = nullptr, const cs::SolverCore* solver = nullptr, const int p_exec_port = 0) {  // singlton
-        static Executor executor(*p_blockchain, *solver, p_exec_port);
+    static Executor& getInstance(const BlockChain* p_blockchain = nullptr, const cs::SolverCore* solver = nullptr, const int p_exec_port = 0, const std::string p_exec_ip = std::string{}) {  // singlton
+        static Executor executor(*p_blockchain, *solver, p_exec_port, p_exec_ip);
         return executor;
     }
 
@@ -282,13 +282,23 @@ public:
         return opt_last_sate.has_value() ? std::make_optional<std::string>(opt_last_sate.value()) : std::nullopt;
     }
 
-    struct ExecuteResult {
-        std::string newState;
-        std::map<csdb::Address, std::string> states;
-        std::vector<csdb::Transaction> trxns;
-        csdb::Amount fee;
-        general::Variant retValue;
-    };
+	struct ExecuteResult {
+	private:
+		struct SmartRes {
+			general::Variant retValue;
+			std::string		 newState;
+            // measured in milliseconds actual cost of execution
+			int64_t			 executionCost;
+            ::general::APIResponse response;
+        };
+	public:
+		std::vector<SmartRes> smartsRes;
+		std::map<csdb::Address, std::string> states;
+		std::vector<csdb::Transaction> trxns;
+        // measured in milliseconds total cost of executions
+		long selfMeasuredCost;
+        ::general::APIResponse response;
+	};
 
     void addInnerSendTransaction(const general::AccessID& accessId, const csdb::Transaction& transaction) {
         std::lock_guard lk(mtx_);
@@ -316,109 +326,168 @@ public:
         return false;
     }
 
-    std::optional<ExecuteResult> executeTransaction(const csdb::Pool& pool, const uint64_t& offsetTrx, const csdb::Amount& feeLimit, const std::string& force_new_state) {
-        csunused(feeLimit);
-        static std::mutex m;
-        std::lock_guard lk(m);  // temporary solution
+    // Convention how to pass the method name
+    enum class MethodNameConvention {
+        // By default, the method name can be obtained from SmartContractInvocation object deserialized from user_field[0]
+        // If method name is empty, the constructor must be called
+        Default = 0,
+        // Call to payable(string, string) requested
+        PayableLegacy,
+        // Call to payable(string, byte[]) requested
+        Payable
+    };
 
-        auto smartTrxn = *(pool.transactions().begin() + offsetTrx);
+    struct ExecuteTransactionInfo {
+        // transaction to execute contract
+        csdb::Transaction transaction;
+        // pass method name convention
+        MethodNameConvention convention;
+        // max allowed fee
+        csdb::Amount feeLimit;
+    };
 
-        auto smartSource = blockchain_.getAddressByType(smartTrxn.source(), BlockChain::AddressType::PublicKey);
-        auto smartTarget = blockchain_.getAddressByType(smartTrxn.target(), BlockChain::AddressType::PublicKey);
+	std::optional<ExecuteResult> executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {
+		static std::mutex m;
+		std::lock_guard lk(m);  // temporary solution
 
-        csdb::Transaction deployTrxn;
-        const auto isdeploy = isDeploy(smartTrxn);
-        if (!isdeploy) {  // execute
-            const auto optDeployId = getDeployTrxn(smartTarget);
-            if (!optDeployId.has_value())
-                return std::nullopt;
-            deployTrxn = blockchain_.loadTransaction(optDeployId.value());
+        if (smarts.empty()) {
+            return std::nullopt;
         }
-        else
-            deployTrxn = smartTrxn;
+        const auto& head_transaction = smarts[0].transaction;
+        if (!head_transaction.is_valid()) {
+            return std::nullopt;
+        }
+        // all smarts must have the same initiator and address
+		const auto source = head_transaction.source();
+		const auto target = head_transaction.target();
+		for (const auto& smart : smarts) {
+			if (source != smart.transaction.source() || target != smart.transaction.target())
+				return std::nullopt;
+		}
 
-        const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
-        executor::SmartContractBinary smartContractBinary;
-        smartContractBinary.contractAddress = smartTarget.to_api_addr();
-        smartContractBinary.object.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
+		auto smartSource = blockchain_.getAddressByType(source, BlockChain::AddressType::PublicKey);
+		auto smartTarget = blockchain_.getAddressByType(target, BlockChain::AddressType::PublicKey);
+
+		// get deploy transaction
+		csdb::Transaction deployTrxn;
+		const auto isdeploy = isDeploy(head_transaction);
+		if (!isdeploy) {  // execute
+			const auto optDeployId = getDeployTrxn(smartTarget);
+            if (!optDeployId.has_value()) {
+                return std::nullopt;
+            }
+			deployTrxn = blockchain_.loadTransaction(optDeployId.value());
+		}
+        else {
+            deployTrxn = head_transaction;
+        }
+
+		// fill smartContractBinary 
+		const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
+		executor::SmartContractBinary smartContractBinary;
+		smartContractBinary.contractAddress = smartTarget.to_api_addr();
+		smartContractBinary.object.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
         // may contain temporary last new state not yet written into block chain (to allow "speculative" multi-executions af the same contract)
-        if (!force_new_state.empty()) {
-            smartContractBinary.object.instance = force_new_state;
+        if (!forceContractState.empty()) {
+            smartContractBinary.object.instance = forceContractState;
         }
         else {
             auto optState = getState(smartTarget);
-            if (optState.has_value())
+            if (optState.has_value()) {
                 smartContractBinary.object.instance = optState.value();
-        }
-        smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr())) ? true : false;
-
-        std::string method;
-        std::vector<general::Variant> params;
-        api::SmartContractInvocation sci;
-        if (!smartTrxn.user_field(0).is_valid() && smartTrxn.amount().to_double()) {  // payable
-            method = "payable";
-            general::Variant var;
-            var.__set_v_string(smartTrxn.amount().to_string());
-            params.emplace_back(var);
-
-			if (smartTrxn.user_field(1).is_valid()) {
-				var.__set_v_string(smartTrxn.user_field(1).value<std::string>());
-				params.emplace_back(var);
-			}
-			else {
-				var.__set_v_string("");
-				params.emplace_back(var);
-			}
-        }
-        else if (!isdeploy) {
-            sci = deserialize<api::SmartContractInvocation>(smartTrxn.user_field(0).value<std::string>());
-            method = sci.method;
-            params = sci.params;
-
-            for (const auto& addrLock : sci.usedContracts) {
-                addToLockSmart(addrLock, getFutureAccessId());
             }
         }
+		smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr())) ? true : false;
 
-        const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, method, params);
-
-        if (!isdeploy) {
-            for (const auto& addrLock : sci.usedContracts) {
-                deleteFromLockSmart(addrLock, getFutureAccessId());
-            }
-        }
-
-        if (!optOriginRes.has_value())
-            return std::nullopt;
-
-        const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
-
-        ExecuteResult res;
-        const auto resp = optOriginRes.value().resp;
-        if (resp.status.code != 0) {
-            if (!resp.status.message.empty()) {
-                res.retValue.__set_v_string(resp.status.message);
+		// fill methodHeader 
+		std::vector<executor::MethodHeader> methodHeader;
+		for (const auto& smart_item : smarts) {
+			executor::MethodHeader header;
+            const csdb::Transaction& smart = smart_item.transaction;
+            if (smart_item.convention != MethodNameConvention::Default) {
+                // call to payable
+                // add method name
+                header.methodName = "payable";
+                // add arg[0]
+                general::Variant& var0 = header.params.emplace_back(::general::Variant{});
+                std::string str_val = smart.amount().to_string();
+                if (smart_item.convention == MethodNameConvention::PayableLegacy) {
+                    var0.__set_v_string(str_val);
+                }
+                else {
+                    var0.__set_v_big_decimal(str_val);
+                }
+                // add arg[1]
+                str_val.clear();
+                if (smart.user_field(1).is_valid()) {
+                    str_val = smart.user_field(1).value<std::string>();
+                }
+                general::Variant& var1 = header.params.emplace_back(::general::Variant{});
+                if (smart_item.convention == MethodNameConvention::PayableLegacy) {
+                    var1.__set_v_string(str_val);
+                }
+                else {
+                    var1.__set_v_byte_array(str_val);
+                }                
             }
             else {
-                res.retValue = resp.ret_val;
+                api::SmartContractInvocation sci;
+                const auto fld = smart.user_field(0);
+                if (!fld.is_valid()) { 
+                    return std::nullopt;
+                }
+                else if (!isdeploy) {
+                    sci = deserialize<api::SmartContractInvocation>(fld.value<std::string>());
+                    header.methodName = sci.method;
+                    header.params = sci.params;
+
+                    for (const auto& addrLock : sci.usedContracts)
+                        addToLockSmart(addrLock, getFutureAccessId());
+                }
             }
-        }
-        else {
-            if (optInnerTransactions.has_value())
-                res.trxns = optInnerTransactions.value();
-            deleteInnerSendTransactions(optOriginRes.value().acceessId);
-            constexpr double FEE_IN_SECOND = kMinFee * 4.0;
-            const double fee = std::min(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SECOND);
-            res.fee = csdb::Amount(fee);
-            res.newState = optOriginRes.value().resp.invokedContractState;
-            for (const auto& [itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
-                const csdb::Address addr = BlockChain::getAddressFromKey(itAddress);
-                res.states[addr] = itState;
-            }
-            res.retValue = optOriginRes.value().resp.ret_val;
-        }
-        return res;
-    }
+			methodHeader.push_back(header);
+		}
+
+		const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeader);
+
+		for (const auto& smart : smarts) {
+			if (!isdeploy) {
+                if (smart.convention == MethodNameConvention::Default) {
+                    const auto fld = smart.transaction.user_field(0);
+                    if (fld.is_valid()) {
+                        auto sci = deserialize<api::SmartContractInvocation>(smart.transaction.user_field(0).value<std::string>());
+                        for (const auto& addrLock : sci.usedContracts)
+                            deleteFromLockSmart(addrLock, getFutureAccessId());
+                    }
+                }
+			}
+		}
+
+		if (!optOriginRes.has_value())
+			return {};
+
+		const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
+
+		// fill res 
+		ExecuteResult res;
+        res.response = optOriginRes.value().resp.status;
+
+		if (optInnerTransactions.has_value())
+			res.trxns = optInnerTransactions.value();
+		deleteInnerSendTransactions(optOriginRes.value().acceessId);
+		//constexpr double FEE_IN_SEC = kMinFee * 4.0;
+		//const double fee = std::max(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SEC);
+		//res.fee = csdb::Amount(fee);
+        res.selfMeasuredCost = (long) optOriginRes.value().timeExecute;
+		for (const auto&[itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
+			auto addr = BlockChain::getAddressFromKey(itAddress);
+			res.states[addr] = itState;
+		}
+		for (const auto& result : optOriginRes.value().resp.results)
+			res.smartsRes.push_back({ result.ret_val, result.invokedContractState, result.executionCost, result.status });
+
+		return res;
+	}
 
     csdb::Transaction make_transaction(const api::Transaction& transaction) {
         csdb::Transaction send_transaction;
@@ -496,10 +565,11 @@ public slots:
 
 private:
     std::map<general::Address, general::AccessID> lockSmarts;
-    explicit Executor(const BlockChain& p_blockchain, const cs::SolverCore& solver, const int p_exec_port)
+    explicit Executor(const BlockChain& p_blockchain, const cs::SolverCore& solver, const int p_exec_port, const std::string p_exec_ip)
     : blockchain_(p_blockchain)
     , solver_(solver)
-    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", p_exec_port)))
+    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
+        ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(p_exec_ip, p_exec_port)))
     , origExecutor_(
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
         std::thread th([&]() {
@@ -522,6 +592,7 @@ private:
     struct OriginExecuteResult {
         ExecuteByteCodeResult resp;
         general::AccessID acceessId;
+        // measured execution duration in milliseconds
         long long timeExecute;
     };
 
@@ -541,8 +612,7 @@ private:
         accessSequence_.erase(p_access_id);
     }
 
-    std::optional<OriginExecuteResult> execute(const std::string& address, const SmartContractBinary& smartContractBinary, const std::string& method,
-        const std::vector<general::Variant>& params) {
+	std::optional<OriginExecuteResult> execute(const std::string& address, const SmartContractBinary& smartContractBinary, std::vector<MethodHeader>& methodHeader) {
         constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
         OriginExecuteResult originExecuteRes{};
         if (!connect())
@@ -552,8 +622,8 @@ private:
         const auto timeBeg = std::chrono::steady_clock::now();
         try {
 			std::shared_lock slk(shErrMt);
-            origExecutor_->executeByteCode(originExecuteRes.resp, access_id, address, smartContractBinary, method, params, EXECUTION_TIME, EXECUTOR_VERSION);
-        }
+			origExecutor_->executeByteCode(originExecuteRes.resp, access_id, address, smartContractBinary, methodHeader, EXECUTION_TIME, EXECUTOR_VERSION);
+		}
         catch (::apache::thrift::transport::TTransportException & x) {
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
@@ -566,7 +636,7 @@ private:
             originExecuteRes.resp.status.code = 1;
             originExecuteRes.resp.status.message = x.what();
         }
-        originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeBeg).count();
+        originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - timeBeg).count();
         --execCount_;
         deleteAccessId(access_id);
         disconnect();
@@ -628,7 +698,7 @@ private:
     std::condition_variable cvErrorConnect_;
     std::atomic_bool isConnect_{false};
 
-    const uint16_t EXECUTOR_VERSION = 0;
+    const uint16_t EXECUTOR_VERSION = 1;
 };
 }  // namespace executor
 namespace apiexec {
@@ -705,6 +775,7 @@ public:
 
     void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<::general::ByteCodeObject>& byteCodeObjects) override;
 
+	void ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) override;
     ////////new
     void iterateOverTokenTransactions(const csdb::Address&, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)>);
     ////////new
@@ -771,7 +842,6 @@ private:
 #ifdef MONITOR_NODE
     csstats::csstats stats;
 #endif
-    ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executorTransport_;
 
     struct SmartOperation {
         enum class State : uint8_t {
@@ -831,6 +901,8 @@ private:
     std::map<csdb::PoolHash, api::Pool> poolCache;
     std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
     std::thread state_updater;
+
+	std::map<std::string, int64_t> mExecuteCount_;
 
     api::SmartContract fetch_smart_body(const csdb::Transaction&);
 
