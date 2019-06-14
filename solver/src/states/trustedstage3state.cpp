@@ -245,7 +245,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
                     }
                 }
                 else {
-                    cslog() << name() << ": [" << static_cast<int>(it.sender) << "] marked as untrusted (no candidates)";
+                    cslog() << name() << ": [" << static_cast<int>(it.sender) << "] marked as untrusted (no candidates - probably silent)";
                     context.mark_untrusted(it.sender);
                 }
             }
