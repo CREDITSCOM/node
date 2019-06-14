@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include <solver/solvercore.hpp>
+#include <solver/smartcontracts.hpp>
 
 #include <csnode/conveyer.hpp>
 #include <csnode/datastream.hpp>
@@ -325,6 +326,10 @@ bool Node::canBeTrusted() {
     }
 
     if (wData.balance_ < Consensus::MinStakeValue) {
+        return false;
+    }
+
+    if (!solver_->smart_contracts().executionAllowed()) {
         return false;
     }
 

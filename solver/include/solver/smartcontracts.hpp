@@ -270,6 +270,11 @@ public:
         return is_locked(absolute_address(addr));
     }
 
+    bool executionAllowed() const {
+        cs::Lock lock(public_access_lock);
+        return execution_allowed;
+    }
+
     // return true if SmartContracts provide special handling for transaction, so
     // the transaction is not pass through conveyer
     // method is thread-safe to be called from API thread
@@ -277,7 +282,7 @@ public:
 
     CallsQueueScheduler& getScheduler();
 
-    // flag to allow execution, also depends on executor presence
+private:
     CallsQueueScheduler& scheduler;
 
     public
