@@ -318,7 +318,19 @@ void SmartConsensus::processStages() {
         }
         if (st.hash != hash_t) {
             ++(smartUntrusted.at(st.sender));
-            cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong hash)";
+            if (st.hash == Zero::hash) {
+                if (st.signature == Zero::signature) {
+                    cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (silent - didn't sent anything)";
+                }
+                else {
+                    cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (silent - sent fake stage to all)";
+                }
+
+            }
+            else {
+                cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong hash)";
+            }
+
         }
         else {
             ++hashFrequency;
@@ -338,7 +350,13 @@ void SmartConsensus::processStages() {
                 }
                 else {
                     ++(smartUntrusted.at(st.sender));
-                    cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong signature)";
+                    if (st.signatures[i] == Zero::signature) {
+                        cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong signature - made another node silent without reasking the stage)";
+                    } 
+                    else {
+                        cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong signature)";
+                    }
+
                 }
             }
         }
@@ -861,6 +879,11 @@ void SmartConsensus::sendFakeStageOne(Node* pnode, cs::PublicKeys confidants, cs
     fake.sender = confidantIndex;
     fake.hash.fill(0);
     fake.id = smartId;
+    if (!fake.fillBinary()) {
+        csdebug() << "Can't fill fake smart stage one";
+        return;
+    }
+    fake.signature = cscrypto::generateSignature(pnode->getSolver()->getPrivateKey(), fake.messageHash.data(), fake.messageHash.size());
     pnode->sendSmartStageOne(confidants, fake);
 }
 
