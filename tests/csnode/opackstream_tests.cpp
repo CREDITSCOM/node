@@ -5,7 +5,7 @@
 
 #include <lib/system/utils.hpp>
 
-using DataPtr = std::shared_ptr<char[]>;
+using DataPtr = std::shared_ptr<char>;
 
 struct StreamData {
     boost::asio::mutable_buffer encoded;
@@ -33,7 +33,7 @@ void displayStreamData(cs::OPackStream& stream) {
 
 auto getStreamData(cs::OPackStream& stream) {
     auto packets = stream.getPackets();
-    DataPtr bufferData(new char[Packet::MaxSize]);
+    DataPtr bufferData(new char[Packet::MaxSize], std::default_delete<char[]>());
 
     boost::asio::mutable_buffer buffer(bufferData.get(), Packet::MaxSize);
     auto encoded = packets->encode(buffer);
