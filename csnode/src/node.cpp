@@ -167,6 +167,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         return;
     }
 
+    solver_->resetGrayList();
+
     // this evil code sould be removed after examination
     cs::Sequence countRemoved = 0;
     cs::Sequence lastSequence = blockChain_.getLastSequence();
