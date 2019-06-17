@@ -175,9 +175,9 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
 /*explicit*/
 SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& calls_queue_scheduler)
 : scheduler(calls_queue_scheduler)
+, force_execution(false)
 , bc(blockchain)
 , execution_allowed(true)
-, force_execution(false)
 {
     // signals subscription (MUST occur AFTER the BlockChains has already subscribed to storage)
 

@@ -22,7 +22,7 @@ apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& 
     csunused(config);
 }
 
-APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const csconnector::Config& config)
+APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const csconnector::Config&)
 : executor_(executor)
 , s_blockchain(blockchain)
 , solver(_solver)
