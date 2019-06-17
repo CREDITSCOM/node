@@ -2319,3 +2319,10 @@ void apiexec::APIEXECHandler::WalletBalanceGet(api::WalletBalanceGetResult& _ret
 	}
 	SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
+
+void apiexec::APIEXECHandler::PoolGet(PoolGetResult& _return, const int64_t sequence) {
+    auto poolBin = blockchain_.loadBlock(sequence).to_binary();
+    _return.pool.reserve(poolBin.size());
+    std::copy(poolBin.begin(), poolBin.end(), std::back_inserter(_return.pool));
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
