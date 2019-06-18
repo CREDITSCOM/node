@@ -1146,7 +1146,10 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         if (log_to_console && (cnt % 1000) == 0) {
             std::cout << '\r' << WithDelimiters(cnt);
         }
-
+        // temp workaround of strange issue in recursive_mutex (BlockCHoain::DbLock_)
+        if ((cnt % 100) == 0) {
+            std::this_thread::yield();
+        }
         if (p.is_valid() && locked_pending_smart_transactions->last_pull_sequence < p.sequence())
             locked_pending_smart_transactions->last_pull_sequence = p.sequence();
 
@@ -1177,6 +1180,10 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
             }
             size_t res;
             luca = s_blockchain.loadBlockMeta(luca, res).previous_hash();
+            // temp workaround of strange issue in recursive_mutex (BlockCHoain::DbLock_)
+            if ((cnt % 100) == 0) {
+                std::this_thread::yield();
+            }
         }
         if (log_to_console) {
             std::cout << '\r' << WithDelimiters(cnt) << "... Done\n";
