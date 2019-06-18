@@ -171,6 +171,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         return;
     }
 
+    solver_->resetGrayList();
+
     // this evil code sould be removed after examination
     cs::Sequence countRemoved = 0;
     cs::Sequence lastSequence = blockChain_.getLastSequence();
@@ -295,7 +297,7 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
     stop();
 }
 
-bool Node::canBeTrusted() {
+bool Node::canBeTrusted(bool critical) {
 #if defined(MONITOR_NODE) || defined(WEB_WALLET_NODE)
 
     return false;
@@ -306,10 +308,12 @@ bool Node::canBeTrusted() {
         return false;
     }
 
-    if (Consensus::DisableTrustedRequestNextRound) {
-        // ignore flag after bigbang
-        if (myLevel_ == Level::Confidant && subRound_ == 0) {
-            return false;
+    if (!critical) {
+        if (Consensus::DisableTrustedRequestNextRound) {
+            // ignore flag after bigbang
+            if (myLevel_ == Level::Confidant && subRound_ == 0) {
+                return false;
+            }
         }
     }
 
@@ -2303,7 +2307,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 }
 
 void Node::sendHash(cs::RoundNumber round) {
-    if (!canBeTrusted()) {
+    if (!canBeTrusted(subRound_ != 0 /*critical, all trusted capable required*/)) {
         return;
     }
 
