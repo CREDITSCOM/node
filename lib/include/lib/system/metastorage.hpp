@@ -54,6 +54,10 @@ public:
     : buffer_(cs::values::kDefaultMetaStorageMaxSize) {
     }
 
+    MetaStorage(std::size_t size) noexcept
+    : buffer_(size) {
+    }
+
     // storage interface
 
     ///

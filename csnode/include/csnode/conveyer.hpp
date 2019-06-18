@@ -33,8 +33,8 @@ public:
     };
 
     enum : unsigned int {
-        HashTablesStorageCapacity = cs::values::kDefaultMetaStorageMaxSize,
-        CharacteristicMetaCapacity = HashTablesStorageCapacity,
+        HashTablesStorageCapacity = 100, // equals to Consensus::MaxRoundsCancelContract to strongly prevent duplicated new_state transactions
+        MetaCapacity = HashTablesStorageCapacity,
 
         // queue
         MaxPacketTransactions = 100,
