@@ -2360,6 +2360,35 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
     if (currentRoundTableMessage_.round == rNum && currentRoundTableMessage_.message.size() != 0) {
         roundPackReply(sender);
     }
+    else if (currentRoundTableMessage_.round == rNum && currentRoundTableMessage_.message.size() == 0) {
+        emptyRoundPackReply(sender);
+    }
+}
+
+void Node::emptyRoundPackReply(const cs::PublicKey& respondent) {
+    csdebug() << "NODE> sending empty roundPack reply to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
+    cs::Sequence seq = getBlockChain().getLastSequence();
+    cs::Bytes bytes;
+    cs::DataStream stream(bytes);
+    stream << seq;
+    cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
+    sendDefault(respondent, MsgTypes::EmptyRoundPack, seq, signature);
+}
+
+void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
+    csdebug() << "NODE> get empty roundPack reply from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    istream_.init(data, size);
+    cs::Signature signature;
+    istream_ >> signature;
+    cs::Bytes bytes;
+    cs::DataStream stream(bytes);
+    stream << rNum;
+    if (!cscrypto::verifySignature(signature, sender, bytes.data(), bytes.size())) {
+        csdebug() << "NODE> the RoundPackReply signature is not correct";
+        return;
+    }
+    cs::Conveyer::instance().setRound(rNum);
+    poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber());
 }
 
 void Node::roundPackReply(const cs::PublicKey& respondent) {

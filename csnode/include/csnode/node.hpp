@@ -73,6 +73,8 @@ public:
     void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
     void roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round);
     void getRoundPackRequest(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
+    void emptyRoundPackReply(const cs::PublicKey & respondent);
+    void getEmptyRoundPack(const uint8_t * data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey & sender);
     void roundPackReply(const cs::PublicKey& respondent);
     void sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respondent);
     void getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
