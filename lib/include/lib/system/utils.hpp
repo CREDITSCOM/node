@@ -31,25 +31,9 @@
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/structures.hpp>
-
-#define cswatch(x) cslog() << (#x) << " is " << (x)
-#define csunused(x) (void)(x)
+#include <lib/system/reflection.hpp>
 
 using namespace std::literals::string_literals;
-
-// compile time and rtti reflection in action, works only in methods.
-// if class/struct is not polimorphic - compile-time reflection, otherwise - run-time.
-#define className typeid(*this).name
-#define classNameString() std::string(className()) + " "s
-
-#define funcName() __func__
-
-// pseudo definitions
-#define csname() className() << "> "
-#define csfunc() funcName() << "(): "
-
-#define csreflection() className() << ", method " << csfunc()
-#define csmeta(...) __VA_ARGS__() << csreflection()
 
 namespace cs {
 enum class Direction : uint8_t {
@@ -87,56 +71,11 @@ inline static std::ostream& operator<<(std::ostream& os, const std::array<T, Siz
     return os;
 }
 
-template <typename T>
-struct is_vector : public std::false_type {};
-
-template <typename T, typename A>
-struct is_vector<std::vector<T, A>> : public std::true_type {};
-
 ///
 /// Static utils helper class
 ///
 class Utils {
 public:
-    enum Values {
-        MinHashValue = std::numeric_limits<int>::min(),
-        MaxHashValue = std::numeric_limits<int>::max(),
-    };
-
-private:
-    // random value generation helper
-    template <typename R, typename T>
-    static R randomValueImpl(T min, T max) {
-        static std::random_device randomDevice;
-        static std::mt19937 generator(randomDevice());
-
-        if constexpr (std::is_integral_v<T>) {
-            std::uniform_int_distribution<> dist(min, max);
-            return static_cast<R>(dist(generator));
-        }
-        else {
-            std::uniform_real_distribution<> distribution(min, max);
-            return static_cast<R>(distribution(generator));
-        }
-    }
-
-public:
-    ///
-    /// Generates random value from random generator [min, max] for integer type
-    ///
-    template <typename R>
-    inline static R generateRandomValue(int min, int max) {
-        return randomValueImpl<R, decltype(min)>(min, max);
-    }
-
-    ///
-    /// Generates random value from random generator [min, max] for floating point type
-    ///
-    template <typename R>
-    inline static R generateRandomValue(double min, double max) {
-        return randomValueImpl<R, decltype(min)>(min, max);
-    }
-
     ///
     /// Fills hash with first size of symbols
     ///
@@ -232,6 +171,7 @@ public:
     ///
     template <typename T>
     inline static void clearMemory(T& object) {
+        static_assert(std::is_copy_assignable_v<T> || std::is_trivially_copyable_v<T>, "T type should be trivially copyable or has user copy assign operator");
         std::memset(&object, 0, sizeof(T));
     }
 
@@ -356,7 +296,7 @@ public:
 #ifdef _MSC_VER
         cs::Byte cnt = static_cast<cs::Byte>(__popcnt64(value));
 #else
-        cs::Byte cnt = __builtin_popcountl(value);
+        cs::Byte cnt = static_cast<cs::Byte>(__builtin_popcountl(value));
 #endif
         return cnt;
     }
@@ -401,64 +341,6 @@ public:
 
         return result;
     }
-
-    template <typename RandomIterator, typename Generator>
-    static void shuffle(RandomIterator first, RandomIterator last, Generator&& rng) {
-        // shuffle [first, last) using random function rng
-        auto uFirst = first;
-        const auto uLast = last;
-        if (uFirst == uLast) {
-            return;
-        }
-
-        using diff = typename std::iterator_traits<RandomIterator>::difference_type;
-        using udiff = typename std::make_unsigned<diff>::type;
-
-        udiff bits = 8 * sizeof(udiff);
-        udiff bmask = udiff(-1);
-
-        auto target = uFirst;
-        diff targetIndex = 1;
-        for (; ++target != uLast; ++targetIndex) {
-            // randomly place an element from [first, target] at target
-            diff off;  // = rng(static_cast<_Diff>(targetIndex + 1));
-            diff index = targetIndex + 1;
-            for (;;) {
-                // try a sample random value
-                udiff ret = 0;   // random bits
-                udiff mask = 0;  // 2^N - 1, _Ret is within [0, mask]
-
-                while (mask < udiff(index - 1)) {
-                    // need more random bits
-                    ret <<= bits - 1;  // avoid full shift
-                    ret <<= 1;
-                    udiff _Get_bits;
-                    // return a random value within [0, bmask]
-                    for (;;) {
-                        // repeat until random value is in range
-                        udiff _Val = rng();
-
-                        if (_Val <= bmask) {
-                            _Get_bits = _Val;
-                            break;
-                        }
-                    }
-                    ret |= _Get_bits;
-                    mask <<= bits - 1;  // avoid full shift
-                    mask <<= 1;
-                    mask |= bmask;
-                }
-
-                // _Ret is [0, mask], index - 1 <= mask, return if unbiased
-                if (ret / index < mask / index || mask % index == udiff(index - 1)) {
-                    off = static_cast<diff>(ret % index);
-                    break;
-                }
-            }
-
-            std::iter_swap(target, uFirst + off);
-        }
-    }
 };
 
 ///
@@ -489,11 +371,6 @@ constexpr int getMax(const bool) {
 
 constexpr int getMin(const bool) {
     return static_cast<int>(std::numeric_limits<bool>::min());
-}
-
-template <typename T>
-constexpr bool isVector() {
-    return cs::is_vector<T>::value;
 }
 
 template <typename TBytes>

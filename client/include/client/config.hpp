@@ -14,7 +14,7 @@ namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
 typedef uint16_t NodeVersion;
-const NodeVersion NODE_VERSION = 414;
+const NodeVersion NODE_VERSION = 415;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
@@ -138,6 +138,10 @@ public:
     }
     const cs::PrivateKey& getMyPrivateKey() const {
         return privateKey_;
+    }
+
+    static NodeVersion getNodeVersion() {
+        return NODE_VERSION;
     }
 
     void dumpJSONKeys(const std::string& fName) const;

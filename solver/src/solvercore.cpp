@@ -9,7 +9,6 @@
 #pragma warning(pop)
 
 #include <csnode/datastream.hpp>
-#include <csnode/spammer.hpp>
 #include <csnode/walletsstate.hpp>
 #include <lib/system/logger.hpp>
 

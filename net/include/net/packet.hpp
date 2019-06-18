@@ -95,6 +95,9 @@ public:
     : data_(std::move(data)) {
     }
 
+    Packet(const Packet&) = default;
+    Packet& operator=(const Packet&) = default;
+
     bool isNetwork() const {
         return checkFlag(BaseFlags::NetworkMsg);
     }
@@ -174,7 +177,7 @@ public:
     void recalculateHeadersLength();
 
     explicit operator bool() {
-        return data_;
+        return !data_.isNull();
     }
 
     boost::asio::mutable_buffer encode(boost::asio::mutable_buffer tempBuffer) {

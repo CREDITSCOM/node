@@ -77,6 +77,10 @@ inline shared_data_ptr<T>::~shared_data_ptr() {
 
 template <class T>
 inline shared_data_ptr<T> &shared_data_ptr<T>::operator=(const shared_data_ptr<T> &o) noexcept {
+    if (&o == this) {
+        return *this;
+    }
+
     if (o.d != d) {
         if (o.d) {
             if (1 < (++o.d->ref)) {

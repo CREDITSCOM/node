@@ -102,6 +102,11 @@ public:
     void realTrustedSetValue(cs::Byte position, cs::Byte value);
     void realTrustedSet(cs::Bytes realTrusted);
     bool checkNodeCache(const cs::PublicKey& sender);
+    void addToGraylist(const cs::PublicKey& sender, uint32_t rounds);
+    void updateGrayList(cs::RoundNumber round);
+    void resetGrayList() {
+        grayList_.clear();
+    }
     cs::Bytes getRealTrusted();
     size_t trueStagesThree();
     uint8_t currentStage3iteration();
@@ -306,6 +311,8 @@ private:
 
     // tracks round info missing ("last hope" tool)
     TimeoutTracking track_next_round;
+    std::map<cs::PublicKey, uint16_t> grayList_;
+    cs::RoundNumber lastGrayUpdated_ = 0;
 };
 
 }  // namespace cs

@@ -70,11 +70,13 @@ struct StageThree {
 
 // smart-contracts stages
 struct StageOneSmarts {
+    bool fillBinary();
+    bool fillFromBinary();
     uint8_t sender;
-    uint64_t id;  // combination of starter params: block number, transaction number, counter
+    uint64_t id = 0;  // combination of starter params: block number, transaction number, counter
     // cs::Sequence sBlockNum;
     // uint32_t startTransaction;
-    csdb::Amount fee;
+    std::vector <csdb::Amount> fees;
     Hash hash;
     Hash messageHash;
     Signature signature;
@@ -82,6 +84,8 @@ struct StageOneSmarts {
 };
 
 struct StageTwoSmarts {
+    Bytes toBinary();
+    bool fromBinary(Bytes message, StageTwoSmarts& stage);
     uint8_t sender;
     uint64_t id;  // combination of starter params: block number, transaction number, counter
     // cs::Sequence sBlockNum;
@@ -93,6 +97,8 @@ struct StageTwoSmarts {
 };
 
 struct StageThreeSmarts {
+    Bytes toBinary();
+    static bool fromBinary(Bytes message, StageThreeSmarts& stage);
     uint8_t sender;
     uint8_t iteration;
     uint64_t id;  // combination of starter params: block number, transaction number, counter

@@ -9,6 +9,7 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/queues.hpp>
 #include <lib/system/structures.hpp>
+#include <lib/system/random.hpp>
 
 #include <boost/lockfree/spsc_queue.hpp>
 
@@ -100,7 +101,8 @@ TEST(RegionAllocator, multithreaded_stress) {
 
     std::thread wr([&]() {
         for (uint32_t i = 0; i < 1000000; ++i) {
-            uint32_t s = rand() % 100 + 4;
+            uint32_t s = cs::Random::generateValue<uint32_t>(0, 100) + 4;
+
             auto p = a.allocateNext(s);
             *(uint32_t*)p.get() = i;
             total += i;
@@ -201,7 +203,7 @@ TEST(fuqueue, DISABLED_multithreaded_stress) {
 
     auto wrFunc = [&]() {
         for (int i = 0; i < 100000; ++i) {
-            const uint32_t t = rand() % 500;
+            const uint32_t t = cs::Random::generateValue<uint32_t>(0, 500);
             auto s = q.lockWrite();
             s->element = t;
             q.unlockWrite(s);
@@ -248,7 +250,7 @@ TEST(boost_spsc_queue, DISABLED_multithreaded_stress) {
 
     auto wrFunc = [&]() {
         for (size_t i = 0; i < count; ++i) {
-            const uint32_t t = rand() % 500;
+            const uint32_t t = cs::Random::generateValue<uint32_t>(0, 500);
 
             while (!queue.push(t)) {
                 executions.fetch_add(1, std::memory_order_acq_rel);

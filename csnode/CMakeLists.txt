@@ -6,6 +6,8 @@ project(csnode)
 if (MSVC)
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Od /Ob0")
     set(CMAKE_CXX_FLAGS_RELSPAM "${CMAKE_CXX_FLAGS_RELSPAM} /Od /Ob0")
+    set(CMAKE_CXX_FLAGS_RELMONITOR "${CMAKE_CXX_FLAGS_RELMONITOR} /Od /Ob0")
+    set(CMAKE_CXX_FLAGS_RELWALLET "${CMAKE_CXX_FLAGS_RELWALLET} /Od /Ob0")
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -52,7 +54,6 @@ add_library(csnode
   include/csnode/blockhashes.hpp
   include/csnode/poolsynchronizer.hpp
   include/csnode/fee.hpp
-  include/csnode/spammer.hpp
   include/csnode/transactionsvalidator.hpp
   include/csnode/walletsstate.hpp
   include/csnode/roundstat.hpp
@@ -74,7 +75,6 @@ add_library(csnode
   src/blockhashes.cpp
   src/poolsynchronizer.cpp
   src/fee.cpp
-  src/spammer.cpp
   src/transactionsvalidator.cpp
   src/walletsstate.cpp
   src/roundstat.cpp

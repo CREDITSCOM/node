@@ -6,6 +6,11 @@
 #include <csnode/node.hpp>
 #include <lib/system/logger.hpp>
 
+namespace
+{
+    const char* kLogPrefix = "SolverCore: ";
+}
+
 namespace cs {
 
 BlockChain& SolverContext::blockchain() const {
@@ -100,7 +105,7 @@ Role SolverContext::role() const {
         default:
             break;
     }
-    cserror() << "SolverCore: unknown NodeLevel value " << static_cast<int>(v) << " was returned by Node";
+    cserror() << kLogPrefix << "unknown NodeLevel value " << static_cast<int>(v) << " was returned by Node";
     // TODO: how to handle "unknown" node level value?
     return Role::Normal;
 }
@@ -121,23 +126,23 @@ void SolverContext::spawn_next_round(cs::StageThree& st3) {
     }
 
     if (tStamp.empty()) {
-        cswarning() << "SolverCore: cannot act as writer because lack writer timestamp";
+        cswarning() << kLogPrefix << "cannot act as writer because lack writer timestamp";
         return;
     }
 
-    csdebug() << "SolverCore: spawn next round";
+    csdebug() << kLogPrefix << "spawn next round";
     if (core.trusted_candidates.empty()) {
-        cserror() << "SolverCore: trusted candidates list must not be empty while spawn next round";
+        cserror() << kLogPrefix << "trusted candidates list must not be empty while spawn next round";
     }
 
-    csdebug() << "SolverCore: new confidant nodes: ";
+    csdebug() << kLogPrefix << "new confidant nodes: ";
     int i = 0;
     for (const auto& it : core.trusted_candidates) {
         csdebug() << '\t' << i << ". " << cs::Utils::byteStreamToHex(it.data(), it.size());
         ++i;
     }
 
-    csdebug() << "SolverCore: new hashes count is " << core.hashes_candidates.size();
+    csdebug() << kLogPrefix << "new hashes count is " << core.hashes_candidates.size();
     core.spawn_next_round(core.trusted_candidates, core.hashes_candidates, std::move(tStamp), st3);
 }
 
@@ -178,7 +183,7 @@ void SolverContext::request_stage1(uint8_t from, uint8_t required) {
     if (!conveyer.isConfidantExists(from)) {
         return;
     }
-    csdebug() << "SolverCore: ask [" << static_cast<int>(from) << "] for stage-1 of [" << static_cast<int>(required) << "]";
+    csdebug() << kLogPrefix << "ask [" << static_cast<int>(from) << "] for stage-1 of [" << static_cast<int>(required) << "]";
     core.pnode->stageRequest(MsgTypes::FirstStageRequest, from, required /*, 0U*/);
 }
 
@@ -187,7 +192,7 @@ void SolverContext::request_stage2(uint8_t from, uint8_t required) {
     if (!conveyer.isConfidantExists(from)) {
         return;
     }
-    csdebug() << "SolverCore: ask [" << static_cast<int>(from) << "] for stage-2 of [" << static_cast<int>(required) << "]";
+    csdebug() << kLogPrefix << "ask [" << static_cast<int>(from) << "] for stage-2 of [" << static_cast<int>(required) << "]";
     core.pnode->stageRequest(MsgTypes::SecondStageRequest, from, required /*, 0U*/);
 }
 
@@ -196,7 +201,7 @@ void SolverContext::request_stage3(uint8_t from, uint8_t required) {
     if (!conveyer.isConfidantExists(from)) {
         return;
     }
-    csdebug() << "SolverCore: ask [" << static_cast<int>(from) << "] for stage-3 of [" << static_cast<int>(required) << "]";
+    csdebug() << kLogPrefix << "ask [" << static_cast<int>(from) << "] for stage-3 of [" << static_cast<int>(required) << "]";
     core.pnode->stageRequest(MsgTypes::ThirdStageRequest, from, required /*, core.currentStage3iteration()*/);
 }
 
@@ -216,15 +221,16 @@ bool SolverContext::transaction_still_in_pool(int64_t inner_id) const {
 }
 
 void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2) {
-    csdebug() << "SolverCore: ask [" << static_cast<int>(respondent1) << "] for RoundTable";
+    csdebug() << kLogPrefix << "ask [" << static_cast<int>(respondent1) << "] for RoundTable";
     core.pnode->sendRoundTableRequest(respondent1);
 
-    csdebug() << "SolverCore: ask [" << static_cast<int>(respondent2) << "] for RoundTable";
+    csdebug() << kLogPrefix << "ask [" << static_cast<int>(respondent2) << "] for RoundTable";
     core.pnode->sendRoundTableRequest(respondent2);
 }
 
-void SolverContext::send_rejected_smarts(std::vector<std::pair<cs::Sequence, uint32_t> >& ref_list) {
-    core.pnode->sendSmartReject(ref_list);
+void SolverContext::send_rejected_smarts(const std::vector<RefExecution>& reject_list) {
+    csdebug() << kLogPrefix << "sending " << reject_list.size() << " rejected contract calls";
+    core.pnode->sendSmartReject(reject_list);
 }
 
 }  // namespace cs
