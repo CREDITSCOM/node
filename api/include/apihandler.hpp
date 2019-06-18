@@ -50,8 +50,8 @@ public:
         FAILURE,
         NOT_IMPLEMENTED,
         NOT_FOUND,
-		INPROGRESS,
-        MAX		
+        INPROGRESS,
+        MAX
     };
 
     static void SetResponseStatus(general::APIResponse& response, APIRequestStatusType status, const std::string& details = "");
@@ -100,11 +100,11 @@ class ContractExecutorConcurrentClient;
 namespace executor {
 class Executor {
 public:  // wrappers
-	void executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject>& code,
-			const std::string& state, std::vector<MethodHeader>& methodHeader, const int64_t& timeout) {
-		csunused(timeout);
-        static std::mutex m;
-        std::lock_guard lk(m);  // temporary solution
+    void executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject>& code,
+            const std::string& state, std::vector<MethodHeader>& methodHeader, const int64_t& timeout) {
+        csunused(timeout);
+        static std::mutex mutex;
+        std::lock_guard lock(mutex);  // temporary solution
 
         if (!code.empty()) {
             executor::SmartContractBinary smartContractBinary;
@@ -112,8 +112,9 @@ public:  // wrappers
             smartContractBinary.object.byteCodeObjects = code;
             smartContractBinary.object.instance = state;
             smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smart_address)) ? true : false;
-			if (auto optOriginRes = execute(address, smartContractBinary, methodHeader))
+            if (auto optOriginRes = execute(address, smartContractBinary, methodHeader)) {
                 resp = optOriginRes.value().resp;
+            }
         }
     }
 
@@ -127,7 +128,7 @@ public:  // wrappers
         const auto acceess_id = generateAccessId();
         ++execCount_;
         try {
-			std::shared_lock slk(shErrMt);
+            std::shared_lock lock(sharedErrorMutex_);
             origExecutor_->executeByteCodeMultiple(_return, acceess_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::transport::TTransportException & x) {
@@ -154,7 +155,7 @@ public:  // wrappers
             return;
         }
         try {
-			std::shared_lock slk(shErrMt);
+            std::shared_lock lock(sharedErrorMutex_);
             origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::transport::TTransportException & x) {
@@ -179,7 +180,7 @@ public:  // wrappers
             return;
         }
         try {
-			std::shared_lock slk(shErrMt);
+            std::shared_lock lock(sharedErrorMutex_);
             origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::transport::TTransportException & x) {
@@ -204,7 +205,7 @@ public:  // wrappers
             return;
         }
         try {
-			std::shared_lock slk(shErrMt);
+            std::shared_lock slk(sharedErrorMutex_);
             origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::transport::TTransportException & x) {
@@ -229,52 +230,57 @@ public:
     }
 
     std::optional<cs::Sequence> getSequence(const general::AccessID& accessId) {
-        std::shared_lock slk(mtx_);
-        if (auto it = accessSequence_.find(accessId); it != accessSequence_.end())
+        std::shared_lock lock(mutex_);
+        if (auto it = accessSequence_.find(accessId); it != accessSequence_.end()) {
             return std::make_optional(it->second);
+        }
         return std::nullopt;
     }
 
     std::optional<csdb::TransactionID> getDeployTrxn(const csdb::Address& p_address) {
-        std::shared_lock slk(mtx_);
-        if (const auto it = deployTrxns_.find(p_address); it != deployTrxns_.end())
+        std::shared_lock lock(mutex_);
+        if (const auto it = deployTrxns_.find(p_address); it != deployTrxns_.end()) {
             return std::make_optional(it->second);
+        }
         return std::nullopt;
     }
 
     void updateDeployTrxns(const csdb::Address& p_address, const csdb::TransactionID& p_trxnsId) {
-        std::lock_guard lk(mtx_);
+        std::lock_guard lock(mutex_);
         deployTrxns_[p_address] = p_trxnsId;
     }
 
     void setLastState(const csdb::Address& p_address, const std::string& p_state) {
-        std::lock_guard lk(mtx_);
+        std::lock_guard lock(mutex_);
         lastState_[p_address] = p_state;
     }
 
     std::optional<std::string> getState(const csdb::Address& p_address) {
-        std::shared_lock slk(mtx_);
+        std::shared_lock lock(mutex_);
         if (const auto it_last_state = lastState_.find(p_address); it_last_state != lastState_.end())
             return std::make_optional(it_last_state->second);
         return std::nullopt;
     }
 
     void updateCacheLastStates(const csdb::Address& p_address, const cs::Sequence& sequence, const std::string& state) {
-        std::lock_guard lk(mtx_);
-        if (execCount_)
+        std::lock_guard lock(mutex_);
+        if (execCount_) {
             (cacheLastStates_[p_address])[sequence] = state;
-        else if (cacheLastStates_.size())
+        }
+        else if (cacheLastStates_.size()) {
             cacheLastStates_.clear();
+        }
     }
 
     std::optional<std::string> getAccessState(const general::AccessID& p_access_id, const csdb::Address& p_address) {
-        std::shared_lock slk(mtx_);
+        std::shared_lock slk(mutex_);
         const auto access_sequence = getSequence(p_access_id);
         if (const auto unmap_states_it = cacheLastStates_.find(p_address); unmap_states_it != cacheLastStates_.end()) {
             std::pair<cs::Sequence, std::string> prev_seq_state{};
             for (const auto& [curr_seq, curr_state] : unmap_states_it->second) {
-                if (curr_seq > access_sequence)
+                if (curr_seq > access_sequence) {
                     return prev_seq_state.first ? std::make_optional<std::string>(prev_seq_state.second) : std::nullopt;
+                }
                 prev_seq_state = {curr_seq, curr_state};
             }
         }
@@ -282,46 +288,48 @@ public:
         return opt_last_sate.has_value() ? std::make_optional<std::string>(opt_last_sate.value()) : std::nullopt;
     }
 
-	struct ExecuteResult {
-	private:
-		struct SmartRes {
-			general::Variant retValue;
-			std::string		 newState;
+    struct ExecuteResult {
+    private:
+        struct SmartRes {
+            general::Variant retValue;
+            std::string		 newState;
             // measured in milliseconds actual cost of execution
-			int64_t			 executionCost;
+            int64_t			 executionCost;
             ::general::APIResponse response;
         };
-	public:
-		std::vector<SmartRes> smartsRes;
-		std::map<csdb::Address, std::string> states;
-		std::vector<csdb::Transaction> trxns;
+    public:
+        std::vector<SmartRes> smartsRes;
+        std::map<csdb::Address, std::string> states;
+        std::vector<csdb::Transaction> trxns;
         // measured in milliseconds total cost of executions
-		long selfMeasuredCost;
+        long selfMeasuredCost;
         ::general::APIResponse response;
-	};
+    };
 
     void addInnerSendTransaction(const general::AccessID& accessId, const csdb::Transaction& transaction) {
-        std::lock_guard lk(mtx_);
+        std::lock_guard lk(mutex_);
         innerSendTransactions_[accessId].push_back(transaction);
     }
 
     std::optional<std::vector<csdb::Transaction>> getInnerSendTransactions(const general::AccessID& accessId) {
-        std::shared_lock slk(mtx_);
-        if (const auto it = innerSendTransactions_.find(accessId); it != innerSendTransactions_.end())
+        std::shared_lock slk(mutex_);
+        if (const auto it = innerSendTransactions_.find(accessId); it != innerSendTransactions_.end()) {
             return std::make_optional<std::vector<csdb::Transaction>>(it->second);
+        }
         return std::nullopt;
     }
 
     void deleteInnerSendTransactions(const general::AccessID& accessId) {
-        std::lock_guard lk(mtx_);
+        std::lock_guard lk(mutex_);
         innerSendTransactions_.erase(accessId);
     }
 
     bool isDeploy(const csdb::Transaction& trxn) {
         if (trxn.user_field(0).is_valid()) {
             const auto sci = deserialize<api::SmartContractInvocation>(trxn.user_field(0).value<std::string>());
-            if (sci.method.empty())
+            if (sci.method.empty()) {
                 return true;
+            }
         }
         return false;
     }
@@ -346,9 +354,9 @@ public:
         csdb::Amount feeLimit;
     };
 
-	std::optional<ExecuteResult> executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {
-		static std::mutex m;
-		std::lock_guard lk(m);  // temporary solution
+    std::optional<ExecuteResult> executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {
+        static std::mutex mutex;
+        std::lock_guard lock(mutex);  // temporary solution
 
         if (smarts.empty()) {
             return std::nullopt;
@@ -358,35 +366,36 @@ public:
             return std::nullopt;
         }
         // all smarts must have the same initiator and address
-		const auto source = head_transaction.source();
-		const auto target = head_transaction.target();
-		for (const auto& smart : smarts) {
-			if (source != smart.transaction.source() || target != smart.transaction.target())
-				return std::nullopt;
-		}
+        const auto source = head_transaction.source();
+        const auto target = head_transaction.target();
+        for (const auto& smart : smarts) {
+            if (source != smart.transaction.source() || target != smart.transaction.target()) {
+                return std::nullopt;
+            }
+        }
 
-		auto smartSource = blockchain_.getAddressByType(source, BlockChain::AddressType::PublicKey);
-		auto smartTarget = blockchain_.getAddressByType(target, BlockChain::AddressType::PublicKey);
+        auto smartSource = blockchain_.getAddressByType(source, BlockChain::AddressType::PublicKey);
+        auto smartTarget = blockchain_.getAddressByType(target, BlockChain::AddressType::PublicKey);
 
-		// get deploy transaction
-		csdb::Transaction deployTrxn;
-		const auto isdeploy = isDeploy(head_transaction);
-		if (!isdeploy) {  // execute
-			const auto optDeployId = getDeployTrxn(smartTarget);
+        // get deploy transaction
+        csdb::Transaction deployTrxn;
+        const auto isdeploy = isDeploy(head_transaction);
+        if (!isdeploy) {  // execute
+            const auto optDeployId = getDeployTrxn(smartTarget);
             if (!optDeployId.has_value()) {
                 return std::nullopt;
             }
-			deployTrxn = blockchain_.loadTransaction(optDeployId.value());
-		}
+            deployTrxn = blockchain_.loadTransaction(optDeployId.value());
+        }
         else {
             deployTrxn = head_transaction;
         }
 
-		// fill smartContractBinary 
-		const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
-		executor::SmartContractBinary smartContractBinary;
-		smartContractBinary.contractAddress = smartTarget.to_api_addr();
-		smartContractBinary.object.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
+        // fill smartContractBinary
+        const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
+        executor::SmartContractBinary smartContractBinary;
+        smartContractBinary.contractAddress = smartTarget.to_api_addr();
+        smartContractBinary.object.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
         // may contain temporary last new state not yet written into block chain (to allow "speculative" multi-executions af the same contract)
         if (!forceContractState.empty()) {
             smartContractBinary.object.instance = forceContractState;
@@ -397,12 +406,12 @@ public:
                 smartContractBinary.object.instance = optState.value();
             }
         }
-		smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr())) ? true : false;
+        smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr())) ? true : false;
 
-		// fill methodHeader 
-		std::vector<executor::MethodHeader> methodHeader;
-		for (const auto& smart_item : smarts) {
-			executor::MethodHeader header;
+        // fill methodHeader
+        std::vector<executor::MethodHeader> methodHeader;
+        for (const auto& smart_item : smarts) {
+            executor::MethodHeader header;
             const csdb::Transaction& smart = smart_item.transaction;
             if (smart_item.convention != MethodNameConvention::Default) {
                 // call to payable
@@ -441,53 +450,58 @@ public:
                     header.methodName = sci.method;
                     header.params = sci.params;
 
-                    for (const auto& addrLock : sci.usedContracts)
+                    for (const auto& addrLock : sci.usedContracts) {
                         addToLockSmart(addrLock, getFutureAccessId());
+                    }
                 }
             }
-			methodHeader.push_back(header);
-		}
+            methodHeader.push_back(header);
+        }
 
-		const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeader);
+        const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeader);
 
-		for (const auto& smart : smarts) {
-			if (!isdeploy) {
+        for (const auto& smart : smarts) {
+            if (!isdeploy) {
                 if (smart.convention == MethodNameConvention::Default) {
                     const auto fld = smart.transaction.user_field(0);
                     if (fld.is_valid()) {
                         auto sci = deserialize<api::SmartContractInvocation>(smart.transaction.user_field(0).value<std::string>());
-                        for (const auto& addrLock : sci.usedContracts)
+                        for (const auto& addrLock : sci.usedContracts) {
                             deleteFromLockSmart(addrLock, getFutureAccessId());
+                        }
                     }
                 }
-			}
-		}
+            }
+        }
 
-		if (!optOriginRes.has_value())
-			return {};
+        if (!optOriginRes.has_value()) {
+            return {};
+        }
 
-		const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
+        const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
 
-		// fill res 
-		ExecuteResult res;
+        // fill res
+        ExecuteResult res;
         res.response = optOriginRes.value().resp.status;
 
-		if (optInnerTransactions.has_value())
-			res.trxns = optInnerTransactions.value();
-		deleteInnerSendTransactions(optOriginRes.value().acceessId);
-		//constexpr double FEE_IN_SEC = kMinFee * 4.0;
-		//const double fee = std::max(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SEC);
-		//res.fee = csdb::Amount(fee);
+        if (optInnerTransactions.has_value()) {
+            res.trxns = optInnerTransactions.value();
+        }
+        deleteInnerSendTransactions(optOriginRes.value().acceessId);
+        //constexpr double FEE_IN_SEC = kMinFee * 4.0;
+        //const double fee = std::max(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SEC);
+        //res.fee = csdb::Amount(fee);
         res.selfMeasuredCost = (long) optOriginRes.value().timeExecute;
-		for (const auto&[itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
-			auto addr = BlockChain::getAddressFromKey(itAddress);
-			res.states[addr] = itState;
-		}
-		for (const auto& result : optOriginRes.value().resp.results)
-			res.smartsRes.push_back({ result.ret_val, result.invokedContractState, result.executionCost, result.status });
+        for (const auto&[itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
+            auto addr = BlockChain::getAddressFromKey(itAddress);
+            res.states[addr] = itState;
+        }
+        for (const auto& result : optOriginRes.value().resp.results) {
+            res.smartsRes.push_back({ result.ret_val, result.invokedContractState, result.executionCost, result.status });
+        }
 
-		return res;
-	}
+        return res;
+    }
 
     csdb::Transaction make_transaction(const api::Transaction& transaction) {
         csdb::Transaction send_transaction;
@@ -536,18 +550,18 @@ public:
     }
 
     void addToLockSmart(const general::Address& address, const general::AccessID& accessId) {
-        std::lock_guard lk(mtx_);
+        std::lock_guard lk(mutex_);
         lockSmarts[address] = accessId;
     }
 
     void deleteFromLockSmart(const general::Address& address, const general::AccessID& accessId) {
         csunused(accessId);
-        std::lock_guard lk(mtx_);
+        std::lock_guard lk(mutex_);
         lockSmarts.erase(address);
     }
 
     bool isLockSmart(const general::Address& address, const general::AccessID& accessId) {
-        std::lock_guard lk(mtx_);
+        std::lock_guard lk(mutex_);
         if (auto addrLock = lockSmarts.find(address); addrLock != lockSmarts.end() && addrLock->second == accessId)
             return true;
         return false;
@@ -597,7 +611,7 @@ private:
     };
 
     uint64_t generateAccessId() {
-        std::lock_guard lk(mtx_);
+        std::lock_guard lk(mutex_);
         ++lastAccessId_;
         accessSequence_[lastAccessId_] = blockchain_.getLastSequence();
         return lastAccessId_;
@@ -608,22 +622,23 @@ private:
     }
 
     void deleteAccessId(const general::AccessID& p_access_id) {
-        std::lock_guard lk(mtx_);
+        std::lock_guard lk(mutex_);
         accessSequence_.erase(p_access_id);
     }
 
 	std::optional<OriginExecuteResult> execute(const std::string& address, const SmartContractBinary& smartContractBinary, std::vector<MethodHeader>& methodHeader) {
         constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
         OriginExecuteResult originExecuteRes{};
-        if (!connect())
+        if (!connect()) {
             return std::nullopt;
+        }
         const auto access_id = generateAccessId();
         ++execCount_;
         const auto timeBeg = std::chrono::steady_clock::now();
         try {
-			std::shared_lock slk(shErrMt);
-			origExecutor_->executeByteCode(originExecuteRes.resp, access_id, address, smartContractBinary, methodHeader, EXECUTION_TIME, EXECUTOR_VERSION);
-		}
+            std::shared_lock lock(sharedErrorMutex_);
+            origExecutor_->executeByteCode(originExecuteRes.resp, access_id, address, smartContractBinary, methodHeader, EXECUTION_TIME, EXECUTOR_VERSION);
+        }
         catch (::apache::thrift::transport::TTransportException & x) {
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
@@ -646,8 +661,9 @@ private:
 
     bool connect() {
         try {
-            if (executorTransport_->isOpen())
+            if (executorTransport_->isOpen()) {
                 executorTransport_->close();
+            }
 
             executorTransport_->open();
             isConnect_ = true;
@@ -669,15 +685,15 @@ private:
         }
     }
 
-	//
-	using OriginExecutor = executor::ContractExecutorConcurrentClient;
-	using BinaryProtocol = apache::thrift::protocol::TBinaryProtocol;
-	std::shared_mutex shErrMt;
-	void reCreationOriginExecutor() {
-		std::lock_guard glk(shErrMt);
-		origExecutor_.reset(new OriginExecutor(::apache::thrift::stdcxx::make_shared<BinaryProtocol>(executorTransport_)));
-	}
-	//	
+    //
+    using OriginExecutor = executor::ContractExecutorConcurrentClient;
+    using BinaryProtocol = apache::thrift::protocol::TBinaryProtocol;
+    std::shared_mutex sharedErrorMutex_;
+    void reCreationOriginExecutor() {
+        std::lock_guard glk(sharedErrorMutex_);
+        origExecutor_.reset(new OriginExecutor(::apache::thrift::stdcxx::make_shared<BinaryProtocol>(executorTransport_)));
+    }
+    //
 
 private:
     const BlockChain& blockchain_;
@@ -692,7 +708,7 @@ private:
     std::map<csdb::Address, std::unordered_map<cs::Sequence, std::string>> cacheLastStates_;
     std::map<general::AccessID, std::vector<csdb::Transaction>> innerSendTransactions_;
 
-    std::shared_mutex mtx_;
+    std::shared_mutex mutex_;
     std::atomic_size_t execCount_{0};
 
     std::condition_variable cvErrorConnect_;
@@ -776,7 +792,7 @@ public:
 
     void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<::general::ByteCodeObject>& byteCodeObjects) override;
 
-	void ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) override;
+    void ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) override;
     ////////new
     void iterateOverTokenTransactions(const csdb::Address&, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)>);
     ////////new
@@ -812,7 +828,7 @@ public:
     }
 
 private:
-	::csstats::AllStats stats_;
+    ::csstats::AllStats stats_;
     executor::Executor& executor_;
 
     struct smart_trxns_queue {
@@ -891,19 +907,13 @@ private:
     cs::SpinLockable<std::map<csdb::Address, smart_state_entry>> smart_state;
     cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smart_last_trxn;
 
-	//
-	/*using TrxInPrgss = std::pair<csdb::Address, int64_t>;
-	using CVInPrgss = std::pair<std::condition_variable, bool>;
-	cs::SpinLockable<std::map<TrxInPrgss, CVInPrgss>> trxInProgress;*/
-	//
-
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployed_by_creator;
     cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
     std::map<csdb::PoolHash, api::Pool> poolCache;
     std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
     std::thread state_updater;
 
-	std::map<std::string, int64_t> mExecuteCount_;
+    std::map<std::string, int64_t> mExecuteCount_;
 
     api::SmartContract fetch_smart_body(const csdb::Transaction&);
 
@@ -946,7 +956,7 @@ private:
 private slots:
     void update_smart_caches_slot(const csdb::Pool& pool);
     void store_block_slot(const csdb::Pool& pool);
-	void collect_all_stats_slot(const csdb::Pool& pool);
+    void collect_all_stats_slot(const csdb::Pool& pool);
 };
 }  // namespace api
 
