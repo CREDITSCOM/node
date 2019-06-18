@@ -65,7 +65,8 @@ public:
     void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
     void getTransactionsPacket(const uint8_t* data, const std::size_t size);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
-    bool canBeTrusted();
+    // critical is true if network near to be down, all capable trusted node required
+    bool canBeTrusted(bool critical);
 
     // SOLVER3 methods
     void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
