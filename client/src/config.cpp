@@ -402,7 +402,7 @@ void Config::showKeys(const std::string& pk58) {
     std::clock_t start = std::clock();
     while (secondsPassed < kTimeoutSeconds) {
         secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
-        std::cout << kTimeoutSeconds - secondsPassed << "\r";
+        std::cout << static_cast<int>(kTimeoutSeconds - secondsPassed) << "\r";
         if (_kbhit()) {
             if (_getch() == 's') {
                 std::cout << "\n\nPress any key to continue...\n" << std::endl;
@@ -427,7 +427,7 @@ void Config::changePasswordOption(const std::string& pathToSk) {
     std::clock_t start = std::clock();
     while (secondsPassed < kTimeoutSeconds) {
         secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
-        std::cout << kTimeoutSeconds - secondsPassed << "\r";
+        std::cout << static_cast<int>(kTimeoutSeconds - secondsPassed) << "\r";
         if (_kbhit()) {
             if (_getch() == 'p') {
                 std::cout << "Encrypting the private key file with new password..." << std::endl;
