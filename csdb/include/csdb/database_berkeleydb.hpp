@@ -41,8 +41,8 @@ private:
     bool getFromTransIndex(const cs::Bytes& key, cs::Bytes* value) override final;
 #endif
 
-    bool updateSmartState(const cs::Bytes& key, const cs::Bytes& value);
-    bool getLastState(const cs::Bytes& key, cs::Bytes& value);
+    bool updateContractData(const cs::Bytes& key, const cs::Bytes& data) override;
+    bool getContractData(const cs::Bytes& key, cs::Bytes& data) override;
 
 private:
     class Iterator;

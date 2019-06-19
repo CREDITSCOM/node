@@ -819,4 +819,18 @@ void Storage::set_previous_transaction_block(const Address& addr, const PoolHash
 
 #endif
 
+bool Storage::get_contract_data(const Address& abs_addr /*input*/, cs::Bytes& data /*output*/) const {
+    const auto& pk = abs_addr.public_key();
+    cs::Bytes bytes(pk.size());
+    bytes.assign(pk.cbegin(), pk.cend());
+    return d->db->getContractData(bytes, data);
+}
+
+bool Storage::update_contract_data(const Address& abs_addr /*input*/, const cs::Bytes& data /*input*/) const {
+    const auto& pk = abs_addr.public_key();
+    cs::Bytes bytes(pk.size());
+    bytes.assign(pk.cbegin(), pk.cend());
+    return d->db->updateContractData(bytes, data);
+}
+
 }  // namespace csdb

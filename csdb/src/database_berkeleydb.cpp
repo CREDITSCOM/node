@@ -465,14 +465,14 @@ bool DatabaseBerkeleyDB::getFromTransIndex(const cs::Bytes &key, cs::Bytes *valu
 }
 #endif
 
-bool DatabaseBerkeleyDB::updateSmartState(const cs::Bytes& key, const cs::Bytes& value) {
+bool DatabaseBerkeleyDB::updateContractData(const cs::Bytes& key, const cs::Bytes& data) {
     if (!db_smart_states_) {
         set_last_error(NotOpen);
         return false;
     }
 
     Dbt_copy<cs::Bytes> db_key(key);
-    Dbt_copy<cs::Bytes> db_value(value);
+    Dbt_copy<cs::Bytes> db_value(data);
 
     int status = db_smart_states_->put(nullptr, &db_key, &db_value, 0);
     if (status) {
@@ -484,7 +484,7 @@ bool DatabaseBerkeleyDB::updateSmartState(const cs::Bytes& key, const cs::Bytes&
     return true;
 }
 
-bool DatabaseBerkeleyDB::getLastState(const cs::Bytes& key, cs::Bytes& value) {
+bool DatabaseBerkeleyDB::getContractData(const cs::Bytes& key, cs::Bytes& data) {
     if (!db_smart_states_) {
         set_last_error(NotOpen);
         return false;
@@ -500,7 +500,7 @@ bool DatabaseBerkeleyDB::getLastState(const cs::Bytes& key, cs::Bytes& value) {
     }
 
     auto begin = reinterpret_cast<uint8_t*>(db_value.get_data());
-    value.assign(begin, begin + db_value.get_size());
+    data.assign(begin, begin + db_value.get_size());
     set_last_error();
     return true;
 }

@@ -246,6 +246,9 @@ public:
 
     const csdb::Address& getGenesisAddress() const;
 
+    bool updateContractData(const csdb::Address& abs_addr, const cs::Bytes& data) const;
+    bool getContractData(const csdb::Address& abs_addr, cs::Bytes& data) const;
+
 private:
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
 

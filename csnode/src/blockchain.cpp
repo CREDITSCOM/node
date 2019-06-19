@@ -811,6 +811,16 @@ bool BlockChain::getTransaction(const csdb::Address& addr, const int64_t& innerI
     return storage_.get_from_blockchain(addr, innerId, result);
 }
 
+bool BlockChain::updateContractData(const csdb::Address& abs_addr, const cs::Bytes& data) const {
+    cs::Lock lock(dbLock_);
+    return storage_.update_contract_data(abs_addr, data);
+}
+
+bool BlockChain::getContractData(const csdb::Address& abs_addr, cs::Bytes& data) const {
+    cs::Lock lock(dbLock_);
+    return storage_.get_contract_data(abs_addr, data);
+}
+
 bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
     if (!walletsCacheUpdater_) {
         cserror() << "!walletsCacheUpdater";
