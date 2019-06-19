@@ -41,6 +41,9 @@ private:
     bool getFromTransIndex(const cs::Bytes& key, cs::Bytes* value) override final;
 #endif
 
+    bool updateSmartState(const cs::Bytes& key, const cs::Bytes& value);
+    bool getLastState(const cs::Bytes& key, cs::Bytes& value);
+
 private:
     class Iterator;
 
@@ -54,6 +57,7 @@ private:
 #ifdef TRANSACTIONS_INDEX
     std::unique_ptr<Db> db_trans_idx_;
 #endif
+    std::unique_ptr<Db> db_smart_states_;
 };
 
 }  // namespace csdb

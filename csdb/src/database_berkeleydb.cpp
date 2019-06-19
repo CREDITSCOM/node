@@ -81,6 +81,7 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
 #ifdef TRANSACTIONS_INDEX
     db_trans_idx_->close(0);
 #endif
+    std::cout << "DB db_smart_states_ was closed.\n" << std::flush;
     env_.close(0);
 }
 
@@ -168,6 +169,12 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
     }
     db_trans_idx_.reset(db_trans_idx);
 #endif
+
+    status = db_smart_states_->open(NULL, "contracts.db", NULL, DB_BTREE, DB_CREATE, 0);
+    if (status != 0) {
+        set_last_error_from_berkeleydb(status);
+        return false;
+    }
 
     set_last_error();
     return true;
@@ -457,5 +464,45 @@ bool DatabaseBerkeleyDB::getFromTransIndex(const cs::Bytes &key, cs::Bytes *valu
     return true;
 }
 #endif
+
+bool DatabaseBerkeleyDB::updateSmartState(const cs::Bytes& key, const cs::Bytes& value) {
+    if (!db_smart_states_) {
+        set_last_error(NotOpen);
+        return false;
+    }
+
+    Dbt_copy<cs::Bytes> db_key(key);
+    Dbt_copy<cs::Bytes> db_value(value);
+
+    int status = db_smart_states_->put(nullptr, &db_key, &db_value, 0);
+    if (status) {
+        set_last_error_from_berkeleydb(status);
+        return false;
+    }
+
+    set_last_error();
+    return true;
+}
+
+bool DatabaseBerkeleyDB::getLastState(const cs::Bytes& key, cs::Bytes& value) {
+    if (!db_smart_states_) {
+        set_last_error(NotOpen);
+        return false;
+    }
+
+    Dbt_copy<cs::Bytes> db_key(key);
+    Dbt_safe db_value;
+
+    int status = db_smart_states_->get(nullptr, &db_key, &db_value, 0);
+    if (status) {
+        set_last_error_from_berkeleydb(status);
+        return false;
+    }
+
+    auto begin = reinterpret_cast<uint8_t*>(db_value.get_data());
+    value.assign(begin, begin + db_value.get_size());
+    set_last_error();
+    return true;
+}
 
 }  // namespace csdb
