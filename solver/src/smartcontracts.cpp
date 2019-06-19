@@ -293,10 +293,15 @@ bool SmartContracts::is_smart_contract(const csdb::Transaction& tr) {
     // to contain smart contract trx must contain either FLD[0] (deploy, start) or FLD[-2] (new_state), both of type
     // "String":
     csdb::UserField f = tr.user_field(trx_uf::deploy::Code);
-    if (!f.is_valid()) {
-        f = tr.user_field(trx_uf::new_state::Value);
+    if constexpr (trx_uf::deploy::Code != trx_uf::start::Methods) {
+        if (!f.is_valid()) {
+            f = tr.user_field(trx_uf::start::Methods);
+        }
     }
-    return f.is_valid() && f.type() == csdb::UserField::Type::String;
+    if (f.is_valid()) {
+        return f.type() == csdb::UserField::Type::String;
+    }
+    return SmartContracts::is_new_state(tr);
 }
 
 /*static*/
@@ -331,7 +336,10 @@ bool SmartContracts::is_new_state(const csdb::Transaction& tr) {
     // must contain user field new_state::Value and new_state::RefStart
     using namespace cs::trx_uf;
     // test user_field[RefStart] helps filter out ancient smart contracts:
-    return (tr.user_field(new_state::Value).type() == csdb::UserField::Type::String && tr.user_field(new_state::RefStart).type() == csdb::UserField::Type::String);
+    if (tr.user_field(new_state::RefStart).type() != csdb::UserField::Type::String) {
+        return false;
+    }
+    return (tr.user_field(new_state::Value).type() == csdb::UserField::Type::String || tr.user_field(new_state::Hash).type() == csdb::UserField::Type::String);
 }
 
 /* static */
@@ -1545,12 +1553,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
     if (!state_value.empty()) {
         if (!reading_db) {
             std::cout << std::endl; // emphasize with empty line
-            if (state_value.empty()) {
-                cslog() << kLogPrefix << "last contract state remains unchanged, execution failed";
-            }
-            else {
-                cslog() << kLogPrefix << "contract state is updated, new size is " << state_value.size();
-            }
+            cslog() << kLogPrefix << "contract state is updated, new size is " << state_value.size();
             std::cout << std::endl; // emphasize with empty line
         }
         // create or get contract state item
@@ -1904,6 +1907,39 @@ void SmartContracts::update_lock_status(const csdb::Address& abs_addr, bool valu
             it->second.is_locked = value;
         }
     }
+}
+
+bool SmartContracts::dbcache_update(const csdb::Address& abs_addr, const SmartContractRef& ref_start, const cs::Bytes& state, bool force_update /*= false*/) {
+    if (!force_update) {
+        // test if new data is actually newer than stored data
+        cs::Bytes current_data;
+        if (bc.getContractData(abs_addr, current_data)) {
+            cs::DataStream stream(current_data);
+            SmartContractRef current_ref;
+            stream >> current_ref.sequence >> current_ref.transaction;
+            if (current_ref.sequence > ref_start.sequence) {
+                return false;
+            }
+            if (current_ref.sequence == ref_start.sequence && current_ref.transaction >= ref_start.transaction) {
+                return false;
+            }
+        }
+    }
+
+    cs::Bytes data;
+    cs::DataStream stream(data);
+    stream << ref_start.sequence << ref_start.transaction << ref_start.hash << state;
+    return bc.updateContractData(abs_addr, data);
+}
+
+bool SmartContracts::dbcache_read(const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, cs::Bytes& state /*output*/) {
+    cs::Bytes data;
+    if (!bc.getContractData(abs_addr, data)) {
+        return false;
+    }
+    cs::DataStream stream(data);
+    stream >> ref_start.sequence >> ref_start.transaction >> ref_start.hash >> state;
+    return stream.isValid() && !stream.isAvailable(1);
 }
 
 }  // namespace cs

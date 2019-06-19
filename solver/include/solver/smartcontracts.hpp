@@ -73,12 +73,14 @@ namespace trx_uf {
         constexpr csdb::user_field_id_t Value = ~1;  // see apihandler.cpp #9 for currently used value ~1
         // reference to start transaction
         constexpr csdb::user_field_id_t RefStart = 1;
-        // fee value
+        // fee value, includes both execution fee and extra storage (delta) fee
         constexpr csdb::user_field_id_t Fee = 2;
         // return value
         constexpr csdb::user_field_id_t RetVal = 3;
+        // hash of state
+        constexpr csdb::user_field_id_t Hash = 4;
         // count of user fields
-        constexpr size_t Count = 4;
+        constexpr size_t Count = 4; // fields Value and Hash exclude each other, so the total number of fields is 4
     }  // namespace new_state
     // smart-gen transaction field
     namespace smart_gen {
@@ -647,6 +649,13 @@ private:
     bool implements_payable(PayableStatus val) {
         return (val == PayableStatus::Implemented || val == PayableStatus::ImplementedVer1);
     }
+
+    // cache states in db operations
+
+    bool dbcache_update(const csdb::Address& abs_addr, const SmartContractRef& ref_start, const cs::Bytes& state, bool force_update = false);
+
+    bool dbcache_read(const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, cs::Bytes& state /*output*/);
+
 };
 
 }  // namespace cs
