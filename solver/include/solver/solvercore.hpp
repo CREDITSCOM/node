@@ -104,6 +104,9 @@ public:
     bool checkNodeCache(const cs::PublicKey& sender);
     void addToGraylist(const cs::PublicKey& sender, uint32_t rounds);
     void updateGrayList(cs::RoundNumber round);
+    void resetGrayList() {
+        grayList_.clear();
+    }
     cs::Bytes getRealTrusted();
     size_t trueStagesThree();
     uint8_t currentStage3iteration();
