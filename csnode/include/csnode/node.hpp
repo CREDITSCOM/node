@@ -27,6 +27,7 @@ class SolverCore;
 
 namespace cs {
 class PoolSynchronizer;
+class BlockValidator;
 }  // namespace cs
 
 class Node {
@@ -219,6 +220,10 @@ public:
     // args: [failed list, restart list]
     using RejectedSmartContractsSignal = cs::Signal<void(const std::vector<RefExecution>&)>;
 
+    bool alwaysExecuteContracts() {
+        return alwaysExecuteContracts_;
+    }
+
 public signals:
     SmartsSignal<cs::StageOneSmarts> gotSmartStageOne;
     SmartsSignal<cs::StageTwoSmarts> gotSmartStageTwo;
@@ -236,6 +241,7 @@ public slots:
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
     void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
+    void validateBlock(csdb::Pool block, bool* shouldStop);
 
 private:
     bool init(const Config& config);
@@ -396,6 +402,9 @@ private:
     std::vector<cs::RoundNumber> expectedRounds_;
     cs::Sequence maxHeighboursSequence_ = 0;
     cs::Bytes lastTrustedMask_;
+    std::unique_ptr<cs::BlockValidator> blockValidator_;
+
+    bool alwaysExecuteContracts_ = false;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

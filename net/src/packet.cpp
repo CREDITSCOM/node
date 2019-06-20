@@ -4,7 +4,7 @@
 #include "packet.hpp"
 #include "transport.hpp"  // for NetworkCommand
 
-RegionAllocator Message::allocator_(1 << 26, 4);
+RegionAllocator Message::allocator_;
 
 enum Lengths {
     FragmentedHeader = 36
@@ -81,9 +81,10 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
 
 const cs::Hash& Packet::getHeaderHash() const {
     if (!headerHashed_) {
-        headerHash_ = generateHash(static_cast<const char*>(data_.get()) + Offsets::FragmentsNum, Lengths::FragmentedHeader);
+        headerHash_ = generateHash(static_cast<const char*>(region_->data()) + Offsets::FragmentsNum, Lengths::FragmentedHeader);
         headerHashed_ = true;
     }
+
     return headerHash_;
 }
 
@@ -215,7 +216,7 @@ void Message::composeFullData() const {
 
         fullData_ = allocator_.allocateNext(totalSize);
 
-        uint8_t* data = static_cast<uint8_t*>(fullData_.get());
+        uint8_t* data = static_cast<uint8_t*>(fullData_->data());
         pack = packets_;
 
         for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
@@ -248,19 +249,14 @@ size_t Message::clearBuffer(size_t from, size_t to) {
 }
 
 Message::~Message() {
-    /*auto pEnd = packets_ + packetsTotal_;
-    for (auto ptr = packets_; ptr != pEnd; ++ptr)
-      if (ptr) ptr->~Packet();
-
-      memset(packets_, 0, sizeof(Packet*) * packetsTotal_);*/
-
     //DEBUG: prevent corruption after heap is damaged,
     // assume maxFragment "points" behind the last fragment,
     // idea is to avoid call to MemPtr<> destructor on incorrect object
-    size_t cnt = clearUnused();
-    if (cnt > 0) {
-        csdebug() << "Net: memory corruption prevented, invalid fragments (" << cnt << ") is behind the max of " << maxFragment_ << " and cannot been destructed";
-        Transport::cntCorruptedFragments += cnt;
+    size_t count = clearUnused();
+
+    if (count > 0) {
+        csdebug() << "Net: memory corruption prevented, invalid fragments (" << count << ") is behind the max of " << maxFragment_ << " and cannot been destructed";
+        Transport::cntCorruptedFragments += count;
     }
 }
 

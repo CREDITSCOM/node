@@ -28,6 +28,93 @@ const uint8_t kBlockVerToSwitchCountedFees = 0;
 
 namespace cs {
 
+ValidationPlugin::ErrorType
+SmartStateValidator::validateBlock(const csdb::Pool& block) {
+    const auto& transactions = block.transactions();
+    for (const auto& t : transactions) {
+        if (SmartContracts::is_new_state(t) && !checkNewState(t)) {
+            cserror() << kLogPrefix << "error occured during new state check in block "
+                      << block.sequence();
+            return ErrorType::error;
+        }
+    }
+    return ErrorType::noError;
+}
+
+bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
+    SmartContractRef ref = t.user_field(trx_uf::new_state::RefStart);
+    if (!ref.is_valid()) {
+        cserror() << kLogPrefix << "ref to start trx is not valid";
+        return false;
+    }
+    auto block = getBlockChain().loadBlock(ref.sequence);
+    if (!block.is_valid()) {
+        cserror() << "load block with init trx failed";
+        return false;
+    }
+    auto connectorPtr = getNode().getConnector();
+    if (connectorPtr == nullptr) {
+        cserror() << kLogPrefix << "unavailable connector ptr";
+        return false;
+    }
+    auto executorPtr = connectorPtr->apiExecHandler();
+    if (executorPtr == nullptr) {
+        cserror() << kLogPrefix << "unavailable executor ptr";
+        return false;
+    }
+    if (ref.transaction >= block.transactions().size()) {
+        cserror() << kLogPrefix << "incorrect reference to start transaction";
+        return false;
+    }
+    std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
+    auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
+    info.transaction = block.transactions().at(ref.transaction);
+    info.feeLimit = csdb::Amount(info.transaction.max_fee().to_double()); // specify limit as SmartContracts::execute() does
+    info.convention = executor::Executor::MethodNameConvention::Default;
+    if (!is_smart(info.transaction)) {
+        // to specify Payable or PayableLegacy convention call correctly we require access to smarts object
+        info.convention = executor::Executor::MethodNameConvention::PayableLegacy;
+        // the most frequent fast test
+        //auto item = known_contracts.find(absolute_address(transaction.target()));
+        //if (item != known_contracts.end()) {
+        //    StateItem& state = item->second;
+        //    if (state.payable == PayableStatus::Implemented) {
+        //        info.convention = executor::Executor::MethodNameConvention::PayableLegacy;
+        //    }
+        //    else if (state.payable == PayableStatus::ImplementedVer1) {
+        //        info.convention = executor::Executor::MethodNameConvention::Payable;
+        //    }
+        //}
+    }
+    auto opt_result = executorPtr->getExecutor().executeTransaction(smarts, std::string{} /*no force new_state required*/);
+    if (!opt_result.has_value()) {
+        cserror() << kLogPrefix << "execution of transaction failed";
+        return false;
+    }
+    const auto& result = opt_result.value();
+    if (result.smartsRes.empty()) {
+        cserror() << kLogPrefix << "execution result is incorrect, it must not be empty";
+        return false;
+    }
+    auto& main_result = result.smartsRes.front();
+
+    std::string newState = t.user_field(trx_uf::new_state::Value).value<std::string>();
+    const std::string& realNewState = main_result.newState;
+    if (newState.empty()) {
+        if (!realNewState.empty()) {
+            csdebug() << kLogPrefix << "new state of trx is empty, but real new state is not";
+        }
+        return true;
+    }
+    else {
+        if (newState != realNewState) {
+            cserror() << kLogPrefix << "new state of trx in blockchain doesn't match real new state";
+            return false;
+        }
+    }
+    return true;
+}
+
 ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block) {
   auto prevHash = block.previous_hash();
   auto& prevBlock = getPrevBlock();

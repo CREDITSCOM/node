@@ -117,12 +117,23 @@ void Network::readerRoutine(const Config& config) {
         }
 
         std::atomic_thread_fence(std::memory_order_acq_rel);
-        while (!task.pack.data_.ptr_) {
-            cslog() << "net: invalid input packet!!!!!!!!!";
+
+        if (!task.pack.region_.get()) {
+            cswarning() << "net: invalid input packet";
+            continue;
         }
+
         packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
-        while (!task.pack.data_.ptr_) {
-            cslog() << "net: invalid input packet!!!!!!!!!";
+
+        while (!task.pack.region_.get()) {
+            cswarning() << "net: invalid input packet";
+        }
+
+        if (!(task.pack.isHeaderValid())) {
+            static constexpr size_t limit = 100;
+            auto size = (task.pack.size() <= limit) ? task.pack.size() : limit;
+
+            cswarning() << "from socket Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task.pack.data()), size);
         }
 
         if (!lastError) {
@@ -180,18 +191,19 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
     size_t size = 0;
     size_t encodedSize = 0;
 
-    uint32_t cnt = 0;
+    uint32_t count = 0;
 
     // net code was built on this constant (Packet::MaxSize)
     // and is used it implicitly in a lot of places(
     char packetBuffer[Packet::MaxSize];
     boost::asio::mutable_buffer encodedPacket = task->pack.encode(buffer(packetBuffer, sizeof(packetBuffer)));
     encodedSize = encodedPacket.size();
+
     do {
         size = sock.send_to(encodedPacket, ep, NO_FLAGS, lastError);
 
-        if (++cnt == 10) {
-            cnt = 0;
+        if (++count == 10) {
+            count = 0;
             std::this_thread::yield();
         }
     } while (lastError == boost::asio::error::would_block);
@@ -222,51 +234,49 @@ void Network::writerRoutine(const Config& config) {
     while (stopWriterRoutine == false) {  // changed from true
 #ifdef __linux__
         uint64_t tasks;
-        auto s = read(writerEventfd_, &tasks, sizeof(uint64_t));
+        int s = read(writerEventfd_, &tasks, sizeof(uint64_t));
         if (s != sizeof(uint64_t)) {
             continue;
         }
 
         if (tasks > 200) {
-            cslog() << "strange: too many tasks " << tasks;
+            cswarning() << "strange: too many tasks " << tasks;
         }
 
         msg.resize(tasks);
         std::fill(msg.begin(), msg.end(), mmsghdr{});
-
         iovecs.resize(tasks);
         std::fill(iovecs.begin(), iovecs.end(), iovec{});
-
         packets_buffer.resize(tasks);
-
         endpoints.resize(tasks);
         encoded_packets.clear();
 
-        uint64_t j = 0;
-
+        int j = 0;
         for (uint64_t i = 0; i < tasks; i++) {
             auto task = oPacMan_.getNextTask();
-
             std::atomic_thread_fence(std::memory_order_acquire);
+            if (!task->pack.region_.get()) {
+                cswarning() << "net: invalid packet for send!!!!!!!!! " << task->pack.region_.get();
+                continue;
+            }
 
-            while (!task->pack.data_.ptr_) {
-                cslog() << "net: invalid packet for send!!!!!!!!!";
+            if (!(task->pack.isHeaderValid())) {
+                static constexpr size_t limit = 100;
+                auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
+                cswarning() << "socket Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
             }
 
             encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
             endpoints[j] = task->endpoint;
-
             iovecs[j].iov_base = encoded_packets[j].data();
             iovecs[j].iov_len = encoded_packets[j].size();
-
             msg[j].msg_hdr.msg_iov = &iovecs[j];
             msg[j].msg_hdr.msg_iovlen = 1;
             msg[j].msg_hdr.msg_name = endpoints[j].data();
-            msg[j].msg_hdr.msg_namelen = static_cast<decltype(msg[j].msg_hdr.msg_namelen)>(endpoints[j].size());
-
+            msg[j].msg_hdr.msg_namelen = endpoints[j].size();
+            task.release();
             ++j;
         }
-
         if (j == 0) {
             continue;
         }
@@ -275,21 +285,15 @@ void Network::writerRoutine(const Config& config) {
 
         int sended = 0;
         struct mmsghdr* messages = msg.data();
-
         do {
-            sended = sendmmsg(sock->native_handle(), messages, static_cast<unsigned int>(tasks), 0);
-
+            sended = sendmmsg(sock->native_handle(), messages, tasks, 0);
             if (sended < 0) {
-                cslog() << "sendmmsg errno = " << errno;
-
-                if (errno != EAGAIN) {
+                cswarning() << "sendmmsg errno = " << errno;
+                if (errno != EAGAIN)
                     break;
-                }
             }
-
             messages += sended;
-            tasks -= static_cast<decltype(tasks)>(sended);
-
+            tasks -= sended;
         } while (tasks);
 #endif
 #if defined(WIN32) || defined(__APPLE__)
@@ -307,10 +311,12 @@ void Network::writerRoutine(const Config& config) {
 
         for (int i = 0; i < tasks; i++) {
             auto task = oPacMan_.getNextTask();
-            while (!task->pack.data_.ptr_) {
-                cslog() << "net: invalid packet!!!!!!!!!";
+            if (!task->pack.region_.get()) {
+                cswarning() << "net: invalid packet!!!!!!!!!";
+                continue;
             }
             sendPack(*sock, task, task->endpoint);
+            task.release();
         }
 #endif
     }
@@ -336,37 +342,35 @@ void Network::processorRoutine() {
         externals.callAll();
 #ifdef __linux__
         uint64_t tasks;
-
         while (true) {
             int ret = poll(&pfd, 1, timeout);
-
             if (ret != 0) {
                 break;
             }
-
             externals.callAll();
         }
-
-        if (auto s = read(readerEventfd_, &tasks, sizeof(uint64_t)); s != sizeof(uint64_t)) {
+        int s = read(readerEventfd_, &tasks, sizeof(uint64_t));
+        if (s != sizeof(uint64_t)) {
             continue;
         }
 
         for (uint64_t i = 0; i < tasks; i++) {
             auto task = iPacMan_.getNextTask();
-
-            while (!task->pack.data_.ptr_) {
-                cslog() << "net: invalid packet processor!!!!!!!!!";
+            if (!task->pack.region_.get()) {
+                cswarning() << "net: invalid packet processor!!!!!!!!!";
+                continue;
             }
-
             processTask(task);
+            task.release();
         }
 #endif
 #if defined(WIN32) || defined(__APPLE__)
 #ifdef WIN32
         while (true) {
             auto ret = WaitForSingleObject(readerEvent_, 50);  // timeout 50ms
-            if (ret != WAIT_TIMEOUT)
+            if (ret != WAIT_TIMEOUT) {
                 break;
+            }
             externals.callAll();
         };
 #else
@@ -387,6 +391,7 @@ void Network::processorRoutine() {
         for (int i = 0; i < tasks; i++) {
             auto task = iPacMan_.getNextTask();
             processTask(task);
+            task.release();
         }
 #endif
     }
@@ -452,11 +457,14 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
     auto qePtr = oPacMan_.allocNext();
 
     if (ep.size() > 16) {
-        cslog() << "endpoint address too big " << ep.size();
+        cswarning() << "endpoint address too big " << ep.size();
         const uint8_t* ptr = reinterpret_cast<const uint8_t*>(ep.data());
         for (size_t i = 0; i < ep.size(); i++) {
-            cslog() << *ptr++;
+            cswarning() << *ptr++;
         }
+    }
+    while (!p.region_.get()) {
+        cswarning() << "net: invalid packet for sendDirect!!!!!!!!! ";
     }
     qePtr->endpoint = ep;
     qePtr->pack = p;
@@ -549,10 +557,6 @@ Network::Network(const Config& config, Transport* transport)
 
     EV_SET(&writerEvent_, 0, EVFILT_USER, EV_DISPATCH | EV_ENABLE, NOTE_FFCOPY | NOTE_TRIGGER, 0, NULL);
 #endif
-    readerThread_ = std::thread(&Network::readerRoutine, this, config);
-    writerThread_ = std::thread(&Network::writerRoutine, this, config);
-    processorThread_ = std::thread(&Network::processorRoutine, this);
-
     if (!config.hasTwoSockets()) {
         auto sockPtr = new ip::udp::socket(bindSocket(context_, this, config.getInputEndpoint(), config.useIPv6()));
 
@@ -564,6 +568,10 @@ Network::Network(const Config& config, Transport* transport)
         singleSock_.store(sockPtr);
         singleSockOpened_.store(true);
     }
+
+    readerThread_ = std::thread(&Network::readerRoutine, this, config);
+    writerThread_ = std::thread(&Network::writerRoutine, this, config);
+    processorThread_ = std::thread(&Network::processorRoutine, this);
 
     while (readerStatus_.load() == ThreadStatus::NonInit)
         ;

@@ -420,10 +420,16 @@ void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transact
             cserror() << "Cannot find source wallet, source is " << wallAddressIniter.to_string();
             return;
         }
-        WalletData& wallData = getWalletData(id, wallAddress);
+
         WalletData& wallDataIniter = getWalletData(sourceId, wallAddressIniter);
         wallDataIniter.balance_ -= csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
+        wallDataIniter.balance_ -= csdb::Amount(initTransaction.counted_fee().to_double());
+        wallDataIniter.balance_ += csdb::Amount(initTransaction.max_fee().to_double());
+        wallDataIniter.balance_ -= csdb::Amount(newStateTransaction.counted_fee().to_double());
+
+        WalletData& wallData = getWalletData(id, wallAddress);
         wallData.balance_ += initTransaction.amount();
+
         setModified(id);
         setModified(sourceId);
     }

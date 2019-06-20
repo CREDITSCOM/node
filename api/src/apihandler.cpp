@@ -11,7 +11,7 @@
 
 #include <base58.h>
 
-constexpr csdb::user_field_id_t smart_state_idx = ~1;
+constexpr csdb::user_field_id_t kSmartStateIndex = ~1;
 using namespace api;
 using namespace ::apache;
 
@@ -22,29 +22,27 @@ apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& 
     csunused(config);
 }
 
-APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const csconnector::Config& config)
+APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const csconnector::Config&)
 : executor_(executor)
 , s_blockchain(blockchain)
 , solver(_solver)
 #ifdef MONITOR_NODE
 , stats(blockchain)
 #endif
-, executorTransport_(
-      new ::apache::thrift::transport::TBufferedTransport(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>("localhost", config.executor_port)))
 , tm(this) {
 #ifdef MONITOR_NODE
-	if (static bool firstTime = true; firstTime) {
-		stats_.second.resize(::csstats::collectionPeriods.size());
-		auto nowGlobal = std::chrono::system_clock::now();
-		auto lastTimePoint = nowGlobal - std::chrono::seconds(::csstats::collectionPeriods[::csstats::PeriodIndex::Month]);
+    if (static bool firstTime = true; firstTime) {
+        stats_.second.resize(::csstats::collectionPeriods.size());
+        auto nowGlobal = std::chrono::system_clock::now();
+        auto lastTimePoint = nowGlobal - std::chrono::seconds(::csstats::collectionPeriods[::csstats::PeriodIndex::Month]);
 
-		for (auto time = nowGlobal; time > lastTimePoint; time -= std::chrono::seconds(::csstats::updateTimeSec)) {
-			::csstats::PeriodStats cut;
-			cut.timeStamp = time;
-			stats_.first.push_back(cut);
-		}
-		firstTime = false;
-	}
+        for (auto time = nowGlobal; time > lastTimePoint; time -= std::chrono::seconds(::csstats::updateTimeSec)) {
+            ::csstats::PeriodStats cut;
+            cut.timeStamp = time;
+            stats_.first.push_back(cut);
+        }
+        firstTime = false;
+    }
 #endif
 }
 
@@ -212,8 +210,8 @@ cs::Bytes toByteArray(const std::string& s) {
     return res;
 }
 
-api::Amount convertAmount(const csdb::Amount& amount) {
-    api::Amount result;
+general::Amount convertAmount(const csdb::Amount& amount) {
+	general::Amount result;
     result.integral = amount.integral();
     result.fraction = amount.fraction();
     assert(result.fraction >= 0);
@@ -297,6 +295,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     result.trxn.fee.commission = transaction.counted_fee().get_raw();
 
     result.trxn.timeCreation = transaction.get_time();
+
+    result.trxn.poolNumber = s_blockchain.loadBlock(transaction.id().pool_hash()).sequence();
 
     if (is_smart(transaction)) {
         using namespace cs::trx_uf;
@@ -401,6 +401,45 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         auto ufd = transaction.user_field(1);
         if (ufd.is_valid())
             result.trxn.__set_userFields(ufd.value<std::string>());
+    }
+
+    // fill ExtraFee
+    // 1) find state transaction
+    csdb::Transaction stateTrx;
+    if (is_smart(transaction)) {
+        auto opers = lockedReference(this->smart_operations);
+        stateTrx = s_blockchain.loadTransaction((*opers)[transaction.id()].stateTransaction);
+    }
+    else if (is_smart_state(transaction))
+        stateTrx = transaction;
+
+    if (!is_smart_state(stateTrx))
+        return result;
+
+    // 2) fill ExtraFee for state transaction
+    auto pool = s_blockchain.loadBlock(stateTrx.id().pool_hash());
+    auto transactions = pool.transactions();
+    ExtraFee extraFee;
+    extraFee.transactionId = convert_transaction_id(stateTrx.id());
+    // 2.1) counted_fee 
+    extraFee.sum = convertAmount(csdb::Amount(stateTrx.counted_fee().to_double()));
+    extraFee.comment = "contract state fee";
+    result.trxn.extraFee.push_back(extraFee);
+    // 2.2) execution fee
+    extraFee.sum = convertAmount(stateTrx.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>());
+    extraFee.comment = "contract execution fee";
+    result.trxn.extraFee.push_back(extraFee);
+
+    // 3) fill ExtraFee for extra transactions
+    auto trxIt = std::find_if(transactions.begin(), transactions.end(), [&stateTrx](const csdb::Transaction& ptrx) { return ptrx.id() == stateTrx.id(); });
+    for (auto trx = ++trxIt; trx != transactions.end(); ++trx) {
+        if (s_blockchain.getAddressByType(trx->source(), BlockChain::AddressType::PublicKey) != 
+            s_blockchain.getAddressByType(stateTrx.source(), BlockChain::AddressType::PublicKey)) // end find extra transactions                   
+                break;
+        extraFee.transactionId = convert_transaction_id(trx->id());
+        extraFee.sum = convertAmount(csdb::Amount(trx->counted_fee().to_double()));
+        extraFee.comment = "extra fee";
+        result.trxn.extraFee.push_back(extraFee);
     }
 
     return result;
@@ -567,8 +606,10 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
     BlockChain::WalletData wallData{};
     BlockChain::WalletId id{};
 
-    if (!s_blockchain.findWalletData(source, wallData, id))
+    if (!transaction.smartContract.forgetNewState &&  // not for getter
+            !s_blockchain.findWalletData(source, wallData, id)) {
         return csdb::Transaction{};
+    }
 
     send_transaction.set_currency(csdb::Currency(1));
     send_transaction.set_source(source);
@@ -577,13 +618,12 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
     send_transaction.set_innerID(transaction.id & 0x3fffffffffff);
 
     // TODO Change Thrift to avoid copy
-    cs::Signature signature;
+    cs::Signature signature{};
+
     if (transaction.signature.size() == signature.size()) {
         std::copy(transaction.signature.begin(), transaction.signature.end(), signature.begin());
     }
-    else {
-        signature.fill(0);
-    }
+
     send_transaction.set_signature(signature);
     return send_transaction;
 }
@@ -594,62 +634,64 @@ std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
 }
 
 void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
-	auto tr = make_transaction(transaction);
-	if (!transaction.userFields.empty())
-		tr.add_user_field(1, transaction.userFields);
+    auto tr = make_transaction(transaction);
+    if (!transaction.userFields.empty()) {
+        tr.add_user_field(1, transaction.userFields);
+    }
 
-	// check money
-	const auto source_addr = s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey);
-	BlockChain::WalletData wallData{};
-	BlockChain::WalletId wallId{};
-	if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
-		_return.status.code = ERROR_CODE;
-		_return.status.message = "wallet not found!";
-		return;
-	}
+    // check money
+    const auto source_addr = s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey);
+    BlockChain::WalletData wallData{};
+    BlockChain::WalletId wallId{};
+    if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
+        _return.status.code = ERROR_CODE;
+        _return.status.message = "wallet not found!";
+        return;
+    }
 
-	const auto max_sum = tr.amount().to_double() + kMinFee;
-	const auto balance = wallData.balance_.to_double();
-	if (max_sum > balance) {
-		cslog() << "API: reject transaction with insufficient balance, max_sum = " << max_sum << ", balance = " << balance;
-		_return.status.code = ERROR_CODE;
-		_return.status.message = "not enough money!\nmax_sum: " + std::to_string(max_sum) + "\nbalance: " + std::to_string(balance);
-		return;
-	}
-  
-	// check max fee
-	if (csdb::AmountCommission countedFee; !cs::fee::estimateMaxFee(tr, countedFee)) {
-		_return.status.code = ERROR_CODE;
-		_return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
-		return;
-	}
+    const auto max_sum = tr.amount().to_double() + kMinFee;
+    const auto balance = wallData.balance_.to_double();
+    if (max_sum > balance) {
+        cslog() << "API: reject transaction with insufficient balance, max_sum = " << max_sum << ", balance = " << balance;
+        _return.status.code = ERROR_CODE;
+        _return.status.message = "not enough money!\nmax_sum: " + std::to_string(max_sum) + "\nbalance: " + std::to_string(balance);
+        return;
+    }
 
-	// check signature
-	const auto byteStream = tr.to_byte_stream_for_sig();
-	if (!cscrypto::verifySignature(tr.signature(), s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
-		cslog() << "API: reject transaction with wrong signature";
-		_return.status.code = ERROR_CODE;
-		_return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
-		return;
-	} 
+    // check max fee
+    if (csdb::AmountCommission countedFee; !cs::fee::estimateMaxFee(tr, countedFee)) {
+        _return.status.code = ERROR_CODE;
+        _return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
+        return;
+    }
 
-	solver.send_wallet_transaction(tr);
+    // check signature
+    const auto byteStream = tr.to_byte_stream_for_sig();
+    if (!cscrypto::verifySignature(tr.signature(), s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(),
+                                   byteStream.size())) {
+        cslog() << "API: reject transaction with wrong signature";
+        _return.status.code = ERROR_CODE;
+        _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+        return;
+    }
 
-	//
-	/*const static unsigned int WAIT_SECONDS_TIME{ 10 };
-	const auto pair = std::pair(tr.source(), tr.innerID());
-	auto lockRef{ lockedReference(this->trxInProgress) };
-	auto& cvTrxn = (*lockRef)[pair];
-	static std::mutex mt;
-	std::unique_lock lock(mt);
-	const auto resWait = cvTrxn.first.wait_for(lock, std::chrono::seconds(WAIT_SECONDS_TIME), [&cvflg = (cvTrxn.second = false)]{ return cvflg; });
-	lockedReference(this->trxInProgress)->erase(pair);
-	//
+    solver.send_wallet_transaction(tr);
 
-	if (!resWait) // time is over
-		SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS, get_delimited_transaction_sighex(tr));
-	else*/
-		SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
+    //
+    /*const static unsigned int WAIT_SECONDS_TIME{ 10 };
+    const auto pair = std::pair(tr.source(), tr.innerID());
+    auto lockRef{ lockedReference(this->trxInProgress) };
+    auto& cvTrxn = (*lockRef)[pair];
+    static std::mutex mt;
+    std::unique_lock lock(mt);
+    const auto resWait = cvTrxn.first.wait_for(lock, std::chrono::seconds(WAIT_SECONDS_TIME), [&cvflg = (cvTrxn.second = false)]{ return cvflg; });
+    lockedReference(this->trxInProgress)->erase(pair);
+    //
+
+    if (!resWait) // time is over
+            SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS, get_delimited_transaction_sighex(tr));
+    else*/
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
 
 template <typename T>
@@ -666,44 +708,47 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
     send_transaction.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
 
-    // check money
-    const auto source_addr = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
-    BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "wallet not found!";
-        return;
-    }
+    if (!input_smart.forgetNewState) {
+        // check money
+        const auto source_addr = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
+        BlockChain::WalletData wallData{};
+        BlockChain::WalletId wallId{};
+        if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
+            _return.status.code = ERROR_CODE;
+            _return.status.message = "not enough money!";
+            return;
+        }
 
-    const auto max_fee = send_transaction.max_fee().to_double();
-    const auto balance = wallData.balance_.to_double();
-    if (max_fee > balance) {
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
-        return;
-    }
-    //
-    
-    // check max fee
-    {
-     csdb::AmountCommission countedFee;
-     if (!cs::fee::estimateMaxFee(send_transaction, countedFee)) {
-         _return.status.code = ERROR_CODE;
-         _return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
-         return;
-     }
-    }
+        const auto max_fee = send_transaction.max_fee().to_double();
+        const auto balance = wallData.balance_.to_double();
+        if (max_fee > balance) {
+            _return.status.code = ERROR_CODE;
+            _return.status.message = "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
+            return;
+        }
+        //
 
-  // check signature
-  const auto byteStream = send_transaction.to_byte_stream_for_sig();
-  if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(), byteStream.size())) {
-    _return.status.code = ERROR_CODE;
-    cslog() << "API: reject transaction with wrong signature";
-    _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
-    return;
-  }
-  //
+        // check max fee
+        {
+            csdb::AmountCommission countedFee;
+            if (!cs::fee::estimateMaxFee(send_transaction, countedFee)) {
+                _return.status.code = ERROR_CODE;
+                _return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
+                return;
+            }
+        }
+
+        // check signature
+        const auto byteStream = send_transaction.to_byte_stream_for_sig();
+        if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).public_key(),
+                                       byteStream.data(), byteStream.size())) {
+            _return.status.code = ERROR_CODE;
+            cslog() << "API: reject transaction with wrong signature";
+            _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+            return;
+        }
+        //
+    }
 
     std::vector<general::ByteCodeObject> origin_bytecode;
     if (!deploy) {
@@ -752,10 +797,10 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
                 contract_state = ss.state;
                 return true;
             });
-			if (!resWait) { // time is over
-				SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
-				return;
-			}
+            if (!resWait) {  // time is over
+                SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
+                return;
+            }
         }
         // --
         auto source_pk = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
@@ -763,18 +808,23 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         executor::ExecuteByteCodeResult api_resp;
         const std::vector<general::ByteCodeObject>& bytecode = deploy ? input_smart.smartContractDeploy.byteCodeObjects : origin_bytecode;
         if (!deploy || !input_smart.smartContractDeploy.byteCodeObjects.empty()) {
-            executor_.executeByteCode(api_resp, source_pk.to_api_addr(), target_pk.to_api_addr(), bytecode, contract_state, input_smart.method, input_smart.params,
-                                      MAX_EXECUTION_TIME);
-
+            std::vector<executor::MethodHeader> methodHeader;
+            {
+                executor::MethodHeader tmp;
+                tmp.methodName = input_smart.method;
+                tmp.params = input_smart.params;
+                methodHeader.push_back(tmp);
+            }
+            executor_.executeByteCode(api_resp, source_pk.to_api_addr(), target_pk.to_api_addr(), bytecode, contract_state, methodHeader, MAX_EXECUTION_TIME);
             if (api_resp.status.code) {
                 _return.status.code = api_resp.status.code;
                 _return.status.message = api_resp.status.message;
                 contract_state_entry.yield();
                 return;
             }
-            _return.__isset.smart_contract_result = api_resp.__isset.ret_val;
-            if (_return.__isset.smart_contract_result)
-                _return.__set_smart_contract_result(api_resp.ret_val);
+            _return.__isset.smart_contract_result = api_resp.__isset.results;
+            if (_return.__isset.smart_contract_result && !api_resp.results.empty())
+                _return.__set_smart_contract_result(api_resp.results[0].ret_val);
         }
 
         SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -785,11 +835,11 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     solver.send_wallet_transaction(send_transaction);
 
     if (deploy) {
-		auto resWait = contract_state_entry.waitTillFront([&](SmartState& ss) { return !ss.state.empty(); });
-		if (!resWait) { // time is over
-			SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
-			return;
-		}
+        auto resWait = contract_state_entry.waitTillFront([&](SmartState& ss) { return !ss.state.empty(); });
+        if (!resWait) {  // time is over
+            SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
+            return;
+        }
     }
     else {
         std::string new_state;
@@ -805,14 +855,14 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             return false;
         });
 
-		if (!resWait) { // time is over
-			SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
-			return;
-		}
+        if (!resWait) { // time is over
+            SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
+            return;
+        }
 
         if (new_state.empty()) {
             _return.status.code = ERROR_CODE;
-            _return.status.message = "state is empty!";
+            _return.status.message = "state is not updated, execution failed";
             return;
         }
         else {
@@ -827,21 +877,25 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 }
 
 void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction) {
-    if (!transaction.__isset.smartContract)
+    if (!transaction.__isset.smartContract) {
         dumb_transaction_flow(_return, transaction);
-    else
+    }
+    else {
         smart_transaction_flow(_return, transaction);
+    }
 
     _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
-    if (!validatePagination(_return, *this, offset, const_limit))
+    if (!validatePagination(_return, *this, offset, const_limit)) {
         return;
+    }
 
     uint64_t sequence = s_blockchain.getLastSequence();
-    if ((uint64_t)offset > sequence)
+    if ((uint64_t)offset > sequence) {
         return;
+    }
 
     _return.pools.reserve(const_limit);
 
@@ -863,8 +917,9 @@ void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const P
     const csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
     csdb::Pool pool = s_blockchain.loadBlock(poolHash);
 
-    if (pool.is_valid())
+    if (pool.is_valid()) {
         _return.transactions = extractTransactions(pool, limit, offset);
+    }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
@@ -875,8 +930,9 @@ void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const PoolHash& hash, c
     csdb::Pool pool = s_blockchain.loadBlock(poolHash);
     _return.isFound = pool.is_valid();
 
-    if (_return.isFound)
+    if (_return.isFound) {
         _return.pool = convertPool(poolHash);
+    }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
@@ -930,83 +986,86 @@ void APIHandler::store_block_slot(const csdb::Pool&) {
 }
 
 void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
-	const ::csstats::Periods periods = ::csstats::collectionPeriods;
+    const ::csstats::Periods periods = ::csstats::collectionPeriods;
 
-	static unsigned int currentCutIndex = 0;
-	static auto startCutTime = stats_.first[currentCutIndex].timeStamp;
-	static auto endCutTime = stats_.first[currentCutIndex + 1].timeStamp;
+    static unsigned int currentCutIndex = 0;
+    static auto startCutTime = stats_.first[currentCutIndex].timeStamp;
+    static auto endCutTime = stats_.first[currentCutIndex + 1].timeStamp;
 
-	auto now = std::chrono::system_clock::now();
-	auto poolTime_t = atoll(pool.user_field(0).value<std::string>().c_str()) / 1000;
-	auto poolTime = std::chrono::system_clock::from_time_t(poolTime_t);
+    auto now = std::chrono::system_clock::now();
+    auto poolTime_t = atoll(pool.user_field(0).value<std::string>().c_str()) / 1000;
+    auto poolTime = std::chrono::system_clock::from_time_t(poolTime_t);
 
-	using Seconds = std::chrono::seconds;
-	Seconds poolAgeSec = std::chrono::duration_cast<Seconds>(now - poolTime);
+    using Seconds = std::chrono::seconds;
+    Seconds poolAgeSec = std::chrono::duration_cast<Seconds>(now - poolTime);
 
-	if (startCutTime <= poolTime && poolTime < endCutTime) {
-		::csstats::PeriodStats& periodStats = stats_.first[currentCutIndex];
-		++periodStats.poolsCount;
+    if (startCutTime <= poolTime && poolTime < endCutTime) {
+        ::csstats::PeriodStats& periodStats = stats_.first[currentCutIndex];
+        ++periodStats.poolsCount;
 
-		size_t transactionsCount = pool.transactions_count();
-		periodStats.transactionsCount += (uint32_t)transactionsCount;
+        size_t transactionsCount = pool.transactions_count();
+        periodStats.transactionsCount += (uint32_t)transactionsCount;
 
-		for (size_t i = 0; i < transactionsCount; ++i) {
-			const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+        for (size_t i = 0; i < transactionsCount; ++i) {
+            const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
 
 #ifdef MONITOR_NODE
-			if (is_smart(transaction) || is_smart_state(transaction))
-				++periodStats.transactionsSmartCount;
+            if (is_smart(transaction) || is_smart_state(transaction))
+                ++periodStats.transactionsSmartCount;
 #endif
 
-			if (is_deploy_transaction(transaction))
-				++periodStats.smartContractsCount;
+            if (is_deploy_transaction(transaction)) {
+                ++periodStats.smartContractsCount;
+            }
 
-			Currency currency = 1;
+            Currency currency = 1;
 
-			const auto& amount = transaction.amount();
+            const auto& amount = transaction.amount();
 
-			periodStats.balancePerCurrency[currency].integral += amount.integral();
-			periodStats.balancePerCurrency[currency].fraction += amount.fraction();
-		}
-	}
-	else if ((currentCutIndex + 1) < stats_.first.size()) {
-		startCutTime = stats_.first[currentCutIndex].timeStamp;
-		endCutTime = stats_.first[currentCutIndex + 1].timeStamp;
-		++currentCutIndex;
-	}
+            periodStats.balancePerCurrency[currency].integral += amount.integral();
+            periodStats.balancePerCurrency[currency].fraction += amount.fraction();
+        }
+    }
+    else if ((currentCutIndex + 1) < stats_.first.size()) {
+        startCutTime = stats_.first[currentCutIndex].timeStamp;
+        endCutTime = stats_.first[currentCutIndex + 1].timeStamp;
+        ++currentCutIndex;
+    }
 
-	auto period = (csstats::Period)poolAgeSec.count();
-	for (size_t periodIndex = 0; periodIndex < periods.size(); ++periodIndex) {
-		if (period < periods[periodIndex]) {
-			csstats::PeriodStats& periodStats = stats_.second[periodIndex];
-			periodStats.poolsCount++;
+    auto period = (csstats::Period)poolAgeSec.count();
+    for (size_t periodIndex = 0; periodIndex < periods.size(); ++periodIndex) {
+        if (period < periods[periodIndex]) {
+            csstats::PeriodStats& periodStats = stats_.second[periodIndex];
+            periodStats.poolsCount++;
 
-			size_t transactionsCount = pool.transactions_count();
-			periodStats.transactionsCount += (uint32_t)transactionsCount;
+            size_t transactionsCount = pool.transactions_count();
+            periodStats.transactionsCount += (uint32_t)transactionsCount;
 
-			for (size_t i = 0; i < transactionsCount; ++i) {
-				const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+            for (size_t i = 0; i < transactionsCount; ++i) {
+                const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
 
-				if (transaction.source() == s_blockchain.getGenesisAddress())
-					continue;
+                if (transaction.source() == s_blockchain.getGenesisAddress())
+                    continue;
 #ifdef MONITOR_NODE
-				if (is_smart(transaction) || is_smart_state(transaction))
-					++periodStats.transactionsSmartCount;
+                if (is_smart(transaction) || is_smart_state(transaction)) {
+                    ++periodStats.transactionsSmartCount;
+                }
 #endif
 
-				if (is_deploy_transaction(transaction))
-					++periodStats.smartContractsCount;
+                if (is_deploy_transaction(transaction)) {
+                    ++periodStats.smartContractsCount;
+                }
 
-				//Currency currency = currencies_indexed[transaction.currency().to_string()];
-				Currency currency = 1;
+                //Currency currency = currencies_indexed[transaction.currency().to_string()];
+                Currency currency = 1;
 
-				const auto& amount = transaction.amount();
+                const auto& amount = transaction.amount();
 
-				periodStats.balancePerCurrency[currency].integral += amount.integral();
-				periodStats.balancePerCurrency[currency].fraction += amount.fraction();
-			}
-		}
-	}
+                periodStats.balancePerCurrency[currency].integral += amount.integral();
+                periodStats.balancePerCurrency[currency].fraction += amount.fraction();
+            }
+        }
+    }
 }
 //
 
@@ -1044,19 +1103,23 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
             std::string newState;
             auto locked_smart_state(lockedReference(this->smart_state));
             (*locked_smart_state)[address].updateState([&](const SmartState& oldState) {
-                newState = tr.user_field(smart_state_idx).value<std::string>();
+                newState = tr.user_field(kSmartStateIndex).value<std::string>();
                 return SmartState{newState.empty() ? oldState.state : newState, newState.empty(), tr.id().clone(), trId.clone()};
             });
 
             auto execTrans = s_blockchain.loadTransaction(trId);
             if (execTrans.is_valid() && is_smart(execTrans)) {
                 const auto smart = fetch_smart(execTrans);
+                if(!smart.method.empty()) {
+                    mExecuteCount_[smart.method]++;
+                }
 
                 {
                     auto retVal = tr.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
                     ::general::Variant val;
-                    if (!retVal.empty())
+                    if (!retVal.empty()) {
                         val = deserialize<::general::Variant>(std::move(retVal));
+                    }
 
                     auto opers = lockedReference(this->smart_operations);
                     auto& op = (*opers)[trId];
@@ -1074,10 +1137,11 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
 
                 auto caller_pk = s_blockchain.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
 
-                if (is_smart_deploy(smart))
+                if (is_smart_deploy(smart)) {
                     tm.checkNewDeploy(target_pk, caller_pk, smart);
+                }
 
-                newState = tr.user_field(smart_state_idx).value<std::string>();
+                newState = tr.user_field(kSmartStateIndex).value<std::string>();
                 if (!newState.empty()) {
                     tm.checkNewState(target_pk, caller_pk, smart, newState);
                 }
@@ -1114,13 +1178,15 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
         auto sp = lockedReference(this->smarts_pending);
         auto so = lockedReference(this->smart_operations);
         for (auto it = sp->begin(); it != sp->end(); it = sp->erase(it)) {
-            if ((it->first + Consensus::MaxRoundsCancelContract) > locked_pending_smart_transactions->last_pull_sequence)
+            if ((it->first + Consensus::MaxRoundsCancelContract) > locked_pending_smart_transactions->last_pull_sequence) {
                 break;
+            }
 
             for (auto& sm : it->second) {
                 auto& oper = (*so)[sm];
-                if (oper.state == SmartOperation::State::Pending)
+                if (oper.state == SmartOperation::State::Pending) {
                     oper.state = SmartOperation::State::Failed;
+                }
             }
         }
     }
@@ -1150,8 +1216,9 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         if ((cnt % 100) == 0) {
             std::this_thread::yield();
         }
-        if (p.is_valid() && locked_pending_smart_transactions->last_pull_sequence < p.sequence())
+        if (p.is_valid() && locked_pending_smart_transactions->last_pull_sequence < p.sequence()) {
             locked_pending_smart_transactions->last_pull_sequence = p.sequence();
+        }
 
         if (curph.is_empty()) {
             if (log_to_console) {
@@ -1203,19 +1270,20 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         auto& trs = p.transactions();
         for (auto i_tr = trs.rbegin(); i_tr != trs.rend(); ++i_tr) {
             auto& tr = *i_tr;
-			if (is_smart(tr) || is_smart_state(tr)) {
-				locked_pending_smart_transactions->queue.push(std::make_pair(p.sequence(), tr));
-			}
-			/*else { // simple transactions
-				auto lockRef{ lockedReference(this->trxInProgress) };
-				if (auto it = lockRef->find(std::pair(tr.source(), tr.innerID())); it != lockRef->end()) {
-					(it->second).second = true;
-					(it->second).first.notify_all();
-				}
-			}*/
+            if (is_smart(tr) || is_smart_state(tr)) {
+                locked_pending_smart_transactions->queue.push(std::make_pair(p.sequence(), tr));
+            }
+            /*else { // simple transactions
+                auto lockRef{ lockedReference(this->trxInProgress) };
+                if (auto it = lockRef->find(std::pair(tr.source(), tr.innerID())); it != lockRef->end()) {
+                    (it->second).second = true;
+                    (it->second).first.notify_all();
+                }
+            }*/
         }
-        if (log_to_console && (cnt % 1000) == 0)
+        if (log_to_console && (cnt % 1000) == 0) {
             std::cout << '\r' << WithDelimiters(cnt);
+        }
     }
     if (log_to_console) {
         std::cout << "\rDone, handled " << WithDelimiters(cnt) << " blocks...\n";
@@ -1239,21 +1307,26 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
             std::string newState;
             auto locked_smart_state(lockedReference(this->smart_state));
             (*locked_smart_state)[address].updateState([&](const SmartState& oldState) {
-                newState = tr.user_field(smart_state_idx).value<std::string>();
+                newState = tr.user_field(kSmartStateIndex).value<std::string>();
                 return SmartState{newState.empty() ? oldState.state : newState, newState.empty(), tr.id().clone(), trId.clone()};
             });
 
             auto execTrans = s_blockchain.loadTransaction(trId);
 
             if ((execTrans.is_valid() && is_smart(execTrans)) || 
-					execTrans.amount().to_double()) { // payable
+                    execTrans.amount().to_double()) { // payable
                 const auto smart = fetch_smart(execTrans);
+
+                if (!smart.method.empty()) {
+                    mExecuteCount_[smart.method]++;
+                }
 
                 {
                     auto retVal = tr.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
                     ::general::Variant val;
-                    if (!retVal.empty())
+                    if (!retVal.empty()) {
                         val = deserialize<::general::Variant>(std::move(retVal));
+                    }
 
                     auto opers = lockedReference(this->smart_operations);
                     auto& op = (*opers)[trId];
@@ -1271,12 +1344,14 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
 
                 auto caller_pk = s_blockchain.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
 
-                if (is_smart_deploy(smart))
+                if (is_smart_deploy(smart)) {
                     tm.checkNewDeploy(target_pk, caller_pk, smart);
+                }
 
-                newState = tr.user_field(smart_state_idx).value<std::string>();
-                if (!newState.empty())
+                newState = tr.user_field(kSmartStateIndex).value<std::string>();
+                if (!newState.empty()) {
                     tm.checkNewState(target_pk, caller_pk, smart, newState);
+                }
             }
         }
         else {
@@ -1286,7 +1361,7 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
                     auto smart_last_trxn = lockedReference(this->smart_last_trxn);
                     return (*smart_last_trxn)[address];
                 }();
-                std::unique_lock<decltype(e.lock)> l(e.lock);
+                std::unique_lock lock(e.lock);
                 e.trid_queue.push_back(tr.id().clone());
                 e.new_trxn_cv.notify_all();
             }
@@ -1321,13 +1396,15 @@ bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init
         auto sp = lockedReference(this->smarts_pending);
         auto so = lockedReference(this->smart_operations);
         for (auto it = sp->begin(); it != sp->end(); it = sp->erase(it)) {
-            if ((it->first + Consensus::MaxRoundsCancelContract) > locked_pending_smart_transactions->last_pull_sequence)
+            if ((it->first + Consensus::MaxRoundsCancelContract) > locked_pending_smart_transactions->last_pull_sequence) {
                 break;
+            }
 
             for (auto& sm : it->second) {
                 auto& oper = (*so)[sm];
-                if (oper.state == SmartOperation::State::Pending)
+                if (oper.state == SmartOperation::State::Pending) {
                     oper.state = SmartOperation::State::Failed;
+                }
             }
         }
     }
@@ -1428,8 +1505,9 @@ void APIHandler::WaitForSmartTransaction(api::TransactionId& _return, const gene
         const auto checker = [&]() {
             if (!entry.trid_queue.empty()) {
                 _return = convert_transaction_id(entry.trid_queue.front());
-                if (--entry.awaiter_num == 0)
+                if (--entry.awaiter_num == 0) {
                     entry.trid_queue.pop_front();
+                }
                 return true;
             }
             return false;
@@ -1456,16 +1534,17 @@ void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, 
             _return.smartContractsList.push_back(fetch_smart_body(tr));
             --limit;
         }
-        else
+        else {
             break;
+        }
     }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
 void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& /* obsolete */) {
-    std::unique_lock lk(dbLock_);
-    newBlockCv_.wait(lk);
+    std::unique_lock lock(dbLock_);
+    newBlockCv_.wait(lock);
     _return = fromByteArray(s_blockchain.getLastHash().to_binary());
 }
 
@@ -1482,8 +1561,9 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
             return;
         }
         auto addr_id = csdb::Address::from_wallet_id(wallId);
-        if (s_blockchain.getTransaction(addr_id, inner_id, transactionTmp))  // find in blockchain
+        if (s_blockchain.getTransaction(addr_id, inner_id, transactionTmp)) {// find in blockchain
             _return.states[inner_id] = VALID;
+        }
         else {
             cs::Conveyer& conveyer = cs::Conveyer::instance();
             auto lock = conveyer.lock();
@@ -1512,10 +1592,12 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
             }
             lock.unlock();
             if (!finish_for_idx) {                                // if hash table doesn't contain trx return true if in last 5 rounds
-                if (conveyer.isMetaTransactionInvalid(inner_id))  // trx is invalid (time between del from hash table and add to blockchain)
+                if (conveyer.isMetaTransactionInvalid(inner_id)) {// trx is invalid (time between del from hash table and add to blockchain)
                     _return.states[inner_id] = INVALID;
-                else
+                }
+                else {
                     _return.states[inner_id] = VALID;
+                }
             }
         }
     }
@@ -1537,17 +1619,23 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, 
 
 void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<general::ByteCodeObject>& byteCodeObjects) {
     executor::GetContractMethodsResult executor_ret;
-    if (byteCodeObjects.empty())
+
+    if (byteCodeObjects.empty()) {
         return;
+    }
+
     executor_.getContractMethods(executor_ret, byteCodeObjects);
     _return.code = executor_ret.status.code;
     _return.message = executor_ret.status.message;
+
     for (size_t Count = 0; Count < executor_ret.methods.size(); Count++) {
         _return.methods[Count].name = executor_ret.methods[Count].name;
+
         for (size_t SubCount = 0; SubCount < executor_ret.methods[Count].arguments.size(); SubCount++) {
             _return.methods[Count].arguments[SubCount].type = executor_ret.methods[Count].arguments[SubCount].type;
             _return.methods[Count].arguments[SubCount].name = executor_ret.methods[Count].arguments[SubCount].name;
         }
+
         _return.methods[Count].returnType = executor_ret.methods[Count].returnType;
     }
 }
@@ -1794,6 +1882,16 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, con
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
+void APIHandler::ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) {
+    if (auto itCount = mExecuteCount_.find(executeMethod); itCount != mExecuteCount_.end()) {
+        _return.executeCount = itCount->second;
+        SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+    }
+    else {
+        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+    }
+}
+
 void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     tm.applyToInternal([&_return, &addr](const TokensMap& tokens, const HoldersMap& holders) {
@@ -1801,8 +1899,9 @@ void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const gener
         if (holderIt != holders.end()) {
             for (const auto& tokAddr : holderIt->second) {
                 auto tokenIt = tokens.find(tokAddr);
-                if (tokenIt == tokens.end())
+                if (tokenIt == tokens.end()) {
                     continue;  // This shouldn't happen
+                }
 
                 api::TokenBalance tb;
                 tb.token = fromByteArray(tokenIt->first.public_key());
@@ -1810,11 +1909,13 @@ void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const gener
                 tb.name = tokenIt->second.name;
 
                 auto hi = tokenIt->second.holders.find(addr);
-                if (hi != tokenIt->second.holders.end())
+                if (hi != tokenIt->second.holders.end()) {
                     tb.balance = hi->second.balance;
+                }
 
-                if (!TokensMaster::isZeroAmount(tb.balance))
+                if (!TokensMaster::isZeroAmount(tb.balance)) {
                     _return.balances.push_back(tb);
+                }
             }
         }
     });
@@ -1835,8 +1936,9 @@ void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const gene
     std::string code{};
     tm.applyToInternal([&addr, &code](const TokensMap& tm, const HoldersMap&) {
         const auto it = tm.find(addr);
-        if (it != tm.cend())
+        if (it != tm.cend()) {
             code = it->second.symbol;
+        }
     });
 
     if (code.empty()) {
@@ -1881,16 +1983,18 @@ void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return, int64_
             }
         }
 
-        if (limit)
+        if (limit) {
             tPair = s_blockchain.getPreviousNonEmptyBlock(tPair.first);
+        }
     }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
 void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64_t offset, int64_t limit) {
-    if (!validatePagination(_return, *this, offset, limit))
+    if (!validatePagination(_return, *this, offset, limit)) {
         return;
+    }
 
     uint64_t totalTransfers = 0;
     std::map<csdb::Address, std::string> tokenCodes;
@@ -1913,21 +2017,26 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
             auto pool = s_blockchain.loadBlock(pooh);
 
             for (auto& t : pool.transactions()) {
-                if (!is_smart(t))
+                if (!is_smart(t)) {
                     continue;
+                }
                 auto tIt = tokenCodes.find(s_blockchain.getAddressByType(t.target(), BlockChain::AddressType::PublicKey));
-                if (tIt == tokenCodes.end())
+                if (tIt == tokenCodes.end()) {
                     continue;
+                }
                 const auto smart = fetch_smart(t);
-                if (!TokensMaster::isTransfer(smart.method, smart.params))
+                if (!TokensMaster::isTransfer(smart.method, smart.params)) {
                     continue;
-                if (--offset >= 0)
+                }
+                if (--offset >= 0) {
                     continue;
+                }
                 csdb::Address target_pk = s_blockchain.getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
                 auto addrPair = TokensMaster::getTransferData(target_pk, smart.method, smart.params);
                 addTokenResult(_return, target_pk, tIt->second, pool, t, smart, addrPair, s_blockchain);
-                if (--limit == 0)
+                if (--limit == 0) {
                     break;
+                }
             }
 
             do {
@@ -1935,8 +2044,9 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
                 const auto lAddr = it->second;
 
                 tokenTransPools.erase(it);
-                if (!lPh.is_empty())
+                if (!lPh.is_empty()) {
                     tokenTransPools.insert(std::make_pair(lPh, lAddr));
+                }
 
                 it = tokenTransPools.find(pooh);
             } while (it != tokenTransPools.end());
@@ -1979,12 +2089,14 @@ static void applyToSortedMap(const MapType& map, const ComparatorType comparator
     std::multiset<typename MapType::const_iterator, std::function<bool(const typename MapType::const_iterator&, const typename MapType::const_iterator&)>> s(
         [comparator](const typename MapType::const_iterator& lhs, const typename MapType::const_iterator& rhs) -> bool { return comparator(*lhs, *rhs); });
 
-    for (auto it = map.begin(); it != map.end(); ++it)
+    for (auto it = map.begin(); it != map.end(); ++it) {
         s.insert(it);
+    }
 
     for (auto& elt : s) {
-        if (!func(*elt))
+        if (!func(*elt)) {
             break;
+        }
     }
 }
 
@@ -1995,8 +2107,9 @@ static std::function<bool(const T&, const T&)> getComparator(const FieldType fie
 
 void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general::Address& token, int64_t offset, int64_t limit, const TokenHoldersSortField order,
                                  const bool desc) {
-    if (!validatePagination(_return, *this, offset, limit))
+    if (!validatePagination(_return, *this, offset, limit)) {
         return;
+    }
 
     bool found = false;
 
@@ -2022,10 +2135,12 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
             _return.count = (uint32_t) tIt->second.realHoldersCount;
 
             applyToSortedMap(tIt->second.holders, comparator, [&offset, &limit, &_return, &token](const HMap::value_type& t) {
-                if (TokensMaster::isZeroAmount(t.second.balance))
+                if (TokensMaster::isZeroAmount(t.second.balance)) {
                     return true;
-                if (--offset >= 0)
+                }
+                if (--offset >= 0) {
                     return true;
+                }
 
                 api::TokenHolder th;
 
@@ -2036,8 +2151,9 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
 
                 _return.holders.push_back(th);
 
-                if (--limit == 0)
+                if (--limit == 0) {
                     return false;
+                }
 
                 return true;
             });
@@ -2048,8 +2164,9 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
 }
 
 void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc) {
-    if (!validatePagination(_return, *this, offset, limit))
+    if (!validatePagination(_return, *this, offset, limit)) {
         return;
+    }
 
     using VT = TokensMap::value_type;
     std::function<bool(const VT&, const VT&)> comparator;
@@ -2082,16 +2199,18 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
         _return.count = (uint32_t) tm.size();
 
         applyToSortedMap(tm, comparator, [&offset, &limit, &_return](const TokensMap::value_type& t) {
-            if (--offset >= 0)
+            if (--offset >= 0) {
                 return true;
+            }
 
             api::TokenInfo tok;
             putTokenInfo(tok, fromByteArray(t.first.public_key()), t.second);
 
             _return.tokens.push_back(tok);
 
-            if (--limit == 0)
+            if (--limit == 0) {
                 return false;
+            }
 
             return true;
         });
@@ -2112,33 +2231,34 @@ void walletStep(const cs::WalletsCache::WalletData::Address* addr, const cs::Wal
         // Guess why I can't use std::upper_bound in here
         // C++ is not as expressive as I've imagined it to be...
         auto it = lst.begin();
-        while (it != lst.end() && !comparator(val, getter(*(it->second)))) /* <-- this looks more like Lisp, doesn't it... */
+        while (it != lst.end() && !comparator(val, getter(*(it->second)))) {/* <-- this looks more like Lisp, doesn't it... */
             ++it;
+        }
 
         lst.insert(it, std::make_pair(addr, wd));
-        if (lst.size() > num)
+        if (lst.size() > num) {
             lst.pop_back();
+        }
     }
 }
 
 template <typename T>
 void iterateOverWallets(std::function<const T&(const cs::WalletsCache::WalletData&)> getter, const uint64_t num, const bool desc, WCSortedList& lst, BlockChain& bc) {
-    std::function<bool(const T&, const T&)> comparator;
-    if (desc)
-        comparator = std::greater<T>();
-    else
-        comparator = std::less<T>();
+    using Comparer = std::function<bool(const T&, const T&)>;
+    Comparer comparator = desc ? Comparer(std::greater<T>()) : Comparer(std::less<T>());
 
     bc.iterateOverWallets([&lst, num, getter, comparator](const cs::WalletsCache::WalletData::Address& addr, const cs::WalletsCache::WalletData& wd) {
-        if (!addr.empty() && wd.balance_ >= csdb::Amount(0))
+        if (!addr.empty() && wd.balance_ >= csdb::Amount(0)) {
             walletStep(&addr, &wd, num, getter, comparator, lst);
+        }
         return true;
     });
 }
 
 void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t _limit, int8_t _ordCol, bool _desc) {
-    if (!validatePagination(_return, *this, _offset, _limit))
+    if (!validatePagination(_return, *this, _offset, _limit)) {
         return;
+    }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 
@@ -2157,8 +2277,9 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
     }
 #endif
 
-    if (lst.size() < (uint64_t)_offset)
+    if (lst.size() < (uint64_t)_offset) {
         return;
+    }
 
     auto ptr = lst.begin();
     std::advance(ptr, _offset);
@@ -2191,8 +2312,9 @@ void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
     uint32_t total = 0;
 
     s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::WalletsCache::WalletData::Address& addr, const cs::WalletsCache::TrustedData& wd) {
-        if (addr.empty())
+        if (addr.empty()) {
             return true;
+        }
         if (offset == 0) {
             if (limit > 0) {
                 api::TrustedInfo wi;
@@ -2209,8 +2331,9 @@ void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
                 --limit;
             }
         }
-        else
+        else {
             --offset;
+        }
 
         ++total;
         return true;
@@ -2287,7 +2410,7 @@ void apiexec::APIEXECHandler::SmartContractGet(SmartContractGetResult& _return, 
         return;
     }
     _return.contractState = opt_state.value();
-	_return.stateCanModify = (solver_.isContractLocked(addr) && executor_.isLockSmart(address, accessId)) ? true : false;
+    _return.stateCanModify = (solver_.isContractLocked(addr) && executor_.isLockSmart(address, accessId)) ? true : false;
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
@@ -2297,10 +2420,19 @@ void apiexec::APIEXECHandler::WalletBalanceGet(api::WalletBalanceGetResult& _ret
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
     if (!blockchain_.findWalletData(addr, wallData, wallId)) {
-        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
-        return;
+        _return.balance.integral = 0;
+        _return.balance.fraction = 0;
     }
-    _return.balance.integral = wallData.balance_.integral();
-    _return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());
+    else {
+        _return.balance.integral = wallData.balance_.integral();
+        _return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());
+    }
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void apiexec::APIEXECHandler::PoolGet(PoolGetResult& _return, const int64_t sequence) {
+    auto poolBin = blockchain_.loadBlock(sequence).to_binary();
+    _return.pool.reserve(poolBin.size());
+    std::copy(poolBin.begin(), poolBin.end(), std::back_inserter(_return.pool));
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }

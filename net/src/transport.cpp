@@ -718,6 +718,10 @@ void Transport::forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> fun
     nh_.forEachNeighbourWithoutSS(std::move(func));
 }
 
+bool Transport::forRandomNeighbour(std::function<void(ConnectionPtr)> func) {
+    return nh_.forRandomNeighbour(std::move(func));
+}
+
 const Connections Transport::getNeighbours() const {
     return nh_.getNeigbours();
 }
@@ -741,8 +745,8 @@ void Transport::resetNeighbours() {
 
 /* Sending network tasks */
 void Transport::sendRegistrationRequest(Connection& conn) {
-
     RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
+
     if (ptr->isBlackListed()) {
         return;
     }
@@ -830,12 +834,12 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
     RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
     uint64_t local_uuid = node_->getBlockChain().uuid();
     if (local_uuid != 0 && remote_uuid != 0 && local_uuid != remote_uuid) {
-        sendRegistrationRefusal(conn, RegistrationRefuseReasons::IncompatibleBlockchain);
-        ptr->setBlackListed(true);
-        return true;
+       sendRegistrationRefusal(conn, RegistrationRefuseReasons::IncompatibleBlockchain);
+       ptr->setBlackListed(true);
+       return true;
     }
     else {
-        ptr->setBlackListed(false);
+       ptr->setBlackListed(false);
     }
 
     iPackStream_ >> conn.id;

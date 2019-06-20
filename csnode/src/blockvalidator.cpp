@@ -1,5 +1,6 @@
 #include <csnode/blockvalidator.hpp>
 
+#include <csnode/node.hpp>
 #include <csnode/blockchain.hpp>
 #include <csnode/walletsstate.hpp>
 
@@ -7,9 +8,10 @@
 
 namespace cs {
 
-BlockValidator::BlockValidator(const BlockChain& bc)
-: bc_(bc)
-, wallets_(::std::make_shared<WalletsState>(bc_)) {
+BlockValidator::BlockValidator(Node& node)
+: node_(node)
+, bc_(node_.getBlockChain())
+, wallets_(::std::make_shared<WalletsState>(node_.getBlockChain())) {
     plugins_.insert(std::make_pair(hashIntergrity, std::make_unique<HashValidator>(*this)));
     plugins_.insert(std::make_pair(blockNum, std::make_unique<BlockNumValidator>(*this)));
     plugins_.insert(std::make_pair(timestamp, std::make_unique<TimestampValidator>(*this)));
@@ -17,10 +19,10 @@ BlockValidator::BlockValidator(const BlockChain& bc)
     plugins_.insert(std::make_pair(smartSignatures, std::make_unique<SmartSourceSignaturesValidator>(*this)));
     plugins_.insert(std::make_pair(balances, std::make_unique<BalanceChecker>(*this)));
     plugins_.insert(std::make_pair(transactionsSignatures, std::make_unique<TransactionsChecker>(*this)));
+    plugins_.insert(std::make_pair(smartStates, std::make_unique<SmartStateValidator>(*this)));
 }
 
-BlockValidator::~BlockValidator() {
-}
+BlockValidator::~BlockValidator() {}
 
 inline bool BlockValidator::return_(ErrorType error, SeverityLevel severity) {
     return !(error >> severity);

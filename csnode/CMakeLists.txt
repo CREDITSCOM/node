@@ -82,7 +82,7 @@ add_library(csnode
   src/nodeutils.cpp
   src/itervalidator.cpp
   src/blockvalidator.cpp
-  src/blokcvalidatorplugins.cpp
+  src/blockvalidatorplugins.cpp
   src/packetqueue.cpp
 )
 

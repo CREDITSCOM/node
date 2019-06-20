@@ -93,7 +93,7 @@ public:
 
     Packet() = default;
     explicit Packet(RegionPtr&& data)
-    : data_(std::move(data)) {
+    : region_(std::move(data)) {
     }
 
     Packet(const Packet&) = default;
@@ -102,9 +102,11 @@ public:
     bool isNetwork() const {
         return checkFlag(BaseFlags::NetworkMsg);
     }
+
     bool isFragmented() const {
         return checkFlag(BaseFlags::Fragmented);
     }
+
     bool isBroadcast() const {
         return checkFlag(BaseFlags::Broadcast);
     }
@@ -112,15 +114,17 @@ public:
     bool isCompressed() const {
         return checkFlag(BaseFlags::Compressed);
     }
+
     bool isNeighbors() const {
         return checkFlag(BaseFlags::Neighbours);
     }
 
     const cs::Hash& getHash() const {
         if (!hashed_) {
-            hash_ = generateHash(data_.get(), data_.size());
+            hash_ = generateHash(region_->data(), region_->size());
             hashed_ = true;
         }
+
         return hash_;
     }
 
@@ -131,6 +135,7 @@ public:
     const cs::PublicKey& getSender() const {
         return getWithOffset<cs::PublicKey>(isFragmented() ? Offsets::SenderWhenFragmented : Offsets::SenderWhenSingle);
     }
+
     const cs::PublicKey& getAddressee() const {
         return getWithOffset<cs::PublicKey>(isFragmented() ? Offsets::AddresseeWhenFragmented : Offsets::AddresseeWhenSingle);
     }
@@ -145,6 +150,7 @@ public:
     const uint16_t& getFragmentId() const {
         return getWithOffset<uint16_t>(Offsets::FragmentId);
     }
+
     const uint16_t& getFragmentsNum() const {
         return getWithOffset<uint16_t>(Offsets::FragmentsNum);
     }
@@ -152,24 +158,31 @@ public:
     MsgTypes getType() const {
         return getWithOffset<MsgTypes>(getHeadersLength());
     }
+
     cs::RoundNumber getRoundNum() const {
         return getWithOffset<cs::RoundNumber>(getHeadersLength() + 1);
     }
 
     void* data() {
-        return data_.get();
+        return region_->data();
     }
+
     const void* data() const {
-        return data_.get();
+        return region_->data();
     }
 
     size_t size() const {
-        return data_.size();
+        return region_->size();
+    }
+
+    void setSize(uint32_t size) {
+        region_->setSize(size);
     }
 
     const uint8_t* getMsgData() const {
-        return static_cast<const uint8_t*>(data_.get()) + getHeadersLength();
+        return static_cast<const uint8_t*>(region_->data()) + getHeadersLength();
     }
+
     size_t getMsgSize() const {
         return size() - getHeadersLength();
     }
@@ -178,11 +191,11 @@ public:
     void recalculateHeadersLength();
 
     explicit operator bool() {
-        return !data_.isNull();
+        return region_.get();
     }
 
     boost::asio::mutable_buffer encode(boost::asio::mutable_buffer tempBuffer) {
-        if (data_.size() == 0) {
+        if (region_->size() == 0) {
             cswarning() << "Encoding empty packet";
             return boost::asio::buffer(tempBuffer.data(), 0);
         }
@@ -194,13 +207,13 @@ public:
             // Packet::MaxSize is a part of implementation magic(
             assert(tempBuffer.size() == Packet::MaxSize);
 
-            char* source = static_cast<char*>(data_.get());
+            char* source = static_cast<char*>(region_->data());
             char* dest = static_cast<char*>(tempBuffer.data());
 
             // copy header
             std::copy(source, source + headerSize, dest);
 
-            int sourceSize = static_cast<int>(data_.size() - headerSize);
+            int sourceSize = static_cast<int>(region_->size() - headerSize);
             int destSize = static_cast<int>(tempBuffer.size() - headerSize);
 
             int compressedSize = LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize);
@@ -214,10 +227,11 @@ public:
             }
         }
 
-        char* source = static_cast<char*>(data_.get());
+        char* source = static_cast<char*>(region_->data());
         char* dest = static_cast<char*>(tempBuffer.data());
-        std::copy(source, source + data_.size(), dest);
-        return boost::asio::buffer(dest, data_.size());
+
+        std::copy(source, source + region_->size(), dest);
+        return boost::asio::buffer(dest, region_->size());
     }
 
     size_t decode(size_t packetSize = 0) {
@@ -230,6 +244,7 @@ public:
             const size_t headerSize = getHeadersLength();
 
             assert(headerSize <= packetSize);
+
             if (headerSize > packetSize) {
                 cserror() << "Malformed compressed packet detected";
                 return 0;
@@ -241,9 +256,9 @@ public:
 
             // It's a part of implementation magic(
             // eg. <IPackMan> allocates Packet::MaxSize packet implicitly
-            assert(data_.size() == Packet::MaxSize);
+            assert(region_->size() == Packet::MaxSize);
 
-            char* source = static_cast<char*>(data_.get());
+            char* source = static_cast<char*>(region_->data());
             char dest[Packet::MaxSize];
 
             int sourceSize = static_cast<int>(packetSize - headerSize);
@@ -270,27 +285,29 @@ public:
         if (isFragmented()) {
             const auto fragment = getFragmentId();
             const auto count = getFragmentsNum();
+
             if (count == 0 || fragment >= MaxFragments || count >= MaxFragments || fragment >= count) {
                 return false;
             }
         }
+
         return true;
     }
 
 private:
     bool checkFlag(const BaseFlags flag) const {
-        return (*static_cast<const uint8_t*>(data_.get()) & flag) != 0;
+        return (*static_cast<const uint8_t*>(region_->data()) & flag) != 0;
     }
 
     uint32_t calculateHeadersLength() const;
 
     template <typename T>
     const T& getWithOffset(const uint32_t offset) const {
-        return *(reinterpret_cast<const T*>(static_cast<const uint8_t*>(data_.get()) + offset));
+        return *(reinterpret_cast<const T*>(static_cast<const uint8_t*>(region_->data()) + offset));
     }
 
 private:
-    RegionPtr data_;
+    RegionPtr region_;
     friend class Network;
 
     mutable bool hashed_ = false;
@@ -331,21 +348,26 @@ public:
         if (!fullData_) {
             composeFullData();
         }
-        return static_cast<const uint8_t*>(fullData_.get()) + packets_->getHeadersLength();
+
+        return static_cast<const uint8_t*>(fullData_->data()) + packets_->getHeadersLength();
     }
 
     size_t getFullSize() const {
         if (!fullData_) {
             composeFullData();
         }
-        return fullData_.size() - packets_->getHeadersLength();
+
+        return fullData_->size() - packets_->getHeadersLength();
     }
 
     Packet extractData() const {
-        if (!fullData_)
+        if (!fullData_) {
             composeFullData();
+        }
+
         Packet result(std::move(fullData_));
         result.headersLength_ = packets_->getHeadersLength();
+
         return result;
     }
 

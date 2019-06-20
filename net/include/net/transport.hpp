@@ -75,7 +75,6 @@ public:
     : config_(config)
     , sendPacksFlag_()
     , remoteNodes_(maxRemoteNodes_ + 1)
-    , netPacksAllocator_(1 << 24, 1)
     , myPublicKey_(node->getNodeIdKey())
     , oLock_()
     , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
@@ -155,6 +154,7 @@ public:
     // thread safe negihbours methods
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);
     void forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> func);
+    bool forRandomNeighbour(std::function<void(ConnectionPtr)> func);
 
     // no thread safe
     const Connections getNeighbours() const;

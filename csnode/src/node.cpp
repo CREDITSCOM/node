@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include <solver/solvercore.hpp>
+#include <solver/smartcontracts.hpp>
 
 #include <csnode/conveyer.hpp>
 #include <csnode/datastream.hpp>
@@ -11,6 +12,7 @@
 #include <csnode/nodecore.hpp>
 #include <csnode/nodeutils.hpp>
 #include <csnode/poolsynchronizer.hpp>
+#include <csnode/blockvalidator.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/progressbar.hpp>
@@ -37,17 +39,16 @@ Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(genesisAddress_, startAddress_)
-, allocator_(1 << 24, 5)
-, packStreamAllocator_(1 << 26, 5)
 , ostream_(&packStreamAllocator_, nodeIdKey_)
-, stat_() {
+, stat_()
+, blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
     std::cout << "Start transport... ";
     transport_ = new Transport(config, this);
     std::cout << "Done\n";
     poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
-    auto& executor = executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort);
+    auto& executor = executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort, config.getApiSettings().executorHost);
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
@@ -55,6 +56,9 @@ Node::Node(const Config& config)
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &executor::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
+    cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
+
+    alwaysExecuteContracts_ = config.alwaysExecuteContracts();
 
     good_ = init(config);
 }
@@ -326,6 +330,10 @@ bool Node::canBeTrusted(bool critical) {
     }
 
     if (wData.balance_ < Consensus::MinStakeValue) {
+        return false;
+    }
+
+    if (!solver_->smart_contracts().executionAllowed()) {
         return false;
     }
 
@@ -680,7 +688,7 @@ void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey&
     std::size_t realBinSize = 0;
     RegionPtr memPtr = compressPoolsBlock(poolsBlock, realBinSize);
 
-    tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), realBinSize, cs::numeric_cast<uint32_t>(memPtr.size()), memPtr, packetNum);
+    tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), realBinSize, cs::numeric_cast<uint32_t>(memPtr->size()), memPtr, packetNum);
 }
 
 void Node::becomeWriter() {
@@ -855,6 +863,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         case MsgTypes::RoundTableRequest:
         case MsgTypes::RejectedContracts:
         case MsgTypes::RoundPackRequest:
+        case MsgTypes::EmptyRoundPack:
             return MessageActions::Process;
 
         default:
@@ -1073,13 +1082,9 @@ void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, 
 
 template <class... Args>
 bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    ConnectionPtr target = transport_->getRandomNeighbour();
-    if (target) {
+    return transport_->forRandomNeighbour([&, this](const auto target){
         sendToNeighbour(target, msgType, round, std::forward<Args>(args)...);
-        return true;
-    }
-
-    return false;
+    });
 }
 
 template <class... Args>
@@ -1165,14 +1170,13 @@ RegionPtr Node::compressPoolsBlock(const cs::PoolsBlock& poolsBlock, std::size_t
     const auto maxSize = LZ4_compressBound(binSize);
     auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(maxSize));
 
-    const int compressedSize = LZ4_compress_default(data, static_cast<char*>(memPtr.get()), binSize, cs::numeric_cast<int>(memPtr.size()));
+    const int compressedSize = LZ4_compress_default(data, static_cast<char*>(memPtr->data()), binSize, cs::numeric_cast<int>(memPtr->size()));
 
     if (!compressedSize) {
         csmeta(cserror) << "Compress poools block error";
     }
 
-    allocator_.shrinkLast(cs::numeric_cast<uint32_t>(compressedSize));
-
+    memPtr->setSize(static_cast<uint32_t>(compressedSize));
     realBinSize = cs::numeric_cast<std::size_t>(binSize);
 
     return memPtr;
@@ -1193,7 +1197,7 @@ cs::PoolsBlock Node::decompressPoolsBlock(const uint8_t* data, const size_t size
     bytes.resize(realBinSize);
     char* bytesData = reinterpret_cast<char*>(bytes.data());
 
-    const int uncompressedSize = LZ4_decompress_safe(static_cast<char*>(memPtr.get()), bytesData, cs::numeric_cast<int>(compressSize), cs::numeric_cast<int>(realBinSize));
+    const int uncompressedSize = LZ4_decompress_safe(static_cast<char*>(memPtr->data()), bytesData, cs::numeric_cast<int>(compressSize), cs::numeric_cast<int>(realBinSize));
 
     if (uncompressedSize < 0) {
         csmeta(cserror) << "Decompress poools block error";
@@ -2393,6 +2397,7 @@ void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNu
     poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber());
 }
 
+
 void Node::roundPackReply(const cs::PublicKey& respondent) {
     csdebug() << "NODE> sending roundPack reply to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
     sendDefault(respondent, MsgTypes::RoundTable, currentRoundTableMessage_.round, currentRoundTableMessage_.message);
@@ -2723,5 +2728,12 @@ void Node::onStopRequested() {
     }
     else {
         stop();
+    }
+}
+
+void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
+    if (!blockValidator_->validateBlock(block, cs::BlockValidator::ValidationLevel::hashIntergrity,
+                                        cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
+        *shouldStop = true;
     }
 }

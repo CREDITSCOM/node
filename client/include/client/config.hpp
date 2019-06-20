@@ -14,7 +14,7 @@ namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
 typedef uint16_t NodeVersion;
-const NodeVersion NODE_VERSION = 415;
+const NodeVersion NODE_VERSION = 418;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
@@ -60,6 +60,7 @@ struct ApiData {
     uint16_t ajaxPort = 8081;
     uint16_t executorPort = 9080;
     uint16_t apiexecPort = 9070;
+    std::string executorHost{ "localhost" };
 };
 
 class Config {
@@ -69,7 +70,7 @@ public:
     Config(const Config&) = default;
     Config(Config&&) = default;
 
-    static Config read(po::variables_map&);
+    static Config read(po::variables_map&, bool seedEnter = false);
 
     const EndpointData& getInputEndpoint() const {
         return inputEp_;
@@ -146,6 +147,10 @@ public:
 
     void dumpJSONKeys(const std::string& fName) const;
 
+    bool alwaysExecuteContracts() const {
+        return alwaysExecuteContracts_;
+    }
+
 private:
     static Config readFromFile(const std::string& fileName);
     void setLoggerSettings(const boost::property_tree::ptree& config);
@@ -153,6 +158,7 @@ private:
     void readApiData(const boost::property_tree::ptree& config);
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
+    bool enterWithSeed();
     void showKeys(const std::string& pk58);
     
     void changePasswordOption(const std::string& pathToSk);
@@ -190,6 +196,8 @@ private:
 
     PoolSyncData poolSyncData_;
     ApiData apiData_;
+
+    bool alwaysExecuteContracts_ = false;
 };
 
 #endif  // CONFIG_HPP

@@ -41,7 +41,7 @@ public:
     constexpr static uint32_t T_min_stage1 = 170;
 
     /** @brief   Numbet of rounds to prevent node from consensus participation */
-    constexpr static uint32_t GrayListPunishment = 100;
+    constexpr static uint32_t GrayListPunishment = 1000;
 
     /** @brief   Max duration (msec) of the whole round (SolverCore on the 1st round) */
     constexpr static uint32_t T_round = 2000;

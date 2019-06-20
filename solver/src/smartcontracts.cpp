@@ -7,95 +7,112 @@
 #include <csdb/currency.hpp>
 #include <csnode/datastream.hpp>
 #include <lib/system/logger.hpp>
-
+#include <csnode/fee.hpp>
 #include <functional>
 #include <memory>
 #include <optional>
 #include <sstream>
 
 namespace {
-const char* kLogPrefix = "Smart: ";
+    const char* kLogPrefix = "Smart: ";
 
-inline void print(std::ostream& os, const ::general::Variant& var) {
-    os << "Variant(";
-    bool print_default = false;
-    if (var.__isset.v_string) {
-        os << var.v_string;
-    }
-    else if (var.__isset.v_null) {
-        os << "Null";
-    }
-    else if (var.__isset.v_boolean) {
-        os << var.v_boolean;
-    }
-    else if (var.__isset.v_boolean_box) {
-        os << var.v_boolean_box;
-    }
-    else if( var.__isset.v_array ) {
-        os << "Array";
-    }
-    else if( var.__isset.v_object ) {
-        os << "Object";
-    }
-    else if( var.__isset.v_void) {
-        os << "Void";
-    }
-    else if( var.__isset.v_list ) {
-        os << "List";
-    }
-    else if( var.__isset.v_set ) {
-        os << "Set";
-    }
-    else if( var.__isset.v_map ) {
-        os << "Map";
-    }
-    else if( var.__isset.v_int ) {
-        os << var.v_int;
-    }
-    else if (var.__isset.v_int_box) {
-        os << var.v_int_box;
-    }
-    else if (var.__isset.v_byte) {
-        os << (unsigned int)var.v_byte;
-    }
-    else if (var.__isset.v_byte_box) {
-        os << (unsigned int)var.v_byte_box;
-    }
-    else if (var.__isset.v_short) {
-        os << var.v_short;
-    }
-    else if (var.__isset.v_short_box) {
-        os << var.v_short_box;
-    }
-    else if (var.__isset.v_long) {
-        os << var.v_long;
-    }
-    else if (var.__isset.v_long_box) {
-        os << var.v_long_box;
-    }
-    else if (var.__isset.v_float) {
-        os << var.v_float;
-    }
-    else if (var.__isset.v_float_box) {
-        os << var.v_float_box;
-    }
-    else if (var.__isset.v_double) {
-        os << var.v_double;
-    }
-    else if (var.__isset.v_double_box) {
-        os << var.v_double_box;
-    }
-    else {
-        /* other variant types are shown by default */
-        print_default = true;
-    }
-    os << ')';
+    inline void print(std::ostream& os, const ::general::Variant& var) {
+        os << "Variant(";
+        bool print_default = false;
+        if (var.__isset.v_string) {
+            os << var.v_string;
+        }
+        else if (var.__isset.v_null) {
+            os << "Null";
+        }
+        else if (var.__isset.v_boolean) {
+            os << var.v_boolean;
+        }
+        else if (var.__isset.v_boolean_box) {
+            os << var.v_boolean_box;
+        }
+        else if (var.__isset.v_array) {
+            os << "Array";
+        }
+        else if (var.__isset.v_object) {
+            os << "Object";
+        }
+        else if (var.__isset.v_void) {
+            os << "Void";
+        }
+        else if (var.__isset.v_list) {
+            os << "List";
+        }
+        else if (var.__isset.v_set) {
+            os << "Set";
+        }
+        else if (var.__isset.v_map) {
+            os << "Map";
+        }
+        else if (var.__isset.v_int) {
+            os << var.v_int;
+        }
+        else if (var.__isset.v_int_box) {
+            os << var.v_int_box;
+        }
+        else if (var.__isset.v_byte) {
+            os << (unsigned int)var.v_byte;
+        }
+        else if (var.__isset.v_byte_box) {
+            os << (unsigned int)var.v_byte_box;
+        }
+        else if (var.__isset.v_short) {
+            os << var.v_short;
+        }
+        else if (var.__isset.v_short_box) {
+            os << var.v_short_box;
+        }
+        else if (var.__isset.v_long) {
+            os << var.v_long;
+        }
+        else if (var.__isset.v_long_box) {
+            os << var.v_long_box;
+        }
+        else if (var.__isset.v_float) {
+            os << var.v_float;
+        }
+        else if (var.__isset.v_float_box) {
+            os << var.v_float_box;
+        }
+        else if (var.__isset.v_double) {
+            os << var.v_double;
+        }
+        else if (var.__isset.v_double_box) {
+            os << var.v_double_box;
+        }
+        else if (var.__isset.v_big_decimal) {
+            os << var.v_big_decimal;
+        }
+        else if (var.__isset.v_byte_array) {
+            os << "byte[" << var.v_byte_array.size() << ']';
+        }
+        else {
+            /* other variant types are shown by default */
+            print_default = true;
+        }
+        os << ')';
 
-    if( print_default ) {
-        os << ": ";
-        var.printTo( os );
+        if (print_default) {
+            os << ": ";
+            var.printTo(os);
+        }
     }
-}
+
+    // serializes val passed to special transaction user field new_state::RetVal
+    inline void set_return_value(csdb::Transaction& new_state_transaction, const ::general::Variant& val) {
+        new_state_transaction.add_user_field(cs::trx_uf::new_state::RetVal, serialize(val));
+    }
+
+    inline void set_return_value(csdb::Transaction& new_state_transaction, uint8_t val) {
+        ::general::Variant variant;
+        variant.__set_v_byte(val);
+        set_return_value(new_state_transaction, variant);
+    }
 
 }
 
@@ -158,8 +175,10 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
 /*explicit*/
 SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& calls_queue_scheduler)
 : scheduler(calls_queue_scheduler)
+, force_execution(false)
 , bc(blockchain)
-, execution_allowed(true) {
+, execution_allowed(true)
+{
     // signals subscription (MUST occur AFTER the BlockChains has already subscribed to storage)
 
     // as event receiver:
@@ -184,6 +203,7 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
         exec_handler_ptr = connector_ptr->apiExecHandler();
     }
     node_id = id;
+    force_execution = pnode->alwaysExecuteContracts();
 
     // currently, blockchain is read in such manner that does not require absolute/optimized consolidation post-factum
     // anyway this tested code may become useful in future
@@ -478,7 +498,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
                 StateItem& state = known_contracts[abs_addr];
                 state.ref_deploy = new_item;
                 if (update_metadata(invoke_info, state)) {
-                    payable = (state.payable == PayableStatus::Implemented);
+                    payable = implements_payable(state.payable);
                 }
             }
         }
@@ -635,9 +655,9 @@ void SmartContracts::test_exe_queue() {
         csdebug() << kLogPrefix << "set running status to {" << it->seq_enqueue << ".*} containing " << it->executions.size() << " jobs";
         update_status(*it, bc.getLastSequence(), SmartContractStatus::Running);
         // call to executor only if is trusted relatively to this contract
-        if (it->is_executor) {
+        if (it->is_executor || force_execution) {
             // final decision to execute contract is here, based on executor availability
-            if (!execution_allowed && !test_executor_availability()) {
+            if (it->is_executor && !execution_allowed && !test_executor_availability()) {
                 cslog() << kLogPrefix << "skip {" << it->seq_enqueue << ".*}, execution is not allowed (executor is not connected)";
                 it->is_executor = false;
                 // notify partners that unable to play trusted role
@@ -836,7 +856,7 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
                     // is emitted by contract
                     const auto& state = it->second;
                     csdb::Transaction starter = get_transaction(state.ref_execute);
-                    if (state.payable == PayableStatus::Implemented && starter.is_valid()) {
+                    if (implements_payable(state.payable) && starter.is_valid()) {
                         emit signal_emitted_accepted(tr, starter);
                     }
                     else {
@@ -957,8 +977,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
                     for (const auto& execution : item.executions) {
                         SmartExecutionData& data = data_list.emplace_back();
                         data.contract_ref = execution.ref_start;
-                        data.error = "contract execution timeout";
-                        data.result.retValue.__set_v_byte(error::TimeExpired);
+                        data.setError(error::TimeExpired, "contract execution timeout");
                     }
                     if (!data_list.empty()) {
                         on_execution_completed_impl(std::move(data_list));
@@ -982,8 +1001,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
                         for (const auto& e: item.executions) {
                             SmartExecutionData& data = data_list.emplace_back();
                             data.contract_ref = e.ref_start;
-                            data.error = "contract execution is out of funds";
-                            data.result.retValue.__set_v_byte(error::OutOfFunds);
+                            data.setError(error::OutOfFunds, "contract execution is out of funds");
                         }
                         if (!data_list.empty()) {
                             on_execution_completed_impl(std::move(data_list));
@@ -1047,35 +1065,85 @@ void SmartContracts::remove_from_queue(const SmartContractRef& item) {
 }
 
 bool SmartContracts::execute(SmartExecutionData& data) {
+    if (!data.result.smartsRes.empty()) {
+        data.result.smartsRes.clear();
+    }
     if (!exec_handler_ptr) {
-        data.error = "contract executor is unavailable";
-        data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+        data.setError(error::ExecuteTransaction, "contract executor is unavailable");
         return false;
     }
-    csdb::Pool block = bc.loadBlock(data.contract_ref.sequence);
-    if (!block.is_valid()) {
-        data.error = "load block with starter transaction failed";
-        data.result.retValue.__set_v_byte(error::InternalBug);
+    csdb::Transaction transaction = get_transaction(data.contract_ref);
+    if (!transaction.is_valid()) {
+        data.setError(error::InternalBug, "load starter transaction failed");
         return false;
     }
     cslog() << kLogPrefix << "executing " << data.contract_ref << "::" << print_executed_method(data.contract_ref) << std::endl;
     // using data.result.newState to pass previous (not yet cached) new state in case of multi-call to conrtract:
-    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(block, data.contract_ref.transaction, data.executor_fee, data.result.newState);
-    if (maybe_result.has_value()) {
-        data.result = maybe_result.value();
-        if (data.result.newState.empty()) {
-            if (data.result.retValue.__isset.v_string) {
-                data.error = data.result.retValue.v_string;
-                data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+    std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
+    auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
+    info.transaction = transaction;
+    
+    info.feeLimit = data.executor_fee;
+    info.convention = executor::Executor::MethodNameConvention::Default;
+    if (!is_smart(transaction)) {
+        // the most frequent fast test
+        auto item = known_contracts.find(absolute_address(transaction.target()));
+        if (item != known_contracts.end()) {
+            StateItem& state = item->second;
+            if (state.payable == PayableStatus::Implemented) {
+                info.convention = executor::Executor::MethodNameConvention::PayableLegacy;
             }
-            else {
-                data.error = "contract execution failed, contract state is unchanged";
+            else if (state.payable == PayableStatus::ImplementedVer1) {
+                info.convention = executor::Executor::MethodNameConvention::Payable;
             }
         }
     }
+    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(smarts, data.explicit_last_state);
+    if (maybe_result.has_value()) {
+        data.result = maybe_result.value();
+        if (!data.result.smartsRes.empty()) {
+            if (data.result.response.code == 0) {
+                auto& result = data.result.smartsRes.front();
+                if (result.response.code == 0) {
+                    // calculate execution fee
+                    csdb::Amount total_fee(0);
+                    for (const auto r : data.result.smartsRes) {
+                        total_fee += fee::getExecutionFee(r.executionCost);
+                    }
+#if defined(USE_SELF_MEASURED_FEE)
+                    if (total_fee.to_double() < DBL_EPSILON) {
+                        total_fee = fee::getExecutionFee(data.result.selfMeasuredCost);
+                    }
+#endif
+                    if (total_fee > data.executor_fee) {
+                        // out of fee detected
+                        data.setError(error::OutOfFunds, "contract execution is out of funds");
+                    }
+                    else {
+                        // update with actual value
+                        data.executor_fee = total_fee;
+                    }
+                } else {
+                    data.error = result.response.message;
+                    if (data.error.empty()) {
+                        data.error = "contract execution failed, new contract state is empty";
+                    }
+                }
+            }
+            else {
+                data.error = data.result.response.message;
+                if (data.error.empty()) {
+                    data.setError(error::ExecuteTransaction, "contract execution failed, contract state is unchanged");
+                }
+            }
+        }
+        else {
+            // smart result is empty!
+            data.setError(error::ExecuteTransaction, "contract execution failed, contract state is unchanged");
+        }
+    }
     else {
-        data.error = "contract execution failed";
-        data.result.retValue.__set_v_byte(error::ExecuteTransaction);
+        data.setError(error::ExecuteTransaction, "contract execution failed");
     }
     return true;
 }
@@ -1115,7 +1183,7 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
             std::string last_state;
             for (auto& data : data_list) {
                 // use data.result.newStatef member to pass last contract's state in multi-call
-                data.result.newState = last_state;
+                data.explicit_last_state = last_state;
                 if (!execute(data)) {
                     if (data.error.empty()) {
                         data.error = "failed to invoke contract";
@@ -1123,15 +1191,11 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
                     // last_state is not updated
                 }
                 else {
-                    if (!data.result.newState.empty()) {
+                    // execute never returns empty data.result.smartsRes list
+                    if (!data.result.smartsRes.empty()) {
                         // remember last state for the next execution
-                        last_state = data.result.newState;
+                        last_state = data.result.smartsRes.front().newState;
                     }
-                }
-                if (data.result.fee > data.executor_fee) {
-                    // out of fee detected
-                    data.error = "contract execution is out of funds";
-                    data.result.retValue.__set_v_byte(error::OutOfFunds);
                 }
             }
         }
@@ -1185,7 +1249,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             continue;
         }
 
-        execution->consumed_fee = data_item.result.fee;  // executor calculates fee for now
+        execution->consumed_fee = data_item.executor_fee;
         cs::TransactionsPacket& packet = execution->result;
         if (packet.transactionsCount() > 0) {
             packet.clear();
@@ -1205,6 +1269,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             }
         }
         csdb::Transaction result = create_new_state(*execution, next_id);
+        csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " new_state";
 
         // create partial failure if new_state is not created
         if(!result.is_valid()) {
@@ -1217,42 +1282,41 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             if (!fake.executions.empty()) {
                 result = create_new_state(fake.executions.front(), next_id); // use the same next_id again
             }
-            else {
+            else {  
                 // wtf!
                 cserror() << kLogPrefix << "failed to create new_state transaction, even empty";
             }
         }
 
-        // finalize new_state transaction
+        // finalize new_state transaction, data_item.result.smartsRes always non-empty
         if (!data_item.error.empty()) {
             cserror() << std::endl << kLogPrefix << data_item.error << std::endl;
             csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " is failed, new state is empty";
             // result contains empty USRFLD[state::Value]
             result.add_user_field(new_state::Value, std::string{});
             // result contains error code from ret_val
-            result.add_user_field(new_state::RetVal, serialize(data_item.result.retValue));
+            set_return_value(result, data_item.result.smartsRes.front().retValue);
             packet.addTransaction(result);
         }
         else {
-            csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " is successful, new state size = " << data_item.result.newState.size();
+            const auto& execution_result = data_item.result.smartsRes.front();
+            csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " is successful, new state size = " << execution_result.newState.size();
 
             // put new state
-            result.add_user_field(new_state::Value, data_item.result.newState);
-            result.add_user_field(new_state::RetVal, serialize(data_item.result.retValue));
+            result.add_user_field(new_state::Value, execution_result.newState);
+            set_return_value(result, execution_result.retValue);
             packet.addTransaction(result);
 
             if (it != exe_queue.end()) {
                 // put emitted transactions
                 if (!data_item.result.trxns.empty()) {
-                    int64_t next_emitted_id = result.innerID() + 1;  // may or may not be useful next block of code
                     for (const auto& tr : data_item.result.trxns) {
                         if (tr.innerID() == 0) {
                             // auto inner id generating
-                            csdebug() << kLogPrefix << "zero innerID in emitted transaction, generate new";
                             csdb::Transaction tmp = tr.clone();
-                            tmp.set_innerID(next_emitted_id);
+                            tmp.set_innerID(++next_id);
+                            csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " emitted transaction";
                             packet.addTransaction(tmp);
-                            ++next_emitted_id;
                         }
                         else {
                             packet.addTransaction(tr);
@@ -1270,6 +1334,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                         auto it_call = find_in_queue_item(it, data_item.contract_ref);
                         if (it_call != it->executions.end()) {
                             csdb::Transaction t = create_new_state(*it_call, ++next_id);
+                            csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " secondary contract new_state";
                             if (t.is_valid()) {
                                 // re-assign some fields
                                 t.set_innerID(next_inner_id(addr));
@@ -1277,7 +1342,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                                 t.set_target(addr);
                                 t.add_user_field(trx_uf::new_state::Value, state);
                                 t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
-                                t.add_user_field(trx_uf::new_state::RetVal, serialize(::general::Variant{}));
+                                set_return_value(t, ::general::Variant{});
                                 packet.addTransaction(t);
                             }
                         }
@@ -1297,8 +1362,8 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
         os << e.ref_start << ' ';
     }
     csdebug() << kLogPrefix << "starting " << os.str() << "consensus";
-    if (!start_consensus(*it, integral_packet)) {
-        cserror() << kLogPrefix << os.str() << "consensus failed, remove item from queue";
+    if (!it->is_executor || !start_consensus(*it, integral_packet)) {
+        cserror() << kLogPrefix << os.str() << "consensus is not started, remove item from queue";
         remove_from_queue(it);
     }
 
@@ -1425,7 +1490,7 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                                         // lookup proper new state, erase other transactions in result
                                         if (SmartContracts::is_new_state(t) && SmartContracts::absolute_address(t.target()) == new_rejected_item.abs_addr) {
                                             t.add_user_field(trx_uf::new_state::Value, std::string{});
-                                            t.add_user_field(trx_uf::new_state::RetVal, error::ConsensusRejected);
+                                            set_return_value(t, error::ConsensusRejected);
                                             integral_pack.addTransaction(t);
                                             e.result.clear();
                                             e.result.addTransaction(t);
@@ -1521,7 +1586,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
                         }
                         else {
                             // handle replenish from on-the-air blocks
-                            if (item.payable != PayableStatus::Implemented) {
+                            if (!implements_payable(item.payable)) {
                                 cserror() << kLogPrefix << "non-payable contract state is updated by replenish transaction";
                             }
                         }
@@ -1566,7 +1631,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         std::string error_message("execution is failed");
         fld = t.user_field(new_state::RetVal);
         if (fld.is_valid()) {
-            ::general::Variant var = deserialize <::general::Variant> (fld.value<std::string>());
+            ::general::Variant var = deserialize <::general::Variant>(fld.value<std::string>());
             if (var.__isset.v_byte) {
                 error_message = SmartContracts::get_error_message(var.v_byte);
             }
@@ -1590,7 +1655,7 @@ bool SmartContracts::is_payable(const csdb::Address& abs_addr) {
 
     StateItem& state = item->second;
     if (state.payable != PayableStatus::Unknown) {
-        return state.payable == PayableStatus::Implemented;
+        return implements_payable(state.payable);
     }
 
     // the first time test
@@ -1602,7 +1667,7 @@ bool SmartContracts::is_payable(const csdb::Address& abs_addr) {
     if (!update_metadata(maybe_deploy.value(), state)) {
         return false;
     }
-    return (state.payable == PayableStatus::Implemented);
+    return implements_payable(state.payable);
 }
 
 bool SmartContracts::update_metadata(const api::SmartContractInvocation& contract, StateItem& state) {
@@ -1633,15 +1698,21 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     state.payable = PayableStatus::Absent;
     // lookup payable(amount, currency) && annotations
     for (const auto& m : result.methods) {
-        // payable status
-        if (state.payable != PayableStatus::Implemented) {
-            if (m.name == PayableName && m.returnType == PayableRetType) {
+        // payable status, continue tests if PayableStatus::Implemented, not PayableStatus::ImplementedVer1
+        if (state.payable != PayableStatus::ImplementedVer1) {
+            if (m.name == PayableName) {
                 if (m.arguments.size() == 2) {
                     const auto& a0 = m.arguments[0];
-                    if (a0.name == PayableNameArg0 && a0.type == PayableArgType) {
+                    if (m.returnType == TypeVoid && a0.type == TypeString) {
                         const auto& a1 = m.arguments[1];
-                        if (/*a1.name == PayableNameArg1 &&*/ a1.type == PayableArgType) {
+                        if (a1.type == TypeString) {
                             state.payable = PayableStatus::Implemented;
+                        }
+                    }
+                    else if (m.returnType == TypeString && a0.type == TypeBigDecimal) {
+                        const auto& a1 = m.arguments[1];
+                        if (a1.type == TypeByteArray) {
+                            state.payable = PayableStatus::ImplementedVer1;
                         }
                     }
                 }
@@ -1735,8 +1806,13 @@ std::string SmartContracts::print_executed_method(const SmartContractRef& ref) {
         return os.str();
     }
     if (is_payable_target(t)) {
+        // cuurently, the 2nd arg is user_field[1]
+        std::string arg = t.user_field(1).value<std::string>();
+        if (arg.empty()) {
+            arg = "<empty>";
+        }
         std::ostringstream os;
-        os << PayableName << "(" << PayableNameArg0 << " = " << t.amount().to_double() << ", " << PayableNameArg1 << " = 1)";
+        os << PayableName << "(" << PayableArg0 << " = " << t.amount().to_double() << ", bundle = " << arg << ')';
         return os.str();
     }
     return std::string("???");
