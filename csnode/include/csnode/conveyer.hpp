@@ -280,6 +280,9 @@ public:
     ///
     size_t packetQueueTransactionsCount() const;
 
+    std::vector<csdb::Transaction> uploadNewStates();
+
+
     // sync, try do not use it :]
     std::unique_lock<cs::SharedMutex> lock() const;
 
@@ -298,6 +301,9 @@ protected:
 private:
     struct Impl;
     std::unique_ptr<Impl> pimpl_;
+
+    // cached current smart states
+    std::vector<csdb::Transaction> newStatesCache;
 
     mutable cs::SharedMutex sharedMutex_;
 };

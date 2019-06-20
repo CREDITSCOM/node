@@ -168,6 +168,15 @@ bool TransactionsPacket::addTransaction(const csdb::Transaction& transaction) {
     return true;
 }
 
+bool TransactionsPacket::addStateTransaction(const csdb::Transaction& transaction) {
+    if (!transaction.is_valid() || !isHashEmpty()) {
+        return false;
+    }
+
+    m_stateTransactions.push_back(transaction);
+    return true;
+}
+
 bool TransactionsPacket::addSignature(const cs::Byte index, const cs::Signature& signature) {
     auto iter = std::find_if(m_signatures.begin(), m_signatures.end(), [&](const auto& element) { return index == element.first; });
 
@@ -185,6 +194,10 @@ const cs::BlockSignatures& TransactionsPacket::signatures() const noexcept {
 
 const std::vector<csdb::Transaction>& TransactionsPacket::transactions() const noexcept {
     return m_transactions;
+}
+
+const std::vector<csdb::Transaction>& TransactionsPacket::stateTransactions() const noexcept {
+    return m_stateTransactions;
 }
 
 std::vector<csdb::Transaction>& TransactionsPacket::transactions() {

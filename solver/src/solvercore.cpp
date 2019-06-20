@@ -261,7 +261,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
             cserror() << log_prefix << "applyCharacteristic() failed to create block";
             return;
         }
-
+        uploadNewStates(conveyer.uploadNewStates());
         deferredBlock_ = std::move(pool.value());
         deferredBlock_.set_confidants(conveyer.confidants());
 
@@ -312,6 +312,10 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
 
     pnode->prepareRoundTable(table, poolMetaInfo, stage3);
     csmeta(csdetails) << "end";
+}
+
+void SolverCore::uploadNewStates(std::vector<csdb::Transaction> newStates) {
+    //psmarts.
 }
 
 void SolverCore::sendRoundTable() {

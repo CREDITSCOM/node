@@ -513,6 +513,10 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
                 newPool.add_smart_signature(smartSignatures);
             }
+            for (auto it : packet.stateTransactions()) {
+                //newStatesCache.addNewState(it);
+            }
+                
         }
 
         // look all next transactions
@@ -573,6 +577,19 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
     return std::make_optional<csdb::Pool>(std::move(newPool));
 }
+
+/*const */std::vector<csdb::Transaction> cs::ConveyerBase::uploadNewStates() /*const */{
+    std::vector<csdb::Transaction> tmp;
+    for (auto it : newStatesCache) {
+        tmp.push_back(it);
+    }
+    newStatesCache.clear();
+    return tmp;
+}
+//void cs::ConveyerBase::clearNewStates() {
+//    newStatesCache.clear();
+//}
+
 
 std::optional<cs::TransactionsPacket> cs::ConveyerBase::findPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round) const {
     if (auto iterator = pimpl_->packetsTable.find(hash); iterator != pimpl_->packetsTable.end()) {

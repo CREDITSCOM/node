@@ -107,6 +107,8 @@ public:
     void resetGrayList() {
         grayList_.clear();
     }
+
+    void uploadNewStates(std::vector<csdb::Transaction> newStates);
     cs::Bytes getRealTrusted();
     size_t trueStagesThree();
     uint8_t currentStage3iteration();
@@ -207,6 +209,7 @@ private:
     bool stateCompleted(Result result);
 
     void spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& currentTimeStamp, cs::StageThree& st3);
+
 
     // timeout tracking
 

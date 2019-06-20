@@ -148,6 +148,13 @@ public:  // Interface
     ///
     bool addTransaction(const csdb::Transaction& transaction);
 
+
+    ///
+    /// @brief Adds state transaction to packet
+    /// @param transaction Any transaction to add
+    ///
+    bool addStateTransaction(const csdb::Transaction& transaction);
+
     ///
     /// @brief Returns transactions
     /// @return Reference to transactions vector
@@ -167,6 +174,12 @@ public:  // Interface
     std::vector<csdb::Transaction>& transactions();
 
     ///
+    /// @brief Returns state trabsactions, non const version
+    /// @return Reference to transactions vector
+    ///
+    const std::vector<csdb::Transaction>& stateTransactions() const noexcept;
+
+    ///
     /// @brief Clears transactions vector
     ///
     void clear() noexcept;
@@ -179,6 +192,7 @@ private:  // Members
     TransactionsPacketHash m_hash;
     std::vector<csdb::Transaction> m_transactions;
     cs::BlockSignatures m_signatures;
+    std::vector<csdb::Transaction> m_stateTransactions;
 };
 }  // namespace cs
 
