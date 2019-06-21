@@ -155,7 +155,11 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
         status = db_seq_no->open(txn, "sequence.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
         db_seq_no_.swap(db_seq_no);
     }
-
+    if (status == 0) {
+        decltype(db_smart_states_) db_smart_states(new Db(&env_, 0));
+        status = db_smart_states->open(NULL, "contracts.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
+        db_smart_states_.swap(db_smart_states);
+    }
     if (status) {
         set_last_error_from_berkeleydb(status);
         return false;
@@ -169,12 +173,6 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
     }
     db_trans_idx_.reset(db_trans_idx);
 #endif
-
-    status = db_smart_states_->open(NULL, "contracts.db", NULL, DB_BTREE, DB_CREATE, 0);
-    if (status != 0) {
-        set_last_error_from_berkeleydb(status);
-        return false;
-    }
 
     set_last_error();
     return true;
