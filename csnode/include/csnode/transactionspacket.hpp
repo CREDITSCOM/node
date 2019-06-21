@@ -94,9 +94,12 @@ public:  // Static interface
 
 public:  // Interface
     enum Serialization : cs::Byte {
-        Signatures = 0x01,
-        Transactions = 0x04,
-        All = Serialization::Signatures | Serialization::Transactions
+        Transactions = 0x01,
+        States = 0x02,
+        Signatures = 0x04,
+
+        SignaturesAndStates = Signatures | States,
+        All = Serialization::SignaturesAndStates | Serialization::Transactions
     };
 
     TransactionsPacket() = default;
