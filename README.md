@@ -7,6 +7,7 @@
 [![Twitter](https://img.shields.io/twitter/follow/creditscom.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=creditscom)
 [![AGPL License](https://img.shields.io/github/license/CREDITSCOM/node.svg?color=green&label=License&style=plastic)](LICENSE)
 ![Version](https://img.shields.io/github/tag/CREDITSCOM/node.svg?label=Versoin&style=plastic)
+[![Build Status](http://89.111.33.166:8080/buildStatus/icon?job=lin-client-node&build=27)](http://89.111.33.166:8080/view/release-pipeline/job/lin-client-node/lastBuild/)
 # Credits Node
 A node is a client-side application that is installed on the user equipment.
 The Node processes and stores transactions, executes and confirms smart contract rules requests processing from third-party systems and provides data when requested.
