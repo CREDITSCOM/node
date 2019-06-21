@@ -477,6 +477,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     std::size_t maskIndex = 0;
     const cs::Bytes& mask = characteristic.mask;
     cs::TransactionsPacket invalidTransactions;
+    std::vector<csdb::Transaction> stateTransactions;
 
     for (const auto& hash : localHashes) {
         // try to get from meta if can
@@ -512,6 +513,11 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
                 smartSignatures.signatures = packet.signatures();
 
                 newPool.add_smart_signature(smartSignatures);
+            }
+
+            // add states to cache
+            for (const auto& transaction : packet.stateTransactions()) {
+                stateTransactions.push_back(transaction);
             }
         }
 
@@ -570,6 +576,10 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
     csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey);
     csmeta(csdetails) << "done";
+
+    if (!stateTransactions.empty()) {
+        emit statesCreated(stateTransactions);
+    }
 
     return std::make_optional<csdb::Pool>(std::move(newPool));
 }

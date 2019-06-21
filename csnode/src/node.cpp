@@ -474,7 +474,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
         csmeta(cserror) << "Created pool is not valid";
         return;
     }
-
+//    solver_->uploadNewStates(conveyer.uploadNewStates());
     pool.value().set_signatures(poolSignatures);
     pool.value().set_confidants(confidantsReference);
 
@@ -1212,7 +1212,7 @@ cs::PoolsBlock Node::decompressPoolsBlock(const uint8_t* data, const size_t size
 }
 
 void Node::sendStageOne(cs::StageOne& stageOneInfo) {
-    corruptionLevel_ = 0;
+    //corruptionLevel_ = 0;
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
         return;
@@ -1255,14 +1255,14 @@ void Node::sendStageOne(cs::StageOne& stageOneInfo) {
     csdebug() << "Stage one Signature R-" << WithDelimiters(cs::Conveyer::instance().currentRoundNumber()) << "(" << static_cast<int>(stageOneInfo.sender)
               << "): " << cs::Utils::byteStreamToHex(stageOneInfo.signature.data(), stageOneInfo.signature.size());
 
-    const int k1 = (corruptionLevel_ / 1) % 2;
-    const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
-    if (k1 == 1 && k2 == myConfidantIndex_) {
-        csdebug() << "STAGE ONE ##############> NOTHING WILL BE SENT";
-    }
-    else {
+    //const int k1 = (corruptionLevel_ / 1) % 2;
+    //const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
+    //if (k1 == 1 && k2 == myConfidantIndex_) {
+    //    csdebug() << "STAGE ONE ##############> NOTHING WILL BE SENT";
+    //}
+    //else {
         sendToConfidants(MsgTypes::FirstStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageOneInfo.signature, message);
-    }
+    //}
 
     csmeta(csdetails) << "Sent message size " << message.size();
 
@@ -1368,15 +1368,15 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
     // create signature
     stageTwoInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
 
-    const int k1 = (corruptionLevel_ / 2) % 2;
-    const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
+    //const int k1 = (corruptionLevel_ / 2) % 2;
+    //const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
 
-    if (k1 == 1 && k2 == myConfidantIndex_) {
-        csdebug() << "STAGE TWO ##############> NOTHING WILL BE SENT";
-    }
-    else {
+    //if (k1 == 1 && k2 == myConfidantIndex_) {
+    //    csdebug() << "STAGE TWO ##############> NOTHING WILL BE SENT";
+    //}
+    //else {
         sendToConfidants(MsgTypes::SecondStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageTwoInfo.signature, bytes);
-    }
+    //}
 
     // cash our stage two
     csmeta(csdetails) << "Bytes size " << bytes.size();
@@ -1465,15 +1465,15 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
 
     stageThreeInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
 
-    const int k1 = (corruptionLevel_ / 4) % 2;
-    const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
+    //const int k1 = (corruptionLevel_ / 4) % 2;
+    //const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
 
-    if (k1 == 1 && k2 == myConfidantIndex_) {
-        csdebug() << "STAGE THREE ##############> NOTHING WILL BE SENT";
-    }
-    else {
+    //if (k1 == 1 && k2 == myConfidantIndex_) {
+    //    csdebug() << "STAGE THREE ##############> NOTHING WILL BE SENT";
+    //}
+    //else {
         sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, bytes);
-    }
+    //}
 
     // cach stage three
     csmeta(csdetails) << "bytes size " << bytes.size();
@@ -1639,15 +1639,15 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
         return;
     }
 
-    const int k1 = (corruptionLevel_ / 8) % 2;
-    const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
+    //const int k1 = (corruptionLevel_ / 8) % 2;
+    //const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
 
-    if (k1 == 1 && k2 == myConfidantIndex_) {
-        csdebug() << "STAGE REPLY ##############> NOTHING WILL BE SENT";
-    }
-    else {
+    //if (k1 == 1 && k2 == myConfidantIndex_) {
+    //    csdebug() << "STAGE REPLY ##############> NOTHING WILL BE SENT";
+    //}
+    //else {
         sendDefault(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
-    }
+    //}
 
     csmeta(csdetails) << "done";
 }

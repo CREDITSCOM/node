@@ -94,9 +94,12 @@ public:  // Static interface
 
 public:  // Interface
     enum Serialization : cs::Byte {
-        Signatures = 0x01,
-        Transactions = 0x04,
-        All = Serialization::Signatures | Serialization::Transactions
+        Transactions = 0x01,
+        States = 0x02,
+        Signatures = 0x04,
+
+        SignaturesAndStates = Signatures | States,
+        All = Serialization::SignaturesAndStates | Serialization::Transactions
     };
 
     TransactionsPacket() = default;
@@ -148,6 +151,13 @@ public:  // Interface
     ///
     bool addTransaction(const csdb::Transaction& transaction);
 
+
+    ///
+    /// @brief Adds state transaction to packet
+    /// @param transaction Any transaction to add
+    ///
+    bool addStateTransaction(const csdb::Transaction& transaction);
+
     ///
     /// @brief Returns transactions
     /// @return Reference to transactions vector
@@ -167,6 +177,12 @@ public:  // Interface
     std::vector<csdb::Transaction>& transactions();
 
     ///
+    /// @brief Returns state trabsactions, non const version
+    /// @return Reference to transactions vector
+    ///
+    const std::vector<csdb::Transaction>& stateTransactions() const noexcept;
+
+    ///
     /// @brief Clears transactions vector
     ///
     void clear() noexcept;
@@ -179,6 +195,7 @@ private:  // Members
     TransactionsPacketHash m_hash;
     std::vector<csdb::Transaction> m_transactions;
     cs::BlockSignatures m_signatures;
+    std::vector<csdb::Transaction> m_stateTransactions;
 };
 }  // namespace cs
 
