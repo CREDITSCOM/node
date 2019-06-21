@@ -16,6 +16,7 @@ class Transaction;
 
 namespace cs {
 using PacketFlushSignal = cs::Signal<void(const cs::TransactionsPacket&)>;
+using StatesSignal = cs::Signal<void(const std::vector<csdb::Transaction>&)>;
 
 ///
 /// @brief The Conveyer class, represents utils and mechanics
@@ -280,14 +281,12 @@ public:
     ///
     size_t packetQueueTransactionsCount() const;
 
-    std::vector<csdb::Transaction> uploadNewStates();
-
-
     // sync, try do not use it :]
     std::unique_lock<cs::SharedMutex> lock() const;
 
 public signals:
     cs::PacketFlushSignal packetFlushed;
+    cs::StatesSignal statesCreated;
 
 public slots:
 
@@ -301,9 +300,6 @@ protected:
 private:
     struct Impl;
     std::unique_ptr<Impl> pimpl_;
-
-    // cached current smart states
-    std::vector<csdb::Transaction> newStatesCache;
 
     mutable cs::SharedMutex sharedMutex_;
 };

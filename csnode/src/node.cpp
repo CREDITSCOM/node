@@ -474,7 +474,7 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
         csmeta(cserror) << "Created pool is not valid";
         return;
     }
-    solver_->uploadNewStates(conveyer.uploadNewStates());
+//    solver_->uploadNewStates(conveyer.uploadNewStates());
     pool.value().set_signatures(poolSignatures);
     pool.value().set_confidants(confidantsReference);
 

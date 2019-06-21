@@ -477,6 +477,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     std::size_t maskIndex = 0;
     const cs::Bytes& mask = characteristic.mask;
     cs::TransactionsPacket invalidTransactions;
+    std::vector<csdb::Transaction> stateTransactions;
 
     for (const auto& hash : localHashes) {
         // try to get from meta if can
@@ -513,10 +514,11 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
                 newPool.add_smart_signature(smartSignatures);
             }
-            for (auto it : packet.stateTransactions()) {
-                //newStatesCache.addNewState(it);
+
+            // add states to cache
+            for (const auto& transaction : packet.stateTransactions()) {
+                stateTransactions.push_back(transaction);
             }
-                
         }
 
         // look all next transactions
@@ -575,21 +577,12 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey);
     csmeta(csdetails) << "done";
 
+    if (!stateTransactions.empty()) {
+        emit statesCreated(stateTransactions);
+    }
+
     return std::make_optional<csdb::Pool>(std::move(newPool));
 }
-
-/*const */std::vector<csdb::Transaction> cs::ConveyerBase::uploadNewStates() /*const */{
-    std::vector<csdb::Transaction> tmp;
-    for (auto it : newStatesCache) {
-        tmp.push_back(it);
-    }
-    newStatesCache.clear();
-    return tmp;
-}
-//void cs::ConveyerBase::clearNewStates() {
-//    newStatesCache.clear();
-//}
-
 
 std::optional<cs::TransactionsPacket> cs::ConveyerBase::findPacket(const cs::TransactionsPacketHash& hash, const RoundNumber round) const {
     if (auto iterator = pimpl_->packetsTable.find(hash); iterator != pimpl_->packetsTable.end()) {

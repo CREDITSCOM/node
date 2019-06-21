@@ -102,8 +102,8 @@ TransactionsPacket TransactionsPacket::fromByteStream(const char* data, size_t s
     if (!res.get(is)) {
         return TransactionsPacket();
     }
-    res.makeHash();
 
+    res.makeHash();
     return res;
 }
 
@@ -221,6 +221,14 @@ void TransactionsPacket::put(::csdb::priv::obstream& os, Serialization options) 
         }
     }
 
+    if (options & Serialization::States) {
+        os.put(m_stateTransactions.size());
+
+        for (const auto& state : m_stateTransactions) {
+            os.put(state);
+        }
+    }
+
     if (options & Serialization::Signatures) {
         os.put(m_signatures.size());
 
@@ -251,25 +259,43 @@ bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
         m_transactions.push_back(transaction);
     }
 
+    std::size_t statesCount = 0;
+
+    if (is.get(statesCount)) {
+        m_stateTransactions.clear();
+        m_stateTransactions.reserve(statesCount);
+
+        for (std::size_t i = 0; i < statesCount; ++i) {
+            csdb::Transaction state;
+
+            if (!is.get(state)) {
+                return false;
+            }
+
+            m_stateTransactions.push_back(state);
+        }
+    }
+
     std::size_t signaturesCount = 0;
 
-    if (!is.get(signaturesCount)) {
-        return false;
-    }
-    m_signatures.clear();
-    m_signatures.reserve(signaturesCount);
+    if (is.get(signaturesCount)) {
+        m_signatures.clear();
+        m_signatures.reserve(signaturesCount);
 
-    for (std::size_t i = 0; i < signaturesCount; ++i) {
-        cs::Byte index;
-        cs::Signature signature;
+        for (std::size_t i = 0; i < signaturesCount; ++i) {
+            cs::Byte index;
+            cs::Signature signature;
 
-        if (!is.get(index)) {
-            return false;
+            if (!is.get(index)) {
+                return false;
+            }
+
+            if (!is.get(signature)) {
+                return false;
+            }
+
+            m_signatures.push_back(std::make_pair(index, signature));
         }
-        if (!is.get(signature)) {
-            return false;
-        }
-        m_signatures.push_back(std::make_pair(index, signature));
     }
 
     return true;

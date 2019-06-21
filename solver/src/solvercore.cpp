@@ -261,7 +261,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
             cserror() << log_prefix << "applyCharacteristic() failed to create block";
             return;
         }
-        uploadNewStates(conveyer.uploadNewStates());
+//        uploadNewStates(conveyer.uploadNewStates());
         deferredBlock_ = std::move(pool.value());
         deferredBlock_.set_confidants(conveyer.confidants());
 
