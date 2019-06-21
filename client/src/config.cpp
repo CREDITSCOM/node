@@ -74,6 +74,7 @@ const std::map<std::string, NodeType> NODE_TYPES_MAP = {{"client", NodeType::Cli
 const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"signal_server", BootstrapType::SignalServer}, {"list", BootstrapType::IpList}};
 
 static const size_t DEFAULT_NODE_KEY_ID = 0;
+static const double kTimeoutSeconds = 5;
 
 static EndpointData readEndpoint(const boost::property_tree::ptree& config, const std::string& propName) {
     const boost::property_tree::ptree& epTree = config.get_child(propName);
@@ -395,14 +396,17 @@ bool Config::enterWithSeed() {
 }
 
 void Config::showKeys(const std::string& pk58) {
-    const double kTimeoutSeconds = 5;
     double secondsPassed = 0;
+    double prevSec = 0;
     std::cout << "To show your keys not encrypted press \"s\"." << std::endl;
     std::cout << "Seconds left:" << std::endl;
     std::clock_t start = std::clock();
     while (secondsPassed < kTimeoutSeconds) {
         secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
-        std::cout << static_cast<int>(kTimeoutSeconds - secondsPassed) << "\r";
+        if (prevSec < secondsPassed) {
+            std::cout << static_cast<int>(kTimeoutSeconds - secondsPassed) << "\r" << std::flush;
+            prevSec = secondsPassed + 1;
+        }
         if (_kbhit()) {
             if (_getch() == 's') {
                 std::cout << "\n\nPress any key to continue...\n" << std::endl;
@@ -422,12 +426,15 @@ void Config::showKeys(const std::string& pk58) {
 void Config::changePasswordOption(const std::string& pathToSk) {
     std::cout << "To change password press \"p\".\n" << std::flush;
     std::cout << "Seconds left:" << std::endl;
-    const double kTimeoutSeconds = 5;
     double secondsPassed = 0;
+    double prevSec = 0;
     std::clock_t start = std::clock();
     while (secondsPassed < kTimeoutSeconds) {
         secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
-        std::cout << static_cast<int>(kTimeoutSeconds - secondsPassed) << "\r";
+        if (prevSec < secondsPassed) {
+            std::cout << static_cast<int>(kTimeoutSeconds - secondsPassed) << "\r" << std::flush;
+            prevSec = secondsPassed + 1;
+        }
         if (_kbhit()) {
             if (_getch() == 'p') {
                 std::cout << "Encrypting the private key file with new password..." << std::endl;
