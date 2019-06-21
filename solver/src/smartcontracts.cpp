@@ -1106,7 +1106,7 @@ bool SmartContracts::execute(SmartExecutionData& data) {
             }
         }
     }
-    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(smarts, data.explicit_last_state);
+    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(smarts, data.explicit_last_state, false /*validationMode*/);
     if (maybe_result.has_value()) {
         data.result = maybe_result.value();
         if (!data.result.smartsRes.empty()) {
