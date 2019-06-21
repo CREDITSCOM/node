@@ -229,7 +229,8 @@ TEST(Conveyer, MainLogic) {
     pk.fill(0);
 
     csdb::PoolHash ph;
-    cs::PoolMetaInfo pool_meta_info{"1542617459297", pk, ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}, {}, {}};
+    cs::Bytes tmpCharacteristic;
+    cs::PoolMetaInfo pool_meta_info{ tmpCharacteristic, "1542617459297", pk, ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}, {}, {}};
 
     auto pool{conveyer.applyCharacteristic(pool_meta_info)};
 

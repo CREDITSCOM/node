@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cscrypto/cscrypto.hpp>
 
 namespace
 {
@@ -297,6 +298,8 @@ Result TrustedStage3State::finalizeStageThree(SolverContext& context) {
     csdebug() << "Starting new collection of stage 3 because a part of nodes didn't respond correct";
     context.spawn_next_round(stage);
     csdebug() << name() << ": --> stage-3 [" << static_cast<int>(stage.sender) << "]";
+    stage.toBytes();
+    stage.signature = cscrypto::generateSignature(context.private_key(), stage.messageBytes.data(), stage.messageBytes.size());
     context.add_stage3(stage);  //, stage.writer != stage.sender);
 
     return Result::Finish;

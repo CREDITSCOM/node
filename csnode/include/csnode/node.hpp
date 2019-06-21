@@ -30,6 +30,10 @@ class PoolSynchronizer;
 class BlockValidator;
 }  // namespace cs
 
+namespace cs {
+    class RoundPackage;
+}
+
 class Node {
 public:
     enum Level {
@@ -82,7 +86,7 @@ public:
     void getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
 
     // consensus communication
-    void sendStageOne(cs::StageOne&);
+    void sendStageOne(const cs::StageOne&);
     void sendStageTwo(cs::StageTwo&);
     void sendStageThree(cs::StageThree&);
 

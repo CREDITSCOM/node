@@ -5,12 +5,64 @@
 #include <csnode/nodecore.hpp>
 #include <cstdint>
 #include <lib/system/utils.hpp>
+#include <packet.hpp>
 
 namespace cs {
 
 constexpr const uint8_t InvalidSender = uint8_t(-1);
 
+class TrustedMask {
+public:
+    TrustedMask();
+    TrustedMask(uint8_t size);
+
+    TrustedMask operator=(const TrustedMask& mask) {
+        init(mask.value());
+    }
+
+    void init(uint8_t size);
+    void init(const std::vector<uint8_t>& newMask);
+    std::string toString();
+    static std::string toString(std::vector<uint8_t> mask);
+    void setMask(uint8_t index, uint8_t value);
+    uint8_t trustedSize();
+    static uint8_t trustedSize(const std::vector<uint8_t>& mask);
+    void toReadOnly() {
+        isReadOnly_ = true;
+    }
+
+    bool isReadOnly() {
+        return isReadOnly_;
+    }
+
+
+
+    uint8_t size() {
+        return static_cast<uint8_t>(mask.size());
+    }
+
+    const std::vector<uint8_t> value() const {
+        return mask;
+    }
+
+    const uint8_t value(size_t index) const {
+        if (index < mask.size()) {
+            return mask[index];
+        }
+        return 255U;
+    }
+
+private:
+    std::vector<uint8_t> mask;
+    bool isReadOnly_;
+
+};
+
 struct StageOne {
+    void toBytes();
+    static StageOne fromBytes(const cs::Bytes bytes);
+    static std::string toString(const StageOne stage);
+    uint8_t msgType = MsgTypes::FirstStage;
     uint8_t sender;
     Hash hash;
     std::string roundTimeStamp;
@@ -18,42 +70,29 @@ struct StageOne {
     std::vector<TransactionsPacketHash> hashesCandidates;
     Hash messageHash;
     Signature signature;
-    cs::Bytes message;
+    cs::Bytes messageBytes;
+    //TrustedMask stageMask;
 };
 
 struct StageTwo {
+    void toBytes();
+    static StageTwo fromBytes(const cs::Bytes bytes);
+    static std::string toString(const StageTwo stage);
+    uint8_t msgType = MsgTypes::SecondStage;
     uint8_t sender;
     cs::Hashes hashes;  // hashes of stage one
     cs::Signatures signatures;
     Signature signature;
-    cs::Bytes message;
+    cs::Bytes messageBytes;
+    //TrustedMask stageMask;
 };
 
-// struct StageThree {
-//  uint8_t sender;
-//  uint8_t writer;
-//  std::vector<uint8_t> realTrustedMask;
-//  Hash hashBlock;
-//  Hash hashHashesList;
-//  Hash hashCandidatesList;
-//  Signature signature;
-//};
 
 struct StageThree {
-    void print() {
-        std::string realTrustedString;
-        for (auto& i : realTrustedMask) {
-            realTrustedString = realTrustedString + "[" + std::to_string(static_cast<int>(i)) + "] ";
-        }
-        csdebug() << "     SENDER = " << static_cast<int>(sender) << ", WRITER = " << static_cast<int>(writer) << ", RealTrusted = " << realTrustedString;
-        csdebug() << "     BlockHash = " << cs::Utils::byteStreamToHex(blockHash);
-        csdebug() << "     BlockSign = " << cs::Utils::byteStreamToHex(blockSignature);
-        csdebug() << "     RoundHash = " << cs::Utils::byteStreamToHex(roundHash);
-        csdebug() << "     RoundSign = " << cs::Utils::byteStreamToHex(roundSignature);
-        csdebug() << "     TrustHash = " << cs::Utils::byteStreamToHex(trustedHash);
-        csdebug() << "     TrustSign = " << cs::Utils::byteStreamToHex(trustedSignature);
-    }
-
+    void toBytes();
+    static StageThree fromBytes(const cs::Bytes bytes);
+    static std::string toString(const StageThree stage);
+    uint8_t msgType = MsgTypes::ThirdStage;
     uint8_t sender;
     uint8_t writer;
     uint8_t iteration;
@@ -65,7 +104,8 @@ struct StageThree {
     Hash trustedHash;
     Signature trustedSignature;
     Signature signature;
-    cs::Bytes message;
+    cs::Bytes messageBytes;
+
 };
 
 // smart-contracts stages
@@ -116,6 +156,15 @@ struct Stage {
     std::string msgData;
     cs::RoundNumber msgRoundNum;
     cs::PublicKey msgSender;
+};
+
+struct StageHash {
+    csdb::PoolHash hash;
+    cs::PublicKey sender;
+    cs::Byte trustedSize;
+    cs::Byte realTrustedSize;
+    uint64_t timeStamp;
+    cs::RoundNumber round;
 };
 
 }  // namespace cs

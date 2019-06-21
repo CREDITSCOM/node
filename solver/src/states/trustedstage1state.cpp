@@ -12,6 +12,7 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
+#include <csnode/datastream.hpp>
 #include <cscrypto/cscrypto.hpp>
 
 namespace cs {
@@ -55,12 +56,26 @@ void TrustedStage1State::on(SolverContext& context) {
     //);
 }
 
+void TrustedStage1State::finalizeStage(SolverContext& context) {
+    stage.roundTimeStamp = cs::Utils::currentTimestamp();
+    stage.toBytes();
+    stage.messageHash = cscrypto::calculateHash(stage.messageBytes.data(), stage.messageBytes.size());
+    cs::Bytes messageToSign;
+    messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
+    cs::DataStream signStream(messageToSign);
+    signStream << cs::Conveyer::instance().currentRoundNumber();
+    signStream << context.subRound();
+    signStream << stage.messageHash;
+    stage.signature = cscrypto::generateSignature(context.private_key(), messageToSign.data(), messageToSign.size());
+}
+
 void TrustedStage1State::off(SolverContext& context) {
     // if (min_time_tracking.cancel()) {
     //  csdebug() << name() << ": cancel track min time to get hashes";
     //}
     csdebug() << name() << ": --> stage-1 [" << static_cast<int>(stage.sender) << "]";
     if (min_time_expired && transactions_checked && enough_hashes) {
+        finalizeStage(context);
         context.add_stage1(stage, true);
     }
 }

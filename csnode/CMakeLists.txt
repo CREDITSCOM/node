@@ -63,6 +63,7 @@ add_library(csnode
   include/csnode/blockvalidator.hpp
   include/csnode/blockvalidatorplugins.hpp
   include/csnode/packetqueue.hpp
+  include/csnode/roundpackage.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -84,6 +85,7 @@ add_library(csnode
   src/blockvalidator.cpp
   src/blockvalidatorplugins.cpp
   src/packetqueue.cpp
+  src/roundpackage.cpp
 )
 
 target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 Boost::thread)

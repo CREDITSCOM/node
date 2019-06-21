@@ -79,6 +79,7 @@ struct RoundTable {
 };
 
 struct PoolMetaInfo {
+    Characteristic characteristic;
     std::string timestamp;
     cs::PublicKey writerKey;
     csdb::PoolHash previousHash;
