@@ -299,7 +299,7 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
 
 bool Node::canBeTrusted(bool critical) {
 #if defined(MONITOR_NODE) || defined(WEB_WALLET_NODE)
-
+    csunused(critical);
     return false;
 
 #else
@@ -2732,8 +2732,9 @@ void Node::onStopRequested() {
 }
 
 void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
-    if (!blockValidator_->validateBlock(block, cs::BlockValidator::ValidationLevel::hashIntergrity,
-                                        cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
+    if (!blockValidator_->validateBlock(block,
+        cs::BlockValidator::ValidationLevel::hashIntergrity + cs::BlockValidator::ValidationLevel::smartStates,
+        cs::BlockValidator::SeverityLevel::onlyFatalErrors)) {
         *shouldStop = true;
     }
 }
