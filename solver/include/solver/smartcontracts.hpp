@@ -206,6 +206,9 @@ enum class SmartContractStatus
     Closed
 };
 
+// It is called in APIHandler.hpp (getState() method), so unable to define as SmartContracts member function
+std::string get_contract_state(const csdb::Address& abs_addr, const BlockChain& blockchain);
+
 // to inform subscribed slots on deploy/execute/replenish occur
 // passes to every slot packet with result transactions
 using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
@@ -243,6 +246,9 @@ public:
     /* Assuming deployer.is_public_key(), not a WalletId */
     static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId, const api::SmartContractDeploy&);
 
+    // true if tr is new_state and contract state is updated
+    static bool is_state_updated(const csdb::Transaction& tr);
+
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
@@ -252,6 +258,9 @@ public:
     // usually ordinary consensus may reject smart-related transactions
     // failed list refers to rejected calls
     void on_reject(const std::vector<Node::RefExecution>& reject_list);
+
+    // get contract state update(s) to keep cache is up-to-date
+    void on_update(const std::vector< csdb::Transaction >& states);
 
     csdb::Address absolute_address(const csdb::Address& optimized_address) const {
         return bc.getAddressByType(optimized_address, BlockChain::AddressType::PublicKey);
@@ -297,6 +306,8 @@ signals:
     SmartContractSignal signal_payable_timeout;
     // emits on every contract emitted transaction is appeared in blockchain, args are (emitted_transaction, starter_transaction):
     cs::Signal<void(const csdb::Transaction&, const csdb::Transaction&)> signal_emitted_accepted;
+    // emits on every update of contract state both during reading db and getting block in real time
+    cs::Signal< void(const csdb::Transaction& new_state_value) > contract_state_updated;
 
     // flag to always execute contracts even in normal state
     bool force_execution;
@@ -652,9 +663,9 @@ private:
 
     // cache states in db operations
 
-    bool dbcache_update(const csdb::Address& abs_addr, const SmartContractRef& ref_start, const cs::Bytes& state, bool force_update = false);
+    bool dbcache_update(const csdb::Address& abs_addr, const SmartContractRef& ref_start, const std::string& state, bool force_update = false);
 
-    bool dbcache_read(const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, cs::Bytes& state /*output*/);
+    bool dbcache_read(const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, std::string& state /*output*/);
 
 };
 

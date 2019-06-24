@@ -86,6 +86,8 @@ std::string serialize(const T& sc) {
 
 namespace cs {
 class SolverCore;
+class SmartContracts;
+std::string get_contract_state(const csdb::Address& abs_addr, const BlockChain& blockchain); // declared in SmartContracts
 }
 
 namespace csconnector {
@@ -256,10 +258,19 @@ public:
     }
 
     std::optional<std::string> getState(const csdb::Address& p_address) {
-        std::shared_lock lock(mutex_);
-        if (const auto it_last_state = lastState_.find(p_address); it_last_state != lastState_.end())
-            return std::make_optional(it_last_state->second);
-        return std::nullopt;
+        csdb::Address abs_addr = blockchain_.getAddressByType(p_address, BlockChain::AddressType::PublicKey);
+        if (!abs_addr.is_valid()) {
+            return std::nullopt;
+        }
+        std::string state = cs::get_contract_state(abs_addr, blockchain_);
+        if (state.empty()) {
+            return std::nullopt;
+        }
+        return std::make_optional(std::move(state));
+        //std::shared_lock lock(mutex_);
+        //if (const auto it_last_state = lastState_.find(p_address); it_last_state != lastState_.end())
+        //    return std::make_optional(it_last_state->second);
+        //return std::nullopt;
     }
 
     void updateCacheLastStates(const csdb::Address& p_address, const cs::Sequence& sequence, const std::string& state) {
@@ -968,6 +979,7 @@ private:
 
 private slots:
     void update_smart_caches_slot(const csdb::Pool& pool);
+    void update_smart_state_slot(const csdb::Transaction& tr_new_state);
     void store_block_slot(const csdb::Pool& pool);
     void collect_all_stats_slot(const csdb::Pool& pool);
 };

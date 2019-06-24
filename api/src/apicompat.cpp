@@ -29,6 +29,7 @@ namespace api
                 return false;
             }
             copy(tmp_dest, dest);
+            return true;
         }
 
         namespace v0
