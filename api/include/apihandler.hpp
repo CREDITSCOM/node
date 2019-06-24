@@ -354,7 +354,18 @@ public:
         csdb::Amount feeLimit;
     };
 
-    std::optional<ExecuteResult> executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {
+    /**
+     * Executes the transaction operation
+     *
+     * @param   smarts              The list of smart contract related transactions to execute.
+     * @param   forceContractState  The forced state of the contract to use in execution, if not empty overrides stored state in blocks.
+     * @param   validationMode      True to enable validation mode, false to disable it. If set to true the execution is only for validation,
+     *                              so any contract can (and must) be modified. The result is guaranteed not to put to chain
+     *
+     * @returns A std::optional&lt;ExecuteResult&gt;
+     */
+
+    std::optional<ExecuteResult> executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState, bool validationMode) {
         static std::mutex mutex;
         std::lock_guard lock(mutex);  // temporary solution
 
@@ -397,16 +408,18 @@ public:
         smartContractBinary.contractAddress = smartTarget.to_api_addr();
         smartContractBinary.object.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
         // may contain temporary last new state not yet written into block chain (to allow "speculative" multi-executions af the same contract)
-        if (!forceContractState.empty()) {
-            smartContractBinary.object.instance = forceContractState;
-        }
-        else {
-            auto optState = getState(smartTarget);
-            if (optState.has_value()) {
-                smartContractBinary.object.instance = optState.value();
+        if (!isdeploy) {
+            if (!forceContractState.empty()) {
+                smartContractBinary.object.instance = forceContractState;
+            }
+            else {
+                auto optState = getState(smartTarget);
+                if (optState.has_value()) {
+                    smartContractBinary.object.instance = optState.value();
+                }
             }
         }
-        smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr())) ? true : false;
+        smartContractBinary.stateCanModify = validationMode || solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr())) ? true : false;
 
         // fill methodHeader
         std::vector<executor::MethodHeader> methodHeader;

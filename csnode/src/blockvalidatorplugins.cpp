@@ -30,6 +30,17 @@ namespace cs {
 
 ValidationPlugin::ErrorType
 SmartStateValidator::validateBlock(const csdb::Pool& block) {
+
+    if (block.sequence() < 90728) {
+        // skip unable-to-validate contracts
+        return ErrorType::noError;
+    }
+
+    if (block.sequence() < 3302505) {
+        // skip invalid contracts until first valid
+        return ErrorType::noError;
+    }
+
     const auto& transactions = block.transactions();
     for (const auto& t : transactions) {
         if (SmartContracts::is_new_state(t) && !checkNewState(t)) {
@@ -86,7 +97,7 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
         //    }
         //}
     }
-    auto opt_result = executorPtr->getExecutor().executeTransaction(smarts, std::string{} /*no force new_state required*/);
+    auto opt_result = executorPtr->getExecutor().executeTransaction(smarts, std::string{} /*no force new_state required*/, true /*validationMode*/);
     if (!opt_result.has_value()) {
         cserror() << kLogPrefix << "execution of transaction failed";
         return false;

@@ -19,6 +19,9 @@ add_library(csconnector
     include/debuglog.hpp
     include/tokens.hpp
     src/tokens.cpp
+	include/apicompat.hpp
+	src/apicompat.cpp
+	include/compat/v0/variant_types.h
     )
 
 target_link_libraries (csconnector PUBLIC csdb csnode lib csconnector_gen csconnector_executor_gen variant_gen)
