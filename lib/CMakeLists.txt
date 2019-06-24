@@ -25,7 +25,6 @@ add_library(lib
   include/lib/system/console.hpp
 )
 
-
 if (MSVC)
   # Boost.Log uses some functions on windows
   find_library(Psapi STATIC IMPORTED)
