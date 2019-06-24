@@ -53,7 +53,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     cs::TransactionsPacket tmpPacket;
     std::vector<csdb::Transaction> newStates;
     /*bool primary_new_state_found = false;*/
-
+    csdb::Transaction lastEmptyNewState;
     for (const auto& tr : pack.transactions()) {
         // only the 1st new_state is specifically handled
         if (SmartContracts::is_new_state(tr)/* && !primary_new_state_found*/) {
@@ -91,8 +91,15 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             //tmpNewState.add_user_field(trx_uf::new_state::Value, tr.user_field(trx_uf::new_state::Value));
 
             auto stateOnly = tr.user_field(trx_uf::new_state::Value).value<std::string>();
-            cscrypto::Bytes st(stateOnly.data(), stateOnly.data() + stateOnly.size());
-            Hash newStateHash = cscrypto::calculateHash(st.data(),st.size());
+            Hash newStateHash;
+            if (stateOnly.size() > 0) {
+                cscrypto::Bytes st(stateOnly.data(), stateOnly.data() + stateOnly.size());
+                newStateHash = cscrypto::calculateHash(st.data(),st.size());
+            }
+            else {
+                newStateHash = Zero::hash;
+                lastEmptyNewState = tr;
+            }
             std::string nHash(newStateHash.data(), newStateHash.data() + sizeof(newStateHash));
             tmpNewState.add_user_field(trx_uf::new_state::Hash, nHash);
             tmpNewStates_.push_back(tmpNewState);
@@ -104,12 +111,15 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
         }
     }
 
-    if (newStates.empty()) {
-        cserror() << kLogPrefix << "There is no state transactions in the package";
-        return false;
+    if (!newStates.empty()) {
+        finalStateTransaction_ = newStates.back();
+    }
+    else {
+        csdebug() << kLogPrefix << "There is no state transactions in the package";
+        finalStateTransaction_ = lastEmptyNewState;
     }
 
-    finalStateTransaction_ = newStates.back();
+
 
     if (/*!primary_new_state_found || */0 == smartRoundNumber_ || std::numeric_limits<uint32_t>::max() == smartTransaction_) {
         cserror() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
@@ -142,7 +152,6 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     // pack_.transactions(0).user_field(1) = 0;
 
     currentSmartTransactionPack_ = tmpPacket;//pack;
-    finalStateTransaction_ = newStates.back();
 
     tmpPacket.makeHash();
     auto tmp = tmpPacket.hash().toBinary();
