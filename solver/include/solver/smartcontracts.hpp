@@ -249,6 +249,8 @@ public:
     // true if tr is new_state and contract state is updated
     static bool is_state_updated(const csdb::Transaction& tr);
 
+    static bool dbcache_read(const BlockChain& blockchain, const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, std::string& state /*output*/);
+
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);

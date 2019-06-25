@@ -932,7 +932,7 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
                 if (!tr.user_field(trx_uf::new_state::Value).is_valid()) {
                     csdb::UserField fld = tr.user_field(trx_uf::new_state::Hash);
                     if (!fld.is_valid()) {
-                        cserror() << kLogPrefix << "new_state does not beither state nor hash, ignore new_state";
+                        cserror() << kLogPrefix << "new_state contains neither state nor hash, ignore new_state";
                     }
                     else {
                         std::string hash_string = fld.value<std::string>();
@@ -2033,7 +2033,7 @@ bool SmartContracts::dbcache_update(const csdb::Address& abs_addr, const SmartCo
         // test if new data is actually newer than stored data
         cs::Bytes current_data;
         if (bc.getContractData(abs_addr, current_data)) {
-            cs::DataStream stream(current_data);
+            cs::DataStream stream(current_data.data(), current_data.size());
             SmartContractRef current_ref;
             stream >> current_ref.sequence >> current_ref.transaction;
             if (current_ref.sequence > ref_start.sequence) {
@@ -2051,30 +2051,31 @@ bool SmartContracts::dbcache_update(const csdb::Address& abs_addr, const SmartCo
     return bc.updateContractData(abs_addr, data);
 }
 
-bool SmartContracts::dbcache_read(const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, std::string& state /*output*/) {
+/*static*/
+bool SmartContracts::dbcache_read(const BlockChain& blockchain, const csdb::Address& abs_addr,
+    SmartContractRef& ref_start /*output*/, std::string& state /*output*/) {
+
     cs::Bytes data;
-    if (!bc.getContractData(abs_addr, data)) {
+    if (!blockchain.getContractData(abs_addr, data)) {
         return false;
     }
-    cs::DataStream stream(data);
+    cs::DataStream stream(data.data(), data.size());
     stream >> ref_start.sequence >> ref_start.transaction >> ref_start.hash >> state;
     return stream.isValid() && !stream.isAvailable(1);
+
+}
+
+bool SmartContracts::dbcache_read(const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, std::string& state /*output*/) {
+    return SmartContracts::dbcache_read(bc, abs_addr, ref_start, state);
 }
 
 // non-member functions
 
 std::string get_contract_state(const csdb::Address& abs_addr, const BlockChain& blockchain) {
-    std::string state;
-    cs::Bytes data;
-    if (!blockchain.getContractData(abs_addr, data)) {
-        return state;
-    }
-    cs::DataStream stream(data);
     SmartContractRef dummy;
-    stream >> dummy.sequence >> dummy.transaction >> dummy.hash >> state;
-    if (!stream.isValid() || stream.isAvailable(1)) {
-        state.clear();
-    }
+    std::string state;
+    // no matter which value is returned:
+    SmartContracts::dbcache_read(blockchain, abs_addr, dummy, state);
     return state;
 }
 

@@ -68,7 +68,8 @@ struct Dbt_safe : public Dbt {
 DatabaseBerkeleyDB::DatabaseBerkeleyDB()
 : env_(static_cast<uint32_t>(0))
 , db_blocks_(nullptr)
-, db_seq_no_(nullptr) {
+, db_seq_no_(nullptr)
+, db_smart_states_(nullptr) {
 }
 
 DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
@@ -78,6 +79,9 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
     std::cout << "Attempt db_seq_no_ to close...\n" << std::flush;
     db_seq_no_->close(0);
     std::cout << "DB db_seq_no_ was closed.\n" << std::flush;
+    std::cout << "Attempt db_smart_states_ to close...\n" << std::flush;
+    db_smart_states_->close(0);
+    std::cout << "DB db_smart_states_ was closed.\n" << std::flush;
 #ifdef TRANSACTIONS_INDEX
     db_trans_idx_->close(0);
 #endif

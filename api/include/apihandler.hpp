@@ -959,6 +959,10 @@ private:
     template <typename Mapper>
     size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out);
 
+    // the method implements common part of both update_smart_caches_once() and update_smart_caches_slot() methods
+    template<typename LongNamedType>
+    bool update_smart_caches(LongNamedType& locked_pending_smart_transactions, bool init);
+
     bool update_smart_caches_once(const csdb::PoolHash&, bool = false);
     void run();
 
