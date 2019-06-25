@@ -49,7 +49,7 @@ Operating system: Windows® 7 / Windows® 8 / Windows® 10 64-bit (with the last
 Processor (CPU): with frequency of 1 GHz (or faster) with PAE, NX and SSE2 support;
 Memory (RAM): 4 Gb
 HDD: 1 Tb
-Internet connection: 3 Mbit/s
+Internet connection: 3 Mbit/s.
 <h4>Recommended system requirements:</h4>
 
 Operating system: Windows® 7 / Windows® 8 / Windows® 10 64-bit (with the last update package)
