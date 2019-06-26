@@ -54,10 +54,10 @@ private:
     DbEnv env_;
     std::unique_ptr<Db> db_blocks_;
     std::unique_ptr<Db> db_seq_no_;
+    std::unique_ptr<Db> db_contracts_;
 #ifdef TRANSACTIONS_INDEX
     std::unique_ptr<Db> db_trans_idx_;
 #endif
-    std::unique_ptr<Db> db_smart_states_;
 };
 
 }  // namespace csdb

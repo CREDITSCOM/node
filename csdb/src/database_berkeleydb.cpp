@@ -66,10 +66,10 @@ struct Dbt_safe : public Dbt {
 }  // namespace
 
 DatabaseBerkeleyDB::DatabaseBerkeleyDB()
-: env_(static_cast<uint32_t>(0))
+: env_(0u)
 , db_blocks_(nullptr)
 , db_seq_no_(nullptr)
-, db_smart_states_(nullptr) {
+, db_contracts_(nullptr) {
 }
 
 DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
@@ -79,13 +79,12 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
     std::cout << "Attempt db_seq_no_ to close...\n" << std::flush;
     db_seq_no_->close(0);
     std::cout << "DB db_seq_no_ was closed.\n" << std::flush;
-    std::cout << "Attempt db_smart_states_ to close...\n" << std::flush;
-    db_smart_states_->close(0);
-    std::cout << "DB db_smart_states_ was closed.\n" << std::flush;
+    std::cout << "Attempt db_contracts_ to close...\n" << std::flush;
+    db_contracts_->close(0);
+    std::cout << "DB db_contracts_ was closed.\n" << std::flush;
 #ifdef TRANSACTIONS_INDEX
     db_trans_idx_->close(0);
 #endif
-    std::cout << "DB db_smart_states_ was closed.\n" << std::flush;
     env_.close(0);
 }
 
@@ -120,6 +119,7 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
 
     db_blocks_.reset(nullptr);
     db_seq_no_.reset(nullptr);
+    db_contracts_.reset(nullptr);
 
     env_.log_set_config(DB_LOG_AUTO_REMOVE, 1);
 
@@ -160,9 +160,10 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
         db_seq_no_.swap(db_seq_no);
     }
     if (status == 0) {
-        decltype(db_smart_states_) db_smart_states(new Db(&env_, 0));
-        status = db_smart_states->open(NULL, "contracts.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
-        db_smart_states_.swap(db_smart_states);
+        // until the explanation found suppress exceptions particularly on db close()
+        decltype(db_contracts_) db_contracts(new Db(&env_, 0/*DB_CXX_NO_EXCEPTIONS*/));
+        status = db_contracts->open(txn, "contracts.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
+        db_contracts_.swap(db_contracts);
     }
     if (status) {
         set_last_error_from_berkeleydb(status);
@@ -468,26 +469,62 @@ bool DatabaseBerkeleyDB::getFromTransIndex(const cs::Bytes &key, cs::Bytes *valu
 #endif
 
 bool DatabaseBerkeleyDB::updateContractData(const cs::Bytes& key, const cs::Bytes& data) {
-    if (!db_smart_states_) {
+    if (!db_contracts_) {
         set_last_error(NotOpen);
         return false;
     }
 
-    Dbt_copy<cs::Bytes> db_key(key);
-    Dbt_copy<cs::Bytes> db_value(data);
+    DbTxn* tid;
+    int status = env_.txn_begin(nullptr, &tid, DB_READ_UNCOMMITTED);
+    int txn_create_status = status;
+    auto g = cs::scopeGuard([&]() {
+        if (txn_create_status) {
+            return;
+        }
+        if (status) {
+            tid->abort();
+        }
+        else {
+            tid->commit(0);
+        }
+    });
 
-    int status = db_smart_states_->put(nullptr, &db_key, &db_value, 0);
+    //Dbt_copy<uint32_t> db_seq_no(seq_no + 1);
+    //if (!status) {
+    //    Dbt_copy<cs::Bytes> db_value(value);
+    //    status = db_blocks_->put(tid, &db_seq_no, &db_value, 0);
+    //}
+    //if (!status) {
+    //    Dbt_copy<cs::Bytes> db_key(key);
+    //    status = db_seq_no_->put(tid, &db_key, &db_seq_no, 0);
+    //}
+
+    //if (!status) {
+    //    set_last_error();
+    //    return true;
+    //}
+    //else {
+    //    set_last_error_from_berkeleydb(status);
+    //    return false;
+    //}
+
+    if (status == 0) {
+        Dbt_copy<cs::Bytes> db_key(key);
+        Dbt_copy<cs::Bytes> db_value(data);
+
+        status = db_contracts_->put(tid, &db_key, &db_value, 0);
+    }
+
     if (status) {
         set_last_error_from_berkeleydb(status);
         return false;
     }
-
     set_last_error();
     return true;
 }
 
 bool DatabaseBerkeleyDB::getContractData(const cs::Bytes& key, cs::Bytes& data) {
-    if (!db_smart_states_) {
+    if (!db_contracts_) {
         set_last_error(NotOpen);
         return false;
     }
@@ -495,7 +532,7 @@ bool DatabaseBerkeleyDB::getContractData(const cs::Bytes& key, cs::Bytes& data) 
     Dbt_copy<cs::Bytes> db_key(key);
     Dbt_safe db_value;
 
-    int status = db_smart_states_->get(nullptr, &db_key, &db_value, 0);
+    int status = db_contracts_->get(nullptr, &db_key, &db_value, 0);
     if (status) {
         set_last_error_from_berkeleydb(status);
         return false;
