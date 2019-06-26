@@ -586,7 +586,7 @@ private:
     }
 
     // blocking call
-    bool execute(/*[in,out]*/ SmartExecutionData& data);
+    bool execute(/*[in,out]*/ SmartExecutionData& data, bool validationMode);
 
     // blocking call
     bool update_metadata(const api::SmartContractInvocation& contract, StateItem& state);

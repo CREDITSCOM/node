@@ -937,62 +937,72 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
                     else {
                         std::string hash_string = fld.value<std::string>();
                         cs::Hash hash;
-                        {
-                            csdb::Transaction tr_clone = tr.clone();
-                            if (hash_string.size() != hash.size()) {
-                                cserror() << kLogPrefix << "new_state contains incompatible hash, use empty new_state";
-                                hash = cs::Zero::hash;
+                        csdb::Transaction tr_state(0, tr.source(), tr.target(), tr.currency(), tr.amount(), tr.max_fee(), tr.counted_fee(), tr.signature());
+                        for (const auto id : tr.user_field_ids()) {
+                            if (id == trx_uf::new_state::Value) {
+                                continue;
+                            }
+                            if (id == trx_uf::new_state::Hash) {
+                                continue;
+                            }
+                            tr_state.add_user_field(id, tr.user_field(id));
+                        }
+                        if (hash_string.size() != hash.size()) {
+                            cserror() << kLogPrefix << "new_state contains incompatible hash, use empty new_state";
+                            hash = cs::Zero::hash;
+                        }
+                        else {
+                            std::copy(hash_string.cbegin(), hash_string.cend(), hash.begin());
+                        }
+                        if (hash != cs::Zero::hash) {
+                            fld = tr.user_field(trx_uf::new_state::RefStart);
+                            if (!fld.is_valid()) {
+                                cserror() << kLogPrefix << "new_state does not refer to start transaction, use empty new_state";
                             }
                             else {
-                                std::copy(hash_string.cbegin(), hash_string.cend(), hash.begin());
-                            }
-                            if (hash != cs::Zero::hash) {
-                                fld = tr.user_field(trx_uf::new_state::RefStart);
-                                if (!fld.is_valid()) {
-                                    cserror() << kLogPrefix << "new_state does not refer to start transaction, use empty new_state";
+                                SmartContractRef ref_start(fld);
+                                csdb::Transaction tr_start = get_transaction(ref_start);
+                                if (!tr_start.is_valid()) {
+                                    cserror() << kLogPrefix << "get start transaction failed, use empty new_state";
                                 }
                                 else {
-                                    SmartContractRef ref_start(fld);
-                                    csdb::Transaction tr_start = get_transaction(ref_start);
-                                    if (!tr_start.is_valid()) {
-                                        cserror() << kLogPrefix << "get start transaction failed, use empty new_state";
-                                    }
-                                    else {
-                                        SmartExecutionData exe_data;
-                                        exe_data.contract_ref = ref_start;
-                                        exe_data.executor_fee = csdb::Amount(tr_start.max_fee().to_double());
-                                        if (!SmartContracts::is_deploy(tr_start)) {
-                                            csdb::Address abs_addr = absolute_address(tr_start.target());
-                                            if (in_known_contracts(abs_addr)) {
-                                                const StateItem& item = known_contracts[abs_addr];
-                                                exe_data.explicit_last_state = item.state;
-                                            }
+                                    SmartExecutionData exe_data;
+                                    exe_data.contract_ref = ref_start;
+                                    exe_data.executor_fee = csdb::Amount(tr_start.max_fee().to_double());
+                                    if (!SmartContracts::is_deploy(tr_start)) {
+                                        csdb::Address abs_addr = absolute_address(tr_start.target());
+                                        if (in_known_contracts(abs_addr)) {
+                                            const StateItem& item = known_contracts[abs_addr];
+                                            exe_data.explicit_last_state = item.state;
                                         }
-                                        if (execute(exe_data)) {
-                                            if (!exe_data.result.smartsRes.empty()) {
-                                                const auto& head = exe_data.result.smartsRes.front();
-                                                if (head.response.code == 0) {
-                                                    tr_clone.add_user_field(trx_uf::new_state::Value, head.newState);
-                                                    // test actual hash
-                                                    cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)head.newState.data(), head.newState.size());
-                                                    if (actual_hash == hash) {
-                                                        csdebug() << kLogPrefix << "contract state is updated, hash is OK";
-                                                    }
-                                                    else {
-                                                        csdebug() << kLogPrefix << "contract state is updated, calculated hash is not equal to stored one";
-                                                    }
+                                    }
+                                    if (execute(exe_data, true /*validationMode*/)) {
+                                        if (!exe_data.result.smartsRes.empty()) {
+                                            const auto& head = exe_data.result.smartsRes.front();
+                                            if (head.response.code == 0) {
+                                                tr_state.add_user_field(trx_uf::new_state::Value, head.newState);
+                                                // test actual hash
+                                                cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)head.newState.data(), head.newState.size());
+                                                std::string hash_result;
+                                                if (actual_hash == hash) {
+                                                    hash_result = "OK";
                                                 }
+                                                else {
+                                                    hash_result = "WRONG";
+                                                }
+                                                csdebug() << kLogPrefix << "state of " << ref_start << " is updated, stored hash is "
+                                                    << hash_result << ", new size is " << head.newState.size();
                                             }
                                         }
                                     }
                                 }
                             }
                             // set empty new state in case of any problem
-                            if (!tr_clone.user_field(trx_uf::new_state::Value).is_valid()) {
-                                tr_clone.add_user_field(trx_uf::new_state::Value, std::string{});
+                            if (!tr_state.user_field(trx_uf::new_state::Value).is_valid()) {
+                                tr_state.add_user_field(trx_uf::new_state::Value, std::string{});
                             }
 
-                            update_contract_state(tr_clone, true);
+                            update_contract_state(tr_state, true);
                         }
                     }
                 }
@@ -1166,7 +1176,7 @@ void SmartContracts::remove_from_queue(const SmartContractRef& item) {
     }
 }
 
-bool SmartContracts::execute(SmartExecutionData& data) {
+bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
     if (!data.result.smartsRes.empty()) {
         data.result.smartsRes.clear();
     }
@@ -1179,7 +1189,12 @@ bool SmartContracts::execute(SmartExecutionData& data) {
         data.setError(error::InternalBug, "load starter transaction failed");
         return false;
     }
-    cslog() << kLogPrefix << "executing " << data.contract_ref << "::" << print_executed_method(data.contract_ref) << std::endl;
+    if (validationMode) {
+        csdebug() << kLogPrefix << "validating state after " << data.contract_ref << "::" << print_executed_method(data.contract_ref);
+    }
+    else {
+        cslog() << kLogPrefix << "executing " << data.contract_ref << "::" << print_executed_method(data.contract_ref) << std::endl;
+    }
     // using data.result.newState to pass previous (not yet cached) new state in case of multi-call to conrtract:
     std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
     auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
@@ -1200,9 +1215,20 @@ bool SmartContracts::execute(SmartExecutionData& data) {
             }
         }
     }
-    auto maybe_result = exec_handler_ptr->getExecutor().executeTransaction(smarts, data.explicit_last_state, false /*validationMode*/);
+    std::optional<executor::Executor::ExecuteResult> maybe_result;
+    if (validationMode) {
+        // for now smarts always contains a one item:
+        maybe_result = exec_handler_ptr->getExecutor().reexecuteContract(smarts.front(), data.explicit_last_state);
+    }
+    else {
+        maybe_result = exec_handler_ptr->getExecutor().executeTransaction(smarts, data.explicit_last_state);
+    }
     if (maybe_result.has_value()) {
         data.result = maybe_result.value();
+        if (validationMode) {
+            // we require only updated states
+            return true;
+        }
         if (!data.result.smartsRes.empty()) {
             if (data.result.response.code == 0) {
                 auto& result = data.result.smartsRes.front();
@@ -1286,7 +1312,7 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
             for (auto& data : data_list) {
                 // use data.result.newStatef member to pass last contract's state in multi-call
                 data.explicit_last_state = last_state;
-                if (!execute(data)) {
+                if (!execute(data, false /**/)) {
                     if (data.error.empty()) {
                         data.error = "failed to invoke contract";
                     }
