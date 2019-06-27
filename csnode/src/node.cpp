@@ -1549,16 +1549,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
     if (!conveyer.isConfidantExists(requester) || !conveyer.isConfidantExists(sender)) {
         return;
     }
-
-    //const int k1 = (corruptionLevel_ / 8) % 2;
-    //const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
-
-    //if (k1 == 1 && k2 == myConfidantIndex_) {
-    //    csdebug() << "STAGE REPLY ##############> NOTHING WILL BE SENT";
-    //}
-    //else {
-        sendDefault(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
-    //}
+    sendDefault(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
 
     csmeta(csdetails) << "done";
 }
@@ -1891,34 +1882,6 @@ void Node::checkForSavedSmartStages(uint64_t id) {
     }
 }
 
-// TODO: this function is a part of round table building <===
-//void Node::addRoundSignature(const cs::StageThree& st3) {
-//    size_t pos = 0;
-//    for (size_t i = 0; i < st3.realTrustedMask.size(); i++) {
-//        if (i == static_cast<size_t>(st3.sender)) {
-//            break;
-//        }
-//        if (st3.realTrustedMask[i] != cs::ConfidantConsts::InvalidConfidantIndex) {
-//            ++pos;
-//        }
-//    }
-//    csdebug() << "NODE> pos = " << pos << ", poolSigsSize = " << lastSentSignatures_.poolSignatures.size() << ", rtSigsSize = " << lastSentSignatures_.roundSignatures.size()
-//              << ", roundSigsSize = " << lastSentSignatures_.trustedConfirmation.size();
-//    std::copy(st3.blockSignature.cbegin(), st3.blockSignature.cend(), lastSentSignatures_.poolSignatures[pos].begin());
-//    std::copy(st3.roundSignature.cbegin(), st3.roundSignature.cend(), lastSentSignatures_.roundSignatures[pos].begin());
-//    std::copy(st3.trustedSignature.cbegin(), st3.trustedSignature.cend(), lastSentSignatures_.trustedConfirmation[pos].begin());
-//
-//    csdebug() << "NODE> Adding signatures of stage3 from T(" << cs::numeric_cast<int>(st3.sender) << ") = " << lastSentSignatures_.roundSignatures.size();
-//}
-//
-//void Node::sendRoundPackage(const cs::PublicKey& target) {
-//    csmeta(csdetails) << "Send round table";
-//    sendDefault(target, MsgTypes::RoundTable, cs::Conveyer::instance().currentRoundNumber(), subRound_, lastRoundTableMessage_, lastSignaturesMessage_);
-//
-//    if (!lastSentRoundData_.table.characteristic.mask.empty()) {
-//        csmeta(csdebug) << "Packing " << lastSentRoundData_.table.characteristic.mask.size() << " bytes of char. mask to send";
-//    }
-//}
 
 //TODO: this code should be refactored
 void Node::sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target) {
@@ -1927,32 +1890,16 @@ void Node::sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& tar
         csdebug() << "No active round table, can't send";
         return;
     }
-    //////////////////////////////////////////////////////////////////////
-    //TODO: refactor this code!!!
-    ///////////////////////////////////////////////
-    auto lastRoundPackage = &roundPackageCache_.back();//& - is used  because the full version has the roundPackageCache - which is a storage with certain methods
-    //if (lastRoundPackage == nullptr) {
-    //    csdebug() << "The needed roundPackage not found";
-    //    return;
-    //}
-    bool found = false;
-    if (lastRoundPackage->roundTable().round != rNum) {
+    auto& rpCurrent = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum](cs::RoundPackage& rp) {return rp.roundTable().round == rNum;});
 
-
-       // lastRoundPackage = roundPackageCache_.find(rNum);
-        //if (lastRoundPackage == nullptr) {
-        //    csdebug() << "The needed roundPackage not found";
-        //    return;
-        //}
-    }
     //////////////////////////////////////////////////
     //if (std::find(lastRoundPackage->roundTable().confidants.cbegin(), lastRoundPackage->roundTable().confidants.cend(), target) != lastRoundPackage->roundTable().confidants.end()) {
     //    solver_->changeHashCollectionTimer();
     //}
-    sendDefault(target, MsgTypes::RoundTable, cs::Conveyer::instance().currentRoundNumber(), subRound_, lastRoundPackage->toBinary());
+    sendDefault(target, MsgTypes::RoundTable, rpCurrent->roundTable().round, rpCurrent->subRound(), rpCurrent->toBinary());
     csdebug() << "Done";
-    if (!lastRoundPackage->poolMetaInfo().characteristic.mask.empty()) {
-        csmeta(csdebug) << "Packing " << lastRoundPackage->poolMetaInfo().characteristic.mask.size() << " bytes of char. mask to send";
+    if (!rpCurrent->poolMetaInfo().characteristic.mask.empty()) {
+        csmeta(csdebug) << "Packing " << rpCurrent->poolMetaInfo().characteristic.mask.size() << " bytes of char. mask to send";
     }
 }
 
@@ -1960,7 +1907,7 @@ void Node::sendRoundPackageToAll(cs::RoundPackage& rPackage) {
     // add signatures// blockSignatures, roundSignatures);
     csmeta(csdetails) << "Send round table to all";
     
-    sendBroadcast(MsgTypes::RoundTable, cs::Conveyer::instance().currentRoundNumber(), subRound_, rPackage.toBinary());
+    sendBroadcast(MsgTypes::RoundTable, rPackage.roundTable().round, rPackage.subRound(), rPackage.toBinary());
 
     if (!rPackage.poolMetaInfo().characteristic.mask.empty()) {
         csmeta(csdebug) << "Packing " << rPackage.poolMetaInfo().characteristic.mask.size() << " bytes of char. mask to send";
@@ -1971,12 +1918,6 @@ void Node::sendRoundPackageToAll(cs::RoundPackage& rPackage) {
         << std::endl << rPackage.toString()
         << "\n----------------------------------------------------------------------------------------------------";
 
-    cs::Conveyer& conveyer = cs::Conveyer::instance();
-    auto& table = conveyer.currentRoundTable();
-
-    csdebug() << "Round " << conveyer.currentRoundNumber() << ", Confidants count " << table.confidants.size();
-    csdebug() << "Hashes count: " << table.hashes.size();
-    performRoundPackage(rPackage, solver_->getPublicKey());
 }
 
 void Node::sendRoundTable(cs::RoundPackage& rPackage) {
@@ -1984,19 +1925,8 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage) {
 
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     csdebug() << "SendRoundTable: add confirmation for round " << conveyer.currentRoundTable().round << " trusted";
-    /*confirmationList_.add(rPackage.roundTable().round, false, conveyer.confidants(),
-        cs::NodeUtils::getTrustedMask(getBlockChain().getLastBlock()), rPackage.trustedSignatures());*/
-
     conveyer.setRound(rPackage.roundTable().round);
     
-    const auto& confidants = conveyer.confidants();
-    if (!confidants.empty() && lastTrustedMask_.size() == confidants.size()) {
-        for (size_t i = 0; i < lastTrustedMask_.size(); ++i) {
-            if (lastTrustedMask_[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
-                solver_->addToGraylist(confidants[i], Consensus::GrayListPunishment);
-            }
-        }
-    }
     subRound_ = 0;
 
     cs::RoundTable table;
@@ -2006,21 +1936,13 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage) {
 
     conveyer.setTable(table);
     sendRoundPackageToAll(rPackage);
+
+
+    csdebug() << "Round " << conveyer.currentRoundNumber() << ", Confidants count " << table.confidants.size();
+    csdebug() << "Hashes count: " << table.hashes.size();
+    performRoundPackage(rPackage, solver_->getPublicKey());
 }
 
-void Node::prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3) {
-    cs::Conveyer& conveyer = cs::Conveyer::instance();
-    const cs::Characteristic* block_characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
-
-    if (!block_characteristic) {
-        csmeta(cserror) << "Send round info characteristic not found, logic error";
-        return;
-    }
-
-    //storeRoundPackageData(roundTable, poolMetaInfo, *block_characteristic, st3);
-
-    csdebug() << "NODE> StageThree prepared: \n" << cs::StageThree::toString(st3);
-}
 bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants) {
     csdebug() << "NODE> PoolSigs Amnt = " << rPackage.poolSignatures().size()
         << ", TrustedSigs Amnt = " << rPackage.trustedSignatures().size()
@@ -2105,18 +2027,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         getCharacteristic(rPackage);
     }
 
-    cs::Bytes realTrusted = rPackage.poolMetaInfo().realTrustedMask;
-    const auto ptrRT = conveyer.roundTable(rNum - 1);
-    if (ptrRT != nullptr) {
-        const cs::ConfidantsKeys& prevConfidants = ptrRT->confidants;
-        if (!prevConfidants.empty() && realTrusted.size() == prevConfidants.size()) {
-            for (size_t i = 0; i < realTrusted.size(); ++i) {
-                if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
-                    solver_->addToGraylist(prevConfidants[i], Consensus::GrayListPunishment);
-                }
-            }
-        }
-    }
     cs::Signatures poolSignatures;
     cs::PublicKeys confidants;
     if (rPackage.roundTable().round > 2/* && confirmationList_.size() > 0*/) { //Here we have problems when the trusted have the first block and the others do not!!!
@@ -2147,6 +2057,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     else {
         csdebug() << "No confirmations in the list";
     }
+
     currentRoundTableMessage_.round = rPackage.roundTable().round;
     currentRoundTableMessage_.sender = sender;
     currentRoundTableMessage_.message = cs::Bytes(data, data + size);
@@ -2156,6 +2067,20 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 void Node::performRoundPackage(cs::RoundPackage& rPackage, cs::PublicKey sender) {
     csdebug() << __func__;
     confirmationList_.add(rPackage.roundTable().round, false, rPackage.roundTable().confidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.trustedSignatures());
+    cs::Conveyer& conveyer = cs::Conveyer::instance();
+    cs::Bytes realTrusted = rPackage.poolMetaInfo().realTrustedMask;
+    const auto ptrRT = conveyer.roundTable(rPackage.roundTable().round - 1);
+    if (ptrRT != nullptr) {
+        const cs::ConfidantsKeys& prevConfidants = ptrRT->confidants;
+        if (!prevConfidants.empty() && realTrusted.size() == prevConfidants.size()) {
+            for (size_t i = 0; i < realTrusted.size(); ++i) {
+                if (realTrusted[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
+                    solver_->addToGraylist(prevConfidants[i], Consensus::GrayListPunishment);
+                }
+            }
+        }
+    }
+    
     // update sub round and max heighbours sequence
     subRound_ = rPackage.subRound();
     maxHeighboursSequence_ = rPackage.roundTable().round;
@@ -2193,8 +2118,6 @@ void Node::sendHash(cs::RoundNumber round) {
     }
 
     csdebug() << "NODE> Sending hash to ALL";
-    //csdb::PoolHash spoiledHash = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
-
     cs::Bytes message;
     cs::DataStream stream(message);
     cs::Byte myTrustedSize = 0;
