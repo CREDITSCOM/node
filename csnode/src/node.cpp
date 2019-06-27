@@ -81,7 +81,12 @@ bool Node::init(const Config& config) {
     std::cout << "Done\n";
     cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
+    cs::Connector::connect(&solver_->smart_contracts().contract_state_updated, api_.get(), &csconnector::connector::onContractStateUpdate);
 #endif  // NODE_API
+
+    // must call prior to blockChain_.init():
+    solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
+    solver_->startDefault();
 
     if (!blockChain_.init(config.getPathToDB())) {
         return false;
@@ -103,9 +108,6 @@ bool Node::init(const Config& config) {
     std::cout << "Solver is init\n";
 
     std::cout << "Everything is init\n";
-
-    solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
-    solver_->startDefault();
 
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);

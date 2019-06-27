@@ -194,8 +194,8 @@ private:  // Service
 private:  // Members
     TransactionsPacketHash m_hash;
     std::vector<csdb::Transaction> m_transactions;
-    cs::BlockSignatures m_signatures;
     std::vector<csdb::Transaction> m_stateTransactions;
+    cs::BlockSignatures m_signatures;
 };
 }  // namespace cs
 

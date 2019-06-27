@@ -77,8 +77,7 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
         cserror() << kLogPrefix << "incorrect reference to start transaction";
         return false;
     }
-    std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
-    auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
+    executor::Executor::ExecuteTransactionInfo info{};
     info.transaction = block.transactions().at(ref.transaction);
     info.feeLimit = csdb::Amount(info.transaction.max_fee().to_double()); // specify limit as SmartContracts::execute() does
     info.convention = executor::Executor::MethodNameConvention::Default;
@@ -97,7 +96,7 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
         //    }
         //}
     }
-    auto opt_result = executorPtr->getExecutor().executeTransaction(smarts, std::string{} /*no force new_state required*/, true /*validationMode*/);
+    auto opt_result = executorPtr->getExecutor().reexecuteContract(info, std::string{} /*no force new_state required*/);
     if (!opt_result.has_value()) {
         cserror() << kLogPrefix << "execution of transaction failed";
         return false;

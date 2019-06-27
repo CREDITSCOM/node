@@ -110,6 +110,7 @@ TransactionsPacket TransactionsPacket::fromByteStream(const char* data, size_t s
 TransactionsPacket::TransactionsPacket(TransactionsPacket&& packet)
 : m_hash(std::move(packet.m_hash))
 , m_transactions(std::move(packet.m_transactions))
+, m_stateTransactions(std::move(packet.m_stateTransactions))
 , m_signatures(std::move(packet.m_signatures)) {
     packet.m_hash = TransactionsPacketHash();
     packet.m_transactions.clear();
@@ -123,6 +124,7 @@ TransactionsPacket& TransactionsPacket::operator=(const TransactionsPacket& pack
     m_hash = packet.m_hash;
     m_transactions = packet.m_transactions;
     m_signatures = packet.m_signatures;
+    m_stateTransactions = packet.m_stateTransactions;
 
     return *this;
 }
