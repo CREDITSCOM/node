@@ -277,6 +277,8 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
         // TODO: The pool building is starting here <===
         context.spawn_next_round(stage);
         csdebug() << name() << ": --> stage-3 [" << static_cast<int>(stage.sender) << "]";
+        stage.toBytes();
+        stage.signature = cscrypto::generateSignature(context.private_key(), stage.messageBytes.data(), stage.messageBytes.size());
         context.add_stage3(stage);  //, stage.writer != stage.sender);
 
         return Result::Finish;

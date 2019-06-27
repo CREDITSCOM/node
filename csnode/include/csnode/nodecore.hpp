@@ -71,23 +71,19 @@ struct Characteristic {
 };
 
 struct RoundTable {
+    cs::Bytes toBinary();
     RoundNumber round = 0;
-    PublicKey general;
     ConfidantsKeys confidants;
     PacketsHashes hashes;
-    Characteristic characteristic;
 };
 
 struct PoolMetaInfo {
     Characteristic characteristic;
     std::string timestamp;
-    cs::PublicKey writerKey;
     csdb::PoolHash previousHash;
     cs::Sequence sequenceNumber;
     cs::Bytes realTrustedMask;
-    std::vector<csdb::Pool::SmartSignature> smartSignatures;
-    cs::Bytes confirmationMask;
-    cs::Signatures confirmations;
+    std::vector <csdb::Pool::SmartSignature> smartSignatures;
 };
 
 struct HashVector {

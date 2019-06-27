@@ -568,13 +568,14 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     newPool.add_real_trusted(cs::Utils::maskToBits(metaPoolInfo.realTrustedMask));
     newPool.set_previous_hash(metaPoolInfo.previousHash);
 
-    if (metaPoolInfo.sequenceNumber > 1) {
-        newPool.add_number_confirmations(static_cast<uint8_t>(metaPoolInfo.confirmationMask.size()));
-        newPool.add_confirmation_mask(cs::Utils::maskToBits(metaPoolInfo.confirmationMask));
-        newPool.add_round_confirmations(metaPoolInfo.confirmations);
-    }
+    //TODO: be sure tthenext lines are included in Node::getCharacteristic()
+    //if (metaPoolInfo.sequenceNumber > 1) {
+    //    newPool.add_number_confirmations(static_cast<uint8_t>(metaPoolInfo.confirmationMask.size()));
+    //    newPool.add_confirmation_mask(cs::Utils::maskToBits(metaPoolInfo.confirmationMask));
+    //    newPool.add_round_confirmations(metaPoolInfo.confirmations);
+    //}
 
-    csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey);
+    //csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey);
     csmeta(csdetails) << "done";
 
     if (!stateTransactions.empty()) {

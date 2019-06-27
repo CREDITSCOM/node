@@ -150,7 +150,7 @@ namespace cs {
     trustedSignatures_ = signatures;
   }
 
-  void RoundPackage::updateSmartSignatures(const std::vector<csdb::Pool::SmartSignature> smartSignatures) {
+  void RoundPackage::updateSmartSignatures(const std::vector<csdb::Pool::SmartSignature> smartSigs) {
   }
 
   const cs::PoolMetaInfo RoundPackage::poolMetaInfo() {
@@ -173,9 +173,8 @@ namespace cs {
     return trustedSignatures_;
   }
 
-  size_t RoundPackage::messageLength()
-  {
-    return messageLength();
+  size_t RoundPackage::messageLength() {
+    return binaryRepresentation_.size();
   }
 
   void RoundPackage::refillToSign() {

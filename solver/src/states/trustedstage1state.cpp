@@ -24,7 +24,6 @@ void TrustedStage1State::on(SolverContext& context) {
     DefaultStateBehavior::on(context);
     context.init_zero(stage);
     stage.sender = context.own_conf_number();
-
     enough_hashes = false;
     transactions_checked = false;
     min_time_expired = false;

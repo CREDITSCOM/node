@@ -37,6 +37,9 @@ public:
     /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
     constexpr static uint8_t GeneralNotSelected = 100;
 
+    /** @brief   The return value is the maximum allowed time interval (in milliseconds) for collectiong hashes */
+    constexpr static uint64_t MaxTimeStampDelta = 1000;
+
     /** @brief   Min duration (msec) to collect hashes in stage-1 of consensus */
     constexpr static uint32_t T_min_stage1 = 170;
 

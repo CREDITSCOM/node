@@ -11,6 +11,7 @@
 #include <lib/system/logger.hpp>
 
 #include <chrono>
+#include <algorithm>
 
 namespace cs {
 void SolverCore::setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv) {
@@ -43,7 +44,7 @@ void SolverCore::gotConveyerSync(cs::RoundNumber rNum) {
     // this is actual if conveyer has just stored last required block
     if (!recv_hash.empty() && cs::Conveyer::instance().currentRoundNumber() == rNum) {
         for (const auto& item : recv_hash) {
-            if (stateCompleted(pstate->onHash(*pcontext, item.first, item.second))) {
+            if (stateCompleted(pstate->onHash(*pcontext, item.hash, item.sender))) {
                 handleTransitions(Event::Hashes);
             }
         }
@@ -88,22 +89,30 @@ void SolverCore::addToGraylist(const cs::PublicKey & sender, uint32_t rounds) {
     }
 }
 
-void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender) {
+void SolverCore::gotHash(const cs::StageHash&& sHash) {
     // GrayList check
-    if (grayList_.count(sender) > 0) {
-        csdebug() << "The sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " is in gray list";
+    if (grayList_.count(sHash.sender) > 0) {
+        csdebug() << "The sender " << cs::Utils::byteStreamToHex(sHash.sender.data(), sHash.sender.size()) << " is in gray list";
         return;
     }
 
     // DPOS check start -> comment if unnecessary
-    if (!checkNodeCache(sender)) {
+    if (!checkNodeCache(sHash.sender)) {
         csdebug() << "The sender's cash value is too low -> Don't allowed to be a confidant";
         return;
     }
     // DPOS check finish
+    auto rNum = cs::Conveyer::instance().currentRoundNumber();
+    auto it = std::find_if(recv_hash.cbegin(), recv_hash.cend(), [sHash, rNum](const cs::StageHash& sh)
+    { return ((sHash.sender == sh.sender) && (sHash.realTrustedSize > sh.realTrustedSize) && (sHash.round == rNum)); });
+    if (it != recv_hash.cend()) {
+        recv_hash.erase(it);
+    }
+    recv_hash.push_back(sHash);
+
     cs::Sequence delta = cs::Conveyer::instance().currentRoundNumber() - pnode->getBlockChain().getLastSequence();
     if (delta > 1) {
-        recv_hash.push_back(std::make_pair<>(hash, sender));
+        //recv_hash.push_back(std::make_pair<>(sHash.hash, sHash.sender));
         csdebug() << "SolverCore: cache hash until last block ready";
         return;
     }
@@ -112,7 +121,7 @@ void SolverCore::gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender) {
         return;
     }
 
-    if (stateCompleted(pstate->onHash(*pcontext, hash, sender))) {
+    if (stateCompleted(pstate->onHash(*pcontext, sHash.hash, sHash.sender))) {
         handleTransitions(Event::Hashes);
     }
 }
@@ -140,6 +149,9 @@ void SolverCore::nextRound() {
     tempRealTrusted_.clear();
     currentStage3iteration_ = 0;
     updateGrayList(cs::Conveyer::instance().currentRoundNumber());
+    lastSentSignatures_.poolSignatures.clear();
+    lastSentSignatures_.roundSignatures.clear();
+    lastSentSignatures_.trustedConfirmation.clear();
 
     if (!pstate) {
         return;
@@ -220,22 +232,6 @@ void SolverCore::gotStageTwo(const cs::StageTwo& stage) {
     }
 }
 
-void SolverCore::printStage3(const cs::StageThree& stage) {
-    std::string realTrustedString;
-
-    for (auto& i : stage.realTrustedMask) {
-        realTrustedString = realTrustedString + "[" + std::to_string(int(i)) + "] ";
-    }
-
-    csdebug() << "     SENDER = " << static_cast<int>(stage.sender) << ", WRITER = " << static_cast<int>(stage.writer) << ", RealTrusted = " << realTrustedString;
-    csdebug() << "     BlockHash = " << cs::Utils::byteStreamToHex(stage.blockHash);
-    csdebug() << "     BlockSign = " << cs::Utils::byteStreamToHex(stage.blockSignature);
-    csdebug() << "     RoundHash = " << cs::Utils::byteStreamToHex(stage.roundHash);
-    csdebug() << "     RoundSign = " << cs::Utils::byteStreamToHex(stage.roundSignature);
-    csdebug() << "     TrustHash = " << cs::Utils::byteStreamToHex(stage.trustedHash);
-    csdebug() << "     TrustSign = " << cs::Utils::byteStreamToHex(stage.trustedSignature);
-}
-
 void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg) {
     if (stage.iteration < currentStage3iteration_) {
         // stage with old iteration
@@ -281,7 +277,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
 
         if (somethingInvalid) {
             if (stageTo.realTrustedMask[stageFrom.sender] != cs::ConfidantConsts::InvalidConfidantIndex) {
-                printStage3(stageFrom);
+                csdebug() << cs::StageThree::toString(stageFrom);
                 realTrustedSetValue(stageFrom.sender, cs::ConfidantConsts::InvalidConfidantIndex);
             }
             return;
@@ -291,7 +287,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
         //  realTrustedSet(stageFrom.sender, cs::ConfidantConsts::FirstWriterIndex);
         //}
         trueStageThreeStorage.emplace_back(stageFrom);
-        pnode->addRoundSignature(stageFrom);
+        addRoundSignature(stageFrom);
         csdebug() << "Stage3 [" << static_cast<int>(stageFrom.sender) << "] - signatures are OK";
     };
 
@@ -307,7 +303,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
                 }
             }
             trueStageThreeStorage.push_back(stage);
-            pnode->addRoundSignature(stage);
+            addRoundSignature(stage);
             break;
 
         case 2:
@@ -343,6 +339,35 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
         default:
             break;
     }
+}
+
+void SolverCore::addRoundSignature(const cs::StageThree& st3) {
+    size_t pos = 0;
+    for (size_t i = 0; i < st3.realTrustedMask.size(); i++) {
+        if (i == static_cast<size_t>(st3.sender)) {
+            break;
+        }
+        if (st3.realTrustedMask[i] != cs::ConfidantConsts::InvalidConfidantIndex) {
+            ++pos;
+        }
+    }
+    csdebug() << "NODE> pos = " << pos
+        << ", poolSigsSize = " << lastSentSignatures_.poolSignatures.size()
+        << ", rtSigsSize = " << lastSentSignatures_.roundSignatures.size()
+        << ", roundSigsSize = " << lastSentSignatures_.trustedConfirmation.size();
+    //  if (lastSentSignatures_.poolSignatures.size() == 0) {
+    size_t tCount = static_cast<int>(cs::TrustedMask::trustedSize(st3.realTrustedMask));
+    lastSentSignatures_.poolSignatures.resize(tCount);
+    lastSentSignatures_.roundSignatures.resize(tCount);
+    lastSentSignatures_.trustedConfirmation.resize(tCount);
+    //  }
+    std::copy(st3.blockSignature.cbegin(), st3.blockSignature.cend(), lastSentSignatures_.poolSignatures[pos].begin());
+    std::copy(st3.roundSignature.cbegin(), st3.roundSignature.cend(), lastSentSignatures_.roundSignatures[pos].begin());
+    std::copy(st3.trustedSignature.cbegin(), st3.trustedSignature.cend(), lastSentSignatures_.trustedConfirmation[pos].begin());
+
+    csdebug() << "NODE> Adding signatures of stage3 from T(" << cs::numeric_cast<int>(st3.sender)
+        << ") = " << lastSentSignatures_.roundSignatures.size();
+
 }
 
 void SolverCore::adjustStageThreeStorage() {

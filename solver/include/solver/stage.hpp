@@ -38,22 +38,22 @@ public:
 
 
     uint8_t size() {
-        return static_cast<uint8_t>(mask.size());
+        return static_cast<uint8_t>(mask_.size());
     }
 
     const std::vector<uint8_t> value() const {
-        return mask;
+        return mask_;
     }
 
     const uint8_t value(size_t index) const {
-        if (index < mask.size()) {
-            return mask[index];
+        if (index < mask_.size()) {
+            return mask_[index];
         }
         return 255U;
     }
 
 private:
-    std::vector<uint8_t> mask;
+    std::vector<uint8_t> mask_;
     bool isReadOnly_;
 
 };

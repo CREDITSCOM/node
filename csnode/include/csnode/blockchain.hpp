@@ -24,6 +24,7 @@
 #include <csnode/walletscache.hpp>
 #include <csnode/walletsids.hpp>
 #include <csnode/walletspools.hpp>
+#include <roundpackage.hpp>
 
 #include <lib/system/concurrent.hpp>
 
@@ -128,6 +129,11 @@ public:
     bool getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const;
 
 public:
+    std::string getLastTimeStamp() const;
+    cs::Bytes getLastRealTrusted() const;
+    bool updateLastBlock(cs::RoundPackage& rPackage);
+    bool updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom);
+    bool deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool);
     /**
      * @fn    std::size_t BlockChain::getCachedBlocksSize() const;
      *
