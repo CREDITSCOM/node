@@ -13,7 +13,7 @@
 #include <chrono>
 
 namespace cs {
-void SolverCore::setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv) {
+void SolverCore::init(const cs::PublicKey& pub, const cs::PrivateKey& priv) {
     public_key = pub;
     private_key = priv;
 

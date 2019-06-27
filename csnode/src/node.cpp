@@ -84,7 +84,7 @@ bool Node::init(const Config& config) {
 #endif  // NODE_API
 
     // must call prior to blockChain_.init():
-    solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
+    solver_->init(nodeIdKey_, nodeIdPrivate_);
     solver_->startDefault();
 
     if (!blockChain_.init(config.getPathToDB())) {

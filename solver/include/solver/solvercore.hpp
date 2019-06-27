@@ -65,7 +65,7 @@ public:
     // Solver "public" interface,
     // below are the "required" methods to be implemented by Solver-compatibility issue:
 
-    void setKeysPair(const cs::PublicKey& pub, const cs::PrivateKey& priv);
+    void init(const cs::PublicKey& pub, const cs::PrivateKey& priv);
     void gotConveyerSync(cs::RoundNumber rNum);
     void gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender);
 

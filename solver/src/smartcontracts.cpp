@@ -930,6 +930,12 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
             if (is_new_state(tr)) {
                 // if tr contains hash of state we must derive result state here
                 if (!tr.user_field(trx_uf::new_state::Value).is_valid()) {
+
+                    if (block.sequence() == 0) {
+                        // start of reading
+                        wait_until_executor(3 /*sec*/);
+                    }
+
                     csdb::UserField fld = tr.user_field(trx_uf::new_state::Hash);
                     if (!fld.is_valid()) {
                         cserror() << kLogPrefix << "new_state contains neither state nor hash, ignore new_state";
@@ -993,6 +999,18 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
                                                 csdebug() << kLogPrefix << "state of " << ref_start << " is updated, stored hash is "
                                                     << hash_result << ", new size is " << head.newState.size();
                                             }
+                                        }
+                                    }
+                                    else {
+                                        // execution error, test if executor is still available
+                                        if (exec_handler_ptr && !exec_handler_ptr->getExecutor().isConnect()) {
+                                            wait_until_executor(2);
+                                        }
+                                        else {
+                                            if (exe_data.error.empty()) {
+                                                exe_data.error = "contract execution failed";
+                                            }
+                                            cserror() << kLogPrefix << "failed to get updated state of " << ref_start << ": " << exe_data.error;
                                         }
                                     }
                                 }
@@ -2093,6 +2111,17 @@ bool SmartContracts::dbcache_read(const BlockChain& blockchain, const csdb::Addr
 
 bool SmartContracts::dbcache_read(const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, std::string& state /*output*/) {
     return SmartContracts::dbcache_read(bc, abs_addr, ref_start, state);
+}
+
+void SmartContracts::wait_until_executor(unsigned int test_freq) {
+    if (!exec_handler_ptr) {
+        cserror() << kLogPrefix << "executor is unavailable, cannot operate correctly";
+        return;
+    }
+    while (!exec_handler_ptr->getExecutor().isConnect()) {
+        cswarning() << kLogPrefix << "wait for executor prior to continue read blockchain DB";
+        std::this_thread::sleep_for(std::chrono::seconds(test_freq));
+    }
 }
 
 // non-member functions
