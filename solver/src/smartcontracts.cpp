@@ -816,7 +816,7 @@ bool SmartContracts::test_executor_availability() {
         execution_allowed = exec_handler_ptr && exec_handler_ptr->getExecutor().isConnect();
         if (execution_allowed) {
             cslog() << std::endl << kLogPrefix << "connection to executor is restored" << std::endl;
-            // update all currently running contracts locks, missed while executor was unavailable
+            // update all contracts metadata, missed while executor was unavailable
             for (const auto& exe_item : exe_queue) {
                 if (exe_item.status == SmartContractStatus::Running || exe_item.status == SmartContractStatus::Finished) {
                     if (!is_metadata_actual(exe_item.abs_addr)) {
@@ -982,28 +982,9 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
                                             exe_data.explicit_last_state = item.state;
                                         }
                                     }
-                                    if (execute(exe_data, true /*validationMode*/)) {
-                                        if (!exe_data.result.smartsRes.empty()) {
-                                            const auto& head = exe_data.result.smartsRes.front();
-                                            if (head.response.code == 0) {
-                                                tr_state.add_user_field(trx_uf::new_state::Value, head.newState);
-                                                // test actual hash
-                                                cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)head.newState.data(), head.newState.size());
-                                                std::string hash_result;
-                                                if (actual_hash == hash) {
-                                                    hash_result = "OK";
-                                                }
-                                                else {
-                                                    hash_result = "WRONG";
-                                                }
-                                                csdebug() << kLogPrefix << "state of " << ref_start << " is updated, stored hash is "
-                                                    << hash_result << ", new size is " << head.newState.size();
-                                            }
-                                        }
-                                    }
-                                    else {
+                                    while (!execute(exe_data, true /*validationMode*/)) {
                                         // execution error, test if executor is still available
-                                        if (exec_handler_ptr && !exec_handler_ptr->getExecutor().isConnect()) {
+                                        if (!execution_allowed) {
                                             wait_until_executor(2);
                                         }
                                         else {
@@ -1011,6 +992,24 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
                                                 exe_data.error = "contract execution failed";
                                             }
                                             cserror() << kLogPrefix << "failed to get updated state of " << ref_start << ": " << exe_data.error;
+                                            break;
+                                        }
+                                    }
+                                    if (!exe_data.result.smartsRes.empty()) {
+                                        const auto& head = exe_data.result.smartsRes.front();
+                                        if (head.response.code == 0) {
+                                            tr_state.add_user_field(trx_uf::new_state::Value, head.newState);
+                                            // test actual hash
+                                            cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)head.newState.data(), head.newState.size());
+                                            std::string hash_result;
+                                            if (actual_hash == hash) {
+                                                hash_result = "OK";
+                                            }
+                                            else {
+                                                hash_result = "WRONG";
+                                            }
+                                            csdebug() << kLogPrefix << "state of " << ref_start << " is updated, stored hash is "
+                                                << hash_result << ", new size is " << head.newState.size();
                                         }
                                     }
                                 }
@@ -1289,7 +1288,15 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
         }
     }
     else {
-        data.setError(error::ExecuteTransaction, "contract execution failed");
+        // the possible reason to return std::nullopt is the executor unconnected, otherwise there is an internal error (incorrect transaction and so on...)
+        execution_allowed = exec_handler_ptr->getExecutor().isConnect();
+        if (!execution_allowed) {
+            data.setError(error::ExecutionError, "execution failed, connection to executor has lost");
+            return false;
+        }
+        else {
+            data.setError(error::ExecuteTransaction, "execution failed, internal error");
+        }
     }
     return true;
 }
