@@ -296,7 +296,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     std::string timeStamp = chooseTimeStamp();
     poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
     poolMetaInfo.timestamp = std::move(currentTimeStamp);
-
+    poolMetaInfo.characteristic.mask = conveyer.characteristic(conveyer.currentRoundNumber())->mask;
     //const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
     //if (confirmation.has_value()) {
     //    poolMetaInfo.confirmationMask = confirmation.value().mask;

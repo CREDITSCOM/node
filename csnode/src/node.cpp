@@ -1216,7 +1216,6 @@ cs::PoolsBlock Node::decompressPoolsBlock(const uint8_t* data, const size_t size
 }
 
 void Node::sendStageOne(const cs::StageOne& stageOneInfo) {
-    corruptionLevel_ = 0;
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
         return;
@@ -2005,7 +2004,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     cs::Bytes bytes;
     istream_ >> bytes;
 
-    if (!istream_.good()) {
+    if (!istream_.good() || !istream_.end()) {
         csmeta(cserror) << "Malformed packet with round table (1)";
         return;
     }
