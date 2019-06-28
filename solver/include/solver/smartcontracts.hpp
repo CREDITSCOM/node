@@ -670,15 +670,18 @@ private:
     bool dbcache_read(const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, std::string& state /*output*/);
 
     /**
-     * block current thread until executor become available test_period_sec 
+     * block current thread until executor become available test_period_sec
      *
      * @author  Alexander Avramenko
      * @date    27.06.2019
      *
-     * @param   test_period_sec Interval in seconds between tests & outputs to console of diagnostic warning.
+     * @param   test_period_sec Interval in seconds between tests &amp; outputs to console of
+     *  diagnostic warning.
+     *
+     * @returns True if it succeeds, false if wait has stopped and executor is still unavailable.
      */
 
-    void wait_until_executor(unsigned int test_period_sec);
+    bool wait_until_executor(unsigned int test_period_sec);
 };
 
 }  // namespace cs

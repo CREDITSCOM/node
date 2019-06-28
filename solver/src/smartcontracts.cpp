@@ -903,7 +903,7 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
     test_exe_queue();
 }
 
-void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*/) {
+void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
     cs::Lock lock(public_access_lock);
 
     // uncomment when exe_queue is updated during blocks reading on startup:
@@ -932,8 +932,12 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
                 if (!tr.user_field(trx_uf::new_state::Value).is_valid()) {
 
                     if (block.sequence() == 0) {
-                        // start of reading
-                        wait_until_executor(3 /*sec*/);
+                        // start of reading, ask user every 3 seconds to start executor
+                        if (!wait_until_executor(3 /*sec*/)) {
+                            cserror() << kLogPrefix << "cannot connect to executor, further blockchain reading is impossible, stop reading";
+                            *should_stop = true;
+                            return;
+                       }
                     }
 
                     csdb::UserField fld = tr.user_field(trx_uf::new_state::Hash);
@@ -985,7 +989,12 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* /*should_stop*
                                     while (!execute(exe_data, true /*validationMode*/)) {
                                         // execution error, test if executor is still available
                                         if (!execution_allowed) {
-                                            wait_until_executor(2);
+                                            // ask user to restart executor every 2 seconds
+                                            if (!wait_until_executor(2)) {
+                                                cserror() << kLogPrefix << "cannot connect to executor, further blockchain reading is impossible, interrupt reading";
+                                                *should_stop = true;
+                                                return;
+                                            }
                                         }
                                         else {
                                             if (exe_data.error.empty()) {
@@ -2120,15 +2129,19 @@ bool SmartContracts::dbcache_read(const csdb::Address& abs_addr, SmartContractRe
     return SmartContracts::dbcache_read(bc, abs_addr, ref_start, state);
 }
 
-void SmartContracts::wait_until_executor(unsigned int test_freq) {
+bool SmartContracts::wait_until_executor(unsigned int test_freq) {
     if (!exec_handler_ptr) {
         cserror() << kLogPrefix << "executor is unavailable, cannot operate correctly";
-        return;
+        return false;
     }
     while (!exec_handler_ptr->getExecutor().isConnect()) {
+        if (pnode->isStopRequested()) {
+            return false;
+        }
         cswarning() << kLogPrefix << "wait for executor prior to continue read blockchain DB";
         std::this_thread::sleep_for(std::chrono::seconds(test_freq));
     }
+    return true;
 }
 
 // non-member functions

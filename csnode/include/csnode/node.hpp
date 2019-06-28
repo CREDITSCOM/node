@@ -58,6 +58,9 @@ public:
     void stop();
 
     static void requestStop();
+    bool isStopRequested() const {
+        return stopRequested_;
+    }
 
     std::string getSenderText(const cs::PublicKey& sender);
 
