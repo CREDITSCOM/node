@@ -1002,7 +1002,8 @@ private:
     struct SmartState {
         std::string state;
         bool lastEmpty;
-        csdb::TransactionID transaction;
+        std::string lastRetVal;
+        //csdb::TransactionID transaction;
         csdb::TransactionID initer;
     };
 

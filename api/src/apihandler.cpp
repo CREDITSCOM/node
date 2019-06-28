@@ -805,13 +805,13 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     }
     else {
         std::string new_state;
-        csdb::TransactionID trId;
+        std::string retval;
 
         auto resWait = contract_state_entry.waitTillFront([&](SmartState& ss) {
             auto execTrans = s_blockchain.loadTransaction(ss.initer);
             if (execTrans.is_valid() && execTrans.signature() == send_transaction.signature()) {
                 new_state = ss.lastEmpty ? std::string() : ss.state;
-                trId = ss.transaction.clone();
+                retval = ss.lastRetVal;
                 return true;
             }
             return false;
@@ -828,10 +828,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             return;
         }
         else {
-            auto stateTrans = s_blockchain.loadTransaction(trId);
-            if (stateTrans.is_valid() && stateTrans.user_field_ids().count(cs::trx_uf::new_state::RetVal) > 0) {
-                auto var_state = deserialize<::general::Variant>(stateTrans.user_field(cs::trx_uf::new_state::RetVal).value<std::string>());
-                _return.__set_smart_contract_result(var_state);
+            if (!retval.empty()) {
+                _return.__set_smart_contract_result(deserialize<::general::Variant>(std::move(retval)));
             }
         }
     }
@@ -1300,7 +1298,7 @@ void APIHandler::update_smart_state_slot(const csdb::Transaction& tr_new_state) 
         return SmartState {
             newState.empty() ? oldState.state : newState,
             newState.empty(),
-            tr_new_state.id().clone(),
+            tr_new_state.user_field(cs::trx_uf::new_state::RetVal).value<std::string>(),
             ref_start.getTransactionID().clone()
         };
     });
