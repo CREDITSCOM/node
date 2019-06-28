@@ -1094,7 +1094,8 @@ bool BlockChain::updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& p
 bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool) {
     deferredBlock_ = csdb::Pool{};
     deferredBlock_ = newPool;
-    deferredBlock_.set_signatures(rPackage.poolSignatures());
+    auto tmp = rPackage.poolSignatures();
+    deferredBlock_.set_signatures(tmp);
     deferredBlock_.compose();
     Hash tempHash;
     auto hash = deferredBlock_.hash().to_binary();

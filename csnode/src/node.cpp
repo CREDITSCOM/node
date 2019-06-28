@@ -463,7 +463,8 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         return;
     }
 //    solver_->uploadNewStates(conveyer.uploadNewStates());
-    pool.value().set_signatures(rPackage.poolSignatures());
+    auto tmp = rPackage.poolSignatures();
+    pool.value().set_signatures(tmp);
     pool.value().set_confidants(confidantsReference);
 
     if (round != 0) {
@@ -1889,7 +1890,7 @@ void Node::sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& tar
         csdebug() << "No active round table, can't send";
         return;
     }
-    auto& rpCurrent = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum](cs::RoundPackage& rp) {return rp.roundTable().round == rNum;});
+    auto rpCurrent = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum](cs::RoundPackage& rp) {return rp.roundTable().round == rNum;});
 
     //////////////////////////////////////////////////
     //if (std::find(lastRoundPackage->roundTable().confidants.cbegin(), lastRoundPackage->roundTable().confidants.cend(), target) != lastRoundPackage->roundTable().confidants.end()) {
@@ -2063,7 +2064,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     performRoundPackage(rPackage, sender);
 }
 
-void Node::performRoundPackage(cs::RoundPackage& rPackage, cs::PublicKey sender) {
+void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& /*sender*/) {
     csdebug() << __func__;
     confirmationList_.add(rPackage.roundTable().round, false, rPackage.roundTable().confidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.trustedSignatures());
     cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -2187,7 +2188,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
         deltaStamp = Consensus::MaxTimeStampDelta;
 
     }
-    if (sHash.timeStamp < lastTimeStamp || sHash.timeStamp > currentTimeStamp + deltaStamp / 2 * 3) {//here we just take the time inteerval 1.5 times larger than last round
+    if (sHash.timeStamp < lastTimeStamp || sHash.timeStamp > currentTimeStamp + deltaStamp / 2 * 3) {//here we just take the time interval 1.5 times larger than last round
         csdebug() << "Our TimeStamp = " << std::to_string(currentTimeStamp) << " ... return";
         return;
     }

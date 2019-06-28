@@ -78,7 +78,7 @@ public:
 
     // SOLVER3 methods
     void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
-    void performRoundPackage(cs::RoundPackage& rPackage, cs::PublicKey sender);
+    void performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& sender);
     void sendHash(cs::RoundNumber round);
     void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
     void roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round);
