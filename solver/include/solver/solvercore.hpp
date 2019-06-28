@@ -9,6 +9,7 @@
 
 #include <csdb/pool.hpp>
 #include <csnode/transactionspacket.hpp>
+#include <csnode/roundpackage.hpp>
 
 #include <algorithm>
 #include <array>
@@ -61,13 +62,15 @@ public:
 
     bool addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures);
 
+    void updateLastPackageSignatures();
+
     uint8_t subRound();
     // Solver "public" interface,
     // below are the "required" methods to be implemented by Solver-compatibility issue:
 
     void init(const cs::PublicKey& pub, const cs::PrivateKey& priv);
     void gotConveyerSync(cs::RoundNumber rNum);
-    void gotHash(csdb::PoolHash&& hash, const cs::PublicKey& sender);
+    void gotHash(const cs::StageHash&& sHash);
 
     const cs::PublicKey& getPublicKey() const {
         return public_key;
@@ -90,10 +93,11 @@ public:
     void gotStageTwo(const cs::StageTwo& stage);
     void gotStageThree(const cs::StageThree& stage, const uint8_t flagg);
 
+    void addRoundSignature(const cs::StageThree & st3);
+
     void gotStageOneRequest(uint8_t requester, uint8_t required);
     void gotStageTwoRequest(uint8_t requester, uint8_t required);
     void gotStageThreeRequest(uint8_t requester, uint8_t required /*, uint8_t iteration*/);
-    void printStage3(const cs::StageThree& stage);
 
     void removeDeferredBlock(cs::Sequence);
     bool realTrustedChanged() const;
@@ -190,7 +194,7 @@ private:
     cs::PublicKey public_key;
     cs::PrivateKey private_key;
     // senders of hashes received this round
-    std::vector<std::pair<csdb::PoolHash, cs::PublicKey>> recv_hash;
+    std::vector<cs::StageHash> recv_hash;
 
     Node* pnode;
     std::unique_ptr<cs::WalletsState> pws;
@@ -207,6 +211,8 @@ private:
 
     void handleTransitions(Event evt);
     bool stateCompleted(Result result);
+
+    std::string chooseTimeStamp();
 
     void spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& currentTimeStamp, cs::StageThree& st3);
 
@@ -302,6 +308,12 @@ private:
     bool realTrustedChanged_;
     cs::Bytes tempRealTrusted_;
 
+    struct SentSignatures {
+        cs::Signatures poolSignatures;
+        cs::Signatures roundSignatures;
+        cs::Signatures trustedConfirmation;
+    };
+
     std::vector<std::pair<uint8_t, cs::Signature>> newBlockSignatures;
 
     std::vector<int> smartUntrusted;
@@ -316,6 +328,8 @@ private:
     TimeoutTracking track_next_round;
     std::map<cs::PublicKey, uint16_t> grayList_;
     cs::RoundNumber lastGrayUpdated_ = 0;
+    RoundPackage justCreatedRoundPackage;
+    SentSignatures lastSentSignatures_;
 };
 
 }  // namespace cs
