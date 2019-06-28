@@ -244,10 +244,10 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
     for (const auto& item : known_contracts) {
         const StateItem& val = item.second;
         if (val.state.empty()) {
-            cswarning() << kLogPrefix << "completely unsuccessful contract found, neither deployed, nor executed";
+            cstrace() << kLogPrefix << "completely unsuccessful " << val.ref_deploy << " found, neither deployed, nor executed";
         }
         if (!val.ref_deploy.is_valid()) {
-            cswarning() << kLogPrefix << "unsuccessfully deployed contract found";
+            cstrace() << kLogPrefix << "unsuccessfully deployed contract found";
         }
     }
 
@@ -1717,7 +1717,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
 
     fld = t.user_field(new_state::Value);
     if (!fld.is_valid()) {
-        cserror() << kLogPrefix << "contract state is not updated, transaction does not contain it";
+        cserror() << kLogPrefix << ref_start << " state is not updated, transaction does not contain it";
         return false;
     }
     std::string state_value = fld.value<std::string>();
@@ -1726,10 +1726,10 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         csdb::Address abs_addr = absolute_address(t.target());
         if(!abs_addr.is_valid()) {
             if (reading_db) {
-                csdebug() << kLogPrefix << "(error in blockchain) cannot find contract by address from new_state";
+                csdebug() << kLogPrefix << ref_start << " (error in blockchain) cannot find contract by address from new_state";
             }
             else {
-                cserror() << kLogPrefix << "failed to convert optimized address";
+                cserror() << kLogPrefix << ref_start << " failed to convert optimized address";
             }
             return false;
         }
@@ -1737,10 +1737,10 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         csdb::Transaction t_start = get_transaction(ref_start);
         if(!t_start.is_valid()) {
             if (reading_db) {
-                csdebug() << kLogPrefix << "(error in blockchain) cannot find starter transaction new_state refer to";
+                csdebug() << kLogPrefix << ref_start << " (error in blockchain) cannot find starter transaction";
             }
             else {
-                cswarning() << kLogPrefix << "new_state transaction does not refer to starter one";
+                cswarning() << kLogPrefix << ref_start << " failed to read starter transaction";
             }
             return false;
         }
@@ -1750,7 +1750,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
 
         if (!reading_db) {
             std::cout << std::endl; // emphasize with empty line
-            cslog() << kLogPrefix << "contract state is updated, new size is " << state_value.size();
+            cslog() << kLogPrefix << ref_start << " state is updated, new size is " << state_value.size();
             std::cout << std::endl; // emphasize with empty line
         }
 
@@ -1759,7 +1759,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         // update state value in cache
         if (!dbcache_update(abs_addr, ref_start, state_value, reading_db)) {
             // unable to allow cache not to be updated
-            cserror() << kLogPrefix << "failed to update contract state in cache";
+            cserror() << kLogPrefix << "failed to update " << ref_start << " state in cache";
             //this->execution_allowed = false;
             return false;
         }
@@ -1783,13 +1783,13 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
                     replenish_contract.erase(it);
                 }
                 else {
-                    csdebug() << kLogPrefix << "(error in blockchain) cannot find replenish transaction new_state refers to";
+                    csdebug() << kLogPrefix << ref_start << " (error in blockchain) cannot find replenish transaction";
                 }
             }
             else {
                 // handle replenish from on-the-air blocks
                 if (!implements_payable(item.payable)) {
-                    cserror() << kLogPrefix << "non-payable contract state is updated by replenish transaction";
+                    cserror() << kLogPrefix << "non-payable " << ref_start << " state is updated by replenish transaction";
                 }
             }
             item.ref_execute = ref_start;
@@ -1810,18 +1810,20 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
                 }
             }
         }
-        std::string error_message("execution is failed");
-        fld = t.user_field(new_state::RetVal);
-        if (fld.is_valid()) {
-            ::general::Variant var = deserialize <::general::Variant>(fld.value<std::string>());
-            if (var.__isset.v_byte) {
-                error_message = SmartContracts::get_error_message(var.v_byte);
+        if (!reading_db) {
+            std::string error_message("execution is failed");
+            fld = t.user_field(new_state::RetVal);
+            if (fld.is_valid()) {
+                ::general::Variant var = deserialize <::general::Variant>(fld.value<std::string>());
+                if (var.__isset.v_byte) {
+                    error_message = SmartContracts::get_error_message(var.v_byte);
+                }
+                else if (var.__isset.v_string) {
+                    error_message = var.v_string;
+                }
             }
-            else if (var.__isset.v_string) {
-                error_message = var.v_string;
-            }
+            csdebug() << kLogPrefix << ref_start << " state is not updated, " << error_message;
         }
-        csdebug() << kLogPrefix << "contract state is not updated, " << error_message;
         return false;
     }
     return true;
