@@ -39,7 +39,7 @@ The node consists of the following elements:</p>
 >git submodule update --init --recursive
 >mkdir build
 >cd build
->cmake -DCMAKE_BUILD_TYPE=Release -A x64 ..
+>cmake -DCMAKE_BUILD_TYPE=Release ..
 >make
 
 <h2>System requirements:</h2>
