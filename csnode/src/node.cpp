@@ -112,7 +112,7 @@ bool Node::init(const Config& config) {
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
-
+    initCurrentRP();
     return true;
 }
 
@@ -139,6 +139,22 @@ void Node::stop() {
 void Node::flushCurrentTasks() {
     transport_->addTask(ostream_.getPackets(), ostream_.getPacketsCount());
     ostream_.clear();
+}
+
+void Node::initCurrentRP() {
+    cs::RoundPackage rp;
+    if (getBlockChain().getLastSequence() == 0) {
+        cs::RoundTable rt;
+        rt.round = 0;
+        rp.updateRoundTable(rt);
+    }
+    else {
+        cs::RoundTable rt;
+        rt.round = getBlockChain().getLastSequence();
+        rt.confidants = getBlockChain().getLastBlock().confidants();
+        rp.updateRoundTable(rt);
+    }
+    roundPackageCache_.push_back(rp);
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
@@ -1933,7 +1949,8 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage) {
     table.round = conveyer.currentRoundNumber();
     table.confidants = rPackage.roundTable().confidants;
     table.hashes = rPackage.roundTable().hashes;
-
+    roundPackageCache_.push_back(rPackage);
+    clearRPCache(rPackage.roundTable().round);
     conveyer.setTable(table);
     sendRoundPackageToAll(rPackage);
 
@@ -2020,13 +2037,15 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         <<  rPackage.toString() 
         <<  "\n-----------------------------------------------------------------------------------------------------------------------------";
 
+
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
     poolSynchronizer_->sync(conveyer.currentRoundNumber());
     if (poolSynchronizer_->isSyncroStarted()) {
         getCharacteristic(rPackage);
     }
-
+    roundPackageCache_.push_back(rPackage);
+    clearRPCache(rPackage.roundTable().round);
     cs::Signatures poolSignatures;
     cs::PublicKeys confidants;
     if (rPackage.roundTable().round > 2/* && confirmationList_.size() > 0*/) { //Here we have problems when the trusted have the first block and the others do not!!!
@@ -2105,6 +2124,21 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     reviewConveyerHashes();
 
     csmeta(csdetails) << "done\n";
+}
+
+void Node::clearRPCache(cs::RoundNumber rNum) {
+    bool flagg = true;
+    if (rNum < 6) {
+        return;
+    }
+    while (flagg) {
+        auto tmp = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum](cs::RoundPackage& rp) {return rp.roundTable().round == rNum - 5; });
+        if (tmp == roundPackageCache_.end()) {
+            break;
+        }
+        roundPackageCache_.erase(tmp);
+    }
+
 }
 
 void Node::sendHash(cs::RoundNumber round) {
@@ -2267,7 +2301,11 @@ void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNu
 
 void Node::roundPackReply(const cs::PublicKey& respondent) {
     csdebug() << "NODE> sending roundPack reply to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
-    sendDefault(respondent, MsgTypes::RoundTable, currentRoundTableMessage_.round, currentRoundTableMessage_.message);
+    if (roundPackageCache_.size() == 0) {
+        csdebug() << "NODE> can't send = don't have last RoundPackage filled";
+    }
+    cs::RoundPackage rp = roundPackageCache_.back();
+    sendDefault(respondent, MsgTypes::RoundTable, rp.roundTable().round, rp.subRound(), rp.toBinary());
 }
 
 void Node::sendRoundTableRequest(uint8_t respondent) {
