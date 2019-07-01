@@ -682,6 +682,19 @@ private:
      */
 
     bool wait_until_executor(unsigned int test_period_sec);
+
+    /**
+     * Gets transaction with actual state on basis of new_state transaction in blockchain
+     *
+     * @author  Alexander Avramenko
+     * @date    01.07.2019
+     *
+     * @param   hashed_state  The new_state transaction with hash of state.
+     *
+     * @returns The transaction with actual state.
+     */
+
+    csdb::Transaction get_actual_state(const csdb::Transaction& hashed_state);
 };
 
 }  // namespace cs
