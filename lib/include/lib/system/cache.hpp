@@ -1,12 +1,14 @@
 #ifndef CACHE_HPP
 #define CACHE_HPP
 
-constexpr unsigned cache_linesize = 64;
+#include <new>
 
-#ifdef _MSC_VER
-#define __cacheline_aligned
+#ifdef __cpp_lib_hardware_interference_size
+constexpr unsigned kCacheLineSize = std::hardware_constructive_interference_size;
 #else
-#define __cacheline_aligned alignas(cache_linesize)
+constexpr unsigned kCacheLineSize = 64;
 #endif
 
-#endif  // CACHE_H
+#define __cacheline_aligned alignas(kCacheLineSize)
+
+#endif  // CACHE_HPP

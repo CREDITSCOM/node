@@ -299,6 +299,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
 
     result.trxn.timeCreation = transaction.get_time();
 
+    result.trxn.poolNumber = s_blockchain.loadBlock(transaction.id().pool_hash()).sequence();
+
     if (is_smart(transaction)) {
         using namespace cs::trx_uf;
         auto sci = deserialize<api::SmartContractInvocation>(transaction.user_field(deploy::Code).value<std::string>());
@@ -402,6 +404,45 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         auto ufd = transaction.user_field(1);
         if (ufd.is_valid())
             result.trxn.__set_userFields(ufd.value<std::string>());
+    }
+
+    // fill ExtraFee
+    // 1) find state transaction
+    csdb::Transaction stateTrx;
+    if (is_smart(transaction)) {
+        auto opers = lockedReference(this->smart_operations);
+        stateTrx = s_blockchain.loadTransaction((*opers)[transaction.id()].stateTransaction);
+    }
+    else if (is_smart_state(transaction))
+        stateTrx = transaction;
+
+    if (!is_smart_state(stateTrx))
+        return result;
+
+    // 2) fill ExtraFee for state transaction
+    auto pool = s_blockchain.loadBlock(stateTrx.id().pool_hash());
+    auto transactions = pool.transactions();
+    ExtraFee extraFee;
+    extraFee.transactionId = convert_transaction_id(stateTrx.id());
+    // 2.1) counted_fee 
+    extraFee.sum = convertAmount(csdb::Amount(stateTrx.counted_fee().to_double()));
+    extraFee.comment = "contract state fee";
+    result.trxn.extraFee.push_back(extraFee);
+    // 2.2) execution fee
+    extraFee.sum = convertAmount(stateTrx.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>());
+    extraFee.comment = "contract execution fee";
+    result.trxn.extraFee.push_back(extraFee);
+
+    // 3) fill ExtraFee for extra transactions
+    auto trxIt = std::find_if(transactions.begin(), transactions.end(), [&stateTrx](const csdb::Transaction& ptrx) { return ptrx.id() == stateTrx.id(); });
+    for (auto trx = ++trxIt; trx != transactions.end(); ++trx) {
+        if (s_blockchain.getAddressByType(trx->source(), BlockChain::AddressType::PublicKey) != 
+            s_blockchain.getAddressByType(stateTrx.source(), BlockChain::AddressType::PublicKey)) // end find extra transactions                   
+                break;
+        extraFee.transactionId = convert_transaction_id(trx->id());
+        extraFee.sum = convertAmount(csdb::Amount(trx->counted_fee().to_double()));
+        extraFee.comment = "extra fee";
+        result.trxn.extraFee.push_back(extraFee);
     }
 
     return result;

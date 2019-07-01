@@ -253,7 +253,9 @@ void Network::writerRoutine(const Config& config) {
 
         int j = 0;
         for (uint64_t i = 0; i < tasks; i++) {
-            auto task = oPacMan_.getNextTask();
+            bool is_empty = false;
+            auto task = oPacMan_.getNextTask(is_empty);
+            if (is_empty) break;
             std::atomic_thread_fence(std::memory_order_acquire);
             if (!task->pack.region_.get()) {
                 cswarning() << "net: invalid packet for send!!!!!!!!! " << task->pack.region_.get();
@@ -264,6 +266,7 @@ void Network::writerRoutine(const Config& config) {
                 static constexpr size_t limit = 100;
                 auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
                 cswarning() << "socket Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
+                continue;
             }
 
             encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
@@ -310,7 +313,9 @@ void Network::writerRoutine(const Config& config) {
         writerLock.clear(std::memory_order_release);  // release lock
 
         for (int i = 0; i < tasks; i++) {
-            auto task = oPacMan_.getNextTask();
+            bool is_empty = false;
+            auto task = oPacMan_.getNextTask(is_empty);
+            if (is_empty) break;
             if (!task->pack.region_.get()) {
                 cswarning() << "net: invalid packet!!!!!!!!!";
                 continue;
@@ -355,7 +360,9 @@ void Network::processorRoutine() {
         }
 
         for (uint64_t i = 0; i < tasks; i++) {
-            auto task = iPacMan_.getNextTask();
+            bool is_empty = false;
+            auto task = iPacMan_.getNextTask(is_empty);
+            if (is_empty) break;
             if (!task->pack.region_.get()) {
                 cswarning() << "net: invalid packet processor!!!!!!!!!";
                 continue;
@@ -389,7 +396,9 @@ void Network::processorRoutine() {
         readerLock.clear(std::memory_order_release);  // release lock
 
         for (int i = 0; i < tasks; i++) {
-            auto task = iPacMan_.getNextTask();
+            bool is_empty = false;
+            auto task = iPacMan_.getNextTask(is_empty);
+            if (is_empty) break;
             processTask(task);
             task.release();
         }

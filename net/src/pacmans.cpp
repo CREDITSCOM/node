@@ -22,12 +22,13 @@ void IPacMan::rejectLast() {
     queue_.pop_back();
 }
 
-TaskPtr<IPacMan> IPacMan::getNextTask() {
-    while (!size_.load(std::memory_order_acquire)) {
-        std::this_thread::yield();
+TaskPtr<IPacMan> IPacMan::getNextTask(bool &is_empty) {
+    TaskPtr<IPacMan> result;
+    if (!size_.load(std::memory_order_acquire)) {
+        is_empty = true;
+        return result;
     }
     std::lock_guard<std::mutex> lock(mutex_);
-    TaskPtr<IPacMan> result;
     result.owner_ = this;
     result.it_ = queue_.begin();
     return result;
@@ -51,12 +52,13 @@ void OPacMan::enQueueLast() {
     size_.fetch_add(1, std::memory_order_acq_rel);
 }
 
-TaskPtr<OPacMan> OPacMan::getNextTask() {
-    while (!size_.load(std::memory_order_acquire)) {
-        std::this_thread::yield();
+TaskPtr<OPacMan> OPacMan::getNextTask(bool &is_empty) {
+    TaskPtr<OPacMan> result;
+    if (!size_.load(std::memory_order_acquire)) {
+        is_empty = true;
+        return result;
     }
     std::lock_guard<std::mutex> lock(mutex_);
-    TaskPtr<OPacMan> result;
     result.owner_ = this;
     result.it_ = queue_.begin();
     return result;
