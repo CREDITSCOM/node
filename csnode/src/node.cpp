@@ -57,6 +57,7 @@ Node::Node(const Config& config)
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     alwaysExecuteContracts_ = config.alwaysExecuteContracts();
+    maxNeighboursSequence_ = blockChain_.getLastSequence();
 
     good_ = init(config);
 }
@@ -203,6 +204,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     // do not pass further the hashes from unsuccessful round
     csmeta(csdebug) << "Get BigBang globalTable.hashes: " << globalTable.hashes.size();
 
+    maxNeighboursSequence_ = globalTable.round;
+
     conveyer.updateRoundTable(cachedRound, globalTable);
     onRoundStart(globalTable);
 
@@ -235,6 +238,10 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
     // TODO: fix sub round
     subRound_ = 0;
     roundTable.round = rNum;
+
+    if (maxNeighboursSequence_ < rNum) {
+        maxNeighboursSequence_ = rNum;
+    }
 
     cs::Conveyer::instance().setRound(rNum);
     cs::Conveyer::instance().setTable(roundTable);
@@ -798,7 +805,7 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     auto now = std::chrono::steady_clock::now();
     delta += std::chrono::duration_cast<std::chrono::milliseconds>(now - point);
 
-    if (maxHeighboursSequence_ < sequence) {
+    if (sequence <= maxNeighboursSequence_) {
         delta = std::chrono::milliseconds(0);
     }
 
@@ -2274,7 +2281,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     // update sub round and max heighbours sequence
     subRound_ = subRound;
-    maxHeighboursSequence_ = rNum;
+    maxNeighboursSequence_ = rNum;
 
     currentRoundTableMessage_.round = rNum;
     currentRoundTableMessage_.sender = sender;

@@ -400,7 +400,7 @@ private:
 
     //expected rounds
     std::vector<cs::RoundNumber> expectedRounds_;
-    cs::Sequence maxHeighboursSequence_ = 0;
+    cs::Sequence maxNeighboursSequence_ = 0;
     cs::Bytes lastTrustedMask_;
     std::unique_ptr<cs::BlockValidator> blockValidator_;
 
