@@ -49,6 +49,20 @@ constexpr bool isPair() {
     return IsPair<T>::value;
 }
 
+template <typename T>
+struct ArrayTraits;
+
+template <typename T, size_t N>
+struct ArrayTraits<std::array<T, N>> {
+    static constexpr auto Count = N;
+};
+
+template<typename Array,
+         typename = std::enable_if_t<std::is_same_v<Array, std::array<typename Array::value_type, ArrayTraits<Array>::Count>>>>
+constexpr Array zero() {
+    return Array{};
+}
+
 }
 
 #endif  //  REFLECTION_HPP
