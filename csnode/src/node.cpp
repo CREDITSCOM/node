@@ -3,6 +3,7 @@
 #include <numeric>
 #include <sstream>
 
+#include <solver/consensus.hpp>
 #include <solver/solvercore.hpp>
 #include <solver/smartcontracts.hpp>
 
@@ -28,9 +29,6 @@
 
 #include <lz4.h>
 #include <cscrypto/cscrypto.hpp>
-
-const unsigned MIN_CONFIDANTS = 3;
-const unsigned MAX_CONFIDANTS = 100;
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
@@ -956,7 +954,7 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
 
     csdebug() << "NODE> Number of confidants :" << cs::numeric_cast<int>(confSize);
 
-    if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS) {
+    if (confSize < Consensus::MinTrustedNodes || confSize > Consensus::MaxTrustedNodes) {
         cswarning() << "Bad confidants num";
         return false;
     }
