@@ -349,7 +349,7 @@ private:
     // ms timeout
     static const uint32_t packetRequestStep_ = 450;
     static const size_t maxPacketRequestSize_ = 1000;
-    static const int64_t maxPingSynchroDelay_ = 90000;
+    static const int64_t maxPingSynchroDelay_ = 30000;
 
     // serialization/deserialization entities
     cs::IPackStream istream_;

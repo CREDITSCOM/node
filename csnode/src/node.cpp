@@ -2260,7 +2260,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
 
 void Node::roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round) {
     csdebug() << "NODE> send request for round info  #" << round;
-    sendDefault(respondent, MsgTypes::RoundPackRequest, round);
+    sendDefault(respondent, MsgTypes::RoundPackRequest, round, round /*dummy data to prevent packet drop on receiver side*/);
 }
 
 void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -2269,12 +2269,18 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
 
     csdebug() << "NODE> getting roundPack request #" << rNum;
 
-    if (currentRoundTableMessage_.round == rNum && currentRoundTableMessage_.message.size() != 0) {
+    if (roundPackageCache_.size() == 0) {
+        csdebug() << "NODE> can't send = don't have last RoundPackage filled";
+        return;
+    }
+    cs::RoundPackage rp = roundPackageCache_.back();
+
+    if (rp.roundTable().round == rNum) {
         roundPackReply(sender);
     }
-    else if (currentRoundTableMessage_.round == rNum && currentRoundTableMessage_.message.size() == 0) {
-        emptyRoundPackReply(sender);
-    }
+    //else if (currentRoundTableMessage_.round == rNum && currentRoundTableMessage_.message.size() == 0) {
+    //    emptyRoundPackReply(sender);
+    //}
 }
 
 void Node::emptyRoundPackReply(const cs::PublicKey& respondent) {
@@ -2308,6 +2314,7 @@ void Node::roundPackReply(const cs::PublicKey& respondent) {
     csdebug() << "NODE> sending roundPack reply to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
     if (roundPackageCache_.size() == 0) {
         csdebug() << "NODE> can't send = don't have last RoundPackage filled";
+        return;
     }
     cs::RoundPackage rp = roundPackageCache_.back();
     sendDefault(respondent, MsgTypes::RoundTable, rp.roundTable().round, rp.subRound(), rp.toBinary());
