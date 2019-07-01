@@ -610,7 +610,9 @@ bool cs::ConveyerBase::isMetaTransactionInvalid(int64_t id) {
 
     for (const cs::ConveyerMetaStorage::Element& element : pimpl_->metaStorage) {
         const auto& invalidTransactions = element.meta.invalidTransactions.transactions();
-        const auto iterator = std::find_if(invalidTransactions.begin(), invalidTransactions.end(), [=](const auto& transaction) { return transaction.innerID() == id; });
+        const auto iterator = std::find_if(invalidTransactions.begin(), invalidTransactions.end(), [=](const auto& transaction) {
+            return transaction.innerID() == id;
+        });
 
         if (iterator != invalidTransactions.end()) {
             return true;

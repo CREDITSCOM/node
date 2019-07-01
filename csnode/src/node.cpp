@@ -3,6 +3,7 @@
 #include <numeric>
 #include <sstream>
 
+#include <solver/consensus.hpp>
 #include <solver/solvercore.hpp>
 #include <solver/smartcontracts.hpp>
 
@@ -29,9 +30,6 @@
 
 #include <lz4.h>
 #include <cscrypto/cscrypto.hpp>
-
-const unsigned MIN_CONFIDANTS = 3;
-const unsigned MAX_CONFIDANTS = 100;
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
@@ -60,6 +58,7 @@ Node::Node(const Config& config)
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     alwaysExecuteContracts_ = config.alwaysExecuteContracts();
+    maxNeighboursSequence_ = blockChain_.getLastSequence();
 
     good_ = init(config);
 }
@@ -224,6 +223,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     // do not pass further the hashes from unsuccessful round
     csmeta(csdebug) << "Get BigBang globalTable.hashes: " << globalTable.hashes.size();
 
+    maxNeighboursSequence_ = globalTable.round;
+
     conveyer.updateRoundTable(cachedRound, globalTable);
     onRoundStart(globalTable);
 
@@ -256,6 +257,10 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
     // TODO: fix sub round
     subRound_ = 0;
     roundTable.round = rNum;
+
+    if (maxNeighboursSequence_ < rNum) {
+        maxNeighboursSequence_ = rNum;
+    }
 
     cs::Conveyer::instance().setRound(rNum);
     cs::Conveyer::instance().setTable(roundTable);
@@ -821,7 +826,7 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     auto now = std::chrono::steady_clock::now();
     delta += std::chrono::duration_cast<std::chrono::milliseconds>(now - point);
 
-    if (maxHeighboursSequence_ < sequence) {
+    if (sequence <= maxNeighboursSequence_) {
         delta = std::chrono::milliseconds(0);
     }
 
@@ -977,7 +982,7 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
 
     csdebug() << "NODE> Number of confidants :" << cs::numeric_cast<int>(confSize);
 
-    if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS) {
+    if (confSize < Consensus::MinTrustedNodes || confSize > Consensus::MaxTrustedNodes) {
         cswarning() << "Bad confidants num";
         return false;
     }
@@ -2102,7 +2107,7 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     
     // update sub round and max heighbours sequence
     subRound_ = rPackage.subRound();
-    maxHeighboursSequence_ = rPackage.roundTable().round;
+    maxNeighboursSequence_ = rPackage.roundTable().round;
 
     cs::PacketsHashes hashes = rPackage.roundTable().hashes;
     cs::PublicKeys confidants = rPackage.roundTable().confidants;
