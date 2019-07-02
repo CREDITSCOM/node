@@ -806,19 +806,19 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             }
         }
         // --
-        auto source_pk = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
-        auto target_pk = s_blockchain.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
+        auto source_pk = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).to_api_addr();
+        auto target_pk = s_blockchain.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey).to_api_addr();
         executor::ExecuteByteCodeResult api_resp;
         const std::vector<general::ByteCodeObject>& bytecode = deploy ? input_smart.smartContractDeploy.byteCodeObjects : origin_bytecode;
         if (!deploy || !input_smart.smartContractDeploy.byteCodeObjects.empty()) {
             std::vector<executor::MethodHeader> methodHeader;
             {
                 executor::MethodHeader tmp;
-                tmp.methodName = input_smart.method;
-                tmp.params = input_smart.params;
+                tmp.methodName  = input_smart.method;
+                tmp.params      = input_smart.params;
                 methodHeader.push_back(tmp);
             }
-            executor_.executeByteCode(api_resp, source_pk.to_api_addr(), target_pk.to_api_addr(), bytecode, contract_state, methodHeader, MAX_EXECUTION_TIME);
+            executor_.executeByteCode(api_resp, source_pk, target_pk, bytecode, contract_state, methodHeader, true);
             if (api_resp.status.code) {
                 _return.status.code = api_resp.status.code;
                 _return.status.message = api_resp.status.message;
@@ -2512,9 +2512,15 @@ void APIHandler::SyncStateGet(api::SyncStateResult& _return) {
 }
 
 void apiexec::APIEXECHandler::GetSeed(apiexec::GetSeedResult& _return, const general::AccessID accessId) {
+    if (accessId == executor::Executor::ACCESS_ID_RESERVE::GETTER) { // for getter
+        std::default_random_engine random(std::random_device{}());
+        const auto randSequence = random() % blockchain_.getLastSequence();
+        const auto hash         = ::csdb::priv::crypto::calc_hash(blockchain_.getHashBySequence(randSequence).to_binary());
+        _return.seed.assign(hash.begin(), hash.end());
+        return;
+    }
     const auto opt_sequence = executor_.getSequence(accessId);
     if (!opt_sequence.has_value()) {
-        //_return.status.message = "AccessId isn't correct!";
         SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
         return;
     }
