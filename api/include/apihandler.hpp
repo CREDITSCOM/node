@@ -229,15 +229,19 @@ public:  // wrappers
 public:
 
     ~Executor() {
-        requestStop_ = true;
-        // wake up watching thread if it sleeps
-        cvErrorConnect_.notify_one();
+        stop();
     }
 
     static Executor& getInstance(const BlockChain* p_blockchain = nullptr, const cs::SolverCore* solver = nullptr, const int p_exec_port = 0,
         const std::string p_exec_ip = std::string{}, const std::string p_exec_cmdline = std::string{}) {  // singlton
         static Executor executor(*p_blockchain, *solver, p_exec_port, p_exec_ip, p_exec_cmdline);
         return executor;
+    }
+
+    void stop() {
+        requestStop_ = true;
+        // wake up watching thread if it sleeps
+        cvErrorConnect_.notify_one();
     }
 
     std::optional<cs::Sequence> getSequence(const general::AccessID& accessId) {
@@ -777,6 +781,9 @@ private:
                 else {
                     executor_process->launch(cs::Process::Options::None);
                 }
+            }
+            if (executor_process) {
+                executor_process->terminate();
             }
         });
         th.detach();

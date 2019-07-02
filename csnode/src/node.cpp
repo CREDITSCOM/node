@@ -133,6 +133,11 @@ void Node::stop() {
 
     blockChain_.close();
 
+    if (api_) {
+        api_->apiExecHandler()->getExecutor().stop();
+        cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
+    }
+
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
 }
 
