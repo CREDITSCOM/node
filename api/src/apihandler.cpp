@@ -444,7 +444,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         extraFee.comment = "extra fee";
         result.trxn.extraFee.push_back(extraFee);
     }
-
+    result.trxn.__isset.extraFee = true;
     return result;
 }
 
