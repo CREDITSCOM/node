@@ -16,6 +16,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <cmath>
 
 namespace
 {
@@ -239,7 +240,7 @@ std::string SolverCore::chooseTimeStamp() {
     int sizeAveNew = 0;
     sizeAve = 0;
     long long curAve;
-    long double sigma;
+    double sigma;
     long long int sigmaInt;
     long long int disp;
     while (true) {
@@ -251,7 +252,7 @@ std::string SolverCore::chooseTimeStamp() {
         }
         disp /= stamps.size();
         curAve = average;
-        sigma = std::sqrtl(static_cast<long double>(disp));
+        sigma = std::sqrt(disp);
         sigmaInt = static_cast<long long int>(sigma);
         csdebug() << "sigma = " << std::to_string(sigmaInt);
         sizeAve = 0;

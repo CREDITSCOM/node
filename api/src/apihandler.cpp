@@ -1103,7 +1103,8 @@ bool APIHandler::update_smart_caches(LongNamedType& locked_pending_smart_transac
                 }
 
                 {
-                    auto retVal = tr.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
+                    csdb::UserField uf = tr.user_field(cs::trx_uf::new_state::RetVal);
+                    std::string retVal = uf.value<std::string>();
                     ::general::Variant val;
                     if (!retVal.empty()) {
                         val = deserialize<::general::Variant>(std::move(retVal));
