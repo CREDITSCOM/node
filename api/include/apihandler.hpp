@@ -104,18 +104,17 @@ namespace executor {
 class Executor {
 public:  // wrappers
     void executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject>& code,
-            const std::string& state, std::vector<MethodHeader>& methodHeader, const int64_t& timeout) {
-        csunused(timeout);
+            const std::string& state, std::vector<MethodHeader>& methodHeader, bool isGetter) {
         static std::mutex mutex;
         std::lock_guard lock(mutex);  // temporary solution
 
         if (!code.empty()) {
             executor::SmartContractBinary smartContractBinary;
-            smartContractBinary.contractAddress = smart_address;
-            smartContractBinary.object.byteCodeObjects = code;
-            smartContractBinary.object.instance = state;
-            smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smart_address)) ? true : false;
-            if (auto optOriginRes = execute(address, smartContractBinary, methodHeader)) {
+            smartContractBinary.contractAddress         = smart_address;
+            smartContractBinary.object.byteCodeObjects  = code;
+            smartContractBinary.object.instance         = state;
+            smartContractBinary.stateCanModify          = solver_.isContractLocked(BlockChain::getAddressFromKey(smart_address)) ? true : false;
+            if (auto optOriginRes = execute(address, smartContractBinary, methodHeader, isGetter)) {
                 resp = optOriginRes.value().resp;
             }
         }
@@ -368,6 +367,8 @@ public:
         // Call to payable(string, byte[]) requested
         Payable
     };
+
+    enum ACCESS_ID_RESERVE { GETTER, START_INDEX };
 
     struct ExecuteTransactionInfo {
         // transaction to execute contract
@@ -812,13 +813,18 @@ private:
         accessSequence_.erase(p_access_id);
     }
 
-	std::optional<OriginExecuteResult> execute(const std::string& address, const SmartContractBinary& smartContractBinary, std::vector<MethodHeader>& methodHeader) {
+	std::optional<OriginExecuteResult> execute(const std::string& address, const SmartContractBinary& smartContractBinary, std::vector<MethodHeader>& methodHeader, bool isGetter = false) {
         constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
         OriginExecuteResult originExecuteRes{};
         if (!connect()) {
             return std::nullopt;
         }
-        const auto access_id = generateAccessId();
+
+        uint64_t access_id{};
+        if (!isGetter)
+            access_id = generateAccessId();
+
+        //const auto access_id = generateAccessId();
         ++execCount_;
         const auto timeBeg = std::chrono::steady_clock::now();
         try {
@@ -839,7 +845,8 @@ private:
         }
         originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - timeBeg).count();
         --execCount_;
-        deleteAccessId(access_id);
+        if (!isGetter)
+            deleteAccessId(access_id);
         disconnect();
         originExecuteRes.acceessId = access_id;
         return std::make_optional<OriginExecuteResult>(std::move(originExecuteRes));
@@ -1134,8 +1141,6 @@ private:
     void smart_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
 
     TokensMaster tm;
-
-    const uint32_t MAX_EXECUTION_TIME = 1000;
 
     const uint8_t ERROR_CODE = 1;
 
