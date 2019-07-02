@@ -2278,11 +2278,13 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
     cs::RoundPackage rp = roundPackageCache_.back();
 
     if (rp.roundTable().round == rNum) {
-        roundPackReply(sender);
+        if(!rp.roundSignatures().empty()) {
+            roundPackReply(sender);
+        }
+        else {
+            emptyRoundPackReply(sender);        
+        }
     }
-    //else if (currentRoundTableMessage_.round == rNum && currentRoundTableMessage_.message.size() == 0) {
-    //    emptyRoundPackReply(sender);
-    //}
 }
 
 void Node::emptyRoundPackReply(const cs::PublicKey& respondent) {
@@ -2303,6 +2305,9 @@ void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNu
     cs::Bytes bytes;
     cs::DataStream stream(bytes);
     stream << rNum;
+    if (rNum <= getBlockChain().getLastSequence()) {
+        return;
+    }
     if (!cscrypto::verifySignature(signature, sender, bytes.data(), bytes.size())) {
         csdebug() << "NODE> the RoundPackReply signature is not correct";
         return;
