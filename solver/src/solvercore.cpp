@@ -16,7 +16,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
-#include <cmath>
+#include <list>
 
 namespace
 {
@@ -213,71 +213,60 @@ bool SolverCore::stateFailed(Result res) {
 //}
 
 std::string SolverCore::chooseTimeStamp() {
-    std::vector<long long int> stamps;
-    long long int lastTimeStamp = std::atoll(pnode->getBlockChain().getLastTimeStamp().c_str());
-    long long int tmp = 0;
-    long long int average = 0;
-    int sizeAve = 0;
+    int64_t lastTimeStamp;
+    try {
+      lastTimeStamp = std::stoll(pnode->getBlockChain().getLastTimeStamp());
+    } catch(...) {
+      return std::to_string(0);
+    }
+
+    std::list<double> stamps;
+    double sx = 0, sx2 = 0;
+    double mean;
+    int N = 0;
     for (auto& it : stageOneStorage) {
         if (it.roundTimeStamp != "") {
-            tmp = std::atoll(it.roundTimeStamp.c_str());
-            //csdebug() << "tmp = " << std::to_string(tmp) << " last time stamp = " << std::to_string(lastTimeStamp);
-            if (tmp > lastTimeStamp) {
-                stamps.push_back(tmp);
-                average += tmp;
-                ++sizeAve;
+            int64_t tStamp;
+            try {
+                tStamp = std::stoll(it.roundTimeStamp);
+            } catch(...) {
+                continue;
             }
-        }
-    }
-    if (sizeAve != 0) {
-        average = average / sizeAve;
-        csdebug() << "average = " << std::to_string(average);
-    }
-    else {
-        csdebug() << "There is no nodes with valid TimeStamp";
-    }
-
-    int sizeAveNew = 0;
-    sizeAve = 0;
-    long long curAve;
-    double sigma;
-    long long int sigmaInt;
-    long long int disp;
-    while (true) {
-        disp = 0;
-        for (auto it : stamps) {
-            if (it != 0) {
-                disp += (it - average)*(it - average);
+            double x = tStamp - lastTimeStamp;
+            if (x > 0.) {
+                stamps.push_back(x);
+                sx += x;
+                sx2 += x * x;
+                ++N;
             }
-        }
-        disp /= stamps.size();
-        curAve = average;
-        sigma = std::sqrt(disp);
-        sigmaInt = static_cast<long long int>(sigma);
-        csdebug() << "sigma = " << std::to_string(sigmaInt);
-        sizeAve = 0;
-        sizeAveNew = 0;
-        average = 0;
-        for (int i = 0; i < stamps.size(); ++i) {
-            if (stamps[i] != 0) {
-                if (stamps[i] > curAve + 3 * sigmaInt) {
-                    stamps[i] = 0;
-                }
-                else {
-                    average += stamps[i];
-                    ++sizeAveNew;
-                }
-                ++sizeAve;
-            }
-        }
-        average /= sizeAveNew;
-        if (sizeAve == sizeAveNew) {
-            break;
         }
     }
 
-    csdebug() << "finish: " << std::to_string(average);
-    return std::to_string(average);
+    bool isDrop = true;
+    while (isDrop) {
+        if (N == 0) {
+            csdebug() << "There is no nodes with valid TimeStamp";
+            return std::to_string(0);
+        }
+        double N_1 = 1. / N;
+        mean = sx * N_1;
+        double disp = sx2 * N_1 - mean * mean;
+        isDrop = false;
+        for (auto it = stamps.begin(), end = stamps.end(); it != end;) {
+            double x = *it;
+            auto it_ = it++;
+            double value = x - mean;
+            if (value * value >  9. * disp) {
+                sx -= x; sx2 -= x * x; --N;
+                stamps.erase(it_);
+                isDrop = true;
+            }
+        }
+    }
+
+    auto meanTimeStamp = static_cast<int64_t>(lastTimeStamp + mean + 0.5);
+    csdebug() << "finish: " << meanTimeStamp;
+    return std::to_string(meanTimeStamp);
 }
 
 // TODO: this function is to be implemented the block and RoundTable building <====

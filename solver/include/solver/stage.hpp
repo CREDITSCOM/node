@@ -16,8 +16,9 @@ public:
     TrustedMask();
     TrustedMask(uint8_t size);
 
-    TrustedMask operator=(const TrustedMask& mask) {
+    TrustedMask& operator=(const TrustedMask& mask) {
         init(mask.value());
+        return *this;
     }
 
     void init(uint8_t size);
@@ -35,8 +36,6 @@ public:
         return isReadOnly_;
     }
 
-
-
     uint8_t size() {
         return static_cast<uint8_t>(mask_.size());
     }
@@ -45,7 +44,7 @@ public:
         return mask_;
     }
 
-    const uint8_t value(size_t index) const {
+    uint8_t value(size_t index) const {
         if (index < mask_.size()) {
             return mask_[index];
         }
@@ -55,7 +54,6 @@ public:
 private:
     std::vector<uint8_t> mask_;
     bool isReadOnly_;
-
 };
 
 struct StageOne {
