@@ -47,7 +47,8 @@ Node::Node(const Config& config)
     std::cout << "Done\n";
     poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
-    auto& executor = executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort, config.getApiSettings().executorHost);
+    const auto& settings = config.getApiSettings();
+    auto& executor = executor::Executor::getInstance(&blockChain_, solver_, settings.executorPort, settings.executorHost, settings.executorCmdLine);
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
@@ -74,9 +75,10 @@ Node::~Node() {
 bool Node::init(const Config& config) {
 #ifdef NODE_API
     std::cout << "Init API... ";
+    const auto& settings = config.getApiSettings();
     api_ = std::make_unique<csconnector::connector>(
         blockChain_, solver_,
-        csconnector::Config{config.getApiSettings().port, config.getApiSettings().ajaxPort, config.getApiSettings().executorPort, config.getApiSettings().apiexecPort});
+        csconnector::Config{settings.port, settings.ajaxPort, settings.executorPort, settings.apiexecPort, settings.executorCmdLine });
     std::cout << "Done\n";
     cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);

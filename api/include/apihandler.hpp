@@ -31,6 +31,7 @@
 
 #include <client/params.hpp>
 #include <lib/system/concurrent.hpp>
+#include <lib/system/process.hpp>
 
 #include "tokens.hpp"
 
@@ -226,8 +227,16 @@ public:  // wrappers
     }
 
 public:
-    static Executor& getInstance(const BlockChain* p_blockchain = nullptr, const cs::SolverCore* solver = nullptr, const int p_exec_port = 0, const std::string p_exec_ip = std::string{}) {  // singlton
-        static Executor executor(*p_blockchain, *solver, p_exec_port, p_exec_ip);
+
+    ~Executor() {
+        requestStop_ = true;
+        // wake up watching thread if it sleeps
+        cvErrorConnect_.notify_one();
+    }
+
+    static Executor& getInstance(const BlockChain* p_blockchain = nullptr, const cs::SolverCore* solver = nullptr, const int p_exec_port = 0,
+        const std::string p_exec_ip = std::string{}, const std::string p_exec_cmdline = std::string{}) {  // singlton
+        static Executor executor(*p_blockchain, *solver, p_exec_port, p_exec_ip, p_exec_cmdline);
         return executor;
     }
 
@@ -734,25 +743,40 @@ public slots:
 
 private:
     std::map<general::Address, general::AccessID> lockSmarts;
-    explicit Executor(const BlockChain& p_blockchain, const cs::SolverCore& solver, const int p_exec_port, const std::string p_exec_ip)
+    explicit Executor(const BlockChain& p_blockchain, const cs::SolverCore& solver, int p_exec_port,
+        const std::string p_exec_ip, const std::string p_exec_cmdline)
     : blockchain_(p_blockchain)
     , solver_(solver)
     , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
         ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(p_exec_ip, p_exec_port)))
     , origExecutor_(
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
-        std::thread th([&]() {
+        std::thread th([=]() {
+            std::string executor_cmdline = p_exec_cmdline;
+            std::unique_ptr<cs::Process> executor_process;
+            if(!executor_cmdline.empty()) {
+                executor_process = std::make_unique<cs::Process>(executor_cmdline);
+                executor_process->launch(cs::Process::Options::None);
+            }
             while (true) {
                 if (isConnect_) {
                     static std::mutex mt;
                     std::unique_lock ulk(mt);
-                    cvErrorConnect_.wait(ulk, [&] { return !isConnect_; });
+                    cvErrorConnect_.wait(ulk, [&] { return !isConnect_ || requestStop_; });
                 }
 
+                if (requestStop_) {
+                    break;
+                }
                 static const int RECONNECT_TIME = 10;
                 std::this_thread::sleep_for(std::chrono::seconds(RECONNECT_TIME));
-                if (connect())
-                    disconnect();
+                if (!executor_process || executor_process->isRunning()) {
+                    if (connect())
+                        disconnect();
+                }
+                else {
+                    executor_process->launch(cs::Process::Options::None);
+                }
             }
         });
         th.detach();
@@ -867,8 +891,8 @@ private:
     std::atomic_size_t execCount_{0};
 
     std::condition_variable cvErrorConnect_;
-    std::atomic_bool isConnect_{false};
-
+    std::atomic_bool isConnect_{ false };
+    std::atomic_bool requestStop_{ false };
     const uint16_t EXECUTOR_VERSION = 1;
 };
 }  // namespace executor

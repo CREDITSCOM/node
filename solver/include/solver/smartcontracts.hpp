@@ -9,7 +9,7 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
 
-#include <csnode/node.hpp>  // introduce csconnector::connector::ApiExecHandlerPtr as well
+#include <csnode/node.hpp>  // introduce csconnector::connector::ApiExecHandlerPtr at least
 
 #include <list>
 #include <mutex>

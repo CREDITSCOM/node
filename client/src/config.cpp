@@ -58,6 +58,7 @@ const std::string PARAM_NAME_AJAX_PORT = "ajax_port";
 const std::string PARAM_NAME_EXECUTOR_PORT = "executor_port";
 const std::string PARAM_NAME_APIEXEC_PORT = "apiexec_port";
 const std::string PARAM_NAME_EXECUTOR_IP = "executor_ip";
+const std::string PARAM_NAME_EXECUTOR_CMDLINE = "executor_command";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
@@ -797,6 +798,9 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_APIEXEC_PORT, apiData_.apiexecPort);
     if (data.count(PARAM_NAME_EXECUTOR_IP) > 0) {
         apiData_.executorHost = data.get<std::string>(PARAM_NAME_EXECUTOR_IP);
+    }
+    if (data.count(PARAM_NAME_EXECUTOR_CMDLINE) > 0) {
+        apiData_.executorCmdLine = data.get<std::string>(PARAM_NAME_EXECUTOR_CMDLINE);
     }
 }
 
