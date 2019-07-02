@@ -2321,7 +2321,7 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
     SetResponseStatus(_return.status, found ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
 }
 
-void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc) {
+void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc, const std::string& filterName, const std::string& filterCode) {
     if (!validatePagination(_return, *this, offset, limit)) {
         return;
     }
@@ -2353,10 +2353,9 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
             break;
     };
 
-    tm.applyToInternal([&offset, &limit, &_return, comparator](const TokensMap& tm, const HoldersMap&) {
+    tm.applyToInternal([&, comparator](const TokensMap& tm, const HoldersMap&) {
         _return.count = (uint32_t) tm.size();
-
-        applyToSortedMap(tm, comparator, [&offset, &limit, &_return](const TokensMap::value_type& t) {
+        applyToSortedMap(tm, comparator, [&](const TokensMap::value_type& t) {
             if (--offset >= 0) {
                 return true;
             }
@@ -2364,11 +2363,21 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
             api::TokenInfo tok;
             putTokenInfo(tok, fromByteArray(t.first.public_key()), t.second);
 
+            // filters
+            auto subName = tok.name.substr(0, filterName.size());
+            auto subCode = tok.code.substr(0, filterCode.size());
+
+            if ((subName == filterName && subCode == filterCode) ||
+                (filterName.empty() && subCode == filterCode) ||
+                (filterCode.empty() && subName == filterName) ||
+                (filterName.empty() && filterCode.empty()))
+                _return.tokens.push_back(tok);
+            //
+
             _return.tokens.push_back(tok);
 
-            if (--limit == 0) {
+            if (--limit == 0)
                 return false;
-            }
 
             return true;
         });

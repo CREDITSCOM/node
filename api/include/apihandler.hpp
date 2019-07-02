@@ -1001,7 +1001,7 @@ public:
     void TokenTransactionsGet(api::TokenTransactionsResult&, const general::Address&, int64_t offset, int64_t limit) override;
     void TokenInfoGet(api::TokenInfoResult&, const general::Address&) override;
     void TokenHoldersGet(api::TokenHoldersResult&, const general::Address&, int64_t offset, int64_t limit, const TokenHoldersSortField order, const bool desc) override;
-    void TokensListGet(api::TokensListResult&, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc) override;
+    void TokensListGet(api::TokensListResult&, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc, const std::string& filterName, const std::string& filterCode) override;
 #ifdef TRANSACTIONS_INDEX
     void TokenTransfersListGet(api::TokenTransfersResult&, int64_t offset, int64_t limit) override;
     void TransactionsListGet(api::TransactionsGetResult&, int64_t offset, int64_t limit) override;
