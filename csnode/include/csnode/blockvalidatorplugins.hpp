@@ -141,15 +141,55 @@ public:
 
 private:
 
-    cs::Bytes account_key;
+    csdb::Address abs_addr;
+    csdb::Address opt_addr;
 
-    std::list<csdb::Transaction> all_transactions;
-    std::list<csdb::Transaction*> incomes;
-    std::list<csdb::Transaction*> expenses;
+    struct Transaction
+    {
+        size_t seq;
+        size_t idx;
+        csdb::Transaction t;
+    };
+    std::list<Transaction> all_transactions;
+
+    struct Income
+    {
+        size_t idx;
+        double sum;
+    };
+    std::list<Income> incomes;
+
+    struct ExtraFee
+    {
+        double fee;
+        std::string comment;
+    };
+
+    struct Expense
+    {
+        size_t idx;
+        double sum;
+        std::list<ExtraFee> extra_fee;
+    };
+    std::list<Expense> expenses;
 
     double balance;
 
-    std::list<double> balance_history;
+    struct InvalidOperation
+    {
+        size_t idx;
+        double start_balance;
+        double sum;
+        double result_balance;
+        std::list<ExtraFee> extra_fee;
+    };
+    std::list<InvalidOperation> invalid_ops;
+
+    size_t execute_from{ 0 };
+
+    bool is_contract{ false };
+
+    //std::list<double> balance_history;
 };
 
 }  // namespace cs

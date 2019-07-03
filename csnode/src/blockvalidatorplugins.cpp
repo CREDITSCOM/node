@@ -398,10 +398,98 @@ bool TransactionsChecker::checkSignature(const csdb::Transaction& t) {
 AccountBalanceChecker::AccountBalanceChecker(BlockValidator& bv, const char* base58_key)
     : ValidationPlugin(bv)
 {
-    DecodeBase58(std::string(base58_key), account_key);
+    cs::Bytes account_key;
+    if (DecodeBase58(std::string(base58_key), account_key)) {
+        abs_addr = csdb::Address::from_public_key(account_key);
+    }
 }
 
 ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Pool& block) {
+
+    if (!abs_addr.is_valid()) {
+        return ValidationPlugin::ErrorType::noError;
+    }
+
+    if (block.transactions_count() == 0) {
+        return ValidationPlugin::ErrorType::noError;
+    }
+
+    size_t t_idx = 0;
+    for (const auto& t : block.transactions()) {
+
+        // get opt_addr if it has not got yet
+        if (!opt_addr.is_valid()) {
+            if (t.target() == abs_addr || t.source() == abs_addr) {
+                for (const auto& w : block.newWallets()) {
+                    if (w.addressId_.trxInd_ == t_idx) {
+                        if (w.addressId_.addressType_ == csdb::Pool::NewWalletInfo::AddressIsSource) {
+                            if (t.source() == abs_addr) {
+                                opt_addr = csdb::Address::from_wallet_id(w.walletId_);
+                            }
+                            break;
+                        }
+                        else if (w.addressId_.addressType_ == csdb::Pool::NewWalletInfo::AddressIsTarget) {
+                            if (t.target() == abs_addr) {
+                                opt_addr = csdb::Address::from_wallet_id(w.walletId_);
+                            }
+                            break;
+                        }
+                        else {
+                            cswarning() << kLogPrefix << "failed to get opd_addr for account";
+                        }
+                    }
+                }
+            }
+        }
+
+        double new_balance = balance;
+        std::list<ExtraFee> extra_fee;
+
+        // process as target
+        if (t.target() == opt_addr || t.target() == abs_addr) {
+
+            if (cs::SmartContracts::is_executable(t)) {
+                is_contract = true;
+            }
+
+            Transaction& tmp = all_transactions.emplace_back(Transaction{ block.sequence(), t_idx, t.clone() });
+            double sum = t.amount().to_double();
+            new_balance = balance + sum;
+            incomes.push_back(Income{all_transactions.size() - 1, sum});
+        }
+        if (t.source() == opt_addr || t.source() == abs_addr) {
+            if (cs::SmartContracts::is_smart_contract(t)) {
+                if (cs::SmartContracts::is_executable(t)) {
+                    execute_from = block.sequence();
+                    if (cs::SmartContracts::is_deploy(t)) {
+                    }
+                    else {
+                    }
+                }
+                else if (cs::SmartContracts::is_new_state(t)) {
+
+                }
+            }
+            else {
+
+            }
+
+            Transaction& tmp = all_transactions.emplace_back(Transaction{ block.sequence(), t_idx, t.clone() });
+            double sum = t.amount().to_double();
+            new_balance = balance - sum;
+            new_balance -= t.counted_fee().to_double();
+            expenses.push_back(Expense{ all_transactions.size() - 1, -sum });
+        }
+
+        // update balance, fix invalid operations
+        if (new_balance < -DBL_EPSILON) {
+            invalid_ops.emplace_back(InvalidOperation{ t_idx, balance, new_balance - balance, new_balance, extra_fee });
+        }
+        balance = new_balance;
+
+        ++t_idx;
+    }
+
     return ValidationPlugin::ErrorType::noError;
 }
 
