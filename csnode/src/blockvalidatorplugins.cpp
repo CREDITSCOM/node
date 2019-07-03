@@ -15,6 +15,8 @@
 #include <cscrypto/cscrypto.hpp>
 #include <smartcontracts.hpp>
 
+#include <base58.h>
+
 #ifdef _MSC_VER
 #include <intrin.h>
 #endif
@@ -387,6 +389,20 @@ bool TransactionsChecker::checkSignature(const csdb::Transaction& t) {
   } else {
     return t.verify_signature(t.source().public_key());
   }
+}
+
+//
+// AccountChecker
+// 
+
+AccountBalanceChecker::AccountBalanceChecker(BlockValidator& bv, const char* base58_key)
+    : ValidationPlugin(bv)
+{
+    DecodeBase58(std::string(base58_key), account_key);
+}
+
+ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Pool& block) {
+    return ValidationPlugin::ErrorType::noError;
 }
 
 } // namespace cs

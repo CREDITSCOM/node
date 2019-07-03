@@ -130,5 +130,27 @@ public:
 private:
     bool checkSignature(const csdb::Transaction&);
 };
+
+class AccountBalanceChecker : public ValidationPlugin
+{
+public:
+
+    AccountBalanceChecker(BlockValidator& bv, const char* base58_key);
+
+    ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+
+    cs::Bytes account_key;
+
+    std::list<csdb::Transaction> all_transactions;
+    std::list<csdb::Transaction*> incomes;
+    std::list<csdb::Transaction*> expenses;
+
+    double balance;
+
+    std::list<double> balance_history;
+};
+
 }  // namespace cs
 #endif  // BLOCK_VALIDATOR_PLUGINS_HPP

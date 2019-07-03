@@ -20,6 +20,7 @@ BlockValidator::BlockValidator(Node& node)
     plugins_.insert(std::make_pair(balances, std::make_unique<BalanceChecker>(*this)));
     plugins_.insert(std::make_pair(transactionsSignatures, std::make_unique<TransactionsChecker>(*this)));
     plugins_.insert(std::make_pair(smartStates, std::make_unique<SmartStateValidator>(*this)));
+    plugins_.insert(std::make_pair(accountBalance, std::make_unique<AccountBalanceChecker>(*this, "CSa4DTfTcenryQAifiPKVpY9jzWshYY11g3mXQR6B7rJ")));
 }
 
 BlockValidator::~BlockValidator() {}
