@@ -374,7 +374,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     else if (is_smart_state(transaction)) {
         result.trxn.type = api::TransactionType::TT_SmartState;
         api::SmartStateTransInfo sti;
-        sti.success = !(transaction.user_field(cs::trx_uf::new_state::Value).value<std::string>().empty());
+        sti.success = cs::SmartContracts::is_state_updated(transaction);
         sti.executionFee = convertAmount(transaction.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>());
         cs::SmartContractRef scr;
         scr.from_user_field(transaction.user_field(cs::trx_uf::new_state::RefStart));
