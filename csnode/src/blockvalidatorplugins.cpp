@@ -81,6 +81,7 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
     }
     executor::Executor::ExecuteTransactionInfo info{};
     info.transaction = block.transactions().at(ref.transaction);
+    info.sequence = ref.sequence;
     info.feeLimit = csdb::Amount(info.transaction.max_fee().to_double()); // specify limit as SmartContracts::execute() does
     info.convention = executor::Executor::MethodNameConvention::Default;
     if (!is_smart(info.transaction)) {

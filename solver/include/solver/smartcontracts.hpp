@@ -70,7 +70,7 @@ namespace trx_uf {
     // new state transaction fields
     namespace new_state {
         // new state value, new byte-code (string)
-        constexpr csdb::user_field_id_t Value = ~1;  // see apihandler.cpp #9 for currently used value ~1
+        constexpr csdb::user_field_id_t Value = -2;  // see apihandler.cpp #9 for currently used value ~1
         // reference to start transaction
         constexpr csdb::user_field_id_t RefStart = 1;
         // fee value, includes both execution fee and extra storage (delta) fee
@@ -206,9 +206,6 @@ enum class SmartContractStatus
     Closed
 };
 
-// It is called in APIHandler.hpp (getState() method), so unable to define as SmartContracts member function
-std::string get_contract_state(const csdb::Address& abs_addr, const BlockChain& blockchain);
-
 // to inform subscribed slots on deploy/execute/replenish occur
 // passes to every slot packet with result transactions
 using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
@@ -250,6 +247,8 @@ public:
     static bool is_state_updated(const csdb::Transaction& tr);
 
     static bool dbcache_read(const BlockChain& blockchain, const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, std::string& state /*output*/);
+
+    static std::string get_contract_state(const BlockChain& storage, const csdb::Address& abs_addr);
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);

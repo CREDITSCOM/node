@@ -408,6 +408,15 @@ csdb::Transaction SmartContracts::get_transaction(BlockChain& storage, const Sma
     return block.transactions().at(contract.transaction);
 }
 
+/*static*/
+std::string SmartContracts::get_contract_state(const BlockChain& storage, const csdb::Address& abs_addr) {
+    SmartContractRef dummy;
+    std::string state;
+    // no matter which value is returned:
+    /*bool ok =*/ SmartContracts::dbcache_read(storage, abs_addr, dummy, state);
+    return state;
+}
+
 std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address& abs_addr) const {
     using namespace trx_uf;
     const auto item = known_contracts.find(abs_addr);
@@ -926,13 +935,19 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                             // test actual hash
                             cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)head.newState.data(), head.newState.size());
                             std::string hash_result;
+                            std::string print_addr;
                             if (actual_hash == hash) {
                                 hash_result = "OK";
                             }
                             else {
                                 hash_result = "WRONG";
+                                csdb::Address abs_addr = absolute_address(tr_start.target());
+                                const cs::PublicKey& key = abs_addr.public_key();
+                                print_addr = " (";
+                                print_addr += EncodeBase58(key.data(), key.data() + key.size());
+                                print_addr += ") ";
                             }
-                            csdebug() << kLogPrefix << "state of " << ref_start << " is updated, stored hash is "
+                            csdebug() << kLogPrefix << "state of " << ref_start << print_addr << " is updated, stored hash is "
                                 << hash_result << ", new size is " << head.newState.size();
                         }
                     }
@@ -1228,7 +1243,7 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
     std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
     auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
     info.transaction = transaction;
-    
+    info.sequence = data.contract_ref.sequence;
     info.feeLimit = data.executor_fee;
     info.convention = executor::Executor::MethodNameConvention::Default;
     if (!is_smart(transaction)) {
@@ -2103,9 +2118,17 @@ bool SmartContracts::dbcache_update(const csdb::Address& abs_addr, const SmartCo
             SmartContractRef current_ref;
             stream >> current_ref.sequence >> current_ref.transaction;
             if (current_ref.sequence > ref_start.sequence) {
+                cswarning() << kLogPrefix << "current contract state is from block " << current_ref.sequence
+                    << ", cannot update it by block " << ref_start.sequence;
                 return false;
             }
             if (current_ref.sequence == ref_start.sequence && current_ref.transaction >= ref_start.transaction) {
+                if (current_ref.transaction == ref_start.transaction) {
+                    cswarning() << kLogPrefix << "conract state from " << ref_start << " has already been stored, ignore duplication";
+                }
+                else {
+                    cswarning() << kLogPrefix << "conract state from " << current_ref << " was stored, ignore " << ref_start;
+                }
                 return false;
             }
         }
@@ -2148,16 +2171,6 @@ bool SmartContracts::wait_until_executor(unsigned int test_freq) {
         std::this_thread::sleep_for(std::chrono::seconds(test_freq));
     }
     return true;
-}
-
-// non-member functions
-
-std::string get_contract_state(const csdb::Address& abs_addr, const BlockChain& blockchain) {
-    SmartContractRef dummy;
-    std::string state;
-    // no matter which value is returned:
-    SmartContracts::dbcache_read(blockchain, abs_addr, dummy, state);
-    return state;
 }
 
 }  // namespace cs

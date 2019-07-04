@@ -270,7 +270,7 @@ std::string SolverCore::chooseTimeStamp() {
 }
 
 // TODO: this function is to be implemented the block and RoundTable building <====
-void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& currentTimeStamp, cs::StageThree& stage3) {
+void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& /*currentTimeStamp*/, cs::StageThree& stage3) {
     csmeta(csdetails) << "start";
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     cs::RoundTable table;
