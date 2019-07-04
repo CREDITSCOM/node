@@ -547,7 +547,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
 
             if (flag == 'g') {
                 std::vector<uint8_t> skBytes;
-                auto ms = cscrypto::keys_derivation::generateMaterSeed();
+                auto ms = cscrypto::keys_derivation::generateMasterSeed();
                 auto keys = cscrypto::keys_derivation::deriveKeyPair(ms, DEFAULT_NODE_KEY_ID);
                 privateKey_ = keys.second;
                 publicKey_ = keys.first;
