@@ -2,6 +2,7 @@
 #define BLOCK_VALIDATOR_PLUGINS_HPP
 
 #include <vector>
+#include <list>
 
 #include <cscrypto/cryptotypes.hpp>
 #include <csdb/amount.hpp>
