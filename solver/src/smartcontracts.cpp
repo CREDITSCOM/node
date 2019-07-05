@@ -397,7 +397,7 @@ csdb::Address SmartContracts::get_valid_smart_address(const csdb::Address& deplo
 }
 
 /*static*/
-csdb::Transaction SmartContracts::get_transaction(BlockChain& storage, const SmartContractRef& contract) {
+csdb::Transaction SmartContracts::get_transaction(const BlockChain& storage, const SmartContractRef& contract) {
     csdb::Pool block = storage.loadBlock(contract.sequence);
     if (!block.is_valid()) {
         return csdb::Transaction{};
@@ -935,18 +935,18 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                             // test actual hash
                             cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)head.newState.data(), head.newState.size());
                             std::string hash_result;
-                            std::string print_addr;
                             if (actual_hash == hash) {
                                 hash_result = "OK";
                             }
                             else {
                                 hash_result = "WRONG";
-                                csdb::Address abs_addr = absolute_address(tr_start.target());
-                                const cs::PublicKey& key = abs_addr.public_key();
-                                print_addr = " (";
-                                print_addr += EncodeBase58(key.data(), key.data() + key.size());
-                                print_addr += ") ";
                             }
+                            std::string print_addr;
+                            csdb::Address abs_addr = absolute_address(tr_start.target());
+                            const cs::PublicKey& key = abs_addr.public_key();
+                            print_addr = " (";
+                            print_addr += EncodeBase58(key.data(), key.data() + key.size());
+                            print_addr += ") ";
                             csdebug() << kLogPrefix << "state of " << ref_start << print_addr << " is updated, stored hash is "
                                 << hash_result << ", new size is " << head.newState.size();
                         }
@@ -957,7 +957,7 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
     }
 
     // set empty new state in case of any problem
-    if (!tr_state.user_field(trx_uf::new_state::Value).is_valid()) {
+    if (tr_state.user_field_ids().count(trx_uf::new_state::Value) == 0) {
         tr_state.add_user_field(trx_uf::new_state::Value, std::string{});
     }
     return tr_state;
@@ -1733,6 +1733,26 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
     }
     SmartContractRef ref_start(fld);
 
+    csdb::Address abs_addr = absolute_address(t.target());
+    if (!abs_addr.is_valid()) {
+        if (reading_db) {
+            csdebug() << kLogPrefix << ref_start << " (error in blockchain) cannot find contract by address from new_state";
+        }
+        else {
+            cserror() << kLogPrefix << ref_start << " failed to convert optimized address";
+        }
+        return false;
+    }
+
+    if (in_known_contracts(abs_addr)) {
+        StateItem& item = known_contracts[abs_addr];
+        if (item.ref_execute == ref_start || item.ref_deploy == ref_start) {
+            // as item.ref_execute is updated below in this method and only if dbcache_update() => true we can test it against duplicated update
+            csdebug() << kLogPrefix << "state of " << ref_start << " is already actual, ignore duplicated update";
+            return true;
+        }
+    }
+
     csdb::Transaction t_state = get_actual_state(t);
     if (!t_state.is_valid()) {
         cserror() << kLogPrefix << ref_start << " state is not updated, transaction does not contain it";
@@ -1741,17 +1761,6 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
     fld = t_state.user_field(trx_uf::new_state::Value);
     std::string state_value = fld.value<std::string>();
     if (!state_value.empty()) {
-
-        csdb::Address abs_addr = absolute_address(t_state.target());
-        if(!abs_addr.is_valid()) {
-            if (reading_db) {
-                csdebug() << kLogPrefix << ref_start << " (error in blockchain) cannot find contract by address from new_state";
-            }
-            else {
-                cserror() << kLogPrefix << ref_start << " failed to convert optimized address";
-            }
-            return false;
-        }
 
         csdb::Transaction t_start = get_transaction(ref_start);
         if(!t_start.is_valid()) {
@@ -1783,15 +1792,15 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
             return false;
         }
 
+        // there is only one place to update state in "memory cache" and only after successful dbcache_update()!!!
         item.state = std::move(state_value);
         // determine it is the result of whether deploy or execute
         if (!replenish) {
             if (deploy) {
                 item.ref_deploy = ref_start;
             }
-            else {
-                item.ref_execute = ref_start;
-            }
+            // deploy is execute also
+            item.ref_execute = ref_start;
         }
         else {
             // new_state after replenish contract transaction

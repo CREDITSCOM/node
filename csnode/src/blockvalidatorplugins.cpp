@@ -416,6 +416,10 @@ ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Poo
     }
 
     size_t t_idx = 0;
+    // stores every new_state contract's address to detect emitted transactions
+    csdb::Address my_contract_abs_addr{};
+    csdb::Address my_contract_opt_addr{};
+
     for (const auto& t : block.transactions()) {
 
         // get opt_addr if it has not got yet
@@ -446,47 +450,91 @@ ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Poo
         double new_balance = balance;
         std::list<ExtraFee> extra_fee;
 
-        // process as target
-        if (t.target() == opt_addr || t.target() == abs_addr) {
 
+        // process smart contract
+        if (cs::SmartContracts::is_smart_contract(t)) {
             if (cs::SmartContracts::is_executable(t)) {
-                is_contract = true;
+                if (cs::SmartContracts::is_deploy(t)) {
+                    if (t.target() == opt_addr || t.target() == abs_addr) {
+                        iam_contract = true;
+                    }
+                }
+                else {
+                }
             }
+            else if (cs::SmartContracts::is_new_state(t)) {
+                if (!iam_contract) {
+                    csdb::UserField fld = t.user_field(cs::trx_uf::new_state::RefStart);
+                    if (fld.is_valid()) {
+                        SmartContractRef ref_start(fld);
+                        csdb::Transaction starter = cs::SmartContracts::get_transaction(getBlockChain(), ref_start);
+                        if (starter.is_valid()) {
+                            if (starter.source() == opt_addr || starter.source() == abs_addr) {
+                                // my account had to pay
+                                new_balance -= t.counted_fee().to_double();
+                                fld = t.user_field(cs::trx_uf::new_state::Fee);
+                                if (fld.is_valid()) {
+                                    csdb::Amount fee = fld.value<csdb::Amount>();
+                                    extra_fee.emplace_back(ExtraFee{ fee.to_double(), "exec fee" });
+                                }
 
-            Transaction& tmp = all_transactions.emplace_back(Transaction{ block.sequence(), t_idx, t.clone() });
-            double sum = t.amount().to_double();
-            new_balance = balance + sum;
-            incomes.push_back(Income{all_transactions.size() - 1, sum});
+                                my_contract_abs_addr = t.source();
+                                // assume WalletsIds have already updated
+                                csdb::internal::WalletId wid;
+                                if (getBlockChain().findWalletId(my_contract_abs_addr, wid)){
+                                    my_contract_opt_addr = csdb::Address::from_wallet_id(wid);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                all_transactions.emplace_back(Transaction{ block.sequence(), t_idx, t.clone() });
+                continue; // to next transaction in block
+            }
         }
-        if (t.source() == opt_addr || t.source() == abs_addr) {
-            if (cs::SmartContracts::is_smart_contract(t)) {
-                if (cs::SmartContracts::is_executable(t)) {
-                    execute_from = block.sequence();
-                    if (cs::SmartContracts::is_deploy(t)) {
-                    }
-                    else {
-                    }
-                }
-                else if (cs::SmartContracts::is_new_state(t)) {
 
-                }
+        // test emitted transactions
+        if (my_contract_abs_addr.is_valid()) {
+            if (t.source() == my_contract_abs_addr || t.target() == my_contract_opt_addr) {
+                extra_fee.emplace_back(ExtraFee{t.counted_fee().to_double(), "emitted fee"});
             }
             else {
-
+                my_contract_abs_addr = csdb::Address{};
+                my_contract_opt_addr = csdb::Address{};
             }
-
-            Transaction& tmp = all_transactions.emplace_back(Transaction{ block.sequence(), t_idx, t.clone() });
+        }
+         
+        // process as target
+        if (t.target() == opt_addr || t.target() == abs_addr) {
+           /* Transaction& tmp =*/ all_transactions.emplace_back(Transaction{ block.sequence(), t_idx, t.clone() });
+            double sum = t.amount().to_double();
+            new_balance = balance + sum;
+        }
+        if (t.source() == opt_addr || t.source() == abs_addr) {
+            /*Transaction& tmp =*/ all_transactions.emplace_back(Transaction{ block.sequence(), t_idx, t.clone() });
             double sum = t.amount().to_double();
             new_balance = balance - sum;
-            new_balance -= t.counted_fee().to_double();
+            if (!iam_contract) {
+                // contract does not pay for emitted transaction(s)
+                new_balance -= t.counted_fee().to_double();
+            }
             expenses.push_back(Expense{ all_transactions.size() - 1, -sum });
         }
 
         // update balance, fix invalid operations
         if (new_balance < -DBL_EPSILON) {
+
             invalid_ops.emplace_back(InvalidOperation{ t_idx, balance, new_balance - balance, new_balance, extra_fee });
         }
-        balance = new_balance;
+
+        if (fabs(new_balance - balance) > DBL_EPSILON) {
+            if (new_balance > balance) {
+                incomes.push_back(Income{ all_transactions.size() - 1, new_balance - balance });
+            }
+
+            balance = new_balance;
+        }
 
         ++t_idx;
     }

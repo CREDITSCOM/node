@@ -185,9 +185,7 @@ private:
     };
     std::list<InvalidOperation> invalid_ops;
 
-    size_t execute_from{ 0 };
-
-    bool is_contract{ false };
+    bool iam_contract{ false };
 
     //std::list<double> balance_history;
 };

@@ -544,8 +544,10 @@ private:
         return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
     }
 
-    static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
+public:
+    static csdb::Transaction get_transaction(const BlockChain& storage, const SmartContractRef& contract);
 
+private:
     // non-static variant
     csdb::Transaction get_transaction(const SmartContractRef& contract) const {
         return SmartContracts::get_transaction(bc, contract);
