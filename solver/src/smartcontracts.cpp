@@ -939,7 +939,11 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                                 hash_result = "OK";
                             }
                             else {
-                                hash_result = "WRONG";
+                                hash_result = "WRONG: ";
+                                hash_result += cs::Utils::byteStreamToHex(hash.data(), hash.size());
+                                hash_result += " (expected ";
+                                hash_result += cs::Utils::byteStreamToHex(actual_hash.data(), actual_hash.size());
+                                hash_result += ")";
                             }
                             std::string print_addr;
                             csdb::Address abs_addr = absolute_address(tr_start.target());

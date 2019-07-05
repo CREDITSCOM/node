@@ -14,10 +14,11 @@ void ConfirmationList::add(cs::RoundNumber rNum, bool bang, const cs::Confidants
 
     confirmationList_.emplace(rNum, std::move(tConfirmation));
     csdebug() << "The confirmation of R-" << rNum << " added, conf.size = " << confirmationList_.size();
-    if (rNum > 5) {
-        for (auto& it : confirmationList_) {
-            if (it.first < rNum - 5) {
-                confirmationList_.erase(it.first);
+    if (rNum > cs::values::kDefaultMetaStorageMaxSize) {
+        for(auto it = confirmationList_.cbegin(); it != confirmationList_.cend(); /*++it*/){
+            auto tmp = it++;
+            if (tmp->first < rNum - cs::values::kDefaultMetaStorageMaxSize) {
+                confirmationList_.erase(tmp);
             }
         }
         csdebug() << "Some confirmations were deleted, conf.size = " << confirmationList_.size();
