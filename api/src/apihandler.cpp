@@ -2124,13 +2124,11 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
             auto subCode = tok.code.substr(0, filterCode.size());
 
             if ((subName == filterName && subCode == filterCode) ||
-                (filterName.empty() && subCode == filterCode) ||
-                (filterCode.empty() && subName == filterName) ||
+                (filterName.empty() && subCode == filterCode)    ||
+                (filterCode.empty() && subName == filterName)    ||
                 (filterName.empty() && filterCode.empty()))
                 _return.tokens.push_back(tok);
-            //
-
-            _return.tokens.push_back(tok);
+            //          
 
             if (--limit == 0)
                 return false;
