@@ -40,7 +40,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
     make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
 #ifdef BINARY_TCP_EXECAPI
-, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.apiexec_port, kServerRWTimeoutMillis, kServerRWTimeoutMillis),
+, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.apiexec_port),
     make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 {
