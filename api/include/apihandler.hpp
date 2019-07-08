@@ -101,38 +101,15 @@ class ContractExecutorConcurrentClient;
 namespace executor {
 class Executor {
 public:  // wrappers
+    
+    // Pass kUseLastSequence to executeByteCode...() to use current last sequence automatically
+    static constexpr cs::Sequence kUseLastSequence = 0;
+
     void executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject>& code,
-        const std::string& state, std::vector<MethodHeader>& methodHeader, bool isGetter);
+        const std::string& state, std::vector<MethodHeader>& methodHeader, bool isGetter, cs::Sequence sequence);
 
     void executeByteCodeMultiple(ExecuteByteCodeMultipleResult& _return, const ::general::Address& initiatorAddress, const SmartContractBinary& invokedContract,
-        const std::string& method, const std::vector<std::vector<::general::Variant>>& params, const int64_t executionTime) {
-        if (!connect()) {
-            _return.status.code = 1;
-            _return.status.message = "No executor connection!";
-            return;
-        }
-        const auto access_id = generateAccessId(blockchain_.getLastSequence());
-        ++execCount_;
-        try {
-            std::shared_lock lock(sharedErrorMutex_);
-            origExecutor_->executeByteCodeMultiple(_return, access_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
-        }
-        catch (::apache::thrift::transport::TTransportException & x) {
-            // sets stop_ flag to true forever, replace with new instance
-            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-                reCreationOriginExecutor();
-            }
-            _return.status.code = 1;
-            _return.status.message = x.what();
-        }
-        catch( std::exception & x ) {
-            _return.status.code = 1;
-            _return.status.message = x.what();
-        }
-        --execCount_;
-        deleteAccessId(access_id);
-        disconnect();
-    }
+        const std::string& method, const std::vector<std::vector<::general::Variant>>& params, const int64_t executionTime, cs::Sequence sequence);
 
     void getContractMethods(GetContractMethodsResult& _return, const std::vector<::general::ByteCodeObject>& byteCodeObjects) {
         if (!connect()) {
@@ -482,7 +459,7 @@ private:
     uint64_t generateAccessId(cs::Sequence explicit_sequence) {
         std::lock_guard lk(mutex_);
         ++lastAccessId_;
-        accessSequence_[lastAccessId_] = explicit_sequence;
+        accessSequence_[lastAccessId_] = (explicit_sequence != kUseLastSequence ? explicit_sequence : blockchain_.getLastSequence());
         return lastAccessId_;
     }
 

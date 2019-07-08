@@ -817,7 +817,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
                 tmp.params      = input_smart.params;
                 methodHeader.push_back(tmp);
             }
-            executor_.executeByteCode(api_resp, source_pk, target_pk, bytecode, contract_state, methodHeader, true);
+            executor_.executeByteCode(api_resp, source_pk, target_pk, bytecode, contract_state, methodHeader, true, executor::Executor::kUseLastSequence);
             if (api_resp.status.code) {
                 _return.status.code = api_resp.status.code;
                 _return.status.message = api_resp.status.message;
@@ -2369,7 +2369,7 @@ void apiexec::APIEXECHandler::PoolGet(PoolGetResult& _return, const int64_t sequ
 namespace executor {
 
     void Executor::executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject>& code,
-        const std::string& state, std::vector<MethodHeader>& methodHeader, bool isGetter) {
+        const std::string& state, std::vector<MethodHeader>& methodHeader, bool isGetter, cs::Sequence sequence) {
         static std::mutex mutex;
         std::lock_guard lock(mutex);  // temporary solution
 
@@ -2379,10 +2379,40 @@ namespace executor {
             smartContractBinary.object.byteCodeObjects = code;
             smartContractBinary.object.instance = state;
             smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smart_address)) ? true : false;
-            if (auto optOriginRes = execute(address, smartContractBinary, methodHeader, isGetter, 0 /*auto sequence*/)) {
+            if (auto optOriginRes = execute(address, smartContractBinary, methodHeader, isGetter, sequence)) {
                 resp = optOriginRes.value().resp;
             }
         }
+    }
+
+    void Executor::executeByteCodeMultiple(ExecuteByteCodeMultipleResult& _return, const ::general::Address& initiatorAddress, const SmartContractBinary& invokedContract,
+        const std::string& method, const std::vector<std::vector<::general::Variant>>& params, const int64_t executionTime, cs::Sequence sequence) {
+        if (!connect()) {
+            _return.status.code = 1;
+            _return.status.message = "No executor connection!";
+            return;
+        }
+        const auto access_id = generateAccessId(sequence);
+        ++execCount_;
+        try {
+            std::shared_lock lock(sharedErrorMutex_);
+            origExecutor_->executeByteCodeMultiple(_return, access_id, initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException& x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                reCreationOriginExecutor();
+            }
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
+        catch (std::exception& x) {
+            _return.status.code = 1;
+            _return.status.message = x.what();
+        }
+        --execCount_;
+        deleteAccessId(access_id);
+        disconnect();
     }
 
     std::optional<std::string> Executor::getState(const csdb::Address& p_address) {
@@ -2450,11 +2480,11 @@ namespace executor {
         }
 
         // fill smartContractBinary
-        const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
+        const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(cs::trx_uf::deploy::Code).value<std::string>());
         executor::SmartContractBinary smartContractBinary;
         smartContractBinary.contractAddress = smartTarget.to_api_addr();
         smartContractBinary.object.byteCodeObjects = sci_deploy.smartContractDeploy.byteCodeObjects;
-        // may contain temporary last new state not yet written into block chain (to allow "speculative" multi-executions af the same contract)
+        // may contain temporary last new state not yet written into block chain (to allow "speculative" multi-executions of the same contract)
         if (!isdeploy) {
             if (!forceContractState.empty()) {
                 smartContractBinary.object.instance = forceContractState;
@@ -2518,7 +2548,7 @@ namespace executor {
             methodHeader.push_back(header);
         }
 
-        const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeader, false /*isGetter*/, 0 /*auto sequence*/);
+        const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeader, false /*isGetter*/, smarts[0].sequence /*sequence*/);
 
         for (const auto& smart : smarts) {
             if (!isdeploy) {
@@ -2694,7 +2724,7 @@ namespace executor {
         return res;
     }
 
-    // explicit_sequence set the environment to execute transaction
+    // explicit_sequence set the proper context while executing transaction
     std::optional<Executor::OriginExecuteResult> Executor::execute(const std::string& address,
         const SmartContractBinary& smartContractBinary, std::vector<MethodHeader>& methodHeader, bool isGetter, cs::Sequence explicit_sequence) {
         constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
