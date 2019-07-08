@@ -225,15 +225,16 @@ std::string SolverCore::chooseTimeStamp() {
     double mean;
     int N = 0;
     for (auto& it : stageOneStorage) {
-        if (it.roundTimeStamp != "") {
+        if (!it.roundTimeStamp.empty()) {
             int64_t tStamp;
             try {
                 tStamp = std::stoll(it.roundTimeStamp);
             } catch(...) {
+                cswarning() << log_prefix << "incompatible timestamp received from [" << (int)it.sender << "]";
                 continue;
             }
-            double x = tStamp - lastTimeStamp;
-            if (x > 0.) {
+            double x = static_cast<double>(tStamp - lastTimeStamp);
+            if (x > DBL_EPSILON) {
                 stamps.push_back(x);
                 sx += x;
                 sx2 += x * x;
