@@ -410,7 +410,10 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     csdb::Transaction stateTrx;
     if (is_smart(transaction)) {
         auto opers = lockedReference(this->smart_operations);
-        stateTrx = s_blockchain.loadTransaction((*opers)[transaction.id()].stateTransaction);
+        auto state_id = (*opers)[transaction.id()].stateTransaction;
+        if (!state_id.pool_hash().is_empty()) {
+            stateTrx = s_blockchain.loadTransaction(state_id);
+        }
     }
     else if (is_smart_state(transaction))
         stateTrx = transaction;
