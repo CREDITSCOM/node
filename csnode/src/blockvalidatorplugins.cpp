@@ -111,16 +111,15 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
     }
     auto& main_result = result.smartsRes.front();
 
-    std::string newState = t.user_field(trx_uf::new_state::Value).value<std::string>();
-    const std::string& realNewState = main_result.newState;
-    if (newState.empty()) {
-        if (!realNewState.empty()) {
+    if (!cs::SmartContracts::is_state_updated(t)) {
+        if (!main_result.newState.empty()) {
             csdebug() << kLogPrefix << "new state of trx is empty, but real new state is not";
         }
         return true;
     }
     else {
-        if (newState != realNewState) {
+        std::string newState = cs::SmartContracts::get_contract_state(getBlockChain(), t.target());
+        if (newState != main_result.newState) {
             cserror() << kLogPrefix << "new state of trx in blockchain doesn't match real new state";
             return false;
         }
