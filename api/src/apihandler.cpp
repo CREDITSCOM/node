@@ -410,7 +410,10 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     csdb::Transaction stateTrx;
     if (is_smart(transaction)) {
         auto opers = lockedReference(this->smart_operations);
-        stateTrx = s_blockchain.loadTransaction((*opers)[transaction.id()].stateTransaction);
+        auto state_id = (*opers)[transaction.id()].stateTransaction;
+        if (!state_id.pool_hash().is_empty()) {
+            stateTrx = s_blockchain.loadTransaction(state_id);
+        }
     }
     else if (is_smart_state(transaction))
         stateTrx = transaction;
@@ -834,7 +837,12 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     solver.send_wallet_transaction(send_transaction);
 
     if (deploy) {
-        auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) { return ss.condFlg; });
+        auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) { 
+            if (!ss.condFlg)
+                return false;
+            ss.condFlg = false;
+            return true;
+        });
         if (!resWait) {  // time is over
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
             return;
@@ -845,14 +853,13 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         bool isOld{ false };
 
         auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) {
-            if(ss.condFlg){
-                hashState   = ss.hash;
-                retVal      = ss.retVal;
-                isOld       = ss.isOld;
-                ss.condFlg  = false;
-                return true;
-            }
-            return false;
+            if(!ss.condFlg)
+                return false;
+            hashState   = ss.hash;
+            retVal      = ss.retVal;
+            isOld       = ss.isOld;
+            ss.condFlg  = false;
+            return true;
         });
 
         if (!resWait) { // time is over

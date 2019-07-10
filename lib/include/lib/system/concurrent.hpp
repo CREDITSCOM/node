@@ -397,17 +397,13 @@ private:
 
     std::condition_variable_any conditionalVariable_;
     cs::SpinLock lock_{ATOMIC_FLAG_INIT};
-    S state_;
+    S hash_;
 
 	const unsigned int WAIT_SECONDS_TIME{ 30 };
 
 public:
     inline WorkerQueue() noexcept
     : lock_() {
-    }
-
-    S getState() const {
-        return state_;
     }
 
     void getPosition() {
@@ -419,7 +415,7 @@ public:
     template <typename T>
     bool waitTillFront(const T& t) {
         std::unique_lock lock(lock_);
-        auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(WAIT_SECONDS_TIME), [&]() { return t(state_); });
+        auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(WAIT_SECONDS_TIME), [&]() { return t(hash_); });
         tidMap_.erase(std::this_thread::get_id());
         conditionalVariable_.notify_all();
 		return res;
@@ -448,7 +444,7 @@ public:
     template <typename Hash>
     void updateHash(const Hash& hash) {
         cs::Lock lock(lock_);
-        state_ = hash(state_);
+        hash_ = hash(hash_);
         conditionalVariable_.notify_all();
     }
 };

@@ -479,6 +479,8 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     cs::TransactionsPacket invalidTransactions;
     std::vector<csdb::Transaction> stateTransactions;
 
+    bool is_state_rejected = false;
+
     for (const auto& hash : localHashes) {
         // try to get from meta if can
         auto optionalPacket = findPacket(hash, round);
@@ -497,27 +499,34 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
             const auto& stateTransaction = transactions.front();
 
             // check range
-            if (maskIndex < mask.size() && mask[maskIndex] != 0) {
-                csdb::Pool::SmartSignature smartSignatures;
-                csdb::UserField userField = stateTransaction.user_field(trx_uf::new_state::RefStart);
+            if (maskIndex < mask.size()) {
+                if (mask[maskIndex] != 0) {
+                    csdb::Pool::SmartSignature smartSignatures;
+                    csdb::UserField userField = stateTransaction.user_field(trx_uf::new_state::RefStart);
 
-                if (userField.is_valid()) {
-                    SmartContractRef reference(userField);
+                    if (userField.is_valid()) {
+                        SmartContractRef reference(userField);
 
-                    if (reference.is_valid()) {
-                        smartSignatures.smartConsensusPool = reference.sequence;
+                        if (reference.is_valid()) {
+                            smartSignatures.smartConsensusPool = reference.sequence;
+                        }
                     }
+
+                    smartSignatures.smartKey = stateTransaction.source().public_key();
+                    smartSignatures.signatures = packet.signatures();
+
+                    newPool.add_smart_signature(smartSignatures);
                 }
-
-                smartSignatures.smartKey = stateTransaction.source().public_key();
-                smartSignatures.signatures = packet.signatures();
-
-                newPool.add_smart_signature(smartSignatures);
+                else {
+                    is_state_rejected = true;
+                }
             }
 
             // add states to cache
-            for (const auto& transaction : packet.stateTransactions()) {
-                stateTransactions.push_back(transaction);
+            if (!is_state_rejected) {
+                for (const auto& transaction : packet.stateTransactions()) {
+                    stateTransactions.push_back(transaction);
+                }
             }
         }
 

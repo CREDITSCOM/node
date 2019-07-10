@@ -65,9 +65,9 @@ void setCountedFees(Transactions& trxs) {
     }
 }
 
-csdb::Amount getExecutionFee(long long duration_msec) {
-    constexpr double FEE_IN_MSEC = kMinFee * 0.001; // the cost is based on 1 kMinFee/sec
-    return csdb::Amount(static_cast<double>(duration_msec) * FEE_IN_MSEC);
+csdb::Amount getExecutionFee(long long duration_mcs) {
+    constexpr double FEE_IN_MCS = kMinFee * 0.001 * 0.001; // the cost is based on 1 kMinFee/sec
+    return csdb::Amount(static_cast<double>(duration_mcs) * FEE_IN_MCS);
 }
 
 } // namespace fee

@@ -149,7 +149,7 @@ public:
     ConnectionPtr getConnectionByNumber(const std::size_t number);
     ConnectionPtr getRandomNeighbour();
 
-    std::unique_lock<cs::SpinLock> getNeighboursLock() const;
+    std::unique_lock< std::mutex > getNeighboursLock() const;
 
     // thread safe negihbours methods
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);

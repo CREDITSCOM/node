@@ -160,7 +160,7 @@ public:
     Connections getNeighboursWithoutSS() const;
 
     // uses to iterate connections
-    std::unique_lock<cs::SpinLock> getNeighboursLock() const;
+    std::unique_lock< std::mutex > getNeighboursLock() const;
 
     // thread safe
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);
@@ -218,10 +218,12 @@ private:
 
     TypedAllocator<Connection> connectionsAllocator_;
 
-    mutable cs::SpinLock nLockFlag_{ATOMIC_FLAG_INIT};
-    FixedVector<ConnectionPtr, MaxNeighbours> neighbours_;
+    //mutable cs::SpinLock nLockFlag_{ATOMIC_FLAG_INIT};
+    mutable std::mutex nLockFlag_;
+    //mutable cs::SpinLock mLockFlag_{ATOMIC_FLAG_INIT};
+    mutable std::mutex mLockFlag_;
 
-    mutable cs::SpinLock mLockFlag_{ATOMIC_FLAG_INIT};
+    FixedVector<ConnectionPtr, MaxNeighbours> neighbours_;
     FixedHashMap<ip::udp::endpoint, ConnectionPtr, uint16_t, MaxConnections> connections_;
 
     struct SenderInfo {
