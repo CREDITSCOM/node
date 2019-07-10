@@ -518,7 +518,7 @@ ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Poo
                 // contract does not pay for emitted transaction(s)
                 new_balance -= t.counted_fee().to_double();
             }
-            expenses.push_back(Expense{ all_transactions.size() - 1, -sum });
+            expenses.push_back(Expense{ all_transactions.size() - 1, -sum, extra_fee });
         }
 
         // update balance, fix invalid operations
