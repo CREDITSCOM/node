@@ -1285,7 +1285,8 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
                     // calculate execution fee
                     csdb::Amount total_fee(0);
                     for (const auto r : data.result.smartsRes) {
-                        total_fee += fee::getExecutionFee(r.executionCost);
+                        // r.executionCost is in nanoseconds, as microseconds are required
+                        total_fee += fee::getExecutionFee(r.executionCost / 1000);
                     }
 #if defined(USE_SELF_MEASURED_FEE)
                     if (total_fee.to_double() < DBL_EPSILON) {
