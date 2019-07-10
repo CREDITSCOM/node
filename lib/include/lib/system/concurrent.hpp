@@ -445,10 +445,10 @@ public:
         }
     }
 
-    template <typename State>
-    void updateState(const State& state) {
+    template <typename Hash>
+    void updateHash(const Hash& hash) {
         cs::Lock lock(lock_);
-        state_ = state(state_);
+        state_ = hash(state_);
         conditionalVariable_.notify_all();
     }
 };

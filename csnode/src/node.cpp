@@ -82,7 +82,6 @@ bool Node::init(const Config& config) {
     std::cout << "Done\n";
     cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
-    cs::Connector::connect(&solver_->smart_contracts().contract_state_updated, api_.get(), &csconnector::connector::onContractStateUpdate);
 #endif  // NODE_API
 
     // must call prior to blockChain_.init():

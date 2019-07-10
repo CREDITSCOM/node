@@ -60,10 +60,6 @@ public:
         api_handler->store_block_slot(pool);
     }
 
-    void onContractStateUpdate(const csdb::Transaction& tr_new_state) {
-        api_handler->update_smart_state_slot(tr_new_state);
-    }
-
     void run();
 
     // interface

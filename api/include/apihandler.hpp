@@ -661,16 +661,15 @@ private:
         cs::Sequence last_pull_sequence = 0;
     };
 
-    struct SmartState {
-        std::string state;
-        bool lastEmpty;
-        std::string lastRetVal;
-        //csdb::TransactionID transaction;
-        csdb::TransactionID initer;
+    struct HashState {
+        std::string hash;
+        std::string retVal;
+        bool isOld;
+        bool condFlg;
     };
 
-    using smart_state_entry = cs::WorkerQueue<SmartState>;
-    using client_type = executor::ContractExecutorConcurrentClient;
+    using client_type           = executor::ContractExecutorConcurrentClient;
+    using smartHashStateEntry   = cs::WorkerQueue<HashState>;
 
     BlockChain& s_blockchain;
     cs::SolverCore& solver;
@@ -722,8 +721,9 @@ private:
     cs::SpinLockable<std::map<cs::Sequence, std::vector<csdb::TransactionID>>> smarts_pending;
 
     cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
-    cs::SpinLockable<std::map<csdb::Address, smart_state_entry>> smart_state;
     cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smart_last_trxn;
+
+    cs::SpinLockable<std::map<csdb::Address, smartHashStateEntry>> hashStateSL;
 
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployed_by_creator;
     cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
@@ -775,7 +775,6 @@ private:
 
 private slots:
     void update_smart_caches_slot(const csdb::Pool& pool);
-    void update_smart_state_slot(const csdb::Transaction& tr_new_state);
     void store_block_slot(const csdb::Pool& pool);
     void collect_all_stats_slot(const csdb::Pool& pool);
 };
