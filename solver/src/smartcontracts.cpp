@@ -621,13 +621,14 @@ void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
             else {
                 SmartContractRef contract_ref(fld_contract_ref);
                 // update state
-                update_contract_state(new_state, false);
                 const csdb::Address abs_addr = absolute_address(new_state.target());
-                const cs::PublicKey& key = abs_addr.public_key();
-                std::cout << std::endl; // emphasize with empty line
-                cslog() << kLogPrefix << '{' << contract_ref.sequence << '.' << contract_ref.transaction << "} (" << EncodeBase58(key.data(), key.data() + key.size())
+                if (update_contract_state(new_state, false)) {
+                    const cs::PublicKey& key = abs_addr.public_key();
+                    std::cout << std::endl; // emphasize with empty line
+                    cslog() << kLogPrefix << '{' << contract_ref.sequence << '.' << contract_ref.transaction << "} (" << EncodeBase58(key.data(), key.data() + key.size())
                         << ") state has been updated";
-                std::cout << std::endl; // emphasize with empty line
+                    std::cout << std::endl; // emphasize with empty line
+                }
                 update_lock_status(abs_addr, false);
                 remove_from_queue(contract_ref);
             }
@@ -1750,10 +1751,16 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
 
     if (in_known_contracts(abs_addr)) {
         StateItem& item = known_contracts[abs_addr];
-        if (item.ref_execute == ref_start || item.ref_deploy == ref_start) {
-            // as item.ref_execute is updated below in this method and only if dbcache_update() => true we can test it against duplicated update
-            csdebug() << kLogPrefix << "state of " << ref_start << " is already actual, ignore duplicated update";
-            return true;
+        if (item.ref_execute.is_valid()) {
+            if (item.ref_execute == ref_start) {
+                // as item.ref_execute is updated below in this method and only if dbcache_update() => true we can test it against duplicated update
+                csdebug() << kLogPrefix << "state of " << item.ref_execute << " is already actual, ignore duplicated update";
+                return true;
+            }
+            if (ref_start < item.ref_execute) {
+                csdebug() << kLogPrefix << "state of " << item.ref_execute << " is newer than " << ref_start << ", ignore outdated update";
+                return true;
+            }
         }
     }
 
@@ -1794,6 +1801,9 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
             cserror() << kLogPrefix << "failed to update " << ref_start << " state in cache";
             //this->execution_allowed = false;
             return false;
+        }
+        else {
+            csdebug() << kLogPrefix << ref_start << " state is updated in cache";
         }
 
         // there is only one place to update state in "memory cache" and only after successful dbcache_update()!!!

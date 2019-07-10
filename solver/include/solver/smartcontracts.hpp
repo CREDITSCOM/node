@@ -143,6 +143,9 @@ inline bool operator==(const SmartContractRef& l, const SmartContractRef& r) {
 }
 
 inline bool operator<(const SmartContractRef& l, const SmartContractRef& r) {
+    if (!l.is_valid() || !r.is_valid()) {
+        return false;
+    }
     if (l.sequence < r.sequence) {
         return true;
     }
@@ -150,6 +153,13 @@ inline bool operator<(const SmartContractRef& l, const SmartContractRef& r) {
         return false;
     }
     return (l.transaction < r.transaction);
+}
+
+inline bool operator>(const SmartContractRef& l, const SmartContractRef& r) {
+    if (!l.is_valid() || !r.is_valid()) {
+        return false;
+    }
+    return !(l < r) && !(l == r);
 }
 
 // helper to print <sequence,transaction>
