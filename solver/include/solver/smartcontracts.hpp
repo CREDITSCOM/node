@@ -318,7 +318,7 @@ signals:
     // emits on every contract emitted transaction is appeared in blockchain, args are (emitted_transaction, starter_transaction):
     cs::Signal<void(const csdb::Transaction&, const csdb::Transaction&)> signal_emitted_accepted;
     // emits on every update of contract state both during reading db and getting block in real time
-    cs::Signal< void(const csdb::Transaction& new_state_value) > contract_state_updated;
+    cs::Signal<void(const csdb::Transaction& new_state_value)> contract_state_updated;
 
     // flag to always execute contracts even in normal state
     bool force_execution;
