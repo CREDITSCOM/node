@@ -414,10 +414,6 @@ AccountBalanceChecker::AccountBalanceChecker(BlockValidator& bv, const char* bas
 
 ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Pool& block) {
 
-    if (!abs_addr.is_valid()) {
-        return ValidationPlugin::ErrorType::noError;
-    }
-
     constexpr double epsilon = 0.000001;
     const cs::Sequence seq = block.sequence();
 
@@ -460,7 +456,7 @@ ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Poo
         size_t cnt_all_transactions = all_transactions.size();
 
         // get opt_addr if it has not got yet
-        if (!opt_addr.is_valid()) {
+        if (!opt_addr.is_wallet_id()) {
             if (t.target() == abs_addr || t.source() == abs_addr) {
                 for (const auto& w : block.newWallets()) {
                     if (w.addressId_.trxInd_ == t_idx) {
@@ -612,12 +608,14 @@ ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Poo
             }
         }
 
-        // update balance, fix invalid operations
-        if (new_balance < -DBL_EPSILON) {
-            invalid_ops.emplace_back(InvalidOperation{ t_idx, balance, new_balance - balance, new_balance, extra_fee });
-        }
 
         if (fabs(new_balance - balance) > DBL_EPSILON) {
+
+            // update balance, fix invalid operations
+            if (new_balance < -DBL_EPSILON) {
+                invalid_ops.emplace_back(InvalidOperation{ all_transactions.size() - 1, balance, new_balance - balance, new_balance, extra_fee });
+            }
+
             if (new_balance > balance) {
                 incomes.push_back(Income{ all_transactions.size() - 1, new_balance - balance, extra_fee });
             }
