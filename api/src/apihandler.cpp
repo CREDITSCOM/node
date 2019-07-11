@@ -1124,8 +1124,8 @@ bool APIHandler::update_smart_caches(LongNamedType& locked_pending_smart_transac
                 { // signal to end waiting for a transaction
                     auto hashStateInst(lockedReference(this->hashStateSL));
                     (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
-                        auto newHash = tr.user_field(cs::trx_uf::new_state::Hash).value<std::string>();
-                        auto retVal  = tr.user_field(cs::trx_uf::new_state::RetVal).value<std::string>();
+                        auto newHash = tr.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();
+                        auto retVal  = tr.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();
                         return HashState{ newHash, retVal, newHash == oldHash.hash, true };
                     });
                 }
