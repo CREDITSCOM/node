@@ -871,11 +871,11 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             _return.status.message = "new hash of state is empty!";
             return;
         }
-        if (isOld){
+        /*if (isOld){
             _return.status.code = ERROR_CODE;
             _return.status.message = "new hash is old!";
             return;
-        }
+        }*/
         if (!retVal.empty())
             _return.__set_smart_contract_result(deserialize<::general::Variant>(std::move(retVal)));
     }
