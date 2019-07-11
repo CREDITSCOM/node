@@ -2668,9 +2668,9 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
         return;
     }
     if (!blockValidator_->validateBlock(block,
-        cs::BlockValidator::ValidationLevel::hashIntergrity /*+
-            cs::BlockValidator::ValidationLevel::smartStates +
-            cs::BlockValidator::ValidationLevel::accountBalance*/,
+        cs::BlockValidator::ValidationLevel::hashIntergrity
+            /*| cs::BlockValidator::ValidationLevel::smartStates*/
+            | cs::BlockValidator::ValidationLevel::accountBalance,
         cs::BlockValidator::SeverityLevel::onlyFatalErrors)) {
         *shouldStop = true;
         return;

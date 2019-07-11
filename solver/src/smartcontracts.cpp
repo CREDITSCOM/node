@@ -1012,7 +1012,7 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
                     // is emitted by contract
                     const auto& state = it->second;
                     csdb::Transaction starter = get_transaction(state.ref_execute);
-                    if (implements_payable(state.payable) && starter.is_valid()) {
+                    if (starter.is_valid()) {
                         emit signal_emitted_accepted(tr, starter);
                     }
                     else {
@@ -1060,6 +1060,7 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
                 }
             }
             else {
+                // test target
                 csdb::Address abs_addr = absolute_address(tr.target());
                 if (!abs_addr.is_valid()) {
                     cserror() << kLogPrefix << "failed convert optimized address";
@@ -1080,6 +1081,25 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
                             // replenish smart contract
                             emit signal_payable_invoke(tr);
                             replenish_contract.emplace_back(block.hash(), block.sequence(), tr_idx);
+                        }
+                    }
+                }
+                // test source
+                abs_addr = absolute_address(tr.source());
+                if (!abs_addr.is_valid()) {
+                    cserror() << kLogPrefix << "failed convert optimized address";
+                }
+                else {
+                    // test tr is emitted by contract, new_state has already filtered above
+                    const auto it = known_contracts.find(abs_addr);
+                    if (it != known_contracts.cend()) {
+                        const auto& state = it->second;
+                        csdb::Transaction starter = get_transaction(state.ref_execute);
+                        if (starter.is_valid()) {
+                            emit signal_emitted_accepted(tr, starter);
+                        }
+                        else {
+                            cserror() << kLogPrefix << "failed to find starter transaction for contract emitted one";
                         }
                     }
                 }

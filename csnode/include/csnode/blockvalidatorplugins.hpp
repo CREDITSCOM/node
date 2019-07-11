@@ -13,6 +13,9 @@
 
 namespace cs {
 
+    class SmartContracts;
+    struct SmartContractRef;
+
 class ValidationPlugin {
 public:
     ValidationPlugin(BlockValidator& bv)
@@ -40,6 +43,8 @@ protected:
     auto& getPrevBlock() {
         return blockValidator_.prevBlock_;
     }
+
+    const cs::SmartContracts* getSmartContracts() const;
 
 private:
     BlockValidator& blockValidator_;
@@ -151,20 +156,21 @@ private:
         size_t idx;
         csdb::Transaction t;
     };
-    std::list<Transaction> all_transactions;
-
-    struct Income
-    {
-        size_t idx;
-        double sum;
-    };
-    std::list<Income> incomes;
+    std::vector<Transaction> all_transactions;
 
     struct ExtraFee
     {
         double fee;
         std::string comment;
     };
+
+    struct Income
+    {
+        size_t idx;
+        double sum;
+        std::list<ExtraFee> extra_fee;
+    };
+    std::list<Income> incomes;
 
     struct Expense
     {
@@ -189,6 +195,14 @@ private:
     bool iam_contract{ false };
 
     //std::list<double> balance_history;
+    
+    std::list<size_t> inprogress;
+    
+    double get_wallet_balance();
+    double balance_error{ 0 };
+
+    void erase_inprogress(const cs::SmartContractRef& ref);
+    //double rollback_execution(size_t idx);
 };
 
 }  // namespace cs
