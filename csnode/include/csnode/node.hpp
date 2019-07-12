@@ -30,6 +30,10 @@ class PoolSynchronizer;
 class BlockValidator;
 }  // namespace cs
 
+namespace cs {
+    class RoundPackage;
+}
+
 class Node {
 public:
     enum Level {
@@ -58,6 +62,9 @@ public:
     void stop();
 
     static void requestStop();
+    bool isStopRequested() const {
+        return stopRequested_;
+    }
 
     std::string getSenderText(const cs::PublicKey& sender);
 
@@ -71,6 +78,8 @@ public:
 
     // SOLVER3 methods
     void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
+    void performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& sender);
+    void clearRPCache(cs::RoundNumber rNum);
     void sendHash(cs::RoundNumber round);
     void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
     void roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round);
@@ -82,7 +91,7 @@ public:
     void getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
 
     // consensus communication
-    void sendStageOne(cs::StageOne&);
+    void sendStageOne(const cs::StageOne&);
     void sendStageTwo(cs::StageTwo&);
     void sendStageThree(cs::StageThree&);
 
@@ -123,8 +132,7 @@ public:
     void startConsensus();
 
     void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3);
-    bool receivingSignatures(const cs::Bytes& sigBytes, const cs::Bytes& roundBytes, const cs::RoundNumber rNum, const cs::Bytes& trustedMask,
-                             const cs::ConfidantsKeys& newConfidants, cs::Signatures& poolSignatures);
+    bool receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants);
     void addRoundSignature(const cs::StageThree& st3);
     // smart-contracts consensus stages sending and getting
 
@@ -138,14 +146,13 @@ public:
     void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
     // called by solver, review required:
     bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
-    void sendRoundTable();
+    void sendRoundTable(cs::RoundPackage& rPackage);
 
     // transaction's pack syncro
     void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
     void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
-    void getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender, cs::Signatures&& poolSignatures,
-                           cs::Bytes&& realTrusted);
+    void getCharacteristic(cs::RoundPackage& rPackage);
 
     void cleanConfirmationList(cs::RoundNumber rNum);
 
@@ -165,6 +172,7 @@ public:
     void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
 
     void flushCurrentTasks();
+    void initCurrentRP();
     void becomeWriter();
 
     bool isPoolsSyncroStarted();
@@ -245,10 +253,10 @@ public slots:
 
 private:
     bool init(const Config& config);
-    void sendRoundPackage(const cs::PublicKey& target);
-    void sendRoundPackageToAll();
+    void sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
+    void sendRoundPackageToAll(cs::RoundPackage& rPackage);
 
-    void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, cs::StageThree& st3);
+    //void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, cs::StageThree& st3);
 
     bool readRoundData(cs::RoundTable& roundTable, bool bang);
     void reviewConveyerHashes();
@@ -341,7 +349,7 @@ private:
     // ms timeout
     static const uint32_t packetRequestStep_ = 450;
     static const size_t maxPacketRequestSize_ = 1000;
-    static const int64_t maxPingSynchroDelay_ = 90000;
+    static const int64_t maxPingSynchroDelay_ = 30000;
 
     // serialization/deserialization entities
     cs::IPackStream istream_;
@@ -380,7 +388,6 @@ private:
     std::vector<cs::StageOneSmarts> smartStageOneStorage_;
     std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
     std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
-    int corruptionLevel_ = 0;
 
     std::vector<cs::Stage> smartStageTemporary_;
     // smart consensus IDs:
@@ -400,9 +407,10 @@ private:
 
     //expected rounds
     std::vector<cs::RoundNumber> expectedRounds_;
-    cs::Sequence maxHeighboursSequence_ = 0;
+    cs::Sequence maxNeighboursSequence_ = 0;
     cs::Bytes lastTrustedMask_;
     std::unique_ptr<cs::BlockValidator> blockValidator_;
+    std::vector<cs::RoundPackage> roundPackageCache_;
 
     bool alwaysExecuteContracts_ = false;
 };

@@ -49,6 +49,7 @@ protected:
     bool enough_hashes{false};
     bool transactions_checked{false};
     bool min_time_expired{false};
+    void finalizeStage(SolverContext& context);
 
     // TimeoutTracking min_time_tracking;
 

@@ -3,6 +3,7 @@
 #include <numeric>
 #include <sstream>
 
+#include <solver/consensus.hpp>
 #include <solver/solvercore.hpp>
 #include <solver/smartcontracts.hpp>
 
@@ -13,6 +14,7 @@
 #include <csnode/nodeutils.hpp>
 #include <csnode/poolsynchronizer.hpp>
 #include <csnode/blockvalidator.hpp>
+#include <csnode/roundpackage.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/progressbar.hpp>
@@ -28,9 +30,6 @@
 
 #include <lz4.h>
 #include <cscrypto/cscrypto.hpp>
-
-const unsigned MIN_CONFIDANTS = 3;
-const unsigned MAX_CONFIDANTS = 100;
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
@@ -48,7 +47,8 @@ Node::Node(const Config& config)
     std::cout << "Done\n";
     poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
-    auto& executor = executor::Executor::getInstance(&blockChain_, solver_, config.getApiSettings().executorPort, config.getApiSettings().executorHost);
+    const auto& settings = config.getApiSettings();
+    auto& executor = executor::Executor::getInstance(&blockChain_, solver_, settings.executorPort, settings.executorHost, settings.executorCmdLine);
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
@@ -59,6 +59,7 @@ Node::Node(const Config& config)
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     alwaysExecuteContracts_ = config.alwaysExecuteContracts();
+    maxNeighboursSequence_ = blockChain_.getLastSequence();
 
     good_ = init(config);
 }
@@ -74,13 +75,18 @@ Node::~Node() {
 bool Node::init(const Config& config) {
 #ifdef NODE_API
     std::cout << "Init API... ";
+    const auto& settings = config.getApiSettings();
     api_ = std::make_unique<csconnector::connector>(
         blockChain_, solver_,
-        csconnector::Config{config.getApiSettings().port, config.getApiSettings().ajaxPort, config.getApiSettings().executorPort, config.getApiSettings().apiexecPort});
+        csconnector::Config{settings.port, settings.ajaxPort, settings.executorPort, settings.apiexecPort, settings.executorCmdLine });
     std::cout << "Done\n";
     cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
 #endif  // NODE_API
+
+    // must call prior to blockChain_.init():
+    solver_->init(nodeIdKey_, nodeIdPrivate_);
+    solver_->startDefault();
 
     if (!blockChain_.init(config.getPathToDB())) {
         return false;
@@ -103,13 +109,10 @@ bool Node::init(const Config& config) {
 
     std::cout << "Everything is init\n";
 
-    solver_->setKeysPair(nodeIdKey_, nodeIdPrivate_);
-    solver_->startDefault();
-
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
-
+    initCurrentRP();
     return true;
 }
 
@@ -129,6 +132,11 @@ void Node::stop() {
 
     blockChain_.close();
 
+    if (api_) {
+        api_->apiExecHandler()->getExecutor().stop();
+        cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
+    }
+
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
 }
 
@@ -136,6 +144,22 @@ void Node::stop() {
 void Node::flushCurrentTasks() {
     transport_->addTask(ostream_.getPackets(), ostream_.getPacketsCount());
     ostream_.clear();
+}
+
+void Node::initCurrentRP() {
+    cs::RoundPackage rp;
+    if (getBlockChain().getLastSequence() == 0) {
+        cs::RoundTable rt;
+        rt.round = 0;
+        rp.updateRoundTable(rt);
+    }
+    else {
+        cs::RoundTable rt;
+        rt.round = getBlockChain().getLastSequence();
+        rt.confidants = getBlockChain().getLastBlock().confidants();
+        rp.updateRoundTable(rt);
+    }
+    roundPackageCache_.push_back(rp);
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
@@ -205,6 +229,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     // do not pass further the hashes from unsuccessful round
     csmeta(csdebug) << "Get BigBang globalTable.hashes: " << globalTable.hashes.size();
 
+    maxNeighboursSequence_ = globalTable.round;
+
     conveyer.updateRoundTable(cachedRound, globalTable);
     onRoundStart(globalTable);
 
@@ -237,6 +263,10 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
     // TODO: fix sub round
     subRound_ = 0;
     roundTable.round = rNum;
+
+    if (maxNeighboursSequence_ < rNum) {
+        maxNeighboursSequence_ = rNum;
+    }
 
     cs::Conveyer::instance().setRound(rNum);
     cs::Conveyer::instance().setTable(roundTable);
@@ -299,7 +329,7 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
 
 bool Node::canBeTrusted(bool critical) {
 #if defined(MONITOR_NODE) || defined(WEB_WALLET_NODE)
-
+    csunused(critical);
     return false;
 
 #else
@@ -381,54 +411,38 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
     processPacketsReply(std::move(packets), round);
 }
 
-void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::RoundNumber round, const cs::PublicKey& sender, cs::Signatures&& poolSignatures,
-                             cs::Bytes&& realTrusted) {
+void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     csmeta(csdetails) << "started";
     cs::Conveyer& conveyer = cs::Conveyer::instance();
-
-    if (!conveyer.isSyncCompleted(round)) {
-        csdebug() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
-
-        cs::Bytes characteristicBytes(data, data + size);
-
-        cs::CharacteristicMeta meta;
-        meta.bytes = std::move(characteristicBytes);
-        meta.sender = sender;
-        meta.signatures = std::move(poolSignatures);
-        meta.realTrusted = std::move(realTrusted);
-
-        conveyer.addCharacteristicMeta(round, std::move(meta));
+    if (getBlockChain().updateLastBlock(rPackage)) {
+        csdebug() << "NODE> The last block updated correctly or doesn't need update";
         return;
     }
 
-    cs::DataStream poolStream(data, size);
-    cs::Characteristic characteristic;
-    cs::PoolMetaInfo poolMetaInfo;
-    size_t smartSigCount;
-    csdb::Pool::SmartSignature tmpSmartSignature;
+    auto round = rPackage.poolMetaInfo().sequenceNumber;
+    if (!conveyer.isSyncCompleted(rPackage.poolMetaInfo().sequenceNumber)) {
+        csdebug() << "NODE> Packet sync not finished, saving characteristic meta to call after sync";
 
-    poolStream >> poolMetaInfo.timestamp;
-    poolStream >> characteristic.mask;
-    poolStream >> poolMetaInfo.sequenceNumber;
-    poolStream >> poolMetaInfo.previousHash;
-    poolStream >> smartSigCount;
-    poolMetaInfo.realTrustedMask = realTrusted;
+        cs::CharacteristicMeta meta;
+        meta.bytes = rPackage.poolMetaInfo().characteristic.mask;
+        //meta.sender = sender;
+        meta.signatures = rPackage.poolSignatures();
+        meta.realTrusted = rPackage.poolMetaInfo().realTrustedMask;
 
-    if (myLevel_ == Level::Confidant) {
-        csdebug() << "We probably don't have enough confirmations so we try to throw our last deferred block";
-        solver_->removeDeferredBlock(poolMetaInfo.sequenceNumber);
+        conveyer.addCharacteristicMeta(round, std::move(meta));
+        return;
     }
 
     csdebug() << "Trying to get confidants from round " << round;
     const auto table = conveyer.roundTable(round);
 
     if (table == nullptr) {
-        cserror() << "NODE> cannot access proper round table to add trusted to pool #" << poolMetaInfo.sequenceNumber;
+        cserror() << "NODE> cannot access proper round table to add trusted to pool #" << rPackage.poolMetaInfo().sequenceNumber;
         return;
     }
 
     const cs::ConfidantsKeys& confidantsReference = table->confidants;
-    const std::size_t realTrustedMaskSize = poolMetaInfo.realTrustedMask.size();
+    const std::size_t realTrustedMaskSize = rPackage.poolMetaInfo().realTrustedMask.size();
 
     csdebug() << "Real TrustedMask size = " << realTrustedMaskSize;
 
@@ -437,53 +451,66 @@ void Node::getCharacteristic(const uint8_t* data, const size_t size, const cs::R
         return;
     }
 
-    for (size_t idx = 0; idx < realTrustedMaskSize; ++idx) {
-        const auto& key = confidantsReference[idx];
+    //for (size_t idx = 0; idx < realTrustedMaskSize; ++idx) {
+    //    const auto& key = confidantsReference[idx];
 
-        if (poolMetaInfo.realTrustedMask[idx] == 0) {
-            poolMetaInfo.writerKey = key;
-        }
-    }
+    //    if (rPackage.poolMetaInfo().realTrustedMask[idx] == 0) {
+    //        poolMetaInfo.writerKey = key;
+    //    }
+    //}
 
-    if (round != 0) {
-        auto confirmation = confirmationList_.find(round);
-        if (confirmation.has_value()) {
-            poolMetaInfo.confirmationMask = confirmation.value().mask;
-            poolMetaInfo.confirmations = confirmation.value().signatures;
-        }
-    }
+    //if (round != 0) {
+    //    auto confirmation = confirmationList_.find(round);
+    //    if (confirmation.has_value()) {
+    //        poolMetaInfo.confirmationMask = confirmation.value().mask;
+    //        poolMetaInfo.confirmations = confirmation.value().signatures;
+    //    }
+    //}
 
     if (!istream_.good()) {
         csmeta(cserror) << "Round info parsing failed, data is corrupted";
         return;
     }
 
-    csdebug() << "NODE> Sequence " << poolMetaInfo.sequenceNumber << ", mask size " << characteristic.mask.size();
-    csdebug() << "NODE> Time: " << poolMetaInfo.timestamp;
+    csdebug() << "NODE> Sequence " << rPackage.poolMetaInfo().sequenceNumber << ", mask size " << rPackage.poolMetaInfo().characteristic.mask.size();
+    csdebug() << "NODE> Time: " << rPackage.poolMetaInfo().timestamp;
 
-    if (blockChain_.getLastSequence() > poolMetaInfo.sequenceNumber) {
-        csmeta(cswarning) << "blockChain last seq: " << blockChain_.getLastSequence() << " > pool meta info seq: " << poolMetaInfo.sequenceNumber;
+    if (blockChain_.getLastSequence() > rPackage.poolMetaInfo().sequenceNumber) {
+        csmeta(cswarning) << "blockChain last seq: " << blockChain_.getLastSequence() 
+            << " > pool meta info seq: " << rPackage.poolMetaInfo().sequenceNumber;
         return;
     }
 
     // otherwise senseless, this block is already in chain
-    conveyer.setCharacteristic(characteristic, poolMetaInfo.sequenceNumber);
-    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(poolMetaInfo);
+    conveyer.setCharacteristic(rPackage.poolMetaInfo().characteristic, rPackage.poolMetaInfo().sequenceNumber);
+    std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(rPackage.poolMetaInfo());
 
     if (!pool.has_value()) {
         csmeta(cserror) << "Created pool is not valid";
         return;
     }
-
-    pool.value().set_signatures(poolSignatures);
+//    solver_->uploadNewStates(conveyer.uploadNewStates());
+    auto tmp = rPackage.poolSignatures();
+    pool.value().set_signatures(tmp);
     pool.value().set_confidants(confidantsReference);
+
+    if (round != 0) {
+        auto confirmation = confirmationList_.find(round);
+        if (confirmation.has_value()) {
+            if (rPackage.poolMetaInfo().sequenceNumber > 1) {
+                pool.value().add_number_confirmations(static_cast<uint8_t>(confirmation.value().mask.size()));
+                pool.value().add_confirmation_mask(cs::Utils::maskToBits(confirmation.value().mask));
+                pool.value().add_round_confirmations(confirmation.value().signatures);
+            }
+        }
+    }
 
     if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
         cserror() << "NODE> failed to store block in BlockChain";
     }
     else {
         blockChain_.testCachedBlocks();
-        confirmationList_.remove(round);
+        //confirmationList_.remove(round);
     }
 
     csmeta(csdetails) << "done";
@@ -530,7 +557,7 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
     const auto roundTable = conveyer.roundTable(round);
 
     // look at main node
-    main = (roundTable != nullptr) ? roundTable->general : conveyer.currentRoundTable().general;
+    main = (roundTable != nullptr) ? roundTable->confidants.front(): conveyer.currentRoundTable().confidants.front();
 
     const bool sendToGeneral = sendToNeighbour(main, msgType, round, hashes);
 
@@ -734,9 +761,14 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
         csdebug() << "NODE> Packets sync completed, #" << round;
         transport_->resetNeighbours();
 
-        if (auto meta = conveyer.characteristicMeta(round); meta.has_value()) {
+        if (roundPackageCache_.size() > 0) {
+            auto rPackage = roundPackageCache_.back();
             csdebug() << "NODE> Run characteristic meta";
-            getCharacteristic(meta->bytes.data(), meta->bytes.size(), round, meta->sender, std::move(meta->signatures), std::move(meta->realTrusted));
+            getCharacteristic(rPackage);
+        }
+        else {
+            csdebug() << "NODE> There is no roundPackage in the list, return and await any";
+            return;
         }
 
         // if next block maybe stored, the last written sequence maybe updated, so deferred consensus maybe resumed
@@ -800,7 +832,7 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     auto now = std::chrono::steady_clock::now();
     delta += std::chrono::duration_cast<std::chrono::milliseconds>(now - point);
 
-    if (maxHeighboursSequence_ < sequence) {
+    if (sequence <= maxNeighboursSequence_) {
         delta = std::chrono::milliseconds(0);
     }
 
@@ -956,7 +988,7 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
 
     csdebug() << "NODE> Number of confidants :" << cs::numeric_cast<int>(confSize);
 
-    if (confSize < MIN_CONFIDANTS || confSize > MAX_CONFIDANTS) {
+    if (confSize < Consensus::MinTrustedNodes || confSize > Consensus::MaxTrustedNodes) {
         cswarning() << "Bad confidants num";
         return false;
     }
@@ -993,7 +1025,7 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
         cs::Signatures signatures;
         signatures.push_back(sig);
         confMask.push_back(0);
-        confirmationList_.remove(roundTable.round);
+        //confirmationList_.remove(roundTable.round);
         confirmationList_.add(roundTable.round, bang, confidants, confMask, signatures);
     }
 
@@ -1003,7 +1035,7 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
     }
 
     roundTable.confidants = std::move(confidants);
-    roundTable.general = mainNode;
+    //roundTable.general = mainNode;
     roundTable.hashes.clear();
 
     return true;
@@ -1211,64 +1243,23 @@ cs::PoolsBlock Node::decompressPoolsBlock(const uint8_t* data, const size_t size
     return poolsBlock;
 }
 
-void Node::sendStageOne(cs::StageOne& stageOneInfo) {
-    corruptionLevel_ = 0;
+void Node::sendStageOne(const cs::StageOne& stageOneInfo) {
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
         return;
     }
 
-    stageOneInfo.roundTimeStamp = cs::Utils::currentTimestamp();
-
     csmeta(csdebug) << "Round: " << cs::Conveyer::instance().currentRoundNumber() << "." << cs::numeric_cast<int>(subRound_)
-                    << ", Sender: " << static_cast<int>(stageOneInfo.sender) << ", Cand Amount: " << stageOneInfo.trustedCandidates.size()
-                    << ", Hashes Amount: " << stageOneInfo.hashesCandidates.size() << ", Time Stamp: " << stageOneInfo.roundTimeStamp;
-    csmeta(csdetails) << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
+        << cs::StageOne::toString(stageOneInfo);
 
-    size_t expectedMessageSize = sizeof(stageOneInfo.sender) + sizeof(stageOneInfo.hash) + sizeof(stageOneInfo.trustedCandidates.size()) +
-                                 sizeof(cs::PublicKey) * stageOneInfo.trustedCandidates.size() + sizeof(stageOneInfo.hashesCandidates.size()) +
-                                 sizeof(cs::Hash) * stageOneInfo.hashesCandidates.size() + sizeof(stageOneInfo.roundTimeStamp.size()) + stageOneInfo.roundTimeStamp.size();
+    csdebug() << "Stage one Message R-" << cs::Conveyer::instance().currentRoundNumber() << "[" << static_cast<int>(stageOneInfo.sender)
+        << "]: " << cs::Utils::byteStreamToHex(stageOneInfo.messageBytes.data(), stageOneInfo.messageBytes.size());
+    csdebug() << "Stage one Signature R-" << cs::Conveyer::instance().currentRoundNumber() << "[" << static_cast<int>(stageOneInfo.sender)
+        << "]: " << cs::Utils::byteStreamToHex(stageOneInfo.signature.data(), stageOneInfo.signature.size());
 
-    cs::Bytes message;
-    message.reserve(expectedMessageSize);
+    sendToConfidants(MsgTypes::FirstStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageOneInfo.signature, stageOneInfo.messageBytes);
 
-    cs::Bytes messageToSign;
-    messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
-
-    cs::DataStream stream(message);
-    stream << stageOneInfo.sender;
-    stream << stageOneInfo.hash;
-    stream << stageOneInfo.trustedCandidates;
-    stream << stageOneInfo.hashesCandidates;
-    stream << stageOneInfo.roundTimeStamp;
-
-    // hash of message
-    stageOneInfo.messageHash = cscrypto::calculateHash(message.data(), message.size());
-
-    cs::DataStream signStream(messageToSign);
-    signStream << cs::Conveyer::instance().currentRoundNumber();
-    signStream << subRound_;
-    signStream << stageOneInfo.messageHash;
-
-    // signature of round number + calculated hash
-    stageOneInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), messageToSign.data(), messageToSign.size());
-    csdebug() << "Stage one Signature R-" << WithDelimiters(cs::Conveyer::instance().currentRoundNumber()) << "(" << static_cast<int>(stageOneInfo.sender)
-              << "): " << cs::Utils::byteStreamToHex(stageOneInfo.signature.data(), stageOneInfo.signature.size());
-
-    const int k1 = (corruptionLevel_ / 1) % 2;
-    const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
-    if (k1 == 1 && k2 == myConfidantIndex_) {
-        csdebug() << "STAGE ONE ##############> NOTHING WILL BE SENT";
-    }
-    else {
-        sendToConfidants(MsgTypes::FirstStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageOneInfo.signature, message);
-    }
-
-    csmeta(csdetails) << "Sent message size " << message.size();
-
-    // cache
-    stageOneInfo.message = std::move(message);
-    csmeta(csdetails) << "done";
+    csmeta(csdetails) << "Sent message size " << stageOneInfo.messageBytes.size();
 }
 
 void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1291,41 +1282,41 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
     cs::StageOne stage;
     istream_ >> stage.signature;
-    istream_ >> stage.message;
-
-    csdetails() << "Stage1 message: " << cs::Utils::byteStreamToHex(stage.message);
-    csdetails() << "Stage1 signature: " << cs::Utils::byteStreamToHex(stage.signature);
+    istream_ >> stage.messageBytes;
 
     if (!istream_.good() || !istream_.end()) {
         csmeta(cserror) << "Bad stage-1 packet format";
         return;
     }
+    csdetails() << "Stage1 message: " << cs::Utils::byteStreamToHex(stage.messageBytes);
+    csdetails() << "Stage1 signature: " << cs::Utils::byteStreamToHex(stage.signature);
+
+
 
     // hash of part received message
-    stage.messageHash = cscrypto::calculateHash(stage.message.data(), stage.message.size());
+    stage.messageHash = cscrypto::calculateHash(stage.messageBytes.data(), stage.messageBytes.size());
+    const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
     cs::Bytes signedMessage;
     cs::DataStream signedStream(signedMessage);
-    signedStream << cs::Conveyer::instance().currentRoundNumber();
+    signedStream << conveyer.currentRoundNumber();
     signedStream << subRound_;
     signedStream << stage.messageHash;
 
     // stream for main message
-    cs::DataStream stream(stage.message.data(), stage.message.size());
+    cs::DataStream stream(stage.messageBytes.data(), stage.messageBytes.size());
     stream >> stage.sender;
     stream >> stage.hash;
     stream >> stage.trustedCandidates;
     stream >> stage.hashesCandidates;
     stream >> stage.roundTimeStamp;
 
-    const cs::Conveyer& conveyer = cs::Conveyer::instance();
-
     if (!conveyer.isConfidantExists(stage.sender)) {
         return;
     }
 
     const cs::PublicKey& confidant = conveyer.confidantByIndex(stage.sender);
-
+    csdebug() << "StageMessage[" << static_cast<int>(stage.sender) <<"]: " << cs::Utils::byteStreamToHex(stage.messageBytes.data(), stage.messageBytes.size());
     if (!cscrypto::verifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
         cswarning() << "NODE> Stage-1 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
         return;
@@ -1351,39 +1342,10 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
         return;
     }
 
-    // TODO: fix it by logic changing
-    const size_t confidantsCount = cs::Conveyer::instance().confidantsCount();
-    const size_t stageBytesSize = sizeof(stageTwoInfo.sender) + sizeof(size_t)                     // count of signatures
-                                  + sizeof(size_t)                                                 // count of hashes
-                                  + (sizeof(cs::Signature) + sizeof(cs::Hash)) * confidantsCount;  // signature + hash items
-
-    cs::Bytes bytes;
-    bytes.reserve(stageBytesSize);
-
-    cs::DataStream stream(bytes);
-    stream << stageTwoInfo.sender;
-    stream << stageTwoInfo.signatures;
-    stream << stageTwoInfo.hashes;
-
-    // create signature
-    stageTwoInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
-
-    const int k1 = (corruptionLevel_ / 2) % 2;
-    const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
-
-    if (k1 == 1 && k2 == myConfidantIndex_) {
-        csdebug() << "STAGE TWO ##############> NOTHING WILL BE SENT";
-    }
-    else {
-        sendToConfidants(MsgTypes::SecondStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageTwoInfo.signature, bytes);
-    }
+    sendToConfidants(MsgTypes::SecondStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageTwoInfo.signature, stageTwoInfo.messageBytes);
 
     // cash our stage two
-    csmeta(csdetails) << "Bytes size " << bytes.size();
-
-    stageTwoInfo.message = std::move(bytes);
-
-    csmeta(csdetails) << "done";
+    csmeta(csdetails) << "Bytes size " << stageTwoInfo.messageBytes.size() << " ... done";
 }
 
 void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1434,7 +1396,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     }
 
     csmeta(csdetails) << "Signature is OK";
-    stage.message = std::move(bytes);
+    stage.messageBytes = std::move(bytes);
 
     csdebug() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] is OK!";
     solver_->gotStageTwo(stage);
@@ -1449,35 +1411,11 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     }
 
     // TODO: think how to improve this code
-    const size_t stageSize = 2 * sizeof(uint8_t) + 2 * sizeof(cs::Signature) + stageThreeInfo.realTrustedMask.size();
 
-    cs::Bytes bytes;
-    bytes.reserve(stageSize);
-
-    cs::DataStream stream(bytes);
-    stream << stageThreeInfo.sender;
-    stream << stageThreeInfo.writer;
-    stream << stageThreeInfo.iteration;
-    stream << stageThreeInfo.blockSignature;
-    stream << stageThreeInfo.roundSignature;
-    stream << stageThreeInfo.trustedSignature;
-    stream << stageThreeInfo.realTrustedMask;
-
-    stageThreeInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
-
-    const int k1 = (corruptionLevel_ / 4) % 2;
-    const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
-
-    if (k1 == 1 && k2 == myConfidantIndex_) {
-        csdebug() << "STAGE THREE ##############> NOTHING WILL BE SENT";
-    }
-    else {
-        sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, bytes);
-    }
+    sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, stageThreeInfo.messageBytes);
 
     // cach stage three
-    csmeta(csdetails) << "bytes size " << bytes.size();
-    stageThreeInfo.message = std::move(bytes);
+    csmeta(csdetails) << "bytes size " << stageThreeInfo.messageBytes.size();
     stageThreeSent_ = true;
     csmeta(csdetails) << "done";
 }
@@ -1543,7 +1481,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
         return;
     }
 
-    stage.message = std::move(bytes);
+    stage.messageBytes = std::move(bytes);
 
     csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
 
@@ -1638,16 +1576,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
     if (!conveyer.isConfidantExists(requester) || !conveyer.isConfidantExists(sender)) {
         return;
     }
-
-    const int k1 = (corruptionLevel_ / 8) % 2;
-    const cs::Byte k2 = static_cast<cs::Byte>(corruptionLevel_ / 16);
-
-    if (k1 == 1 && k2 == myConfidantIndex_) {
-        csdebug() << "STAGE REPLY ##############> NOTHING WILL BE SENT";
-    }
-    else {
-        sendDefault(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
-    }
+    sendDefault(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
 
     csmeta(csdetails) << "done";
 }
@@ -1980,226 +1909,103 @@ void Node::checkForSavedSmartStages(uint64_t id) {
     }
 }
 
-// TODO: this function is a part of round table building <===
-void Node::addRoundSignature(const cs::StageThree& st3) {
-    size_t pos = 0;
-    for (size_t i = 0; i < st3.realTrustedMask.size(); i++) {
-        if (i == static_cast<size_t>(st3.sender)) {
-            break;
-        }
-        if (st3.realTrustedMask[i] != cs::ConfidantConsts::InvalidConfidantIndex) {
-            ++pos;
-        }
+
+//TODO: this code should be refactored
+void Node::sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target) {
+    csdebug() << "Send round table: ";
+    if (roundPackageCache_.size() == 0) {
+        csdebug() << "No active round table, can't send";
+        return;
     }
-    csdebug() << "NODE> pos = " << pos << ", poolSigsSize = " << lastSentSignatures_.poolSignatures.size() << ", rtSigsSize = " << lastSentSignatures_.roundSignatures.size()
-              << ", roundSigsSize = " << lastSentSignatures_.trustedConfirmation.size();
-    std::copy(st3.blockSignature.cbegin(), st3.blockSignature.cend(), lastSentSignatures_.poolSignatures[pos].begin());
-    std::copy(st3.roundSignature.cbegin(), st3.roundSignature.cend(), lastSentSignatures_.roundSignatures[pos].begin());
-    std::copy(st3.trustedSignature.cbegin(), st3.trustedSignature.cend(), lastSentSignatures_.trustedConfirmation[pos].begin());
+    auto rpCurrent = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum](cs::RoundPackage& rp) {return rp.roundTable().round == rNum;});
 
-    csdebug() << "NODE> Adding signatures of stage3 from T(" << cs::numeric_cast<int>(st3.sender) << ") = " << lastSentSignatures_.roundSignatures.size();
-}
-
-void Node::sendRoundPackage(const cs::PublicKey& target) {
-    csmeta(csdetails) << "Send round table";
-    sendDefault(target, MsgTypes::RoundTable, cs::Conveyer::instance().currentRoundNumber(), subRound_, lastRoundTableMessage_, lastSignaturesMessage_);
-
-    if (!lastSentRoundData_.table.characteristic.mask.empty()) {
-        csmeta(csdebug) << "Packing " << lastSentRoundData_.table.characteristic.mask.size() << " bytes of char. mask to send";
+    //////////////////////////////////////////////////
+    //if (std::find(lastRoundPackage->roundTable().confidants.cbegin(), lastRoundPackage->roundTable().confidants.cend(), target) != lastRoundPackage->roundTable().confidants.end()) {
+    //    solver_->changeHashCollectionTimer();
+    //}
+    sendDefault(target, MsgTypes::RoundTable, rpCurrent->roundTable().round, rpCurrent->subRound(), rpCurrent->toBinary());
+    csdebug() << "Done";
+    if (!rpCurrent->poolMetaInfo().characteristic.mask.empty()) {
+        csmeta(csdebug) << "Packing " << rpCurrent->poolMetaInfo().characteristic.mask.size() << " bytes of char. mask to send";
     }
 }
 
-void Node::sendRoundPackageToAll() {
+void Node::sendRoundPackageToAll(cs::RoundPackage& rPackage) {
     // add signatures// blockSignatures, roundSignatures);
     csmeta(csdetails) << "Send round table to all";
+    
+    sendBroadcast(MsgTypes::RoundTable, rPackage.roundTable().round, rPackage.subRound(), rPackage.toBinary());
 
-    lastSignaturesMessage_.clear();
-
-    cs::DataStream stream(lastSignaturesMessage_);
-    stream << lastSentSignatures_.poolSignatures;
-    stream << lastSentSignatures_.roundSignatures;
-    stream << lastSentSignatures_.trustedConfirmation;
-
-    csdebug() << "NODE> Send Signatures amount = " << lastSentSignatures_.roundSignatures.size();
-
-    sendBroadcast(MsgTypes::RoundTable, cs::Conveyer::instance().currentRoundNumber(), subRound_, lastRoundTableMessage_, lastSignaturesMessage_);
-
-    if (!lastSentRoundData_.table.characteristic.mask.empty()) {
-        csmeta(csdebug) << "Packing " << lastSentRoundData_.table.characteristic.mask.size() << " bytes of char. mask to send";
+    if (!rPackage.poolMetaInfo().characteristic.mask.empty()) {
+        csmeta(csdebug) << "Packing " << rPackage.poolMetaInfo().characteristic.mask.size() << " bytes of char. mask to send";
     }
 
     /////////////////////////////////////////////////////////////////////////// screen output
-    csdebug() << "------------------------------------------  SendRoundTable  ---------------------------------------";
-    cs::Conveyer& conveyer = cs::Conveyer::instance();
-    expectedRounds_.push_back(conveyer.currentRoundNumber() + 1);
-    auto& table = conveyer.currentRoundTable();
+    csdebug() << "------------------------------------------  SendRoundTable  ---------------------------------------" 
+        << std::endl << rPackage.toString()
+        << "\n----------------------------------------------------------------------------------------------------";
 
-    csdebug() << "Round " << conveyer.currentRoundNumber() << ", Confidants count " << table.confidants.size();
-    csdebug() << "Hashes count: " << table.hashes.size();
-
-    transport_->clearTasks();
-    onRoundStart(table);
-
-    // writer sometimes could not have all hashes, need check
-    reviewConveyerHashes();
 }
 
-void Node::sendRoundTable() {
+void Node::sendRoundTable(cs::RoundPackage& rPackage) {
     becomeWriter();
 
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     csdebug() << "SendRoundTable: add confirmation for round " << conveyer.currentRoundTable().round << " trusted";
-    confirmationList_.add(lastSentRoundData_.table.round, false, conveyer.confidants(), cs::NodeUtils::getTrustedMask(getBlockChain().getLastBlock()),
-                          lastSentSignatures_.trustedConfirmation);
-
-    conveyer.setRound(lastSentRoundData_.table.round);
+    conveyer.setRound(rPackage.roundTable().round);
     
-    const auto& confidants = conveyer.confidants();
-    if (!confidants.empty() && lastTrustedMask_.size() == confidants.size()) {
-        for (size_t i = 0; i < lastTrustedMask_.size(); ++i) {
-            if (lastTrustedMask_[i] == cs::ConfidantConsts::InvalidConfidantIndex) {
-                solver_->addToGraylist(confidants[i], Consensus::GrayListPunishment);
-            }
-        }
-    }
     subRound_ = 0;
 
     cs::RoundTable table;
     table.round = conveyer.currentRoundNumber();
-    table.confidants = lastSentRoundData_.table.confidants;
-    table.hashes = lastSentRoundData_.table.hashes;
-
+    table.confidants = rPackage.roundTable().confidants;
+    table.hashes = rPackage.roundTable().hashes;
+    roundPackageCache_.push_back(rPackage);
+    clearRPCache(rPackage.roundTable().round);
     conveyer.setTable(table);
-    sendRoundPackageToAll();
+    sendRoundPackageToAll(rPackage);
+
+
+    csdebug() << "Round " << conveyer.currentRoundNumber() << ", Confidants count " << table.confidants.size();
+    csdebug() << "Hashes count: " << table.hashes.size();
+    performRoundPackage(rPackage, solver_->getPublicKey());
 }
 
-// TODO: this function is a part of round table building <===
-void Node::storeRoundPackageData(const cs::RoundTable& newRoundTable, const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, cs::StageThree& st3) {
-    lastSentRoundData_.table.round = newRoundTable.round;
-    lastSentRoundData_.subRound = subRound_;
-    // no general stored!
-    lastSentRoundData_.table.confidants.clear();
-    lastSentRoundData_.table.confidants = newRoundTable.confidants;
+bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants) {
+    csdebug() << "NODE> PoolSigs Amnt = " << rPackage.poolSignatures().size()
+        << ", TrustedSigs Amnt = " << rPackage.trustedSignatures().size()
+        << ", RoundSigs Amnt = " << rPackage.roundSignatures().size();
 
-    lastSentRoundData_.table.hashes.clear();
-    lastSentRoundData_.table.hashes = newRoundTable.hashes;
-
-    lastSentRoundData_.table.characteristic.mask.clear();
-    lastSentRoundData_.table.characteristic.mask = characteristic.mask;
-
-    size_t expectedMessageSize = newRoundTable.confidants.size() * sizeof(cscrypto::PublicKey) + sizeof(size_t) + newRoundTable.hashes.size() * sizeof(cscrypto::Hash) +
-                                 sizeof(size_t) + poolMetaInfo.timestamp.size() * sizeof(cs::Byte) + sizeof(size_t) + characteristic.mask.size() * sizeof(cs::Byte) +
-                                 sizeof(size_t) + sizeof(size_t) + sizeof(cs::Hash) + sizeof(size_t) + poolMetaInfo.realTrustedMask.size() + sizeof(size_t);
-
-    lastRoundTableMessage_.clear();
-    lastRoundTableMessage_.reserve(expectedMessageSize);
-
-    cs::DataStream stream(lastRoundTableMessage_);
-    stream << lastSentRoundData_.table.confidants;
-    stream << poolMetaInfo.realTrustedMask;
-    stream << lastSentRoundData_.table.hashes;
-    stream << poolMetaInfo.timestamp;
-    stream << lastSentRoundData_.table.characteristic.mask;
-    stream << poolMetaInfo.sequenceNumber;
-    stream << poolMetaInfo.previousHash;
-
-    lastTrustedMask_.clear();
-    lastTrustedMask_ = poolMetaInfo.realTrustedMask;
-    cs::Bytes trustedList;
-    cs::DataStream tStream(trustedList);
-    tStream << newRoundTable.round;
-    tStream << newRoundTable.confidants;
-
-    st3.trustedHash = cscrypto::calculateHash(trustedList.data(), trustedList.size());
-    st3.roundHash = cscrypto::calculateHash(lastRoundTableMessage_.data(), lastRoundTableMessage_.size());
-
-    st3.trustedSignature = cscrypto::generateSignature(solver_->getPrivateKey(), st3.trustedHash.data(), st3.trustedHash.size());
-
-    csdebug() << "Round = " << newRoundTable.round << ", Trusted Signature = " << cs::Utils::byteStreamToHex(st3.trustedSignature);
-
-    st3.roundSignature = cscrypto::generateSignature(solver_->getPrivateKey(), st3.roundHash.data(), st3.roundHash.size());
-
-    // here should be placed parcing of round table
-
-    size_t sigSize = cs::NodeUtils::realTrustedValue(poolMetaInfo.realTrustedMask);
-
-    csdebug() << "NODE> PoolSignatures reserved to size = " << sigSize;
-
-    lastSentSignatures_.poolSignatures.clear();
-    lastSentSignatures_.poolSignatures.resize(sigSize);
-    lastSentSignatures_.roundSignatures.clear();
-    lastSentSignatures_.roundSignatures.resize(sigSize);
-    lastSentSignatures_.trustedConfirmation.clear();
-    lastSentSignatures_.trustedConfirmation.resize(sigSize);
-
-    csdebug() << "NODE> poolSigsSize = " << lastSentSignatures_.poolSignatures.size() << ", rtSigsSize = " << lastSentSignatures_.roundSignatures.size()
-              << ", roundSigsSize = " << lastSentSignatures_.trustedConfirmation.size();
-}
-
-void Node::prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3) {
-    cs::Conveyer& conveyer = cs::Conveyer::instance();
-    const cs::Characteristic* block_characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
-
-    if (!block_characteristic) {
-        csmeta(cserror) << "Send round info characteristic not found, logic error";
-        return;
-    }
-
-    storeRoundPackageData(roundTable, poolMetaInfo, *block_characteristic, st3);
-
-    csdebug() << "NODE> StageThree prepared:";
-
-    st3.print();
-}
-bool Node::receivingSignatures(const cs::Bytes& sigBytes, const cs::Bytes& roundBytes, const cs::RoundNumber rNum, const cs::Bytes& trustedMask,
-                               const cs::ConfidantsKeys& newConfidants, cs::Signatures& poolSignatures) {
-    cs::Conveyer& conveyer = cs::Conveyer::instance();
-    cs::ConfidantsKeys currentConfidants = conveyer.confidants();
-
-    cs::DataStream stream(sigBytes.data(), sigBytes.size());
-
-    stream >> poolSignatures;
-
-    cs::Signatures roundSignatures;
-    stream >> roundSignatures;
-
-    cs::Signatures trustedConfirmation;
-    stream >> trustedConfirmation;
-
-    csdebug() << "NODE> PoolSigs Amnt = " << poolSignatures.size() << ", TrustedSigs Amnt = " << trustedConfirmation.size() << ", RoundSigs Amnt = " << roundSignatures.size();
-
-    if (trustedMask.size() != currentConfidants.size()) {
-        csmeta(cserror) << "Illegal trusted mask count in round table";
+    if (rPackage.poolMetaInfo().realTrustedMask.size() != currentConfidants.size()) {
+        csmeta(cserror) << "Illegal trusted mask count in round table: " << rPackage.poolMetaInfo().realTrustedMask.size();
         return false;
     }
+    cs::Bytes roundBytes = rPackage.bytesToSign();
     cs::Hash tempHash = cscrypto::calculateHash(roundBytes.data(), roundBytes.size());
 
-    if (!cs::NodeUtils::checkGroupSignature(currentConfidants, trustedMask, roundSignatures, tempHash)) {
+    if (!cs::NodeUtils::checkGroupSignature(currentConfidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.roundSignatures(), tempHash)) {
         csdebug() << "NODE> The roundtable signatures are NOT OK";
         return false;
     }
     else {
         csdebug() << "NODE> The roundtable signatures are ok";
     }
+    //refactored -->
+    cs::Bytes bytes = rPackage.roundTable().toBinary();
+    cs::Hash trustedHash = cscrypto::calculateHash(bytes.data(), bytes.size());
+    //refactored <--
 
-    cs::Bytes trustedToHash;
-    cs::DataStream tth(trustedToHash);
-    tth << rNum;
-    tth << newConfidants;
-    cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
-
-    if (cs::NodeUtils::checkGroupSignature(currentConfidants, trustedMask, trustedConfirmation, trustedHash)) {
+    if (cs::NodeUtils::checkGroupSignature(currentConfidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.trustedSignatures(), trustedHash)) {
         csdebug() << "NODE> The trusted confirmation for the next round are ok";
-        confirmationList_.add(rNum, false, currentConfidants, trustedMask, trustedConfirmation);
+        //confirmationList_.add(rPackage.roundTable().round, false, currentConfidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.trustedSignatures());
     }
     else {
         csdebug() << "NODE> The trusted confirmation for the next round are NOT OK";
-        // return false;
+        return false;
     }
 
     return true;
 }
-
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
     csdebug() << "NODE> next round table received, round: " << rNum;
     csmeta(csdetails) << "started";
@@ -2224,39 +2030,76 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    cs::Bytes roundBytes;
-    istream_ >> roundBytes;
+    cs::Bytes bytes;
+    istream_ >> bytes;
 
-    if (!istream_.good()) {
+    if (!istream_.good() || !istream_.end()) {
         csmeta(cserror) << "Malformed packet with round table (1)";
         return;
     }
 
-    cs::Bytes bytes;
-    istream_ >> bytes;
+    cs::RoundPackage rPackage;
 
-    if (!istream_.good()) {
-        csmeta(cserror) << "Malformed packet with round table (2)";
+    if (!rPackage.fromBinary(bytes, rNum, subRound)) {
+        csdebug() << "NODE> RoundPackage could not be parsed";
         return;
     }
+    csdebug() << "---------------------------------- RoundPackage #" << rPackage.roundTable().round << " --------------------------------------------- \n" 
+        <<  rPackage.toString() 
+        <<  "\n-----------------------------------------------------------------------------------------------------------------------------";
 
-    cs::DataStream roundStream(roundBytes.data(), roundBytes.size());
-    cs::ConfidantsKeys confidants;
-    roundStream >> confidants;
-
-    if (confidants.size() <= Consensus::MinTrustedNodes && confidants.size() > Consensus::MaxTrustedNodes) {
-        csmeta(cserror) << "Illegal confidants count in round table";
-        return;
-    }
 
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
     poolSynchronizer_->sync(conveyer.currentRoundNumber());
+    if (poolSynchronizer_->isSyncroStarted()) {
+        getCharacteristic(rPackage);
+    }
+    roundPackageCache_.push_back(rPackage);
+    clearRPCache(rPackage.roundTable().round);
+    cs::Signatures poolSignatures;
+    cs::PublicKeys confidants;
+    if (rPackage.roundTable().round > 2/* && confirmationList_.size() > 0*/) { //Here we have problems when the trusted have the first block and the others do not!!!
+        auto conf = confirmationList_.find(rPackage.roundTable().round - 1/*getBlockChain().getLastSequence() + 1*/);
+        if (!conf.has_value()) {
+            csdebug() << "Can't find confirmation - leave getRoundPackage()";
+            confirmationList_.add(rPackage.roundTable().round, false, rPackage.roundTable().confidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.trustedSignatures());
+            //return;
+        }
+        else {
+            confidants = conf.value().confidants;
+        }
+        if (confidants.empty()) {
+            csdb::Pool tmp = getBlockChain().loadBlock(rPackage.roundTable().round - 1);
+            if (tmp.confidants().empty()) {
+                csdebug() << "Can't find public keys - leave getRoundPackage()";
+                return;
+            } 
+            else {
+                confidants = tmp.confidants();
+            }
+        }
 
-    cs::Bytes realTrusted;
-    roundStream >> realTrusted;
+        if (!receivingSignatures(rPackage, confidants) && storedRound == getBlockChain().getLastSequence()) {
+            return;
+        }
+    }
+    else {
+        csdebug() << "No confirmations in the list";
+    }
 
-    const auto ptrRT = conveyer.roundTable(rNum - 1);
+    currentRoundTableMessage_.round = rPackage.roundTable().round;
+    currentRoundTableMessage_.sender = sender;
+    currentRoundTableMessage_.message = cs::Bytes(data, data + size);
+    performRoundPackage(rPackage, sender);
+}
+
+void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& /*sender*/) {
+    csdebug() << __func__;
+    confirmationList_.add(rPackage.roundTable().round, false, rPackage.roundTable().confidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.trustedSignatures());
+    cs::Conveyer& conveyer = cs::Conveyer::instance();
+    cs::Bytes realTrusted = rPackage.poolMetaInfo().realTrustedMask;
+    const auto ptrRT = conveyer.roundTable(rPackage.roundTable().round - 1);
     if (ptrRT != nullptr) {
         const cs::ConfidantsKeys& prevConfidants = ptrRT->confidants;
         if (!prevConfidants.empty() && realTrusted.size() == prevConfidants.size()) {
@@ -2267,43 +2110,46 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
             }
         }
     }
-
-    cs::Signatures poolSignatures;
-
-    if (!receivingSignatures(bytes, roundBytes, rNum, realTrusted, confidants, poolSignatures) && storedRound == getBlockChain().getLastSequence()) {
-        return;
-    }
-
+    
     // update sub round and max heighbours sequence
-    subRound_ = subRound;
-    maxHeighboursSequence_ = rNum;
+    subRound_ = rPackage.subRound();
+    maxNeighboursSequence_ = rPackage.roundTable().round;
 
-    currentRoundTableMessage_.round = rNum;
-    currentRoundTableMessage_.sender = sender;
-    currentRoundTableMessage_.message = cs::Bytes(data, data + size);
-
-    cs::PacketsHashes hashes;
-    roundStream >> hashes;
-
+    cs::PacketsHashes hashes = rPackage.roundTable().hashes;
+    cs::PublicKeys confidants = rPackage.roundTable().confidants;
     cs::RoundTable roundTable;
-    roundTable.round = rNum;
+    roundTable.round = rPackage.roundTable().round;
     roundTable.confidants = std::move(confidants);
     roundTable.hashes = std::move(hashes);
-    roundTable.general = sender;
+    //roundTable.general = sender;
 
     csdebug() << "NODE> confidants: " << roundTable.confidants.size();
-
+    
     // first change conveyer state
-    conveyer.setTable(roundTable);
+    cs::Conveyer::instance().setTable(roundTable);
 
     // create pool by previous round, then change conveyer state.
-    getCharacteristic(reinterpret_cast<cs::Byte*>(roundStream.data()), roundStream.size(), conveyer.previousRoundNumber(), sender, std::move(poolSignatures),
-                      std::move(realTrusted));
+    getCharacteristic(rPackage);
 
-    onRoundStart(conveyer.currentRoundTable());
+    onRoundStart(cs::Conveyer::instance().currentRoundTable());
     reviewConveyerHashes();
 
     csmeta(csdetails) << "done\n";
+}
+
+void Node::clearRPCache(cs::RoundNumber rNum) {
+    bool flagg = true;
+    if (rNum < 6) {
+        return;
+    }
+    while (flagg) {
+        auto tmp = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum](cs::RoundPackage& rp) {return rp.roundTable().round == rNum - 5; });
+        if (tmp == roundPackageCache_.end()) {
+            break;
+        }
+        roundPackageCache_.erase(tmp);
+    }
+
 }
 
 void Node::sendHash(cs::RoundNumber round) {
@@ -2317,10 +2163,24 @@ void Node::sendHash(cs::RoundNumber round) {
     }
 
     csdebug() << "NODE> Sending hash to ALL";
-    csdb::PoolHash spoiledHash = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
+    cs::Bytes message;
+    cs::DataStream stream(message);
+    cs::Byte myTrustedSize = 0;
+    cs::Byte myRealTrustedSize = 0;
+    uint64_t timeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
+    csdebug() << "TimeStamp = " << std::to_string(timeStamp);
+    if (cs::Conveyer::instance().currentRoundNumber() > 1) {
+        cs::Bytes lastTrusted = getBlockChain().getLastRealTrusted();
+        myTrustedSize = static_cast<uint8_t>(lastTrusted.size());
+        myRealTrustedSize = cs::TrustedMask::trustedSize(lastTrusted);
+    }
+    csdb::PoolHash tmp = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
+    stream << tmp.to_binary() << myTrustedSize << myRealTrustedSize << timeStamp << round << subRound_;
+    cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+    cs::Bytes messageToSend(message.data(), message.data() + message.size() - sizeof(cs::RoundNumber) - sizeof(cs::Byte));
+    sendToConfidants(MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
+    csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_) << ", message: " << cs::Utils::byteStreamToHex(messageToSend);
 
-    sendToConfidants(MsgTypes::BlockHash, round, subRound_, spoiledHash);
-    csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_);
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -2341,20 +2201,72 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
         // TODO : Maybe return
     }
 
-    csdb::PoolHash tmp;
-    istream_ >> tmp;
+    cs::Bytes message;
+    cs::Signature signature;
+    istream_ >> message >> signature;
 
     if (!istream_.good() || !istream_.end()) {
         cswarning() << "NODE> bad hash packet format";
         return;
     }
 
-    solver_->gotHash(std::move(tmp), sender);
+    cs::StageHash sHash;
+    cs::Bytes tmp;
+    sHash.sender = sender;
+    sHash.round = rNum;
+    cs::DataStream stream(message.data(), message.size());
+    stream >> tmp;
+    stream >> sHash.trustedSize;
+    stream >> sHash.realTrustedSize;
+    stream >> sHash.timeStamp;
+    if (!stream.size() == 0 || !stream.isValid()) {
+        csdebug() << "Stream is a bit uncertain ... ";
+    }
+    uint64_t lastTimeStamp = std::atoll(getBlockChain().getLastTimeStamp().c_str());
+    uint64_t currentTimeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
+
+    csdebug() << "Got Hash message (" << tmp.size() << "): " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
+        << " : " << static_cast<int>(sHash.trustedSize) << " - " << static_cast<int>(sHash.realTrustedSize);
+    csdebug() << "TimeStamp     = " << std::to_string(sHash.timeStamp);
+    uint64_t deltaStamp = currentTimeStamp - lastTimeStamp;
+    if (deltaStamp > Consensus::MaxTimeStampDelta) {
+        deltaStamp = Consensus::MaxTimeStampDelta;
+
+    }
+    if (sHash.timeStamp < lastTimeStamp || sHash.timeStamp > currentTimeStamp + deltaStamp / 2 * 3) {//here we just take the time interval 1.5 times larger than last round
+        csdebug() << "Our TimeStamp = " << std::to_string(currentTimeStamp) << " ... return";
+        return;
+    }
+
+    sHash.hash = csdb::PoolHash::from_binary(std::move(tmp));
+    cs::DataStream stream1(message);
+    stream1 << rNum << subRound;
+
+
+    if (!cscrypto::verifySignature(signature, sender, message.data(), message.size())) {
+        csdebug() << "Hash message signature is NOT VALID";
+        return;
+
+    }
+    csdebug() << "Hash message signature is  VALID";
+    //cs::PublicKeys confidants = cs::Conveyer::instance().confidants();
+
+    if (roundPackageCache_.size() > 0) { // if cache.size > 0 current won't be  nullptr
+        csdebug() << "roundPackageList.size() = " << roundPackageCache_.size();
+        auto myTrustedSize = roundPackageCache_.back().poolMetaInfo().realTrustedMask.size();
+        auto myRealTrustedSize = cs::TrustedMask::trustedSize(roundPackageCache_.back().poolMetaInfo().realTrustedMask);
+        if (myRealTrustedSize < myTrustedSize && myRealTrustedSize < sHash.realTrustedSize) {
+            csdebug() << "Starting RoundPackage request";
+         //   roundPackageRequest(rNum, sender);
+        }
+    }
+
+    solver_->gotHash(std::move(sHash));
 }
 
 void Node::roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round) {
     csdebug() << "NODE> send request for round info  #" << round;
-    sendDefault(respondent, MsgTypes::RoundPackRequest, round);
+    sendDefault(respondent, MsgTypes::RoundPackRequest, round, round /*dummy data to prevent packet drop on receiver side*/);
 }
 
 void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -2363,11 +2275,19 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
 
     csdebug() << "NODE> getting roundPack request #" << rNum;
 
-    if (currentRoundTableMessage_.round == rNum && currentRoundTableMessage_.message.size() != 0) {
-        roundPackReply(sender);
+    if (roundPackageCache_.size() == 0) {
+        csdebug() << "NODE> can't send = don't have last RoundPackage filled";
+        return;
     }
-    else if (currentRoundTableMessage_.round == rNum && currentRoundTableMessage_.message.size() == 0) {
-        emptyRoundPackReply(sender);
+    cs::RoundPackage rp = roundPackageCache_.back();
+
+    if (rp.roundTable().round == rNum) {
+        if(!rp.roundSignatures().empty()) {
+            roundPackReply(sender);
+        }
+        else {
+            emptyRoundPackReply(sender);        
+        }
     }
 }
 
@@ -2389,6 +2309,9 @@ void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNu
     cs::Bytes bytes;
     cs::DataStream stream(bytes);
     stream << rNum;
+    if (rNum <= getBlockChain().getLastSequence()) {
+        return;
+    }
     if (!cscrypto::verifySignature(signature, sender, bytes.data(), bytes.size())) {
         csdebug() << "NODE> the RoundPackReply signature is not correct";
         return;
@@ -2400,7 +2323,12 @@ void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNu
 
 void Node::roundPackReply(const cs::PublicKey& respondent) {
     csdebug() << "NODE> sending roundPack reply to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
-    sendDefault(respondent, MsgTypes::RoundTable, currentRoundTableMessage_.round, currentRoundTableMessage_.message);
+    if (roundPackageCache_.size() == 0) {
+        csdebug() << "NODE> can't send = don't have last RoundPackage filled";
+        return;
+    }
+    cs::RoundPackage rp = roundPackageCache_.back();
+    sendDefault(respondent, MsgTypes::RoundTable, rp.roundTable().round, rp.subRound(), rp.toBinary());
 }
 
 void Node::sendRoundTableRequest(uint8_t respondent) {
@@ -2464,8 +2392,11 @@ bool Node::tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumbe
     }
 
     csdebug() << "NODE> Re-send last round info #" << rNum << " to ALL";
-
-    sendRoundPackage(target);
+    auto rPackage = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum] (cs::RoundPackage& rp) {return rp.roundTable().round == rNum;});
+    if (rPackage == roundPackageCache_.cend()) {
+        return false;
+    }
+    sendRoundPackage(rNum, target);
 
     return true;
 }
@@ -2732,8 +2663,16 @@ void Node::onStopRequested() {
 }
 
 void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
-    if (!blockValidator_->validateBlock(block, cs::BlockValidator::ValidationLevel::hashIntergrity,
-                                        cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
+    if (stopRequested_) {
         *shouldStop = true;
+        return;
+    }
+    if (!blockValidator_->validateBlock(block,
+        cs::BlockValidator::ValidationLevel::hashIntergrity
+            /*| cs::BlockValidator::ValidationLevel::smartStates*/
+            /*| cs::BlockValidator::ValidationLevel::accountBalance */,
+        cs::BlockValidator::SeverityLevel::onlyFatalErrors)) {
+        *shouldStop = true;
+        return;
     }
 }

@@ -33,6 +33,7 @@ struct Config {
     int executor_port = 9080;
     int apiexec_port = 9070;
     std::string executor_ip{ "localhost" };
+    std::string executor_cmdline{};
 };
 
 class connector {

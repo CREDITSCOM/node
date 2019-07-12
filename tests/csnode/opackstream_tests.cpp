@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "csdb/address.hpp"
+
 #include "packstream.hpp"
+#include "datastream.hpp"
 
 #include <lib/system/utils.hpp>
 
@@ -123,8 +125,8 @@ TEST(OPackStream, getCurrSize) {
     ASSERT_EQ(5, oPackStream.getCurrentSize());
 }
 
-template <class T, size_t ArraySize>
-void TestConcreteTypeWriteToOPackStream(const T& value, const unsigned char (&expected_encoded_data)[ArraySize]) {
+template<typename T>
+void TestConcreteTypeWriteToOPackStream(const T& value, const unsigned char* data, size_t size) {
     RegionAllocator allocator;
 
     cs::OPackStream stream(&allocator, kPublicKey);
@@ -137,8 +139,13 @@ void TestConcreteTypeWriteToOPackStream(const T& value, const unsigned char (&ex
     displayStreamData(stream);
 
     ASSERT_EQ(1, stream.getPacketsCount());
-    ASSERT_EQ(encoded.size(), sizeof expected_encoded_data);
-    ASSERT_TRUE(0 == memcmp(encoded.data(), expected_encoded_data, encoded.size()));
+    ASSERT_EQ(encoded.size(), size * sizeof(unsigned char));
+    ASSERT_TRUE(0 == memcmp(encoded.data(), data, encoded.size()));
+}
+
+template <typename T, size_t ArraySize>
+void TestConcreteTypeWriteToOPackStream(const T& value, const unsigned char (&data)[ArraySize]) {
+    TestConcreteTypeWriteToOPackStream(value, data, ArraySize);
 }
 
 TEST(OPackStream, IpAddressWrite) {
@@ -174,8 +181,10 @@ TEST(OPackStream, EmptyTransactionsPacketHashWrite) {
 //
 
 TEST(OPackStream, EmptyTransactionsPacketWrite) {
-    const unsigned char expected[] = {0x03, 0x00, 0x00, 0x01, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    const unsigned char expected[] = {0x03, 0x00, 0x00, 0x01, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
     TestConcreteTypeWriteToOPackStream(cs::TransactionsPacket{}, expected);
 }
 

@@ -62,6 +62,7 @@ inline void mouseSelectionDisable() {
 #ifndef WIN32
 extern "C" void sigHandler(int sig) {
     gSignalStatus = 1;
+    Node::requestStop();
     std::cout << "+++++++++++++++++ >>> Signal received!!! <<< +++++++++++++++++++++++++" << std::endl;
     switch (sig) {
         case SIGINT:
@@ -97,6 +98,7 @@ void installSignalHandler() {
 #else
 BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
     gSignalStatus = 1;
+    Node::requestStop();
     std::cout << "+++++++++++++++++ >>> Signal received!!! <<< +++++++++++++++++++++++++" << std::endl;
     switch (fdwCtrlType) {
             // Handle the CTRL-C signal.

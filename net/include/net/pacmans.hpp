@@ -79,7 +79,7 @@ public:
   Task& allocNext();
   void enQueueLast();
 
-  TaskPtr<IPacMan> getNextTask();
+  TaskPtr<IPacMan> getNextTask(bool &is_empty);
 
   using TaskIterator = std::list<Task>::iterator;
   void releaseTask(TaskIterator&);
@@ -102,7 +102,7 @@ public:
   Task* allocNext();
   void enQueueLast();
 
-  TaskPtr<OPacMan> getNextTask();
+  TaskPtr<OPacMan> getNextTask(bool &is_empty);
 
   using TaskIterator = std::list<Task>::iterator;
   void releaseTask(TaskIterator&);

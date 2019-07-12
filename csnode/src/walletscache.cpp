@@ -182,9 +182,6 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
             fundConfidantsWalletsWithExecFee(*itTrx, blockchain);
         }
     }
-#ifdef MONITOR_NODE
-    it_writer->second.totalFee += totalAmountOfCountedFee;
-#endif
 
     if (totalAmountOfCountedFee > csdb::Amount(0)) {
         fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants, cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()));
@@ -231,6 +228,12 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(const csdb::Amoun
             }
             WalletData& walletData = getWalletData(confidantId, confidantAddress);
             walletData.balance_ += feeToEachConfidant;
+
+#ifdef MONITOR_NODE
+            auto it_writer = data_.trusted_info_.find(walletData.address_);
+            it_writer->second.totalFee += feeToEachConfidant;
+#endif
+
             payedFee += feeToEachConfidant;
             ++numPayedTrusted;
             if (numPayedTrusted == (realTrustedNumber - 1)) {
@@ -392,7 +395,7 @@ void WalletsCache::ProcessorBase::checkClosedSmart(const csdb::Transaction& tran
 }
 
 void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction) {
-    if (newStateTransaction.user_field(trx_uf::new_state::Value).value<std::string>().empty()) {
+    if (!cs::SmartContracts::is_state_updated(newStateTransaction)) {
         return rollbackReplenishPayableContract(initTransaction, csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>()));
     }
     bool waitingSmart = false;
