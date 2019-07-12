@@ -29,10 +29,10 @@ const cs::Characteristic kCharacteristic = {{0xEE, 0xEE, 0xEd}};
 
 namespace cs {
 bool operator==(const cs::RoundTable& left, const cs::RoundTable& right) {
-    auto round_is_equal = left.round == right.round, general_is_equal = left.general == right.general, confidants_is_equal = left.confidants == right.confidants,
-         hashes_is_equal = left.hashes == right.hashes, charBytes_is_equal = left.characteristic.mask == right.characteristic.mask;
+    auto round_is_equal = left.round == right.round, /*general_is_equal = left.general == right.general,*/ confidants_is_equal = left.confidants == right.confidants,
+         hashes_is_equal = left.hashes == right.hashes/*, charBytes_is_equal = left.characteristic.mask == right.characteristic.mask*/;
 
-    return round_is_equal && general_is_equal && confidants_is_equal && hashes_is_equal && charBytes_is_equal;
+    return round_is_equal && /*general_is_equal && */confidants_is_equal && hashes_is_equal/* && charBytes_is_equal*/;
 }
 
 bool operator==(const cs::Characteristic& left, const cs::Characteristic& right) {
@@ -87,7 +87,7 @@ auto CreateTestPacket(const size_t number_of_transactions) {
 }
 
 auto CreateTestRoundTable(const cs::PacketsHashes& hashes) {
-    return cs::RoundTable{kRoundNumber, kPublicKey, kConfidantsKeys, hashes, kCharacteristic};
+    return cs::RoundTable{kRoundNumber, /*kPublicKey, */kConfidantsKeys, hashes/*, kCharacteristic*/};
 }
 
 TEST(TransactionsEqualityOperator, SameAreEqual) {
@@ -229,7 +229,8 @@ TEST(Conveyer, MainLogic) {
     pk.fill(0);
 
     csdb::PoolHash ph;
-    cs::PoolMetaInfo pool_meta_info{"1542617459297", pk, ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}, {}, {}};
+    cs::Bytes tmpCharacteristic;
+    cs::PoolMetaInfo pool_meta_info{ tmpCharacteristic, "1542617459297", ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}};
 
     auto pool{conveyer.applyCharacteristic(pool_meta_info)};
 

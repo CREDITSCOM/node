@@ -13,6 +13,17 @@ void ConfirmationList::add(cs::RoundNumber rNum, bool bang, const cs::Confidants
     tConfirmation.signatures = confirmation;
 
     confirmationList_.emplace(rNum, std::move(tConfirmation));
+    csdebug() << "The confirmation of R-" << rNum << " added, conf.size = " << confirmationList_.size();
+    if (rNum > cs::values::kDefaultMetaStorageMaxSize) {
+        for(auto it = confirmationList_.cbegin(); it != confirmationList_.cend(); /*++it*/){
+            auto tmp = it++;
+            if (tmp->first < rNum - cs::values::kDefaultMetaStorageMaxSize) {
+                confirmationList_.erase(tmp);
+            }
+        }
+        csdebug() << "Some confirmations were deleted, conf.size = " << confirmationList_.size();
+    }
+
 }
 
 void ConfirmationList::remove(cs::RoundNumber rNum) {
@@ -29,9 +40,10 @@ std::optional<cs::TrustedConfirmation> ConfirmationList::find(cs::RoundNumber rN
     const auto it = confirmationList_.find(rNum);
 
     if (it == confirmationList_.end()) {
+        csdebug() << "The confirmation of R-" << rNum << " was not found, conf.size = " << confirmationList_.size();
         return std::nullopt;
     }
-
+    csdebug() << "The confirmation of R - " << rNum << " was found, conf.size = " << confirmationList_.size();
     return std::make_optional<cs::TrustedConfirmation>(it->second);
 }
 }  // namespace cs

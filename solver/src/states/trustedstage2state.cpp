@@ -4,6 +4,7 @@
 
 #include <lib/system/logger.hpp>
 #include <csnode/conveyer.hpp>
+#include <cscrypto/cscrypto.hpp>
 
 namespace
 {
@@ -110,6 +111,9 @@ Result TrustedStage2State::onStage1(SolverContext& context, const cs::StageOne& 
         csdebug() << name() << ": enough stage-1 received";
         /*signing of the second stage should be placed here*/
         csdebug() << name() << ": --> stage-2 [" << static_cast<int>(stage.sender) << "]";
+        stage.toBytes();
+        csdebug() << name() << ": stageMessage (" << stage.messageBytes.size() << "): " << cs::Utils::byteStreamToHex(stage.messageBytes);
+        stage.signature = cscrypto::generateSignature(context.private_key(), stage.messageBytes.data(), stage.messageBytes.size());
         context.add_stage2(stage, true);
         return Result::Finish;
     }

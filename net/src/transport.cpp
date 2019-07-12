@@ -706,7 +706,7 @@ ConnectionPtr Transport::getRandomNeighbour() {
     return nh_.getRandomSyncNeighbour();
 }
 
-std::unique_lock<cs::SpinLock> Transport::getNeighboursLock() const {
+std::unique_lock< std::mutex > Transport::getNeighboursLock() const {
     return nh_.getNeighboursLock();
 }
 

@@ -51,8 +51,9 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     // csdb::Address abs_addr;
     std::vector <csdb::Amount> executor_fees;
     cs::TransactionsPacket tmpPacket;
+    std::vector<csdb::Transaction> newStates;
     /*bool primary_new_state_found = false;*/
-
+    csdb::Transaction lastEmptyNewState;
     for (const auto& tr : pack.transactions()) {
         // only the 1st new_state is specifically handled
         if (SmartContracts::is_new_state(tr)/* && !primary_new_state_found*/) {
@@ -87,14 +88,38 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             tmpNewState.add_user_field(trx_uf::new_state::Count, tr.user_field(trx_uf::new_state::Count));
             tmpNewState.add_user_field(trx_uf::new_state::RefStart, tr.user_field(trx_uf::new_state::RefStart));
             tmpNewState.add_user_field(trx_uf::new_state::RetVal, tr.user_field(trx_uf::new_state::RetVal));
-            tmpNewState.add_user_field(trx_uf::new_state::Value, tr.user_field(trx_uf::new_state::Value));
+            //tmpNewState.add_user_field(trx_uf::new_state::Value, tr.user_field(trx_uf::new_state::Value));
+
+            auto stateOnly = tr.user_field(trx_uf::new_state::Value).value<std::string>();
+            Hash newStateHash;
+            if (stateOnly.size() > 0) {
+                cscrypto::Bytes st(stateOnly.data(), stateOnly.data() + stateOnly.size());
+                newStateHash = cscrypto::calculateHash(st.data(),st.size());
+            }
+            else {
+                newStateHash = Zero::hash;
+                lastEmptyNewState = tr;
+            }
+            std::string nHash(newStateHash.data(), newStateHash.data() + sizeof(newStateHash));
+            tmpNewState.add_user_field(trx_uf::new_state::Hash, nHash);
             tmpNewStates_.push_back(tmpNewState);
             tmpPacket.addTransaction(tmpNewStates_.back());
+            newStates.push_back(tr);
         }
         else {
             tmpPacket.addTransaction(tr);
         }
     }
+
+    if (!newStates.empty()) {
+        finalStateTransaction_ = newStates.back();
+    }
+    else {
+        csdebug() << kLogPrefix << "There is no state transactions in the package";
+        finalStateTransaction_ = lastEmptyNewState;
+    }
+
+
 
     if (/*!primary_new_state_found || */0 == smartRoundNumber_ || std::numeric_limits<uint32_t>::max() == smartTransaction_) {
         cserror() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
@@ -126,7 +151,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
 
     // pack_.transactions(0).user_field(1) = 0;
 
-    currentSmartTransactionPack_ = pack;
+    currentSmartTransactionPack_ = tmpPacket;//pack;
 
     tmpPacket.makeHash();
     auto tmp = tmpPacket.hash().toBinary();
@@ -537,6 +562,7 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
             finalSmartTransactionPack_.addTransaction(tr);
         }
     }
+    finalSmartTransactionPack_.addStateTransaction(finalStateTransaction_);
     finalSmartTransactionPack_.makeHash();
 }
 

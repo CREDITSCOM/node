@@ -41,6 +41,9 @@ private:
     bool getFromTransIndex(const cs::Bytes& key, cs::Bytes* value) override final;
 #endif
 
+    bool updateContractData(const cs::Bytes& key, const cs::Bytes& data) override;
+    bool getContractData(const cs::Bytes& key, cs::Bytes& data) override;
+
 private:
     class Iterator;
 
@@ -51,6 +54,7 @@ private:
     DbEnv env_;
     std::unique_ptr<Db> db_blocks_;
     std::unique_ptr<Db> db_seq_no_;
+    std::unique_ptr<Db> db_contracts_;
 #ifdef TRANSACTIONS_INDEX
     std::unique_ptr<Db> db_trans_idx_;
 #endif

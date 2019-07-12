@@ -16,6 +16,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <list>
 
 namespace
 {
@@ -211,47 +212,110 @@ bool SolverCore::stateFailed(Result res) {
 //  }
 //}
 
+std::string SolverCore::chooseTimeStamp() {
+    int64_t lastTimeStamp;
+    try {
+      lastTimeStamp = std::stoll(pnode->getBlockChain().getLastTimeStamp());
+    } catch(...) {
+      return std::to_string(0);
+    }
+
+    std::list<double> stamps;
+    double sx = 0, sx2 = 0;
+    double mean;
+    int N = 0;
+    for (auto& it : stageOneStorage) {
+        if (!it.roundTimeStamp.empty()) {
+            int64_t tStamp;
+            try {
+                tStamp = std::stoll(it.roundTimeStamp);
+            } catch(...) {
+                cswarning() << log_prefix << "incompatible timestamp received from [" << (int)it.sender << "]";
+                continue;
+            }
+            double x = static_cast<double>(tStamp - lastTimeStamp);
+            if (x > DBL_EPSILON) {
+                stamps.push_back(x);
+                sx += x;
+                sx2 += x * x;
+                ++N;
+            }
+        }
+    }
+
+    bool isDrop = true;
+    while (isDrop) {
+        if (N == 0) {
+            csdebug() << "There is no nodes with valid TimeStamp";
+            return std::to_string(0);
+        }
+        double N_1 = 1. / N;
+        mean = sx * N_1;
+        double disp = sx2 * N_1 - mean * mean;
+        isDrop = false;
+        for (auto it = stamps.begin(), end = stamps.end(); it != end;) {
+            double x = *it;
+            auto it_ = it++;
+            double value = x - mean;
+            if (value * value >  9. * disp) {
+                sx -= x; sx2 -= x * x; --N;
+                stamps.erase(it_);
+                isDrop = true;
+            }
+        }
+    }
+
+    auto meanTimeStamp = static_cast<int64_t>(lastTimeStamp + mean + 0.5);
+    csdebug() << "finish: " << meanTimeStamp;
+    return std::to_string(meanTimeStamp);
+}
+
 // TODO: this function is to be implemented the block and RoundTable building <====
-void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& currentTimeStamp, cs::StageThree& stage3) {
+void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& /*currentTimeStamp*/, cs::StageThree& stage3) {
     csmeta(csdetails) << "start";
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     cs::RoundTable table;
+    //TODO: place here adjustTrustedCandidates() call
     table.round = conveyer.currentRoundNumber() + 1;
     table.confidants = nodes;
     table.hashes = hashes;
-
+    justCreatedRoundPackage.updateRoundTable(table);
     csdetails() << log_prefix << "applying " << hashes.size() << " hashes to ROUND Table";
 
     // only for new consensus
     cs::PoolMetaInfo poolMetaInfo;
+    std::string timeStamp = chooseTimeStamp();
     poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
-    poolMetaInfo.timestamp = std::move(currentTimeStamp);
-
-    const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
-    if (confirmation.has_value()) {
-        poolMetaInfo.confirmationMask = confirmation.value().mask;
-        poolMetaInfo.confirmations = confirmation.value().signatures;
-    }
+    poolMetaInfo.timestamp = std::move(timeStamp);
+    poolMetaInfo.characteristic.mask = conveyer.characteristic(conveyer.currentRoundNumber())->mask;
+    //const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
+    //if (confirmation.has_value()) {
+    //    poolMetaInfo.confirmationMask = confirmation.value().mask;
+    //    poolMetaInfo.confirmations = confirmation.value().signatures;
+    //}
 
     csdetails() << log_prefix << "timestamp: " << poolMetaInfo.timestamp;
     for (std::size_t i = 0; i < hashes.size(); ++i) {
         csdetails() << log_prefix << '\t' << i << ". " << hashes[i].toString();
     }
 
-    if (stage3.sender != cs::ConfidantConsts::InvalidConfidantIndex) {
-        const cs::ConfidantsKeys& confidants = conveyer.confidants();
-        if (stage3.writer < confidants.size()) {
-            poolMetaInfo.writerKey = confidants[stage3.writer];
-        }
-        else {
-            cserror() << log_prefix << "stage-3 writer index: " << static_cast<int>(stage3.writer)
-                << ", out of range is current confidants size: " << confidants.size();
-        }
-    }
+    //if (stage3.sender != cs::ConfidantConsts::InvalidConfidantIndex) {
+    //    const cs::ConfidantsKeys& confidants = conveyer.confidants();
+    //    if (stage3.writer < confidants.size()) {
+    //        poolMetaInfo.writerKey = confidants[stage3.writer];
+    //    }
+    //    else {
+    //        cserror() << log_prefix << "stage-3 writer index: " << static_cast<int>(stage3.writer)
+    //            << ", out of range is current confidants size: " << confidants.size();
+    //    }
+    //}
 
     poolMetaInfo.realTrustedMask = stage3.realTrustedMask;
     poolMetaInfo.previousHash = pnode->getBlockChain().getLastHash();
 
+    justCreatedRoundPackage.updatePoolMeta(poolMetaInfo);
+    cs::Bytes confirmationMask;
+    cs::Signatures confirmations;
     // TODO: in this method we delete the local hashes - so if we need to rebuild thid pool again from the roundTable it's impossible
     uint32_t binSize = 0;
     if (stage3.iteration == 0) {
@@ -261,13 +325,23 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
             cserror() << log_prefix << "applyCharacteristic() failed to create block";
             return;
         }
-
+//        uploadNewStates(conveyer.uploadNewStates());
         deferredBlock_ = std::move(pool.value());
         deferredBlock_.set_confidants(conveyer.confidants());
 
-        csdebug() << log_prefix << "block #" << deferredBlock_.sequence() << " add new wallets to pool";
+        csmeta(csdebug) << "block #" << deferredBlock_.sequence() << " add new wallets to pool";
         pnode->getBlockChain().addNewWalletsToPool(deferredBlock_);
         pnode->getBlockChain().setTransactionsFees(deferredBlock_);
+        const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
+        if (confirmation.has_value()) {
+            confirmationMask = confirmation.value().mask;
+            confirmations = confirmation.value().signatures;
+        }
+        if (justCreatedRoundPackage.poolMetaInfo().sequenceNumber > 1) {
+            deferredBlock_.add_number_confirmations(static_cast<uint8_t>(confirmationMask.size()));
+            deferredBlock_.add_confirmation_mask(cs::Utils::maskToBits(confirmationMask));
+            deferredBlock_.add_round_confirmations(confirmations);
+        }
     }
     else {
         csdb::Pool tmpPool;
@@ -280,7 +354,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         for (auto& it : deferredBlock_.transactions()) {
             tmpPool.add_transaction(it);
         }
-        tmpPool.add_user_field(0, poolMetaInfo.timestamp);
+        tmpPool.add_user_field(0, justCreatedRoundPackage.poolMetaInfo().timestamp);
         for (auto& it : deferredBlock_.smartSignatures()) {
             tmpPool.add_smart_signature(it);
         }
@@ -294,10 +368,15 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         for (auto& it : *defWallets) {
             newWallets->push_back(it);
         }
+        const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
+        if (confirmation.has_value()) {
+            confirmationMask = confirmation.value().mask;
+            confirmations = confirmation.value().signatures;
+        }
         if (poolMetaInfo.sequenceNumber > 1) {
-            tmpPool.add_number_confirmations(static_cast<uint8_t>(poolMetaInfo.confirmationMask.size()));
-            tmpPool.add_confirmation_mask(cs::Utils::maskToBits(poolMetaInfo.confirmationMask));
-            tmpPool.add_round_confirmations(poolMetaInfo.confirmations);
+            tmpPool.add_number_confirmations(static_cast<uint8_t>(confirmationMask.size()));
+            tmpPool.add_confirmation_mask(cs::Utils::maskToBits(confirmationMask));
+            tmpPool.add_round_confirmations(confirmations);
         }
 
         deferredBlock_ = csdb::Pool{};
@@ -310,12 +389,43 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     std::copy(lastHashBin.cbegin(), lastHashBin.cend(), stage3.blockHash.begin());
     stage3.blockSignature = cscrypto::generateSignature(private_key, stage3.blockHash.data(), stage3.blockHash.size());
 
-    pnode->prepareRoundTable(table, poolMetaInfo, stage3);
-    csmeta(csdetails) << "end";
+    //pnode->prepareRoundTable(table, poolMetaInfo, stage3);
+    //csmeta(csdetails) << "end";
+
+    const cs::Characteristic* block_characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
+
+    if (!block_characteristic) {
+        csmeta(cserror) << "Send round info characteristic not found, logic error";
+        return;
+    }
+
+    cs::Bytes bytes = justCreatedRoundPackage.bytesToSign();
+    stage3.roundHash = cscrypto::calculateHash(bytes.data(), bytes.size());
+
+    cs::Bytes messageToSign;
+    messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
+    cs::DataStream signStream(messageToSign);
+    signStream << justCreatedRoundPackage.roundTable().round;
+    signStream << pnode->subRound();
+    signStream << stage3.roundHash;
+    stage3.roundSignature = cscrypto::generateSignature(private_key, stage3.roundHash.data(), stage3.roundHash.size());
+
+    cs::Bytes trustedList;
+    cs::DataStream tStream(trustedList);
+    tStream << justCreatedRoundPackage.roundTable().round;
+    tStream << justCreatedRoundPackage.roundTable().confidants;
+    stage3.trustedHash = cscrypto::calculateHash(trustedList.data(), trustedList.size());
+    stage3.trustedSignature = cscrypto::generateSignature(private_key, stage3.trustedHash.data(), stage3.trustedHash.size());
+
+    csdebug() << "NODE> StageThree prepared:" << std::endl << cs::StageThree::toString(stage3);
+}
+
+void SolverCore::uploadNewStates(std::vector<csdb::Transaction> newStates) {
+    //psmarts.
 }
 
 void SolverCore::sendRoundTable() {
-    pnode->sendRoundTable();
+    pnode->sendRoundTable(justCreatedRoundPackage);
 }
 
 bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) {
@@ -340,7 +450,32 @@ bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) 
     deferredBlock_ = csdb::Pool();
 
     csmeta(csdetails) << "end";
+    updateLastPackageSignatures();
     return true;
+}
+
+void SolverCore::updateLastPackageSignatures() {
+
+    justCreatedRoundPackage.updatePoolSignatures(lastSentSignatures_.poolSignatures);
+    justCreatedRoundPackage.updateRoundSignatures(lastSentSignatures_.roundSignatures);
+    justCreatedRoundPackage.updateTrustedSignatures(lastSentSignatures_.trustedConfirmation);
+
+    //auto ptr = pnode->getCurrentRoundPackage();
+    //if (ptr != nullptr) {
+    //    if (justCreatedRoundPackage.roundTable().round == ptr->roundTable().round) {
+    //        if (cs::TrustedMask::trustedSize(justCreatedRoundPackage.poolMetaInfo().realTrustedMask)
+    //            <= cs::TrustedMask::trustedSize(ptr->poolMetaInfo().realTrustedMask)) {
+    //            return;
+    //        }
+
+    //    }
+    //}
+
+    //pnode->addRoundPackageToList(justCreatedRoundPackage);
+
+    //if (!pnode->addRPackageToCache(justCreatedRoundPackage)) {
+    //    return;
+    //}
 }
 
 void SolverCore::removeDeferredBlock(cs::Sequence seq) {
