@@ -15,7 +15,7 @@
 #include <lib/system/random.hpp>
 #include <lib/system/console.hpp>
 
-static cs::TransactionsPacket packet;
+static cs::TransactionsPacket testPacket;
 
 static csdb::Transaction makeTransaction(int64_t innerId) {
     csdb::Transaction transaction;
@@ -33,7 +33,7 @@ static csdb::Transaction makeTransaction(int64_t innerId) {
 }
 
 TEST(TransactionsPacket, createPacket) {
-    ASSERT_TRUE(packet.isHashEmpty());
+    ASSERT_TRUE(testPacket.isHashEmpty());
 }
 
 TEST(TransactionsPacket, addTransactions) {
@@ -49,41 +49,41 @@ TEST(TransactionsPacket, addTransactions) {
     const size_t randomTransactionsCount = cs::Random::generateValue<size_t>(3, 30);
     const size_t startInnerID = cs::Random::generateValue<size_t>(1, 2789);
 
-    const auto oldtransactionsCount = packet.transactionsCount();
+    const auto oldtransactionsCount = testPacket.transactionsCount();
 
     for (std::size_t i = 0; i < randomTransactionsCount; ++i) {
         transaction.set_innerID(static_cast<int64_t>(i + startInnerID));
-        ASSERT_TRUE(packet.addTransaction(transaction));
+        ASSERT_TRUE(testPacket.addTransaction(transaction));
     }
 
-    const auto& newtransactionsCount = packet.transactionsCount();
+    const auto& newtransactionsCount = testPacket.transactionsCount();
     ASSERT_NE(oldtransactionsCount, newtransactionsCount);
     ASSERT_EQ(newtransactionsCount, randomTransactionsCount);
 }
 
 TEST(TransactionsPacket, makeHash) {
-    const auto oldMainHash = packet.hash();
+    const auto oldMainHash = testPacket.hash();
 
-    packet.makeHash();
+    testPacket.makeHash();
 
-    ASSERT_FALSE(packet.isHashEmpty());
-    ASSERT_NE(oldMainHash, packet.hash());
+    ASSERT_FALSE(testPacket.isHashEmpty());
+    ASSERT_NE(oldMainHash, testPacket.hash());
 }
 
 TEST(TransactionsPacket, makeNewHash) {
-    const auto oldMainHash = packet.hash();
-    const auto oldtransactionsCount = packet.transactionsCount();
+    const auto oldMainHash = testPacket.hash();
+    const auto oldtransactionsCount = testPacket.transactionsCount();
 
-    packet.makeHash();
+    testPacket.makeHash();
 
-    ASSERT_EQ(oldMainHash, packet.hash());
-    ASSERT_EQ(oldtransactionsCount, packet.transactionsCount());
+    ASSERT_EQ(oldMainHash, testPacket.hash());
+    ASSERT_EQ(oldtransactionsCount, testPacket.transactionsCount());
 }
 
 TEST(TransactionsPacket, makeHashFromString) {
     cs::TransactionsPacketHash hashFromString;
     ASSERT_TRUE(hashFromString.isEmpty());
-    const auto& mainHash = packet.hash();
+    const auto& mainHash = testPacket.hash();
     const std::string mainHashStr = mainHash.toString();
     hashFromString = cs::TransactionsPacketHash::fromString(mainHashStr);
 
@@ -93,7 +93,7 @@ TEST(TransactionsPacket, makeHashFromString) {
 }
 
 TEST(TransactionsPacket, makeHashFromBinary) {
-    const auto& mainHash = packet.hash();
+    const auto& mainHash = testPacket.hash();
     const auto& mainHashBin = mainHash.toBinary();
     const cs::TransactionsPacketHash hashFromBinary = cs::TransactionsPacketHash::fromBinary(mainHashBin);
     ASSERT_EQ(mainHash, hashFromBinary);
@@ -102,13 +102,13 @@ TEST(TransactionsPacket, makeHashFromBinary) {
 }
 
 TEST(TransactionsPacket, makeTransactionsPacketFromBinary) {
-    const auto& mainPacketBin = packet.toBinary();
+    const auto& mainPacketBin = testPacket.toBinary();
     const cs::TransactionsPacket packetFromBinary = cs::TransactionsPacket::fromBinary(mainPacketBin);
 
     ASSERT_EQ(mainPacketBin, packetFromBinary.toBinary());
-    ASSERT_EQ(packet.transactionsCount(), packetFromBinary.transactionsCount());
+    ASSERT_EQ(testPacket.transactionsCount(), packetFromBinary.transactionsCount());
 
-    const auto& mainHash = packet.hash();
+    const auto& mainHash = testPacket.hash();
     const auto& packetFromBinaryHash = packetFromBinary.hash();
 
     ASSERT_EQ(mainHash, packetFromBinaryHash);
@@ -116,17 +116,17 @@ TEST(TransactionsPacket, makeTransactionsPacketFromBinary) {
 }
 
 TEST(TransactionsPacket, makeTransactionsPacketFromByteStream) {
-    const auto mainPacketBin = packet.toBinary();
+    const auto mainPacketBin = testPacket.toBinary();
     const size_t rawSize = mainPacketBin.size();
     const void* rawData = mainPacketBin.data();
 
     const cs::TransactionsPacket hashFromStream = cs::TransactionsPacket::fromByteStream(static_cast<const char*>(rawData), rawSize);
 
     ASSERT_EQ(mainPacketBin, hashFromStream.toBinary());
-    ASSERT_EQ(packet.toBinary(), hashFromStream.toBinary());
-    ASSERT_EQ(packet.transactionsCount(), hashFromStream.transactionsCount());
+    ASSERT_EQ(testPacket.toBinary(), hashFromStream.toBinary());
+    ASSERT_EQ(testPacket.transactionsCount(), hashFromStream.transactionsCount());
 
-    const auto& mainHash = packet.hash();
+    const auto& mainHash = testPacket.hash();
     const auto& hashFromStreamHash = hashFromStream.hash();
 
     ASSERT_EQ(mainHash, hashFromStreamHash);
@@ -171,6 +171,57 @@ TEST(TransactionsPacket, signaturesSerialization) {
     ASSERT_EQ(pack.hash(), expectedPacket.hash());
 }
 
+TEST(TransactionsPacket, copyConstructor) {
+    cs::TransactionsPacket packet;
+
+    for (int64_t i = 0; i < 100; ++i) {
+        packet.addTransaction(makeTransaction(i));
+    }
+
+    cs::TransactionsPacket copiedPacket = packet;
+    ASSERT_EQ(copiedPacket.toBinary(), packet.toBinary());
+}
+
+TEST(TransactionsPacket, moveConstructor) {
+    cs::TransactionsPacket packet;
+
+    for (int64_t i = 0; i < 100; ++i) {
+        packet.addTransaction(makeTransaction(i));
+    }
+
+    cs::TransactionsPacket copiedPacket = packet;
+    cs::TransactionsPacket movedPacket = std::move(packet);
+
+    ASSERT_EQ(copiedPacket.toBinary(), movedPacket.toBinary());
+}
+
+TEST(TransactionsPacket, copyOperator) {
+    cs::TransactionsPacket packet;
+
+    for (int64_t i = 0; i < 100; ++i) {
+        packet.addTransaction(makeTransaction(i));
+    }
+
+    cs::TransactionsPacket copiedPacket;
+    copiedPacket = packet;
+
+    ASSERT_EQ(copiedPacket.toBinary(), packet.toBinary());
+}
+
+TEST(TransactionsPacket, moveOperator) {
+    cs::TransactionsPacket packet;
+
+    for (int64_t i = 0; i < 100; ++i) {
+        packet.addTransaction(makeTransaction(i));
+    }
+
+    cs::TransactionsPacket copiedPacket = packet;
+    cs::TransactionsPacket movedPacket;
+    movedPacket = std::move(packet);
+
+    ASSERT_EQ(copiedPacket.toBinary(), movedPacket.toBinary());
+}
+
 TEST(TransactionPacketHash, fromBinary) {
     auto startAddress = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000007");
 
@@ -184,13 +235,13 @@ TEST(TransactionPacketHash, fromBinary) {
     transaction.set_amount(csdb::Amount(10000, 0));
     transaction.set_innerID(cs::Random::generateValue<int64_t>(1, 2789));
 
-    cs::TransactionsPacket testPacket;
-    testPacket.addTransaction(transaction);
+    cs::TransactionsPacket packet;
+    packet.addTransaction(transaction);
 
-    ASSERT_EQ(testPacket.makeHash(), true);
+    ASSERT_EQ(packet.makeHash(), true);
 
-    auto bytes = testPacket.hash().toBinary();
+    auto bytes = packet.hash().toBinary();
     cs::TransactionsPacketHash hash = cs::TransactionsPacketHash::fromBinary(std::move(bytes));
 
-    ASSERT_EQ(hash, testPacket.hash());
+    ASSERT_EQ(hash, packet.hash());
 }
