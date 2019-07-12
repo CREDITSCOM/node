@@ -2030,15 +2030,11 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
             putTokenInfo(tok, fromByteArray(t.first.public_key()), t.second);
 
             // filters
-            auto subName = tok.name.substr(0, filterName.size());
-            auto subCode = tok.code.substr(0, filterCode.size());
-
-            if ((subName == filterName && subCode == filterCode) ||
-                (filterName.empty() && subCode == filterCode)    ||
-                (filterCode.empty() && subName == filterName)    ||
+            if ((tok.name.find(filterName) != -1 && tok.code.find(filterCode) != -1) ||
+                (filterName.empty() && tok.code.find(filterCode)) ||
+                (tok.name.find(filterName) && filterCode.empty()) ||
                 (filterName.empty() && filterCode.empty()))
-                _return.tokens.push_back(tok);
-            //          
+                    _return.tokens.push_back(tok);         
 
             if (--limit == 0)
                 return false;
