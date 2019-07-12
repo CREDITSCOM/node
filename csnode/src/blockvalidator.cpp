@@ -22,7 +22,8 @@ BlockValidator::BlockValidator(Node& node)
     plugins_.insert(std::make_pair(smartStates, std::make_unique<SmartStateValidator>(*this)));
     /*HL99dwfM3YPQnauN1djBvVLZNbC3b1FHwe5vPv8pDZ1y - 0xAAE*/
     /*CSa4DTfTcenryQAifiPKVpY9jzWshYY11g3mXQR6B7rJ - dAp*/
-    plugins_.insert(std::make_pair(accountBalance, std::make_unique<AccountBalanceChecker>(*this, "HL99dwfM3YPQnauN1djBvVLZNbC3b1FHwe5vPv8pDZ1y")));
+    /*8Vr9JA4AessnxVthGjp2ae7YLWQPU7jMvWYiPZA6vpDH - -253CS*/
+    plugins_.insert(std::make_pair(accountBalance, std::make_unique<AccountBalanceChecker>(*this, "8Vr9JA4AessnxVthGjp2ae7YLWQPU7jMvWYiPZA6vpDH")));
 }
 
 BlockValidator::~BlockValidator() {}
