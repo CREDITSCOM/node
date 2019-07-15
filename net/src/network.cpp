@@ -239,8 +239,8 @@ void Network::writerRoutine(const Config& config) {
             continue;
         }
 
-        if (tasks > 200) {
-            cswarning() << "strange: too many tasks " << tasks;
+        if (tasks > 600) {
+            csdetails() << "(informational) current task quantity more then normal: " << tasks;
         }
 
         msg.resize(tasks);
