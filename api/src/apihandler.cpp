@@ -317,7 +317,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
                     api::TokenDeployTransInfo dti;
                     dti.name = it->second.name;
                     dti.code = it->second.symbol;
-                    dti.standart = (api::TokenStandart)(uint32_t)it->second.standart;
+                    dti.tokenStandard = it->second.tokenStandard;
                     result.trxn.smartInfo.__set_v_tokenDeploy(dti);
                 }
             });
@@ -574,12 +574,12 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
     tm.applyToInternal([&tr, &res](const TokensMap& tokens, const HoldersMap&) {
         auto it = tokens.find(tr.target());
         if (it != tokens.end())
-            res.smartContractDeploy.tokenStandart = (api::TokenStandart)(uint32_t)it->second.standart;
+            res.smartContractDeploy.tokenStandard = it->second.tokenStandard;
         else
-            res.smartContractDeploy.tokenStandart = TokenStandart::NotAToken;
+            res.smartContractDeploy.tokenStandard = TokenStandard::NotAToken;
     });
 #else
-    res.smartContractDeploy.tokenStandart = TokenStandart::NotAToken;
+    res.smartContractDeploy.tokenStandard = TokenStandard::NotAToken;
 #endif
 
 #ifdef MONITOR_NODE
@@ -1508,15 +1508,15 @@ void addTokenResult(api::TokenTransactionsResult& _return, const csdb::Address& 
 }
 
 void putTokenInfo(api::TokenInfo& ti, const general::Address& addr, const Token& token) {
-    ti.address = addr;
-    ti.code = token.symbol;
-    ti.name = token.name;
-    ti.totalSupply = token.totalSupply;
+    ti.address           = addr;
+    ti.code              = token.symbol;
+    ti.name              = token.name;
+    ti.totalSupply       = token.totalSupply;
     ti.owner = fromByteArray(token.owner.public_key());
-    ti.transfersCount = (uint32_t) token.transfersCount;
+    ti.transfersCount    = (uint32_t) token.transfersCount;
     ti.transactionsCount = (uint32_t) token.transactionsCount;
-    ti.holdersCount = (uint32_t) token.realHoldersCount;
-    ti.standart = (decltype(api::TokenInfo::standart))(uint32_t)(token.standart);
+    ti.holdersCount      = (uint32_t) token.realHoldersCount;
+    ti.tokenStandard     = (decltype(api::TokenInfo::tokenStandard))(uint32_t)(token.tokenStandard);
 }
 
 template <typename ResultType>
@@ -1646,7 +1646,7 @@ void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return, 
         return;
     }
 
-    _return.ts = (api::TokenStandart)(uint32_t)TokensMaster::getTokenStandart(methodsResult.methods);
+    _return.tokenStandard = methodsResult.tokenStandard;
     _return.byteCodeObjects = std::move(result.byteCodeObjects);
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -1987,7 +1987,7 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
     SetResponseStatus(_return.status, found ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
 }
 
-void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc, const std::string& filterName, const std::string& filterCode) {
+void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc, const TokenFilters& filters) {
     if (!validatePagination(_return, *this, offset, limit)) {
         return;
     }
@@ -2030,11 +2030,14 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
             putTokenInfo(tok, fromByteArray(t.first.public_key()), t.second);
 
             // filters
-            if ((tok.name.find(filterName) != -1 && tok.code.find(filterCode) != -1) ||
-                (filterName.empty() && tok.code.find(filterCode)) ||
-                (tok.name.find(filterName) && filterCode.empty()) ||
-                (filterName.empty() && filterCode.empty()))
-                    _return.tokens.push_back(tok);         
+            if ((tok.name.find(filters.name) != -1 && tok.code.find(filters.code) != -1 && tok.tokenStandard == filters.tokenStandard ) ||
+                (tok.name.find(filters.name) && tok.code.find(filters.code) && !tok.tokenStandard) ||
+                (tok.name.find(filters.name) && filters.code.empty() && !tok.tokenStandard) ||
+                (filters.name.empty() && tok.code.find(filters.code) && tok.tokenStandard) ||
+                (filters.name.empty() && tok.code.find(filters.code) && !tok.tokenStandard) ||
+                (filters.name.empty() && filters.code.empty() && tok.tokenStandard) ||
+                (filters.name.empty() && filters.code.empty() && !tok.tokenStandard))
+                    _return.tokens.push_back(tok);      
 
             if (--limit == 0)
                 return false;

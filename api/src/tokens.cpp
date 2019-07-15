@@ -127,61 +127,6 @@ static bool javaTypesEqual(const std::string& goodType, const std::string& quest
     return true;
 }
 
-TokenStandart TokensMaster::getTokenStandart(const std::vector<general::MethodDescription>& methods) {
-    const static std::map<std::string, std::pair<std::string, std::vector<std::string>>> StandartMethods = {
-        {"getName", {"java.lang.string", {}}},
-        {"getSymbol", {"java.lang.string", {}}},
-        {"getDecimal", {"int", {}}},
-        {"setFrozen", {"boolean", {"boolean"}}},
-        {"totalSupply", {"java.lang.string", {}}},
-        {"balanceOf", {"java.lang.string", {"java.lang.string"}}},
-        {"allowance", {"java.lang.string", {"java.lang.string", "java.lang.string"}}},
-        {"transfer", {"boolean", {"java.lang.string", "java.lang.string"}}},
-        {"transferFrom", {"boolean", {"java.lang.string", "java.lang.string", "java.lang.string"}}},
-        {"approve", {"void", {"java.lang.string", "java.lang.string"}}},
-        {"burn", {"boolean", {"java.lang.string"}}},
-        {"register", {"void", {}}},
-        {"buyTokens", {"boolean", {"java.lang.string"}}}};
-
-    const static auto findPos = [](const std::string& key) { return std::distance(StandartMethods.begin(), StandartMethods.find(key)); };
-    const static std::pair<size_t, size_t> extendedPositions = {findPos("register"), findPos("buyTokens")};
-
-    std::vector<bool> gotMethods(StandartMethods.size(), false);
-    for (auto& m : methods) {
-        auto smIt = StandartMethods.find(m.name);
-
-        if (smIt != StandartMethods.end()) {
-            if (smIt->second.second.size() != m.arguments.size() || !javaTypesEqual(smIt->second.first, m.returnType))
-                continue;
-
-            bool argsMatch = true;
-            for (uint32_t i = 0; i < m.arguments.size(); ++i) {
-                if (!javaTypesEqual(smIt->second.second[i], m.arguments[i].type)) {
-                    argsMatch = false;
-                    break;
-                }
-            }
-
-            if (argsMatch)
-                gotMethods[std::distance(StandartMethods.begin(), smIt)] = true;
-        }
-    }
-
-    bool canBeCredits = true;
-    bool canBeCreditsExtended = true;
-    for (uint8_t i = 0; i < gotMethods.size(); ++i) {
-        if (!gotMethods[i]) {
-            canBeCreditsExtended = false;
-            if (i != extendedPositions.first && i != extendedPositions.second) {
-                canBeCredits = false;
-                break;
-            }
-        }
-    }
-
-    return canBeCreditsExtended ? TokenStandart::CreditsExtended : (canBeCredits ? TokenStandart::CreditsBasic : TokenStandart::NotAToken);
-}
-
 template <typename T>
 T getVariantAs(const general::Variant&);
 template <>
@@ -337,16 +282,12 @@ void TokensMaster::run() {
 
                 executor::GetContractMethodsResult methodsResult;
 
-                // try { api_->executor_.getOrigExecutor(); }
-                // catch (...) { std::cout << "executor dosent run!" << std::endl; return; }
-
                 if (!dt.byteCodeObjects.empty()) {
                     api_->getExecutor().getContractMethods(methodsResult, dt.byteCodeObjects);
                     if (!methodsResult.status.code) {
-                        auto ts = getTokenStandart(methodsResult.methods);
-                        if (ts != TokenStandart::NotAToken) {
+                        if (methodsResult.tokenStandard != TokenStandard::NotAToken) {
                             Token t;
-                            t.standart = ts;
+                            t.tokenStandard = methodsResult.tokenStandard;
                             t.owner = dt.deployer;
 
                             {
@@ -383,7 +324,7 @@ void TokensMaster::run() {
                             if (trPair.second.is_valid())
                                 initiateHolder(tIt->second, tIt->first, trPair.second, true);
                         }
-                        else if (tIt->second.standart == TokenStandart::CreditsExtended) {
+                        else if (tIt->second.tokenStandard == TokenStandard::CreditsExtended) {
                             csdb::Address regDude = tryGetRegisterData(ps.method, ps.params);
                             if (regDude.is_valid())
                                 initiateHolder(tIt->second, tIt->first, regDude);
@@ -494,9 +435,6 @@ std::pair<csdb::Address, csdb::Address> TokensMaster::getTransferData(const csdb
 }
 std::string TokensMaster::getAmount(const api::SmartContractInvocation&) {
     return "";
-}
-TokenStandart TokensMaster::getTokenStandart(const std::vector<general::MethodDescription>&) {
-    return TokenStandart::NotAToken;
 }
 
 /*void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&) { }
