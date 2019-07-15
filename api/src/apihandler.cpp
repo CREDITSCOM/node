@@ -2483,20 +2483,31 @@ namespace executor {
         ExecuteResult res;
         res.response = optOriginRes.value().resp.status;
 
-        if (optInnerTransactions.has_value()) {
+        if (optInnerTransactions.has_value())
             res.trxns = optInnerTransactions.value();
-        }
+
         deleteInnerSendTransactions(optOriginRes.value().acceessId);
-        //constexpr double FEE_IN_SEC = kMinFee * 4.0;
-        //const double fee = std::max(kMinFee, static_cast<double>(optOriginRes.value().timeExecute) * FEE_IN_SEC);
-        //res.fee = csdb::Amount(fee);
         res.selfMeasuredCost = (long)optOriginRes.value().timeExecute;
-        for (const auto& [itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
-            auto addr = BlockChain::getAddressFromKey(itAddress);
-            res.states[addr] = itState;
-        }
-        for (const auto& result : optOriginRes.value().resp.results) {
-            res.smartsRes.push_back({ result.ret_val, result.invokedContractState, result.executionCost, result.status });
+
+        for (const auto& setters : optOriginRes.value().resp.results) {
+            ExecuteResult::SmartRes smartRes;
+            smartRes.retValue       = setters.ret_val;
+            smartRes.executionCost  = setters.executionCost;
+            smartRes.response       = setters.status;
+           
+            for (auto& states : setters.contractsState) {          // state
+                auto addr = BlockChain::getAddressFromKey(states.first);
+                smartRes.states[BlockChain::getAddressFromKey(states.first)] = states.second;
+            }
+                   
+            for (auto transaction : setters.emittedTransactions) { // emittedTransactions    
+                ExecuteResult::EmittedTrxn emittedTrxn;
+                emittedTrxn.source   = BlockChain::getAddressFromKey(transaction.source);
+                emittedTrxn.target   = BlockChain::getAddressFromKey(transaction.target);
+                emittedTrxn.amount   = csdb::Amount(transaction.amount.integral, transaction.amount.fraction);
+                emittedTrxn.userData = transaction.userData;
+                smartRes.emittedTransactions.push_back(emittedTrxn);
+            }
         }
 
         return res;
@@ -2617,17 +2628,31 @@ namespace executor {
         ExecuteResult res;
         res.response = optOriginRes.value().resp.status;
 
-        if (optInnerTransactions.has_value()) {
+        if (optInnerTransactions.has_value())
             res.trxns = optInnerTransactions.value();
-        }
+
         deleteInnerSendTransactions(optOriginRes.value().acceessId);
         res.selfMeasuredCost = (long)optOriginRes.value().timeExecute;
-        for (const auto& [itAddress, itState] : optOriginRes.value().resp.externalContractsState) {
-            auto addr = BlockChain::getAddressFromKey(itAddress);
-            res.states[addr] = itState;
-        }
-        for (const auto& result : optOriginRes.value().resp.results) {
-            res.smartsRes.push_back({ result.ret_val, result.invokedContractState, result.executionCost, result.status });
+
+        for (const auto& setters : optOriginRes.value().resp.results) {
+            ExecuteResult::SmartRes smartRes;
+            smartRes.retValue = setters.ret_val;
+            smartRes.executionCost = setters.executionCost;
+            smartRes.response = setters.status;
+
+            for (auto& states : setters.contractsState) {          // state
+                auto addr = BlockChain::getAddressFromKey(states.first);
+                smartRes.states[BlockChain::getAddressFromKey(states.first)] = states.second;
+            }
+
+            for (auto transaction : setters.emittedTransactions) { // emittedTransactions    
+                ExecuteResult::EmittedTrxn emittedTrxn;
+                emittedTrxn.source = BlockChain::getAddressFromKey(transaction.source);
+                emittedTrxn.target = BlockChain::getAddressFromKey(transaction.target);
+                emittedTrxn.amount = csdb::Amount(transaction.amount.integral, transaction.amount.fraction);
+                emittedTrxn.userData = transaction.userData;
+                smartRes.emittedTransactions.push_back(emittedTrxn);
+            }
         }
 
         return res;

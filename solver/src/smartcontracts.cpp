@@ -931,7 +931,7 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                     }
                     if (!exe_data.result.smartsRes.empty()) {
                         const auto& head = exe_data.result.smartsRes.front();
-                        if (head.response.code == 0) {
+                        /*if (head.response.code == 0) { //$
                             tr_state.add_user_field(trx_uf::new_state::Value, head.newState);
                             // test actual hash
                             cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)head.newState.data(), head.newState.size());
@@ -954,7 +954,7 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                             print_addr += ") ";
                             csdebug() << kLogPrefix << "state of " << ref_start << print_addr << " is updated, stored hash is "
                                 << hash_result << ", new size is " << head.newState.size();
-                        }
+                        }*/
                     }
                 }
             }
@@ -1400,7 +1400,7 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
                     // execute never returns empty data.result.smartsRes list
                     if (!data.result.smartsRes.empty()) {
                         // remember last state for the next execution
-                        last_state = data.result.smartsRes.front().newState;
+                        // last_state = data.result.smartsRes.front().newState; //$
                     }
                 }
             }
@@ -1505,7 +1505,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             packet.addTransaction(result);
         }
         else {
-            const auto& execution_result = data_item.result.smartsRes.front();
+            /*const auto& execution_result = data_item.result.smartsRes.front(); //$
             csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " is successful, new state size = " << execution_result.newState.size();
 
             // put new state
@@ -1554,7 +1554,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                         }
                     }
                 }
-            }
+            }*/
         }
         // add all transactions to integral packet
         for (const auto& t : packet.transactions()) {

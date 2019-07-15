@@ -259,21 +259,25 @@ public:
     }
 
     struct ExecuteResult {
-    private:
+        struct EmittedTrxn {
+            csdb::Address source;
+            csdb::Address target;
+            csdb::Amount amount;
+            std::string userData;
+        };
+
         struct SmartRes {
             general::Variant retValue;
-            std::string		 newState;
-            // measured in milliseconds actual cost of execution
-            int64_t			 executionCost;
+            std::map<csdb::Address, std::string> states;
+            std::vector<EmittedTrxn> emittedTransactions;
+            int64_t executionCost; // measured in milliseconds actual cost of execution
             ::general::APIResponse response;
         };
-    public:
-        std::vector<SmartRes> smartsRes;
-        std::map<csdb::Address, std::string> states;
-        std::vector<csdb::Transaction> trxns;
-        // measured in milliseconds total cost of executions
-        long selfMeasuredCost;
+
         ::general::APIResponse response;
+        std::vector<SmartRes> smartsRes;
+        std::vector<csdb::Transaction> trxns;       
+        long selfMeasuredCost; // measured in milliseconds total cost of executions       
     };
 
     void addInnerSendTransaction(const general::AccessID& accessId, const csdb::Transaction& transaction) {
