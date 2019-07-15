@@ -764,6 +764,8 @@ private:
     void dumb_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
     void smart_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
 
+    std::optional<std::string> checkTransaction(const ::api::Transaction&);
+
     TokensMaster tm;
 
     const uint8_t ERROR_CODE = 1;

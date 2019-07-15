@@ -90,6 +90,7 @@ namespace trx_uf {
     // ordinary transaction field
     namespace ordinary {
         // no fields defined
+        constexpr csdb::user_field_id_t Text = 1;
     }
 }  // namespace trx_uf
 

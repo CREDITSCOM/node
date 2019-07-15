@@ -611,7 +611,7 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
     BlockChain::WalletData wallData{};
     BlockChain::WalletId id{};
 
-    if (!transaction.smartContract.forgetNewState &&  // not for getter
+    if (transaction.__isset.smartContract && !transaction.smartContract.forgetNewState &&  // not for getter
             !s_blockchain.findWalletData(source, wallData, id)) {
         return csdb::Transaction{};
     }
@@ -640,62 +640,9 @@ std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
 
 void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
     auto tr = make_transaction(transaction);
-    if (!transaction.userFields.empty()) {
-        tr.add_user_field(1, transaction.userFields);
-    }
-
-    // check money
-    const auto source_addr = s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey);
-    BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "wallet not found!";
-        return;
-    }
-
-    const auto max_sum = tr.amount().to_double() + kMinFee;
-    const auto balance = wallData.balance_.to_double();
-    if (max_sum > balance) {
-        cslog() << "API: reject transaction with insufficient balance, max_sum = " << max_sum << ", balance = " << balance;
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "not enough money!\nmax_sum: " + std::to_string(max_sum) + "\nbalance: " + std::to_string(balance);
-        return;
-    }
-
-    // check max fee
-    if (csdb::AmountCommission countedFee; !cs::fee::estimateMaxFee(tr, countedFee)) {
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
-        return;
-    }
-
-    // check signature
-    const auto byteStream = tr.to_byte_stream_for_sig();
-    if (!cscrypto::verifySignature(tr.signature(), s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key(), byteStream.data(),
-                                   byteStream.size())) {
-        cslog() << "API: reject transaction with wrong signature";
-        _return.status.code = ERROR_CODE;
-        _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
-        return;
-    }
-
+    if (!transaction.userFields.empty())
+        tr.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
     solver.send_wallet_transaction(tr);
-
-    //
-    /*const static unsigned int WAIT_SECONDS_TIME{ 10 };
-    const auto pair = std::pair(tr.source(), tr.innerID());
-    auto lockRef{ lockedReference(this->trxInProgress) };
-    auto& cvTrxn = (*lockRef)[pair];
-    static std::mutex mt;
-    std::unique_lock lock(mt);
-    const auto resWait = cvTrxn.first.wait_for(lock, std::chrono::seconds(WAIT_SECONDS_TIME), [&cvflg = (cvTrxn.second = false)]{ return cvflg; });
-    lockedReference(this->trxInProgress)->erase(pair);
-    //
-
-    if (!resWait) // time is over
-            SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS, get_delimited_transaction_sighex(tr));
-    else*/
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
 
@@ -705,54 +652,54 @@ std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type, std::ost
     return s;
 }
 
+std::optional<std::string> APIHandler::checkTransaction(const Transaction& transaction) {
+    if (transaction.__isset.smartContract && transaction.smartContract.forgetNewState)
+        return {};
+
+    auto trxn = make_transaction(transaction);
+    if (transaction.__isset.smartContract)
+        trxn.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
+    else if(!transaction.userFields.empty())
+        trxn.add_user_field(1, transaction.userFields);
+
+    // check money
+    const auto source_addr = s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
+    BlockChain::WalletData wallData{};
+    BlockChain::WalletId wallId{};
+    if (!s_blockchain.findWalletData(source_addr, wallData, wallId))
+        return "not enough money!";
+
+    const auto max_fee = trxn.max_fee().to_double();
+    const auto balance = wallData.balance_.to_double();
+    if (max_fee > balance)
+        return "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
+
+    // check max fee
+    csdb::AmountCommission countedFee;
+    if (!cs::fee::estimateMaxFee(trxn, countedFee))
+        return "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
+
+    // check signature
+    const auto byteStream = trxn.to_byte_stream_for_sig();
+    if (!cscrypto::verifySignature(trxn.signature(), s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey).public_key(),
+        byteStream.data(), byteStream.size())) {
+        cslog() << "API: reject transaction with wrong signature";
+        return "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+    }
+    return {};
+}
+
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
-    auto input_smart = transaction.smartContract;
-    auto send_transaction = make_transaction(transaction);
-    const auto smart_addr = s_blockchain.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
-    const bool deploy = is_smart_deploy(input_smart);
+    auto input_smart        = transaction.__isset.smartContract ? transaction.smartContract : SmartContractInvocation{};
+    auto send_transaction   = make_transaction(transaction);
+    const auto smart_addr   = s_blockchain.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
+    bool deploy             = transaction.__isset.smartContract ? is_smart_deploy(input_smart) : false;
 
-    send_transaction.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
-
-    if (!input_smart.forgetNewState) {
-        // check money
-        const auto source_addr = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
-        BlockChain::WalletData wallData{};
-        BlockChain::WalletId wallId{};
-        if (!s_blockchain.findWalletData(source_addr, wallData, wallId)) {
-            _return.status.code = ERROR_CODE;
-            _return.status.message = "not enough money!";
-            return;
-        }
-
-        const auto max_fee = send_transaction.max_fee().to_double();
-        const auto balance = wallData.balance_.to_double();
-        if (max_fee > balance) {
-            _return.status.code = ERROR_CODE;
-            _return.status.message = "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
-            return;
-        }
-        //
-
-        // check max fee
-        {
-            csdb::AmountCommission countedFee;
-            if (!cs::fee::estimateMaxFee(send_transaction, countedFee)) {
-                _return.status.code = ERROR_CODE;
-                _return.status.message = "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
-                return;
-            }
-        }
-
-        // check signature
-        const auto byteStream = send_transaction.to_byte_stream_for_sig();
-        if (!cscrypto::verifySignature(send_transaction.signature(), s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).public_key(),
-                                       byteStream.data(), byteStream.size())) {
-            _return.status.code = ERROR_CODE;
-            cslog() << "API: reject transaction with wrong signature";
-            _return.status.message = "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
-            return;
-        }
-        //
+    if (transaction.__isset.smartContract) {
+        send_transaction.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
+    } else if (!transaction.userFields.empty()) { // for payable
+        send_transaction.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
+        deploy = false;
     }
 
     std::vector<general::ByteCodeObject> origin_bytecode;
@@ -760,9 +707,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         for (auto& it : input_smart.smartContractDeploy.byteCodeObjects) {
             it.byteCode.clear();
         }
-
         input_smart.smartContractDeploy.sourceCode.clear();
-
         decltype(auto) locked_smart_origin = lockedReference(this->smart_origin);
         auto it = locked_smart_origin->find(smart_addr);
         if (it != locked_smart_origin->end())
@@ -793,15 +738,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     hashStateEntry.getPosition();
 
     if (input_smart.forgetNewState) {
-        // -- prevent start transaction from flow to solver, so move it here:
-        /*if (!deploy) {
-            auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) { return ss.condFlg; });
-            if (!resWait) {  // time is over
-                SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
-                return;
-            }
-        }*/
-        // --
         auto source_pk = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).to_api_addr();
         auto target_pk = s_blockchain.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey).to_api_addr();
         executor::ExecuteByteCodeResult api_resp;
@@ -850,14 +786,12 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     }
     else {
         std::string hashState, retVal;
-        bool isOld{ false };
 
         auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) {
             if(!ss.condFlg)
                 return false;
             hashState   = ss.hash;
             retVal      = ss.retVal;
-            isOld       = ss.isOld;
             ss.condFlg  = false;
             return true;
         });
@@ -871,11 +805,6 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             _return.status.message = "new hash of state is empty!";
             return;
         }
-        /*if (isOld){
-            _return.status.code = ERROR_CODE;
-            _return.status.message = "new hash is old!";
-            return;
-        }*/
         if (!retVal.empty())
             _return.__set_smart_contract_result(deserialize<::general::Variant>(std::move(retVal)));
     }
@@ -883,12 +812,15 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 }
 
 void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction) {
-    if (!transaction.__isset.smartContract) {
+    if (auto errInfo = checkTransaction(transaction); errInfo.has_value()) {
+        _return.status.code     = ERROR_CODE;
+        _return.status.message  = errInfo.value();
+    }
+
+    if(!transaction.__isset.smartContract && !solver.smart_contracts().is_known_smart_contract(BlockChain::getAddressFromKey(transaction.target)))
         dumb_transaction_flow(_return, transaction);
-    }
-    else {
+    else
         smart_transaction_flow(_return, transaction);
-    }
 
     _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
 }
@@ -2098,15 +2030,11 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
             putTokenInfo(tok, fromByteArray(t.first.public_key()), t.second);
 
             // filters
-            auto subName = tok.name.substr(0, filterName.size());
-            auto subCode = tok.code.substr(0, filterCode.size());
-
-            if ((subName == filterName && subCode == filterCode) ||
-                (filterName.empty() && subCode == filterCode)    ||
-                (filterCode.empty() && subName == filterName)    ||
+            if ((tok.name.find(filterName) != -1 && tok.code.find(filterCode) != -1) ||
+                (filterName.empty() && tok.code.find(filterCode)) ||
+                (tok.name.find(filterName) && filterCode.empty()) ||
                 (filterName.empty() && filterCode.empty()))
-                _return.tokens.push_back(tok);
-            //          
+                    _return.tokens.push_back(tok);         
 
             if (--limit == 0)
                 return false;
