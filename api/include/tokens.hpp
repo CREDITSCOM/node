@@ -20,27 +20,17 @@ class APIHandler;
 class SmartContractInvocation;
 }
 
-/*namespace std {
-  template<>
-  struct hash<csdb::Address> {
-    size_t operator()(const csdb::Address& addr) const {
-      const auto vec = addr.public_key();
-      return boost::hash_range(vec.begin(), vec.end());
-    }
-  };
-}*/
-
 using TokenId = csdb::Address;
 using HolderKey = csdb::Address;
 
-enum TokenStandart {
+enum TokenStandard {
     NotAToken = 0,
     CreditsBasic = 1,
     CreditsExtended = 2
 };
 
 struct Token {
-    TokenStandart standart;
+    int64_t tokenStandard;
     csdb::Address owner;
 
     std::string name;
@@ -84,8 +74,6 @@ public:
     static bool isZeroAmount(const std::string& str) {
         return str == "0";
     }
-
-    static TokenStandart getTokenStandart(const std::vector<::general::MethodDescription>&);
 
 private:
     void refreshTokenState(const csdb::Address& token, const std::string& newState);

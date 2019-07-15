@@ -119,7 +119,7 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
     }
     auto& main_result = result.smartsRes.front();
 
-    if (!cs::SmartContracts::is_state_updated(t)) {
+    /*if (!cs::SmartContracts::is_state_updated(t)) { //$
         if (!main_result.newState.empty()) {
             csdebug() << kLogPrefix << "new state of trx is empty, but real new state is not";
         }
@@ -131,7 +131,7 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
             cserror() << kLogPrefix << "new state of trx in blockchain doesn't match real new state";
             return false;
         }
-    }
+    }*/
     return true;
 }
 

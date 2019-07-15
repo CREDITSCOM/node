@@ -190,7 +190,7 @@ struct SmartExecutionData {
         ret_val.__set_v_byte(code);
         using container_type = decltype(executor::Executor::ExecuteResult::smartsRes);
         using element_type = container_type::value_type;
-        result.smartsRes.emplace_back(element_type{ ret_val, std::string{}, 0, ::general::APIResponse{} });
+        //result.smartsRes.emplace_back(element_type{ ret_val, std::string{}, 0, ::general::APIResponse{} });//$
         error = message;
     }
 };
