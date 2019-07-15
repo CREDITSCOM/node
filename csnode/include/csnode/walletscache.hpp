@@ -95,7 +95,7 @@ private:
         virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;
         virtual void setModified(WalletId id) = 0;
         void invokeReplenishPayableContract(const csdb::Transaction&);
-        void rollbackReplenishPayableContract(const csdb::Transaction&, const csdb::Amount& execFee = 0);
+        void rollbackExceededTimeoutContract(const csdb::Transaction&, const csdb::Amount& execFee = 0);
         void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx);
         void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction);
         bool isClosedSmart(const csdb::Transaction& transaction);
@@ -120,7 +120,7 @@ public:
     class Initer : protected ProcessorBase {
     public:
         using ProcessorBase::invokeReplenishPayableContract;
-        using ProcessorBase::rollbackReplenishPayableContract;
+        using ProcessorBase::rollbackExceededTimeoutContract;
         Initer(WalletsCache& data);
         void loadPrevBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
         bool moveData(WalletId srcIdSpecial, WalletId destIdNormal);
@@ -138,7 +138,7 @@ public:
     class Updater : protected ProcessorBase {
     public:
         using ProcessorBase::invokeReplenishPayableContract;
-        using ProcessorBase::rollbackReplenishPayableContract;
+        using ProcessorBase::rollbackExceededTimeoutContract;
         using ProcessorBase::smartSourceTransactionReleased;
         Updater(WalletsCache& data);
         void loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);

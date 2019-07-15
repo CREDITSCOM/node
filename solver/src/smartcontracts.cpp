@@ -187,7 +187,7 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
     cs::Connector::connect(&cs::Conveyer::instance().statesCreated, this, &SmartContracts::on_update);
     // as event source:
     cs::Connector::connect(&signal_payable_invoke, &bc, &BlockChain::onPayableContractReplenish);
-    cs::Connector::connect(&signal_payable_timeout, &bc, &BlockChain::onPayableContractTimeout);
+    cs::Connector::connect(&signal_contract_timeout, &bc, &BlockChain::onContractTimeout);
     cs::Connector::connect(&signal_emitted_accepted, &bc, &BlockChain::onContractEmittedAccepted);
 }
 
@@ -1043,7 +1043,7 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
         }
         csdb::Transaction t = get_transaction(*it);
         if (t.is_valid()) {
-            emit signal_payable_timeout(t);
+            emit signal_contract_timeout(t);
         }
         replenish_contract.erase(it);
     }
@@ -1136,9 +1136,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
             for (const auto& execution : item.executions) {
                 csdb::Transaction starter = get_transaction(execution.ref_start);
                 if (starter.is_valid()) {
-                    if (!is_executable(starter)) {
-                        emit signal_payable_timeout(starter);
-                    }
+                    emit signal_contract_timeout(starter);
                 }
                 else {
                     cserror() << kLogPrefix << "cannot handle {" << execution.ref_start.sequence << '.' << execution.ref_start.transaction

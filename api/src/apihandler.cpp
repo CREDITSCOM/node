@@ -443,7 +443,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
                 break;
         extraFee.transactionId = convert_transaction_id(trx->id());
         extraFee.sum = convertAmount(csdb::Amount(trx->counted_fee().to_double()));
-        extraFee.comment = "extra fee";
+        extraFee.comment = "emitted trxs fee";
         result.trxn.extraFee.push_back(extraFee);
     }
     result.trxn.__isset.extraFee = true;

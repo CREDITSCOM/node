@@ -315,7 +315,7 @@ signals:
     // emits on invocation of payable()
     SmartContractSignal signal_payable_invoke;
     // emits on invocation of payable() is failed after timeout
-    SmartContractSignal signal_payable_timeout;
+    SmartContractSignal signal_contract_timeout;
     // emits on every contract emitted transaction is appeared in blockchain, args are (emitted_transaction, starter_transaction):
     cs::Signal<void(const csdb::Transaction&, const csdb::Transaction&)> signal_emitted_accepted;
     // emits on every update of contract state both during reading db and getting block in real time
