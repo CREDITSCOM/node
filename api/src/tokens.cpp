@@ -273,6 +273,12 @@ void TokensMaster::run() {
     running_.store(true);
 
     tokThread_ = std::thread([this]() {
+        // for log
+        size_t oldSize{}, currSize{}, timeExecutes{};
+        std::chrono::time_point<std::chrono::steady_clock> timeBeg{};
+        int8_t Count{};
+        const int8_t DELTA{ 5 };
+        //
         while (running_.load()) {
             std::unique_lock<std::mutex> l(cvMut_);
             while (!deployQueue_.empty()) {
@@ -305,6 +311,27 @@ void TokensMaster::run() {
             std::swap(executes, newExecutes_);
             l.unlock();
 
+            // log
+            oldSize = currSize;
+            currSize = executes.size();
+            if (currSize > oldSize && !oldSize)
+                Count++;
+            else {
+                Count = 0;
+                timeExecutes = 0;
+            }
+
+            if (Count == DELTA - 1)
+                timeBeg = std::chrono::steady_clock::now();
+
+            if (Count == DELTA) {
+                csdebug() << "[TOKEN]: warning:" << "container growth of running methods for " << DELTA - 1 << " times in a row";
+                csdebug() << "[TOKEN]: the number of methods called in the previous pack: " << oldSize;
+                csdebug() << "[TOKEN]: the number of methods called in the current pack: " << currSize;
+                csdebug() << "[TOKEN]: time running of current pack: " << timeExecutes << " milliseconds";
+            }
+            //
+
             for (auto& st : executes) {
                 {
                     std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
@@ -334,6 +361,9 @@ void TokensMaster::run() {
 
                 refreshTokenState(st.first, st.second.newState);
             }
+
+            if (Count == DELTA - 1)
+                timeExecutes = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - timeBeg).count();
 
             l.lock();
             tokCv_.wait(l);
