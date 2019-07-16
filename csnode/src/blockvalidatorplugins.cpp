@@ -119,19 +119,28 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
     }
     auto& main_result = result.smartsRes.front();
 
-    /*if (!cs::SmartContracts::is_state_updated(t)) { //$
-        if (!main_result.newState.empty()) {
-            csdebug() << kLogPrefix << "new state of trx is empty, but real new state is not";
+    if (!cs::SmartContracts::is_state_updated(t)) {
+        csdb::Address abs_addr = getBlockChain().getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
+        if (main_result.states.count(abs_addr) > 0) {
+            if (!main_result.states.at(abs_addr).empty()) {
+                csdebug() << kLogPrefix << "new state in trx is empty, but real new state is not";
+            }
         }
         return true;
     }
     else {
-        std::string newState = cs::SmartContracts::get_contract_state(getBlockChain(), t.target());
-        if (newState != main_result.newState) {
-            cserror() << kLogPrefix << "new state of trx in blockchain doesn't match real new state";
-            return false;
+        csdb::Address abs_addr = getBlockChain().getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
+        if (main_result.states.count(abs_addr) == 0) {
+            csdebug() << kLogPrefix << "real new state in is empty, but new state in trx is not";
         }
-    }*/
+        else {
+            std::string newState = cs::SmartContracts::get_contract_state(getBlockChain(), t.target());
+            if (newState != main_result.states.at(abs_addr)) {
+                cserror() << kLogPrefix << "new state of trx in blockchain doesn't match real new state";
+                return false;
+            }
+        }
+    }
     return true;
 }
 

@@ -858,11 +858,12 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
     if (!is_new_state(hashed_state)) {
         return csdb::Transaction{};
     }
-    if (hashed_state.user_field(trx_uf::new_state::Value).is_valid()) {
+    using namespace trx_uf;
+    if (hashed_state.user_field(new_state::Value).is_valid()) {
         return hashed_state;
     }
 
-    csdb::UserField fld = hashed_state.user_field(trx_uf::new_state::Hash);
+    csdb::UserField fld = hashed_state.user_field(new_state::Hash);
     if (!fld.is_valid()) {
         cserror() << kLogPrefix << "hashed_state contains neither state nor hash";
         return csdb::Transaction{};
@@ -874,10 +875,10 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
         hashed_state.amount(), hashed_state.max_fee(), hashed_state.counted_fee(), hashed_state.signature());
 
     for (const auto id : hashed_state.user_field_ids()) {
-        if (id == trx_uf::new_state::Value) {
+        if (id == new_state::Value) {
             continue;
         }
-        if (id == trx_uf::new_state::Hash) {
+        if (id == new_state::Hash) {
             continue;
         }
         tr_state.add_user_field(id, hashed_state.user_field(id));
@@ -888,73 +889,110 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
     else {
         std::copy(hash_string.cbegin(), hash_string.cend(), hash.begin());
         if (hash != cs::Zero::hash) {
-            fld = hashed_state.user_field(trx_uf::new_state::RefStart);
+            fld = hashed_state.user_field(new_state::RefStart);
             if (!fld.is_valid()) {
                 cserror() << kLogPrefix << "hashed_state does not refer to start transaction, use empty new_state";
             }
             else {
                 SmartContractRef ref_start(fld);
-                csdb::Transaction tr_start = get_transaction(ref_start);
-                if (!tr_start.is_valid()) {
-                    cserror() << kLogPrefix << "get start transaction failed, use empty new_state";
-                }
-                else {
-                    SmartExecutionData exe_data;
-                    exe_data.contract_ref = ref_start;
-                    exe_data.executor_fee = csdb::Amount(tr_start.max_fee().to_double());
-                    if (!SmartContracts::is_deploy(tr_start)) {
-                        csdb::Address abs_addr = absolute_address(tr_start.target());
-                        if (in_known_contracts(abs_addr)) {
-                            const StateItem& item = known_contracts[abs_addr];
-                            exe_data.explicit_last_state = item.state;
-                        }
-                    }
-                    while (!execute(exe_data, true /*validationMode*/)) {
-                        // execution error, test if executor is still available
-                        if (!execution_allowed) {
-                            // ask user to restart executor every 2 seconds
-                            if (!wait_until_executor(2)) {
-                                cserror() << kLogPrefix << "cannot connect to executor, further blockchain reading is impossible, interrupt reading";
-                                if (pnode->isStopRequested()) {
-                                    cslog() << kLogPrefix << "node is requested to stop, cancel wait to executor";
-                                }
-                                return csdb::Transaction{};
-                            }
+                csdb::Address req_abs_addr = absolute_address(hashed_state.target());
+                // test last state in cache
+                if (in_known_contracts(req_abs_addr)) {
+                    const StateItem& item = known_contracts[req_abs_addr];
+                    if (item.ref_execute == ref_start) {
+                        cs::Hash current_hash = cscrypto::calculateHash((cs::Byte*)item.state.data(), item.state.size());
+                        if (current_hash == hash) {
+                            tr_state.add_user_field(new_state::Value, item.state);
                         }
                         else {
-                            if (exe_data.error.empty()) {
-                                exe_data.error = "contract execution failed";
-                            }
-                            cserror() << kLogPrefix << "failed to get updated state of " << ref_start << ": " << exe_data.error;
-                            break;
+                            cswarning() << kLogPrefix << "incorrect " << ref_start << " state in cache, request from other nodes";
+                            // request correct state in network
+                            net_request_contract_state(req_abs_addr);
+                            // mark current state as incorrect
+                            auto& tmp = const_cast<StateItem&>(item);
+                            tmp.state.clear();
+                            tr_state.add_user_field(new_state::Value, std::string{});
+                            return tr_state;
                         }
                     }
-                    if (!exe_data.result.smartsRes.empty()) {
-                        const auto& head = exe_data.result.smartsRes.front();
-                        /*if (head.response.code == 0) { //$
-                            tr_state.add_user_field(trx_uf::new_state::Value, head.newState);
-                            // test actual hash
-                            cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)head.newState.data(), head.newState.size());
-                            std::string hash_result;
-                            if (actual_hash == hash) {
-                                hash_result = "OK";
+                }
+                // execute contract to get last state if state is not found in cache
+                if (tr_state.user_field_ids().count(new_state::Value) == 0) {
+                    csdb::Transaction tr_start = get_transaction(ref_start);
+                    if (!tr_start.is_valid()) {
+                        cserror() << kLogPrefix << "get start transaction failed, use empty new_state";
+                    }
+                    else {
+                        // test it is explicit "primary" call, otherwise request state in network
+                        csdb::Address primary_abs_addr = absolute_address(tr_start.target());
+                        if (req_abs_addr != primary_abs_addr) {
+                            net_request_contract_state(req_abs_addr);
+                        }
+                        else {
+                            SmartExecutionData exe_data;
+                            exe_data.contract_ref = ref_start;
+                            exe_data.executor_fee = csdb::Amount(tr_start.max_fee().to_double());
+                            if (!SmartContracts::is_deploy(tr_start)) {
+                                if (in_known_contracts(req_abs_addr)) {
+                                    const StateItem& item = known_contracts[req_abs_addr];
+                                    exe_data.explicit_last_state = item.state;
+                                }
                             }
-                            else {
-                                hash_result = "WRONG: ";
-                                hash_result += cs::Utils::byteStreamToHex(hash.data(), hash.size());
-                                hash_result += " (expected ";
-                                hash_result += cs::Utils::byteStreamToHex(actual_hash.data(), actual_hash.size());
-                                hash_result += ")";
+                            while (!execute(exe_data, true /*validationMode*/)) {
+                                // execution error, test if executor is still available
+                                if (!execution_allowed) {
+                                    // ask user to restart executor every 2 seconds
+                                    if (!wait_until_executor(2)) {
+                                        cserror() << kLogPrefix << "cannot connect to executor, further blockchain reading is impossible, interrupt reading";
+                                        if (pnode->isStopRequested()) {
+                                            cslog() << kLogPrefix << "node is requested to stop, cancel wait to executor";
+                                        }
+                                        return csdb::Transaction{};
+                                    }
+                                }
+                                else {
+                                    if (exe_data.error.empty()) {
+                                        exe_data.error = "contract execution failed";
+                                    }
+                                    cserror() << kLogPrefix << "failed to get updated state of " << ref_start << ": " << exe_data.error;
+                                    break;
+                                }
                             }
-                            std::string print_addr;
-                            csdb::Address abs_addr = absolute_address(tr_start.target());
-                            const cs::PublicKey& key = abs_addr.public_key();
-                            print_addr = " (";
-                            print_addr += EncodeBase58(key.data(), key.data() + key.size());
-                            print_addr += ") ";
-                            csdebug() << kLogPrefix << "state of " << ref_start << print_addr << " is updated, stored hash is "
-                                << hash_result << ", new size is " << head.newState.size();
-                        }*/
+                            if (!exe_data.result.smartsRes.empty()) {
+                                const auto& head = exe_data.result.smartsRes.front();
+                                if (head.response.code == 0) {
+                                    // required contract address may differ from "primary" executed contract:
+
+                                    if (head.states.count(req_abs_addr) == 0) {
+                                        cserror() << kLogPrefix << "cannot find contract new state in execution result";
+                                    }
+                                    else {
+                                        const auto& state = head.states.at(req_abs_addr);
+                                        tr_state.add_user_field(new_state::Value, state);
+                                        // test actual hash
+                                        cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)state.data(), state.size());
+                                        std::string hash_result;
+                                        if (actual_hash == hash) {
+                                            hash_result = "OK";
+                                        }
+                                        else {
+                                            hash_result = "WRONG: ";
+                                            hash_result += cs::Utils::byteStreamToHex(hash.data(), hash.size());
+                                            hash_result += " (expected ";
+                                            hash_result += cs::Utils::byteStreamToHex(actual_hash.data(), actual_hash.size());
+                                            hash_result += ")";
+                                        }
+                                        std::string print_addr;
+                                        const cs::PublicKey& key = req_abs_addr.public_key();
+                                        print_addr = " (";
+                                        print_addr += EncodeBase58(key.data(), key.data() + key.size());
+                                        print_addr += ") ";
+                                        csdebug() << kLogPrefix << "state of " << ref_start << print_addr << " is updated, stored hash is "
+                                            << hash_result << ", new size is " << state.size();
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -962,8 +1000,8 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
     }
 
     // set empty new state in case of any problem
-    if (tr_state.user_field_ids().count(trx_uf::new_state::Value) == 0) {
-        tr_state.add_user_field(trx_uf::new_state::Value, std::string{});
+    if (tr_state.user_field_ids().count(new_state::Value) == 0) {
+        tr_state.add_user_field(new_state::Value, std::string{});
     }
     return tr_state;
 }
@@ -1355,6 +1393,8 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
 // returns false if execution canceled, so caller may call to remove_from_queue()
 bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions) {
     std::vector<SmartExecutionData> data_list;
+    csdb::Address contract_abs_addr;
+    bool is_contract_abs_addr_set = false;
     for (const auto& execution : executions) {
         SmartExecutionData& execution_data = data_list.emplace_back();
         execution_data.contract_ref = execution.ref_start;
@@ -1372,6 +1412,10 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
         bool deploy = is_deploy(start_tr);
         csdebug() << kLogPrefix << "invoke api to remote executor to " << (deploy ? "deploy" : (!replenish_only ? "execute" : "replenish"))
             << " {" << execution.ref_start.sequence << '.' << execution.ref_start.transaction << '}';
+        if (!is_contract_abs_addr_set) {
+            contract_abs_addr = absolute_address(start_tr.target());
+            is_contract_abs_addr_set = true;
+        }
     }
 
     if (data_list.empty()) {
@@ -1380,7 +1424,7 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
     }
 
     // create runnable object
-    auto runnable = [this, data_list{std::move(data_list)}]() mutable {
+    auto runnable = [this, data_list{std::move(data_list)}, contract_abs_addr]() mutable {
         if (!data_list.empty()) {
 
             // actually, multi-execution list always refers to the same contract, so we need not to distinct different contracts last state
@@ -1398,7 +1442,10 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
                     // execute never returns empty data.result.smartsRes list
                     if (!data.result.smartsRes.empty()) {
                         // remember last state for the next execution
-                        // last_state = data.result.smartsRes.front().newState; //$
+                        const auto& head = data.result.smartsRes.front();
+                        if (head.states.count(contract_abs_addr) > 0) {
+                            last_state = head.states.at(contract_abs_addr);
+                        }
                     }
                 }
             }
@@ -1503,56 +1550,97 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             packet.addTransaction(result);
         }
         else {
-            /*const auto& execution_result = data_item.result.smartsRes.front(); //$
-            csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " is successful, new state size = " << execution_result.newState.size();
+            const auto& execution_result = data_item.result.smartsRes.front();
+            csdb::Address primary_abs_addr = absolute_address(result.target());
+            if (execution_result.states.count(primary_abs_addr) == 0) {
+                cswarning() << kLogPrefix << "primary " << data_item.contract_ref << " new state is empty";
+                result.add_user_field(new_state::Value, std::string{});
+                packet.addTransaction(result);
+                set_return_value(result, error::ExecutionError);
+            }
+            else {
+                const auto& primary_new_state = execution_result.states.at(primary_abs_addr);
+                csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " is successful, new state size = " << primary_new_state.size();
 
-            // put new state
-            result.add_user_field(new_state::Value, execution_result.newState);
-            set_return_value(result, execution_result.retValue);
-            packet.addTransaction(result);
+                // put new state
+                result.add_user_field(new_state::Value, primary_new_state);
+                set_return_value(result, execution_result.retValue);
+                packet.addTransaction(result);
 
-            if (it != exe_queue.end()) {
-                // put emitted transactions
-                if (!data_item.result.trxns.empty()) {
-                    for (const auto& tr : data_item.result.trxns) {
-                        if (tr.innerID() == 0) {
-                            // auto inner id generating
-                            csdb::Transaction tmp = tr.clone();
-                            tmp.set_innerID(++next_id);
-                            csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " emitted transaction";
-                            packet.addTransaction(tmp);
+                if (it != exe_queue.end()) {
+                    // put primary emitted transactions
+                    if (!data_item.result.trxns.empty()) {
+                        for (const auto& tr : data_item.result.trxns) {
+                            if (absolute_address(tr.source()) != primary_abs_addr) {
+                                // is not by primary contract emitted
+                                continue;
+                            }
+                            if (tr.innerID() == 0) {
+                                // auto inner id generating
+                                csdb::Transaction tmp = tr.clone();
+                                tmp.set_innerID(++next_id);
+                                csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " emitted transaction";
+                                packet.addTransaction(tmp);
+                            }
+                            else {
+                                packet.addTransaction(tr);
+                            }
                         }
-                        else {
-                            packet.addTransaction(tr);
-                        }
+                        csdebug() << kLogPrefix << "add " << data_item.result.trxns.size() << " emitted transaction(s) to " << data_item.contract_ref << " state";
                     }
-                    csdebug() << kLogPrefix << "add " << data_item.result.trxns.size() << " emitted transaction(s) to " << data_item.contract_ref << " state";
-                }
-                else {
-                    csdebug() << kLogPrefix << "no emitted transaction added to " << data_item.contract_ref;
-                }
-                // put subsequent new_states if any
-                if (!data_item.result.states.empty()) {
-                    csdebug() << kLogPrefix << "add " << data_item.result.states.size() << " subsequent new state(s) along with " << data_item.contract_ref << " state";
-                    for (const auto& [addr, state] : data_item.result.states) {
-                        auto it_call = find_in_queue_item(it, data_item.contract_ref);
-                        if (it_call != it->executions.end()) {
-                            csdb::Transaction t = create_new_state(*it_call, ++next_id);
-                            csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " secondary contract new_state";
-                            if (t.is_valid()) {
-                                // re-assign some fields
-                                t.set_innerID(next_inner_id(addr));
-                                t.set_source(addr);
-                                t.set_target(addr);
-                                t.add_user_field(trx_uf::new_state::Value, state);
-                                t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
-                                set_return_value(t, ::general::Variant{});
-                                packet.addTransaction(t);
+                    else {
+                        csdebug() << kLogPrefix << "no emitted transaction added to " << data_item.contract_ref;
+                    }
+                    // put subsequent new_states if any
+                    if (execution_result.states.size() > 1) {
+                        csdebug() << kLogPrefix << "add " << execution_result.states.size() << " subsequent new state(s) along with " << data_item.contract_ref << " state";
+                        for (const auto& [addr, state] : execution_result.states) {
+                            csdb::Address secondary_abs_addr = absolute_address(addr);
+                            if (secondary_abs_addr == primary_abs_addr) {
+                                continue;
+                            }
+                            auto it_call = find_in_queue_item(it, data_item.contract_ref);
+                            if (it_call != it->executions.end()) {
+                                int64_t secondary_next_id = next_inner_id(secondary_abs_addr);
+                                csdb::Transaction t = create_new_state(*it_call, ++secondary_next_id);
+                                csdebug() << kLogPrefix << "set innerID = " << secondary_next_id << " in "
+                                    << data_item.contract_ref << " secondary contract new_state";
+                                if (t.is_valid()) {
+                                    // re-assign some fields
+                                    t.set_innerID(secondary_next_id);
+                                    t.set_source(addr);
+                                    t.set_target(addr);
+                                    t.add_user_field(trx_uf::new_state::Value, state);
+                                    t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
+                                    set_return_value(t, ::general::Variant{});
+                                    packet.addTransaction(t);
+                                    if (!state.empty()) {
+                                        // put subsequent contract emitted transactions
+                                        for (const auto& tr : data_item.result.trxns) {
+                                            if (absolute_address(tr.source()) != secondary_abs_addr) {
+                                                // is not by the current contract emitted
+                                                continue;
+                                            }
+                                            if (tr.innerID() == 0) {
+                                                // auto inner id generating
+                                                csdb::Transaction tmp = tr.clone();
+                                                tmp.set_innerID(++secondary_next_id);
+                                                csdebug() << kLogPrefix << "set innerID = " << secondary_next_id << " in "
+                                                    << data_item.contract_ref << " secondary emitted transaction";
+                                                packet.addTransaction(tmp);
+                                            }
+                                            else {
+                                                packet.addTransaction(tr);
+                                            }
+                                        }
+                                        csdebug() << kLogPrefix << "add " << data_item.result.trxns.size() << " emitted transaction(s) to " << data_item.contract_ref << " state";
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }*/
+            }
         }
         // add all transactions to integral packet
         for (const auto& t : packet.transactions()) {
@@ -2213,6 +2301,9 @@ bool SmartContracts::wait_until_executor(unsigned int test_freq) {
         std::this_thread::sleep_for(std::chrono::seconds(test_freq));
     }
     return true;
+}
+
+void SmartContracts::net_request_contract_state(const csdb::Address& abs_addr) {
 }
 
 }  // namespace cs

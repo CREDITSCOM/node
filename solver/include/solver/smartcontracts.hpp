@@ -190,7 +190,18 @@ struct SmartExecutionData {
         ret_val.__set_v_byte(code);
         using container_type = decltype(executor::Executor::ExecuteResult::smartsRes);
         using element_type = container_type::value_type;
-        //result.smartsRes.emplace_back(element_type{ ret_val, std::string{}, 0, ::general::APIResponse{} });//$
+        decltype(element_type::states) states{};
+        decltype(element_type::emittedTransactions) emitted{};
+        // the purpose is to put only ret_val, others are empty members
+        result.smartsRes.emplace_back(
+            element_type {
+                ret_val,    // TVariant
+                states,     // empty map of states
+                emitted,    // empty list of emitted transactions
+                0,          // zero execution time
+                ::general::APIResponse{} // empty response object
+            }
+        );
         error = message;
     }
 };
@@ -707,6 +718,10 @@ private:
      */
 
     csdb::Transaction get_actual_state(const csdb::Transaction& hashed_state);
+
+    // request correct state in network
+    void net_request_contract_state(const csdb::Address& abs_addr);
+
 };
 
 }  // namespace cs
