@@ -156,6 +156,13 @@ public:
 
     void cleanConfirmationList(cs::RoundNumber rNum);
 
+    // state syncro functions
+    
+    void sendStateRequest(cs::Sequence seq, uint32_t idx, cs::PublicKeys confidants);
+    void getStateRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
+    void sendStateReply(const cs::PublicKey& respondent, const cs::Bytes state);
+    void getStateReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
+
     // syncro get functions
     void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
     void getBlockReply(const uint8_t*, const size_t);
