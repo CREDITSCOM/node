@@ -5,6 +5,7 @@
 #include <list>
 #include <mutex>
 #include <atomic>
+#include <chrono>
 #include <boost/asio.hpp>
 
 #include "packet.hpp"
@@ -65,6 +66,7 @@ struct TaskBody {
   char data[sizeof(Task)];
 };
 */
+
 class IPacMan {
 public:
   IPacMan()
@@ -74,6 +76,7 @@ public:
     ip::udp::endpoint sender;
     size_t size;
     Packet pack;
+    std::chrono::time_point<std::chrono::high_resolution_clock> timestamp;
   };
 
   Task& allocNext();
@@ -84,6 +87,7 @@ public:
   using TaskIterator = std::list<Task>::iterator;
   void releaseTask(TaskIterator&);
   void rejectLast();
+  size_t getSize() { return size_; }
 
 private:
   std::list<Task> queue_;
