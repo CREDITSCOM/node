@@ -65,7 +65,8 @@ struct Connection {
     , node(std::move(rhs.node))
     , isSignal(rhs.isSignal)
     , connected(rhs.connected)
-    , msgRels(std::move(rhs.msgRels)) {
+    , msgRels(std::move(rhs.msgRels))
+    , isRedirect(rhs.isRedirect) {
     }
 
     Connection(const Connection&) = delete;
@@ -104,6 +105,8 @@ struct Connection {
     };
 
     FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
+
+    bool isRedirect = false;
 
     cs::Sequence syncSeqs[BlocksToSync] = {0};
     cs::Sequence syncSeqsRetries[BlocksToSync] = {0};
