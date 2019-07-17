@@ -417,6 +417,13 @@ std::string SmartContracts::get_contract_state(const BlockChain& storage, const 
     return state;
 }
 
+/*static*/
+std::string SmartContracts::to_base58(const BlockChain& storage, const csdb::Address& addr) {
+    csdb::Address abs_addr = storage.getAddressByType(addr, BlockChain::AddressType::PublicKey);
+    const cs::PublicKey& key = abs_addr.public_key();
+    return EncodeBase58(key.data(), key.data() + key.size());
+}
+
 std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address& abs_addr) const {
     using namespace trx_uf;
     const auto item = known_contracts.find(abs_addr);
@@ -582,9 +589,9 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
             const size_t cnt = execution->uses.size();
             if (cnt > 0) {
                 for (const auto& u : execution->uses) {
+                    csdebug() << kLogPrefix << new_item << " uses " << to_base58(u);
                     if (!in_known_contracts(u)) {
-                        cslog() << kLogPrefix << "call to unknown contract declared in executing item, cancel {"
-                            << new_item.sequence << '.' << new_item.transaction << '}';
+                        cslog() << kLogPrefix << "call to unknown contract declared in executing item, cancel " << new_item;
                         remove_from_queue(new_item);
                         // also removes parent "it" from exe_queue if empty
                         return;
@@ -623,10 +630,8 @@ void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
                 // update state
                 const csdb::Address abs_addr = absolute_address(new_state.target());
                 if (update_contract_state(new_state, false)) {
-                    const cs::PublicKey& key = abs_addr.public_key();
                     std::cout << std::endl; // emphasize with empty line
-                    cslog() << kLogPrefix << '{' << contract_ref.sequence << '.' << contract_ref.transaction << "} (" << EncodeBase58(key.data(), key.data() + key.size())
-                        << ") state has been updated";
+                    cslog() << kLogPrefix << contract_ref << " (" << to_base58(abs_addr) << ") state has been updated";
                     std::cout << std::endl; // emphasize with empty line
                 }
                 update_lock_status(abs_addr, false);
@@ -983,9 +988,8 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                                             hash_result += ")";
                                         }
                                         std::string print_addr;
-                                        const cs::PublicKey& key = req_abs_addr.public_key();
                                         print_addr = " (";
-                                        print_addr += EncodeBase58(key.data(), key.data() + key.size());
+                                        print_addr += to_base58(req_abs_addr);
                                         print_addr += ") ";
                                         csdebug() << kLogPrefix << "state of " << ref_start << print_addr << " is updated, stored hash is "
                                             << hash_result << ", new size is " << state.size();
@@ -2222,8 +2226,7 @@ void SmartContracts::test_contracts_locks() {
     for (auto& item : known_contracts) {
         if (item.second.is_locked) {
             item.second.is_locked = false;
-            const cs::PublicKey& key = item.first.public_key();
-            csdebug() << kLogPrefix << "find locked contract " << EncodeBase58(key.data(), key.data() + key.size()) << " which is not executed now, unlock";
+            csdebug() << kLogPrefix << "find locked contract " << to_base58(item.first) << " which is not executed now, unlock";
         }
     }
 }
@@ -2232,8 +2235,7 @@ void SmartContracts::update_lock_status(const csdb::Address& abs_addr, bool valu
     auto it = known_contracts.find(abs_addr);
     if (it != known_contracts.end()) {
         if (it->second.is_locked != value) {
-            const cs::PublicKey& key = abs_addr.public_key();
-            csdebug() << kLogPrefix << (value ? "lock" : "unlock") << " contract " << EncodeBase58(key.data(), key.data() + key.size());
+            csdebug() << kLogPrefix << (value ? "lock" : "unlock") << " contract " << to_base58(abs_addr);
             it->second.is_locked = value;
         }
     }
