@@ -812,17 +812,18 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 }
 
 void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction) {
+    _return.roundNum = (uint32_t)cs::Conveyer::instance().currentRoundTable().round;
+
     if (auto errInfo = checkTransaction(transaction); errInfo.has_value()) {
         _return.status.code     = ERROR_CODE;
         _return.status.message  = errInfo.value();
+        return;
     }
 
     if(!transaction.__isset.smartContract && !solver.smart_contracts().is_known_smart_contract(BlockChain::getAddressFromKey(transaction.target)))
         dumb_transaction_flow(_return, transaction);
     else
-        smart_transaction_flow(_return, transaction);
-
-    _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
+        smart_transaction_flow(_return, transaction); 
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
