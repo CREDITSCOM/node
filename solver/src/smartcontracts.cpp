@@ -154,10 +154,14 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
                 auto invoke = deserialize<api::SmartContractInvocation>(std::move(data));
                 if (!invoke.usedContracts.empty()) {
                     for (const auto item : invoke.usedContracts) {
-                        const csdb::Address addr = BlockChain::getAddressFromKey(item);
-                        if (addr.is_valid()) {
-                            execution.uses.push_back(addr);
-                        }
+                        if (item.size() == cscrypto::kPublicKeySize) {
+                            cs::PublicKey key;
+                            std::copy(item.cbegin(), item.cend(), key.begin());
+                            const csdb::Address addr = csdb::Address::from_public_key(key); // BlockChain::getAddressFromKey(item);
+                            if (addr.is_valid()) {
+                                execution.uses.push_back(addr);
+                            }
+                        }                        
                     }
                 }
             }
@@ -1028,21 +1032,21 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
                 bool is_start = is_deploy ? false : this->is_start(tr);
                 if (is_deploy || is_start) {
                     if (is_deploy) {
-                        csdebug() << kLogPrefix << "contract is deployed by #" << block.sequence() << "." << tr_idx;
+                        csdebug() << kLogPrefix << "deploy in block #" << block.sequence() << "." << tr_idx;
                     }
                     else {
-                        csdebug() << kLogPrefix << "contract is invoked by #" << block.sequence() << "." << tr_idx;
+                        csdebug() << kLogPrefix << "execute in block #" << block.sequence() << "." << tr_idx;
                     }
                     enqueue(block, tr_idx);
                 }
                 else if (is_new_state(tr)) {
-                    csdebug() << kLogPrefix << "contract state is updated by #" << block.sequence() << "." << tr_idx;
+                    csdebug() << kLogPrefix << "new state in block #" << block.sequence() << "." << tr_idx;
                     on_new_state(block, tr_idx);
                 }
             }
             else if (is_payable_target(tr)) {
                 // execute payable method
-                csdebug() << kLogPrefix << "contract balance is replenished by #" << block.sequence() << "." << tr_idx;
+                csdebug() << kLogPrefix << "contract replenish in block #" << block.sequence() << "." << tr_idx;
                 emit signal_payable_invoke(tr);
                 enqueue(block, tr_idx);
             }
@@ -1573,31 +1577,36 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
 
                 if (it != exe_queue.end()) {
                     // put primary emitted transactions
-                    if (!data_item.result.trxns.empty()) {
-                        for (const auto& tr : data_item.result.trxns) {
-                            if (absolute_address(tr.source()) != primary_abs_addr) {
+                    if (!execution_result.emittedTransactions.empty()) {
+                        for (const auto& tr : execution_result.emittedTransactions) {
+                            if (absolute_address(tr.source) != primary_abs_addr) {
                                 // is not by primary contract emitted
                                 continue;
                             }
-                            if (tr.innerID() == 0) {
-                                // auto inner id generating
-                                csdb::Transaction tmp = tr.clone();
-                                tmp.set_innerID(++next_id);
-                                csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " emitted transaction";
-                                packet.addTransaction(tmp);
-                            }
-                            else {
-                                packet.addTransaction(tr);
-                            }
+                            csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " emitted transaction";
+                            // auto inner id generating
+                            csdb::Transaction tmp(
+                                ++next_id,
+                                tr.source,
+                                tr.target,
+                                result.currency(),
+                                tr.amount,
+                                result.max_fee(),
+                                csdb::AmountCommission(0.0),
+                                Zero::signature  // empty signature
+                            );
+                            packet.addTransaction(tmp);
                         }
-                        csdebug() << kLogPrefix << "add " << data_item.result.trxns.size() << " emitted transaction(s) to " << data_item.contract_ref << " state";
+                        csdebug() << kLogPrefix << "add " << execution_result.emittedTransactions.size()
+                            << " emitted transaction(s) to " << data_item.contract_ref << " state";
                     }
                     else {
                         csdebug() << kLogPrefix << "no emitted transaction added to " << data_item.contract_ref;
                     }
                     // put subsequent new_states if any
                     if (execution_result.states.size() > 1) {
-                        csdebug() << kLogPrefix << "add " << execution_result.states.size() << " subsequent new state(s) along with " << data_item.contract_ref << " state";
+                        csdebug() << kLogPrefix << "add " << execution_result.states.size()
+                            << " subsequent new state(s) along with " << data_item.contract_ref << " state";
                         for (const auto& [addr, state] : execution_result.states) {
                             csdb::Address secondary_abs_addr = absolute_address(addr);
                             if (secondary_abs_addr == primary_abs_addr) {
@@ -1606,39 +1615,45 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                             auto it_call = find_in_queue_item(it, data_item.contract_ref);
                             if (it_call != it->executions.end()) {
                                 int64_t secondary_next_id = next_inner_id(secondary_abs_addr);
-                                csdb::Transaction t = create_new_state(*it_call, ++secondary_next_id);
+                                csdb::Transaction t(
+                                    ++secondary_next_id,
+                                    addr,
+                                    addr,
+                                    result.currency(),
+                                    csdb::Amount(0),
+                                    result.max_fee(),
+                                    csdb::AmountCommission(0.0),
+                                    Zero::signature  // empty signature
+                                );
                                 csdebug() << kLogPrefix << "set innerID = " << secondary_next_id << " in "
                                     << data_item.contract_ref << " secondary contract new_state";
-                                if (t.is_valid()) {
-                                    // re-assign some fields
-                                    t.set_innerID(secondary_next_id);
-                                    t.set_source(addr);
-                                    t.set_target(addr);
-                                    t.add_user_field(trx_uf::new_state::Value, state);
-                                    t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
-                                    set_return_value(t, ::general::Variant{});
-                                    packet.addTransaction(t);
-                                    if (!state.empty()) {
-                                        // put subsequent contract emitted transactions
-                                        for (const auto& tr : data_item.result.trxns) {
-                                            if (absolute_address(tr.source()) != secondary_abs_addr) {
-                                                // is not by the current contract emitted
-                                                continue;
-                                            }
-                                            if (tr.innerID() == 0) {
-                                                // auto inner id generating
-                                                csdb::Transaction tmp = tr.clone();
-                                                tmp.set_innerID(++secondary_next_id);
-                                                csdebug() << kLogPrefix << "set innerID = " << secondary_next_id << " in "
-                                                    << data_item.contract_ref << " secondary emitted transaction";
-                                                packet.addTransaction(tmp);
-                                            }
-                                            else {
-                                                packet.addTransaction(tr);
-                                            }
+                                t.add_user_field(trx_uf::new_state::Value, state);
+                                t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
+                                set_return_value(t, ::general::Variant{});
+                                packet.addTransaction(t);
+                                if (!state.empty()) {
+                                    // put subsequent contract emitted transactions
+                                    for (const auto& tr : execution_result.emittedTransactions) {
+                                        if (absolute_address(tr.source) != secondary_abs_addr) {
+                                            // is not by the current contract emitted
+                                            continue;
                                         }
-                                        csdebug() << kLogPrefix << "add " << data_item.result.trxns.size() << " emitted transaction(s) to " << data_item.contract_ref << " state";
+                                        csdb::Transaction tmp2(
+                                            ++secondary_next_id,
+                                            tr.source,
+                                            tr.target,
+                                            result.currency(),
+                                            tr.amount,
+                                            result.max_fee(),
+                                            csdb::AmountCommission(0.0),
+                                            Zero::signature  // empty signature
+                                        );
+                                        packet.addTransaction(tmp2);
+                                        csdebug() << kLogPrefix << "set innerID = " << secondary_next_id << " in "
+                                            << data_item.contract_ref << " secondary emitted transaction";
                                     }
+                                    csdebug() << kLogPrefix << "add " << execution_result.emittedTransactions.size()
+                                        << " emitted transaction(s) to " << data_item.contract_ref << " state";
                                 }
                             }
                         }
@@ -1736,6 +1751,9 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
             if (executions.empty()) {
                 // actually impossible
                 continue;
+            }
+            for (auto n : executions) {
+                csdebug() << kLogPrefix << RefFormatter{ sequence, n } << " is rejected";
             }
             // to store newly created items:
             decltype(exe_queue) new_queue_items;
