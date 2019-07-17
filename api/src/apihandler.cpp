@@ -221,6 +221,8 @@ api::TransactionId convert_transaction_id(const csdb::TransactionID& trid) {
     api::TransactionId result_id;
     result_id.index = (uint32_t) trid.index();
     result_id.poolHash = fromByteArray(trid.pool_hash().to_binary());
+    result_id.__isset.index = true;
+    result_id.__isset.poolHash = true;
     return result_id;
 }
 
@@ -452,7 +454,9 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
 
 std::vector<api::SealedTransaction> APIHandler::convertTransactions(const std::vector<csdb::Transaction>& transactions) {
     std::vector<api::SealedTransaction> result;
-    result.resize(transactions.size());
+    auto size = transactions.size();
+    result.resize(size);
+    //result.resize(transactions.size());
     /*const auto convert = std::bind(&APIHandler::convertTransaction, this, std::placeholders::_1);
     std::transform(transactions.begin(), transactions.end(), result.begin(), convert);
     for (auto& it : result) {
