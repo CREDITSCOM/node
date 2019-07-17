@@ -37,7 +37,7 @@ The node consists of the following elements:</p>
 <li><a href="https://github.com/jedisct1/libsodium">libsodium</a></li>
 <li>The building Berkeley DB distribution uses the Free Software Foundation's autoconf and libtool tools to build on UNIX platforms.</li>
 
-On Windows<br/>
+On Windows:<br/>
 
 It is necessary to run in the terminal, which sets the environment variables for building a Visual Studio project
 
@@ -49,7 +49,7 @@ It is necessary to run in the terminal, which sets the environment variables for
 >cd build
 >cmake -DCMAKE_BUILD_TYPE=Release -A x64 ..
 >cmake --build . --target ALL_BUILD --config Release
-On Linux<br/>
+On Linux:<br/>
 >```sh
 >git clone https://github.com/CREDITSCOM/node.git
 >cd node
