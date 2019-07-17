@@ -34,8 +34,6 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
     bool sent = false;
 
     for (auto& nb : neighbours_) {
-        if (!nb->isRedirect) continue;
-
         bool found = false;
         for (auto ptr = bp.receivers; ptr != bp.recEnd; ++ptr) {
             if (*ptr == nb->id) {
@@ -84,7 +82,6 @@ void Neighbourhood::sendByNeighbours(const Packet* pack) {
 
     if (pack->isNeighbors()) {
         for (auto& nb : neighbours_) {
-            if (!nb->isRedirect) continue;
             auto& bp = msgDirects_.tryStore(pack->getHash());
 
             bp.pack = *pack;
@@ -154,8 +151,6 @@ void Neighbourhood::checkSilent() {
             if ((*conn)->isSignal) {
                 continue;
             }
-
-            if ((*conn)->isRedirect) continue;
 
             const auto packetsCount = (*(*conn)->node)->packets.load(std::memory_order_relaxed);
 
@@ -407,7 +402,6 @@ void Neighbourhood::gotRegistration(Connection&& conn, RemoteNodePtr node) {
         connPtr->in = conn.in;
         connPtr->specialOut = conn.specialOut;
         connPtr->out = conn.out;
-        connPtr->isRedirect = true;
     }
 
     connectNode(node, connPtr);
