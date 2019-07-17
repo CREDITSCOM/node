@@ -72,4 +72,8 @@ public:
 
     /** @brief True to disable, false to enable the trusted request to become trusted next round again */
     constexpr static bool DisableTrustedRequestNextRound = false;
+
+    /** The max contract's state size in bytes to synchronize it between node via conveyer. Otherwise, every node must get new state
+    itself or make individual request to dedicated trusted nodes*/
+    constexpr static size_t MaxContractStateSizeToSync = 8192;
 };

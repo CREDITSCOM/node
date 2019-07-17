@@ -562,7 +562,19 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
             finalSmartTransactionPack_.addTransaction(tr);
         }
     }
-    finalSmartTransactionPack_.addStateTransaction(finalStateTransaction_);
+    size_t state_size = std::numeric_limits<size_t>::max();
+    csdb::UserField fld = finalStateTransaction_.user_field(cs::trx_uf::new_state::Value);
+    if (fld.is_valid()) {
+        std::string state = fld.value<std::string>();
+        state_size = state.size();
+    }
+    if (state_size <= Consensus::MaxContractStateSizeToSync) {
+        finalSmartTransactionPack_.addStateTransaction(finalStateTransaction_);
+        csdebug() << kLogPrefix << "contract state of size " << state_size << " included in package";
+    }
+    else {
+        csdebug() << kLogPrefix << "contract state is too large, size is " << state_size << "b, not included in package";
+    }
     finalSmartTransactionPack_.makeHash();
 }
 
