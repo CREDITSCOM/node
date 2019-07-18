@@ -2482,14 +2482,14 @@ namespace executor {
             return {};
         }
 
-        const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
+        //const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
 
         // fill res
         ExecuteResult res;
         res.response = optOriginRes.value().resp.status;
 
-        if (optInnerTransactions.has_value())
-            res.trxns = optInnerTransactions.value();
+        //if (optInnerTransactions.has_value())
+        //    res.trxns = optInnerTransactions.value();
 
         deleteInnerSendTransactions(optOriginRes.value().acceessId);
         res.selfMeasuredCost = (long)optOriginRes.value().timeExecute;
@@ -2627,14 +2627,14 @@ namespace executor {
             return {};
         }
 
-        const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
+        //const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
 
         // fill res
         ExecuteResult res;
         res.response = optOriginRes.value().resp.status;
 
-        if (optInnerTransactions.has_value())
-            res.trxns = optInnerTransactions.value();
+        //if (optInnerTransactions.has_value())
+        //    res.trxns = optInnerTransactions.value();
 
         deleteInnerSendTransactions(optOriginRes.value().acceessId);
         res.selfMeasuredCost = (long)optOriginRes.value().timeExecute;

@@ -154,10 +154,14 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
                 auto invoke = deserialize<api::SmartContractInvocation>(std::move(data));
                 if (!invoke.usedContracts.empty()) {
                     for (const auto item : invoke.usedContracts) {
-                        const csdb::Address addr = BlockChain::getAddressFromKey(item);
-                        if (addr.is_valid()) {
-                            execution.uses.push_back(addr);
-                        }
+                        if (item.size() == cscrypto::kPublicKeySize) {
+                            cs::PublicKey key;
+                            std::copy(item.cbegin(), item.cend(), key.begin());
+                            const csdb::Address addr = csdb::Address::from_public_key(key); // BlockChain::getAddressFromKey(item);
+                            if (addr.is_valid()) {
+                                execution.uses.push_back(addr);
+                            }
+                        }                        
                     }
                 }
             }
@@ -417,6 +421,13 @@ std::string SmartContracts::get_contract_state(const BlockChain& storage, const 
     return state;
 }
 
+/*static*/
+std::string SmartContracts::to_base58(const BlockChain& storage, const csdb::Address& addr) {
+    csdb::Address abs_addr = storage.getAddressByType(addr, BlockChain::AddressType::PublicKey);
+    const cs::PublicKey& key = abs_addr.public_key();
+    return EncodeBase58(key.data(), key.data() + key.size());
+}
+
 std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address& abs_addr) const {
     using namespace trx_uf;
     const auto item = known_contracts.find(abs_addr);
@@ -582,9 +593,9 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
             const size_t cnt = execution->uses.size();
             if (cnt > 0) {
                 for (const auto& u : execution->uses) {
+                    csdebug() << kLogPrefix << new_item << " uses " << to_base58(u);
                     if (!in_known_contracts(u)) {
-                        cslog() << kLogPrefix << "call to unknown contract declared in executing item, cancel {"
-                            << new_item.sequence << '.' << new_item.transaction << '}';
+                        cslog() << kLogPrefix << "call to unknown contract declared in executing item, cancel " << new_item;
                         remove_from_queue(new_item);
                         // also removes parent "it" from exe_queue if empty
                         return;
@@ -623,10 +634,8 @@ void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
                 // update state
                 const csdb::Address abs_addr = absolute_address(new_state.target());
                 if (update_contract_state(new_state, false)) {
-                    const cs::PublicKey& key = abs_addr.public_key();
                     std::cout << std::endl; // emphasize with empty line
-                    cslog() << kLogPrefix << '{' << contract_ref.sequence << '.' << contract_ref.transaction << "} (" << EncodeBase58(key.data(), key.data() + key.size())
-                        << ") state has been updated";
+                    cslog() << kLogPrefix << contract_ref << " (" << to_base58(abs_addr) << ") state has been updated";
                     std::cout << std::endl; // emphasize with empty line
                 }
                 update_lock_status(abs_addr, false);
@@ -983,9 +992,8 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                                             hash_result += ")";
                                         }
                                         std::string print_addr;
-                                        const cs::PublicKey& key = req_abs_addr.public_key();
                                         print_addr = " (";
-                                        print_addr += EncodeBase58(key.data(), key.data() + key.size());
+                                        print_addr += to_base58(req_abs_addr);
                                         print_addr += ") ";
                                         csdebug() << kLogPrefix << "state of " << ref_start << print_addr << " is updated, stored hash is "
                                             << hash_result << ", new size is " << state.size();
@@ -1024,21 +1032,21 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
                 bool is_start = is_deploy ? false : this->is_start(tr);
                 if (is_deploy || is_start) {
                     if (is_deploy) {
-                        csdebug() << kLogPrefix << "contract is deployed by #" << block.sequence() << "." << tr_idx;
+                        csdebug() << kLogPrefix << "deploy in block #" << block.sequence() << "." << tr_idx;
                     }
                     else {
-                        csdebug() << kLogPrefix << "contract is invoked by #" << block.sequence() << "." << tr_idx;
+                        csdebug() << kLogPrefix << "execute in block #" << block.sequence() << "." << tr_idx;
                     }
                     enqueue(block, tr_idx);
                 }
                 else if (is_new_state(tr)) {
-                    csdebug() << kLogPrefix << "contract state is updated by #" << block.sequence() << "." << tr_idx;
+                    csdebug() << kLogPrefix << "new state in block #" << block.sequence() << "." << tr_idx;
                     on_new_state(block, tr_idx);
                 }
             }
             else if (is_payable_target(tr)) {
                 // execute payable method
-                csdebug() << kLogPrefix << "contract balance is replenished by #" << block.sequence() << "." << tr_idx;
+                csdebug() << kLogPrefix << "contract replenish in block #" << block.sequence() << "." << tr_idx;
                 emit signal_payable_invoke(tr);
                 enqueue(block, tr_idx);
             }
@@ -1569,31 +1577,36 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
 
                 if (it != exe_queue.end()) {
                     // put primary emitted transactions
-                    if (!data_item.result.trxns.empty()) {
-                        for (const auto& tr : data_item.result.trxns) {
-                            if (absolute_address(tr.source()) != primary_abs_addr) {
+                    if (!execution_result.emittedTransactions.empty()) {
+                        for (const auto& tr : execution_result.emittedTransactions) {
+                            if (absolute_address(tr.source) != primary_abs_addr) {
                                 // is not by primary contract emitted
                                 continue;
                             }
-                            if (tr.innerID() == 0) {
-                                // auto inner id generating
-                                csdb::Transaction tmp = tr.clone();
-                                tmp.set_innerID(++next_id);
-                                csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " emitted transaction";
-                                packet.addTransaction(tmp);
-                            }
-                            else {
-                                packet.addTransaction(tr);
-                            }
+                            csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " emitted transaction";
+                            // auto inner id generating
+                            csdb::Transaction tmp(
+                                ++next_id,
+                                tr.source,
+                                tr.target,
+                                result.currency(),
+                                tr.amount,
+                                result.max_fee(),
+                                csdb::AmountCommission(0.0),
+                                Zero::signature  // empty signature
+                            );
+                            packet.addTransaction(tmp);
                         }
-                        csdebug() << kLogPrefix << "add " << data_item.result.trxns.size() << " emitted transaction(s) to " << data_item.contract_ref << " state";
+                        csdebug() << kLogPrefix << "add " << execution_result.emittedTransactions.size()
+                            << " emitted transaction(s) to " << data_item.contract_ref << " state";
                     }
                     else {
                         csdebug() << kLogPrefix << "no emitted transaction added to " << data_item.contract_ref;
                     }
                     // put subsequent new_states if any
                     if (execution_result.states.size() > 1) {
-                        csdebug() << kLogPrefix << "add " << execution_result.states.size() << " subsequent new state(s) along with " << data_item.contract_ref << " state";
+                        csdebug() << kLogPrefix << "add " << execution_result.states.size()
+                            << " subsequent new state(s) along with " << data_item.contract_ref << " state";
                         for (const auto& [addr, state] : execution_result.states) {
                             csdb::Address secondary_abs_addr = absolute_address(addr);
                             if (secondary_abs_addr == primary_abs_addr) {
@@ -1602,39 +1615,45 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                             auto it_call = find_in_queue_item(it, data_item.contract_ref);
                             if (it_call != it->executions.end()) {
                                 int64_t secondary_next_id = next_inner_id(secondary_abs_addr);
-                                csdb::Transaction t = create_new_state(*it_call, ++secondary_next_id);
+                                csdb::Transaction t(
+                                    ++secondary_next_id,
+                                    addr,
+                                    addr,
+                                    result.currency(),
+                                    csdb::Amount(0),
+                                    result.max_fee(),
+                                    csdb::AmountCommission(0.0),
+                                    Zero::signature  // empty signature
+                                );
                                 csdebug() << kLogPrefix << "set innerID = " << secondary_next_id << " in "
                                     << data_item.contract_ref << " secondary contract new_state";
-                                if (t.is_valid()) {
-                                    // re-assign some fields
-                                    t.set_innerID(secondary_next_id);
-                                    t.set_source(addr);
-                                    t.set_target(addr);
-                                    t.add_user_field(trx_uf::new_state::Value, state);
-                                    t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
-                                    set_return_value(t, ::general::Variant{});
-                                    packet.addTransaction(t);
-                                    if (!state.empty()) {
-                                        // put subsequent contract emitted transactions
-                                        for (const auto& tr : data_item.result.trxns) {
-                                            if (absolute_address(tr.source()) != secondary_abs_addr) {
-                                                // is not by the current contract emitted
-                                                continue;
-                                            }
-                                            if (tr.innerID() == 0) {
-                                                // auto inner id generating
-                                                csdb::Transaction tmp = tr.clone();
-                                                tmp.set_innerID(++secondary_next_id);
-                                                csdebug() << kLogPrefix << "set innerID = " << secondary_next_id << " in "
-                                                    << data_item.contract_ref << " secondary emitted transaction";
-                                                packet.addTransaction(tmp);
-                                            }
-                                            else {
-                                                packet.addTransaction(tr);
-                                            }
+                                t.add_user_field(trx_uf::new_state::Value, state);
+                                t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
+                                set_return_value(t, ::general::Variant{});
+                                packet.addTransaction(t);
+                                if (!state.empty()) {
+                                    // put subsequent contract emitted transactions
+                                    for (const auto& tr : execution_result.emittedTransactions) {
+                                        if (absolute_address(tr.source) != secondary_abs_addr) {
+                                            // is not by the current contract emitted
+                                            continue;
                                         }
-                                        csdebug() << kLogPrefix << "add " << data_item.result.trxns.size() << " emitted transaction(s) to " << data_item.contract_ref << " state";
+                                        csdb::Transaction tmp2(
+                                            ++secondary_next_id,
+                                            tr.source,
+                                            tr.target,
+                                            result.currency(),
+                                            tr.amount,
+                                            result.max_fee(),
+                                            csdb::AmountCommission(0.0),
+                                            Zero::signature  // empty signature
+                                        );
+                                        packet.addTransaction(tmp2);
+                                        csdebug() << kLogPrefix << "set innerID = " << secondary_next_id << " in "
+                                            << data_item.contract_ref << " secondary emitted transaction";
                                     }
+                                    csdebug() << kLogPrefix << "add " << execution_result.emittedTransactions.size()
+                                        << " emitted transaction(s) to " << data_item.contract_ref << " state";
                                 }
                             }
                         }
@@ -1732,6 +1751,9 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
             if (executions.empty()) {
                 // actually impossible
                 continue;
+            }
+            for (auto n : executions) {
+                csdebug() << kLogPrefix << RefFormatter{ sequence, n } << " is rejected";
             }
             // to store newly created items:
             decltype(exe_queue) new_queue_items;
@@ -2222,8 +2244,7 @@ void SmartContracts::test_contracts_locks() {
     for (auto& item : known_contracts) {
         if (item.second.is_locked) {
             item.second.is_locked = false;
-            const cs::PublicKey& key = item.first.public_key();
-            csdebug() << kLogPrefix << "find locked contract " << EncodeBase58(key.data(), key.data() + key.size()) << " which is not executed now, unlock";
+            csdebug() << kLogPrefix << "find locked contract " << to_base58(item.first) << " which is not executed now, unlock";
         }
     }
 }
@@ -2232,8 +2253,7 @@ void SmartContracts::update_lock_status(const csdb::Address& abs_addr, bool valu
     auto it = known_contracts.find(abs_addr);
     if (it != known_contracts.end()) {
         if (it->second.is_locked != value) {
-            const cs::PublicKey& key = abs_addr.public_key();
-            csdebug() << kLogPrefix << (value ? "lock" : "unlock") << " contract " << EncodeBase58(key.data(), key.data() + key.size());
+            csdebug() << kLogPrefix << (value ? "lock" : "unlock") << " contract " << to_base58(abs_addr);
             it->second.is_locked = value;
         }
     }

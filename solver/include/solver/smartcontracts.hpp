@@ -272,6 +272,8 @@ public:
 
     static std::string get_contract_state(const BlockChain& storage, const csdb::Address& abs_addr);
 
+    static std::string to_base58(const BlockChain& storage, const csdb::Address& addr);
+
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
@@ -287,6 +289,10 @@ public:
 
     csdb::Address absolute_address(const csdb::Address& optimized_address) const {
         return bc.getAddressByType(optimized_address, BlockChain::AddressType::PublicKey);
+    }
+
+    std::string to_base58(const csdb::Address& addr) {
+        return SmartContracts::to_base58(bc, addr);
     }
 
     bool is_closed_smart_contract(const csdb::Address& addr) const {

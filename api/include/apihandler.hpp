@@ -276,7 +276,7 @@ public:
 
         ::general::APIResponse response;
         std::vector<SmartRes> smartsRes;
-        std::vector<csdb::Transaction> trxns;       
+        //std::vector<csdb::Transaction> trxns;       
         long selfMeasuredCost; // measured in milliseconds total cost of executions       
     };
 
