@@ -98,11 +98,17 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
 }
 
 void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
+    cs::TransactionsPacketHash hash = packet.hash();
     csdebug() << csname() << "Add separate transactions packet to conveyer, transactions " << packet.transactionsCount();
     cs::Lock lock(sharedMutex_);
 
-    // add current packet
-    pimpl_->packetQueue.push(packet);
+    if (auto iterator = pimpl_->packetsTable.find(hash); iterator == pimpl_->packetsTable.end()) {
+        // add current packet
+        pimpl_->packetQueue.push(packet);
+    }
+    else {
+        csdebug() << csname() << "Same separate packet already is in table: " << hash.toString();
+    }
 }
 
 void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packet) {
