@@ -143,7 +143,7 @@ void Neighbourhood::checkSilent() {
             if (!(*conn)->node) {
                 ConnectionPtr tc = *conn;
                 csunused(tc);
-                disconnectNode(conn);
+                disconnectNode(&*conn);
                 --conn;
                 continue;
             }
@@ -161,7 +161,7 @@ void Neighbourhood::checkSilent() {
                 Connection* c = *tc;
                 tc->node->connection.compare_exchange_strong(c, nullptr, std::memory_order_release, std::memory_order_relaxed);
 
-                disconnectNode(conn);
+                disconnectNode(&*conn);
                 --conn;
             }
             else {
@@ -200,14 +200,12 @@ void Neighbourhood::checkNeighbours() {
     }
 }
 
-template <typename Vec>
-static ConnectionPtr* findInVec(const Connection::Id& id, Vec& vec) {
+static ConnectionPtr* findInVec(const Connection::Id& id, std::deque<ConnectionPtr>& vec) {
     for (auto it = vec.begin(); it != vec.end(); ++it) {
         if ((*it)->id == id) {
-            return it;
+            return &*it;
         }
     }
-
     return nullptr;
 }
 
@@ -376,13 +374,16 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
         return;
     }
 
-    neighbours_.emplace(conn);
+    neighbours_.emplace(neighbours_.end(), conn);
 }
 
 void Neighbourhood::disconnectNode(ConnectionPtr* connPtr) {
     (*connPtr)->connected = false;
     (*connPtr)->node = RemoteNodePtr();
-    neighbours_.remove(connPtr);
+    auto res = std::find(neighbours_.begin(), neighbours_.end(), *connPtr);
+    if (res != neighbours_.end()) {
+      neighbours_.erase(res);
+    }
 }
 
 void Neighbourhood::gotRegistration(Connection&& conn, RemoteNodePtr node) {
@@ -613,7 +614,7 @@ void Neighbourhood::pourByNeighbours(const Packet* pack, const uint32_t packNum)
                 i = 0;
             }
 
-            conn = neighbours_.begin() + i;
+            conn = &neighbours_[i];
             ++i;
         }
 
