@@ -2640,7 +2640,7 @@ namespace executor {
         res.selfMeasuredCost = (long)optOriginRes.value().timeExecute;
 
         for (const auto& setters : optOriginRes.value().resp.results) {
-            ExecuteResult::SmartRes smartRes;
+            auto& smartRes = res.smartsRes.emplace_back(ExecuteResult::SmartRes{});
             smartRes.retValue = setters.ret_val;
             smartRes.executionCost = setters.executionCost;
             smartRes.response = setters.status;
