@@ -1747,7 +1747,7 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
             grouped_failed[item.first].emplace_back(item.second);
         }
 
-        for (const auto& [sequence, executions] : grouped_failed) {
+        for (auto& [sequence, executions] : grouped_failed) {
             if (executions.empty()) {
                 // actually impossible
                 continue;
@@ -1755,11 +1755,33 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
             for (auto n : executions) {
                 csdebug() << kLogPrefix << RefFormatter{ sequence, n } << " is rejected";
             }
+
             // to store newly created items:
             decltype(exe_queue) new_queue_items;
             auto it_queue = exe_queue.begin();
             while (it_queue != exe_queue.end()) {
                 if (it_queue->seq_enqueue == sequence) {
+                    // remove outdated executions (duplicated transaction is rejected)
+                    size_t cnt_ignored = executions.size();
+                    const auto it_state = known_contracts.find(it_queue->abs_addr);
+                    if (it_state != known_contracts.cend()) {
+                        const SmartContractRef& last_success_exe = it_state->second.ref_execute;
+                        if (last_success_exe.sequence == sequence) {
+                            executions.remove_if([=](uint16_t n) { return n <= last_success_exe.transaction; });
+                        }
+                    }
+                    cnt_ignored -= executions.size();
+                    if (cnt_ignored > 0) {
+                        csdebug() << kLogPrefix << cnt_ignored << " rejection(s) is/are not confirmed";
+                        if (executions.empty()) {
+                            // continue to next sequence
+                            break;
+                        }
+                        for (auto n : executions) {
+                            csdebug() << kLogPrefix << RefFormatter{ sequence, n } << " is confirmed to reject";
+                        }
+                    }
+
                     auto it_exe = it_queue->executions.begin();
                     while (it_exe != it_queue->executions.end()) {
                         if (std::find(executions.cbegin(), executions.cend(), it_exe->ref_start.transaction) != executions.cend()) {
@@ -2323,7 +2345,7 @@ bool SmartContracts::wait_until_executor(unsigned int test_freq) {
     return true;
 }
 
-void SmartContracts::net_request_contract_state(const csdb::Address& abs_addr) {
+void SmartContracts::net_request_contract_state(const csdb::Address& /*abs_addr*/) {
 }
 
 }  // namespace cs
