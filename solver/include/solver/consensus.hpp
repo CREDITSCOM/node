@@ -18,6 +18,9 @@ public:
     /** @brief   The default state timeout */
     constexpr static unsigned int DefaultStateTimeout = 5000;
 
+    /** @brief   The default state timeout */
+    constexpr static uint64_t DefaultTimeStampRange = 30000;
+
     /** @brief   Maximum time in msec to wait new round after consensus achieved, after that waiting trusted nodes
      * activates */
     constexpr static unsigned int PostConsensusTimeout = 60000;

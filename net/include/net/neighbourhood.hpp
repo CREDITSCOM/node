@@ -2,6 +2,8 @@
 #ifndef NEIGHBOURHOOD_HPP
 #define NEIGHBOURHOOD_HPP
 
+#include <deque>
+
 #include <boost/asio.hpp>
 
 #include <lib/system/allocators.hpp>
@@ -223,7 +225,7 @@ private:
     //mutable cs::SpinLock mLockFlag_{ATOMIC_FLAG_INIT};
     mutable std::mutex mLockFlag_;
 
-    FixedVector<ConnectionPtr, MaxNeighbours> neighbours_;
+    std::deque<ConnectionPtr> neighbours_;
     FixedHashMap<ip::udp::endpoint, ConnectionPtr, uint16_t, MaxConnections> connections_;
 
     struct SenderInfo {
