@@ -13,7 +13,7 @@ The Node processes and stores transactions, executes and confirms smart contract
 Written on C++.
 
 ## Version
-Current node version 4.2.420.0
+Current node version 4.2.417.3
 
 
 <h2>What is Credits Node?</h2>
