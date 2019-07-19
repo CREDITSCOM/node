@@ -1,4 +1,9 @@
 /* Send blaming letters to @yrtimd */
+
+#include <algorithm>
+#include <iterator>
+#include <random>
+
 #include "neighbourhood.hpp"
 #include "transport.hpp"
 
@@ -6,18 +11,37 @@
 #include <csnode/blockchain.hpp>
 #include <lib/system/random.hpp>
 
-Neighbourhood::Neighbourhood(Transport* net)
-: transport_(net)
-, connectionsAllocator_(MaxConnections + 1)
-, nLockFlag_()
-, mLockFlag_() {
-}
-
+namespace {
 template <typename T>
 T getSecureRandom() {
     T result;
     cscrypto::fillBufWithRandomBytes(static_cast<void*>(&result), sizeof(T));
     return result;
+}
+
+template<class InputIt>
+std::vector<typename std::iterator_traits<InputIt>::value_type> sample(InputIt first, InputIt last, size_t n) {
+    static std::mt19937 engine{std::random_device{}()};
+
+    InputIt nth = next(first, n);
+    std::vector<typename std::iterator_traits<InputIt>::value_type> result{first, nth};
+    size_t k = n + 1;
+    for (InputIt it = nth; it != last; ++it, ++k) {
+        size_t r = std::uniform_int_distribution<size_t>{0, k}(engine);
+        if (r < n)
+            result[r] = *it;
+    }
+    return result;
+}
+
+const int neighbors_redirect_min = 6;
+}  // anonimous namespace
+
+Neighbourhood::Neighbourhood(Transport* net)
+: transport_(net)
+, connectionsAllocator_(MaxConnections + 1)
+, nLockFlag_()
+, mLockFlag_() {
 }
 
 bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
@@ -31,9 +55,27 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
         return result;
     }
 
-    bool sent = false;
+    if (neighbours_.size() == 0) return false;
 
-    for (auto& nb : neighbours_) {
+    static bool redirect_limit = false;
+    static auto start_time = std::chrono::high_resolution_clock::now();
+
+    if (!redirect_limit) {
+        auto now_time = std::chrono::high_resolution_clock::now();
+        auto spended_time = std::chrono::duration_cast<std::chrono::seconds>(now_time - start_time);
+        if (spended_time.count() > 10) redirect_limit = true; // 10 seconst dry run
+    }
+
+    int redirect_number;
+    if (redirect_limit) {
+        redirect_number = std::max(neighbors_redirect_min, static_cast<int>(neighbours_.size()) / 3 + 1);
+    } else {
+        redirect_number = neighbours_.size();
+    }
+
+    auto selection = sample(std::begin(neighbours_), std::end(neighbours_), redirect_number);
+    bool sent = false;
+    for (auto& nb : selection) {
         bool found = false;
         for (auto ptr = bp.receivers; ptr != bp.recEnd; ++ptr) {
             if (*ptr == nb->id) {
