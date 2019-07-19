@@ -2229,12 +2229,17 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
         << " : " << static_cast<int>(sHash.trustedSize) << " - " << static_cast<int>(sHash.realTrustedSize);
     csdebug() << "TimeStamp     = " << std::to_string(sHash.timeStamp);
     uint64_t deltaStamp = currentTimeStamp - lastTimeStamp;
-    if (deltaStamp > Consensus::MaxTimeStampDelta) {
-        deltaStamp = Consensus::MaxTimeStampDelta;
+    if (deltaStamp > Consensus::DefaultTimeStampRange) {
+        deltaStamp = Consensus::DefaultTimeStampRange;
 
     }
-    if (sHash.timeStamp < lastTimeStamp || sHash.timeStamp > currentTimeStamp + deltaStamp / 2 * 3) {//here we just take the time interval 1.5 times larger than last round
-        csdebug() << "Our TimeStamp = " << std::to_string(currentTimeStamp) << " ... return";
+    if (sHash.timeStamp < lastTimeStamp){
+        csdebug() << "Incoming TimeStamp(< last BC timeStamp)= " << std::to_string(sHash.timeStamp) << " < " << std::to_string(lastTimeStamp) << " ... return";
+        return;
+    }
+
+    if (sHash.timeStamp > currentTimeStamp + deltaStamp / 2 * 3) {//here we just take the time interval 1.5 times larger than last round
+        csdebug() << "Incoming TimeStamp(> current timeStamp + delta) = " << std::to_string(sHash.timeStamp) << " > " << std::to_string(currentTimeStamp) << " ... return";
         return;
     }
 

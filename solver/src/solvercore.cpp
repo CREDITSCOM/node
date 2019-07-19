@@ -212,11 +212,24 @@ bool SolverCore::stateFailed(Result res) {
 //  }
 //}
 
-std::string SolverCore::chooseTimeStamp() {
+uint64_t SolverCore::lastTimeStamp() {
+    int64_t lts;
+    try {
+        lts = std::stoll(pnode->getBlockChain().getLastTimeStamp());
+    }
+    catch (...) {
+        csdebug() << "Timestamp was announced as zero";
+        return 0;
+    }
+    return lts;
+}
+
+std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
     int64_t lastTimeStamp;
     try {
       lastTimeStamp = std::stoll(pnode->getBlockChain().getLastTimeStamp());
     } catch(...) {
+        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
       return std::to_string(0);
     }
 
@@ -225,7 +238,7 @@ std::string SolverCore::chooseTimeStamp() {
     double mean;
     int N = 0;
     for (auto& it : stageOneStorage) {
-        if (!it.roundTimeStamp.empty()) {
+        if (!it.roundTimeStamp.empty() && mask[it.sender] != cs::ConfidantConsts::InvalidConfidantIndex) {
             int64_t tStamp;
             try {
                 tStamp = std::stoll(it.roundTimeStamp);
@@ -284,7 +297,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
 
     // only for new consensus
     cs::PoolMetaInfo poolMetaInfo;
-    std::string timeStamp = conveyer.currentRoundNumber() == 1 ? currentTimeStamp : chooseTimeStamp();
+    std::string timeStamp = conveyer.currentRoundNumber() == 1 ? currentTimeStamp : chooseTimeStamp(stage3.realTrustedMask);
     poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
     poolMetaInfo.timestamp = std::move(timeStamp);
     poolMetaInfo.characteristic.mask = conveyer.characteristic(conveyer.currentRoundNumber())->mask;
