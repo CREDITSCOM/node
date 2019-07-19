@@ -271,7 +271,7 @@ std::string SolverCore::chooseTimeStamp() {
 }
 
 // TODO: this function is to be implemented the block and RoundTable building <====
-void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& /*currentTimeStamp*/, cs::StageThree& stage3) {
+void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& currentTimeStamp, cs::StageThree& stage3) {
     csmeta(csdetails) << "start";
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     cs::RoundTable table;
@@ -284,7 +284,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
 
     // only for new consensus
     cs::PoolMetaInfo poolMetaInfo;
-    std::string timeStamp = chooseTimeStamp();
+    std::string timeStamp = conveyer.currentRoundNumber() == 1 ? currentTimeStamp : chooseTimeStamp();
     poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
     poolMetaInfo.timestamp = std::move(timeStamp);
     poolMetaInfo.characteristic.mask = conveyer.characteristic(conveyer.currentRoundNumber())->mask;
@@ -294,7 +294,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     //    poolMetaInfo.confirmations = confirmation.value().signatures;
     //}
 
-    csdetails() << log_prefix << "timestamp: " << poolMetaInfo.timestamp;
+    csdebug() << log_prefix << "timestamp: " << poolMetaInfo.timestamp;
     for (std::size_t i = 0; i < hashes.size(); ++i) {
         csdetails() << log_prefix << '\t' << i << ". " << hashes[i].toString();
     }
