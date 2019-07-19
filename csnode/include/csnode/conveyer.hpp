@@ -295,6 +295,9 @@ protected:
     void removeHashesFromTable(const cs::PacketsHashes& hashes);
     cs::TransactionsPacketTable& poolTable(cs::RoundNumber round);
 
+    // returns true if packet is found at cache, otherwise - false
+    bool isPacketAtCache(const cs::TransactionsPacket& packet);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pimpl_;

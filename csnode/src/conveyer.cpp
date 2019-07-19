@@ -109,7 +109,7 @@ void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packe
     cs::TransactionsPacketHash hash = packet.hash();
     cs::Lock lock(sharedMutex_);
 
-    if (auto iterator = pimpl_->packetsTable.find(hash); iterator == pimpl_->packetsTable.end()) {
+    if (!isPacketAtCache(packet)) {
         pimpl_->packetsTable.emplace(std::move(hash), packet);
     }
     else {
@@ -647,7 +647,7 @@ void cs::ConveyerBase::flushTransactions() {
 
             auto hash = packet.hash();
 
-            if (auto iter = pimpl_->packetsTable.find(hash); iter == pimpl_->packetsTable.end()) {
+            if (!isPacketAtCache(packet)) {
                 pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
             }
             else {
@@ -676,6 +676,25 @@ cs::TransactionsPacketTable& cs::ConveyerBase::poolTable(cs::RoundNumber round) 
     }
 
     return pimpl_->packetsTable;
+}
+
+bool cs::ConveyerBase::isPacketAtCache(const cs::TransactionsPacket& packet) {
+    auto hash = packet.hash();
+    auto iter = pimpl_->packetsTable.find(hash);
+
+    if (iter != pimpl_->packetsTable.end()) {
+        return true;
+    }
+
+    for (const auto& element : pimpl_->metaStorage) {
+        auto metaIter = element.meta.hashTable.find(hash);
+
+        if (metaIter != element.meta.hashTable.end()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 cs::Conveyer& cs::Conveyer::instance() {
