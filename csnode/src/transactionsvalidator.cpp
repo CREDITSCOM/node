@@ -179,7 +179,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
         }
     }
 
-    if (wallState.balance_ < zeroBalance_) {
+    if (wallState.balance_ < zeroBalance_ && !SmartContracts::is_new_state(trx)) {
         csdebug() << kLogPrefix << "transaction[" << trxInd << "] results to potentially negative balance " << wallState.balance_.to_double();
         // will be checked in rejected smarts
         if (context.smart_contracts().is_known_smart_contract(trx.source())) {

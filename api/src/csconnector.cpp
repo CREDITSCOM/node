@@ -23,20 +23,25 @@ using namespace ::apache::thrift::server;
 using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
+constexpr const unsigned int kServerRWTimeoutMillis = 30000;
+
 connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config)
-: executor_(executor::Executor::getInstance(&m_blockchain, solver, config.executor_port, config.executor_ip))
+: executor_(executor::Executor::getInstance(&m_blockchain, solver, config.executor_port, config.executor_ip, config.executor_cmdline))
 , api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, executor_, config))
 , apiexec_handler(make_shared<apiexec::APIEXECHandler>(m_blockchain, *solver, executor_, config))
 , p_api_processor(make_shared<api::APIProcessor>(api_handler))
 , p_apiexec_processor(make_shared<apiexec::APIEXECProcessor>(apiexec_handler))
 #ifdef BINARY_TCP_API
-, server(p_api_processor, make_shared<TServerSocket>(config.port), make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
+, server(p_api_processor, make_shared<TServerSocket>(config.port, kServerRWTimeoutMillis, kServerRWTimeoutMillis),
+    make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 #ifdef AJAX_IFACE
-, ajax_server(p_api_processor, make_shared<TServerSocket>(config.ajax_port), make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
+, ajax_server(p_api_processor, make_shared<TServerSocket>(config.ajax_port, kServerRWTimeoutMillis, kServerRWTimeoutMillis),
+    make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
 #ifdef BINARY_TCP_EXECAPI
-, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.apiexec_port), make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
+, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.apiexec_port),
+    make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 {
 

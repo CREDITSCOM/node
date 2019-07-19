@@ -33,11 +33,11 @@ csdb::AmountCommission getFee(const csdb::Transaction&);
 ///
 /// <remarks>   Alexander Avramenko, 11.06.2019. </remarks>
 ///
-/// <param name="duration_msec">    The measured duration in milliseconds. </param>
+/// <param name="duration_msec">    The measured duration in microseconds. </param>
 ///
 /// <returns>   The execution fee. </returns>
 
-csdb::Amount getExecutionFee(long long duration_msec);
+csdb::Amount getExecutionFee(long long duration_mcs);
 
 } // namespace fee
 } // namespace cs

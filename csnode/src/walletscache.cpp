@@ -395,7 +395,7 @@ void WalletsCache::ProcessorBase::checkClosedSmart(const csdb::Transaction& tran
 }
 
 void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction) {
-    if (newStateTransaction.user_field(trx_uf::new_state::Value).value<std::string>().empty()) {
+    if (!cs::SmartContracts::is_state_updated(newStateTransaction)) {
         return rollbackReplenishPayableContract(initTransaction, csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>()));
     }
     bool waitingSmart = false;

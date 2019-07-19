@@ -14,7 +14,7 @@ namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
 typedef uint16_t NodeVersion;
-const NodeVersion NODE_VERSION = 417;
+const NodeVersion NODE_VERSION = 420;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
@@ -61,6 +61,7 @@ struct ApiData {
     uint16_t executorPort = 9080;
     uint16_t apiexecPort = 9070;
     std::string executorHost{ "localhost" };
+    std::string executorCmdLine{};
 };
 
 class Config {

@@ -267,6 +267,34 @@ public:
      */
     bool get_from_blockchain(const Address& addr /*input*/, const int64_t& innerId /*input*/, Transaction& trx /*output*/) const;
 
+    /**
+     * Gets contract data from storage.
+     *
+     * @author  0xAAE
+     * @date    19.06.2019
+     *
+     * @param           abs_addr   The contract address.
+     * @param [in,out]  data       The contract data.
+     *
+     * @returns True if it succeeds, false if it fails.
+     */
+
+    bool get_contract_data(const Address& abs_addr /*input*/, cs::Bytes& data /*output*/) const;
+
+    /**
+     * Updates the contract data in storage.
+     *
+     * @author  0xAAE
+     * @date    19.06.2019
+     *
+     * @param   abs_addr   The contract address.
+     * @param   data       The contract data.
+     *
+     * @returns True if it succeeds, false if it fails.
+     */
+
+    bool update_contract_data(const Address& abs_addr /*input*/, const cs::Bytes& data /*input*/) const;
+
 public signals:
     const ReadBlockSignal& readBlockEvent() const;
 

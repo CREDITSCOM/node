@@ -194,6 +194,28 @@ cs::Sequence BlockChain::getLastSequence() const {
     }
 }
 
+std::string BlockChain::getLastTimeStamp() const {
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+
+    if (deferredBlock_.is_valid()) {
+        return deferredBlock_.user_field(0).value<std::string>();
+    }
+    else {
+        return getLastBlock().user_field(0).value<std::string>();
+    }
+}
+
+cs::Bytes BlockChain::getLastRealTrusted() const {
+    std::lock_guard<decltype(dbLock_)> l(dbLock_);
+
+    if (deferredBlock_.is_valid()) {
+        return cs::Utils::bitsToMask(deferredBlock_.numberTrusted(), deferredBlock_.realTrusted());
+    }
+    else {
+        return cs::Utils::bitsToMask(getLastBlock().numberTrusted(), getLastBlock().realTrusted());
+    }
+}
+
 void BlockChain::writeGenesisBlock() {
     cswarning() << "Adding the genesis block";
 
@@ -811,6 +833,16 @@ bool BlockChain::getTransaction(const csdb::Address& addr, const int64_t& innerI
     return storage_.get_from_blockchain(addr, innerId, result);
 }
 
+bool BlockChain::updateContractData(const csdb::Address& abs_addr, const cs::Bytes& data) const {
+    cs::Lock lock(dbLock_);
+    return storage_.update_contract_data(abs_addr, data);
+}
+
+bool BlockChain::getContractData(const csdb::Address& abs_addr, cs::Bytes& data) const {
+    cs::Lock lock(dbLock_);
+    return storage_.get_contract_data(abs_addr, data);
+}
+
 bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
     if (!walletsCacheUpdater_) {
         cserror() << "!walletsCacheUpdater";
@@ -993,6 +1025,90 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     csdebug() << "----------------------------------- " << pool.sequence() << " --------------------------------------";
 
     return std::make_optional(pool);
+}
+
+bool BlockChain::updateLastBlock(cs::RoundPackage& rPackage) {
+    return updateLastBlock(rPackage, deferredBlock_);
+}
+
+bool BlockChain::updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom) {
+    csdebug() << "BLOCKCHAIN> Starting update last block: check ...";
+    //if (deferredBlock_.is_valid()) {
+    //  csdebug() << "BLOCKCHAIN> Deferred block is invalid, can't update it";
+    //  return false;
+    //}
+    if (poolFrom.is_read_only()) {
+        csdebug() << "BLOCKCHAIN> Deferred block is read_only, be carefull";
+        //return false;
+    }
+
+    if (poolFrom.sequence() != rPackage.poolMetaInfo().sequenceNumber) {
+        csdebug() << "BLOCKCHAIN> Deferred block sequence " << poolFrom.sequence() << " doesn't equal to that in the roundPackage " << rPackage.poolMetaInfo().sequenceNumber << ", can't update it";
+        return false;
+    }
+    if (poolFrom.signatures().size() >= rPackage.poolSignatures().size()) {
+        csdebug() << "BLOCKCHAIN> Deferred block has more or the same amount Signatures, than received roundPackage, can't update it";
+        return true;
+    }
+    if (poolFrom.previous_hash() != rPackage.poolMetaInfo().previousHash) {
+        csdebug() << "BLOCKCHAIN> Deferred block PREVIOUS HASH doesn't equal to that in the roundPackage, can't update it";
+        return false;
+    }
+    csdebug() << "BLOCKCHAIN> Ok";
+
+    csdb::Pool tmpPool;
+    tmpPool.set_sequence(poolFrom.sequence());
+    tmpPool.set_previous_hash(poolFrom.previous_hash());
+    tmpPool.add_real_trusted(cs::Utils::maskToBits(rPackage.poolMetaInfo().realTrustedMask));
+    csdebug() << "BLOCKCHAIN> new mask set to deferred block: " << cs::TrustedMask::toString(rPackage.poolMetaInfo().realTrustedMask);
+    tmpPool.add_number_trusted(static_cast<uint8_t>(rPackage.poolMetaInfo().realTrustedMask.size()));
+    tmpPool.setRoundCost(poolFrom.roundCost());
+    tmpPool.set_confidants(poolFrom.confidants());
+    for (auto& it : poolFrom.transactions()) {
+        tmpPool.add_transaction(it);
+    }
+    tmpPool.add_user_field(0, rPackage.poolMetaInfo().timestamp);
+    for (auto& it : poolFrom.smartSignatures()) {
+        tmpPool.add_smart_signature(it);
+    }
+    csdb::Pool::NewWallets* newWallets = tmpPool.newWallets();
+    const csdb::Pool::NewWallets& defWallets = poolFrom.newWallets();
+    if (!newWallets) {
+        cserror() << "newPool is read-only";
+        return false;
+    }
+
+    for (auto it : defWallets) {
+        newWallets->push_back(it);
+    }
+
+    if (rPackage.poolMetaInfo().sequenceNumber > 1) {
+        tmpPool.add_number_confirmations(poolFrom.numberConfirmations());
+        tmpPool.add_confirmation_mask(poolFrom.roundConfirmationMask());
+        tmpPool.add_round_confirmations(poolFrom.roundConfirmations());
+    }
+
+    return deferredBlockExchange(rPackage, tmpPool);
+}
+
+bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool) {
+    deferredBlock_ = csdb::Pool{};
+    deferredBlock_ = newPool;
+    auto tmp = rPackage.poolSignatures();
+    deferredBlock_.set_signatures(tmp);
+    deferredBlock_.compose();
+    Hash tempHash;
+    auto hash = deferredBlock_.hash().to_binary();
+    std::copy(hash.cbegin(), hash.cend(), tempHash.data());
+    if (NodeUtils::checkGroupSignature(deferredBlock_.confidants(), rPackage.poolMetaInfo().realTrustedMask, rPackage.poolSignatures(), tempHash)) {
+        csmeta(csdebug) << "The number of signatures is sufficient and all of them are OK!";
+
+    }
+    else {
+        cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
+        return false;
+    }
+    return true;
 }
 
 bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {

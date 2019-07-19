@@ -477,6 +477,9 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     std::size_t maskIndex = 0;
     const cs::Bytes& mask = characteristic.mask;
     cs::TransactionsPacket invalidTransactions;
+    std::vector<csdb::Transaction> stateTransactions;
+
+    bool is_state_rejected = false;
 
     for (const auto& hash : localHashes) {
         // try to get from meta if can
@@ -496,22 +499,34 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
             const auto& stateTransaction = transactions.front();
 
             // check range
-            if (maskIndex < mask.size() && mask[maskIndex] != 0) {
-                csdb::Pool::SmartSignature smartSignatures;
-                csdb::UserField userField = stateTransaction.user_field(trx_uf::new_state::RefStart);
+            if (maskIndex < mask.size()) {
+                if (mask[maskIndex] != 0) {
+                    csdb::Pool::SmartSignature smartSignatures;
+                    csdb::UserField userField = stateTransaction.user_field(trx_uf::new_state::RefStart);
 
-                if (userField.is_valid()) {
-                    SmartContractRef reference(userField);
+                    if (userField.is_valid()) {
+                        SmartContractRef reference(userField);
 
-                    if (reference.is_valid()) {
-                        smartSignatures.smartConsensusPool = reference.sequence;
+                        if (reference.is_valid()) {
+                            smartSignatures.smartConsensusPool = reference.sequence;
+                        }
                     }
+
+                    smartSignatures.smartKey = stateTransaction.source().public_key();
+                    smartSignatures.signatures = packet.signatures();
+
+                    newPool.add_smart_signature(smartSignatures);
                 }
+                else {
+                    is_state_rejected = true;
+                }
+            }
 
-                smartSignatures.smartKey = stateTransaction.source().public_key();
-                smartSignatures.signatures = packet.signatures();
-
-                newPool.add_smart_signature(smartSignatures);
+            // add states to cache
+            if (!is_state_rejected) {
+                for (const auto& transaction : packet.stateTransactions()) {
+                    stateTransactions.push_back(transaction);
+                }
             }
         }
 
@@ -562,14 +577,19 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     newPool.add_real_trusted(cs::Utils::maskToBits(metaPoolInfo.realTrustedMask));
     newPool.set_previous_hash(metaPoolInfo.previousHash);
 
-    if (metaPoolInfo.sequenceNumber > 1) {
-        newPool.add_number_confirmations(static_cast<uint8_t>(metaPoolInfo.confirmationMask.size()));
-        newPool.add_confirmation_mask(cs::Utils::maskToBits(metaPoolInfo.confirmationMask));
-        newPool.add_round_confirmations(metaPoolInfo.confirmations);
-    }
+    //TODO: be sure tthenext lines are included in Node::getCharacteristic()
+    //if (metaPoolInfo.sequenceNumber > 1) {
+    //    newPool.add_number_confirmations(static_cast<uint8_t>(metaPoolInfo.confirmationMask.size()));
+    //    newPool.add_confirmation_mask(cs::Utils::maskToBits(metaPoolInfo.confirmationMask));
+    //    newPool.add_round_confirmations(metaPoolInfo.confirmations);
+    //}
 
-    csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey);
+    //csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey);
     csmeta(csdetails) << "done";
+
+    if (!stateTransactions.empty()) {
+        emit statesCreated(stateTransactions);
+    }
 
     return std::make_optional<csdb::Pool>(std::move(newPool));
 }

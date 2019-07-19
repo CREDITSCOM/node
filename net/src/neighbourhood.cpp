@@ -134,48 +134,56 @@ void Neighbourhood::checkSilent() {
     static uint32_t refillCount = 0;
 
     bool needRefill = true;
-    cs::ScopedLock lock(mLockFlag_, nLockFlag_);
+    std::atomic_bool flagCallRefillNeighbourhood{ false };
 
-    for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
-        if (!(*conn)->node) {
-            ConnectionPtr tc = *conn;
-            csunused(tc);
-            disconnectNode(conn);
-            --conn;
-            continue;
+    { // begin of scoped locked block
+        cs::ScopedLock lock(mLockFlag_, nLockFlag_);
+
+        for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
+            if (!(*conn)->node) {
+                ConnectionPtr tc = *conn;
+                csunused(tc);
+                disconnectNode(conn);
+                --conn;
+                continue;
+            }
+
+            if ((*conn)->isSignal) {
+                continue;
+            }
+
+            const auto packetsCount = (*(*conn)->node)->packets.load(std::memory_order_relaxed);
+
+            if (packetsCount == (*conn)->lastPacketsCount) {
+                cswarning() << "Node " << (*conn)->in << " stopped responding";
+
+                ConnectionPtr tc = *conn;
+                Connection* c = *tc;
+                tc->node->connection.compare_exchange_strong(c, nullptr, std::memory_order_release, std::memory_order_relaxed);
+
+                disconnectNode(conn);
+                --conn;
+            }
+            else {
+                needRefill = false;
+                (*conn)->lastPacketsCount = packetsCount;
+            }
         }
 
-        if ((*conn)->isSignal) {
-            continue;
-        }
-
-        const auto packetsCount = (*(*conn)->node)->packets.load(std::memory_order_relaxed);
-
-        if (packetsCount == (*conn)->lastPacketsCount) {
-            cswarning() << "Node " << (*conn)->in << " stopped responding";
-
-            ConnectionPtr tc = *conn;
-            Connection* c = *tc;
-            tc->node->connection.compare_exchange_strong(c, nullptr, std::memory_order_release, std::memory_order_relaxed);
-
-            disconnectNode(conn);
-            --conn;
+        if (needRefill) {
+            ++refillCount;
+            if (refillCount >= WarnsBeforeRefill) {
+                refillCount = 0;
+                flagCallRefillNeighbourhood = true;
+            }
         }
         else {
-            needRefill = false;
-            (*conn)->lastPacketsCount = packetsCount;
-        }
-    }
-
-    if (needRefill) {
-        ++refillCount;
-        if (refillCount >= WarnsBeforeRefill) {
             refillCount = 0;
-            transport_->refillNeighbourhood();
         }
-    }
-    else {
-        refillCount = 0;
+    } // end of scoped locked block
+
+    if (flagCallRefillNeighbourhood) {
+        transport_->refillNeighbourhood();
     }
 }
 
@@ -284,8 +292,8 @@ Connections Neighbourhood::getNeighboursWithoutSS() const {
     return connections;
 }
 
-std::unique_lock<cs::SpinLock> Neighbourhood::getNeighboursLock() const {
-    return std::unique_lock<cs::SpinLock>(nLockFlag_);
+std::unique_lock<std::mutex> Neighbourhood::getNeighboursLock() const {
+    return std::unique_lock< std::mutex >(nLockFlag_);
 }
 
 void Neighbourhood::forEachNeighbour(std::function<void(ConnectionPtr)> func) {

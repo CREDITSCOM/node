@@ -16,6 +16,7 @@ class Transaction;
 
 namespace cs {
 using PacketFlushSignal = cs::Signal<void(const cs::TransactionsPacket&)>;
+using StatesSignal = cs::Signal<void(const std::vector<csdb::Transaction>&)>;
 
 ///
 /// @brief The Conveyer class, represents utils and mechanics
@@ -285,6 +286,7 @@ public:
 
 public signals:
     cs::PacketFlushSignal packetFlushed;
+    cs::StatesSignal statesCreated;
 
 public slots:
 
