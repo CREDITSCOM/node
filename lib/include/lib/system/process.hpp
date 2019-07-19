@@ -19,7 +19,7 @@
 
 namespace cs {
 using ProcessStartSignal = cs::Signal<void()>;
-using ProcessFinishSignal = cs::Signal<void()>;
+using ProcessFinishSignal = cs::Signal<void(int, const std::error_code&)>;
 using ProcessErrorSignal = cs::Signal<void(const cs::ProcessException&)>;
 
 ///
@@ -125,7 +125,14 @@ inline const std::string& Process::file() const {
 }
 
 inline bool Process::isRunning() const {
-    return process_.running();
+    try {
+        return process_.running();
+    }
+    catch (const std::exception& exception) {
+        emit errorOccured(cs::ProcessException(exception.what()));
+    }
+
+    return false;
 }
 
 inline void Process::wait() {
@@ -169,8 +176,8 @@ inline void Process::launch(Process::Options options) {
         emit errorOccured(cs::ProcessException(code.message(), code.value()));
     };
 
-    auto exit = [this](int, const std::error_code&) {
-        emit finished();
+    auto exit = [this](int code, const std::error_code& errorCode) {
+        emit finished(code, errorCode);
     };
 
     io_.reset();
