@@ -190,6 +190,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
     }
 
     wallState.trxTail_.push(trx.innerID());
+    csdebug() << kLogPrefix << "innerID of " << cs::SmartContracts::to_base58(context.blockchain(), trx.source()) << " <- " << trx.innerID();
     trxList_[trxInd] = wallState.lastTrxInd_;
     wallState.lastTrxInd_ = static_cast<decltype(wallState.lastTrxInd_)>(trxInd);
 

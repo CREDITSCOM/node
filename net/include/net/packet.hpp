@@ -77,6 +77,8 @@ enum MsgTypes : uint8_t {
     HashReply,
     RejectedContracts,
     RoundPackRequest,
+    StateRequest,
+    StateReply,
     BigBang = 35,
     EmptyRoundPack,
     NodeStopRequest = 255

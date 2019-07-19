@@ -221,6 +221,8 @@ api::TransactionId convert_transaction_id(const csdb::TransactionID& trid) {
     api::TransactionId result_id;
     result_id.index = (uint32_t) trid.index();
     result_id.poolHash = fromByteArray(trid.pool_hash().to_binary());
+    result_id.__isset.index = true;
+    result_id.__isset.poolHash = true;
     return result_id;
 }
 
@@ -452,7 +454,9 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
 
 std::vector<api::SealedTransaction> APIHandler::convertTransactions(const std::vector<csdb::Transaction>& transactions) {
     std::vector<api::SealedTransaction> result;
-    result.resize(transactions.size());
+    auto size = transactions.size();
+    result.resize(size);
+    //result.resize(transactions.size());
     /*const auto convert = std::bind(&APIHandler::convertTransaction, this, std::placeholders::_1);
     std::transform(transactions.begin(), transactions.end(), result.begin(), convert);
     for (auto& it : result) {
@@ -812,17 +816,18 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 }
 
 void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction) {
+    _return.roundNum = (uint32_t)cs::Conveyer::instance().currentRoundTable().round;
+
     if (auto errInfo = checkTransaction(transaction); errInfo.has_value()) {
         _return.status.code     = ERROR_CODE;
         _return.status.message  = errInfo.value();
+        return;
     }
 
     if(!transaction.__isset.smartContract && !solver.smart_contracts().is_known_smart_contract(BlockChain::getAddressFromKey(transaction.target)))
         dumb_transaction_flow(_return, transaction);
     else
-        smart_transaction_flow(_return, transaction);
-
-    _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
+        smart_transaction_flow(_return, transaction); 
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
@@ -2477,20 +2482,20 @@ namespace executor {
             return {};
         }
 
-        const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
+        //const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
 
         // fill res
         ExecuteResult res;
         res.response = optOriginRes.value().resp.status;
 
-        if (optInnerTransactions.has_value())
-            res.trxns = optInnerTransactions.value();
+        //if (optInnerTransactions.has_value())
+        //    res.trxns = optInnerTransactions.value();
 
         deleteInnerSendTransactions(optOriginRes.value().acceessId);
         res.selfMeasuredCost = (long)optOriginRes.value().timeExecute;
 
         for (const auto& setters : optOriginRes.value().resp.results) {
-            ExecuteResult::SmartRes smartRes;
+            auto& smartRes = res.smartsRes.emplace_back(ExecuteResult::SmartRes{});
             smartRes.retValue       = setters.ret_val;
             smartRes.executionCost  = setters.executionCost;
             smartRes.response       = setters.status;
@@ -2622,20 +2627,20 @@ namespace executor {
             return {};
         }
 
-        const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
+        //const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
 
         // fill res
         ExecuteResult res;
         res.response = optOriginRes.value().resp.status;
 
-        if (optInnerTransactions.has_value())
-            res.trxns = optInnerTransactions.value();
+        //if (optInnerTransactions.has_value())
+        //    res.trxns = optInnerTransactions.value();
 
         deleteInnerSendTransactions(optOriginRes.value().acceessId);
         res.selfMeasuredCost = (long)optOriginRes.value().timeExecute;
 
         for (const auto& setters : optOriginRes.value().resp.results) {
-            ExecuteResult::SmartRes smartRes;
+            auto& smartRes = res.smartsRes.emplace_back(ExecuteResult::SmartRes{});
             smartRes.retValue = setters.ret_val;
             smartRes.executionCost = setters.executionCost;
             smartRes.response = setters.status;

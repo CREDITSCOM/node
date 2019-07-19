@@ -520,6 +520,69 @@ void Node::cleanConfirmationList(cs::RoundNumber rNum) {
     confirmationList_.remove(rNum);
 }
 
+void Node::sendStateRequest(cs::Sequence seq, uint32_t idx, cs::PublicKeys confidants) {//the function to be refactored
+    csmeta(csdebug) << "Sending StateRequest" << cs::RefFormatter{ seq, idx };
+    auto round = cs::Conveyer::instance().currentRoundNumber();
+    cs::Bytes message;
+    cs::DataStream stream(message);
+    stream << round << seq << idx;
+    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+
+    sendToList(confidants, cs::ConfidantConsts::InvalidConfidantIndex, MsgTypes::StateRequest, round, seq, idx, sig);
+}
+
+void Node::getStateRequest(const uint8_t * data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey & sender) {
+    csmeta(csdebug) << "Getting StateRequest from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    istream_.init(data, size);
+    cs::Sequence seq;
+    uint32_t idx;
+    cs::Signature signature;
+    istream_ >> seq >> idx >> signature;
+
+    if (!istream_.good() || !istream_.end()) {
+        cserror() << "NODE> Bad StateRequest packet format";
+        return;
+    }
+
+    cs::Bytes message;
+    cs::DataStream stream(message);
+    stream << rNum << seq << idx;
+    if (!cscrypto::verifySignature(signature, sender, message.data(), message.size())) {
+        csdebug() << "NODE> StateRequest Signature is incorrect";
+        return;
+    }
+
+    /*Place here the function call with (seq, idx, respondent = sender)*/
+}
+
+void Node::sendStateReply(const cs::PublicKey& respondent, const cs::Bytes state) {
+    csmeta(csdebug) << "Sending State to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
+    auto round = cs::Conveyer::instance().currentRoundNumber();
+    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), state.data(), state.size());
+
+    sendDefault(respondent, MsgTypes::StateReply, round, state, sig);
+}
+
+void Node::getStateReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+    csmeta(csdebug) << "Getting State from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    istream_.init(data, size);
+    cs::Bytes state;
+    cs::Signature signature;
+    istream_ >> state >> signature;
+
+    if (!istream_.good() || !istream_.end()) {
+        cserror() << "NODE> Bad State packet format";
+        return;
+    }
+
+    if (!cscrypto::verifySignature(signature, sender, state.data(), state.size())) {
+        csdebug() << "NODE> State Signature is incorrect";
+        return;
+    }
+
+    /*Place here the function call with (state)*/
+}
+
 cs::ConfidantsKeys Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber) const {
     csmeta(csdebug);
 
@@ -896,6 +959,8 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         case MsgTypes::RejectedContracts:
         case MsgTypes::RoundPackRequest:
         case MsgTypes::EmptyRoundPack:
+        case MsgTypes::StateRequest:
+        case MsgTypes::StateReply:
             return MessageActions::Process;
 
         default:

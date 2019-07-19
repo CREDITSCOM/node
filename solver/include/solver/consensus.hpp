@@ -35,7 +35,7 @@ public:
     constexpr static csdb::Amount MinStakeValue = csdb::Amount{50000};
 
     /** @brief   The round when DPOS starts working */
-    constexpr static uint64_t StartingDPOS = 10'000ULL;
+    constexpr static uint64_t StartingDPOS = 1'000'000ULL;
 
     /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
     constexpr static uint8_t GeneralNotSelected = 100;
@@ -75,4 +75,8 @@ public:
 
     /** @brief True to disable, false to enable the trusted request to become trusted next round again */
     constexpr static bool DisableTrustedRequestNextRound = false;
+
+    /** The max contract's state size in bytes to synchronize it between node via conveyer. Otherwise, every node must get new state
+    itself or make individual request to dedicated trusted nodes*/
+    constexpr static size_t MaxContractStateSizeToSync = 8192;
 };
