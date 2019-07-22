@@ -2357,8 +2357,7 @@ namespace executor {
     }
 
     std::optional<Executor::ExecuteResult> Executor::executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {
-        static std::mutex mutex;
-        std::lock_guard lock(mutex);  // temporary solution
+        std::lock_guard lock(callExecutorLock_);  // temporary solution
 
         if (smarts.empty()) {
             return std::nullopt;
@@ -2519,8 +2518,7 @@ namespace executor {
     }
 
     std::optional<Executor::ExecuteResult> Executor::reexecuteContract(ExecuteTransactionInfo& contract, std::string forceContractState) {
-        static std::mutex mutex;
-        std::lock_guard lock(mutex);  // temporary solution
+        std::lock_guard lock(callExecutorLock_);  // temporary solution
 
         if (!contract.transaction.is_valid()) {
             return std::nullopt;
