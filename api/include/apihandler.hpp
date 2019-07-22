@@ -532,6 +532,9 @@ private:
     std::atomic_bool isConnect_{ false };
     std::atomic_bool requestStop_{ false };
     const uint16_t EXECUTOR_VERSION = 1;
+
+    // temporary solution?
+    std::mutex callExecutorLock_;
 };
 }  // namespace executor
 namespace apiexec {
