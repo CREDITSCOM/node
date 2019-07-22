@@ -777,12 +777,19 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     solver.send_wallet_transaction(send_transaction);
 
     if (deploy) {
-        auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) { 
+        std::string hashState;
+        auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) {
             if (!ss.condFlg)
                 return false;
             ss.condFlg = false;
+            hashState = ss.hash;
             return true;
         });
+        if (hashState.empty()) {
+            _return.status.code = ERROR_CODE;
+            _return.status.message = "new hash of state is empty!";
+            return;
+        }
         if (!resWait) {  // time is over
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
             return;
@@ -1062,6 +1069,9 @@ bool APIHandler::update_smart_caches(LongNamedType& locked_pending_smart_transac
                     auto hashStateInst(lockedReference(this->hashStateSL));
                     (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
                         auto newHash = tr.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();
+                        if (std::all_of(newHash.begin(), newHash.end(), [](char p) { return !p; }))
+                            newHash = "";
+
                         auto retVal  = tr.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();
                         return HashState{ newHash, retVal, newHash == oldHash.hash, true };
                     });
