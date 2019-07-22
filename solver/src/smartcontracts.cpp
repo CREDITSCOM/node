@@ -983,6 +983,12 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
     }
 }
 
+/*public*/
+void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
+    cs::Lock lock(public_access_lock);
+    on_read_block_impl(block, should_stop);
+}
+
 /*private*/
 void SmartContracts::on_store_block_impl(const csdb::Pool& block) {
     test_executor_availability();
@@ -1039,12 +1045,6 @@ void SmartContracts::on_store_block_impl(const csdb::Pool& block) {
     }
 
     test_exe_queue();
-}
-
-/*public*/
-void SmartContracts::on_read_block_impl(const csdb::Pool& block, bool* should_stop) {
-    cs::Lock lock(public_access_lock);
-    on_read_block_impl(block, should_stop);
 }
 
 /*private*/
