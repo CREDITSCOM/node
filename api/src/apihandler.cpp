@@ -779,21 +779,21 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     if (deploy) {
         std::string hashState;
         auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) {
+            hashState = ss.hash;
             if (!ss.condFlg)
                 return false;
-            ss.condFlg = false;
-            hashState = ss.hash;
+            ss.condFlg = false;         
             return true;
         });
-        if (hashState.empty()) {
-            _return.status.code = ERROR_CODE;
-            _return.status.message = "new hash of state is empty!";
-            return;
-        }
         if (!resWait) {  // time is over
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
             return;
         }
+        if (hashState.empty()) {
+            _return.status.code = ERROR_CODE;
+            _return.status.message = "new hash of state is empty!";
+            return;
+        }     
     }
     else {
         std::string hashState, retVal;
