@@ -261,6 +261,10 @@ public:
         return ptr_ != rhs.ptr_;
     }
 
+    bool operator==(const MemPtr& rhs) const {
+        return ptr_ == rhs.ptr_;
+    }
+
 private:
     MemPtr(MemRegion* region)
     : ptr_(region) {

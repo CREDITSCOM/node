@@ -111,7 +111,7 @@ public:
     void resetGrayList() {
         grayList_.clear();
     }
-
+    uint64_t lastTimeStamp();
     void uploadNewStates(std::vector<csdb::Transaction> newStates);
     cs::Bytes getRealTrusted();
     size_t trueStagesThree();
@@ -212,7 +212,7 @@ private:
     void handleTransitions(Event evt);
     bool stateCompleted(Result result);
 
-    std::string chooseTimeStamp();
+    std::string chooseTimeStamp(cs::Bytes mask);
 
     void spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& currentTimeStamp, cs::StageThree& st3);
 

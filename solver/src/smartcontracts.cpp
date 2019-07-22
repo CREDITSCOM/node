@@ -607,7 +607,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
                     execution->avail_fee -= execution->new_state_fee;  // reserve more fee for future new_state
                 }
             }
-            execution->consumed_fee += smart_round_fee(block);  // setup costs of initial round
+            execution->consumed_fee += smart_round_fee(block);  // setup costs of initial round, 0 actually
         }
     }
 
@@ -1214,7 +1214,7 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
                 continue;
             }
             // test out-of-fee in every execution item and cancel all jobs if any out-of-fee occurs
-            const auto add_fee = smart_round_fee(block);
+            const auto add_fee = smart_round_fee(block); // 0 actually
             for (auto& execution : item.executions) {
                 execution.consumed_fee += add_fee;
                 if (execution.avail_fee < execution.consumed_fee) {
@@ -1313,7 +1313,9 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
     auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
     info.transaction = transaction;
     info.sequence = data.contract_ref.sequence;
+    // data.executor_fee bring all available fee for future execution:
     info.feeLimit = data.executor_fee;
+    data.executor_fee = csdb::Amount(0);
     info.convention = executor::Executor::MethodNameConvention::Default;
     if (!is_smart(transaction)) {
         // the most frequent fast test
@@ -1720,8 +1722,7 @@ csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item, in
 
 // get & handle rejected transactions
 // the aim is
-//  - to store completed executions
-//  - repeat consensus for rejected executions fixing empty new_states
+//  - to perform consensus on successful + 1st rejected execution again
 //  - re-execute valid but "compromised" by rejected items executions
 void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_list) {
 
@@ -1747,7 +1748,7 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
             grouped_failed[item.first].emplace_back(item.second);
         }
 
-        for (const auto& [sequence, executions] : grouped_failed) {
+        for (auto& [sequence, executions] : grouped_failed) {
             if (executions.empty()) {
                 // actually impossible
                 continue;
@@ -1755,11 +1756,33 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
             for (auto n : executions) {
                 csdebug() << kLogPrefix << RefFormatter{ sequence, n } << " is rejected";
             }
+
             // to store newly created items:
             decltype(exe_queue) new_queue_items;
             auto it_queue = exe_queue.begin();
             while (it_queue != exe_queue.end()) {
                 if (it_queue->seq_enqueue == sequence) {
+                    // remove outdated executions (duplicated transaction is rejected)
+                    size_t cnt_ignored = executions.size();
+                    const auto it_state = known_contracts.find(it_queue->abs_addr);
+                    if (it_state != known_contracts.cend()) {
+                        const SmartContractRef& last_success_exe = it_state->second.ref_execute;
+                        if (last_success_exe.sequence == sequence) {
+                            executions.remove_if([=](uint16_t n) { return n <= last_success_exe.transaction; });
+                        }
+                    }
+                    cnt_ignored -= executions.size();
+                    if (cnt_ignored > 0) {
+                        csdebug() << kLogPrefix << cnt_ignored << " rejection(s) is/are not confirmed";
+                        if (executions.empty()) {
+                            // continue to next sequence
+                            break;
+                        }
+                        for (auto n : executions) {
+                            csdebug() << kLogPrefix << RefFormatter{ sequence, n } << " is confirmed to reject";
+                        }
+                    }
+
                     auto it_exe = it_queue->executions.begin();
                     while (it_exe != it_queue->executions.end()) {
                         if (std::find(executions.cbegin(), executions.cend(), it_exe->ref_start.transaction) != executions.cend()) {
@@ -1768,8 +1791,11 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                                 // has alredy done before
                                 break;
                             }
+
                             // it_exe here points to the first rejected call in multi-call
-                            // replace all rejected items with empty new state
+                            // replace this item result with empty new state
+                            // and re-execute all "compromised" items
+                            
                             std::vector<ExecutionItem> reject;
                             reject.emplace_back(*it_exe);
                             it_exe = it_queue->executions.erase(it_exe);
@@ -2195,13 +2221,14 @@ std::string SmartContracts::get_executed_method_name(const SmartContractRef& ref
     return std::string();
 }
 
-csdb::Amount SmartContracts::smart_round_fee(const csdb::Pool& block) {
+// currently not used
+csdb::Amount SmartContracts::smart_round_fee(const csdb::Pool& /*block*/) {
     csdb::Amount fee(0);
-    if (block.transactions_count() > 0) {
-        for (const auto& t : block.transactions()) {
-            fee += csdb::Amount(t.counted_fee().to_double());
-        }
-    }
+    //if (block.transactions_count() > 0) {
+    //    for (const auto& t : block.transactions()) {
+    //        fee += csdb::Amount(t.counted_fee().to_double());
+    //    }
+    //}
     return fee;
 }
 
@@ -2323,7 +2350,7 @@ bool SmartContracts::wait_until_executor(unsigned int test_freq) {
     return true;
 }
 
-void SmartContracts::net_request_contract_state(const csdb::Address& abs_addr) {
+void SmartContracts::net_request_contract_state(const csdb::Address& /*abs_addr*/) {
 }
 
 }  // namespace cs
