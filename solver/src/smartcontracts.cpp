@@ -968,9 +968,23 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
     return tr_state;
 }
 
+/*public*/
 void SmartContracts::on_store_block(const csdb::Pool& block) {
-    cs::Lock lock(public_access_lock);
+    cs::RoundNumber cur_round = Conveyer::instance().currentRoundNumber();
+    cs::Sequence last_block = bc.getLastSequence();
 
+    cs::Lock lock(public_access_lock);
+    if (cur_round > last_block && cur_round - last_block > 1) {
+        bool should_stop = false;
+        on_read_block_impl(block, &should_stop);
+    }
+    else {
+        on_store_block_impl(block);
+    }
+}
+
+/*private*/
+void SmartContracts::on_store_block_impl(const csdb::Pool& block) {
     test_executor_availability();
     test_exe_conditions(block);
     test_exe_queue();
@@ -1027,12 +1041,14 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
     test_exe_queue();
 }
 
-void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
+/*public*/
+void SmartContracts::on_read_block_impl(const csdb::Pool& block, bool* should_stop) {
     cs::Lock lock(public_access_lock);
+    on_read_block_impl(block, should_stop);
+}
 
-    // uncomment when exe_queue is updated during blocks reading on startup:
-    // test_exe_conditions(block);
-
+/*private*/
+void SmartContracts::on_read_block_impl(const csdb::Pool& block, bool* should_stop) {
     // control round-based timeout
     // assume block arrive in increasing sequence order
     while (!replenish_contract.empty()) {

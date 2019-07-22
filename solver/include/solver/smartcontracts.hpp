@@ -706,6 +706,29 @@ private:
      */
 
     csdb::Transaction get_actual_state(const csdb::Transaction& hashed_state);
+
+    /**
+     * called from public method on_store_block()
+     *
+     * @author  Alexander Avramenko
+     * @date    22.07.2019
+     *
+     * @param   block   The block.
+     */
+
+    void on_store_block_impl(const csdb::Pool& block);
+
+    /**
+     * called from public method on_read_block()
+     *
+     * @author  Alexander Avramenko
+     * @date    22.07.2019
+     *
+     * @param           block       The block.
+     * @param [in,out]  should_stop If non-null, true if should stop.
+     */
+
+    void on_read_block_impl(const csdb::Pool& block, bool* should_stop);
 };
 
 }  // namespace cs
