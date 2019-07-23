@@ -408,7 +408,7 @@ private:
     std::map<csdb::Address, StateItem> known_contracts;
 
     // contract replenish transactions stored during reading from DB on stratup
-    std::vector<SmartContractRef> replenish_contract;
+    std::vector<SmartContractRef> uncompleted_contracts;
 
     // specifies a one contract call
     struct ExecutionItem {
@@ -681,6 +681,7 @@ private:
     }
 
     void test_contracts_locks();
+    void test_uncompleted_contracts(cs::Sequence current_sequence);
 
     // returns 1 if any error
     uint64_t next_inner_id(const csdb::Address& addr) const;

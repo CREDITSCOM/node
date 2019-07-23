@@ -613,6 +613,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx) {
 
     update_status(*it, new_item.sequence, SmartContractStatus::Waiting);
     it->is_executor = contains_me(block.confidants());
+    uncompleted_contracts.emplace_back(new_item);
 }
 
 void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
@@ -1041,6 +1042,8 @@ void SmartContracts::on_store_block_impl(const csdb::Pool& block) {
     test_exe_conditions(block);
     test_exe_queue();
     test_contracts_locks();
+    // completely replaced with test_exe_conditions():
+    //test_uncompleted_contracts(block.sequence());
 
     // inspect transactions against smart contracts, raise special event on every item found:
     if (block.transactions_count() > 0) {
@@ -1052,10 +1055,10 @@ void SmartContracts::on_store_block_impl(const csdb::Pool& block) {
                 bool is_start = is_deploy ? false : this->is_start(tr);
                 if (is_deploy || is_start) {
                     if (is_deploy) {
-                        csdebug() << kLogPrefix << "deploy in block #" << block.sequence() << "." << tr_idx;
+                        csdebug() << kLogPrefix << "found deploy " << RefFormatter{ block.sequence(), uint32_t(tr_idx) };
                     }
                     else {
-                        csdebug() << kLogPrefix << "execute in block #" << block.sequence() << "." << tr_idx;
+                        csdebug() << kLogPrefix << "found execute " << RefFormatter{ block.sequence(), uint32_t(tr_idx) };
                     }
                     enqueue(block, tr_idx);
                 }
@@ -1097,18 +1100,7 @@ void SmartContracts::on_store_block_impl(const csdb::Pool& block) {
 void SmartContracts::on_read_block_impl(const csdb::Pool& block, bool* should_stop) {
     // control round-based timeout
     // assume block arrive in increasing sequence order
-    while (!replenish_contract.empty()) {
-        const auto it = replenish_contract.cbegin();
-        if (block.sequence() - it->sequence <= Consensus::MaxRoundsCancelContract) {
-            // no timeout yet
-            break;
-        }
-        csdb::Transaction t = get_transaction(*it);
-        if (t.is_valid()) {
-            emit signal_contract_timeout(t);
-        }
-        replenish_contract.erase(it);
-    }
+    test_uncompleted_contracts(block.sequence());
 
     if (block.transactions_count() > 0) {
         size_t tr_idx = 0;
@@ -1136,13 +1128,15 @@ void SmartContracts::on_read_block_impl(const csdb::Pool& block, bool* should_st
                             state.ref_deploy.hash = block.hash();
                             state.ref_deploy.sequence = block.sequence();
                             state.ref_deploy.transaction = tr_idx;
+                            uncompleted_contracts.emplace_back(state.ref_deploy);
                         }
                     }
                     else {
+                        // target is contract => execute or replenish
+                        uncompleted_contracts.emplace_back(block.hash(), block.sequence(), tr_idx);
                         if (!is_executable(tr)) {
                             // replenish smart contract
                             emit signal_payable_invoke(tr);
-                            replenish_contract.emplace_back(block.hash(), block.sequence(), tr_idx);
                         }
                     }
                 }
@@ -1203,6 +1197,14 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
                 else {
                     cserror() << kLogPrefix << "cannot handle {" << execution.ref_start.sequence << '.' << execution.ref_start.transaction
                         << "} execution timeout properly, starter transaction not found";
+                }
+                auto it_uncompleted = std::find(uncompleted_contracts.cbegin(), uncompleted_contracts.cend(),
+                    execution.ref_start);
+                if (it_uncompleted != uncompleted_contracts.cend()) {
+                    uncompleted_contracts.erase(it_uncompleted);
+                }
+                else {
+                    csdebug() << kLogPrefix << " (logic error) cannot find " << execution.ref_start << " in uncompleted contracts";
                 }
             }
             continue;
@@ -1908,6 +1910,16 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         return false;
     }
     SmartContractRef ref_start(fld);
+    if (!uncompleted_contracts.empty()) {
+        csdb::Transaction t_start = get_transaction(ref_start);
+        if (t_start.is_valid()) {
+            // handle replenish during startup reading
+            const auto it = std::find(uncompleted_contracts.cbegin(), uncompleted_contracts.cend(), ref_start);
+            if (it != uncompleted_contracts.cend()) {
+                uncompleted_contracts.erase(it);
+            }
+        }
+    }
 
     csdb::Address abs_addr = absolute_address(t.target());
     if (!abs_addr.is_valid()) {
@@ -2000,44 +2012,23 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
             if (deploy) {
                 item.ref_deploy = ref_start;
             }
-            item.ref_execute = ref_start;
         }
         else {
             // new_state after replenish contract transaction
-            if (reading_db) {
-                // handle replenish during startup reading
-                const auto it = std::find(replenish_contract.cbegin(), replenish_contract.cend(), ref_start);
-                if (it != replenish_contract.cend()) {
-                    replenish_contract.erase(it);
-                }
-                else {
-                    csdebug() << kLogPrefix << ref_start << " (error in blockchain) cannot find replenish transaction";
-                }
-            }
-            else {
+            if (!reading_db) {
                 // handle replenish from on-the-air blocks
                 if (!implements_payable(item.payable)) {
                     cserror() << kLogPrefix << "non-payable " << ref_start << " state is updated by replenish transaction";
                 }
             }
-            item.ref_execute = ref_start;
         }
+        item.ref_execute = ref_start;
 
         // emits signal
         contract_state_updated(t_state);
     }
     else {
         // state_value is empty - erase replenish_contract item if exists
-        if (!replenish_contract.empty()) {
-            csdb::Transaction t_start = get_transaction(ref_start);
-            if (t_start.is_valid()) {
-                // handle replenish during startup reading
-                const auto it = std::find(replenish_contract.cbegin(), replenish_contract.cend(), ref_start);
-                if (it != replenish_contract.cend()) {
-                    replenish_contract.erase(it);
-                }
-            }
-        }
         if (!reading_db) {
             std::string error_message("execution is failed");
             fld = t_state.user_field(new_state::RetVal);
@@ -2304,6 +2295,22 @@ void SmartContracts::test_contracts_locks() {
             item.second.is_locked = false;
             csdebug() << kLogPrefix << "find locked contract " << to_base58(item.first) << " which is not executed now, unlock";
         }
+    }
+}
+
+void SmartContracts::test_uncompleted_contracts(cs::Sequence current_sequence) {
+    while (!uncompleted_contracts.empty()) {
+        const auto it = uncompleted_contracts.cbegin();
+        if (current_sequence - it->sequence <= Consensus::MaxRoundsCancelContract) {
+            // no timeout yet
+            break;
+        }
+        csdb::Transaction t = get_transaction(*it);
+        if (t.is_valid()) {
+            emit signal_contract_timeout(t);
+        }
+        csdebug() << kLogPrefix << *it << " is finished with timeout";
+        uncompleted_contracts.erase(it);
     }
 }
 
