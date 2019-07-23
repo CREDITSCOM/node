@@ -249,11 +249,16 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithExecFee(const csdb::T
         cswarning() << __func__ << ": transaction is not new state";
         return;
     }
+    SmartContractRef smartRef(transaction.user_field(trx_uf::new_state::RefStart));
     if (isClosedSmart(transaction)) {
-        cserror() << "This transaction must be blocked in consensus";
+        cs::Sequence seq = 0;
+        csdb::Pool block = blockchain.loadBlock(transaction.id().pool_hash());
+        if (block.is_valid()) {
+            seq = block.sequence();
+        }
+        csdebug() << "WalletsCache: there was timeout for " << smartRef << " before, current block #" << seq << ", new_state must not be in blockchain";
         return;
     }
-    SmartContractRef smartRef(transaction.user_field(trx_uf::new_state::RefStart));
     if (!smartRef.is_valid()) {
         cserror() << __func__ << ": incorrect reference to starter transaction in new state";
         return;
@@ -328,7 +333,16 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
     else if (SmartContracts::is_new_state(tr)) {
         csdb::Transaction initTransaction = findSmartContractInitTrx(tr, blockchain);
         if (isClosedSmart(initTransaction)) {
-            cserror() << "This transaction must be blocked in consensus!";
+            csdb::Pool block = blockchain.loadBlock(tr.id().pool_hash());
+            csdb::UserField fld = tr.user_field(cs::trx_uf::new_state::RefStart);
+            if (block.is_valid() && fld.is_valid()) {
+                cs::Sequence seq = block.sequence();
+                cs::SmartContractRef ref_start(fld);
+                csdebug() << "WalletsCache: there was timeout for " << ref_start << " before, current block #" << seq << ", new_state must not be in blockchain";
+            }
+            else {
+                csdebug() << "WalletsCAche: transaction must be blocked in consensus, failed to discover current or start block";
+            }
             wallData.balance_ -= csdb::Amount(initTransaction.max_fee().to_double()) + csdb::Amount(initTransaction.counted_fee().to_double());
         }
         if (SmartContracts::is_executable(initTransaction)) {
