@@ -26,7 +26,7 @@ class Transaction;
 namespace cs {
 class WalletsIds;
 
-constexpr size_t InitialWalletsNum = 1 * 10 * 1024;
+constexpr size_t InitialWalletsNum = 1 * 24 * 1024;
 
 class WalletsCache {
 public:
