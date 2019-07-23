@@ -350,7 +350,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
         wallData_s.trxTail_.push(tr.innerID());
         cs::Bytes tmp;
         tmp.assign(wallData_s.address_.cbegin(), wallData_s.address_.cend());
-        csdebug() << "Wallets: innerID of (new_state) " << EncodeBase58(tmp) << " <- " << tr.innerID();
+        csdetails() << "Wallets: innerID of (new_state) " << EncodeBase58(tmp) << " <- " << tr.innerID();
 
 #ifdef MONITOR_NODE              
         wallData_s.lastTransaction_ = tr.id();
@@ -368,7 +368,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
         wallData.trxTail_.push(tr.innerID());
         cs::Bytes tmp;
         tmp.assign(wallData.address_.cbegin(), wallData.address_.cend());
-        csdebug() << "Wallets: innerID of " << EncodeBase58(tmp) << " <- " << tr.innerID();
+        csdetails() << "Wallets: innerID of " << EncodeBase58(tmp) << " <- " << tr.innerID();
 
 #ifdef MONITOR_NODE        
         setWalletTime(wallData.address_, tr.get_time());
