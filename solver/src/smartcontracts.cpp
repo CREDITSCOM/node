@@ -248,15 +248,15 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
     for (const auto& item : known_contracts) {
         const StateItem& val = item.second;
         if (val.state.empty()) {
-            cstrace() << kLogPrefix << "completely unsuccessful " << val.ref_deploy << " found, neither deployed, nor executed";
+            csdetails() << kLogPrefix << "completely unsuccessful " << val.ref_deploy << " found, neither deployed, nor executed";
         }
         if (!val.ref_deploy.is_valid()) {
-            cstrace() << kLogPrefix << "unsuccessfully deployed contract found";
+            csdetails() << kLogPrefix << "unsuccessfully deployed contract found";
         }
     }
 
     size_t new_cnt = known_contracts.size();
-    cslog() << kLogPrefix << "" << new_cnt << " smart contract states loaded";
+    csdebug() << kLogPrefix << "" << new_cnt << " smart contract states loaded";
     if (cnt > new_cnt) {
         cslog() << kLogPrefix << "" << cnt - new_cnt << " smart contract state(s) is/are optimizied out";
     }
@@ -1925,11 +1925,11 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         if (item.ref_execute.is_valid()) {
             if (item.ref_execute == ref_start) {
                 // as item.ref_execute is updated below in this method and only if dbcache_update() => true we can test it against duplicated update
-                csdebug() << kLogPrefix << "state of " << item.ref_execute << " is already actual, ignore duplicated update";
+                csdetails() << kLogPrefix << "state of " << item.ref_execute << " is already actual, ignore duplicated update";
                 return true;
             }
             if (ref_start < item.ref_execute) {
-                csdebug() << kLogPrefix << "state of " << item.ref_execute << " is newer than " << ref_start << ", ignore outdated update";
+                csdetails() << kLogPrefix << "state of " << item.ref_execute << " is newer than " << ref_start << ", ignore outdated update";
                 return true;
             }
         }
@@ -1967,24 +1967,39 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         // create or get contract state item
         StateItem& item = known_contracts[abs_addr];
         // update state value in cache
-        if (!dbcache_update(abs_addr, ref_start, state_value, reading_db)) {
-            // unable to allow cache not to be updated
-            cserror() << kLogPrefix << "failed to update " << ref_start << " state in cache";
-            //this->execution_allowed = false;
-            return false;
+        if (!dbcache_update(abs_addr, ref_start, state_value, false /*force_update*/)) {
+            if (reading_db) {
+                // update state in memory cache
+                std::string state_from_db;
+                SmartContractRef ref_from_db;
+                if (dbcache_read(abs_addr, ref_from_db /*output*/, state_from_db /*output*/)) {
+                    if (ref_from_db == ref_start) {
+                        csdebug() << kLogPrefix << to_base58(abs_addr) << " state after " << ref_start << " has reached cache in DB";
+                    }
+                    else {
+                        csdetails() << kLogPrefix << to_base58(abs_addr) << " state after " << ref_start << " is overridden by " << item.ref_execute << " in DB";
+                    }
+                }
+            }
+            else {
+                // unable to allow cache not to be updated
+                cserror() << kLogPrefix << "failed to update " << ref_start << " state in cache";
+                //this->execution_allowed = false;
+                return false;
+            }
         }
         else {
-            csdebug() << kLogPrefix << ref_start << " state is updated in cache";
+            csdebug() << kLogPrefix << ref_start << " state is updated in DB";
         }
 
         // there is only one place to update state in "memory cache" and only after successful dbcache_update()!!!
         item.state = std::move(state_value);
         // determine it is the result of whether deploy or execute
         if (!replenish) {
+            // deploy is execute also
             if (deploy) {
                 item.ref_deploy = ref_start;
             }
-            // deploy is execute also
             item.ref_execute = ref_start;
         }
         else {
@@ -2311,16 +2326,15 @@ bool SmartContracts::dbcache_update(const csdb::Address& abs_addr, const SmartCo
             SmartContractRef current_ref;
             stream >> current_ref.sequence >> current_ref.transaction;
             if (current_ref.sequence > ref_start.sequence) {
-                cswarning() << kLogPrefix << "current contract state is from block " << current_ref.sequence
-                    << ", cannot update it by block " << ref_start.sequence;
+                csdetails() << kLogPrefix << "contract state from " << current_ref << " was stored, ignore " << ref_start;
                 return false;
             }
             if (current_ref.sequence == ref_start.sequence && current_ref.transaction >= ref_start.transaction) {
                 if (current_ref.transaction == ref_start.transaction) {
-                    cswarning() << kLogPrefix << "conract state from " << ref_start << " has already been stored, ignore duplication";
+                    csdetails() << kLogPrefix << "conract state from " << ref_start << " has already been stored, ignore duplication";
                 }
                 else {
-                    cswarning() << kLogPrefix << "conract state from " << current_ref << " was stored, ignore " << ref_start;
+                    csdetails() << kLogPrefix << "conract state from " << current_ref << " was stored, ignore " << ref_start;
                 }
                 return false;
             }
