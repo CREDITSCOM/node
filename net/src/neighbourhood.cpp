@@ -69,6 +69,9 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
     int redirect_number;
     if (redirect_limit) {
         redirect_number = std::max(neighbors_redirect_min, static_cast<int>(neighbours_.size()) / 3 + 1);
+        if (redirect_number > neighbours_.size()) {
+            redirect_number = neighbours_.size();
+        }
     } else {
         redirect_number = neighbours_.size();
     }
