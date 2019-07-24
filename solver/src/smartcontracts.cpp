@@ -644,8 +644,9 @@ void SmartContracts::on_new_state(const csdb::Pool& block, size_t trx_idx) {
             }
             csdb::UserField fld_fee = new_state.user_field(trx_uf::new_state::Fee);
             if (fld_fee.is_valid()) {
-                csdebug() << kLogPrefix << "contract execution fee " << fld_fee.value<csdb::Amount>().to_double();
-                csdebug() << kLogPrefix << "contract new state fee " << new_state.counted_fee().to_double();
+                FormatRef ref{ block.sequence(), trx_idx };
+                csdebug() << kLogPrefix << ref << " execution fee " << fld_fee.value<csdb::Amount>().to_double();
+                csdebug() << kLogPrefix << ref << " new state fee " << new_state.counted_fee().to_double();
             }
         }
     }
@@ -658,13 +659,13 @@ void SmartContracts::test_exe_queue() {
     auto it = exe_queue.begin();
     while (it != exe_queue.end()) {
         if (it->status == SmartContractStatus::Closed) {
-            csdebug() << kLogPrefix << "finished {" << it->seq_enqueue << ".*} still in queue, remove it";
+            csdebug() << kLogPrefix << "finished " << FormatRef(it->seq_enqueue) << " still in queue, remove it";
             it = remove_from_queue(it);
             continue;
         }
         if (it->executions.empty()) {
             // the senseless item in the queue
-            csdebug() << kLogPrefix << "empty {" << it->seq_enqueue << ".*} in queue, remove it";
+            csdebug() << kLogPrefix << "empty " << FormatRef(it->seq_enqueue) << " in queue, remove it";
             it = remove_from_queue(it);
             continue;
         }
@@ -683,7 +684,7 @@ void SmartContracts::test_exe_queue() {
         // is locked:
         bool wait_until_unlock = false;
         if (is_locked(it->abs_addr)) {
-            csdebug() << kLogPrefix << '{' << it->seq_enqueue << ".*} still is locked, wait until unlocked";
+            csdebug() << kLogPrefix << FormatRef(it->seq_enqueue) << " still is locked, wait until unlocked";
             wait_until_unlock = true;
         }
         // is anyone of using locked:
@@ -691,8 +692,8 @@ void SmartContracts::test_exe_queue() {
             for (const auto& execution : it->executions) {
                 for (const auto& u : execution.uses) {
                     if (is_locked(absolute_address(u))) {
-                        csdebug() << kLogPrefix << "some contract using by {" << execution.ref_start.sequence << '.'
-                            << execution.ref_start.transaction << "} still is locked, wait until unlocked";
+                        csdebug() << kLogPrefix << "some contract using by "
+                            << FormatRef(execution.ref_start.sequence, execution.ref_start.transaction) << " still is locked, wait until unlocked";
                         wait_until_unlock = true;
                         break;
                     }
@@ -704,20 +705,20 @@ void SmartContracts::test_exe_queue() {
             continue;
         }
 
-        csdebug() << kLogPrefix << "set running status to {" << it->seq_enqueue << ".*} containing " << it->executions.size() << " jobs";
+        csdebug() << kLogPrefix << "set running status to " << FormatRef(it->seq_enqueue) << " containing " << it->executions.size() << " jobs";
         update_status(*it, bc.getLastSequence(), SmartContractStatus::Running);
         // call to executor only if is trusted relatively to this contract
         if (it->is_executor || force_execution) {
             // final decision to execute contract is here, based on executor availability
             if (it->is_executor && !execution_allowed && !test_executor_availability()) {
-                cslog() << kLogPrefix << "skip {" << it->seq_enqueue << ".*}, execution is not allowed (executor is not connected)";
+                cslog() << kLogPrefix << "skip " << FormatRef(it->seq_enqueue) << ", execution is not allowed (executor is not connected)";
                 it->is_executor = false;
                 // notify partners that unable to play trusted role
                 bool fake_sent = false;
                 const auto& confidants = pnode->retriveSmartConfidants(it->seq_enqueue);
                 for (auto itconf = confidants.cbegin(); itconf != confidants.cend(); ++itconf) {
                     if (std::equal(itconf->cbegin(), itconf->cend(), node_id.cbegin())) {
-                        cslog() << kLogPrefix << "unable to execute {" << it->seq_enqueue << ".*}, so send fake stage-1 & stage-2";
+                        cslog() << kLogPrefix << "unable to execute " << FormatRef(it->seq_enqueue) << ", so send fake stage-1 & stage-2";
                         cs::Byte own_conf_num = cs::Byte(itconf - confidants.cbegin());
                         // empty it->executions tested above, so it is safe to call to front()
                         const auto& ref_start = it->executions.front().ref_start;
@@ -729,16 +730,16 @@ void SmartContracts::test_exe_queue() {
                     }
                 }
                 if (!fake_sent) {
-                    cslog() << kLogPrefix << "unable to execute {" << it->seq_enqueue << ".*} and failed to send fake stage-1 & stage-2";
+                    cslog() << kLogPrefix << "unable to execute " << FormatRef(it->seq_enqueue) << " and failed to send fake stage-1 & stage-2";
                 }
             }
             else {
-                csdebug() << kLogPrefix << "execute {" << it->seq_enqueue << ".*} now";
+                csdebug() << kLogPrefix << "execute " << FormatRef(it->seq_enqueue) << " now";
                 execute_async(it->executions);
             }
         }
         else {
-            csdebug() << kLogPrefix << "skip {" << it->seq_enqueue << ".*} execution, not in trusted list";
+            csdebug() << kLogPrefix << "skip " << FormatRef(it->seq_enqueue) << " execution, not in trusted list";
         }
 
         ++it;
@@ -1055,10 +1056,10 @@ void SmartContracts::on_store_block_impl(const csdb::Pool& block) {
                 bool is_start = is_deploy ? false : this->is_start(tr);
                 if (is_deploy || is_start) {
                     if (is_deploy) {
-                        csdebug() << kLogPrefix << "found deploy " << RefFormatter{ block.sequence(), uint32_t(tr_idx) };
+                        csdebug() << kLogPrefix << "found deploy " << FormatRef(block.sequence(), uint32_t(tr_idx));
                     }
                     else {
-                        csdebug() << kLogPrefix << "found execute " << RefFormatter{ block.sequence(), uint32_t(tr_idx) };
+                        csdebug() << kLogPrefix << "found execute " << FormatRef(block.sequence(), uint32_t(tr_idx));
                     }
                     enqueue(block, tr_idx);
                 }
@@ -1185,9 +1186,9 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
         // smart is in executor or is under smart-consensus
 
         // unconditional timeout, actual for both Finished and Running items
-        if (seq > item.seq_start && seq - item.seq_start > Consensus::MaxRoundsCancelContract) {
-            cswarning() << kLogPrefix << '{' << item.seq_enqueue << ".*} is in queue over " << Consensus::MaxRoundsCancelContract
-                        << " blocks (from #" << item.seq_start << "), remove it without transaction";
+        if (seq > item.seq_start && seq - item.seq_start >= Consensus::MaxRoundsCancelContract) {
+            cswarning() << kLogPrefix << FormatRef(item.seq_enqueue) << " is in queue " << Consensus::MaxRoundsCancelContract
+                << " blocks (from #" << item.seq_start << "), remove it without transaction";
             update_status(item, seq, SmartContractStatus::Closed);
             for (const auto& execution : item.executions) {
                 csdb::Transaction starter = get_transaction(execution.ref_start);
@@ -1213,8 +1214,8 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
         if (item.status == SmartContractStatus::Running) {
             // test near-timeout:
             if (seq > item.seq_start && seq - item.seq_start > Consensus::MaxRoundsExecuteContract) {
-                cslog() << kLogPrefix << '{' << item.seq_enqueue << ".*} is in queue over " << Consensus::MaxRoundsExecuteContract
-                        << " blocks (from #" << item.seq_start << "), stop it";
+                cslog() << kLogPrefix << FormatRef(item.seq_enqueue) << " is in queue over " << Consensus::MaxRoundsExecuteContract
+                    << " blocks (from #" << item.seq_start << "), stop it";
                 if (item.is_executor) {
                     std::vector<SmartExecutionData> data_list;
                     for (const auto& execution : item.executions) {
@@ -1264,13 +1265,13 @@ void SmartContracts::test_exe_conditions(const csdb::Pool& block) {
 // return next element in queue
 SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts::queue_iterator it) {
     if (it != exe_queue.cend()) {
-        cslog() << kLogPrefix << "remove from queue completed item {" << it->seq_enqueue << ".*}";
+        cslog() << kLogPrefix << "remove from queue completed item " << FormatRef(it->seq_enqueue);
         for (const auto item : it->executions) {
             cslog() << "\t{" << item.ref_start.sequence << '.' << item.ref_start.transaction << "} " << print_executed_method(item.ref_start);
         }
         const cs::Sequence seq = bc.getLastSequence();
-        const cs::Sequence seq_cancel = it->seq_start + Consensus::MaxRoundsCancelContract + 1;
-        if (seq > it->seq_start + Consensus::MaxRoundsExecuteContract && seq < seq_cancel) {
+        const cs::Sequence seq_cancel = it->seq_start + Consensus::MaxRoundsCancelContract;
+        if (seq >= it->seq_start + Consensus::MaxRoundsExecuteContract && seq < seq_cancel) {
             cslog() << kLogPrefix << seq_cancel - seq << " round(s) remains until unconditional timeout";
         }
         // its too early to unlock contract(s), wait until states will updated
@@ -1761,7 +1762,7 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
         csdebug() << kLogPrefix << "" << reject_list.size() << " contract(s) are rejected";
 
         // group reject_list by block sequence
-        std::map< cs::Sequence, std::list<uint16_t> > grouped_failed;
+        std::map< cs::Sequence, std::list<uint32_t> > grouped_failed;
         for (const auto& item : reject_list) {
             grouped_failed[item.first].emplace_back(item.second);
         }
@@ -1772,7 +1773,7 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                 continue;
             }
             for (auto n : executions) {
-                csdebug() << kLogPrefix << RefFormatter{ sequence, n } << " is rejected";
+                csdebug() << kLogPrefix << FormatRef(sequence, n) << " is rejected";
             }
 
             // to store newly created items:
@@ -1797,7 +1798,7 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                             break;
                         }
                         for (auto n : executions) {
-                            csdebug() << kLogPrefix << RefFormatter{ sequence, n } << " is confirmed to reject";
+                            csdebug() << kLogPrefix << FormatRef(sequence, n) << " is confirmed to reject";
                         }
                     }
 
@@ -2260,20 +2261,20 @@ void SmartContracts::update_status(QueueItem& item, cs::RoundNumber r, SmartCont
     switch (status) {
         case SmartContractStatus::Waiting:
             item.seq_enqueue = r;
-            csdebug() << kLogPrefix << '{' << item.seq_enqueue << ".*} is waiting from #" << r;
+            csdebug() << kLogPrefix << FormatRef(item.seq_enqueue) << " is waiting from #" << r;
             break;
         case SmartContractStatus::Running:
             item.seq_start = r;
             update_lock_status(item, true);
-            csdebug() << kLogPrefix << '{' << item.seq_enqueue << ".*} is running from #" << r;
+            csdebug() << kLogPrefix << FormatRef(item.seq_enqueue) << " is running from #" << r;
             break;
         case SmartContractStatus::Finished:
             item.seq_finish = r;
-            csdebug() << kLogPrefix << '{' << item.seq_enqueue << ".*} is finished on #" << r;
+            csdebug() << kLogPrefix << FormatRef(item.seq_enqueue) << " is finished on #" << r;
             break;
         case SmartContractStatus::Closed:
             update_lock_status(item, false);
-            csdebug() << kLogPrefix << '{' << item.seq_enqueue << ".*} is closed";
+            csdebug() << kLogPrefix << FormatRef(item.seq_enqueue) << " is closed";
             break;
         default:
             break;
@@ -2301,15 +2302,19 @@ void SmartContracts::test_contracts_locks() {
 void SmartContracts::test_uncompleted_contracts(cs::Sequence current_sequence) {
     while (!uncompleted_contracts.empty()) {
         const auto it = uncompleted_contracts.cbegin();
-        if (current_sequence - it->sequence <= Consensus::MaxRoundsCancelContract) {
+        if (current_sequence - it->sequence < Consensus::MaxRoundsCancelContract) {
             // no timeout yet
             break;
         }
         csdb::Transaction t = get_transaction(*it);
         if (t.is_valid()) {
+            const cs::SmartContractRef& ref = *it;
             emit signal_contract_timeout(t);
+            csdebug() << kLogPrefix << to_base58(t.target()) << ' ' << *it << " is finished with timeout on " << current_sequence;
         }
-        csdebug() << kLogPrefix << *it << " is finished with timeout";
+        else {
+            csdebug() << kLogPrefix << *it << " is finished with timeout on " << current_sequence;
+        }
         uncompleted_contracts.erase(it);
     }
 }

@@ -521,7 +521,7 @@ void Node::cleanConfirmationList(cs::RoundNumber rNum) {
 }
 
 void Node::sendStateRequest(cs::Sequence seq, uint32_t idx, cs::PublicKeys confidants) {//the function to be refactored
-    csmeta(csdebug) << "Sending StateRequest" << cs::RefFormatter{ seq, idx };
+    csmeta(csdebug) << "Sending StateRequest" << cs::FormatRef(seq, idx);
     auto round = cs::Conveyer::instance().currentRoundNumber();
     cs::Bytes message;
     cs::DataStream stream(message);
