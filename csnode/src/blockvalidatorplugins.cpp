@@ -432,7 +432,7 @@ ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Poo
             size_t idx = inprogress.front();
             if (idx <= all_transactions.size()) {
                 auto& item = all_transactions[idx];
-                if (seq > item.seq && seq - item.seq <= Consensus::MaxRoundsCancelContract) {
+                if (seq > item.seq && seq - item.seq < Consensus::MaxRoundsCancelContract) {
                     // no timeout yet
                     break;
                 }

@@ -26,7 +26,7 @@ class Transaction;
 namespace cs {
 class WalletsIds;
 
-constexpr size_t InitialWalletsNum = 1 * 512 * 1024;
+constexpr size_t InitialWalletsNum = 1 * 24 * 1024;
 
 class WalletsCache {
 public:
@@ -175,8 +175,8 @@ private:
     WalletsIds& walletsIds_;
     const csdb::Address genesisAddress_;
     const csdb::Address startAddress_;
-    std::list<csdb::Transaction> smartPayableTransactions_;
-    std::list<csdb::Transaction> closedSmarts_;
+    std::list<csdb::TransactionID> smartPayableTransactions_;
+    std::list<csdb::TransactionID> closedSmarts_;
 
 #ifdef MONITOR_NODE
     std::map<WalletData::Address, TrustedData> trusted_info_;

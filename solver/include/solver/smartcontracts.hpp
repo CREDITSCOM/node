@@ -94,6 +94,62 @@ namespace trx_uf {
     }
 }  // namespace trx_uf
 
+/**
+ * A format reference, helper to print {sequence,transaction} or {sequence.*}
+ *
+ * @author  Alexander Avramenko
+ * @date    24.07.2019
+ */
+
+struct FormatRef {
+    cs::Sequence seq;
+    uint32_t idx;
+
+    FormatRef(cs::Sequence s, uint32_t i)
+        : seq(s)
+        , idx(i)
+    {}
+
+    FormatRef(cs::Sequence s, size_t i)
+        : seq(s)
+        , idx(uint32_t(i))
+    {}
+
+    FormatRef(cs::Sequence s, uint16_t i)
+        : seq(s)
+        , idx(i)
+    {}
+
+    FormatRef(cs::Sequence s)
+        : seq(s)
+        , idx(std::numeric_limits<uint32_t>::max())
+    {}
+};
+
+/**
+ * Stream insertion operator, prints FormatRef to ostream as {*.*}
+ *
+ * @author  Alexander Avramenko
+ * @date    24.07.2019
+ *
+ * @param [in,out]  os      The operating system.
+ * @param           format  Describes the format to use.
+ *
+ * @returns The shifted result.
+ */
+
+inline std::ostream& operator<<(std::ostream& os, const FormatRef& format) {
+    os << '{' << WithDelimiters(format.seq) << '.';
+    if (format.idx != std::numeric_limits<uint32_t>::max()) {
+        os << format.idx;
+    }
+    else {
+        os << '*';
+    }
+    os << '}';
+    return os;
+}
+
 struct SmartContractRef {
     // block hash
     csdb::PoolHash hash;
@@ -135,7 +191,7 @@ struct SmartContractRef {
 };
 
 inline std::ostream& operator <<(std::ostream& os, const SmartContractRef& ref) {
-    os << '{' << ref.sequence << '.' << ref.transaction << '}';
+    os << FormatRef(ref.sequence, ref.transaction);
     return os;
 }
 
@@ -161,18 +217,6 @@ inline bool operator>(const SmartContractRef& l, const SmartContractRef& r) {
         return false;
     }
     return !(l < r) && !(l == r);
-}
-
-// helper to print <sequence,transaction>
-struct RefFormatter {
-    cs::Sequence seq;
-    uint32_t idx;
-};
-
-// print RefFormatter to ostream as {*.*}
-inline std::ostream& operator<<(std::ostream& os, const RefFormatter& format) {
-    os << '{' << format.seq << '.' << format.idx << '}';
-    return os;
 }
 
 struct SmartExecutionData {
@@ -408,7 +452,7 @@ private:
     std::map<csdb::Address, StateItem> known_contracts;
 
     // contract replenish transactions stored during reading from DB on stratup
-    std::vector<SmartContractRef> replenish_contract;
+    std::vector<SmartContractRef> uncompleted_contracts;
 
     // specifies a one contract call
     struct ExecutionItem {
@@ -681,6 +725,7 @@ private:
     }
 
     void test_contracts_locks();
+    void test_uncompleted_contracts(cs::Sequence current_sequence);
 
     // returns 1 if any error
     uint64_t next_inner_id(const csdb::Address& addr) const;
