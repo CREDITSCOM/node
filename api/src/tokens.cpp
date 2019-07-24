@@ -157,93 +157,38 @@ void executeAndCall(api::APIHandler* p_api, const general::Address& addr, const 
 void TokensMaster::refreshTokenState(const csdb::Address& token, const std::string& newState) {
     bool present = false;
     auto byteCodeObjects = api_->getSmartByteCode(token, present);
-    if (!present)
-        return;
-
-    const auto pk = token.public_key();
-    general::Address addr = std::string((char*)pk.data(), pk.size());
+    if (!present || byteCodeObjects.empty()) return;
 
     std::string name, symbol, totalSupply;
-
-    if (byteCodeObjects.empty())
-        return;
     csdb::Address deployer;
     {
         std::lock_guard<decltype(dataMut_)> l(dataMut_);
         deployer = tokens_[token].owner;
     }
+
+    general::Address addr   = std::string((char*)token.public_key().data(), token.public_key().size());
     general::Address dpAddr = std::string((char*)deployer.public_key().data(), deployer.public_key().size());
 
     executeAndCall<std::string>(api_, dpAddr, addr, byteCodeObjects, newState, "getName", std::vector<general::Variant>(),
                                 [&name](const std::string& newName) { name = newName.substr(0, 255); });
 
-    executeAndCall<std::string>(api_, dpAddr, addr, byteCodeObjects, newState, "getSymbol", std::vector<general::Variant>(), [&symbol](const std::string& newSymb) {
-        symbol.clear();
-
-        for (uint32_t i = 0; i < newSymb.size(); ++i) {
-            if (i >= 4)
-                break;
-            symbol.push_back((char)std::toupper(newSymb[i]));
-        }
-    });
-
     executeAndCall<std::string>(api_, dpAddr, addr, byteCodeObjects, newState, "totalSupply", std::vector<general::Variant>(),
-                                [&totalSupply](const std::string& newSupp) { totalSupply = tryExtractAmount(newSupp); });
+        [&totalSupply](const std::string& newSupp) { totalSupply = tryExtractAmount(newSupp); });
 
-    std::vector<csdb::Address> holders;
-
-    {
-        std::lock_guard<decltype(dataMut_)> l(dataMut_);
-        auto& t = tokens_[token];
-        t.name = name;
-        t.symbol = symbol;
-        t.totalSupply = totalSupply;
-
-        holders.reserve(t.holders.size());
-        for (auto& h : t.holders)
-            holders.push_back(h.first);
-    }
-
-    std::vector<std::vector<general::Variant>> holderKeysParams;
-    holderKeysParams.reserve(holders.size());
-    for (auto& h : holders) {
-        general::Variant var;
-        // var.__set_v_string('"' + EncodeBase58(h.public_key()) + '"');
-        auto key = h.public_key();
-        var.__set_v_string(EncodeBase58(cs::Bytes(key.begin(), key.end())));
-        holderKeysParams.push_back(std::vector<general::Variant>(1, var));
-    }
-
-    executor::ExecuteByteCodeMultipleResult result;
-    if (byteCodeObjects.empty())
-        return;
-
-    executor::SmartContractBinary smartContractBinary;
-    smartContractBinary.contractAddress = addr;
-    smartContractBinary.object.byteCodeObjects = byteCodeObjects;
-    smartContractBinary.object.instance = newState;
-    smartContractBinary.stateCanModify = 0;
-
-    api_->getExecutor().executeByteCodeMultiple(result, dpAddr, smartContractBinary, "balanceOf", holderKeysParams, 100, executor::Executor::kUseLastSequence);
-
-    if (!result.status.code && (result.results.size() == holders.size())) {
-        std::lock_guard<decltype(dataMut_)> l(dataMut_);
-        auto& t = tokens_[token];
-
-        for (uint32_t i = 0; i < holders.size(); ++i) {
-            const auto& res = result.results[i];
-            if (!res.status.code) {
-                auto& oldBalance = t.holders[holders[i]].balance;
-                // auto newBalance = tryExtractAmount('"' + getVariantAs<std::string>(res.ret_val) + '"');
-                auto newBalance = tryExtractAmount(getVariantAs<std::string>(res.ret_val));
-                if (isZeroAmount(newBalance) && !isZeroAmount(oldBalance))
-                    --t.realHoldersCount;
-                else if (isZeroAmount(oldBalance) && !isZeroAmount(newBalance))
-                    ++t.realHoldersCount;
-                oldBalance = newBalance;
+    executeAndCall<std::string>(api_, dpAddr, addr, byteCodeObjects, newState, "getSymbol", std::vector<general::Variant>(),
+        [&symbol](const std::string& newSymb) {
+            symbol.clear();
+            for (uint32_t i = 0; i < newSymb.size(); ++i) {
+                if (i >= 4) break;
+                symbol.push_back((char)std::toupper(newSymb[i]));
             }
-        }
-    }
+        });  
+
+    std::lock_guard<decltype(dataMut_)> l(dataMut_);
+    auto& t       = tokens_[token];
+    t.name        = name;
+    t.symbol      = symbol;
+    t.totalSupply = totalSupply;     
 }
 
 /* Call under data lock only */
@@ -355,6 +300,36 @@ void TokensMaster::run() {
                             csdb::Address regDude = tryGetRegisterData(ps.method, ps.params);
                             if (regDude.is_valid())
                                 initiateHolder(tIt->second, tIt->first, regDude);
+                        }
+
+                        // Balance update
+                        auto refreshBalance = [&](const csdb::Address& addrFrom, const  csdb::Address& addrTo, const std::string& amount) {
+                            auto& t = tokens_[st.first];
+
+                            // sender
+                            auto& currBalanceFrom = t.holders[addrFrom].balance;
+                            auto newBalance = std::to_string(stoi(currBalanceFrom) - stoi(amount));
+                            if (!isZeroAmount(currBalanceFrom) && isZeroAmount(newBalance))
+                                --t.realHoldersCount;
+                            currBalanceFrom = newBalance;
+
+                            //reciever
+                            auto& currBalanceTo = t.holders[addrTo].balance;
+                            newBalance = std::to_string(stoi(currBalanceTo) + stoi(amount));
+                            if (isZeroAmount(currBalanceTo) && !isZeroAmount(newBalance))
+                                ++t.realHoldersCount;
+                            currBalanceTo = newBalance;
+                        };
+
+                        if (ps.method == "transfer" && ps.params.size() == 2) {
+                            refreshBalance(ps.initiator,
+                                tryExtractPublicKey(ps.params[0].v_string),
+                                tryExtractAmount(ps.params[1].v_string));
+                        }
+                        else if (ps.method == "transferFrom" && ps.params.size() == 3) {
+                            refreshBalance(tryExtractPublicKey(ps.params[0].v_string),
+                                tryExtractPublicKey(ps.params[1].v_string),
+                                tryExtractAmount(ps.params[2].v_string));
                         }
                     }
                 }
