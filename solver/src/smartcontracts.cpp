@@ -1375,7 +1375,7 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
                         total_fee = fee::getExecutionFee(data.result.selfMeasuredCost);
                     }
 #endif
-                    if (total_fee > data.executor_fee) {
+                    if (total_fee > info.feeLimit) {
                         // out of fee detected
                         data.setError(error::OutOfFunds, "contract execution is out of funds");
                     }
