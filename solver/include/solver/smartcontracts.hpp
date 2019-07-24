@@ -793,6 +793,19 @@ private:
 
     void on_read_block_impl(const csdb::Pool& block, bool* should_stop);
 
+    /**
+     * Executes the next block action both while reading DB and assembling new blocks on-the-go
+     *
+     * @author  Alexander Avramenko
+     * @date    24.07.2019
+     *
+     * @param           block       The block.
+     * @param           reading_db  True to reading database.
+     * @param [in,out]  should_stop If non-null, true if should stop.
+     */
+
+    void on_next_block(const csdb::Pool& block, bool reading_db, bool* should_stop);
+
     // request correct state in network
     void net_request_contract_state(const csdb::Address& abs_addr);
 

@@ -1098,6 +1098,59 @@ void SmartContracts::on_store_block_impl(const csdb::Pool& block) {
 }
 
 /*private*/
+void SmartContracts::on_next_block(const csdb::Pool& block, bool reading_db, bool* should_stop) {
+
+    // inspect transactions against smart contracts, raise special event on every item found:
+    if (block.transactions_count() > 0) {
+        size_t tr_idx = 0;
+        for (const auto& tr : block.transactions()) {
+            if (is_smart_contract(tr)) {
+                //if(is_new_state(tr))
+                // dispatch transaction by its type
+                bool is_deploy = this->is_deploy(tr);
+                bool is_start = is_deploy ? false : this->is_start(tr);
+                if (is_deploy || is_start) {
+                    if (is_deploy) {
+                        csdebug() << kLogPrefix << "found deploy " << FormatRef(block.sequence(), uint32_t(tr_idx));
+                    }
+                    else {
+                        csdebug() << kLogPrefix << "found execute " << FormatRef(block.sequence(), uint32_t(tr_idx));
+                    }
+                    enqueue(block, tr_idx);
+                }
+                else if (is_new_state(tr)) {
+                    csdebug() << kLogPrefix << "new state in block #" << block.sequence() << "." << tr_idx;
+                    on_new_state(block, tr_idx);
+                }
+            }
+            else if (is_payable_target(tr)) {
+                // execute payable method
+                csdebug() << kLogPrefix << "contract replenish in block #" << block.sequence() << "." << tr_idx;
+                emit signal_payable_invoke(tr);
+                enqueue(block, tr_idx);
+            }
+            else {
+                // test is emitted by contract
+                csdb::Address abs_addr = absolute_address(tr.source());
+                const auto it = known_contracts.find(abs_addr);
+                if (it != known_contracts.cend()) {
+                    // is emitted by contract
+                    const auto& state = it->second;
+                    csdb::Transaction starter = get_transaction(state.ref_execute);
+                    if (starter.is_valid()) {
+                        emit signal_emitted_accepted(tr, starter);
+                    }
+                    else {
+                        cserror() << kLogPrefix << "failed to find starter transaction for contract emitted one";
+                    }
+                }
+            }
+            ++tr_idx;
+        }
+    }
+}
+
+/*private*/
 void SmartContracts::on_read_block_impl(const csdb::Pool& block, bool* should_stop) {
     // control round-based timeout
     // assume block arrive in increasing sequence order
@@ -1626,7 +1679,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                     }
                     // put subsequent new_states if any
                     if (execution_result.states.size() > 1) {
-                        csdebug() << kLogPrefix << "add " << execution_result.states.size()
+                        csdebug() << kLogPrefix << "add " << execution_result.states.size() - 1
                             << " subsequent new state(s) along with " << data_item.contract_ref << " state";
                         for (const auto& [addr, state] : execution_result.states) {
                             csdb::Address secondary_abs_addr = absolute_address(addr);
