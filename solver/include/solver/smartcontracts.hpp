@@ -354,10 +354,7 @@ public:
         return is_locked(absolute_address(addr));
     }
 
-    bool executionAllowed() const {
-        cs::Lock lock(public_access_lock);
-        return execution_allowed;
-    }
+    bool executionAllowed();
 
     // return true if SmartContracts provide special handling for transaction, so
     // the transaction is not pass through conveyer
@@ -603,7 +600,7 @@ private:
 
     SmartContractStatus get_smart_contract_status(const csdb::Address& addr) const;
 
-    void test_exe_queue();
+    void test_exe_queue(bool reading_db);
 
     // true if target of transaction is smart contract which implements payable() method
     bool is_payable_target(const csdb::Transaction& tr);
@@ -626,8 +623,6 @@ private:
     }
 
     void enqueue(const csdb::Pool& block, size_t trx_idx);
-
-    void on_new_state(const csdb::Pool& block, size_t trx_idx);
 
     // perform async execution via API to remote executor
     // returns false if execution is canceled
@@ -673,10 +668,6 @@ private:
 
     // calculates from block a one smart round costs
     csdb::Amount smart_round_fee(const csdb::Pool& block);
-
-    // tests max fee amount and round-based timeout on executed smart contracts;
-    // invoked after every new block appears in blockchain
-    void test_exe_conditions(const csdb::Pool& block);
 
     bool in_known_contracts(const csdb::Address& addr) const {
         return (known_contracts.find(absolute_address(addr)) != known_contracts.cend());
@@ -751,11 +742,12 @@ private:
      *
      * @param   test_period_sec Interval in seconds between tests &amp; outputs to console of
      *  diagnostic warning.
+     * @param   max_periods     (Optional) The maximum periods.
      *
      * @returns True if it succeeds, false if wait has stopped and executor is still unavailable.
      */
 
-    bool wait_until_executor(unsigned int test_period_sec);
+    bool wait_until_executor(unsigned int test_period_sec, unsigned int max_periods = std::numeric_limits<unsigned int>::max());
 
     /**
      * Gets transaction with actual state on basis of new_state transaction in blockchain
@@ -771,29 +763,6 @@ private:
     csdb::Transaction get_actual_state(const csdb::Transaction& hashed_state);
 
     /**
-     * called from public method on_store_block()
-     *
-     * @author  Alexander Avramenko
-     * @date    22.07.2019
-     *
-     * @param   block   The block.
-     */
-
-    void on_store_block_impl(const csdb::Pool& block);
-
-    /**
-     * called from public method on_read_block()
-     *
-     * @author  Alexander Avramenko
-     * @date    22.07.2019
-     *
-     * @param           block       The block.
-     * @param [in,out]  should_stop If non-null, true if should stop.
-     */
-
-    void on_read_block_impl(const csdb::Pool& block, bool* should_stop);
-
-    /**
      * Executes the next block action both while reading DB and assembling new blocks on-the-go
      *
      * @author  Alexander Avramenko
@@ -804,7 +773,7 @@ private:
      * @param [in,out]  should_stop If non-null, true if should stop.
      */
 
-    void on_next_block(const csdb::Pool& block, bool reading_db, bool* should_stop);
+    void on_next_block_impl(const csdb::Pool& block, bool reading_db, bool* should_stop);
 
     // request correct state in network
     void net_request_contract_state(const csdb::Address& abs_addr);
