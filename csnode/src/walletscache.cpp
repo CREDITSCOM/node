@@ -248,16 +248,6 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithExecFee(const csdb::T
         return;
     }
     SmartContractRef smartRef(transaction.user_field(trx_uf::new_state::RefStart));
-    if (isClosedSmart(transaction)) {
-        cs::Sequence seq = 0;
-        csdb::Pool block = blockchain.loadBlock(transaction.id().pool_hash());
-        if (block.is_valid()) {
-            seq = block.sequence();
-        }
-        csdebug() << "WalletsCache: (error in blockchain) timeout was detected for " << smartRef
-            << " before, current block #" << seq << ", new_state must not be in blockchain";
-        return;
-    }
     if (!smartRef.is_valid()) {
         cserror() << __func__ << ": incorrect reference to starter transaction in new state";
         return;
@@ -342,7 +332,10 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
             else {
                 csdebug() << "WalletsCache: (error in blockchain) transaction must be blocked in consensus, failed to discover current or start block";
             }
-            wallData.balance_ -= csdb::Amount(initTransaction.max_fee().to_double()) + csdb::Amount(initTransaction.counted_fee().to_double());
+            wallData.balance_ -= csdb::Amount(initTransaction.max_fee().to_double())
+                               + csdb::Amount(initTransaction.counted_fee().to_double())
+                               - initTransaction.amount();
+            checkClosedSmart(initTransaction);
         }
         if (SmartContracts::is_executable(initTransaction)) {
             wallData.balance_ += csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()) -
