@@ -222,6 +222,7 @@ public:
     csdb::PoolHash getLastHash() const;
     cs::Sequence getLastSequence() const;
     csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
+    cs::Sequence getSequenceByHash(const csdb::PoolHash&) const;
 
     // get inner data (from caches)
 

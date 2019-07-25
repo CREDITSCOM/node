@@ -556,6 +556,16 @@ csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
     return blockHashes_->find(seq);
 }
 
+cs::Sequence BlockChain::getSequenceByHash(const csdb::PoolHash& hash) const {
+    std::lock_guard lock(dbLock_);
+    
+    if (deferredBlock_.hash() == hash) {
+        return deferredBlock_.sequence();
+    }
+
+    return blockHashes_->find(hash);
+}
+
 uint64_t BlockChain::getWalletsCountWithBalance() {
     std::lock_guard lock(cacheMutex_);
 
