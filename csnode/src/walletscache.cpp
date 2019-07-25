@@ -131,7 +131,14 @@ void WalletsCache::ProcessorBase::rollbackExceededTimeoutContract(const csdb::Tr
     wallData.balance_ += transaction.amount() + csdb::Amount(transaction.max_fee().to_double()) - csdb::Amount(transaction.counted_fee().to_double());
 
     if (SmartContracts::is_executable(transaction)) {
-        data_.closedSmarts_.push_back(transaction.id());
+        auto it = data_.closedSmarts_.find(transaction.target());
+        if (it == data_.closedSmarts_.end()) {
+            data_.closedSmarts_.insert(std::make_pair(transaction.target(),
+                                       std::list<csdb::TransactionID>{transaction.id()}));
+        }
+        else {
+            it->second.push_back(transaction.id());
+        }
     }
     else {
         auto it = std::find(data_.smartPayableTransactions_.cbegin(), data_.smartPayableTransactions_.cend(), transaction.id());
@@ -335,8 +342,8 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
             wallData.balance_ -= csdb::Amount(initTransaction.max_fee().to_double())
                                + csdb::Amount(initTransaction.counted_fee().to_double())
                                - initTransaction.amount();
-            checkClosedSmart(initTransaction);
         }
+        checkClosedSmart(initTransaction, blockchain);
         if (SmartContracts::is_executable(initTransaction)) {
             wallData.balance_ += csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()) -
                                  csdb::Amount(tr.counted_fee().to_double()) - csdb::Amount(tr.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
@@ -390,13 +397,31 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 }
 
 bool WalletsCache::ProcessorBase::isClosedSmart(const csdb::Transaction& transaction) {
-    return (std::find(data_.closedSmarts_.cbegin(), data_.closedSmarts_.cend(), transaction.id()) != data_.closedSmarts_.cend());
+    auto it = data_.closedSmarts_.find(transaction.target());
+    if (it == data_.closedSmarts_.end()) {
+        return false;
+    }
+    return it->second.end() != std::find(it->second.begin(), it->second.end(), transaction.id());
 }
 
-void WalletsCache::ProcessorBase::checkClosedSmart(const csdb::Transaction& transaction) {
-    auto it = std::find(data_.closedSmarts_.cbegin(), data_.closedSmarts_.cend(), transaction.id());
-    if (it != data_.closedSmarts_.cend()) {
-        data_.closedSmarts_.erase(it);
+void WalletsCache::ProcessorBase::checkClosedSmart(const csdb::Transaction& transaction, const BlockChain& bc) {
+    auto it = data_.closedSmarts_.find(transaction.target());
+    if (it == data_.closedSmarts_.end()) {
+        return;
+    }
+    auto blockSeq = bc.getSequenceByHash(transaction.id().pool_hash());
+    if (blockSeq == 0) {
+        csdebug() << "WalletsCache : " << __func__ << " invalid block sequence";
+        return;
+    }
+    for (auto i = it->second.begin(); i != it->second.end(); ) {
+        if (bc.getSequenceByHash(i->pool_hash()) < blockSeq
+            || transaction.id() == *i) {
+            i = it->second.erase(i);
+        }
+        else {
+            ++i;
+        }
     }
 }
 

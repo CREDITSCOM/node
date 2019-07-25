@@ -99,7 +99,7 @@ private:
         void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx);
         void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction);
         bool isClosedSmart(const csdb::Transaction& transaction);
-        void checkClosedSmart(const csdb::Transaction& transaction);
+        void checkClosedSmart(const csdb::Transaction& transaction, const BlockChain&);
         void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction, const BlockChain& blockchain);
 
         /*#ifdef MONITOR_NODE
@@ -176,7 +176,7 @@ private:
     const csdb::Address genesisAddress_;
     const csdb::Address startAddress_;
     std::list<csdb::TransactionID> smartPayableTransactions_;
-    std::list<csdb::TransactionID> closedSmarts_;
+    std::map<csdb::Address, std::list<csdb::TransactionID>> closedSmarts_;
 
 #ifdef MONITOR_NODE
     std::map<WalletData::Address, TrustedData> trusted_info_;
