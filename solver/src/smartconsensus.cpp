@@ -86,7 +86,6 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             tmpNewState.set_innerID(tr.innerID());
             tmpNewState.set_max_fee(tr.max_fee());
 
-            tmpNewState.add_user_field(trx_uf::new_state::Count, tr.user_field(trx_uf::new_state::Count));
             tmpNewState.add_user_field(trx_uf::new_state::RefStart, tr.user_field(trx_uf::new_state::RefStart));
             tmpNewState.add_user_field(trx_uf::new_state::RetVal, tr.user_field(trx_uf::new_state::RetVal));
             //tmpNewState.add_user_field(trx_uf::new_state::Value, tr.user_field(trx_uf::new_state::Value));

@@ -1579,6 +1579,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                                 csdebug() << kLogPrefix << "set innerID = " << secondary_next_id << " in "
                                     << data_item.contract_ref << " secondary contract new_state";
                                 t.add_user_field(trx_uf::new_state::Value, state);
+                                t.add_user_field(trx_uf::new_state::RefStart, data_item.contract_ref.to_user_field());
                                 t.add_user_field(trx_uf::new_state::Fee, csdb::Amount(0));
                                 set_return_value(t, ::general::Variant{});
                                 packet.addTransaction(t);
