@@ -266,6 +266,9 @@ public:
      * \используется для входного параметра addr в виде id кошелька
      */
     bool get_from_blockchain(const Address& addr /*input*/, const int64_t& innerId /*input*/, Transaction& trx /*output*/) const;
+#ifdef TRANSACTIONS_INDEX
+    bool get_trx_from_blockchain(const Address& addr /*input*/, int64_t innerId /*input*/, Transaction& trx /*output*/) const;
+#endif
 
     /**
      * Gets contract data from storage.

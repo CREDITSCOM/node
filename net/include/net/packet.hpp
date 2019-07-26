@@ -224,7 +224,7 @@ public:
                 return boost::asio::buffer(dest, static_cast<size_t>(compressedSize) + headerSize);
             }
             else {
-                csdebug() << "Skipping packet compression, rawSize = " << sourceSize << ", compressedSize = " << compressedSize;
+                csdetails() << "Skipping packet compression, rawSize = " << sourceSize << ", compressedSize = " << compressedSize;
                 *source &= ~BaseFlags::Compressed;
             }
         }
