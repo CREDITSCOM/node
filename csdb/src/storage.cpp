@@ -638,6 +638,44 @@ Wallet Storage::wallet(const Address& addr) const {
     return Wallet::get(addr);
 }
 
+#ifdef TRANSACTIONS_INDEX
+static bool checkPool(const Pool& pool, const Address& addr,
+                      int64_t innerId, Transaction& trx) {
+    const auto& trxs = pool.transactions();
+    for (const auto& t : trxs) {
+        if (t.source() == addr && t.innerId() == innerId) {
+            trx = t;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Storage::get_trx_from_blockchain(const Address& addr, int64_t innerId,
+                                      Transaction& trx) const {
+    auto lastTrx = get_last_by_source(addr);
+    if (!lastTrx.is_valid()) {
+        return false;
+    }
+    if (lastTrx.innerID() == innerId) {
+        trx = lastTrx;
+        return true;
+    }
+
+    poolHash = lastTrx.id().pool_hash();
+    while (poolHash.is_valid()) {
+        if (checkPool(pool_load(poolHash), addr, innerId, trx)) {
+            return true;
+        }
+        poolHash = get_previous_transaction_block(Address, poolHash);
+        if (!poolHash.is_valid()) {
+            break;
+        }
+    }
+    return false;
+}
+#endif
+
 bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& innerId /*input*/, Transaction& trx /*output*/) const {
     Pool curPool;
     cs::Sequence curIdx = cs::numeric_cast<cs::Sequence>(innerId);
