@@ -1102,7 +1102,8 @@ bool APIHandler::update_smart_caches(LongNamedType& locked_pending_smart_transac
             cs::SmartContractRef scr(tr.user_field(cs::trx_uf::new_state::RefStart));
             csdb::TransactionID trId(scr.hash, scr.transaction);
 
-            auto execTrans = s_blockchain.loadTransaction(trId);
+            //auto execTrans = s_blockchain.loadTransaction(trId);
+            auto execTrans = s_blockchain.loadBlock(scr.sequence).transactions()[scr.transaction];
 
             if ((execTrans.is_valid() && is_smart(execTrans)) ||
                 execTrans.amount().to_double()) { // payable
