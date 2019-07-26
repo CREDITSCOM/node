@@ -84,6 +84,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             tmpNewState.set_counted_fee(tr.counted_fee());
             tmpNewState.set_currency(tr.currency());
             tmpNewState.set_innerID(tr.innerID());
+            tmpNewState.set_max_fee(tr.max_fee());
 
             tmpNewState.add_user_field(trx_uf::new_state::Count, tr.user_field(trx_uf::new_state::Count));
             tmpNewState.add_user_field(trx_uf::new_state::RefStart, tr.user_field(trx_uf::new_state::RefStart));
@@ -112,11 +113,11 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     }
 
     if (!newStates.empty()) {
-        finalStateTransaction_ = newStates.back();
+        finalStateTransaction_ = newStates;
     }
     else {
         csdebug() << kLogPrefix << "There is no state transactions in the package";
-        finalStateTransaction_ = lastEmptyNewState;
+        finalStateTransaction_.push_back(lastEmptyNewState);
     }
 
 
@@ -552,8 +553,7 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
     /*bool primary_new_state_found = false;*/
     size_t counter = 0;
     for (const auto& tr : currentSmartTransactionPack_.transactions()) {
-        if (/*!primary_new_state_found && */SmartContracts::is_new_state(tr)) {
-            /*primary_new_state_found = true;*/
+        if (SmartContracts::is_new_state(tr)) {
             tmpNewStates_[counter].add_user_field(trx_uf::new_state::Fee, finalFees[counter]);
             finalSmartTransactionPack_.addTransaction(tmpNewStates_[counter]);
             ++counter;
@@ -562,18 +562,21 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
             finalSmartTransactionPack_.addTransaction(tr);
         }
     }
-    size_t state_size = std::numeric_limits<size_t>::max();
-    csdb::UserField fld = finalStateTransaction_.user_field(cs::trx_uf::new_state::Value);
-    if (fld.is_valid()) {
-        std::string state = fld.value<std::string>();
-        state_size = state.size();
-    }
-    if (state_size <= Consensus::MaxContractStateSizeToSync) {
-        finalSmartTransactionPack_.addStateTransaction(finalStateTransaction_);
-        csdebug() << kLogPrefix << "contract state of size " << state_size << " included in package";
-    }
-    else {
-        csdebug() << kLogPrefix << "contract state is too large, size is " << state_size << "b, not included in package";
+    for(auto& it : finalStateTransaction_) {
+        size_t state_size = std::numeric_limits<size_t>::max();
+        csdb::UserField fld = it.user_field(cs::trx_uf::new_state::Value);
+        if (fld.is_valid()) {
+            std::string state = fld.value<std::string>();
+            state_size = state.size();
+
+        }
+        if (state_size <= Consensus::MaxContractStateSizeToSync) {
+            finalSmartTransactionPack_.addStateTransaction(it);
+            csdebug() << kLogPrefix << "contract state of size " << state_size << " included in package";
+        }
+        else {
+            csdebug() << kLogPrefix << "contract state is too large, size is " << state_size << "b, not included in package";
+        }
     }
     finalSmartTransactionPack_.makeHash();
 }
