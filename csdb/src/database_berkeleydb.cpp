@@ -145,25 +145,21 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
         }
     });
 
-#ifdef TRANSACTIONS_INDEX
-    auto db_trans_idx = new Db(&env_, 0);
-#endif
-
     if (!status) {
-        decltype(db_blocks_) db_blocks(new Db(&env_, 0));
+        auto db_blocks = new Db(&env_, 0);
         status = db_blocks->open(txn, "blockchain.db", NULL, DB_RECNO, DB_CREATE | DB_READ_UNCOMMITTED, 0);
-        db_blocks_.swap(db_blocks);
+        db_blocks_.reset(db_blocks);
     }
     if (!status) {
-        decltype(db_seq_no_) db_seq_no(new Db(&env_, 0));
+        auto db_seq_no = new Db(&env_, 0);
         status = db_seq_no->open(txn, "sequence.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
-        db_seq_no_.swap(db_seq_no);
+        db_seq_no_.reset(db_seq_no);
     }
     if (status == 0) {
         // until the explanation found suppress exceptions particularly on db close()
-        decltype(db_contracts_) db_contracts(new Db(&env_, 0/*DB_CXX_NO_EXCEPTIONS*/));
+        auto db_contracts = new Db(&env_, 0/*DB_CXX_NO_EXCEPTIONS*/);
         status = db_contracts->open(txn, "contracts.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
-        db_contracts_.swap(db_contracts);
+        db_contracts_.reset(db_contracts);
     }
     if (status) {
         set_last_error_from_berkeleydb(status);
@@ -171,6 +167,7 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
     }
 
 #ifdef TRANSACTIONS_INDEX
+    auto db_trans_idx = new Db(&env_, 0);
     status = db_trans_idx->open(NULL, "index.db", NULL, DB_BTREE, DB_CREATE, 0);
     if (status) {
         set_last_error_from_berkeleydb(status);
