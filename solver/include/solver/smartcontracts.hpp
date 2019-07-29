@@ -594,9 +594,9 @@ private:
     }
 
     // return next element in queue, the only exception is end() which returns unmodified
-    queue_iterator remove_from_queue(queue_iterator it);
+    queue_iterator remove_from_queue(queue_iterator it, bool reading_db);
 
-    void remove_from_queue(const SmartContractRef& item);
+    void remove_from_queue(const SmartContractRef& item, bool reading_db);
 
     SmartContractStatus get_smart_contract_status(const csdb::Address& addr) const;
 
@@ -622,7 +622,7 @@ private:
         return SmartContracts::get_transaction(bc, contract);
     }
 
-    void enqueue(const csdb::Pool& block, size_t trx_idx);
+    void enqueue(const csdb::Pool& block, size_t trx_idx, bool reading_db);
 
     // perform async execution via API to remote executor
     // returns false if execution is canceled
@@ -682,15 +682,15 @@ private:
         return true;
     }
 
-    void update_lock_status(const csdb::Address& abs_addr, bool value);
+    void update_lock_status(const csdb::Address& abs_addr, bool value, bool reading_db);
 
-    void update_lock_status(const QueueItem& item, bool value) {
-        update_lock_status(item.abs_addr, value);
+    void update_lock_status(const QueueItem& item, bool value, bool reading_db) {
+        update_lock_status(item.abs_addr, value, reading_db);
         if (!item.executions.empty()) {
             for (const auto& execution : item.executions) {
                 if (!execution.uses.empty()) {
                     for (const auto& u : execution.uses) {
-                        update_lock_status(absolute_address(u), value);
+                        update_lock_status(absolute_address(u), value, reading_db);
                     }
                 }
             }
@@ -703,7 +703,7 @@ private:
 
     // exe_queue item modifiers
 
-    void update_status(QueueItem& item, cs::RoundNumber r, SmartContractStatus status);
+    void update_status(QueueItem& item, cs::RoundNumber r, SmartContractStatus status, bool reading_db);
 
     bool start_consensus(QueueItem& item, const cs::TransactionsPacket& pack) {
         // if re-run consensus
