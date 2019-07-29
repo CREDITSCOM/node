@@ -41,14 +41,17 @@ const cs::SmartContracts* ValidationPlugin::getSmartContracts() const {
 ValidationPlugin::ErrorType
 SmartStateValidator::validateBlock(const csdb::Pool& block) {
 
-    if (block.sequence() < 90728) {
-        // skip unable-to-validate contracts
-        return ErrorType::noError;
-    }
+    // CreditsNet has got known issues due to deprecated behavior in ancient times, so:
+    if (getBlockChain().uuid() == 11024959585341937636) {
+        if (block.sequence() < 90728) {
+            // skip unable-to-validate contracts
+            return ErrorType::noError;
+        }
 
-    if (block.sequence() < 3302505) {
-        // skip invalid contracts until first valid
-        return ErrorType::noError;
+        if (block.sequence() < 3302505) {
+            // skip invalid contracts until first valid
+            return ErrorType::noError;
+        }
     }
 
     const auto& transactions = block.transactions();
