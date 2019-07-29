@@ -423,6 +423,9 @@ void WalletsCache::ProcessorBase::checkClosedSmart(const csdb::Transaction& tran
             ++i;
         }
     }
+    if (it->second.empty()) {
+        data_.closedSmarts_.erase(it);
+    }
 }
 
 void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction) {
