@@ -224,7 +224,7 @@ public:
     Transaction get_last_by_target(Address target) const noexcept;
 
     // And now for something completely different
-    PoolHash get_previous_transaction_block(const Address&, const PoolHash&);
+    PoolHash get_previous_transaction_block(const Address&, const PoolHash&) const;
     void set_previous_transaction_block(const Address&, const PoolHash& currTransBlock, const PoolHash& prevTransBlock);
 
     /**

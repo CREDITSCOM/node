@@ -643,7 +643,7 @@ static bool checkPool(const Pool& pool, const Address& addr,
                       int64_t innerId, Transaction& trx) {
     const auto& trxs = pool.transactions();
     for (const auto& t : trxs) {
-        if (t.source() == addr && t.innerId() == innerId) {
+        if (t.source() == addr && t.innerID() == innerId) {
             trx = t;
             return true;
         }
@@ -662,15 +662,12 @@ bool Storage::get_trx_from_blockchain(const Address& addr, int64_t innerId,
         return true;
     }
 
-    poolHash = lastTrx.id().pool_hash();
-    while (poolHash.is_valid()) {
+    auto poolHash = lastTrx.id().pool_hash();
+    while (poolHash.is_empty()) {
         if (checkPool(pool_load(poolHash), addr, innerId, trx)) {
             return true;
         }
-        poolHash = get_previous_transaction_block(Address, poolHash);
-        if (!poolHash.is_valid()) {
-            break;
-        }
+        poolHash = get_previous_transaction_block(addr, poolHash);
     }
     return false;
 }
@@ -832,7 +829,7 @@ cs::Bytes Storage::get_trans_index_key(const Address& addr, const PoolHash& ph) 
     return os.buffer();
 }
 
-PoolHash Storage::get_previous_transaction_block(const Address& addr, const PoolHash& ph) {
+PoolHash Storage::get_previous_transaction_block(const Address& addr, const PoolHash& ph) const {
     PoolHash result;
 
     const auto key = get_trans_index_key(addr, ph);
