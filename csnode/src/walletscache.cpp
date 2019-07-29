@@ -333,11 +333,11 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
             if (block.is_valid() && fld.is_valid()) {
                 cs::Sequence seq = block.sequence();
                 cs::SmartContractRef ref_start(fld);
-                csdebug() << "WalletsCache: (error in blockchain) timeout was detected for " << ref_start
-                    << " before, current block #" << seq << ", new_state must not be in blockchain";
+                csdebug() << "WalletsCache: (deprecated behaviour) timeout was detected for " << ref_start
+                    << " before, new_state found in block " << WithDelimiters(seq);
             }
             else {
-                csdebug() << "WalletsCache: (error in blockchain) transaction must be blocked in consensus, failed to discover current or start block";
+                csdebug() << "WalletsCache: (error in blockchain) transaction must be blocked in consensus, failed to get current block or start block";
             }
             wallData.balance_ -= csdb::Amount(initTransaction.max_fee().to_double())
                                + csdb::Amount(initTransaction.counted_fee().to_double())
