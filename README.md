@@ -7,14 +7,15 @@
 [![Twitter](https://img.shields.io/twitter/follow/creditscom.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=creditscom)
 [![AGPL License](https://img.shields.io/github/license/CREDITSCOM/node.svg?color=green&label=License&style=plastic)](LICENSE)
 ![Version](https://img.shields.io/github/tag/CREDITSCOM/node.svg?label=Versoin&style=plastic)
+[![Build Status](http://89.111.33.166:8080/buildStatus/icon?job=lin-client-node&build=27)](http://89.111.33.166:8080/view/release-pipeline/job/lin-client-node/lastBuild/)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=CREDITSCOM_node&metric=alert_status)](https://sonarcloud.io/dashboard?id=CREDITSCOM_node)
 # Credits Node
 A node is a client-side application that is installed on the user equipment.
 The Node processes and stores transactions, executes and confirms smart contract rules requests processing from third-party systems and provides data when requested.
 Written on C++.
 
 ## Version
-Current node version 4.2.417.3
-
+Current node version 4.2.417.4
 
 <h2>What is Credits Node?</h2>
 <p>Credits Node is the main module that provide an opportunity to run a node and participate in CREDITS blockhain network. The node performs processing and storage of transactions, execution and confirmation of the terms of smart contracts, processing requests from third-party systems, and provides data upon request. Each node on the network has the same functionality.
@@ -28,10 +29,16 @@ The node consists of the following elements:</p>
 
 <h2>Build dependencies</h2>
 <ul>
-<li>Boost 1.68 and higher static prebuild, compiler with C++17 support</li>
-</ul>
+<li><a href="https://www.boost.org/users/history/version_1_68_0.html">Boost 1.68</a> or newest static prebuild</li>
+<li>Compiler with C++17 support</li>
+<li><a href="https://cmake.org/download/">Cmake 3.11</a> or newest</li>
+<li> Requirements fo building <a href="https://thrift.apache.org/docs/install/">Apache Thrift</a></li>
+<li><a href="https://github.com/jedisct1/libsodium">libsodium</a></li>
+<li>The building Berkeley DB distribution uses the Free Software Foundation's autoconf and libtool tools to build on UNIX platforms.</li>
 
-<h2>How to Build</h2>
+On Windows:<br/>
+
+It is necessary to run in the terminal, which sets the environment variables for building a Visual Studio project
 
 >```sh
 >git clone https://github.com/CREDITSCOM/node.git
@@ -40,7 +47,16 @@ The node consists of the following elements:</p>
 >mkdir build
 >cd build
 >cmake -DCMAKE_BUILD_TYPE=Release -A x64 ..
->make
+>cmake --build . --target ALL_BUILD --config Release
+On Linux:<br/>
+>```sh
+>git clone https://github.com/CREDITSCOM/node.git
+>cd node
+>git submodule update --init --recursive
+>mkdir build
+>cd build
+>cmake -DCMAKE_BUILD_TYPE=Release ..
+>make -j4
 
 <h2>System requirements:</h2>
 <h4>Minimum system requirements:</h4>
@@ -48,7 +64,7 @@ Operating system: Windows® 7 / Windows® 8 / Windows® 10 64-bit (with the last
 Processor (CPU): with frequency of 1 GHz (or faster) with PAE, NX and SSE2 support;
 Memory (RAM): 4 Gb
 HDD: 1 Tb
-Internet connection: 3 Mbit/s
+Internet connection: 3 Mbit/s.
 <h4>Recommended system requirements:</h4>
 
 Operating system: Windows® 7 / Windows® 8 / Windows® 10 64-bit (with the last update package)

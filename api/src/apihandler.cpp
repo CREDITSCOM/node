@@ -56,7 +56,7 @@ void APIHandler::run() {
     tm.run();  // Run this AFTER updating all the caches for maximal efficiency
 
     state_updater_running.test_and_set(std::memory_order_acquire);
-    state_updater = std::thread([this]() { state_updater_work_function(); });
+    //state_updater = std::thread([this]() { state_updater_work_function(); });
 }
 
 APIHandler::~APIHandler() {
@@ -930,8 +930,21 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
     return;
 }
 
-void APIHandler::store_block_slot(const csdb::Pool&) {
-    newBlockCv_.notify_all();
+void APIHandler::store_block_slot(const csdb::Pool& pool) {
+    //newBlockCv_.notify_all();
+    // call if any of contract-related transaction found
+    bool has_contracts = false;
+    if (pool.transactions_count() > 0) {
+        for (const auto t : pool.transactions()) {
+            if (is_smart(t) || is_smart_state(t)) {
+                has_contracts = true;
+                break;
+            }
+        }
+    }
+    if (has_contracts) {
+        update_smart_caches_slot(pool);
+    }
 }
 
 void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
@@ -1164,9 +1177,10 @@ void APIHandler::update_smart_caches_slot(const csdb::Pool& pool) {
             locked_pending_smart_transactions->queue.push(std::make_pair(pool.sequence(), tr));
         }
     }
-    // ignore return value
-    update_smart_caches<>(locked_pending_smart_transactions, false);
-
+    // ignore return value, call only if it has sense
+    if (!locked_pending_smart_transactions->queue.empty()) {
+        update_smart_caches<>(locked_pending_smart_transactions, false);
+    }
 }
 
 bool APIHandler::update_smart_caches_once(const csdb::PoolHash& start, bool init) {

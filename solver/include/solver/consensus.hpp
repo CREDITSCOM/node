@@ -35,7 +35,7 @@ public:
     constexpr static csdb::Amount MinStakeValue = csdb::Amount{50000};
 
     /** @brief   The round when DPOS starts working */
-    constexpr static uint64_t StartingDPOS = 1'000'000ULL;
+    constexpr static uint64_t StartingDPOS = 10'000ULL;
 
     /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
     constexpr static uint8_t GeneralNotSelected = 100;
