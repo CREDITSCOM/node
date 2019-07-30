@@ -196,7 +196,8 @@ public slots:
         this->walletsCacheUpdater_->invokeReplenishPayableContract(starter);
     }
     void onContractTimeout(const csdb::Transaction& starter) {
-        this->walletsCacheUpdater_->rollbackExceededTimeoutContract(starter);
+        cs::Sequence seq = getSequenceByHash(starter.id().pool_hash());
+        this->walletsCacheUpdater_->rollbackExceededTimeoutContract(starter, seq);
     }
     void onContractEmittedAccepted(const csdb::Transaction& emitted, const csdb::Transaction& starter) {
         this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter);
