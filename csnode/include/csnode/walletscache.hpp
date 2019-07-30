@@ -95,11 +95,11 @@ private:
         virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;
         virtual void setModified(WalletId id) = 0;
         void invokeReplenishPayableContract(const csdb::Transaction&);
-        void rollbackExceededTimeoutContract(const csdb::Transaction&, const csdb::Amount& execFee = 0);
+        void rollbackExceededTimeoutContract(const csdb::Transaction&, cs::Sequence sequence, const csdb::Amount& execFee = 0);
         void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx);
-        void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction);
-        bool isClosedSmart(const csdb::Transaction& transaction);
-        void checkClosedSmart(const csdb::Transaction& transaction, const BlockChain&);
+        void checkSmartWaitingForMoney(cs::Sequence init_sequence, const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction);
+        bool isClosedSmart(const csdb::Address& contract_addr, cs::Sequence seq, uint32_t tr_idx);
+        void checkClosedSmart(const csdb::Address& contract_addr, cs::Sequence seq, uint32_t tr_idx);
         void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction, const BlockChain& blockchain);
 
         /*#ifdef MONITOR_NODE
@@ -176,7 +176,8 @@ private:
     const csdb::Address genesisAddress_;
     const csdb::Address startAddress_;
     std::list<csdb::TransactionID> smartPayableTransactions_;
-    std::map<csdb::Address, std::list<csdb::TransactionID>> closedSmarts_;
+    using RefContractCall = std::pair< cs::Sequence, uint32_t >; // <Block, TransactionIndex>
+    std::map< csdb::Address, std::list<RefContractCall> > closedSmarts_;
 
 #ifdef MONITOR_NODE
     std::map<WalletData::Address, TrustedData> trusted_info_;
