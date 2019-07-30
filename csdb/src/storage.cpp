@@ -868,4 +868,23 @@ bool Storage::update_contract_data(const Address& abs_addr /*input*/, const cs::
     return d->db->updateContractData(bytes, data);
 }
 
+cs::Sequence Storage::pool_sequence(const PoolHash& hash) const {
+    cs::Sequence seq = std::numeric_limits<cs::Sequence>::max();
+    if (!isOpen()) {
+        d->set_last_error(NotOpen);
+        return seq;
+    }
+
+    if (hash.is_empty()) {
+        d->set_last_error(InvalidParameter, "%s: Empty hash passed", funcName());
+        return seq;
+    }
+
+    uint32_t tmp;
+    if (d->db->seq_no(hash.to_binary(), &tmp)) {
+        seq = tmp;
+    }
+    return seq;
+}
+
 }  // namespace csdb

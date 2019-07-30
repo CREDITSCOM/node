@@ -259,6 +259,29 @@ bool DatabaseBerkeleyDB::get(const cs::Bytes &key, cs::Bytes *value) {
     return true;
 }
 
+// sequnce from block hash
+bool DatabaseBerkeleyDB::seq_no(const cs::Bytes& key, uint32_t* value) {
+    if (value == nullptr) {
+        set_last_error(InvalidArgument);
+        return false;
+    }
+    if (!db_blocks_) {
+        set_last_error(NotOpen);
+        return false;
+    }
+
+    Dbt_copy<cs::Bytes> db_key(key);
+    Dbt_copy<uint32_t> db_seq_no;
+    int status = db_seq_no_->get(nullptr, &db_key, &db_seq_no, DB_READ_UNCOMMITTED);
+    if (status) {
+        set_last_error_from_berkeleydb(status);
+        return false;
+    }
+    
+    *value = *static_cast<uint32_t*>(db_seq_no.get_data());
+    return true;
+}
+
 bool DatabaseBerkeleyDB::get(const uint32_t seq_no, cs::Bytes *value) {
     if (!db_blocks_) {
         set_last_error(NotOpen);

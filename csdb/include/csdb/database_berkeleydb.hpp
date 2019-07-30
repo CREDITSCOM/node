@@ -33,6 +33,7 @@ private:
     bool get(const cs::Bytes& key, cs::Bytes* value) final;
     bool get(const uint32_t seq_no, cs::Bytes* value) final;
     bool remove(const cs::Bytes&) final;
+    bool seq_no(const cs::Bytes& key, uint32_t* value) final; // sequnce from block hash
     bool write_batch(const ItemList&) final;
     IteratorPtr new_iterator() final;
 

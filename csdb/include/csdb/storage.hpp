@@ -298,6 +298,16 @@ public:
 
     bool update_contract_data(const Address& abs_addr /*input*/, const cs::Bytes& data /*input*/) const;
 
+    /**
+     * Gets from database pool sequence by pool hash
+     *
+     * @param   hash    The pool hash.
+     *
+     * @returns Pool sequence of type cs::Sequence. If hash is not found in database returns std::numeric_limits<cs::Sequence>::max() value
+     */
+
+    cs::Sequence pool_sequence(const PoolHash& hash) const;
+
 public signals:
     const ReadBlockSignal& readBlockEvent() const;
 
