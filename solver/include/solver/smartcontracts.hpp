@@ -268,8 +268,8 @@ enum class SmartContractStatus
     Running,
     // execution is finished, waiting for new state transaction in blockchain, no more transaction emitting is allowed
     Finished,
-    // contract is closed, neither new_state nor emitting transactions are allowed, should be removed from queue
-    Closed
+    // contract is canceled, neither new_state nor emitting transactions are allowed, should be removed from queue
+    Canceled
 };
 
 // to inform subscribed slots on deploy/execute/replenish occur
@@ -341,7 +341,7 @@ public:
 
     bool is_closed_smart_contract(const csdb::Address& addr) const {
         cs::Lock lock(public_access_lock);
-        return get_smart_contract_status(addr) == SmartContractStatus::Closed;
+        return get_smart_contract_status(addr) == SmartContractStatus::Canceled;
     }
 
     bool is_known_smart_contract(const csdb::Address& addr) const {
@@ -439,6 +439,8 @@ private:
         SmartContractRef ref_deploy;
         // reference to last successful execution which state is stored by item, may be equal to ref_deploy
         SmartContractRef ref_execute;
+        // Reference to execution which state is cached in DB
+        SmartContractRef ref_cache;
         // current state which is result of last successful execution / deploy
         std::string state;
         // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
@@ -594,9 +596,9 @@ private:
     }
 
     // return next element in queue, the only exception is end() which returns unmodified
-    queue_iterator remove_from_queue(queue_iterator it, bool reading_db);
+    queue_iterator remove_from_queue(queue_iterator it, bool skip_log);
 
-    void remove_from_queue(const SmartContractRef& item, bool reading_db);
+    void remove_from_queue(const SmartContractRef& item, bool skip_log);
 
     SmartContractStatus get_smart_contract_status(const csdb::Address& addr) const;
 
@@ -622,7 +624,7 @@ private:
         return SmartContracts::get_transaction(bc, contract);
     }
 
-    void enqueue(const csdb::Pool& block, size_t trx_idx, bool reading_db);
+    void enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_log);
 
     // perform async execution via API to remote executor
     // returns false if execution is canceled
@@ -633,7 +635,7 @@ private:
     csdb::Transaction create_new_state(const ExecutionItem& queue_item, int64_t new_id);
 
     // update in contracts table appropriate item's state
-    bool update_contract_state(const csdb::Transaction& t, bool reading_db);
+    bool update_contract_state(const csdb::Transaction& t, bool skip_log);
 
     // get deploy info from cached deploy transaction reference
     std::optional<api::SmartContractInvocation> find_deploy_info(const csdb::Address& abs_addr) const;
@@ -657,7 +659,7 @@ private:
     bool execute(/*[in,out]*/ SmartExecutionData& data, bool validationMode);
 
     // blocking call
-    bool update_metadata(const api::SmartContractInvocation& contract, StateItem& state);
+    bool update_metadata(const api::SmartContractInvocation& contract, StateItem& state, bool skip_log);
 
     void add_uses_from(const csdb::Address& abs_addr, const std::string& method, std::vector<csdb::Address>& uses);
 
@@ -682,15 +684,15 @@ private:
         return true;
     }
 
-    void update_lock_status(const csdb::Address& abs_addr, bool value, bool reading_db);
+    void update_lock_status(const csdb::Address& abs_addr, bool value, bool skip_log);
 
-    void update_lock_status(const QueueItem& item, bool value, bool reading_db) {
-        update_lock_status(item.abs_addr, value, reading_db);
+    void update_lock_status(const QueueItem& item, bool value, bool skip_log) {
+        update_lock_status(item.abs_addr, value, skip_log);
         if (!item.executions.empty()) {
             for (const auto& execution : item.executions) {
                 if (!execution.uses.empty()) {
                     for (const auto& u : execution.uses) {
-                        update_lock_status(absolute_address(u), value, reading_db);
+                        update_lock_status(absolute_address(u), value, skip_log);
                     }
                 }
             }
@@ -703,7 +705,7 @@ private:
 
     // exe_queue item modifiers
 
-    void update_status(QueueItem& item, cs::RoundNumber r, SmartContractStatus status, bool reading_db);
+    void update_status(QueueItem& item, cs::RoundNumber r, SmartContractStatus status, bool skip_log);
 
     bool start_consensus(QueueItem& item, const cs::TransactionsPacket& pack) {
         // if re-run consensus
