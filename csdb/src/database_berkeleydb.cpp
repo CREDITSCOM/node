@@ -1,5 +1,6 @@
 #include <db_cxx.h>
 #include <cassert>
+#include <cstdio>
 #include <cstdlib>
 #include <exception>
 
@@ -70,6 +71,7 @@ DatabaseBerkeleyDB::DatabaseBerkeleyDB()
 , db_blocks_(nullptr)
 , db_seq_no_(nullptr)
 , db_contracts_(nullptr) {
+    logfile_thread_ = std::thread(&DatabaseBerkeleyDB::logfile_routine, this);
 }
 
 DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
@@ -85,7 +87,39 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
 #ifdef TRANSACTIONS_INDEX
     db_trans_idx_->close(0);
 #endif
+    if (logfile_thread_.joinable()) {
+        quit_ = true;
+        logfile_thread_.join();
+    }
     env_.close(0);
+}
+
+void DatabaseBerkeleyDB::logfile_routine() {
+    int cnt = 0;
+    /* Check once every 5 minutes. */
+    for (;; sleep(1)) {
+        if (quit_) break;
+        if (++cnt % 300 == 0) {
+            int ret;
+            char **begin, **list;
+            env_.txn_checkpoint(0, 0, DB_FORCE);
+
+            /* Get the list of log files. */
+            if (env_.log_archive(&list, DB_ARCH_ABS) != 0) {
+                continue;
+            }
+
+            /* Remove the log files. */
+            if (list != 0) {
+                for (begin = list; *list != NULL; ++list) {
+                    if ((ret = ::remove(*list)) != 0) {
+                        cslog() << "Can't remove " << *list << " error = " << ret;
+                    }
+                }
+                free(begin);
+            }
+        }
+    }
 }
 
 void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status) {

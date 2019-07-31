@@ -8,6 +8,7 @@
 
 #include <db_cxx.h>
 #include <memory>
+#include <thread>
 
 #include "csdb/database.hpp"
 
@@ -44,6 +45,8 @@ private:
     bool updateContractData(const cs::Bytes& key, const cs::Bytes& data) override;
     bool getContractData(const cs::Bytes& key, cs::Bytes& data) override;
 
+    void logfile_routine();
+
 private:
     class Iterator;
 
@@ -58,6 +61,8 @@ private:
 #ifdef TRANSACTIONS_INDEX
     std::unique_ptr<Db> db_trans_idx_;
 #endif
+    std::thread logfile_thread_;
+    bool quit_ = false;
 };
 
 }  // namespace csdb
