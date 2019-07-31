@@ -1252,7 +1252,7 @@ void SmartContracts::remove_from_queue(const SmartContractRef& item, bool skip_l
     for (queue_iterator it_older = exe_queue.begin(); it_older != it; ++it_older) {
         if (it_older->abs_addr == it->abs_addr) {
             csdebug() << kLogPrefix << to_base58(it->abs_addr) << ' ' << FormatRef(it_older->seq_enqueue)
-                << " is canceled by newer state of " << FormatRef(it->seq_enqueue);
+                << " is canceled by newer state after " << FormatRef(it->seq_enqueue) << " on " << WithDelimiters(seq);
             update_status(*it_older, seq, SmartContractStatus::Canceled, skip_log);
         }
     }
