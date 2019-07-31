@@ -71,7 +71,6 @@ DatabaseBerkeleyDB::DatabaseBerkeleyDB()
 , db_blocks_(nullptr)
 , db_seq_no_(nullptr)
 , db_contracts_(nullptr) {
-    logfile_thread_ = std::thread(&DatabaseBerkeleyDB::logfile_routine, this);
 }
 
 DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
@@ -209,6 +208,7 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
     }
     db_trans_idx_.reset(db_trans_idx);
 #endif
+    logfile_thread_ = std::thread(&DatabaseBerkeleyDB::logfile_routine, this);
 
     set_last_error();
     return true;
