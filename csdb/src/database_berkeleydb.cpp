@@ -97,7 +97,7 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
 void DatabaseBerkeleyDB::logfile_routine() {
     int cnt = 0;
     /* Check once every 5 minutes. */
-    for (;; sleep(1)) {
+    for (;; std::this_thread::sleep_for(std::chrono::seconds(1))) {
         if (quit_) break;
         if (++cnt % 300 == 0) {
             int ret;
