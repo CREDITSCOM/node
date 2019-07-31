@@ -91,6 +91,7 @@ namespace trx_uf {
     namespace ordinary {
         // no fields defined
         constexpr csdb::user_field_id_t Text = 1;
+        constexpr csdb::user_field_id_t UsedContracts = 2;
     }
 }  // namespace trx_uf
 
