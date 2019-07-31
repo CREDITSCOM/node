@@ -664,7 +664,16 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
     if (transaction.__isset.smartContract)
         trxn.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
     else if(!transaction.userFields.empty())
-        trxn.add_user_field(1, transaction.userFields);
+        trxn.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
+
+    // for payable
+    if (transaction.__isset.usedContracts && !transaction.usedContracts.empty() && !transaction.__isset.smartContract) {
+        std::string uf;
+        for (auto& addr : transaction.usedContracts) {
+            uf += addr;
+        }
+        trxn.add_user_field(cs::trx_uf::ordinary::UsedContracts, uf);
+    }
 
     // check money
     const auto source_addr = s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
