@@ -278,7 +278,7 @@ using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
 
 // to inform subscribed slots on deploy/execution/replenish completion or timeout
 // passes to every slot the "starter" transaction
-using SmartContractSignal = cs::Signal<void(const csdb::Transaction&)>;
+using SmartContractSignal = cs::Signal<void(const csdb::Transaction&, cs::Sequence)>;
 
 class SmartContracts final {
 public:
@@ -511,7 +511,7 @@ private:
 
 
         QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
-            : status(SmartContractStatus::Waiting)
+            : status(SmartContractStatus::Idle)
             , seq_enqueue(0)
             , seq_start(0)
             , seq_finish(0)
@@ -617,6 +617,8 @@ private:
 
 public:
     static csdb::Transaction get_transaction(const BlockChain& storage, const SmartContractRef& contract);
+
+    static csdb::Transaction get_transaction(const BlockChain& storage, const csdb::Transaction& state_transaction);
 
 private:
     // non-static variant

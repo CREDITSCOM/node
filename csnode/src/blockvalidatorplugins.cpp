@@ -333,9 +333,9 @@ Packets SmartSourceSignaturesValidator::grepNewStatesPacks(const Transactions& t
 }
 
 csdb::Transaction SmartSourceSignaturesValidator::switchCountedFee(const csdb::Transaction& t) {
-  auto initTrx = WalletsCache::findSmartContractInitTrx(t, getBlockChain());
+  csdb::Transaction initTrx = cs::SmartContracts::get_transaction(getBlockChain(), t);
   if (!initTrx.is_valid()) {
-    cserror() << kLogPrefix << " no init transaction for smart source transaction in blockchain";
+    cserror() << kLogPrefix << " no init transaction for smart state transaction in blockchain";
     return t;
   }
   csdb::Transaction res(t.innerID(), t.source(), t.target(), t.currency(), t.amount(), t.max_fee(),

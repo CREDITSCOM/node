@@ -414,6 +414,19 @@ csdb::Transaction SmartContracts::get_transaction(const BlockChain& storage, con
 }
 
 /*static*/
+csdb::Transaction SmartContracts::get_transaction(const BlockChain& storage, const csdb::Transaction& state_transaction) {
+    if (!SmartContracts::is_new_state(state_transaction)) {
+        return csdb::Transaction{};
+    }
+    csdb::UserField fld = state_transaction.user_field(trx_uf::new_state::RefStart);
+    if (!fld.is_valid()) {
+        return csdb::Transaction{};
+    }
+    SmartContractRef ref(fld);
+    return SmartContracts::get_transaction(storage, ref);
+}
+
+/*static*/
 std::string SmartContracts::get_contract_state(const BlockChain& storage, const csdb::Address& abs_addr) {
     SmartContractRef dummy;
     std::string state;
@@ -649,7 +662,7 @@ void SmartContracts::test_exe_queue(bool reading_db) {
             ++it;
             continue;
         }
-        // status: Waiting
+        // status: Waiting or Idle
 
         // is locked:
         bool wait_until_unlock = false;
@@ -1166,7 +1179,7 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
                 if (!reading_db) {
                     csdebug() << kLogPrefix << "found contract replenish " << FormatRef(block.sequence(), tr_idx);
                 }
-                emit signal_payable_invoke(tr);
+                emit signal_payable_invoke(tr, seq);
                 enqueue(block, tr_idx, reading_db);
             }
             else {
@@ -1238,6 +1251,8 @@ void SmartContracts::remove_from_queue(const SmartContractRef& item, bool skip_l
     cs::Sequence seq = bc.getLastSequence();
     for (queue_iterator it_older = exe_queue.begin(); it_older != it; ++it_older) {
         if (it_older->abs_addr == it->abs_addr) {
+            csdebug() << kLogPrefix << to_base58(it->abs_addr) << ' ' << FormatRef(it_older->seq_enqueue)
+                << " is canceled by newer state of " << FormatRef(it->seq_enqueue);
             update_status(*it_older, seq, SmartContractStatus::Canceled, skip_log);
         }
     }
@@ -2243,7 +2258,7 @@ void SmartContracts::update_status(QueueItem& item, cs::RoundNumber r, SmartCont
             for (const auto& execution : item.executions) {
                 csdb::Transaction t = get_transaction(execution.ref_start);
                 if (t.is_valid()) {
-                    emit signal_contract_timeout(t);
+                    emit signal_contract_timeout(t, r);
                     std::string extra_info;
                     if (execution.ref_start.sequence != item.seq_start) {
                         std::ostringstream os;
