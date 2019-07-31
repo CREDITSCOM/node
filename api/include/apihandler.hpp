@@ -394,16 +394,16 @@ public:
         return false;
     }
 
+    std::mutex mt;
+
     // equivalent access to the blockchain for api and other threads
     template<typename T, typename = std::enable_if_t<std::is_same_v<T, csdb::PoolHash> || std::is_same_v<T, cs::Sequence>>>
     csdb::Pool loadBlockApi(const T& p) const {
-        static std::mutex mt;
         std::lock_guard lk(mt);
         return blockchain_.loadBlock(p);
     }
 
     csdb::Transaction loadTransactionApi(const csdb::TransactionID& id) const {
-        static std::mutex mt;
         std::lock_guard lk(mt);
         return blockchain_.loadTransaction(id);
     }
