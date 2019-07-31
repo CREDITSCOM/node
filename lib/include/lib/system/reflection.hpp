@@ -4,6 +4,7 @@
 #include <utility>
 #include <string>
 #include <vector>
+#include <array>
 #include <type_traits>
 
 #define cswatch(x) cslog() << (#x) << " is " << (x)
@@ -47,6 +48,17 @@ struct IsPair<std::pair<T, A>> : std::true_type {};
 template <typename T>
 constexpr bool isPair() {
     return IsPair<T>::value;
+}
+
+template <typename T>
+struct IsArray : std::false_type {};
+
+template <typename T, size_t size>
+struct IsArray<std::array<T, size>> : std::true_type {};
+
+template <typename T>
+constexpr bool isArray() {
+    return IsArray<T>::value;
 }
 
 template <typename T>
