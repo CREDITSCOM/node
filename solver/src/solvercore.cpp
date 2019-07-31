@@ -235,7 +235,7 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
 
     std::list<double> stamps;
     double sx = 0, sx2 = 0;
-    double mean;
+    double mean = 0.0;
     int N = 0;
     for (auto& it : stageOneStorage) {
         if (!it.roundTimeStamp.empty() && mask[it.sender] != cs::ConfidantConsts::InvalidConfidantIndex) {

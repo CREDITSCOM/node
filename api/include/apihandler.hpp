@@ -398,7 +398,7 @@ public:
         return false;
     }
 
-    std::mutex mt;
+    mutable std::mutex mt;
 
     // equivalent access to the blockchain for api and other threads
     template<typename T, typename = std::enable_if_t<std::is_same_v<T, csdb::PoolHash> || std::is_same_v<T, cs::Sequence>>>
