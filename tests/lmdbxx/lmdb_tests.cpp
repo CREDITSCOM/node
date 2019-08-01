@@ -1,17 +1,11 @@
 #include "gtest/gtest.h"
 
-#ifdef __cpp_lib_filesystem
-#include <filesystem>
-namespace fs = std::filesystem;
-#else
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#endif
-
+#include <boost/filesystem.hpp>
 #include <lib/system/console.hpp>
 
 #include <lmdb.hpp>
 
+namespace fs = boost::filesystem;
 static const std::string dbPath = "./testdb";
 
 static void removePath(cs::Lmdb& db) {

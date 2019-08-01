@@ -1,17 +1,14 @@
 #include "lmdb.hpp"
 #include <iostream>
 
-#ifdef __cpp_lib_filesystem
-#include <filesystem>
-namespace fs = std::filesystem;
-#elif
-#include <experimental/filesystem>
-namespace fs = std::experimenta::filesystem
-#endif
+#include <boost/filesystem.hpp>
+#include <boost/system/error_code.hpp>
+
+namespace fs = boost::filesystem;
 
 cs::Lmdb::Lmdb(const std::string& path, const unsigned int flags) try : env_(lmdb::env::create(flags)), path_(path) {
     fs::path dbPath(path_);
-    std::error_code code;
+    boost::system::error_code code;
     const auto res = fs::is_directory(dbPath, code);
 
     if (!res) {
