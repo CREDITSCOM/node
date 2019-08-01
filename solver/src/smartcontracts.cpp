@@ -555,9 +555,9 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_
         }
     }
 
+    [[maybe_unused]] bool payable = false;
     if (it == exe_queue.end()) {
         // enqueue to end
-        [[maybe_unused]] bool payable = false;
         if (SmartContracts::is_deploy(t)) {
             // pre-register in known_contracts, metadata is not actual
             auto maybe_invoke_info = get_smart_contract_impl(t);
@@ -606,11 +606,41 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_
             const std::string method = get_executed_method_name(new_item);
             const size_t cnt_0 = execution->uses.size();
             add_uses_from(abs_addr, method, execution->uses);  // if failed, execution_allowed wil be set to false
+            // and from explicit uses from starter transaction (applicable to payable() calls)
+            size_t cnt_m = execution->uses.size();
+            csdb::UserField fld = t.user_field(cs::trx_uf::ordinary::UsedContracts);
+            if (fld.is_valid()) {
+                if (payable) {
+                    std::string extra_uses_list = fld.value<std::string>();
+                    if (!extra_uses_list.empty()) {
+                        auto total_size = extra_uses_list.size();
+                        for (size_t offset = 0; offset + cscrypto::kPublicKeySize <= total_size; offset += cscrypto::kPublicKeySize) {
+                            cs::PublicKey key;
+                            std::copy(extra_uses_list.data() + offset, extra_uses_list.data() + offset + cscrypto::kPublicKeySize, key.begin());
+                            execution->uses.emplace_back(csdb::Address::from_public_key(key));
+                        }
+                    }
+                }
+                else {
+                    csdebug() << kLogPrefix << "(logical error) explicit used contracts set for non-replenish call, or contract does not implement payable() method";
+                }
+            }
+
             const size_t cnt = execution->uses.size();
             if (cnt > 0) {
                 for (const auto& u : execution->uses) {
-                    if (!skip_log) {
-                        csdebug() << kLogPrefix << new_item << " uses " << to_base58(u);
+                    if (cnt_m > 0) {
+                        // added from metadata item
+                        --cnt_m;
+                        if (!skip_log) {
+                            csdebug() << kLogPrefix << new_item << " uses " << to_base58(u) << " from contract metadata";
+                        }
+                    }
+                    else {
+                        // explicitly added by replenish transaction
+                        if (!skip_log) {
+                            csdebug() << kLogPrefix << new_item << " uses " << to_base58(u) << " from replenish transaction";
+                        }
                     }
                     if (!in_known_contracts(u)) {
                         cslog() << kLogPrefix << "call to unknown contract declared in executing item, cancel " << new_item;
