@@ -1505,9 +1505,6 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
         return;
     }
 
-    // create (multi-)packet:
-    // new_state[0] + [ emitted_list[0] ] + [ susequent_state_list[0] ] + ... + new_state[n-1] + [ emitted_list[n-1] ] + [ subsequent_state_list[n-1] ]
-    cs::TransactionsPacket integral_packet;
     int64_t next_id = 0; // "lazy" initialization assumed
 
     for (const auto& data_item : data_list) {
@@ -1679,10 +1676,6 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                 }
             }
         }
-        // add all transactions to integral packet
-        for (const auto& t : packet.transactions()) {
-            integral_packet.addTransaction(t);
-        }
     }
 
     // 'it' already has tested
@@ -1691,13 +1684,36 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
         os << e.ref_start << ' ';
     }
     csdebug() << kLogPrefix << "starting " << os.str() << "consensus";
-    if (!it->is_executor || !start_consensus(*it, integral_packet)) {
+    if (!it->is_executor || !start_consensus(*it)) {
         cserror() << kLogPrefix << os.str() << "consensus is not started, remove item from queue";
         remove_from_queue(it, false/*skip_log*/);
     }
+}
+
+bool SmartContracts::start_consensus(QueueItem& item) {
+    if (item.executions.empty()) {
+        return false;
+    }
+    // create (multi-)packet:
+    // new_state[0] + [ emitted_list[0] ] + [ susequent_state_list[0] ] + ... + new_state[n-1] + [ emitted_list[n-1] ] + [ subsequent_state_list[n-1] ]
+    cs::TransactionsPacket integral_packet;
+    // add all transactions to integral packet
+    for (const auto& e : item.executions) {
+        for (const auto& t : e.result.transactions()) {
+            integral_packet.addTransaction(t);
+        }
+    }
+    // if re-run consensus
+    uint8_t run_counter = 0;
+    if (item.pconsensus) {
+        run_counter = item.pconsensus->runCounter() + 1;
+    }
+    item.pconsensus = std::make_unique<SmartConsensus>();
 
     // inform slots if any, packet does not contain smart consensus' data!
     emit signal_smart_executed(integral_packet);
+
+    return item.pconsensus->initSmartRound(integral_packet, run_counter, this->pnode, this);
 }
 
 uint64_t SmartContracts::next_inner_id(const csdb::Address& addr) const {
@@ -1773,10 +1789,11 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                 csdebug() << kLogPrefix << FormatRef(sequence, n) << " is rejected";
             }
 
-            // to store newly created items:
-            decltype(exe_queue) new_queue_items;
-            auto it_queue = exe_queue.begin();
-            while (it_queue != exe_queue.end()) {
+            for (auto it_queue = exe_queue.begin(); it_queue != exe_queue.end(); ) {
+                if (it_queue->is_rejected) {
+                    // has alredy done before
+                    break;
+                }
                 if (it_queue->seq_enqueue == sequence) {
                     // remove outdated executions (duplicated transaction is rejected)
                     size_t cnt_ignored = executions.size();
@@ -1799,78 +1816,47 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                         }
                     }
 
-                    auto it_exe = it_queue->executions.begin();
-                    while (it_exe != it_queue->executions.end()) {
+                    for (auto it_exe = it_queue->executions.begin(); it_exe != it_queue->executions.end(); ++it_exe) {
                         if (std::find(executions.cbegin(), executions.cend(), it_exe->ref_start.transaction) != executions.cend()) {
                             // found (maybe partially) rejected queue item
-                            if (it_queue->is_rejected) {
-                                // has alredy done before
-                                break;
-                            }
-
                             // it_exe here points to the first rejected call in multi-call
                             // replace this item result with empty new state
-                            // and re-execute all "compromised" items
-                            
-                            std::vector<ExecutionItem> reject;
-                            reject.emplace_back(*it_exe);
-                            it_exe = it_queue->executions.erase(it_exe);
-                            // schedule re-execution of subsequent non-rejected items
-                            std::vector<ExecutionItem> restart;
+                            // and re-execute all "compromised" subsequent items
+                            it_queue->is_rejected = true;
 
-                            // starting inner sub-cycle
-                            while (it_exe != it_queue->executions.end()) {
-                                if (std::find(executions.cbegin(), executions.cend(), it_exe->ref_start.transaction) != executions.cend()) {
-                                    // do not clear result, new_state is required
-                                    reject.emplace_back(*it_exe);
-                                }
-                                else {
-                                    // empty result pack required
-                                    it_exe->result.clear();
-                                    restart.emplace_back(*it_exe);
-                                }
-                                it_exe = it_queue->executions.erase(it_exe);
+                            // clear state of rejected execution
+                            if (it_exe->result.transactionsCount() > 0) {
+                                csdb::Transaction empty_new_state = it_exe->result.transactions().front().clone();
+                                using namespace trx_uf;
+                                empty_new_state.add_user_field(new_state::Value, std::string{});
+                                set_return_value(empty_new_state, error::ConsensusRejected);
+                                it_exe->result.clear();
+                                it_exe->result.addTransaction(empty_new_state);
                             }
 
-                            // it_exe now is equal to it_queue->executions.end(), do not use it!!!
-
-                            // finally create 1 otr 2 new queue items
-                            if (!reject.empty()) {
-                                QueueItem& new_rejected_item = new_queue_items.emplace_back(it_queue->fork());
-                                new_rejected_item.executions.assign(reject.cbegin(), reject.cend());
-                                update_status(new_rejected_item, current_sequence, SmartContractStatus::Finished, false /*skip_log*/);
-                                new_rejected_item.is_rejected = true;
-                                cs::TransactionsPacket integral_pack;
-                                for (auto& e : new_rejected_item.executions) {
-                                    for (auto& t : e.result.transactions()) {
-                                        // lookup proper new state, erase other transactions in result
-                                        if (SmartContracts::is_new_state(t) && SmartContracts::absolute_address(t.target()) == new_rejected_item.abs_addr) {
-                                            t.add_user_field(trx_uf::new_state::Value, std::string{});
-                                            set_return_value(t, error::ConsensusRejected);
-                                            integral_pack.addTransaction(t);
-                                            e.result.clear();
-                                            e.result.addTransaction(t);
-                                            break;
-                                        }
-                                    }
-                                }
-                                start_consensus(new_rejected_item, integral_pack);
-                            }
-                            if (!restart.empty()) {
-                                QueueItem& new_restart_item = new_queue_items.emplace_back(it_queue->fork());
-                                new_restart_item.executions.assign(restart.cbegin(), restart.cend());
+                            // schedule re-execution of subsequent non-rejected items if any, remove restarted executions from current it_queue
+                            size_t cnt_restart_items = it_queue->executions.end() - it_exe - 1;
+                            if (cnt_restart_items > 0) {
+                                QueueItem& new_restart_item = exe_queue.emplace_back(it_queue->fork());
+                                new_restart_item.executions.assign(it_exe + 1, it_queue->executions.end());
                                 update_status(new_restart_item, current_sequence, SmartContractStatus::Waiting, false /*skip_log*/);
+                                it_queue->executions.erase(it_exe + 1, it_queue->executions.end());
                             }
-                            csdebug() << kLogPrefix << "{" << sequence << "*.} is splitted onto " << it_queue->executions.size() << " completed + "
-                                << reject.size() << " rejected + " << restart.size() << " restart calls";
+
+                            csdebug() << kLogPrefix << FormatRef(sequence) << " is splitted onto "
+                                << it_queue->executions.size() << " completed + "
+                                << cnt_restart_items << " restarted calls";
+
                             break;
                         }
-                        if (it_exe == it_queue->executions.end()) {
-                            break;
-                        }
-                        ++it_exe;
+                    }
+    
+                    // finally, restart consensus on the queue item
+                    if (!start_consensus(*it_queue)) {
+                        cserror() << kLogPrefix << "failed to restart consensus on " << FormatRef(sequence);
                     }
                 }
+
                 if (it_queue->executions.empty()) {
                     // all jobs are rejected/restarted
                     it_queue = exe_queue.erase(it_queue);
@@ -1879,10 +1865,6 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                     break;
                 }
                 ++it_queue;
-            }
-            // add new items if any
-            if (!new_queue_items.empty()) {
-                exe_queue.insert(exe_queue.end(), new_queue_items.cbegin(), new_queue_items.cend());
             }
         }
     }

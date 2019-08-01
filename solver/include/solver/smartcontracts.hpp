@@ -710,15 +710,7 @@ private:
 
     void update_status(QueueItem& item, cs::RoundNumber r, SmartContractStatus status, bool skip_log);
 
-    bool start_consensus(QueueItem& item, const cs::TransactionsPacket& pack) {
-        // if re-run consensus
-        uint8_t run_counter = 0;
-        if (item.pconsensus) {
-            run_counter = item.pconsensus->runCounter() + 1;
-        }
-        item.pconsensus = std::make_unique<SmartConsensus>();
-        return item.pconsensus->initSmartRound(pack, run_counter, this->pnode, this);
-    }
+    bool start_consensus(QueueItem& item);
 
     void test_contracts_locks();
     void test_uncompleted_contracts(cs::Sequence current_sequence);
