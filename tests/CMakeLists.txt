@@ -4,3 +4,4 @@ find_package(Threads REQUIRED)
 
 add_subdirectory(lib_system)
 add_subdirectory(csnode)
+add_subdirectory(lmdbxx)
