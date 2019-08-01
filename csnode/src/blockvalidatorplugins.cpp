@@ -42,7 +42,7 @@ ValidationPlugin::ErrorType
 SmartStateValidator::validateBlock(const csdb::Pool& block) {
 
     // CreditsNet has got known issues due to deprecated behavior in ancient times, so:
-    if (getBlockChain().uuid() == 11024959585341937636) {
+    if (getBlockChain().uuid() == 11024959585341937636ULL) {
         if (block.sequence() < 90728) {
             // skip unable-to-validate contracts
             return ErrorType::noError;
