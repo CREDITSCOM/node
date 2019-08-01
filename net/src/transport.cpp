@@ -1221,6 +1221,9 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
     return true;
 }
 
+// Turn on testing blockchain ID in PING packets to prevent nodes from confuse alien ones
+//#define PING_WITH_BCHID
+
 void Transport::sendPingPack(const Connection& conn) {
     cs::Sequence seq = node_->getBlockChain().getLastSequence();
     cs::Lock lock(oLock_);
