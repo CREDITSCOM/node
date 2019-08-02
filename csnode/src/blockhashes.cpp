@@ -1,107 +1,119 @@
 #include <csnode/blockhashes.hpp>
+
 #include <cstring>
-#include <fstream>
+
 #include <lib/system/logger.hpp>
 
-namespace cs {
-BlockHashes::BlockHashes()
-: db_{}
-, isDbInited_(false) {
-}
+static const char* seqPath = "/seqdb";
+static const char* hashPath = "/hashdb";
 
-void BlockHashes::initStart() {
+namespace cs {
+BlockHashes::BlockHashes(const std::string& path)
+: db_{}
+, isDbInited_(false)
+, seqDb_(path + seqPath)
+, hashDb_(path + hashPath) {
+    initialization();
 }
 
 bool BlockHashes::initFromPrevBlock(csdb::Pool prevBlock) {
     cs::Sequence seq = prevBlock.sequence();
-    db_.last_ = seq;
+
     if (!isDbInited_) {
         db_.first_ = 0;
-        db_.last_ = seq;
-        hashes_.reserve(db_.last_ + 1);
         isDbInited_ = true;
     }
 
-    hashes_.emplace_back(prevBlock.hash());
+    auto hash = prevBlock.hash();
+
+    seqDb_.insert(seq, hash.to_binary());
+    hashDb_.insert(hash.to_binary(), seq);
+
+    db_.last_ = seq;
+
     return true;
-}
-
-void BlockHashes::initFinish() {
-    if (hashes_.size() >= 2) {
-        size_t lh = 0;
-        size_t rh = hashes_.size() - 1;
-        while (lh < rh) {
-            std::swap(hashes_[lh++], hashes_[rh--]);
-        }
-    }
-
-    for (const auto& hash : hashes_) {
-        cslog() << "READ> " << hash.to_string();
-    }
 }
 
 bool BlockHashes::loadNextBlock(csdb::Pool nextBlock) {
     cs::Sequence seq = nextBlock.sequence();
+
     if (!isDbInited_) {
         db_.first_ = 0;
-        db_.last_ = seq;
         isDbInited_ = true;
     }
     else if (seq <= db_.last_) {
-        csdebug() << __func__ << ": seq <= db_.last_";
+        csdebug() << csfunc() << ": seq <= db_.last_";
         return false;
     }
 
-    if (seq != hashes_.size()) {
-        csdebug() << __func__ << ": seq != hashes_.size()";
+    if (seq != seqDb_.size()) {
+        csdebug() << csfunc() << ": seq != hashes_.size()";
         return false;  // see BlockChain::putBlock
     }
 
-    hashes_.emplace_back(nextBlock.hash());
+    auto hash = nextBlock.hash();
+
+    seqDb_.insert(seq, hash.to_binary());
+    hashDb_.insert(hash.to_binary(), seq);
+
     db_.last_ = seq;
+
     return true;
 }
 
 csdb::PoolHash BlockHashes::find(cs::Sequence seq) const {
-    if (empty()) {
-        return csdb::PoolHash();
+    if (empty() || !seqDb_.isKeyExists(seq)) {
+        return csdb::PoolHash{};
     }
-    const auto& range = getDbStructure();
-    if (seq < range.first_ || range.last_ < seq) {
-        return csdb::PoolHash();
-    }
-    return hashes_[seq];
+
+    auto value = seqDb_.value<cs::Bytes>(seq);
+    return csdb::PoolHash::from_binary(std::move(value));
 }
 
 cs::Sequence BlockHashes::find(csdb::PoolHash hash) const {
-    const auto result = std::find(hashes_.cbegin(), hashes_.cend(), hash);
-
-    if (result != hashes_.cend()) {
-        return std::distance(hashes_.cbegin(), result);
+    if (empty() || !hashDb_.isKeyExists(hash.to_binary())) {
+        return cs::Sequence{};
     }
 
-    return 0;
+    return hashDb_.value<cs::Sequence>(hash.to_binary());
 }
 
 csdb::PoolHash BlockHashes::removeLast() {
-    if (hashes_.empty()) {
+    if (empty()) {
         return csdb::PoolHash{};
     }
-    const auto result = hashes_.back();
-    hashes_.pop_back();
+
+    auto pair = seqDb_.last<cs::Sequence, cs::Bytes>();
+
+    seqDb_.remove(pair.first);
+    hashDb_.remove(pair.second);
+
     --db_.last_;
-    return result;
+
+    return csdb::PoolHash::from_binary(std::move(pair.second));
 }
 
 csdb::PoolHash BlockHashes::getLast() const {
-    if (hashes_.empty()) {
+    if (empty()) {
         return csdb::PoolHash{};
     }
-    return hashes_.back();
+
+    auto pair = seqDb_.last<cs::Sequence, cs::Bytes>();
+    return csdb::PoolHash::from_binary(std::move(pair.second));
 }
 
-const std::vector<csdb::PoolHash>& BlockHashes::getHashes() const {
-    return hashes_;
+void BlockHashes::onDbFailed(const LmdbException& exception) {
+    cswarning() << csfunc() << ", block hashes database exception: " << exception.what();
 }
 
+void BlockHashes::initialization() {
+    cs::Connector::connect(&seqDb_.failed, this, &BlockHashes::onDbFailed);
+    cs::Connector::connect(&hashDb_.failed, this, &BlockHashes::onDbFailed);
+
+    seqDb_.setMapSize(cs::Lmdb::DefaultMapSize);
+    hashDb_.setMapSize(cs::Lmdb::DefaultMapSize);
+
+    seqDb_.open();
+    hashDb_.open();
+}
 }  // namespace cs
