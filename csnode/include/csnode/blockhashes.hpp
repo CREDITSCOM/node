@@ -2,7 +2,7 @@
 #define BLOCKHASHES_HPP
 
 #include <csdb/pool.hpp>
-#include <vector>
+#include <lmdb.hpp>
 
 namespace cs {
 class BlockHashes {
@@ -13,36 +13,40 @@ public:
     };
 
 public:
-    BlockHashes();
+    explicit BlockHashes(const std::string& path);
 
     const DbStructure& getDbStructure() const {
         return db_;
     }
 
     bool empty() const {
-        return hashes_.empty();
+        return size() == 0;
     }
 
-    void initStart();
+    size_t size() const {
+        return seqDb_.size();
+    }
+
     bool initFromPrevBlock(csdb::Pool prevBlock);
-    void initFinish();
     bool loadNextBlock(csdb::Pool nextBlock);
 
     csdb::PoolHash find(cs::Sequence seq) const;
-
     cs::Sequence find(csdb::PoolHash hash) const;
 
     csdb::PoolHash removeLast();
-
     csdb::PoolHash getLast() const;
 
-    const std::vector<csdb::PoolHash>& getHashes() const;
+private slots:
+    void onDbFailed(const cs::LmdbException& exception);
 
 private:
-    std::vector<csdb::PoolHash> hashes_;
+    void initialization();
 
     DbStructure db_;
     bool isDbInited_;
+
+    cs::Lmdb seqDb_;
+    cs::Lmdb hashDb_;
 };
 }  // namespace cs
 

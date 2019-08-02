@@ -13,11 +13,16 @@
 #include <csnode/nodeutils.hpp>
 #include <solver/smartcontracts.hpp>
 
+#include <boost/filesystem.hpp>
+
 #include <client/config.hpp>
 
 //#define RECREATE_INDEX
 
 using namespace cs;
+namespace fs = boost::filesystem;
+
+static const char* cashesPath = "./cashes";
 
 BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 : good_(false)
@@ -29,8 +34,11 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_() {
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
+
+    createCashesPath();
+
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
-    blockHashes_ = std::make_unique<cs::BlockHashes>();
+    blockHashes_ = std::make_unique<cs::BlockHashes>(cashesPath);
 }
 
 BlockChain::~BlockChain() {
@@ -382,8 +390,7 @@ void BlockChain::removeLastBlock() {
     else {
         csmeta(cserror) << "Error! Last pool hash mismatch";
         const auto findSequence = blockHashes_->find(poolHash);
-        const auto& bh = blockHashes_->getHashes();
-        csmeta(cserror) << "Block hashes size: " << bh.size() << ", Pool sequence: " << pool.sequence() << ", in Block hashes sequence: " << findSequence
+        csmeta(cserror) << "Block hashes size: " << blockHashes_->size() << ", Pool sequence: " << pool.sequence() << ", in Block hashes sequence: " << findSequence
                         << (findSequence != 0 ? "" : " (hash not found)");
         // if (findSequence == 0) {
         //  for (std::size_t i = 0; i < bh.size(); ++i) {
@@ -841,6 +848,16 @@ bool BlockChain::updateContractData(const csdb::Address& abs_addr, const cs::Byt
 bool BlockChain::getContractData(const csdb::Address& abs_addr, cs::Bytes& data) const {
     cs::Lock lock(dbLock_);
     return storage_.get_contract_data(abs_addr, data);
+}
+
+void BlockChain::createCashesPath() {
+    fs::path dbPath(cashesPath);
+    boost::system::error_code code;
+    const auto res = fs::is_directory(dbPath, code);
+
+    if (!res) {
+        fs::create_directory(dbPath);
+    }
 }
 
 bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
