@@ -74,6 +74,37 @@ TEST(Lmdbxx, InsertTrivial) {
     removePath(db);
 }
 
+TEST(Lmdbxx, LastPair) {
+    cs::Lmdb db(dbPath);
+    db.open();
+
+    std::string key1 = "Key10";
+    std::string value1 = "Value10";
+
+    db.insert(key1, value1);
+
+    {
+        auto [key, value] = db.last<std::string, std::string>();
+
+        ASSERT_TRUE(key == key1);
+        ASSERT_TRUE(value == value1);
+    }
+
+    std::string key2 = "Key2";
+    std::string value2 = "Value2";
+
+    db.insert(key2, value2);
+
+    {
+        auto [key, value] = db.last<std::string, std::string>();
+
+        ASSERT_TRUE(key == key2);
+        ASSERT_TRUE(value == value2);
+    }
+
+    removePath(db);
+}
+
 TEST(Lmdbxx, TestMappedSize) {
     cs::Lmdb db(dbPath);
     db.setMapSize(10);
