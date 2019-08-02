@@ -2,6 +2,7 @@
 #define LMDBXX_HPP
 
 #include <cassert>
+#include <charconv>
 
 #include <lmdbexception.hpp>
 
@@ -141,8 +142,11 @@ public:
     void insert(const Key& key, const Value& value,
                 const char* name = nullptr,
                 const unsigned int flags = lmdb::dbi::default_flags) {
-        insert(reinterpret_cast<const char*>(key.data()), key.size(),
-               reinterpret_cast<const char*>(value.data()), value.size(),
+        decltype(auto) k = cast(key);
+        decltype(auto) v = cast(value);
+
+        insert(reinterpret_cast<const char*>(k.data()), k.size(),
+               reinterpret_cast<const char*>(v.data()), v.size(),
                name, flags);
     }
 
@@ -177,7 +181,8 @@ public:
     // removes key/value pair by key as data/size method entity
     template<typename Key>
     bool remove(const Key& key, const char* name = nullptr, const unsigned int flags = lmdb::dbi::default_flags) {
-        return remove(reinterpret_cast<const char*>(key.data()), key.size(), name, flags);
+        decltype(auto) k = cast(key);
+        return remove(reinterpret_cast<const char*>(k.data()), k.size(), name, flags);
     }
 
     // returns key status at database,
@@ -200,7 +205,8 @@ public:
 
     template<typename Key>
     bool isKeyExists(const Key& key, const char* name = nullptr) const {
-        return isKeyExists(reinterpret_cast<const char*>(key.data()), key.size(), name);
+        decltype(auto) k = cast(key);
+        return isKeyExists(reinterpret_cast<const char*>(k.data()), k.size(), name);
     }
 
     // returns value by key, casts it to template argument
@@ -231,7 +237,8 @@ public:
     // any key with data/size methods
     template<typename T, typename Key>
     T value(const Key& key) const {
-        return value<T>(reinterpret_cast<const char*>(key.data()), key.size());
+        decltype(auto) k = cast(key);
+        return value<T>(reinterpret_cast<const char*>(k.data()), k.size());
     }
 
 protected:
@@ -249,17 +256,38 @@ protected:
         emit failed(LmdbException(error));
     }
 
+    template<typename T, typename = std::enable_if_t<std::is_integral_v<T> || std::is_floating_point_v<T>>>
+    auto cast(const T& value) const {
+        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>, "Value must be integral or floating point to cast");
+
+        std::array<char, sizeof(T)> bytes{};
+        std::to_chars(bytes.data(), bytes.data() + bytes.size(), value);
+
+        return bytes;
+    }
+
+    template<typename T, typename = std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T>>>
+    const T& cast(const T& value) const {
+        return value;
+    }
+
     template<typename T>
     T createResult(const lmdb::val& value) const {
-        if constexpr (!IsArray<T>::value) {
-            return T(value.data(), value.data() + value.size());
-        }
-        else {
+        if constexpr (IsArray<T>::value) {
             T array;
             assert(array.size() == value.size());
             std::copy(value.data(), value.data() + value.size(), array.data());
 
             return array;
+        }
+        else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) {
+            T result = 0;
+            std::from_chars(value.data(), value.data() + value.size(), result);
+
+            return result;
+        }
+        else {
+            return T(value.data(), value.data() + value.size());
         }
     }
 
