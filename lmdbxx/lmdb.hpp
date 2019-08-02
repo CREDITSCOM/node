@@ -241,6 +241,30 @@ public:
         return value<T>(reinterpret_cast<const char*>(k.data()), k.size());
     }
 
+    // returns last pair of key/value inserted to database
+    template<typename Key, typename Value>
+    std::pair<Key, Value> last(const char* name = nullptr) const {
+        try {
+            auto transaction = lmdb::txn::begin(env_, nullptr, MDB_RDONLY);
+            auto dbi = lmdb::dbi::open(transaction, name);
+            auto cursor = lmdb::cursor::open(transaction, dbi);
+
+            lmdb::val key;
+            lmdb::val value;
+
+            const auto result = cursor.get(key, value, MDB_LAST);
+
+            if (result) {
+                return std::make_pair<Key, Value>(createResult<Key>(key), createResult<Value>(value));
+            }
+        }
+        catch (lmdb::error& error) {
+            raise(error);
+        }
+
+        return std::make_pair<Key, Value>(Key{}, Value{});
+    }
+
 protected:
     void flushImpl(bool force) {
         try {
