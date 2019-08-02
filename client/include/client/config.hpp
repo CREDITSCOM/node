@@ -14,7 +14,7 @@ namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
 typedef uint16_t NodeVersion;
-const NodeVersion NODE_VERSION = 420;
+const NodeVersion NODE_VERSION = 417;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";

@@ -224,7 +224,7 @@ public:
     Transaction get_last_by_target(Address target) const noexcept;
 
     // And now for something completely different
-    PoolHash get_previous_transaction_block(const Address&, const PoolHash&);
+    PoolHash get_previous_transaction_block(const Address&, const PoolHash&) const;
     void set_previous_transaction_block(const Address&, const PoolHash& currTransBlock, const PoolHash& prevTransBlock);
 
     /**
@@ -266,6 +266,10 @@ public:
      * \используется для входного параметра addr в виде id кошелька
      */
     bool get_from_blockchain(const Address& addr /*input*/, const int64_t& innerId /*input*/, Transaction& trx /*output*/) const;
+#ifdef TRANSACTIONS_INDEX
+    bool get_trx_from_blockchain(const Address& addr /*input*/, int64_t innerId /*input*/,
+                                 const PoolHash& lastTrxPh, Transaction& trx /*output*/) const;
+#endif
 
     /**
      * Gets contract data from storage.
@@ -294,6 +298,16 @@ public:
      */
 
     bool update_contract_data(const Address& abs_addr /*input*/, const cs::Bytes& data /*input*/) const;
+
+    /**
+     * Gets from database pool sequence by pool hash
+     *
+     * @param   hash    The pool hash.
+     *
+     * @returns Pool sequence of type cs::Sequence. If hash is not found in database returns std::numeric_limits<cs::Sequence>::max() value
+     */
+
+    cs::Sequence pool_sequence(const PoolHash& hash) const;
 
 public signals:
     const ReadBlockSignal& readBlockEvent() const;

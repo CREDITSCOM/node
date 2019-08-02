@@ -90,8 +90,66 @@ namespace trx_uf {
     // ordinary transaction field
     namespace ordinary {
         // no fields defined
+        constexpr csdb::user_field_id_t Text = 1;
+        constexpr csdb::user_field_id_t UsedContracts = 2;
     }
 }  // namespace trx_uf
+
+/**
+ * A format reference, helper to print {sequence,transaction} or {sequence.*}
+ *
+ * @author  Alexander Avramenko
+ * @date    24.07.2019
+ */
+
+struct FormatRef {
+    cs::Sequence seq;
+    uint32_t idx;
+
+    FormatRef(cs::Sequence s, uint32_t i)
+        : seq(s)
+        , idx(i)
+    {}
+
+    FormatRef(cs::Sequence s, size_t i)
+        : seq(s)
+        , idx(uint32_t(i))
+    {}
+
+    FormatRef(cs::Sequence s, uint16_t i)
+        : seq(s)
+        , idx(i)
+    {}
+
+    FormatRef(cs::Sequence s)
+        : seq(s)
+        , idx(std::numeric_limits<uint32_t>::max())
+    {}
+};
+
+/**
+ * Stream insertion operator, prints FormatRef to ostream as {*.*}
+ *
+ * @author  Alexander Avramenko
+ * @date    24.07.2019
+ *
+ * @param [in,out]  os      The operating system.
+ * @param           format  Describes the format to use.
+ *
+ * @returns The shifted result.
+ */
+
+inline std::ostream& operator<<(std::ostream& os, const FormatRef& format) {
+    os << '{' << WithDelimiters(format.seq) << '.';
+    if (format.idx != std::numeric_limits<uint32_t>::max()) {
+        os << format.idx;
+    }
+    else {
+        os << '*';
+    }
+    os << '}';
+    return os;
+}
 
 struct SmartContractRef {
     // block hash
@@ -134,7 +192,7 @@ struct SmartContractRef {
 };
 
 inline std::ostream& operator <<(std::ostream& os, const SmartContractRef& ref) {
-    os << '{' << ref.sequence << '.' << ref.transaction << '}';
+    os << FormatRef(ref.sequence, ref.transaction);
     return os;
 }
 
@@ -162,18 +220,6 @@ inline bool operator>(const SmartContractRef& l, const SmartContractRef& r) {
     return !(l < r) && !(l == r);
 }
 
-// helper to print <sequence,transaction>
-struct RefFormatter {
-    cs::Sequence seq;
-    uint32_t idx;
-};
-
-// print RefFormatter to ostream as {*.*}
-inline std::ostream& operator<<(std::ostream& os, const RefFormatter& format) {
-    os << '{' << format.seq << '.' << format.idx << '}';
-    return os;
-}
-
 struct SmartExecutionData {
     SmartContractRef contract_ref;
     csdb::Amount executor_fee;
@@ -189,7 +235,18 @@ struct SmartExecutionData {
         ret_val.__set_v_byte(code);
         using container_type = decltype(executor::Executor::ExecuteResult::smartsRes);
         using element_type = container_type::value_type;
-        result.smartsRes.emplace_back(element_type{ ret_val, std::string{}, 0, ::general::APIResponse{} });
+        decltype(element_type::states) states{};
+        decltype(element_type::emittedTransactions) emitted{};
+        // the purpose is to put only ret_val, others are empty members
+        result.smartsRes.emplace_back(
+            element_type {
+                ret_val,    // TVariant
+                states,     // empty map of states
+                emitted,    // empty list of emitted transactions
+                0,          // zero execution time
+                ::general::APIResponse{} // empty response object
+            }
+        );
         error = message;
     }
 };
@@ -212,8 +269,8 @@ enum class SmartContractStatus
     Running,
     // execution is finished, waiting for new state transaction in blockchain, no more transaction emitting is allowed
     Finished,
-    // contract is closed, neither new_state nor emitting transactions are allowed, should be removed from queue
-    Closed
+    // contract is canceled, neither new_state nor emitting transactions are allowed, should be removed from queue
+    Canceled
 };
 
 // to inform subscribed slots on deploy/execute/replenish occur
@@ -222,7 +279,7 @@ using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
 
 // to inform subscribed slots on deploy/execution/replenish completion or timeout
 // passes to every slot the "starter" transaction
-using SmartContractSignal = cs::Signal<void(const csdb::Transaction&)>;
+using SmartContractSignal = cs::Signal<void(const csdb::Transaction&, cs::Sequence)>;
 
 class SmartContracts final {
 public:
@@ -260,6 +317,8 @@ public:
 
     static std::string get_contract_state(const BlockChain& storage, const csdb::Address& abs_addr);
 
+    static std::string to_base58(const BlockChain& storage, const csdb::Address& addr);
+
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
@@ -277,9 +336,13 @@ public:
         return bc.getAddressByType(optimized_address, BlockChain::AddressType::PublicKey);
     }
 
+    std::string to_base58(const csdb::Address& addr) {
+        return SmartContracts::to_base58(bc, addr);
+    }
+
     bool is_closed_smart_contract(const csdb::Address& addr) const {
         cs::Lock lock(public_access_lock);
-        return get_smart_contract_status(addr) == SmartContractStatus::Closed;
+        return get_smart_contract_status(addr) == SmartContractStatus::Canceled;
     }
 
     bool is_known_smart_contract(const csdb::Address& addr) const {
@@ -292,10 +355,7 @@ public:
         return is_locked(absolute_address(addr));
     }
 
-    bool executionAllowed() const {
-        cs::Lock lock(public_access_lock);
-        return execution_allowed;
-    }
+    bool executionAllowed();
 
     // return true if SmartContracts provide special handling for transaction, so
     // the transaction is not pass through conveyer
@@ -314,7 +374,7 @@ signals:
     // emits on invocation of payable()
     SmartContractSignal signal_payable_invoke;
     // emits on invocation of payable() is failed after timeout
-    SmartContractSignal signal_payable_timeout;
+    SmartContractSignal signal_contract_timeout;
     // emits on every contract emitted transaction is appeared in blockchain, args are (emitted_transaction, starter_transaction):
     cs::Signal<void(const csdb::Transaction&, const csdb::Transaction&)> signal_emitted_accepted;
     // emits on every update of contract state both during reading db and getting block in real time
@@ -380,6 +440,8 @@ private:
         SmartContractRef ref_deploy;
         // reference to last successful execution which state is stored by item, may be equal to ref_deploy
         SmartContractRef ref_execute;
+        // Reference to execution which state is cached in DB
+        SmartContractRef ref_cache;
         // current state which is result of last successful execution / deploy
         std::string state;
         // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
@@ -390,7 +452,7 @@ private:
     std::map<csdb::Address, StateItem> known_contracts;
 
     // contract replenish transactions stored during reading from DB on stratup
-    std::vector<SmartContractRef> replenish_contract;
+    std::vector<SmartContractRef> uncompleted_contracts;
 
     // specifies a one contract call
     struct ExecutionItem {
@@ -450,7 +512,7 @@ private:
 
 
         QueueItem(const SmartContractRef& ref_contract, csdb::Address absolute_address, csdb::Transaction tr_start)
-            : status(SmartContractStatus::Waiting)
+            : status(SmartContractStatus::Idle)
             , seq_enqueue(0)
             , seq_start(0)
             , seq_finish(0)
@@ -535,13 +597,13 @@ private:
     }
 
     // return next element in queue, the only exception is end() which returns unmodified
-    queue_iterator remove_from_queue(queue_iterator it);
+    queue_iterator remove_from_queue(queue_iterator it, bool skip_log);
 
-    void remove_from_queue(const SmartContractRef& item);
+    void remove_from_queue(const SmartContractRef& item, bool skip_log);
 
     SmartContractStatus get_smart_contract_status(const csdb::Address& addr) const;
 
-    void test_exe_queue();
+    void test_exe_queue(bool reading_db);
 
     // true if target of transaction is smart contract which implements payable() method
     bool is_payable_target(const csdb::Transaction& tr);
@@ -557,15 +619,15 @@ private:
 public:
     static csdb::Transaction get_transaction(const BlockChain& storage, const SmartContractRef& contract);
 
+    static csdb::Transaction get_transaction(const BlockChain& storage, const csdb::Transaction& state_transaction);
+
 private:
     // non-static variant
     csdb::Transaction get_transaction(const SmartContractRef& contract) const {
         return SmartContracts::get_transaction(bc, contract);
     }
 
-    void enqueue(const csdb::Pool& block, size_t trx_idx);
-
-    void on_new_state(const csdb::Pool& block, size_t trx_idx);
+    void enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_log);
 
     // perform async execution via API to remote executor
     // returns false if execution is canceled
@@ -576,7 +638,7 @@ private:
     csdb::Transaction create_new_state(const ExecutionItem& queue_item, int64_t new_id);
 
     // update in contracts table appropriate item's state
-    bool update_contract_state(const csdb::Transaction& t, bool reading_db);
+    bool update_contract_state(const csdb::Transaction& t, bool skip_log);
 
     // get deploy info from cached deploy transaction reference
     std::optional<api::SmartContractInvocation> find_deploy_info(const csdb::Address& abs_addr) const;
@@ -600,7 +662,7 @@ private:
     bool execute(/*[in,out]*/ SmartExecutionData& data, bool validationMode);
 
     // blocking call
-    bool update_metadata(const api::SmartContractInvocation& contract, StateItem& state);
+    bool update_metadata(const api::SmartContractInvocation& contract, StateItem& state, bool skip_log);
 
     void add_uses_from(const csdb::Address& abs_addr, const std::string& method, std::vector<csdb::Address>& uses);
 
@@ -611,10 +673,6 @@ private:
 
     // calculates from block a one smart round costs
     csdb::Amount smart_round_fee(const csdb::Pool& block);
-
-    // tests max fee amount and round-based timeout on executed smart contracts;
-    // invoked after every new block appears in blockchain
-    void test_exe_conditions(const csdb::Pool& block);
 
     bool in_known_contracts(const csdb::Address& addr) const {
         return (known_contracts.find(absolute_address(addr)) != known_contracts.cend());
@@ -629,15 +687,15 @@ private:
         return true;
     }
 
-    void update_lock_status(const csdb::Address& abs_addr, bool value);
+    void update_lock_status(const csdb::Address& abs_addr, bool value, bool skip_log);
 
-    void update_lock_status(const QueueItem& item, bool value) {
-        update_lock_status(item.abs_addr, value);
+    void update_lock_status(const QueueItem& item, bool value, bool skip_log) {
+        update_lock_status(item.abs_addr, value, skip_log);
         if (!item.executions.empty()) {
             for (const auto& execution : item.executions) {
                 if (!execution.uses.empty()) {
                     for (const auto& u : execution.uses) {
-                        update_lock_status(absolute_address(u), value);
+                        update_lock_status(absolute_address(u), value, skip_log);
                     }
                 }
             }
@@ -650,19 +708,12 @@ private:
 
     // exe_queue item modifiers
 
-    void update_status(QueueItem& item, cs::RoundNumber r, SmartContractStatus status);
+    void update_status(QueueItem& item, cs::RoundNumber r, SmartContractStatus status, bool skip_log);
 
-    bool start_consensus(QueueItem& item, const cs::TransactionsPacket& pack) {
-        // if re-run consensus
-        uint8_t run_counter = 0;
-        if (item.pconsensus) {
-            run_counter = item.pconsensus->runCounter() + 1;
-        }
-        item.pconsensus = std::make_unique<SmartConsensus>();
-        return item.pconsensus->initSmartRound(pack, run_counter, this->pnode, this);
-    }
+    bool start_consensus(QueueItem& item);
 
     void test_contracts_locks();
+    void test_uncompleted_contracts(cs::Sequence current_sequence);
 
     // returns 1 if any error
     uint64_t next_inner_id(const csdb::Address& addr) const;
@@ -688,11 +739,12 @@ private:
      *
      * @param   test_period_sec Interval in seconds between tests &amp; outputs to console of
      *  diagnostic warning.
+     * @param   max_periods     (Optional) The maximum periods.
      *
      * @returns True if it succeeds, false if wait has stopped and executor is still unavailable.
      */
 
-    bool wait_until_executor(unsigned int test_period_sec);
+    bool wait_until_executor(unsigned int test_period_sec, unsigned int max_periods = std::numeric_limits<unsigned int>::max());
 
     /**
      * Gets transaction with actual state on basis of new_state transaction in blockchain
@@ -708,27 +760,21 @@ private:
     csdb::Transaction get_actual_state(const csdb::Transaction& hashed_state);
 
     /**
-     * called from public method on_store_block()
+     * Executes the next block action both while reading DB and assembling new blocks on-the-go
      *
      * @author  Alexander Avramenko
-     * @date    22.07.2019
-     *
-     * @param   block   The block.
-     */
-
-    void on_store_block_impl(const csdb::Pool& block);
-
-    /**
-     * called from public method on_read_block()
-     *
-     * @author  Alexander Avramenko
-     * @date    22.07.2019
+     * @date    24.07.2019
      *
      * @param           block       The block.
+     * @param           reading_db  True to reading database.
      * @param [in,out]  should_stop If non-null, true if should stop.
      */
 
-    void on_read_block_impl(const csdb::Pool& block, bool* should_stop);
+    void on_next_block_impl(const csdb::Pool& block, bool reading_db, bool* should_stop);
+
+    // request correct state in network
+    void net_request_contract_state(const csdb::Address& abs_addr);
+
 };
 
 }  // namespace cs

@@ -150,7 +150,7 @@ private:
 
     std::vector<cs::Stage> smartStageTemporary_;
     cs::Bytes smartConsensusMask;
-    csdb::Transaction finalStateTransaction_;
+    std::vector<csdb::Transaction> finalStateTransaction_;
 };
 
 }  // namespace cs

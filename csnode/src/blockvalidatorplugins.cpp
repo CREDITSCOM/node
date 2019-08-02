@@ -41,14 +41,17 @@ const cs::SmartContracts* ValidationPlugin::getSmartContracts() const {
 ValidationPlugin::ErrorType
 SmartStateValidator::validateBlock(const csdb::Pool& block) {
 
-    if (block.sequence() < 90728) {
-        // skip unable-to-validate contracts
-        return ErrorType::noError;
-    }
+    // CreditsNet has got known issues due to deprecated behavior in ancient times, so:
+    if (getBlockChain().uuid() == 11024959585341937636ULL) {
+        if (block.sequence() < 90728) {
+            // skip unable-to-validate contracts
+            return ErrorType::noError;
+        }
 
-    if (block.sequence() < 3302505) {
-        // skip invalid contracts until first valid
-        return ErrorType::noError;
+        if (block.sequence() < 3302505) {
+            // skip invalid contracts until first valid
+            return ErrorType::noError;
+        }
     }
 
     const auto& transactions = block.transactions();
@@ -120,16 +123,25 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
     auto& main_result = result.smartsRes.front();
 
     if (!cs::SmartContracts::is_state_updated(t)) {
-        if (!main_result.newState.empty()) {
-            csdebug() << kLogPrefix << "new state of trx is empty, but real new state is not";
+        csdb::Address abs_addr = getBlockChain().getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
+        if (main_result.states.count(abs_addr) > 0) {
+            if (!main_result.states.at(abs_addr).empty()) {
+                csdebug() << kLogPrefix << "new state in trx is empty, but real new state is not";
+            }
         }
         return true;
     }
     else {
-        std::string newState = cs::SmartContracts::get_contract_state(getBlockChain(), t.target());
-        if (newState != main_result.newState) {
-            cserror() << kLogPrefix << "new state of trx in blockchain doesn't match real new state";
-            return false;
+        csdb::Address abs_addr = getBlockChain().getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
+        if (main_result.states.count(abs_addr) == 0) {
+            csdebug() << kLogPrefix << "real new state in is empty, but new state in trx is not";
+        }
+        else {
+            std::string newState = cs::SmartContracts::get_contract_state(getBlockChain(), t.target());
+            if (newState != main_result.states.at(abs_addr)) {
+                cserror() << kLogPrefix << "new state of trx in blockchain doesn't match real new state";
+                return false;
+            }
         }
     }
     return true;
@@ -321,9 +333,9 @@ Packets SmartSourceSignaturesValidator::grepNewStatesPacks(const Transactions& t
 }
 
 csdb::Transaction SmartSourceSignaturesValidator::switchCountedFee(const csdb::Transaction& t) {
-  auto initTrx = WalletsCache::findSmartContractInitTrx(t, getBlockChain());
+  csdb::Transaction initTrx = cs::SmartContracts::get_transaction(getBlockChain(), t);
   if (!initTrx.is_valid()) {
-    cserror() << kLogPrefix << " no init transaction for smart source transaction in blockchain";
+    cserror() << kLogPrefix << " no init transaction for smart state transaction in blockchain";
     return t;
   }
   csdb::Transaction res(t.innerID(), t.source(), t.target(), t.currency(), t.amount(), t.max_fee(),
@@ -423,7 +435,7 @@ ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Poo
             size_t idx = inprogress.front();
             if (idx <= all_transactions.size()) {
                 auto& item = all_transactions[idx];
-                if (seq > item.seq && seq - item.seq <= Consensus::MaxRoundsCancelContract) {
+                if (seq > item.seq && seq - item.seq < Consensus::MaxRoundsCancelContract) {
                     // no timeout yet
                     break;
                 }

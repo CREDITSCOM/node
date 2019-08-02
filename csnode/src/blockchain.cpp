@@ -112,7 +112,6 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         *shouldStop = true;
     }
     else {
-        walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
         if (!blockHashes_->initFromPrevBlock(block)) {
             cserror() << "Blockchain: blockHashes_->initFromPrevBlock(block) failed on block #" << block.sequence();
             *shouldStop = true;
@@ -131,6 +130,7 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
             }
 #endif
         }
+        walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
     }
 }
 
@@ -561,6 +561,18 @@ csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
     }
 
     return blockHashes_->find(seq);
+}
+
+cs::Sequence BlockChain::getSequenceByHash(const csdb::PoolHash& hash) const {
+    std::lock_guard lock(dbLock_);
+    
+    if (deferredBlock_.hash() == hash) {
+        return deferredBlock_.sequence();
+    }
+
+    return storage_.pool_sequence(hash);
+
+    //return blockHashes_->find(hash);
 }
 
 uint64_t BlockChain::getWalletsCountWithBalance() {

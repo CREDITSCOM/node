@@ -259,21 +259,25 @@ public:
     }
 
     struct ExecuteResult {
-    private:
+        struct EmittedTrxn {
+            csdb::Address source;
+            csdb::Address target;
+            csdb::Amount amount;
+            std::string userData;
+        };
+
         struct SmartRes {
             general::Variant retValue;
-            std::string		 newState;
-            // measured in milliseconds actual cost of execution
-            int64_t			 executionCost;
+            std::map<csdb::Address, std::string> states;
+            std::vector<EmittedTrxn> emittedTransactions;
+            int64_t executionCost; // measured in milliseconds actual cost of execution
             ::general::APIResponse response;
         };
-    public:
-        std::vector<SmartRes> smartsRes;
-        std::map<csdb::Address, std::string> states;
-        std::vector<csdb::Transaction> trxns;
-        // measured in milliseconds total cost of executions
-        long selfMeasuredCost;
+
         ::general::APIResponse response;
+        std::vector<SmartRes> smartsRes;
+        //std::vector<csdb::Transaction> trxns;       
+        long selfMeasuredCost; // measured in milliseconds total cost of executions       
     };
 
     void addInnerSendTransaction(const general::AccessID& accessId, const csdb::Transaction& transaction) {
@@ -392,6 +396,20 @@ public:
         if (auto addrLock = lockSmarts.find(address); addrLock != lockSmarts.end() && addrLock->second == accessId)
             return true;
         return false;
+    }
+
+    mutable std::mutex mt;
+
+    // equivalent access to the blockchain for api and other threads
+    template<typename T, typename = std::enable_if_t<std::is_same_v<T, csdb::PoolHash> || std::is_same_v<T, cs::Sequence>>>
+    csdb::Pool loadBlockApi(const T& p) const {
+        std::lock_guard lk(mt);
+        return blockchain_.loadBlock(p);
+    }
+
+    csdb::Transaction loadTransactionApi(const csdb::TransactionID& id) const {
+        std::lock_guard lk(mt);
+        return blockchain_.loadTransaction(id);
     }
 
 public slots:
@@ -531,7 +549,7 @@ private:
     std::condition_variable cvErrorConnect_;
     std::atomic_bool isConnect_{ false };
     std::atomic_bool requestStop_{ false };
-    const uint16_t EXECUTOR_VERSION = 1;
+    const uint16_t EXECUTOR_VERSION = 2;
 
     // temporary solution?
     std::mutex callExecutorLock_;
@@ -628,7 +646,7 @@ public:
     void TokenTransactionsGet(api::TokenTransactionsResult&, const general::Address&, int64_t offset, int64_t limit) override;
     void TokenInfoGet(api::TokenInfoResult&, const general::Address&) override;
     void TokenHoldersGet(api::TokenHoldersResult&, const general::Address&, int64_t offset, int64_t limit, const TokenHoldersSortField order, const bool desc) override;
-    void TokensListGet(api::TokensListResult&, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc, const std::string& filterName, const std::string& filterCode) override;
+    void TokensListGet(api::TokensListResult&, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc, const TokenFilters& filters) override;
 #ifdef TRANSACTIONS_INDEX
     void TokenTransfersListGet(api::TokenTransfersResult&, int64_t offset, int64_t limit) override;
     void TransactionsListGet(api::TransactionsGetResult&, int64_t offset, int64_t limit) override;
@@ -667,8 +685,8 @@ private:
     struct HashState {
         std::string hash;
         std::string retVal;
-        bool isOld;
-        bool condFlg;
+        bool isOld{false};
+        bool condFlg{false};
     };
 
     using client_type           = executor::ContractExecutorConcurrentClient;
@@ -729,7 +747,7 @@ private:
     cs::SpinLockable<std::map<csdb::Address, smartHashStateEntry>> hashStateSL;
 
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployed_by_creator;
-    cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
+    //cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
     std::map<csdb::PoolHash, api::Pool> poolCache;
     std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
     std::thread state_updater;
@@ -739,7 +757,7 @@ private:
     api::SmartContract fetch_smart_body(const csdb::Transaction&);
 
 private:
-    void state_updater_work_function();
+    //void state_updater_work_function();
 
     std::vector<api::SealedTransaction> extractTransactions(const csdb::Pool& pool, int64_t limit, const int64_t offset);
 
@@ -756,16 +774,15 @@ private:
     template <typename Mapper>
     size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out);
 
-    // the method implements common part of both update_smart_caches_once() and update_smart_caches_slot() methods
-    template<typename LongNamedType>
-    bool update_smart_caches(LongNamedType& locked_pending_smart_transactions, bool init);
+    bool updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequence sequence);
 
-    bool update_smart_caches_once(const csdb::PoolHash&, bool = false);
     void run();
 
     ::csdb::Transaction make_transaction(const ::api::Transaction&);
     void dumb_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
     void smart_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
+
+    std::optional<std::string> checkTransaction(const ::api::Transaction&);
 
     TokensMaster tm;
 
@@ -777,7 +794,7 @@ private:
     std::mutex dbLock_;
 
 private slots:
-    void update_smart_caches_slot(const csdb::Pool& pool);
+    void updateSmartCachesPool(const csdb::Pool& pool);
     void store_block_slot(const csdb::Pool& pool);
     void collect_all_stats_slot(const csdb::Pool& pool);
 };

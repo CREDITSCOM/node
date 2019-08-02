@@ -32,6 +32,9 @@ using boost::asio::buffer;
 
 const ip::udp::socket::message_flags NO_FLAGS = 0;
 
+static std::atomic<double> current_lag;
+const double lag_limit = 1000.;
+
 static ip::udp::socket bindSocket(io_context& context, Network* net, const EndpointData& data, bool ipv6 = true) {
     try {
         ip::udp::socket sock(context, ipv6 ? ip::udp::v6() : ip::udp::v4());
@@ -123,7 +126,13 @@ void Network::readerRoutine(const Config& config) {
             continue;
         }
 
+        while (current_lag.load(std::memory_order_relaxed) > lag_limit && iPacMan_.getSize() > 2) {
+          std::this_thread::yield();
+          csdetails() << "Current lag = " << current_lag.load(std::memory_order_relaxed) << "ms queue size = " << iPacMan_.getSize() << " - spin";
+        }
+
         packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
+        task.timestamp = std::chrono::high_resolution_clock::now();
 
         while (!task.pack.region_.get()) {
             cswarning() << "net: invalid input packet";
@@ -155,7 +164,6 @@ void Network::readerRoutine(const Config& config) {
             }
             else {
                 iPacMan_.enQueueLast();
-
 #ifdef LOG_NET
                 csdebug(logger::Net) << "<-- " << packetSize << " bytes from " << task.sender << " " << task.pack;
 #endif
@@ -239,8 +247,8 @@ void Network::writerRoutine(const Config& config) {
             continue;
         }
 
-        if (tasks > 200) {
-            cswarning() << "strange: too many tasks " << tasks;
+        if (tasks > 600) {
+            csdetails() << "(informational) current task quantity more then normal: " << tasks;
         }
 
         msg.resize(tasks);
@@ -362,6 +370,9 @@ void Network::processorRoutine() {
         for (uint64_t i = 0; i < tasks; i++) {
             bool is_empty = false;
             auto task = iPacMan_.getNextTask(is_empty);
+            auto nowtime = std::chrono::high_resolution_clock::now();
+            current_lag.store(std::chrono::duration<double, std::milli>(
+              nowtime - task->timestamp).count(), std::memory_order_relaxed);
             if (is_empty) break;
             if (!task->pack.region_.get()) {
                 cswarning() << "net: invalid packet processor!!!!!!!!!";

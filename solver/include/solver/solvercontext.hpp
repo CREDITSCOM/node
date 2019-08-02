@@ -241,6 +241,8 @@ public:
 
     csdb::PoolHash spoileHash(const csdb::PoolHash& hashToSpoil, const cs::PublicKey& pKey);
 
+    uint64_t lastTimeStamp();
+
     void sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respondent);
 
     void add_stage1(cs::StageOne& stage, bool send);

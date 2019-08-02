@@ -106,6 +106,17 @@ void TrustedStage2State::off(SolverContext& /*context*/) {
 Result TrustedStage2State::onStage1(SolverContext& context, const cs::StageOne& st) {
     stage.signatures[st.sender] = st.signature;
     stage.hashes[st.sender] = st.messageHash;
+    if (context.lastTimeStamp() == 0 && Conveyer::instance().currentRoundNumber()>1) {
+        csdebug() << name() << ": no valid last block - can't get timestamp";
+        return Result::Ignore;
+    }
+    const std::string ts = context.stage1(context.own_conf_number())->roundTimeStamp;
+    uint64_t myStamp = ts.empty() ? 0 : std::stoll(ts);
+    uint64_t otherStamp = st.roundTimeStamp.empty() ? 0 : (uint64_t) std::stoll(st.roundTimeStamp);
+    if (otherStamp < context.lastTimeStamp() || otherStamp > myStamp + Consensus::DefaultTimeStampRange * 2) {
+        csdebug() << name() << ": [" << static_cast<int>(st.sender) << "] mark untrusted: invalid timeStamp";
+        context.mark_untrusted(st.sender);
+    }
     ++cnt_recv_stages;
     if (cnt_recv_stages == context.cnt_trusted()) {
         csdebug() << name() << ": enough stage-1 received";

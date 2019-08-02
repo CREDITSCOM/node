@@ -1,5 +1,6 @@
 #include <db_cxx.h>
 #include <cassert>
+#include <cstdio>
 #include <cstdlib>
 #include <exception>
 
@@ -85,7 +86,39 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
 #ifdef TRANSACTIONS_INDEX
     db_trans_idx_->close(0);
 #endif
+    if (logfile_thread_.joinable()) {
+        quit_ = true;
+        logfile_thread_.join();
+    }
     env_.close(0);
+}
+
+void DatabaseBerkeleyDB::logfile_routine() {
+    int cnt = 0;
+    /* Check once every 5 minutes. */
+    for (;; std::this_thread::sleep_for(std::chrono::seconds(1))) {
+        if (quit_) break;
+        if (++cnt % 300 == 0) {
+            int ret;
+            char **begin, **list;
+            env_.txn_checkpoint(0, 0, DB_FORCE);
+
+            /* Get the list of log files. */
+            if (env_.log_archive(&list, DB_ARCH_ABS) != 0) {
+                continue;
+            }
+
+            /* Remove the log files. */
+            if (list != 0) {
+                for (begin = list; *list != NULL; ++list) {
+                    if ((ret = ::remove(*list)) != 0) {
+                        cslog() << "Can't remove " << *list << " error = " << ret;
+                    }
+                }
+                free(begin);
+            }
+        }
+    }
 }
 
 void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status) {
@@ -145,25 +178,21 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
         }
     });
 
-#ifdef TRANSACTIONS_INDEX
-    auto db_trans_idx = new Db(&env_, 0);
-#endif
-
     if (!status) {
-        decltype(db_blocks_) db_blocks(new Db(&env_, 0));
+        auto db_blocks = new Db(&env_, 0);
         status = db_blocks->open(txn, "blockchain.db", NULL, DB_RECNO, DB_CREATE | DB_READ_UNCOMMITTED, 0);
-        db_blocks_.swap(db_blocks);
+        db_blocks_.reset(db_blocks);
     }
     if (!status) {
-        decltype(db_seq_no_) db_seq_no(new Db(&env_, 0));
+        auto db_seq_no = new Db(&env_, 0);
         status = db_seq_no->open(txn, "sequence.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
-        db_seq_no_.swap(db_seq_no);
+        db_seq_no_.reset(db_seq_no);
     }
     if (status == 0) {
         // until the explanation found suppress exceptions particularly on db close()
-        decltype(db_contracts_) db_contracts(new Db(&env_, 0/*DB_CXX_NO_EXCEPTIONS*/));
+        auto db_contracts = new Db(&env_, 0/*DB_CXX_NO_EXCEPTIONS*/);
         status = db_contracts->open(txn, "contracts.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
-        db_contracts_.swap(db_contracts);
+        db_contracts_.reset(db_contracts);
     }
     if (status) {
         set_last_error_from_berkeleydb(status);
@@ -171,6 +200,7 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
     }
 
 #ifdef TRANSACTIONS_INDEX
+    auto db_trans_idx = new Db(&env_, 0);
     status = db_trans_idx->open(NULL, "index.db", NULL, DB_BTREE, DB_CREATE, 0);
     if (status) {
         set_last_error_from_berkeleydb(status);
@@ -178,6 +208,7 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
     }
     db_trans_idx_.reset(db_trans_idx);
 #endif
+    logfile_thread_ = std::thread(&DatabaseBerkeleyDB::logfile_routine, this);
 
     set_last_error();
     return true;
@@ -256,6 +287,29 @@ bool DatabaseBerkeleyDB::get(const cs::Bytes &key, cs::Bytes *value) {
     auto begin = static_cast<uint8_t *>(db_value.get_data());
     value->assign(begin, begin + db_value.get_size());
     set_last_error();
+    return true;
+}
+
+// sequnce from block hash
+bool DatabaseBerkeleyDB::seq_no(const cs::Bytes& key, uint32_t* value) {
+    if (value == nullptr) {
+        set_last_error(InvalidArgument);
+        return false;
+    }
+    if (!db_blocks_) {
+        set_last_error(NotOpen);
+        return false;
+    }
+
+    Dbt_copy<cs::Bytes> db_key(key);
+    Dbt_copy<uint32_t> db_seq_no;
+    int status = db_seq_no_->get(nullptr, &db_key, &db_seq_no, DB_READ_UNCOMMITTED);
+    if (status) {
+        set_last_error_from_berkeleydb(status);
+        return false;
+    }
+    
+    *value = *static_cast<uint32_t*>(db_seq_no.get_data());
     return true;
 }
 

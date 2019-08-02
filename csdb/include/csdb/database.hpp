@@ -39,6 +39,7 @@ public:
     virtual bool get(const cs::Bytes& key, cs::Bytes* value = nullptr) = 0;
     virtual bool get(const uint32_t seq_no, cs::Bytes* value = nullptr) = 0;
     virtual bool remove(const cs::Bytes& key) = 0;
+    virtual bool seq_no(const cs::Bytes& key, uint32_t* value) = 0; // sequnce from block hash
 
     using Item = std::pair<cs::Bytes, cs::Bytes>;
     using ItemList = std::vector<Item>;

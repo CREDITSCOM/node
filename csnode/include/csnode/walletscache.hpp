@@ -26,12 +26,17 @@ class Transaction;
 namespace cs {
 class WalletsIds;
 
-constexpr size_t InitialWalletsNum = 1 * 512 * 1024;
+constexpr size_t InitialWalletsNum = 1 * 24 * 1024;
 
 class WalletsCache {
 public:
     using WalletId = csdb::internal::WalletId;
     using Mask = boost::dynamic_bitset<uint64_t>;
+
+    struct RefContractCall {
+        cs::Sequence sequence;
+        uint32_t transaction;
+    };
 
     struct Config {
         size_t initialWalletsNum_ = InitialWalletsNum;
@@ -95,11 +100,11 @@ private:
         virtual WalletData& getWalletData(WalletId id, const csdb::Address& address) = 0;
         virtual void setModified(WalletId id) = 0;
         void invokeReplenishPayableContract(const csdb::Transaction&);
-        void rollbackReplenishPayableContract(const csdb::Transaction&, const csdb::Amount& execFee = 0);
+        void rollbackExceededTimeoutContract(const csdb::Transaction&, const WalletsCache::RefContractCall&, const csdb::Amount& execFee = 0);
         void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx);
-        void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction);
-        bool isClosedSmart(const csdb::Transaction& transaction);
-        void checkClosedSmart(const csdb::Transaction& transaction);
+        void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const WalletsCache::RefContractCall& initRef, const csdb::Transaction& newStateTransaction);
+        bool isCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref);
+        void checkCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref);
         void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction, const BlockChain& blockchain);
 
         /*#ifdef MONITOR_NODE
@@ -120,7 +125,7 @@ public:
     class Initer : protected ProcessorBase {
     public:
         using ProcessorBase::invokeReplenishPayableContract;
-        using ProcessorBase::rollbackReplenishPayableContract;
+        using ProcessorBase::rollbackExceededTimeoutContract;
         Initer(WalletsCache& data);
         void loadPrevBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
         bool moveData(WalletId srcIdSpecial, WalletId destIdNormal);
@@ -138,7 +143,7 @@ public:
     class Updater : protected ProcessorBase {
     public:
         using ProcessorBase::invokeReplenishPayableContract;
-        using ProcessorBase::rollbackReplenishPayableContract;
+        using ProcessorBase::rollbackExceededTimeoutContract;
         using ProcessorBase::smartSourceTransactionReleased;
         Updater(WalletsCache& data);
         void loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
@@ -164,8 +169,8 @@ public:
     WalletsCache(const WalletsCache&&) = delete;
     WalletsCache& operator=(const WalletsCache&&) = delete;
 
-    static csdb::Address findSmartContractIniter(const csdb::Transaction& tr, const BlockChain& blockchain);
-    static csdb::Transaction findSmartContractInitTrx(const csdb::Transaction& tr, const BlockChain& blockchain);
+    //static csdb::Address findSmartContractIniter(const csdb::Transaction& tr, const BlockChain& blockchain);
+    //static csdb::Transaction findSmartContractInitTrx(const csdb::Transaction& tr, const BlockChain& blockchain);
 
     std::unique_ptr<Initer> createIniter();
     std::unique_ptr<Updater> createUpdater();
@@ -175,8 +180,8 @@ private:
     WalletsIds& walletsIds_;
     const csdb::Address genesisAddress_;
     const csdb::Address startAddress_;
-    std::list<csdb::Transaction> smartPayableTransactions_;
-    std::list<csdb::Transaction> closedSmarts_;
+    std::list<csdb::TransactionID> smartPayableTransactions_;
+    std::map< csdb::Address, std::list<RefContractCall> > canceledSmarts_;
 
 #ifdef MONITOR_NODE
     std::map<WalletData::Address, TrustedData> trusted_info_;

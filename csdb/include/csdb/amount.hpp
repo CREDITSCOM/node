@@ -103,15 +103,16 @@ public:
      * Amount a2{Amount(n) / 4};  // a2 = -2.25;
      * \endcode
      */
-    inline constexpr Amount(int32_t integral, uint64_t numerator, uint64_t denominator = 100);
+    inline constexpr Amount(int32_t integral, uint64_t numerator, uint64_t denominator);
     /// \todo Переделать на inline constexpr
     Amount(double value);
 
-private:
-    inline constexpr Amount(const int32_t integral, const uint64_t fraction, std::nullptr_t) noexcept
+    inline constexpr Amount(const int32_t integral, const uint64_t fraction) noexcept
     : integral_(integral)
     , fraction_(fraction) {
     }
+
+private:
     inline constexpr Amount(const internal::uint128_t& value, bool divide) noexcept;
     inline constexpr Amount(const internal::uint128_t::division64_result& value) noexcept;
     static inline constexpr uint64_t _check_fraction(const internal::uint128_t& fraction);
@@ -260,7 +261,7 @@ inline constexpr bool Amount::operator>=(const Amount& other) const noexcept {
 }
 
 inline constexpr Amount Amount::operator-() const noexcept {
-    return (0 == fraction_) ? Amount(-integral_) : Amount(-integral_ - 1, AMOUNT_MAX_FRACTION - fraction_, nullptr);
+    return (0 == fraction_) ? Amount(-integral_) : Amount(-integral_ - 1, AMOUNT_MAX_FRACTION - fraction_);
 }
 
 inline Amount& Amount::operator+=(const Amount& other) noexcept {
@@ -304,12 +305,12 @@ inline Amount& Amount::operator-=(double other) {
 }
 
 inline constexpr Amount Amount::operator+(const Amount& other) const noexcept {
-    return (AMOUNT_MAX_FRACTION < (fraction_ + other.fraction_)) ? Amount(integral_ + other.integral_ + 1, fraction_ + other.fraction_ - AMOUNT_MAX_FRACTION, nullptr)
-                                                                 : Amount(integral_ + other.integral_, fraction_ + other.fraction_, nullptr);
+    return (AMOUNT_MAX_FRACTION < (fraction_ + other.fraction_)) ? Amount(integral_ + other.integral_ + 1, fraction_ + other.fraction_ - AMOUNT_MAX_FRACTION)
+                                                                 : Amount(integral_ + other.integral_, fraction_ + other.fraction_);
 }
 
 inline constexpr Amount Amount::operator+(const int32_t other) const noexcept {
-    return Amount(integral_ + other, fraction_, nullptr);
+    return Amount(integral_ + other, fraction_);
 }
 
 inline Amount Amount::operator+(double other) const {
@@ -317,12 +318,12 @@ inline Amount Amount::operator+(double other) const {
 }
 
 inline constexpr Amount Amount::operator-(const Amount& other) const noexcept {
-    return (fraction_ < other.fraction_) ? Amount(integral_ - other.integral_ - 1, fraction_ + AMOUNT_MAX_FRACTION - other.fraction_, nullptr)
-                                         : Amount(integral_ - other.integral_, fraction_ - other.fraction_, nullptr);
+    return (fraction_ < other.fraction_) ? Amount(integral_ - other.integral_ - 1, fraction_ + AMOUNT_MAX_FRACTION - other.fraction_)
+                                         : Amount(integral_ - other.integral_, fraction_ - other.fraction_);
 }
 
 inline constexpr Amount Amount::operator-(int32_t other) const noexcept {
-    return Amount(integral_ - other, fraction_, nullptr);
+    return Amount(integral_ - other, fraction_);
 }
 
 inline Amount Amount::operator-(double other) const {
@@ -365,7 +366,7 @@ inline constexpr Amount Amount::operator/(const int32_t other) const {
                                       : (1 == other) ? (*this)
                                                      : (0 > integral_) ? this->operator-().operator/(other).operator-()
                                                                        : Amount(internal::uint128_t::mul(integral_, AMOUNT_MAX_FRACTION).div(other).quotient_, false) +
-                                                                             Amount(0, fraction_ / other, nullptr);
+                                                                             Amount(0, fraction_ / other);
 }
 
 inline Amount& Amount::operator/=(int32_t other) {
@@ -389,7 +390,7 @@ struct Amount::amount_full {
     static constexpr const uint64_t multiplier = amount_full<s...>::multiplier * 10;
     static constexpr const uint64_t fraction = amount_full<s...>::fraction;
     static constexpr const Amount value() {
-        return Amount{static_cast<int32_t>(integral), fraction, nullptr};
+        return Amount{static_cast<int32_t>(integral), fraction};
     }
 };
 
@@ -399,7 +400,7 @@ struct Amount::amount_full<'.', s...>
   static constexpr const uint64_t integral = 0;
   static constexpr const uint64_t multiplier = 1;
   static constexpr const uint64_t fraction = amount_fraction<AMOUNT_MAX_FRACTION / 10ULL, s...>::value;
-  static constexpr const Amount value() {return Amount{static_cast<int32_t>(integral), fraction, nullptr};}
+  static constexpr const Amount value() {return Amount{static_cast<int32_t>(integral), fraction};}
 };
 
 }  // namespace csdb

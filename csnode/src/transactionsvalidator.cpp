@@ -49,9 +49,9 @@ bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, con
         rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
         return false;
     }
-    csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(trx, context.blockchain());
+    csdb::Transaction initTransaction = SmartContracts::get_transaction(context.blockchain(), trx);
     if (!initTransaction.is_valid()) {
-        cslog() << kLogPrefix << __func__ << ": reject new_state transaction, starter transaction is not found";
+        cslog() << kLogPrefix << __func__ << ": reject new_state transaction, starter transaction does not exist";
         rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
         return false;
     }
@@ -112,7 +112,7 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
             for (const auto& t : trxs) {
                 if (SmartContracts::is_new_state(t) &&
                     std::find(rejectedNewStates_.begin(), rejectedNewStates_.end(), context.smart_contracts().absolute_address(t.source())) == rejectedNewStates_.end()) {
-                    auto initTransaction = WalletsCache::findSmartContractInitTrx(t, context.blockchain());
+                    csdb::Transaction initTransaction = cs::SmartContracts::get_transaction(context.blockchain(), t);
                     if (initTransaction.is_valid() && smarts.absolute_address(initTransaction.target()) == smarts.absolute_address(trx.source())) {
                         auto it = payableMaxFees_.find(smarts.absolute_address(initTransaction.source()));
                         csdb::Amount leftFromMaxFee;
@@ -190,6 +190,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
     }
 
     wallState.trxTail_.push(trx.innerID());
+    csdetails() << kLogPrefix << "innerID of " << cs::SmartContracts::to_base58(context.blockchain(), trx.source()) << " <- " << trx.innerID();
     trxList_[trxInd] = wallState.lastTrxInd_;
     wallState.lastTrxInd_ = static_cast<decltype(wallState.lastTrxInd_)>(trxInd);
 
@@ -230,7 +231,7 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
     }
 
     for (const auto& state : newStates) {
-        csdb::Transaction initTransaction = WalletsCache::findSmartContractInitTrx(state, context.blockchain());
+        csdb::Transaction initTransaction = SmartContracts::get_transaction(context.blockchain(), state);
         auto it = std::find_if(rejectedSmarts.cbegin(), rejectedSmarts.cend(),
                                [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == smarts.absolute_address(initTransaction.target())); });
         if (it != rejectedSmarts.end()) {

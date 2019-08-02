@@ -638,6 +638,32 @@ Wallet Storage::wallet(const Address& addr) const {
     return Wallet::get(addr);
 }
 
+#ifdef TRANSACTIONS_INDEX
+static bool checkPool(const Pool& pool, const Address& addr,
+                      int64_t innerId, Transaction& trx) {
+    const auto& trxs = pool.transactions();
+    for (const auto& t : trxs) {
+        if (t.source() == addr && t.innerID() == innerId) {
+            trx = t;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Storage::get_trx_from_blockchain(const Address& addr, int64_t innerId,
+                                      const PoolHash& lastTrxPh, Transaction& trx) const {
+    auto poolHash = lastTrxPh;
+    while (!poolHash.is_empty()) {
+        if (checkPool(pool_load(poolHash), addr, innerId, trx)) {
+            return true;
+        }
+        poolHash = get_previous_transaction_block(addr, poolHash);
+    }
+    return false;
+}
+#endif
+
 bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& innerId /*input*/, Transaction& trx /*output*/) const {
     Pool curPool;
     cs::Sequence curIdx = cs::numeric_cast<cs::Sequence>(innerId);
@@ -794,7 +820,7 @@ cs::Bytes Storage::get_trans_index_key(const Address& addr, const PoolHash& ph) 
     return os.buffer();
 }
 
-PoolHash Storage::get_previous_transaction_block(const Address& addr, const PoolHash& ph) {
+PoolHash Storage::get_previous_transaction_block(const Address& addr, const PoolHash& ph) const {
     PoolHash result;
 
     const auto key = get_trans_index_key(addr, ph);
@@ -831,6 +857,25 @@ bool Storage::update_contract_data(const Address& abs_addr /*input*/, const cs::
     cs::Bytes bytes(pk.size());
     bytes.assign(pk.cbegin(), pk.cend());
     return d->db->updateContractData(bytes, data);
+}
+
+cs::Sequence Storage::pool_sequence(const PoolHash& hash) const {
+    cs::Sequence seq = std::numeric_limits<cs::Sequence>::max();
+    if (!isOpen()) {
+        d->set_last_error(NotOpen);
+        return seq;
+    }
+
+    if (hash.is_empty()) {
+        d->set_last_error(InvalidParameter, "%s: Empty hash passed", funcName());
+        return seq;
+    }
+
+    uint32_t tmp;
+    if (d->db->seq_no(hash.to_binary(), &tmp)) {
+        seq = tmp;
+    }
+    return seq;
 }
 
 }  // namespace csdb
