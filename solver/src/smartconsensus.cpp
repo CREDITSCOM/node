@@ -453,7 +453,7 @@ void SmartConsensus::processStages() {
     createFinalTransactionSet(finalFees);
     st3.packageSignature =
         cscrypto::generateSignature(pnode_->getSolver()->getPrivateKey(), finalSmartTransactionPack_.hash().toBinary().data(), finalSmartTransactionPack_.hash().toBinary().size());
-    csmeta(cslog) << "done";
+    csmeta(csdetails) << "done";
     st3.id = id();
     st3.sender = ownSmartsConfNum_;
     st3.iteration = 0U;
