@@ -2027,12 +2027,10 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage) {
     table.hashes = rPackage.roundTable().hashes;
     roundPackageCache_.push_back(rPackage);
     clearRPCache(rPackage.roundTable().round);
-    conveyer.setTable(table);
     sendRoundPackageToAll(rPackage);
 
-
-    csdebug() << "Round " << conveyer.currentRoundNumber() << ", Confidants count " << table.confidants.size();
-    csdebug() << "Hashes count: " << table.hashes.size();
+    csdebug() << "Round " << rPackage.roundTable().round << ", Confidants count " << rPackage.roundTable().confidants.size();
+    csdebug() << "Hashes count: " << rPackage.roundTable().hashes.size();
     performRoundPackage(rPackage, solver_->getPublicKey());
 }
 
