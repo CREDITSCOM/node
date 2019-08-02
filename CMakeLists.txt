@@ -140,6 +140,7 @@ add_subdirectory(cscrypto)
 add_subdirectory(csdb)
 add_subdirectory(solver)
 add_subdirectory(client)
+add_subdirectory(lmdbxx)
 
 enable_testing()
 add_subdirectory(tests)

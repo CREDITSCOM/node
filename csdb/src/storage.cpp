@@ -652,18 +652,9 @@ static bool checkPool(const Pool& pool, const Address& addr,
 }
 
 bool Storage::get_trx_from_blockchain(const Address& addr, int64_t innerId,
-                                      Transaction& trx) const {
-    auto lastTrx = get_last_by_source(addr);
-    if (!lastTrx.is_valid()) {
-        return false;
-    }
-    if (lastTrx.innerID() == innerId) {
-        trx = lastTrx;
-        return true;
-    }
-
-    auto poolHash = lastTrx.id().pool_hash();
-    while (poolHash.is_empty()) {
+                                      const PoolHash& lastTrxPh, Transaction& trx) const {
+    auto poolHash = lastTrxPh;
+    while (!poolHash.is_empty()) {
         if (checkPool(pool_load(poolHash), addr, innerId, trx)) {
             return true;
         }

@@ -239,7 +239,7 @@ public:
     void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
     void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>); 
 #endif
-	uint32_t getTransactionsCount(const csdb::Address&);
+    uint32_t getTransactionsCount(const csdb::Address&);
 
 #ifdef TRANSACTIONS_INDEX
     csdb::TransactionID getLastTransaction(const csdb::Address&);
@@ -258,6 +258,7 @@ public:
     bool getContractData(const csdb::Address& abs_addr, cs::Bytes& data) const;
 
 private:
+    void createCashesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
 
     void writeGenesisBlock();

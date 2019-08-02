@@ -88,7 +88,7 @@ add_library(csnode
   src/roundpackage.cpp
 )
 
-target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 Boost::thread)
+target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 lmdbxx Boost::thread)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -100,4 +100,5 @@ target_include_directories(${PROJECT_NAME} PUBLIC
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../csdb/
                                          ${CMAKE_BINARY_DIR}/api/api_gen
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../lmdbxx)
