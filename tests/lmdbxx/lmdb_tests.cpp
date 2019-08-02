@@ -56,6 +56,24 @@ TEST(Lmdbxx, InsertStringUnnamedDb) {
     removePath(db);
 }
 
+TEST(Lmdbxx, InsertTrivial) {
+    cs::Lmdb db(dbPath);
+    db.open();
+
+    int key = 100;
+    double value = 50.0;
+
+    db.insert(key, value);
+
+    ASSERT_TRUE(db.size() == 1);
+    ASSERT_TRUE(db.isKeyExists(key));
+
+    auto v = db.value<double>(key);
+    ASSERT_EQ(value, v);
+
+    removePath(db);
+}
+
 TEST(Lmdbxx, TestMappedSize) {
     cs::Lmdb db(dbPath);
     db.setMapSize(10);
@@ -75,6 +93,7 @@ TEST(Lmdbxx, TestMappedSize) {
     cs::Console::writeLine("Key + value size ", key.size() + value.size());
 
     db.open();
+
     db.setMapSize(cs::Lmdb::DefaultMapSize);
 
     db.insert(key, value);
