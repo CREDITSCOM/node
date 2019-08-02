@@ -30,23 +30,27 @@ namespace cs {
 // smart contract related error codes
     namespace error {
         // timeout during operation
-        constexpr uint8_t TimeExpired = 254;
+        constexpr int8_t TimeExpired = -2;
         // insufficient funds to complete operation
-        constexpr uint8_t OutOfFunds = 253;
+        constexpr int8_t OutOfFunds = -3;
         // std::exception thrown
-        constexpr uint8_t StdException = 252;
+        constexpr int8_t StdException = -4;
         // other exception thrown
-        constexpr uint8_t Exception = 251;
+        constexpr int8_t Exception = -5;
         // replenished contract does not implement payable()
-        constexpr uint8_t UnpayableReplenish = 250; // -6
+        constexpr int8_t UnpayableReplenish = -6; // -6
         // the trusted consensus have rejected new_state (and emitted transactions)
-        constexpr uint8_t ConsensusRejected = 249; // -7
+        constexpr int8_t ConsensusRejected = -7; // -7
         // error in Executor::ExecuteTransaction()
-        constexpr uint8_t ExecuteTransaction = 248; // -8
+        constexpr int8_t ExecuteTransaction = -8; // -8
         // bug in SmartContracts
-        constexpr uint8_t InternalBug = 247; // -9
-        // executor is disconnected or unavailable, value is hard-coded in ApiExec module
-        constexpr uint8_t ExecutionError = 1;
+        constexpr int8_t InternalBug = -9; // -9
+        // network error while call to executor
+        constexpr int8_t ThriftException = -10;
+        // error in contract, value is hard-coded in ApiExec module
+        constexpr int8_t ContractError = 1;
+        // executor is unreachable or in invalid state
+        constexpr int8_t ExecutorUnreachable = 4;
     }  // namespace error
 
 // transactions user fields
@@ -227,7 +231,7 @@ struct SmartExecutionData {
     std::string error;
     std::string explicit_last_state;
 
-    void setError(uint8_t code, const char* message) {
+    void setError(int8_t code, const char* message) {
         if (!result.smartsRes.empty()) {
             result.smartsRes.clear();
         }
@@ -418,7 +422,7 @@ private:
     csconnector::connector::ApiExecHandlerPtr exec_handler_ptr;
 
     // flag to allow execution, currently depends on executor presence
-    bool execution_allowed;
+    bool executor_ready;
 
     CallsQueueScheduler::CallTag tag_cancel_running_contract;
 

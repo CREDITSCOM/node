@@ -2561,11 +2561,11 @@ namespace executor {
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 reCreationOriginExecutor();
             }
-            originExecuteRes.resp.status.code = 1;
+            originExecuteRes.resp.status.code = cs::error::ThriftException;
             originExecuteRes.resp.status.message = x.what();
         }
         catch (std::exception& x) {
-            originExecuteRes.resp.status.code = 1;
+            originExecuteRes.resp.status.code = cs::error::StdException;
             originExecuteRes.resp.status.message = x.what();
         }
         originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - timeBeg).count();

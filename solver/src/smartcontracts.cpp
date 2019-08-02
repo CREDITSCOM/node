@@ -109,7 +109,7 @@ namespace {
         new_state_transaction.add_user_field(cs::trx_uf::new_state::RetVal, serialize(val));
     }
 
-    inline void set_return_value(csdb::Transaction& new_state_transaction, uint8_t val) {
+    inline void set_return_value(csdb::Transaction& new_state_transaction, int8_t val) {
         ::general::Variant variant;
         variant.__set_v_byte(val);
         set_return_value(new_state_transaction, variant);
@@ -182,10 +182,9 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
 : scheduler(calls_queue_scheduler)
 , force_execution(false)
 , bc(blockchain)
-, execution_allowed(true)
+, executor_ready(true)
 {
     // signals subscription (MUST occur AFTER the BlockChains has already subscribed to storage)
-
     // as event receiver:
     cs::Connector::connect(&bc.storeBlockEvent, this, &SmartContracts::on_store_block);
     cs::Connector::connect(&bc.readBlockEvent(), this, &SmartContracts::on_read_block);
@@ -267,6 +266,8 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
 std::string SmartContracts::get_error_message(uint8_t code) {
     using namespace cs::error;
     switch (code) {
+    case ContractError:
+        return "error in contract";
     case TimeExpired:
         return "timeout during operation";
     case OutOfFunds:
@@ -283,7 +284,8 @@ std::string SmartContracts::get_error_message(uint8_t code) {
         return "common error in executor";
     case InternalBug:
         return "internal bug in node detected";
-    case ExecutionError:
+    case ExecutorUnreachable:
+    case ThriftException:
         return "executor is disconnected or unavailable, or incompatible";
     }
     std::ostringstream os;
@@ -605,7 +607,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_
             // in addition to contract "subcalls" set by transaction take more from contract's metadata
             const std::string method = get_executed_method_name(new_item);
             const size_t cnt_0 = execution->uses.size();
-            add_uses_from(abs_addr, method, execution->uses);  // if failed, execution_allowed wil be set to false
+            add_uses_from(abs_addr, method, execution->uses);  // if failed, executor_ready wil be set to false
             // and from explicit uses from starter transaction (applicable to payable() calls)
             size_t cnt_m = execution->uses.size();
             csdb::UserField fld = t.user_field(cs::trx_uf::ordinary::UsedContracts);
@@ -731,7 +733,7 @@ void SmartContracts::test_exe_queue(bool reading_db) {
             // call to executor only if is trusted relatively to this contract
             if (it->is_executor || force_execution) {
                 // final decision to execute contract is here, based on executor availability
-                if (it->is_executor && !execution_allowed && !test_executor_availability()) {
+                if (it->is_executor && !executor_ready && !test_executor_availability()) {
                     cslog() << kLogPrefix << "skip " << FormatRef(it->seq_enqueue) << ", execution is not allowed (executor is not connected)";
                     it->is_executor = false;
                     // notify partners that unable to play trusted role
@@ -755,8 +757,19 @@ void SmartContracts::test_exe_queue(bool reading_db) {
                     }
                 }
                 else {
-                    csdebug() << kLogPrefix << "execute " << FormatRef(it->seq_enqueue) << " now";
-                    execute_async(it->executions);
+                    if (!executor_ready) {
+                        // ask user to restart executor every 2 seconds
+                        if (!wait_until_executor(1 /*sec*/, 1 /*try only once*/)) {
+                            cserror() << kLogPrefix << "cannot connect to executor, unable call to contract";
+                        }
+                        else {
+                            executor_ready = true;
+                        }
+                    }
+                    if (executor_ready) {
+                        csdebug() << kLogPrefix << "execute " << FormatRef(it->seq_enqueue) << " now";
+                        execute_async(it->executions);
+                    }
                 }
             }
             else {
@@ -781,7 +794,7 @@ SmartContractStatus SmartContracts::get_smart_contract_status(const csdb::Addres
 bool SmartContracts::executionAllowed() {
     cs::Lock lock(public_access_lock);
 
-    if (!execution_allowed) {
+    if (!executor_ready) {
         if (!wait_until_executor(2 /*seconds, period*/, 1 /*max requests*/)) {
             cserror() << kLogPrefix << "cannot connect to executor, further blockchain reading is impossible, interrupt reading";
             if (pnode->isStopRequested()) {
@@ -789,8 +802,9 @@ bool SmartContracts::executionAllowed() {
             }
             return false;
         }
+        executor_ready = true;
     }
-    return execution_allowed;
+    return executor_ready;
 }
 
 bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
@@ -870,7 +884,7 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
 }
 
 bool SmartContracts::test_executor_availability() {
-    if (!execution_allowed) {
+    if (!executor_ready) {
         // ask user to restart executor every 2 seconds
         if (!wait_until_executor(2)) {
             cserror() << kLogPrefix << "cannot connect to executor, further blockchain reading is impossible, interrupt reading";
@@ -879,7 +893,7 @@ bool SmartContracts::test_executor_availability() {
             }
             return false;
         }
-        execution_allowed = true;
+        executor_ready = true;
         // update all contracts metadata, missed while executor was unavailable
         for (const auto& exe_item : exe_queue) {
             if (exe_item.status == SmartContractStatus::Running || exe_item.status == SmartContractStatus::Finished) {
@@ -889,7 +903,7 @@ bool SmartContracts::test_executor_availability() {
                         auto it_state = known_contracts.find(exe_item.abs_addr);
                         if (it_state != known_contracts.end()) {
                             if (!update_metadata(maybe_deploy.value(), it_state->second, true /*skip_log*/)) {
-                                if (!execution_allowed) {
+                                if (!executor_ready) {
                                     // the problem has got back
                                     break;
                                 }
@@ -900,7 +914,7 @@ bool SmartContracts::test_executor_availability() {
             }
         }
     }
-    return execution_allowed;
+    return executor_ready;
 }
 
 CallsQueueScheduler& SmartContracts::getScheduler() {
@@ -993,7 +1007,7 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                             }
                             while (!execute(exe_data, true /*validationMode*/)) {
                                 // execution error, test if executor is still available
-                                if (!execution_allowed) {
+                                if (!executor_ready) {
                                     // ask user to restart executor every 2 seconds
                                     if (!wait_until_executor(2)) {
                                         cserror() << kLogPrefix << "cannot connect to executor, further blockchain reading is impossible, interrupt reading";
@@ -1318,10 +1332,10 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
         return false;
     }
     if (validationMode) {
-        csdebug() << kLogPrefix << "validating state after " << data.contract_ref << "::" << print_executed_method(data.contract_ref);
+        csdetails() << kLogPrefix << "validating state after " << data.contract_ref << "::" << print_executed_method(data.contract_ref);
     }
     else {
-        cslog() << kLogPrefix << "executing " << data.contract_ref << "::" << print_executed_method(data.contract_ref) << std::endl;
+        cslog() << kLogPrefix << "executing " << data.contract_ref << "::" << print_executed_method(data.contract_ref);
     }
     // using data.result.newState to pass previous (not yet cached) new state in case of multi-call to conrtract:
     std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
@@ -1353,14 +1367,15 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
     else {
         maybe_result = exec_handler_ptr->getExecutor().executeTransaction(smarts, data.explicit_last_state);
     }
+    bool test_executor_ready = false;
     if (maybe_result.has_value()) {
         data.result = maybe_result.value();
         if (validationMode) {
             // we require only updated states
             return true;
         }
-        if (!data.result.smartsRes.empty()) {
-            if (data.result.response.code == 0) {
+        if (data.result.response.code == 0) {
+            if (!data.result.smartsRes.empty()) {
                 auto& result = data.result.smartsRes.front();
                 if (result.response.code == 0) {
                     // calculate execution fee
@@ -1390,26 +1405,31 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
                 }
             }
             else {
-                data.error = data.result.response.message;
-                if (data.error.empty()) {
-                    data.setError(error::ExecuteTransaction, "contract execution failed, contract state is unchanged");
-                }
+                // smart result is empty!
+                data.setError(error::ExecuteTransaction, "execution failed (check executor version), contract state is unchanged");
             }
         }
+        else if (data.result.response.code == error::ThriftException) {
+            test_executor_ready = true;
+            data.setError(error::ExecutorUnreachable, "execution failed, connection to executor has lost");
+        }
         else {
-            // smart result is empty!
-            data.setError(error::ExecuteTransaction, "contract execution failed, contract state is unchanged");
+            test_executor_ready = true;
+            data.error = data.result.response.message;
+            if (data.error.empty()) {
+                data.setError(error::ExecuteTransaction, "execution failed, contract state is unchanged");
+            }
         }
     }
     else {
         // the possible reason to return std::nullopt is the executor unconnected, otherwise there is an internal error (incorrect transaction and so on...)
-        execution_allowed = exec_handler_ptr->getExecutor().isConnect();
-        if (!execution_allowed) {
-            data.setError(error::ExecutionError, "execution failed, connection to executor has lost");
+        test_executor_ready = true;
+        data.setError(error::ExecutorUnreachable, "execution failed, executor is unreachable");
+    }
+    if (test_executor_ready) {
+        executor_ready = exec_handler_ptr->getExecutor().isConnect();
+        if (!executor_ready) {
             return false;
-        }
-        else {
-            data.setError(error::ExecuteTransaction, "execution failed, internal error");
         }
     }
     return true;
@@ -1563,8 +1583,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
 
         // finalize new_state transaction, data_item.result.smartsRes always non-empty
         if (!data_item.error.empty()) {
-            cserror() << std::endl << kLogPrefix << data_item.error << std::endl;
-            csdebug() << kLogPrefix << "execution of " << data_item.contract_ref << " is failed, new state is empty";
+            cswarning() << kLogPrefix << "execution of " << data_item.contract_ref << " is failed: " << data_item.error << ", new state is empty";
             // result contains empty USRFLD[state::Value]
             result.add_user_field(new_state::Value, std::string{});
             // result contains error code from ret_val
@@ -1578,7 +1597,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                 cswarning() << kLogPrefix << "primary " << data_item.contract_ref << " new state is empty";
                 result.add_user_field(new_state::Value, std::string{});
                 packet.addTransaction(result);
-                set_return_value(result, error::ExecutionError);
+                set_return_value(result, error::ContractError);
             }
             else {
                 const auto& primary_new_state = execution_result.states.at(primary_abs_addr);
@@ -1947,8 +1966,9 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         // create or get contract state item
         StateItem& item = known_contracts[abs_addr];
         // update state value in cache if it is older then or equal to or unset
-        if (!item.ref_cache.is_valid() || item.ref_cache < ref_start || item.ref_cache == ref_start) {
-            if (!dbcache_update(abs_addr, ref_start, state_value, false /*force_update*/)) {
+        bool force_update_contracts_cache = true;
+        if (force_update_contracts_cache || !item.ref_cache.is_valid() || item.ref_cache < ref_start || item.ref_cache == ref_start) {
+            if (!dbcache_update(abs_addr, ref_start, state_value, force_update_contracts_cache)) {
                 if (reading_db) {
                     // update state in memory cache
                     std::string state_from_db;
@@ -1972,14 +1992,14 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
                 else {
                     // unable to allow cache not to be updated
                     cserror() << kLogPrefix << "failed to update " << ref_start << " state in DB";
-                    //this->execution_allowed = false;
+                    //this->executor_ready = false;
                     return false;
                 }
             }
             else {
                 item.ref_cache = ref_start;
                 if (reading_db) {
-                    csdebug() << kLogPrefix << to_base58(abs_addr) << "state after " << ref_start << " hass updated cache in DB while reading or synchronizing blocks";
+                    csdetails() << kLogPrefix << to_base58(abs_addr) << "state after " << ref_start << " has updated cache in DB while reading or synchronizing blocks";
                 }
                 else {
                     csdetails() << kLogPrefix << ref_start << " updated state in DB";
@@ -2065,13 +2085,13 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     auto& executor_instance = exec_handler_ptr->getExecutor();
     executor_instance.getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
     if (result.status.code != 0) {
-        execution_allowed = executor_instance.isConnect();
+        executor_ready = executor_instance.isConnect();
         if (!skip_log) {
             if (!result.status.message.empty()) {   
                 cswarning() << kLogPrefix << result.status.message;
             }
             else {
-                if (!execution_allowed) {
+                if (!executor_ready) {
                     cswarning() << kLogPrefix << "unable to connect to executor";
                 }
                 else {
