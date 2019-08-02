@@ -553,8 +553,9 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
     size_t counter = 0;
     for (const auto& tr : currentSmartTransactionPack_.transactions()) {
         if (SmartContracts::is_new_state(tr)) {
-            tmpNewStates_[counter].add_user_field(trx_uf::new_state::Fee, finalFees[counter]);
-            finalSmartTransactionPack_.addTransaction(tmpNewStates_[counter]);
+            auto tmp = tmpNewStates_[counter];
+            tmp.add_user_field(trx_uf::new_state::Fee, finalFees[counter]);
+            finalSmartTransactionPack_.addTransaction(tmp);
             ++counter;
         }
         else {

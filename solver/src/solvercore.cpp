@@ -238,6 +238,9 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
     double mean = 0.0;
     int N = 0;
     for (auto& it : stageOneStorage) {
+        if (it.sender >= cs::Conveyer::instance().confidantsCount()) {
+            continue;
+        }
         if (!it.roundTimeStamp.empty() && mask[it.sender] != cs::ConfidantConsts::InvalidConfidantIndex) {
             int64_t tStamp;
             try {
