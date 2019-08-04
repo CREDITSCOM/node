@@ -384,7 +384,7 @@ void BlockChain::removeLastBlock() {
     const csdb::PoolHash poolHash = pool.hash();
 
     if (lastHash == poolHash) {
-        blockHashes_->removeLast();
+        auto removed = blockHashes_->removeLast();
         csmeta(csdebug) << "Remove last hash is ok, sequence: " << pool.sequence();
     }
     else {
@@ -560,7 +560,9 @@ csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
         return deferredBlock_.hash().clone();
     }
 
-    return blockHashes_->find(seq);
+    return storage_.pool_hash(seq);
+
+    //return blockHashes_->find(seq);
 }
 
 cs::Sequence BlockChain::getSequenceByHash(const csdb::PoolHash& hash) const {
