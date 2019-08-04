@@ -112,8 +112,8 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         *shouldStop = true;
     }
     else {
-        if (!blockHashes_->initFromPrevBlock(block)) {
-            cserror() << "Blockchain: blockHashes_->initFromPrevBlock(block) failed on block #" << block.sequence();
+        if (!blockHashes_->onReadBlock(block)) {
+            cserror() << "Blockchain: blockHashes_->onReadBlock(block) failed on block #" << block.sequence();
             *shouldStop = true;
         }
         else {
@@ -560,9 +560,12 @@ csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
         return deferredBlock_.hash().clone();
     }
 
-    return storage_.pool_hash(seq);
+    csdb::PoolHash tmp = blockHashes_->find(seq);
+    if (!tmp.is_empty()) {
+        return tmp;
+    }
 
-    //return blockHashes_->find(seq);
+    return storage_.pool_hash(seq);
 }
 
 cs::Sequence BlockChain::getSequenceByHash(const csdb::PoolHash& hash) const {
@@ -572,9 +575,12 @@ cs::Sequence BlockChain::getSequenceByHash(const csdb::PoolHash& hash) const {
         return deferredBlock_.sequence();
     }
 
-    return storage_.pool_sequence(hash);
+    cs::Sequence seq = blockHashes_->find(hash);
+    if (seq != kWrongSequence) {
+        return seq;
+    }
 
-    //return blockHashes_->find(hash);
+    return storage_.pool_sequence(hash);
 }
 
 uint64_t BlockChain::getWalletsCountWithBalance() {
@@ -887,7 +893,7 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
         const auto& currentRoundConfidants = nextPool.confidants();
         walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants, *this);
         walletsPools_->loadNextBlock(nextPool);
-        if (!blockHashes_->loadNextBlock(nextPool)) {
+        if (!blockHashes_->onStoreBlock(nextPool)) {
             cslog() << "Error writing DB structure";
         }
     }

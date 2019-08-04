@@ -8,8 +8,8 @@ namespace cs {
 class BlockHashes {
 public:
     struct DbStructure {
-        cs::Sequence first_;
-        cs::Sequence last_;
+        cs::Sequence first_{ 0 };
+        cs::Sequence last_{ 0 };
     };
 
 public:
@@ -28,14 +28,14 @@ public:
         //return seqDb_.size();
     }
 
-    bool initFromPrevBlock(csdb::Pool prevBlock);
-    bool loadNextBlock(csdb::Pool nextBlock);
+    bool onReadBlock(const csdb::Pool& block);
+    bool onStoreBlock(const csdb::Pool& block);
 
     csdb::PoolHash find(cs::Sequence seq) const;
     cs::Sequence find(csdb::PoolHash hash) const;
 
     csdb::PoolHash removeLast();
-    csdb::PoolHash getLast() const;
+    csdb::PoolHash getLast();
 
 private slots:
     void onDbFailed(const cs::LmdbException& exception);
@@ -48,6 +48,15 @@ private:
 
     cs::Lmdb seqDb_;
     cs::Lmdb hashDb_;
+
+    std::map<cs::Sequence, csdb::PoolHash> mem_cache1;
+    std::map<cs::Sequence, csdb::PoolHash> mem_cache2;
+    std::map<cs::Sequence, csdb::PoolHash>* active_mem_cache;
+    std::atomic<bool> flush_completed;
+
+    void flush_mem_cache();
+    bool on_next_block(const csdb::Pool& block, bool fast_mode);
+    bool wait_flush_completed(uint32_t sleep_msec, uint32_t count);
 };
 }  // namespace cs
 
