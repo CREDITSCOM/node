@@ -309,6 +309,8 @@ public:
 
     cs::Sequence pool_sequence(const PoolHash& hash) const;
 
+    csdb::PoolHash pool_hash(cs::Sequence sequence) const;
+
 public signals:
     const ReadBlockSignal& readBlockEvent() const;
 
