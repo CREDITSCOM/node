@@ -13,11 +13,12 @@ BlockHashes::BlockHashes(const std::string& path)
 , isDbInited_(false)
 , seqDb_(path + seqPath)
 , hashDb_(path + hashPath) {
-    initialization();
+    //initialization();
 }
 
 bool BlockHashes::initFromPrevBlock(csdb::Pool prevBlock) {
     cs::Sequence seq = prevBlock.sequence();
+    db_.last_ = seq;
 
     if (!isDbInited_) {
         db_.first_ = 0;
@@ -26,10 +27,13 @@ bool BlockHashes::initFromPrevBlock(csdb::Pool prevBlock) {
 
     auto hash = prevBlock.hash();
 
-    seqDb_.insert(seq, hash.to_binary());
-    hashDb_.insert(hash.to_binary(), seq);
+    //auto cached_hash = find(seq);
+    //if (cached_hash == hash) {
+    //    return true;
+    //}
 
-    db_.last_ = seq;
+    //seqDb_.insert(seq, hash.to_binary());
+    //hashDb_.insert(hash.to_binary(), seq);
 
     return true;
 }
@@ -46,15 +50,15 @@ bool BlockHashes::loadNextBlock(csdb::Pool nextBlock) {
         return false;
     }
 
-    if (seq != seqDb_.size()) {
-        csdebug() << csfunc() << ": seq != hashes_.size()";
-        return false;  // see BlockChain::putBlock
-    }
+    //if (seq != seqDb_.size()) {
+    //    csdebug() << csfunc() << ": seq != hashes_.size()";
+    //    return false;  // see BlockChain::putBlock
+    //}
 
-    auto hash = nextBlock.hash();
+    //auto hash = nextBlock.hash();
 
-    seqDb_.insert(seq, hash.to_binary());
-    hashDb_.insert(hash.to_binary(), seq);
+    //seqDb_.insert(seq, hash.to_binary());
+    //hashDb_.insert(hash.to_binary(), seq);
 
     db_.last_ = seq;
 
@@ -72,7 +76,7 @@ csdb::PoolHash BlockHashes::find(cs::Sequence seq) const {
 
 cs::Sequence BlockHashes::find(csdb::PoolHash hash) const {
     if (empty() || !hashDb_.isKeyExists(hash.to_binary())) {
-        return cs::Sequence{};
+        return cs::kWrongSequence;
     }
 
     return hashDb_.value<cs::Sequence>(hash.to_binary());
@@ -85,21 +89,26 @@ csdb::PoolHash BlockHashes::removeLast() {
 
     auto pair = seqDb_.last<cs::Sequence, cs::Bytes>();
 
-    seqDb_.remove(pair.first);
-    hashDb_.remove(pair.second);
+    //seqDb_.remove(pair.first);
+    //hashDb_.remove(pair.second);
 
-    --db_.last_;
+    if (db_.last_ == pair.first) {
+        --db_.last_;
+    }
+    else {
+        db_.last_ = pair.first - 1;
+    }
 
     return csdb::PoolHash::from_binary(std::move(pair.second));
 }
 
 csdb::PoolHash BlockHashes::getLast() const {
-    if (empty()) {
+    //if (empty()) {
         return csdb::PoolHash{};
-    }
+    //}
 
-    auto pair = seqDb_.last<cs::Sequence, cs::Bytes>();
-    return csdb::PoolHash::from_binary(std::move(pair.second));
+    //auto pair = seqDb_.last<cs::Sequence, cs::Bytes>();
+    //return csdb::PoolHash::from_binary(std::move(pair.second));
 }
 
 void BlockHashes::onDbFailed(const LmdbException& exception) {

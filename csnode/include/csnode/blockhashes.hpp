@@ -24,7 +24,8 @@ public:
     }
 
     size_t size() const {
-        return seqDb_.size();
+        return db_.last_;
+        //return seqDb_.size();
     }
 
     bool initFromPrevBlock(csdb::Pool prevBlock);

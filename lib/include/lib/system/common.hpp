@@ -21,6 +21,9 @@ namespace cs {
 using RoundNumber = uint64_t;
 using Sequence = RoundNumber;
 
+constexpr const Sequence kWrongSequence = std::numeric_limits<Sequence>::max();
+constexpr const RoundNumber kWrongRoundNumber = std::numeric_limits<RoundNumber>::max();
+
 using Byte = cscrypto::Byte;
 
 // dynamic vector of bytes
