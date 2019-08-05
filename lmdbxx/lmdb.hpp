@@ -19,8 +19,10 @@ using IncreaseSignal = cs::Signal<void(size_t size)>;
 // lmdbxx RAII wrapper, not thread safe by default
 class Lmdb {
     using Info = MDB_envinfo;
+    using Stats = MDB_stat;
 public:
-    enum Options : unsigned int {
+    enum Options : size_t {
+        GrowMapSize = 10485760,
         DefaultMapSize = 1UL * 1024UL * 1024UL * 1024UL
     };
 
@@ -132,6 +134,8 @@ public:
     void insert(const char* keyData, std::size_t keySize, const char* valueData, std::size_t valueSize,
                 const char* name = nullptr,
                 const unsigned int flags = lmdb::dbi::default_put_flags) {
+        checkMapSize();
+
         try {
             auto transaction = lmdb::txn::begin(env_);
             auto dbi = lmdb::dbi::open(transaction, name);
@@ -145,13 +149,7 @@ public:
             emit commited(keyData, keySize);
         }
         catch(const lmdb::error& error) {
-            if (error.code() != int(MDB_MAP_FULL)) {
-                raise(error);
-            }
-            else {
-                reserve();
-                insert(keyData, keySize, valueData, valueSize, name, flags);
-            }
+            raise(error);
         }
     }
 
@@ -337,21 +335,30 @@ protected:
         }
     }
 
-    void reserve() {
-        auto size = mapSize();
-        setMapSize(size * 2);
-
-        auto newMapSize = mapSize();
-
-        if (size < newMapSize) {
-            emit mapSizeIncreased(newMapSize);
-        }
-    }
-
     Info info() const {
         Info temp{};
         mdb_env_info(env_.handle(), &temp);
         return temp;
+    }
+
+    Stats stats() const {
+        Stats temp{};
+        mdb_env_stat(env_.handle(), &temp);
+        return temp;
+    }
+
+    void checkMapSize() {
+        Info metaInfo = info();
+        Stats metaStats = stats();
+
+        auto freeSpace = metaInfo.me_mapsize - (metaStats.ms_psize * metaInfo.me_last_pgno);
+
+        if (freeSpace < GrowMapSize/2) {
+            auto newSize = mapSize() + GrowMapSize;
+            setMapSize(newSize);
+
+            emit mapSizeIncreased(newSize);
+        }
     }
 
     lmdb::env environment(const unsigned flags) const {

@@ -140,10 +140,9 @@ TEST(Lmdbxx, TestMappedSize) {
 
 TEST(Lmdbxx, TestAutoMapSizeIncrease) {
     bool isIncreased = false;
+    size_t reallocatesCount = 0;
 
     cs::Lmdb db(dbPath);
-    db.setMapSize(18000);
-    db.open();
 
     cs::Connector::connect(&db.failed, [](const auto& e) {
         cs::Console::writeLine("Error in database ", e.what());
@@ -151,11 +150,14 @@ TEST(Lmdbxx, TestAutoMapSizeIncrease) {
 
     cs::Connector::connect(&db.mapSizeIncreased, [&](const size_t) {
         isIncreased = true;
+        ++reallocatesCount;
     });
+
+    db.open();
 
     std::string key = "Key";
     std::string value = "Value";
-    constexpr size_t count = 10000;
+    constexpr size_t count = 50000;
 
     for (size_t i = 0; i < count; ++i) {
         auto newKey = key + std::to_string(i);
@@ -166,6 +168,8 @@ TEST(Lmdbxx, TestAutoMapSizeIncrease) {
 
     ASSERT_EQ(db.size(), count);
     ASSERT_TRUE(isIncreased);
+
+    cs::Console::writeLine("Reallocates count ", reallocatesCount);
 
     removePath(db);
 }
