@@ -49,6 +49,10 @@ namespace cs {
         constexpr int8_t ThriftException = -10;
         // error in contract, value is hard-coded in ApiExec module
         constexpr int8_t ContractError = 1;
+        // incompatible version
+        constexpr int8_t ExecutorIncompatible = 2;
+        // node unreachable from executor
+        constexpr int8_t NodeUnreachable = 3;
         // executor is unreachable or in invalid state
         constexpr int8_t ExecutorUnreachable = 4;
     }  // namespace error

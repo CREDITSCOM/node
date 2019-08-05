@@ -973,13 +973,9 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                         }
                         else {
                             cswarning() << kLogPrefix << "incorrect " << ref_start << " state in cache, request from other nodes";
-                            // request correct state in network
+                            // request correct state in network and return empty new_state transaction as "no valid state available"
                             net_request_contract_state(req_abs_addr);
-                            // mark current state as incorrect
-                            auto& tmp = const_cast<StateItem&>(item);
-                            tmp.state.clear();
                             tr_state.add_user_field(new_state::Value, std::string{});
-                            return tr_state;
                         }
                     }
                 }
@@ -1323,6 +1319,7 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
         data.result.smartsRes.clear();
     }
     if (!exec_handler_ptr) {
+        executor_ready = false;
         data.setError(error::ExecuteTransaction, "contract executor is unavailable");
         return false;
     }
@@ -1370,42 +1367,49 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
     bool test_executor_ready = false;
     if (maybe_result.has_value()) {
         data.result = maybe_result.value();
-        if (validationMode) {
-            // we require only updated states
-            return true;
-        }
         if (data.result.response.code == 0) {
             if (!data.result.smartsRes.empty()) {
                 auto& result = data.result.smartsRes.front();
                 if (result.response.code == 0) {
-                    // calculate execution fee
-                    csdb::Amount total_fee(0);
-                    for (const auto r : data.result.smartsRes) {
-                        // r.executionCost is in nanoseconds, as microseconds are required
-                        total_fee += fee::getExecutionFee(r.executionCost / 1000);
-                    }
+                    if (!validationMode) {
+                        // calculate execution fee
+                        csdb::Amount total_fee(0);
+                        for (const auto r : data.result.smartsRes) {
+                            // r.executionCost is in nanoseconds, as microseconds are required
+                            total_fee += fee::getExecutionFee(r.executionCost / 1000);
+                        }
 #if defined(USE_SELF_MEASURED_FEE)
-                    if (total_fee.to_double() < DBL_EPSILON) {
-                        total_fee = fee::getExecutionFee(data.result.selfMeasuredCost);
-                    }
+                        if (total_fee.to_double() < DBL_EPSILON) {
+                            total_fee = fee::getExecutionFee(data.result.selfMeasuredCost);
+                        }
 #endif
-                    if (total_fee > info.feeLimit) {
-                        // out of fee detected
-                        data.setError(error::OutOfFunds, "contract execution is out of funds");
-                    }
-                    else {
-                        // update with actual value
-                        data.executor_fee = total_fee;
+                        if (total_fee > info.feeLimit) {
+                            // out of fee detected
+                            data.setError(error::OutOfFunds, "contract execution is out of funds");
+                        }
+                        else {
+                            // update with actual value
+                            data.executor_fee = total_fee;
+                        }
                     }
                 } else {
                     data.error = result.response.message;
                     if (data.error.empty()) {
                         data.error = "contract execution failed, new contract state is empty";
                     }
+                    switch (result.response.code) {
+                    case error::ExecutorIncompatible:
+                    case error::NodeUnreachable:
+                        // may or may not be connected, it is not ready
+                        executor_ready = false;
+                        //TODO: decide, maybe stop executor process
+                        break;
+                    }
                 }
             }
             else {
                 // smart result is empty!
+                executor_ready = false;
                 data.setError(error::ExecuteTransaction, "execution failed (check executor version), contract state is unchanged");
             }
         }
@@ -1426,7 +1430,11 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
         test_executor_ready = true;
         data.setError(error::ExecutorUnreachable, "execution failed, executor is unreachable");
     }
-    if (test_executor_ready) {
+    // result
+    if (!executor_ready) {
+        return false;
+    }
+    else if (test_executor_ready) {
         executor_ready = exec_handler_ptr->getExecutor().isConnect();
         if (!executor_ready) {
             return false;
