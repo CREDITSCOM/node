@@ -651,8 +651,8 @@ static bool checkPool(const Pool& pool, const Address& addr,
     return false;
 }
 
-bool Storage::get_trx_from_blockchain(const Address& addr, int64_t innerId,
-                                      const PoolHash& lastTrxPh, Transaction& trx) const {
+bool Storage::get_from_blockchain(const Address& addr, int64_t innerId,
+                                  const PoolHash& lastTrxPh, Transaction& trx) const {
     auto poolHash = lastTrxPh;
     while (!poolHash.is_empty()) {
         if (checkPool(pool_load(poolHash), addr, innerId, trx)) {
@@ -662,8 +662,7 @@ bool Storage::get_trx_from_blockchain(const Address& addr, int64_t innerId,
     }
     return false;
 }
-#endif
-
+#else
 bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& innerId /*input*/, Transaction& trx /*output*/) const {
     Pool curPool;
     cs::Sequence curIdx = cs::numeric_cast<cs::Sequence>(innerId);
@@ -709,6 +708,7 @@ bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& 
 
     return is_in_blockchain;
 }
+#endif
 
 const ReadBlockSignal& Storage::readBlockEvent() const {
     return d->read_block_event;

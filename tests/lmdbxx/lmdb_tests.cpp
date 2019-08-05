@@ -6,10 +6,10 @@
 #include <lmdb.hpp>
 
 namespace fs = boost::filesystem;
-static const std::string dbPath = "./testdb";
+static const std::string dbPath = "./temptestdb";
 
 static void removePath(cs::Lmdb& db) {
-    if (db.isOpened()) {
+    if (db.isOpen()) {
         db.close();
     }
 
@@ -33,10 +33,10 @@ TEST(Lmdbxx, DatabaseOpenClose) {
     cs::Lmdb db(dbPath);
 
     db.open();
-    ASSERT_TRUE(db.isOpened());
+    ASSERT_TRUE(db.isOpen());
 
     db.close();
-    ASSERT_FALSE(db.isOpened());
+    ASSERT_FALSE(db.isOpen());
 
     removePath(db);
 }
@@ -61,14 +61,14 @@ TEST(Lmdbxx, InsertTrivial) {
     db.open();
 
     int key = 100;
-    double value = 50.0;
+    long value = 50;
 
     db.insert(key, value);
 
     ASSERT_TRUE(db.size() == 1);
     ASSERT_TRUE(db.isKeyExists(key));
 
-    auto v = db.value<double>(key);
+    auto v = db.value<long>(key);
     ASSERT_EQ(value, v);
 
     removePath(db);
@@ -107,11 +107,15 @@ TEST(Lmdbxx, LastPair) {
 
 TEST(Lmdbxx, TestMappedSize) {
     cs::Lmdb db(dbPath);
-    db.setMapSize(10);
+    db.setMapSize(9000);
+    db.open();
 
     cs::Connector::connect(&db.failed, [](const auto& e) {
         cs::Console::writeLine("Error in database ", e.what());
     });
+
+    cs::Console::writeLine("Db map size ", db.mapSize());
+    ASSERT_TRUE(db.mapSize() == 9000);
 
     std::string key = "key";
     std::string value = "SuperAndLargeValue";
@@ -123,16 +127,49 @@ TEST(Lmdbxx, TestMappedSize) {
 
     cs::Console::writeLine("Key + value size ", key.size() + value.size());
 
-    db.open();
-
     db.setMapSize(cs::Lmdb::DefaultMapSize);
-
     db.insert(key, value);
 
     ASSERT_TRUE(db.isKeyExists(key));
     ASSERT_TRUE(db.size() == 1);
 
     ASSERT_TRUE(db.value<std::string>(key) == value);
+
+    removePath(db);
+}
+
+TEST(Lmdbxx, TestAutoMapSizeIncrease) {
+    bool isIncreased = false;
+    size_t reallocatesCount = 0;
+
+    cs::Lmdb db(dbPath);
+
+    cs::Connector::connect(&db.failed, [](const auto& e) {
+        cs::Console::writeLine("Error in database ", e.what());
+    });
+
+    cs::Connector::connect(&db.mapSizeIncreased, [&](const size_t) {
+        isIncreased = true;
+        ++reallocatesCount;
+    });
+
+    db.open();
+
+    std::string key = "Key";
+    std::string value = "Value";
+    constexpr size_t count = 50000;
+
+    for (size_t i = 0; i < count; ++i) {
+        auto newKey = key + std::to_string(i);
+        auto newValue = value + std::to_string(i);
+
+        db.insert(newKey, newValue);
+    }
+
+    ASSERT_EQ(db.size(), count);
+    ASSERT_TRUE(isIncreased);
+
+    cs::Console::writeLine("Reallocates count ", reallocatesCount);
 
     removePath(db);
 }

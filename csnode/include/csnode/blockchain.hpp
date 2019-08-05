@@ -242,7 +242,7 @@ public:
     uint32_t getTransactionsCount(const csdb::Address&);
 
 #ifdef TRANSACTIONS_INDEX
-    csdb::TransactionID getLastTransaction(const csdb::Address&);
+    csdb::TransactionID getLastTransaction(const csdb::Address&) const;
     csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
 
     std::pair<csdb::PoolHash, uint32_t> getLastNonEmptyBlock();

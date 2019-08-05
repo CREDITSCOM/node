@@ -1,6 +1,8 @@
 #ifndef BLOCKHASHES_HPP
 #define BLOCKHASHES_HPP
 
+#include <map>
+
 #include <csdb/pool.hpp>
 #include <lmdb.hpp>
 

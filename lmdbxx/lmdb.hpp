@@ -14,11 +14,15 @@ using FlushSignal = cs::Signal<void()>;
 using CommitSignal = cs::Signal<void(const char* data, size_t size)>;
 using RemoveSignal = cs::Signal<void(const char* data, size_t size)>;
 using FailureSignal = cs::Signal<void(const LmdbException& error)>;
+using IncreaseSignal = cs::Signal<void(size_t size)>;
 
 // lmdbxx RAII wrapper, not thread safe by default
 class Lmdb {
+    using Info = MDB_envinfo;
+    using Stats = MDB_stat;
 public:
-    enum Options : unsigned int {
+    enum Options : size_t {
+        GrowMapSize = 10485760,
         DefaultMapSize = 1UL * 1024UL * 1024UL * 1024UL
     };
 
@@ -32,7 +36,7 @@ public:
               const lmdb::mode mode = lmdb::env::default_mode) {
         try {
             env_.open(path_.c_str(), flags, mode);
-            isOpened_ = true;
+            isOpen_ = true;
         }
         catch(const lmdb::error& error) {
             raise(error);
@@ -41,12 +45,12 @@ public:
 
     void close() {
         env_.close();
-        isOpened_ = false;
+        isOpen_ = false;
     }
 
     // returns database open status
-    bool isOpened() const {
-        return isOpened_;
+    bool isOpen() const {
+        return isOpen_;
     }
 
     void setFlags(const unsigned int flags, const bool onoff = true) {
@@ -86,6 +90,16 @@ public:
         }
     }
 
+    // returns current map size
+    size_t mapSize() const {
+        if (!isOpen()) {
+            return size_t{};
+        }
+
+        auto stats = info();
+        return stats.me_mapsize;
+    }
+
     // flushes data to drive in sync mode
     void flush() {
         flushImpl(true);
@@ -109,7 +123,7 @@ public:
             raise(error);
         }
 
-        return 0;
+        return size_t{};
     }
 
     /// transactions
@@ -120,6 +134,8 @@ public:
     void insert(const char* keyData, std::size_t keySize, const char* valueData, std::size_t valueSize,
                 const char* name = nullptr,
                 const unsigned int flags = lmdb::dbi::default_put_flags) {
+        checkMapSize();
+
         try {
             auto transaction = lmdb::txn::begin(env_);
             auto dbi = lmdb::dbi::open(transaction, name);
@@ -142,6 +158,8 @@ public:
     void insert(const Key& key, const Value& value,
                 const char* name = nullptr,
                 const unsigned int flags = lmdb::dbi::default_flags) {
+        static_assert(!std::is_floating_point_v<Key> && !std::is_floating_point_v<Value>, "Floating point value does not support");
+
         decltype(auto) k = cast(key);
         decltype(auto) v = cast(value);
 
@@ -181,6 +199,7 @@ public:
     // removes key/value pair by key as data/size method entity
     template<typename Key>
     bool remove(const Key& key, const char* name = nullptr, const unsigned int flags = lmdb::dbi::default_flags) {
+        static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
         decltype(auto) k = cast(key);
         return remove(reinterpret_cast<const char*>(k.data()), k.size(), name, flags);
     }
@@ -205,6 +224,7 @@ public:
 
     template<typename Key>
     bool isKeyExists(const Key& key, const char* name = nullptr) const {
+        static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
         decltype(auto) k = cast(key);
         return isKeyExists(reinterpret_cast<const char*>(k.data()), k.size(), name);
     }
@@ -237,6 +257,7 @@ public:
     // any key with data/size methods
     template<typename T, typename Key>
     T value(const Key& key) const {
+        static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
         decltype(auto) k = cast(key);
         return value<T>(reinterpret_cast<const char*>(k.data()), k.size());
     }
@@ -244,6 +265,7 @@ public:
     // returns last pair of key/value inserted to database
     template<typename Key, typename Value>
     std::pair<Key, Value> last(const char* name = nullptr) const {
+        static_assert(!std::is_floating_point_v<Key> && !std::is_floating_point_v<Value>, "Floating point value does not support");
         try {
             auto transaction = lmdb::txn::begin(env_, nullptr, MDB_RDONLY);
             auto dbi = lmdb::dbi::open(transaction, name);
@@ -280,17 +302,15 @@ protected:
         emit failed(LmdbException(error));
     }
 
-    template<typename T, typename = std::enable_if_t<std::is_integral_v<T> || std::is_floating_point_v<T>>>
+    template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
     auto cast(const T& value) const {
-        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>, "Value must be integral or floating point to cast");
-
         std::array<char, sizeof(T)> bytes{};
         std::to_chars(bytes.data(), bytes.data() + bytes.size(), value);
 
         return bytes;
     }
 
-    template<typename T, typename = std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T>>>
+    template<typename T, typename = std::enable_if_t<!std::is_integral_v<T>>>
     const T& cast(const T& value) const {
         return value;
     }
@@ -304,7 +324,7 @@ protected:
 
             return array;
         }
-        else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) {
+        else if constexpr (std::is_integral_v<T>) {
             T result = 0;
             std::from_chars(value.data(), value.data() + value.size(), result);
 
@@ -315,10 +335,42 @@ protected:
         }
     }
 
+    Info info() const {
+        Info temp{};
+        mdb_env_info(env_.handle(), &temp);
+        return temp;
+    }
+
+    Stats stats() const {
+        Stats temp{};
+        mdb_env_stat(env_.handle(), &temp);
+        return temp;
+    }
+
+    void checkMapSize() {
+        Info metaInfo = info();
+        Stats metaStats = stats();
+
+        auto freeSpace = metaInfo.me_mapsize - (metaStats.ms_psize * metaInfo.me_last_pgno);
+
+        if (freeSpace < GrowMapSize/2) {
+            auto newSize = mapSize() + GrowMapSize;
+            setMapSize(newSize);
+
+            emit mapSizeIncreased(newSize);
+        }
+    }
+
+    lmdb::env environment(const unsigned flags) const {
+        return lmdb::env::create(flags);
+    }
+
 private:
     lmdb::env env_;
     std::string path_;
-    bool isOpened_ = false;
+
+    bool isOpen_ = false;
+    unsigned int flags_;
 
 public signals:
 
@@ -333,6 +385,9 @@ public signals:
 
     // generates when database data key is removed
     RemoveSignal removed;
+
+    // generates when database inseased map size
+    IncreaseSignal mapSizeIncreased;
 };
 }
 

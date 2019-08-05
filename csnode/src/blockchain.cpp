@@ -857,7 +857,11 @@ void BlockChain::close() {
 
 bool BlockChain::getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const {
     cs::Lock lock(dbLock_);
+#ifdef TRANSACTIONS_INDEX
+    return storage_.get_from_blockchain(addr, innerId, getLastTransaction(addr).pool_hash(), result);
+#else
     return storage_.get_from_blockchain(addr, innerId, result);
+#endif
 }
 
 bool BlockChain::updateContractData(const csdb::Address& abs_addr, const cs::Bytes& data) const {
@@ -1410,7 +1414,7 @@ uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
 //}
 
 #ifdef TRANSACTIONS_INDEX
-csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
+csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) const {
     std::lock_guard lock(cacheMutex_);
     WalletId id;
 
