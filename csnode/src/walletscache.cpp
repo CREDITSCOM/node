@@ -367,10 +367,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
         cs::Bytes tmp;
         tmp.assign(wallData_s.address_.cbegin(), wallData_s.address_.cend());
         csdetails() << "Wallets: innerID of (new_state) " << EncodeBase58(tmp) << " <- " << tr.innerID();
-
-#ifdef MONITOR_NODE              
         wallData_s.lastTransaction_ = tr.id();
-#endif
         setModified(id_s);
         //
     }
@@ -389,10 +386,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 #ifdef MONITOR_NODE        
         setWalletTime(wallData.address_, tr.get_time());
 #endif
-
-#ifdef TRANSACTIONS_INDEX
         wallData.lastTransaction_ = tr.id();
-#endif
     }
 
     setModified(id);
@@ -495,10 +489,7 @@ void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) 
 #ifdef MONITOR_NODE
     setWalletTime(wallData.address_, tr.get_time());
 #endif
-
-#ifdef TRANSACTIONS_INDEX
     wallData.lastTransaction_ = tr.id();
-#endif
 }
 
 bool WalletsCache::Initer::findWalletId(const csdb::Address& address, WalletId& id) {
