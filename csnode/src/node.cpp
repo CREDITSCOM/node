@@ -520,24 +520,23 @@ void Node::cleanConfirmationList(cs::RoundNumber rNum) {
     confirmationList_.remove(rNum);
 }
 
-void Node::sendStateRequest(cs::Sequence seq, uint32_t idx, cs::PublicKeys confidants) {//the function to be refactored
-    csmeta(csdebug) << "Sending StateRequest" << cs::FormatRef(seq, idx);
+void Node::sendStateRequest(uint64_t smartId, cs::PublicKeys confidants) {//the function to be refactored
+    csmeta(csdebug) << "Sending StateRequest" << cs::FormatRef(smartId);
     auto round = cs::Conveyer::instance().currentRoundNumber();
     cs::Bytes message;
     cs::DataStream stream(message);
-    stream << round << seq << idx;
+    stream << round << smartId;
     cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
 
-    sendToList(confidants, cs::ConfidantConsts::InvalidConfidantIndex, MsgTypes::StateRequest, round, seq, idx, sig);
+    sendToList(confidants, cs::ConfidantConsts::InvalidConfidantIndex, MsgTypes::StateRequest, round, smartId, sig);
 }
 
 void Node::getStateRequest(const uint8_t * data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey & sender) {
     csmeta(csdebug) << "Getting StateRequest from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
     istream_.init(data, size);
-    cs::Sequence seq;
-    uint32_t idx;
+    uint64_t smartId;
     cs::Signature signature;
-    istream_ >> seq >> idx >> signature;
+    istream_ >> smartId >> signature;
 
     if (!istream_.good() || !istream_.end()) {
         cserror() << "NODE> Bad StateRequest packet format";
@@ -546,7 +545,7 @@ void Node::getStateRequest(const uint8_t * data, const std::size_t size, const c
 
     cs::Bytes message;
     cs::DataStream stream(message);
-    stream << rNum << seq << idx;
+    stream << rNum << smartId;
     if (!cscrypto::verifySignature(signature, sender, message.data(), message.size())) {
         csdebug() << "NODE> StateRequest Signature is incorrect";
         return;

@@ -158,7 +158,7 @@ public:
 
     // state syncro functions
     
-    void sendStateRequest(cs::Sequence seq, uint32_t idx, cs::PublicKeys confidants);
+    void sendStateRequest( uint64_t smartId, cs::PublicKeys confidants);
     void getStateRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
     void sendStateReply(const cs::PublicKey& respondent, const cs::Bytes state);
     void getStateReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
