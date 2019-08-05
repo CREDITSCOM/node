@@ -1266,6 +1266,7 @@ void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& /* obsolet
 }
 
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const general::Address& address, const std::vector<int64_t>& v) {
+#if 0
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     for (auto inner_id : v) {
         csdb::Transaction transactionTmp;
@@ -1318,11 +1319,13 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
             }
         }
     }
+#endif // 0
     _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+    SetResponseStatus(_return.status, APIRequestStatusType::NOT_IMPLEMENTED);
 }
 
 void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, const general::Address& address, const int64_t id) {
+#if 0
     csdb::Transaction trx;
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     if (!s_blockchain.getTransaction(addr, id, trx)) {
@@ -1331,7 +1334,8 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, 
     }
     _return.method = convertTransaction(trx).trxn.smartContract.method;
     _return.params = convertTransaction(trx).trxn.smartContract.params;
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+#endif // 0
+    SetResponseStatus(_return.status, APIRequestStatusType::NOT_IMPLEMENTED);
 }
 
 void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<general::ByteCodeObject>& byteCodeObjects) {
