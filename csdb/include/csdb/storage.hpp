@@ -265,10 +265,11 @@ public:
      * \параметр addr должен точно совпадать с полем source у транзакции в блокчейне (если addr - id, source должен быть также id)
      * \используется для входного параметра addr в виде id кошелька
      */
+#ifndef TRANSACTIONS_INDEX
     bool get_from_blockchain(const Address& addr /*input*/, const int64_t& innerId /*input*/, Transaction& trx /*output*/) const;
-#ifdef TRANSACTIONS_INDEX
-    bool get_trx_from_blockchain(const Address& addr /*input*/, int64_t innerId /*input*/,
-                                 const PoolHash& lastTrxPh, Transaction& trx /*output*/) const;
+#else
+    bool get_from_blockchain(const Address& addr /*input*/, int64_t innerId /*input*/,
+                             const PoolHash& lastTrxPh, Transaction& trx /*output*/) const;
 #endif
 
     /**
