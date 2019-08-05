@@ -2343,11 +2343,12 @@ void SmartContracts::update_lock_status(const csdb::Address& abs_addr, bool valu
     }
 }
 
-bool SmartContracts::dbcache_update(const csdb::Address& abs_addr, const SmartContractRef& ref_start, const std::string& state, bool force_update /*= false*/) {
+/*static*/
+bool SmartContracts::dbcache_update(const BlockChain& blockchain, const csdb::Address& abs_addr, const SmartContractRef& ref_start, const std::string& state, bool force_update) {
     if (!force_update) {
         // test if new data is actually newer than stored data
         cs::Bytes current_data;
-        if (bc.getContractData(abs_addr, current_data)) {
+        if (blockchain.getContractData(abs_addr, current_data)) {
             cs::DataStream stream(current_data.data(), current_data.size());
             SmartContractRef current_ref;
             stream >> current_ref.sequence >> current_ref.transaction;
@@ -2370,7 +2371,7 @@ bool SmartContracts::dbcache_update(const csdb::Address& abs_addr, const SmartCo
     cs::Bytes data;
     cs::DataStream stream(data);
     stream << ref_start.sequence << ref_start.transaction << ref_start.hash << state;
-    return bc.updateContractData(abs_addr, data);
+    return blockchain.updateContractData(abs_addr, data);
 }
 
 /*static*/
@@ -2389,6 +2390,11 @@ bool SmartContracts::dbcache_read(const BlockChain& blockchain, const csdb::Addr
 
 bool SmartContracts::dbcache_read(const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, std::string& state /*output*/) {
     return SmartContracts::dbcache_read(bc, abs_addr, ref_start, state);
+}
+
+bool SmartContracts::dbcache_update(const csdb::Address& abs_addr, const SmartContractRef& ref_start, const std::string& state,
+    bool force_update /*= false*/) {
+    return SmartContracts::dbcache_update(bc, abs_addr, ref_start, state, force_update);
 }
 
 bool SmartContracts::wait_until_executor(unsigned int test_freq, unsigned int max_periods /*= std::numeric_limits<unsigned int>::max()*/) {
@@ -2410,7 +2416,32 @@ bool SmartContracts::wait_until_executor(unsigned int test_freq, unsigned int ma
     return true;
 }
 
-void SmartContracts::net_request_contract_state(const csdb::Address& /*abs_addr*/) {
+void SmartContracts::net_request_contract_state(const csdb::Address& abs_addr) {
+    pnode->sendStateRequest(abs_addr, cs::Conveyer::instance().confidants());
+}
+
+/*public*/
+void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs_addr, const cs::Bytes& contract_data) {
+    cs::Lock lock(public_access_lock);
+
+    cs::SmartContractRef ref;
+    std::string state;
+    cs::DataStream stream(contract_data.data(), contract_data.size());
+    stream >> ref.sequence >> ref.transaction >> ref.hash >> state;
+    if (stream.isValid() && !stream.isAvailable(1)) {
+        if (dbcache_update(contract_abs_addr, ref, state, false)) {
+            return;
+        }
+        else {
+            cswarning() << kLogPrefix << "ignore outdated net package with " << cs::SmartContracts::to_base58(contract_abs_addr)
+                << " state";
+        }
+    }
+    else {
+        cswarning() << kLogPrefix << "ignore incompatible net package with " << cs::SmartContracts::to_base58(contract_abs_addr)
+            << " state";
+    }
 }
 
 }  // namespace cs
+
