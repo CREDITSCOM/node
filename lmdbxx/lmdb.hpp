@@ -142,6 +142,8 @@ public:
     void insert(const Key& key, const Value& value,
                 const char* name = nullptr,
                 const unsigned int flags = lmdb::dbi::default_flags) {
+        static_assert(!std::is_floating_point_v<Key> && !std::is_floating_point_v<Value>, "Floating point value does not support");
+
         decltype(auto) k = cast(key);
         decltype(auto) v = cast(value);
 
@@ -181,6 +183,7 @@ public:
     // removes key/value pair by key as data/size method entity
     template<typename Key>
     bool remove(const Key& key, const char* name = nullptr, const unsigned int flags = lmdb::dbi::default_flags) {
+        static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
         decltype(auto) k = cast(key);
         return remove(reinterpret_cast<const char*>(k.data()), k.size(), name, flags);
     }
@@ -205,6 +208,7 @@ public:
 
     template<typename Key>
     bool isKeyExists(const Key& key, const char* name = nullptr) const {
+        static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
         decltype(auto) k = cast(key);
         return isKeyExists(reinterpret_cast<const char*>(k.data()), k.size(), name);
     }
@@ -237,6 +241,7 @@ public:
     // any key with data/size methods
     template<typename T, typename Key>
     T value(const Key& key) const {
+        static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
         decltype(auto) k = cast(key);
         return value<T>(reinterpret_cast<const char*>(k.data()), k.size());
     }
@@ -244,6 +249,7 @@ public:
     // returns last pair of key/value inserted to database
     template<typename Key, typename Value>
     std::pair<Key, Value> last(const char* name = nullptr) const {
+        static_assert(!std::is_floating_point_v<Key> && !std::is_floating_point_v<Value>, "Floating point value does not support");
         try {
             auto transaction = lmdb::txn::begin(env_, nullptr, MDB_RDONLY);
             auto dbi = lmdb::dbi::open(transaction, name);
@@ -280,17 +286,15 @@ protected:
         emit failed(LmdbException(error));
     }
 
-    template<typename T, typename = std::enable_if_t<std::is_integral_v<T> || std::is_floating_point_v<T>>>
+    template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
     auto cast(const T& value) const {
-        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>, "Value must be integral or floating point to cast");
-
         std::array<char, sizeof(T)> bytes{};
         std::to_chars(bytes.data(), bytes.data() + bytes.size(), value);
 
         return bytes;
     }
 
-    template<typename T, typename = std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T>>>
+    template<typename T, typename = std::enable_if_t<!std::is_integral_v<T>>>
     const T& cast(const T& value) const {
         return value;
     }
@@ -304,7 +308,7 @@ protected:
 
             return array;
         }
-        else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) {
+        else if constexpr (std::is_integral_v<T>) {
             T result = 0;
             std::from_chars(value.data(), value.data() + value.size(), result);
 
