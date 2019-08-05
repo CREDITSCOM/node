@@ -453,7 +453,7 @@ void SmartConsensus::processStages() {
     createFinalTransactionSet(finalFees);
     st3.packageSignature =
         cscrypto::generateSignature(pnode_->getSolver()->getPrivateKey(), finalSmartTransactionPack_.hash().toBinary().data(), finalSmartTransactionPack_.hash().toBinary().size());
-    csmeta(cslog) << "done";
+    csmeta(csdetails) << "done";
     st3.id = id();
     st3.sender = ownSmartsConfNum_;
     st3.iteration = 0U;
@@ -608,9 +608,9 @@ void SmartConsensus::sendFinalTransactionSet() {
         << finalSmartTransactionPack_.hash().toString();
 }
 
-void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRound, uint32_t startTransaction, uint8_t requesterNumber, uint8_t requiredNumber,
+void SmartConsensus::gotSmartStageRequest(uint8_t msgType, uint64_t smartID, uint8_t requesterNumber, uint8_t requiredNumber,
                                           const cs::PublicKey& requester) {
-    if (smartRoundNumber_ != smartRound || smartTransaction_ != startTransaction) {
+    if (smartID !=id()) {
         return;
     }
 
@@ -632,7 +632,7 @@ void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRou
                     pnode_->smartStageEmptyReply(requesterNumber);
                 }
                 else {
-                    pnode_->sendSmartStageReply(smartStageOneStorage_.at(requiredNumber).message, smartRoundNumber_, smartStageOneStorage_.at(requiredNumber).signature,
+                    pnode_->sendSmartStageReply(smartStageOneStorage_.at(requiredNumber).message, smartStageOneStorage_.at(requiredNumber).signature,
                                                 MsgTypes::FirstSmartStage, requester);
                 }
             }
@@ -643,7 +643,7 @@ void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRou
                     pnode_->smartStageEmptyReply(requesterNumber);
                 }
                 else {
-                    pnode_->sendSmartStageReply(smartStageTwoStorage_.at(requiredNumber).message, smartRoundNumber_, smartStageTwoStorage_.at(requiredNumber).signature,
+                    pnode_->sendSmartStageReply(smartStageTwoStorage_.at(requiredNumber).message, smartStageTwoStorage_.at(requiredNumber).signature,
                                                 MsgTypes::FirstSmartStage, requester);
                 }
             }
@@ -654,7 +654,7 @@ void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRou
                     pnode_->smartStageEmptyReply(requesterNumber);
                 }
                 else {
-                    pnode_->sendSmartStageReply(smartStageThreeStorage_.at(requiredNumber).message, smartRoundNumber_, smartStageThreeStorage_.at(requiredNumber).signature,
+                    pnode_->sendSmartStageReply(smartStageThreeStorage_.at(requiredNumber).message, smartStageThreeStorage_.at(requiredNumber).signature,
                                                 MsgTypes::FirstSmartStage, requester);
                 }
             }
@@ -761,7 +761,7 @@ void SmartConsensus::requestSmartStages(int st) {
 
         if (sender == cs::ConfidantConsts::InvalidConfidantIndex) {
             if (i != ownSmartsConfNum_ && i != sender && smartConfidantExist(i)) {
-                pnode_->smartStageRequest(msg, smartRoundNumber_, smartTransaction_, smartConfidants_.at(i), ownSmartsConfNum_, i);
+                pnode_->smartStageRequest(msg, id(), smartConfidants_.at(i), ownSmartsConfNum_, i);
             }
             isRequested = true;
         }
@@ -798,7 +798,7 @@ void SmartConsensus::requestSmartStagesNeighbors(int st) {
 
         if (required == cs::ConfidantConsts::InvalidConfidantIndex) {
             if (idx != ownSmartsConfNum_ && idx != required && smartConfidantExist(idx)) {
-                pnode_->smartStageRequest(messageType, smartRoundNumber_, smartTransaction_, smartConfidants_.at(idx), ownSmartsConfNum_, required);
+                pnode_->smartStageRequest(messageType, id(), smartConfidants_.at(idx), ownSmartsConfNum_, required);
                 isRequested = true;
             }
         }

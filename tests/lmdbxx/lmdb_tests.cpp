@@ -61,14 +61,14 @@ TEST(Lmdbxx, InsertTrivial) {
     db.open();
 
     int key = 100;
-    double value = 50.0;
+    long value = 50;
 
     db.insert(key, value);
 
     ASSERT_TRUE(db.size() == 1);
     ASSERT_TRUE(db.isKeyExists(key));
 
-    auto v = db.value<double>(key);
+    auto v = db.value<long>(key);
     ASSERT_EQ(value, v);
 
     removePath(db);

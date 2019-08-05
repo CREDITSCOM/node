@@ -195,7 +195,7 @@ namespace cs {
             fees.push_back(fee);
         }
         stream >> hash;
-        return false;
+        return true;
     }
 
     Bytes StageTwoSmarts::toBinary()

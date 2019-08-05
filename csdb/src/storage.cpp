@@ -878,4 +878,42 @@ cs::Sequence Storage::pool_sequence(const PoolHash& hash) const {
     return seq;
 }
 
+csdb::PoolHash Storage::pool_hash(cs::Sequence sequence) const {
+    if (!isOpen()) {
+        d->set_last_error(NotOpen);
+        return PoolHash{};
+    }
+
+    Pool res;
+    cs::Bytes data;
+
+    if (!d->db->get(static_cast<uint32_t>(sequence), &data)) {
+        {
+            std::unique_lock<std::mutex> lock2(d->write_lock);
+            for (auto& poolToWrite : d->write_queue) {
+                if (poolToWrite.sequence() == sequence) {
+                    res = poolToWrite;
+                    break;
+                }
+            }
+        }
+
+        if (!d->db->get(static_cast<uint32_t>(sequence), &data)) {
+            d->set_last_error(DatabaseError);
+            return PoolHash{};
+        }
+    }
+
+    res = Pool::from_binary(std::move(data));
+    if (!res.is_valid()) {
+        d->set_last_error(DataIntegrityError);
+        return PoolHash{};
+    }
+    else {
+        d->set_last_error();
+    }
+
+    return res.hash();
+}
+
 }  // namespace csdb
