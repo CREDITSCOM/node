@@ -6,7 +6,7 @@
 
 namespace fs = boost::filesystem;
 
-cs::Lmdb::Lmdb(const std::string& path, const unsigned int flags) try : env_(lmdb::env::create(flags)), path_(path) {
+cs::Lmdb::Lmdb(const std::string& path, const unsigned int flags) try : env_(environment(flags)), path_(path), flags_(flags) {
     fs::path dbPath(path_);
     boost::system::error_code code;
     const auto res = fs::is_directory(dbPath, code);

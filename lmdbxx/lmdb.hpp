@@ -14,9 +14,11 @@ using FlushSignal = cs::Signal<void()>;
 using CommitSignal = cs::Signal<void(const char* data, size_t size)>;
 using RemoveSignal = cs::Signal<void(const char* data, size_t size)>;
 using FailureSignal = cs::Signal<void(const LmdbException& error)>;
+using IncreaseSignal = cs::Signal<void(size_t size)>;
 
 // lmdbxx RAII wrapper, not thread safe by default
 class Lmdb {
+    using Info = MDB_envinfo;
 public:
     enum Options : unsigned int {
         DefaultMapSize = 1UL * 1024UL * 1024UL * 1024UL
@@ -32,7 +34,7 @@ public:
               const lmdb::mode mode = lmdb::env::default_mode) {
         try {
             env_.open(path_.c_str(), flags, mode);
-            isOpened_ = true;
+            isOpen_ = true;
         }
         catch(const lmdb::error& error) {
             raise(error);
@@ -41,12 +43,12 @@ public:
 
     void close() {
         env_.close();
-        isOpened_ = false;
+        isOpen_ = false;
     }
 
     // returns database open status
-    bool isOpened() const {
-        return isOpened_;
+    bool isOpen() const {
+        return isOpen_;
     }
 
     void setFlags(const unsigned int flags, const bool onoff = true) {
@@ -86,6 +88,16 @@ public:
         }
     }
 
+    // returns current map size
+    size_t mapSize() const {
+        if (!isOpen()) {
+            return size_t{};
+        }
+
+        auto stats = info();
+        return stats.me_mapsize;
+    }
+
     // flushes data to drive in sync mode
     void flush() {
         flushImpl(true);
@@ -109,7 +121,7 @@ public:
             raise(error);
         }
 
-        return 0;
+        return size_t{};
     }
 
     /// transactions
@@ -133,7 +145,13 @@ public:
             emit commited(keyData, keySize);
         }
         catch(const lmdb::error& error) {
-            raise(error);
+            if (error.code() != int(MDB_MAP_FULL)) {
+                raise(error);
+            }
+            else {
+                reserve();
+                insert(keyData, keySize, valueData, valueSize, name, flags);
+            }
         }
     }
 
@@ -315,10 +333,33 @@ protected:
         }
     }
 
+    void reserve() {
+        auto size = mapSize();
+        setMapSize(size * 2);
+
+        auto newMapSize = mapSize();
+
+        if (size < newMapSize) {
+            emit mapSizeIncreased(newMapSize);
+        }
+    }
+
+    Info info() const {
+        Info temp{};
+        mdb_env_info(env_.handle(), &temp);
+        return temp;
+    }
+
+    lmdb::env environment(const unsigned flags) const {
+        return lmdb::env::create(flags);
+    }
+
 private:
     lmdb::env env_;
     std::string path_;
-    bool isOpened_ = false;
+
+    bool isOpen_ = false;
+    unsigned int flags_;
 
 public signals:
 
@@ -333,6 +374,9 @@ public signals:
 
     // generates when database data key is removed
     RemoveSignal removed;
+
+    // generates when database inseased map size
+    IncreaseSignal mapSizeIncreased;
 };
 }
 
