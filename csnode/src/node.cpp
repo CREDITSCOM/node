@@ -520,23 +520,23 @@ void Node::cleanConfirmationList(cs::RoundNumber rNum) {
     confirmationList_.remove(rNum);
 }
 
-void Node::sendStateRequest(uint64_t smartId, cs::PublicKeys confidants) {//the function to be refactored
-    csmeta(csdebug) << "Sending StateRequest" << cs::FormatRef(smartId);
+void Node::sendStateRequest(const csdb::Address& contract_abs_addr, const cs::PublicKeys& confidants) {
+    csmeta(csdebug) << "Sending StateRequest" << cs::SmartContracts::to_base58(blockChain_, contract_abs_addr);
     auto round = cs::Conveyer::instance().currentRoundNumber();
     cs::Bytes message;
     cs::DataStream stream(message);
-    stream << round << smartId;
+    const auto& key = contract_abs_addr.public_key();
+    stream << round << key;
     cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
-
-    sendToList(confidants, cs::ConfidantConsts::InvalidConfidantIndex, MsgTypes::StateRequest, round, smartId, sig);
+    sendToList(confidants, cs::ConfidantConsts::InvalidConfidantIndex, MsgTypes::StateRequest, round, key, sig);
 }
 
 void Node::getStateRequest(const uint8_t * data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey & sender) {
     csmeta(csdebug) << "Getting StateRequest from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
     istream_.init(data, size);
-    uint64_t smartId;
+    cs::PublicKey key;
     cs::Signature signature;
-    istream_ >> smartId >> signature;
+    istream_ >> key >> signature;
 
     if (!istream_.good() || !istream_.end()) {
         cserror() << "NODE> Bad StateRequest packet format";
@@ -545,41 +545,56 @@ void Node::getStateRequest(const uint8_t * data, const std::size_t size, const c
 
     cs::Bytes message;
     cs::DataStream stream(message);
-    stream << rNum << smartId;
+    stream << rNum << key;
     if (!cscrypto::verifySignature(signature, sender, message.data(), message.size())) {
         csdebug() << "NODE> StateRequest Signature is incorrect";
         return;
     }
 
-    /*Place here the function call with (seq, idx, respondent = sender)*/
+    csdb::Address abs_addr = csdb::Address::from_public_key(key);
+    cs::Bytes contract_data;
+    if (blockChain_.getContractData(abs_addr, contract_data)) {
+        sendStateReply(sender, abs_addr, contract_data);
+    }
 }
 
-void Node::sendStateReply(const cs::PublicKey& respondent, const cs::Bytes state) {
-    csmeta(csdebug) << "Sending State to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
-    auto round = cs::Conveyer::instance().currentRoundNumber();
-    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), state.data(), state.size());
+void Node::sendStateReply(const cs::PublicKey& respondent, const csdb::Address& contract_abs_addr, const cs::Bytes& data) {
+    csmeta(csdebug) << "Sending state of " << cs::SmartContracts::to_base58(blockChain_, contract_abs_addr)
+        << "to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
+    cs::RoundNumber round = cs::Conveyer::instance().currentRoundNumber();
 
-    sendDefault(respondent, MsgTypes::StateReply, round, state, sig);
+    cs::Bytes signed_data;
+    cs::DataStream stream(signed_data);
+    const cs::PublicKey& key = contract_abs_addr.public_key();
+    stream << round << key << data;
+    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), signed_data.data(), signed_data.size());
+    sendDefault(respondent, MsgTypes::StateReply, round, key, data, sig);
 }
 
 void Node::getStateReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
-    csmeta(csdebug) << "Getting State from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    csmeta(csdebug) << "Getting state from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
     istream_.init(data, size);
-    cs::Bytes state;
+    cs::PublicKey key;
+    cs::Bytes contract_data;
     cs::Signature signature;
-    istream_ >> state >> signature;
+    istream_ >> key >> contract_data >> signature;
 
     if (!istream_.good() || !istream_.end()) {
         cserror() << "NODE> Bad State packet format";
         return;
     }
 
-    if (!cscrypto::verifySignature(signature, sender, state.data(), state.size())) {
+    cs::Bytes signed_data;
+    cs::DataStream signed_stream(signed_data);
+    signed_stream << rNum << key << contract_data;
+    if (!cscrypto::verifySignature(signature, sender, signed_data.data(), signed_data.size())) {
         csdebug() << "NODE> State Signature is incorrect";
         return;
     }
 
     /*Place here the function call with (state)*/
+    csdb::Address abs_addr = csdb::Address::from_public_key(key);
+    solver_->smart_contracts().net_update_contract_state(abs_addr, contract_data);
 }
 
 cs::ConfidantsKeys Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber) const {

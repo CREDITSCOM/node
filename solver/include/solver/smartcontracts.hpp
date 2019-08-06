@@ -49,6 +49,10 @@ namespace cs {
         constexpr int8_t ThriftException = -10;
         // error in contract, value is hard-coded in ApiExec module
         constexpr int8_t ContractError = 1;
+        // incompatible version
+        constexpr int8_t ExecutorIncompatible = 2;
+        // node unreachable from executor
+        constexpr int8_t NodeUnreachable = 3;
         // executor is unreachable or in invalid state
         constexpr int8_t ExecutorUnreachable = 4;
     }  // namespace error
@@ -318,6 +322,7 @@ public:
     static bool is_state_updated(const csdb::Transaction& tr);
 
     static bool dbcache_read(const BlockChain& blockchain, const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, std::string& state /*output*/);
+    static bool dbcache_update(const BlockChain& blockchain, const csdb::Address& abs_addr, const SmartContractRef& ref_start, const std::string& state, bool force_update);
 
     static std::string get_contract_state(const BlockChain& storage, const csdb::Address& abs_addr);
 
@@ -335,6 +340,8 @@ public:
 
     // get contract state update(s) to keep cache is up-to-date
     void on_update(const std::vector< csdb::Transaction >& states);
+
+    void net_update_contract_state(const csdb::Address& contract_abs_addr, const cs::Bytes& contract_data);
 
     csdb::Address absolute_address(const csdb::Address& optimized_address) const {
         return bc.getAddressByType(optimized_address, BlockChain::AddressType::PublicKey);

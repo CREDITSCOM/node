@@ -75,6 +75,9 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             if (fld.is_valid()) {
                 executor_fees.push_back(fld.value<csdb::Amount>());
             }
+            else {
+                executor_fees.push_back(csdb::Amount(0));
+            }
             // break;
             // creating fee free copy of state transaction
             tmpNewState.set_amount(tr.amount());
@@ -553,9 +556,11 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
     size_t counter = 0;
     for (const auto& tr : currentSmartTransactionPack_.transactions()) {
         if (SmartContracts::is_new_state(tr)) {
-            auto tmp = tmpNewStates_[counter];
-            tmp.add_user_field(trx_uf::new_state::Fee, finalFees[counter]);
-            finalSmartTransactionPack_.addTransaction(tmp);
+            if (counter < tmpNewStates_.size() && counter < finalFees.size()) {
+                auto tmp = tmpNewStates_[counter];
+                tmp.add_user_field(trx_uf::new_state::Fee, finalFees[counter]);
+                finalSmartTransactionPack_.addTransaction(tmp);
+            }
             ++counter;
         }
         else {

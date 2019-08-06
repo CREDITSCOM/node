@@ -158,9 +158,9 @@ public:
 
     // state syncro functions
     
-    void sendStateRequest( uint64_t smartId, cs::PublicKeys confidants);
+    void sendStateRequest(const csdb::Address& contract_abs_addr, const cs::PublicKeys& confidants);
     void getStateRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
-    void sendStateReply(const cs::PublicKey& respondent, const cs::Bytes state);
+    void sendStateReply(const cs::PublicKey& respondent, const csdb::Address& contract_abs_addr, const cs::Bytes& data);
     void getStateReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
     // syncro get functions
