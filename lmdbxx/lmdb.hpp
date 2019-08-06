@@ -22,8 +22,9 @@ class Lmdb {
     using Stats = MDB_stat;
 public:
     enum Options : size_t {
-        GrowMapSize = 10485760,
-        DefaultMapSize = 1UL * 1024UL * 1024UL * 1024UL
+        DefaultMapSize = 10485760,
+        Default1GbMapSize = 1UL * 1024UL * 1024UL * 1024UL,
+        DefaultIncreaseSize = DefaultMapSize/2
     };
 
     explicit Lmdb(const std::string& path, const unsigned int flags = lmdb::env::default_flags);
@@ -88,6 +89,12 @@ public:
         catch(const lmdb::error& error) {
             raise(error);
         }
+    }
+
+    // sets increase size to db,
+    // space that will be added to current map size
+    void setIncreaseSize(std::size_t size) {
+        increaseSize_ = size;
     }
 
     // returns current map size
@@ -200,6 +207,7 @@ public:
     template<typename Key>
     bool remove(const Key& key, const char* name = nullptr, const unsigned int flags = lmdb::dbi::default_flags) {
         static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
+
         decltype(auto) k = cast(key);
         return remove(reinterpret_cast<const char*>(k.data()), k.size(), name, flags);
     }
@@ -225,6 +233,7 @@ public:
     template<typename Key>
     bool isKeyExists(const Key& key, const char* name = nullptr) const {
         static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
+
         decltype(auto) k = cast(key);
         return isKeyExists(reinterpret_cast<const char*>(k.data()), k.size(), name);
     }
@@ -258,6 +267,7 @@ public:
     template<typename T, typename Key>
     T value(const Key& key) const {
         static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
+
         decltype(auto) k = cast(key);
         return value<T>(reinterpret_cast<const char*>(k.data()), k.size());
     }
@@ -266,6 +276,7 @@ public:
     template<typename Key, typename Value>
     std::pair<Key, Value> last(const char* name = nullptr) const {
         static_assert(!std::is_floating_point_v<Key> && !std::is_floating_point_v<Value>, "Floating point value does not support");
+
         try {
             auto transaction = lmdb::txn::begin(env_, nullptr, MDB_RDONLY);
             auto dbi = lmdb::dbi::open(transaction, name);
@@ -353,8 +364,8 @@ protected:
 
         auto freeSpace = metaInfo.me_mapsize - (metaStats.ms_psize * metaInfo.me_last_pgno);
 
-        if (freeSpace < GrowMapSize/2) {
-            auto newSize = mapSize() + GrowMapSize;
+        if (freeSpace < increaseSize_/2) {
+            auto newSize = mapSize() + increaseSize_;
             setMapSize(newSize);
 
             emit mapSizeIncreased(newSize);
@@ -371,6 +382,7 @@ private:
 
     bool isOpen_ = false;
     unsigned int flags_;
+    size_t increaseSize_ = DefaultIncreaseSize;
 
 public signals:
 

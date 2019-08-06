@@ -173,8 +173,8 @@ void BlockHashes::initialization() {
     cs::Connector::connect(&seqDb_.failed, this, &BlockHashes::onDbFailed);
     cs::Connector::connect(&hashDb_.failed, this, &BlockHashes::onDbFailed);
 
-    seqDb_.setMapSize(cs::Lmdb::DefaultMapSize);
-    hashDb_.setMapSize(cs::Lmdb::DefaultMapSize);
+    seqDb_.setMapSize(cs::Lmdb::Default1GbMapSize);
+    hashDb_.setMapSize(cs::Lmdb::Default1GbMapSize);
 
     seqDb_.open();
     hashDb_.open();
