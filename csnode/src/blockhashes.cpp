@@ -17,14 +17,15 @@ BlockHashes::BlockHashes(const std::string& path)
     initialization();
 }
 
-bool BlockHashes::on_next_block(const csdb::Pool& block, bool fast_mode) {
+bool BlockHashes::onNextBlock(const csdb::Pool& block, bool fastMode) {
     cs::Sequence seq = block.sequence();
+
     if (db_.last_ > 0) {
         if (seq <= db_.last_) {
-            // already cached
-            return false;
+            return false; // already cached
         }
     }
+
     db_.last_ = seq;
 
     if (!isDbInited_) {
@@ -34,24 +35,23 @@ bool BlockHashes::on_next_block(const csdb::Pool& block, bool fast_mode) {
 
     auto hash = block.hash();
     auto cached_hash = find(seq);
+
     if (cached_hash == hash) {
         return true;
     }
 
-    if (!flush_completed) {
-        // accumulate in mem_cache
-        (*active_mem_cache)[seq] = hash;
+    if (!isFlushCompleted_) {
+        (*activeMemoryCache_)[seq] = hash; // accumulate in mem_cache
     }
     else {
-        if (active_mem_cache->empty() && !fast_mode) {
+        if (activeMemoryCache_->empty() && !fastMode) {
             // add item directly
             seqDb_.insert(seq, hash.to_binary());
             hashDb_.insert(hash.to_binary(), seq);
         }
         else {
-            (*active_mem_cache)[seq] = hash;
-            // swap mem_caches and start store to DB in separate thread
-            flush_mem_cache();
+            (*activeMemoryCache_)[seq] = hash;
+            flushMemoryCache(); // swap mem_caches and start store to DB in separate thread
         }
     }
 
@@ -59,100 +59,101 @@ bool BlockHashes::on_next_block(const csdb::Pool& block, bool fast_mode) {
 }
 
 bool BlockHashes::onReadBlock(const csdb::Pool& block) {
-    return on_next_block(block, true); // fast mode
+    return onNextBlock(block, true); // fast mode
 }
 
 bool BlockHashes::onStoreBlock(const csdb::Pool& block) {
-    cs::RoundNumber cur_round = Conveyer::instance().currentRoundNumber();
-    cs::Sequence seq = block.sequence();
-    if (cur_round > seq && cur_round - seq > 1) {
-        return on_next_block(block, true); // fast mode, sync goes on
+    auto currentRound = Conveyer::instance().currentRoundNumber();
+    auto seq = block.sequence();
+
+    if (currentRound > seq && currentRound - seq > 1) {
+        return onNextBlock(block, true); // fast mode, sync goes on
     }
-    return on_next_block(block, false); // normal mode
+
+    return onNextBlock(block, false); // normal mode
 }
 
 csdb::PoolHash BlockHashes::find(cs::Sequence seq) const {
     if (seq > db_.last_) {
         return csdb::PoolHash{};
     }
-    if (!active_mem_cache->empty()) {
-        if (active_mem_cache->count(seq) > 0) {
-            return (*active_mem_cache)[seq];
+
+    if (!activeMemoryCache_->empty()) {
+        if (activeMemoryCache_->count(seq) > 0) {
+            return (*activeMemoryCache_)[seq];
         }
     }
+
+    // if !flush_completed there may be an item still on way to DB
     if (seqDb_.size() == 0 || !seqDb_.isKeyExists(seq)) {
-        // if !flush_completed there may be an item still on way to DB
         return csdb::PoolHash{};
     }
+
     auto value = seqDb_.value<cs::Bytes>(seq);
     return csdb::PoolHash::from_binary(std::move(value));
 }
 
-cs::Sequence BlockHashes::find(csdb::PoolHash hash) const {
-    // search may be too long:
-    //if (!active_mem_cache->empty()) {
-    //    for (const auto& item : *active_mem_cache) {
-    //        if (item.second == hash) {
-    //            return item.first;
-    //        }
-    //    }
-    //}
+cs::Sequence BlockHashes::find(const csdb::PoolHash& hash) const {
+    // if !flush_completed there may be an item still on way to DB
     if (seqDb_.size() == 0 || !hashDb_.isKeyExists(hash.to_binary())) {
-        // if !flush_completed there may be an item still on way to DB
         return cs::kWrongSequence;
     }
 
     return hashDb_.value<cs::Sequence>(hash.to_binary());
 }
 
-bool BlockHashes::wait_flush_completed(uint32_t sleep_msec, uint32_t count) {
-    if (!flush_completed) {
+bool BlockHashes::waitFlushCompleted(uint32_t sleepMsec, uint32_t count) {
+    if (!isFlushCompleted_) {
         uint32_t cnt = 0;
+
         do {
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_msec));
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleepMsec));
             if (++cnt >= count) {
                 return false;;
             }
-        } while (!flush_completed);
+        } while (!isFlushCompleted_);
     }
+
     return true;
 }
 
 csdb::PoolHash BlockHashes::removeLast() {
-    if (!active_mem_cache->empty()) {
-        csdb::PoolHash tmp = active_mem_cache->crbegin()->second.clone();
-        active_mem_cache->erase(active_mem_cache->crbegin()->first);
+    if (!activeMemoryCache_->empty()) {
+        csdb::PoolHash tmp = activeMemoryCache_->crbegin()->second.clone();
+        activeMemoryCache_->erase(activeMemoryCache_->crbegin()->first);
         --db_.last_;
         return tmp;
     }
+
     if (empty()) {
         return csdb::PoolHash{};
     }
-    if (!flush_completed) {
-        if (!wait_flush_completed(20, 50)) {
-            // wait for flushing to complete failed
-            return csdb::PoolHash{};
+
+    if (!isFlushCompleted_) {
+        if (!waitFlushCompleted(20, 50)) {
+            return csdb::PoolHash{}; // wait for flushing to complete failed
         }
     }
-    auto pair = seqDb_.last<cs::Sequence, cs::Bytes>();
-    seqDb_.remove(pair.first);
-    hashDb_.remove(pair.second);
 
-    if (db_.last_ == pair.first) {
+    auto [sequence, hash] = seqDb_.last<cs::Sequence, cs::Bytes>();
+    seqDb_.remove(sequence);
+    hashDb_.remove(hash);
+
+    if (db_.last_ == sequence) {
         --db_.last_;
     }
     else {
-        db_.last_ = pair.first - 1;
+        db_.last_ = sequence - 1;
     }
 
-    return csdb::PoolHash::from_binary(std::move(pair.second));
+    return csdb::PoolHash::from_binary(std::move(hash));
 }
 
 csdb::PoolHash BlockHashes::getLast() {
-    if (!active_mem_cache->empty()) {
-        return active_mem_cache->crbegin()->second;
+    if (!activeMemoryCache_->empty()) {
+        return activeMemoryCache_->crbegin()->second;
     }
-    if (!wait_flush_completed(20, 25)) {
+    if (!waitFlushCompleted(20, 25)) {
         return csdb::PoolHash{};
     }
     if (seqDb_.size() == 0) {
@@ -167,8 +168,8 @@ void BlockHashes::onDbFailed(const LmdbException& exception) {
 }
 
 void BlockHashes::initialization() {
-    active_mem_cache = &mem_cache1;
-    flush_completed = true;
+    activeMemoryCache_ = &memoryCache1_;
+    isFlushCompleted_ = true;
 
     cs::Connector::connect(&seqDb_.failed, this, &BlockHashes::onDbFailed);
     cs::Connector::connect(&hashDb_.failed, this, &BlockHashes::onDbFailed);
@@ -180,40 +181,45 @@ void BlockHashes::initialization() {
     hashDb_.open();
 }
 
-void BlockHashes::flush_mem_cache() {
-    if (!flush_completed) {
+void BlockHashes::flushMemoryCache() {
+    if (!isFlushCompleted_) {
         return;
     }
-    if (active_mem_cache->empty()) {
-        // nothing to store
-        return;
+
+    if (activeMemoryCache_->empty()) {
+        return; // nothing to store
     }
-    flush_completed = false;
+
+    isFlushCompleted_ = false;
     
-    std::map<cs::Sequence, csdb::PoolHash>* flushing_cache = active_mem_cache;
-    if (active_mem_cache == &mem_cache1) {
-        active_mem_cache = &mem_cache2;
+    if (activeMemoryCache_ == &memoryCache1_) {
+        activeMemoryCache_ = &memoryCache2_;
     }
-    else if (active_mem_cache == &mem_cache2) {
-        active_mem_cache = &mem_cache1;
+    else if (activeMemoryCache_ == &memoryCache2_) {
+        activeMemoryCache_ = &memoryCache1_;
     }
     else {
-        // incorrect active_mem_cache
-        return;
+        return; // incorrect active_mem_cache
     }
-    active_mem_cache->clear();
 
-    std::thread t(
-        [this, flushing_cache]() {
-            size_t cnt = 0;
-            for (const auto& item : *flushing_cache) {
-                seqDb_.insert(item.first, item.second.to_binary());
-                hashDb_.insert(item.second.to_binary(), item.first);
-                ++cnt;
+    activeMemoryCache_->clear();
+
+    std::thread t([this, flushingCache = activeMemoryCache_]() {
+            size_t count = 0;
+
+            for (const auto& [sequence, hash] : *flushingCache) {
+                const auto hashBinary = hash.to_binary();
+
+                seqDb_.insert(sequence, hashBinary);
+                hashDb_.insert(hashBinary, sequence);
+
+                ++count;
             }
-            flush_completed = true;
+
+            isFlushCompleted_ = true;
         }
     );
+
     t.detach();
 }
 

@@ -16,6 +16,7 @@ public:
 
 public:
     explicit BlockHashes(const std::string& path);
+    ~BlockHashes() = default;
 
     const DbStructure& getDbStructure() const {
         return db_;
@@ -27,14 +28,13 @@ public:
 
     size_t size() const {
         return db_.last_;
-        //return seqDb_.size();
     }
 
     bool onReadBlock(const csdb::Pool& block);
     bool onStoreBlock(const csdb::Pool& block);
 
     csdb::PoolHash find(cs::Sequence seq) const;
-    cs::Sequence find(csdb::PoolHash hash) const;
+    cs::Sequence find(const csdb::PoolHash& hash) const;
 
     csdb::PoolHash removeLast();
     csdb::PoolHash getLast();
@@ -51,14 +51,15 @@ private:
     cs::Lmdb seqDb_;
     cs::Lmdb hashDb_;
 
-    std::map<cs::Sequence, csdb::PoolHash> mem_cache1;
-    std::map<cs::Sequence, csdb::PoolHash> mem_cache2;
-    std::map<cs::Sequence, csdb::PoolHash>* active_mem_cache;
-    std::atomic<bool> flush_completed;
+    std::map<cs::Sequence, csdb::PoolHash> memoryCache1_;
+    std::map<cs::Sequence, csdb::PoolHash> memoryCache2_;
+    std::map<cs::Sequence, csdb::PoolHash>* activeMemoryCache_;
+    std::atomic<bool> isFlushCompleted_;
 
-    void flush_mem_cache();
-    bool on_next_block(const csdb::Pool& block, bool fast_mode);
-    bool wait_flush_completed(uint32_t sleep_msec, uint32_t count);
+    void flushMemoryCache();
+
+    bool onNextBlock(const csdb::Pool& block, bool fastMode);
+    bool waitFlushCompleted(uint32_t sleepMsec, uint32_t count);
 };
 }  // namespace cs
 
