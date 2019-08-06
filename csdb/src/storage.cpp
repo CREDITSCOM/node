@@ -638,7 +638,6 @@ Wallet Storage::wallet(const Address& addr) const {
     return Wallet::get(addr);
 }
 
-#ifdef TRANSACTIONS_INDEX
 static bool checkPool(const Pool& pool, const Address& addr,
                       int64_t innerId, Transaction& trx) {
     const auto& trxs = pool.transactions();
@@ -651,72 +650,16 @@ static bool checkPool(const Pool& pool, const Address& addr,
     return false;
 }
 
-bool Storage::get_trx_from_blockchain(const Address& addr, int64_t innerId,
-                                      Transaction& trx) const {
-    auto lastTrx = get_last_by_source(addr);
-    if (!lastTrx.is_valid()) {
-        return false;
-    }
-    if (lastTrx.innerID() == innerId) {
-        trx = lastTrx;
-        return true;
-    }
-
-    auto poolHash = lastTrx.id().pool_hash();
-    while (poolHash.is_empty()) {
+bool Storage::get_from_blockchain(const Address& addr, int64_t innerId,
+                                  const PoolHash& lastTrxPh, Transaction& trx) const {
+    auto poolHash = lastTrxPh;
+    while (!poolHash.is_empty()) {
         if (checkPool(pool_load(poolHash), addr, innerId, trx)) {
             return true;
         }
         poolHash = get_previous_transaction_block(addr, poolHash);
     }
     return false;
-}
-#endif
-
-bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& innerId /*input*/, Transaction& trx /*output*/) const {
-    Pool curPool;
-    cs::Sequence curIdx = cs::numeric_cast<cs::Sequence>(innerId);
-    bool is_in_blockchain = false;
-
-    auto nextIt = [this, &curPool, &curIdx]() -> bool {
-        if (curPool.is_valid()) {
-            if (curIdx) {
-                curIdx--;
-                return true;
-            }
-            else {
-                do {
-                    curPool = pool_load(curPool.previous_hash());
-                } while (curPool.is_valid() && !(curPool.transactions_count()));
-                if (curPool.is_valid()) {
-                    curIdx = static_cast<cs::Sequence>(curPool.transactions_count() - 1);
-                    return true;
-                }
-            }
-        }
-        else {
-            curPool = pool_load(last_hash());
-            while (curPool.is_valid() && !(curPool.transactions_count())) {
-                curPool = pool_load(curPool.previous_hash());
-            }
-            if (curPool.is_valid()) {
-                curIdx = static_cast<cs::Sequence>(curPool.transactions_count() - 1);
-                return true;
-            }
-        }
-        return false;
-    };
-
-    do {
-        const Transaction trx_curr = curPool.transaction(curIdx);
-        if (trx_curr.source() == addr && trx_curr.innerID() == innerId) {
-            is_in_blockchain = true;
-            trx = trx_curr;
-            break;
-        }
-    } while (nextIt());
-
-    return is_in_blockchain;
 }
 
 const ReadBlockSignal& Storage::readBlockEvent() const {
@@ -821,7 +764,6 @@ Transaction Storage::get_last_by_target(Address target) const noexcept {
     return Transaction{};
 }
 
-#ifdef TRANSACTIONS_INDEX
 cs::Bytes Storage::get_trans_index_key(const Address& addr, const PoolHash& ph) {
     ::csdb::priv::obstream os;
     addr.put(os);
@@ -851,8 +793,6 @@ void Storage::set_previous_transaction_block(const Address& addr, const PoolHash
 
   d->db->putToTransIndex(key, os.buffer());
 }
-
-#endif
 
 bool Storage::get_contract_data(const Address& abs_addr /*input*/, cs::Bytes& data /*output*/) const {
     const auto& pk = abs_addr.public_key();
@@ -885,6 +825,44 @@ cs::Sequence Storage::pool_sequence(const PoolHash& hash) const {
         seq = tmp;
     }
     return seq;
+}
+
+csdb::PoolHash Storage::pool_hash(cs::Sequence sequence) const {
+    if (!isOpen()) {
+        d->set_last_error(NotOpen);
+        return PoolHash{};
+    }
+
+    Pool res;
+    cs::Bytes data;
+
+    if (!d->db->get(static_cast<uint32_t>(sequence), &data)) {
+        {
+            std::unique_lock<std::mutex> lock2(d->write_lock);
+            for (auto& poolToWrite : d->write_queue) {
+                if (poolToWrite.sequence() == sequence) {
+                    res = poolToWrite;
+                    break;
+                }
+            }
+        }
+
+        if (!d->db->get(static_cast<uint32_t>(sequence), &data)) {
+            d->set_last_error(DatabaseError);
+            return PoolHash{};
+        }
+    }
+
+    res = Pool::from_binary(std::move(data));
+    if (!res.is_valid()) {
+        d->set_last_error(DataIntegrityError);
+        return PoolHash{};
+    }
+    else {
+        d->set_last_error();
+    }
+
+    return res.hash();
 }
 
 }  // namespace csdb

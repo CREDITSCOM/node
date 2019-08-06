@@ -67,7 +67,8 @@ public:
     size_t smartStage3StorageSize();
     void sendFinalTransactionSet();
     bool smartConfidantExist(uint8_t);
-    void gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRound, uint32_t startTransaction, uint8_t requesterNumber, uint8_t requiredNumber, const cs::PublicKey& requester);
+    void gotSmartStageRequest(uint8_t msgType, uint64_t smartID, uint8_t requesterNumber, uint8_t requiredNumber,
+        const cs::PublicKey& requester);
 
     void requestSmartStages(int st);
     void requestSmartStagesNeighbors(int st);

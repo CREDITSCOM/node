@@ -37,7 +37,7 @@ const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
-, blockChain_(genesisAddress_, startAddress_)
+, blockChain_(genesisAddress_, startAddress_, config.recreateIndex())
 , ostream_(&packStreamAllocator_, nodeIdKey_)
 , stat_()
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
@@ -65,6 +65,7 @@ Node::Node(const Config& config)
 }
 
 Node::~Node() {
+    std::cout << "Desturctor called\n";
     sendingTimer_.stop();
 
     delete solver_;
@@ -520,67 +521,86 @@ void Node::cleanConfirmationList(cs::RoundNumber rNum) {
     confirmationList_.remove(rNum);
 }
 
-void Node::sendStateRequest(cs::Sequence seq, uint32_t idx, cs::PublicKeys confidants) {//the function to be refactored
-    csmeta(csdebug) << "Sending StateRequest" << cs::FormatRef(seq, idx);
+void Node::sendStateRequest(const csdb::Address& contract_abs_addr, const cs::PublicKeys& confidants) {
+    csmeta(csdebug) << cs::SmartContracts::to_base58(blockChain_, contract_abs_addr);
+
     auto round = cs::Conveyer::instance().currentRoundNumber();
     cs::Bytes message;
     cs::DataStream stream(message);
-    stream << round << seq << idx;
+    const auto& key = contract_abs_addr.public_key();
+    stream << round << key;
     cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
-
-    sendToList(confidants, cs::ConfidantConsts::InvalidConfidantIndex, MsgTypes::StateRequest, round, seq, idx, sig);
+    sendToList(confidants, cs::ConfidantConsts::InvalidConfidantIndex, MsgTypes::StateRequest, round, key, sig);
 }
 
 void Node::getStateRequest(const uint8_t * data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey & sender) {
-    csmeta(csdebug) << "Getting StateRequest from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
     istream_.init(data, size);
-    cs::Sequence seq;
-    uint32_t idx;
+    cs::PublicKey key;
     cs::Signature signature;
-    istream_ >> seq >> idx >> signature;
+    istream_ >> key >> signature;
+    csdb::Address abs_addr = csdb::Address::from_public_key(key);
+
+    csmeta(csdebug) << cs::SmartContracts::to_base58(blockChain_, abs_addr) << " from "
+        << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
     if (!istream_.good() || !istream_.end()) {
         cserror() << "NODE> Bad StateRequest packet format";
         return;
     }
 
-    cs::Bytes message;
-    cs::DataStream stream(message);
-    stream << rNum << seq << idx;
-    if (!cscrypto::verifySignature(signature, sender, message.data(), message.size())) {
+    cs::Bytes signed_bytes;
+    cs::DataStream stream(signed_bytes);
+    stream << rNum << key;
+    if (!cscrypto::verifySignature(signature, sender, signed_bytes.data(), signed_bytes.size())) {
         csdebug() << "NODE> StateRequest Signature is incorrect";
         return;
     }
 
-    /*Place here the function call with (seq, idx, respondent = sender)*/
+    cs::Bytes contract_data;
+    if (blockChain_.getContractData(abs_addr, contract_data)) {
+        sendStateReply(sender, abs_addr, contract_data);
+    }
 }
 
-void Node::sendStateReply(const cs::PublicKey& respondent, const cs::Bytes state) {
-    csmeta(csdebug) << "Sending State to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
-    auto round = cs::Conveyer::instance().currentRoundNumber();
-    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), state.data(), state.size());
+void Node::sendStateReply(const cs::PublicKey& respondent, const csdb::Address& contract_abs_addr, const cs::Bytes& data) {
+    csmeta(csdebug) << cs::SmartContracts::to_base58(blockChain_, contract_abs_addr)
+        << "to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
 
-    sendDefault(respondent, MsgTypes::StateReply, round, state, sig);
+    cs::RoundNumber round = cs::Conveyer::instance().currentRoundNumber();
+    cs::Bytes signed_data;
+    cs::DataStream stream(signed_data);
+    const cs::PublicKey& key = contract_abs_addr.public_key();
+    stream << round << key << data;
+    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), signed_data.data(), signed_data.size());
+    sendDefault(respondent, MsgTypes::StateReply, round, key, data, sig);
 }
 
 void Node::getStateReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
-    csmeta(csdebug) << "Getting State from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
     istream_.init(data, size);
-    cs::Bytes state;
+    cs::PublicKey key;
+    cs::Bytes contract_data;
     cs::Signature signature;
-    istream_ >> state >> signature;
+    istream_ >> key >> contract_data >> signature;
+    csdb::Address abs_addr = csdb::Address::from_public_key(key);
+    
+    csmeta(csdebug) << cs::SmartContracts::to_base58(blockChain_, abs_addr) << " from "
+        << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
     if (!istream_.good() || !istream_.end()) {
         cserror() << "NODE> Bad State packet format";
         return;
     }
 
-    if (!cscrypto::verifySignature(signature, sender, state.data(), state.size())) {
+    cs::Bytes signed_data;
+    cs::DataStream signed_stream(signed_data);
+    signed_stream << rNum << key << contract_data;
+    if (!cscrypto::verifySignature(signature, sender, signed_data.data(), signed_data.size())) {
         csdebug() << "NODE> State Signature is incorrect";
         return;
     }
 
     /*Place here the function call with (state)*/
+    solver_->smart_contracts().net_update_contract_state(abs_addr, contract_data);
 }
 
 cs::ConfidantsKeys Node::retriveSmartConfidants(const cs::Sequence startSmartRoundNumber) const {
@@ -1723,7 +1743,7 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
     }
     // hash of part received message
     stage.messageHash = cscrypto::calculateHash(stage.message.data(), stage.message.size());
-    if (stage.fillFromBinary()) {
+    if (!stage.fillFromBinary()) {
         return;
     }
     cs::Sequence block = cs::SmartConsensus::blockPart(stage.id);
@@ -1768,12 +1788,13 @@ void Node::sendSmartStageTwo(const cs::ConfidantsKeys& smartConfidants, cs::Stag
 
     cs::DataStream stream(bytes);
     stream << stageTwoInfo.sender;
+    stream << stageTwoInfo.id;
     stream << stageTwoInfo.signatures;
     stream << stageTwoInfo.hashes;
 
     // create signature
     stageTwoInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
-    sendToList(smartConfidants, stageTwoInfo.sender, MsgTypes::SecondSmartStage, cs::Conveyer::instance().currentRoundNumber(), stageTwoInfo.id, stageTwoInfo.signature, bytes);
+    sendToList(smartConfidants, stageTwoInfo.sender, MsgTypes::SecondSmartStage, cs::Conveyer::instance().currentRoundNumber(), bytes, stageTwoInfo.signature);
 
     // cash our stage two
     stageTwoInfo.message = std::move(bytes);
@@ -1788,10 +1809,8 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
     istream_.init(data, size);
 
     cs::StageTwoSmarts stage;
-    istream_ >> stage.id >> stage.signature;
-
     cs::Bytes bytes;
-    istream_ >> bytes;
+    istream_ >> bytes >> stage.signature;
 
     if (!istream_.good() || !istream_.end()) {
         cserror() << "NODE> Bad SmartStageTwo packet format";
@@ -1800,6 +1819,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
 
     cs::DataStream stream(bytes.data(), bytes.size());
     stream >> stage.sender;
+    stream >> stage.id;
     stream >> stage.signatures;
     stream >> stage.hashes;
 
@@ -1836,13 +1856,14 @@ void Node::sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::St
     cs::DataStream stream(bytes);
     stream << stageThreeInfo.sender;
     stream << stageThreeInfo.writer;
+    stream << stageThreeInfo.id;
     stream << stageThreeInfo.realTrustedMask;
     stream << stageThreeInfo.packageSignature;
 
     stageThreeInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
     sendToList(smartConfidants, stageThreeInfo.sender, MsgTypes::ThirdSmartStage, cs::Conveyer::instance().currentRoundNumber(),
                // payload:
-               stageThreeInfo.id, stageThreeInfo.signature, bytes);
+              bytes, stageThreeInfo.signature);
 
     // cach stage three
     stageThreeInfo.message = std::move(bytes);
@@ -1856,10 +1877,8 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
     istream_.init(data, size);
 
     cs::StageThreeSmarts stage;
-    istream_ >> stage.id >> stage.signature;
-
     cs::Bytes bytes;
-    istream_ >> bytes;
+    istream_ >> bytes >> stage.signature;
 
     if (!istream_.good() || !istream_.end()) {
         cserror() << "NODE> Bad SmartStage Three packet format";
@@ -1869,6 +1888,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
     cs::DataStream stream(bytes.data(), bytes.size());
     stream >> stage.sender;
     stream >> stage.writer;
+    stream >> stage.id;
     stream >> stage.realTrustedMask;
     stream >> stage.packageSignature;
 
@@ -1884,8 +1904,8 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
     emit gotSmartStageThree(stage, false);
 }
 
-void Node::smartStageRequest(MsgTypes msgType, cs::Sequence smartRound, uint32_t startTransaction, cs::PublicKey confidant, uint8_t respondent, uint8_t required) {
-    sendDefault(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartRound, startTransaction, respondent, required);
+void Node::smartStageRequest(MsgTypes msgType, uint64_t smartID, cs::PublicKey confidant, uint8_t respondent, uint8_t required) {
+    sendDefault(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartID, respondent, required);
     csmeta(csdetails) << "done";
 }
 
@@ -1895,9 +1915,8 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
     istream_.init(data, size);
 
     uint8_t requesterNumber = 0;
-    cs::Sequence smartRound = 0;
-    uint32_t startTransaction = 0;
-    istream_ >> smartRound >> startTransaction >> requesterNumber;
+    uint64_t smartID = 0;
+    istream_ >> smartID >> requesterNumber;
 
     uint8_t requiredNumber = 0;
     istream_ >> requiredNumber;
@@ -1909,13 +1928,13 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
 
     cs::PublicKey req = requester;
 
-    emit receivedSmartStageRequest(msgType, smartRound, startTransaction, requesterNumber, requiredNumber, req);
+    emit receivedSmartStageRequest(msgType, smartID, requesterNumber, requiredNumber, req);
 }
 
-void Node::sendSmartStageReply(const cs::Bytes& message, const cs::RoundNumber smartRNum, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey& requester) {
+void Node::sendSmartStageReply(const cs::Bytes& message, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey& requester) {
     csmeta(csdetails) << "started";
 
-    sendDefault(requester, msgType, cs::Conveyer::instance().currentRoundNumber(), smartRNum, signature, message);
+    sendDefault(requester, msgType, cs::Conveyer::instance().currentRoundNumber(), message, signature);
     csmeta(csdetails) << "done";
 }
 
@@ -2027,12 +2046,10 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage) {
     table.hashes = rPackage.roundTable().hashes;
     roundPackageCache_.push_back(rPackage);
     clearRPCache(rPackage.roundTable().round);
-    conveyer.setTable(table);
     sendRoundPackageToAll(rPackage);
 
-
-    csdebug() << "Round " << conveyer.currentRoundNumber() << ", Confidants count " << table.confidants.size();
-    csdebug() << "Hashes count: " << table.hashes.size();
+    csdebug() << "Round " << rPackage.roundTable().round << ", Confidants count " << rPackage.roundTable().confidants.size();
+    csdebug() << "Hashes count: " << rPackage.roundTable().hashes.size();
     performRoundPackage(rPackage, solver_->getPublicKey());
 }
 

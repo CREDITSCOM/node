@@ -1261,6 +1261,7 @@ void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& /* obsolet
 }
 
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const general::Address& address, const std::vector<int64_t>& v) {
+#if 0
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     for (auto inner_id : v) {
         csdb::Transaction transactionTmp;
@@ -1313,11 +1314,13 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
             }
         }
     }
+#endif // 0
     _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+    SetResponseStatus(_return.status, APIRequestStatusType::NOT_IMPLEMENTED);
 }
 
 void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, const general::Address& address, const int64_t id) {
+#if 0
     csdb::Transaction trx;
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     if (!s_blockchain.getTransaction(addr, id, trx)) {
@@ -1326,7 +1329,8 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, 
     }
     _return.method = convertTransaction(trx).trxn.smartContract.method;
     _return.params = convertTransaction(trx).trxn.smartContract.params;
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+#endif // 0
+    SetResponseStatus(_return.status, APIRequestStatusType::NOT_IMPLEMENTED);
 }
 
 void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<general::ByteCodeObject>& byteCodeObjects) {
@@ -1656,7 +1660,6 @@ void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const gene
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
-#ifdef TRANSACTIONS_INDEX
 void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return, int64_t offset, int64_t limit) {
     if (!validatePagination(_return, *this, offset, limit))
         return;
@@ -1756,8 +1759,6 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
-
-#endif
 
 void APIHandler::TokenWalletTransfersGet(api::TokenTransfersResult& _return, const general::Address& token, const general::Address& address, int64_t offset, int64_t limit) {
     const csdb::Address wallet = BlockChain::getAddressFromKey(address);
@@ -2556,11 +2557,11 @@ namespace executor {
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 reCreationOriginExecutor();
             }
-            originExecuteRes.resp.status.code = 1;
+            originExecuteRes.resp.status.code = cs::error::ThriftException;
             originExecuteRes.resp.status.message = x.what();
         }
         catch (std::exception& x) {
-            originExecuteRes.resp.status.code = 1;
+            originExecuteRes.resp.status.code = cs::error::StdException;
             originExecuteRes.resp.status.message = x.what();
         }
         originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - timeBeg).count();

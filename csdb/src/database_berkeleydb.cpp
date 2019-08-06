@@ -70,8 +70,8 @@ DatabaseBerkeleyDB::DatabaseBerkeleyDB()
 : env_(0u)
 , db_blocks_(nullptr)
 , db_seq_no_(nullptr)
-, db_contracts_(nullptr) {
-}
+, db_contracts_(nullptr)
+, db_trans_idx_(nullptr) {}
 
 DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
     std::cout << "Attempt db_blocks_ to close...\n" << std::flush;
@@ -83,9 +83,9 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
     std::cout << "Attempt db_contracts_ to close...\n" << std::flush;
     db_contracts_->close(0);
     std::cout << "DB db_contracts_ was closed.\n" << std::flush;
-#ifdef TRANSACTIONS_INDEX
+    std::cout << "Attempt db_trans_idx_ to close...\n" << std::flush;
     db_trans_idx_->close(0);
-#endif
+    std::cout << "DB db_trans_idx_ was closed.\n" << std::flush;
     if (logfile_thread_.joinable()) {
         quit_ = true;
         logfile_thread_.join();
@@ -153,6 +153,7 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
     db_blocks_.reset(nullptr);
     db_seq_no_.reset(nullptr);
     db_contracts_.reset(nullptr);
+    db_trans_idx_.reset(nullptr);
 
     env_.log_set_config(DB_LOG_AUTO_REMOVE, 1);
 
@@ -194,20 +195,16 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
         status = db_contracts->open(txn, "contracts.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
         db_contracts_.reset(db_contracts);
     }
+    if (!status) {
+        auto db_trans_idx = new Db(&env_, 0);
+        status = db_trans_idx->open(NULL, "index.db", NULL, DB_BTREE, DB_CREATE, 0);
+        db_trans_idx_.reset(db_trans_idx);
+    }
     if (status) {
         set_last_error_from_berkeleydb(status);
         return false;
     }
 
-#ifdef TRANSACTIONS_INDEX
-    auto db_trans_idx = new Db(&env_, 0);
-    status = db_trans_idx->open(NULL, "index.db", NULL, DB_BTREE, DB_CREATE, 0);
-    if (status) {
-        set_last_error_from_berkeleydb(status);
-        return false;
-    }
-    db_trans_idx_.reset(db_trans_idx);
-#endif
     logfile_thread_ = std::thread(&DatabaseBerkeleyDB::logfile_routine, this);
 
     set_last_error();
@@ -480,7 +477,6 @@ DatabaseBerkeleyDB::IteratorPtr DatabaseBerkeleyDB::new_iterator() {
     return Database::IteratorPtr(new DatabaseBerkeleyDB::Iterator(cursorp));
 }
 
-#ifdef TRANSACTIONS_INDEX
 bool DatabaseBerkeleyDB::putToTransIndex(const cs::Bytes &key, const cs::Bytes &value) {
     if (!db_trans_idx_) {
         set_last_error(NotOpen);
@@ -520,7 +516,6 @@ bool DatabaseBerkeleyDB::getFromTransIndex(const cs::Bytes &key, cs::Bytes *valu
     set_last_error();
     return true;
 }
-#endif
 
 bool DatabaseBerkeleyDB::updateContractData(const cs::Bytes& key, const cs::Bytes& data) {
     if (!db_contracts_) {

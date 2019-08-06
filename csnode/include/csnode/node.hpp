@@ -112,9 +112,9 @@ public:
     void sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::StageThreeSmarts& stageThreeInfo);
     void getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
     void smartStageEmptyReply(uint8_t requesterNumber);
-    void smartStageRequest(MsgTypes msgType, cs::Sequence smartRound, uint32_t startTransaction, cs::PublicKey confidant, uint8_t respondent, uint8_t required);
+    void smartStageRequest(MsgTypes msgType, uint64_t smartID, cs::PublicKey confidant, uint8_t respondent, uint8_t required);
     void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
-    void sendSmartStageReply(const cs::Bytes& message, const cs::RoundNumber smartRNum, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey& requester);
+    void sendSmartStageReply(const cs::Bytes& message, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey& requester);
 
     void addSmartConsensus(uint64_t id);
     void removeSmartConsensus(uint64_t id);
@@ -158,9 +158,9 @@ public:
 
     // state syncro functions
     
-    void sendStateRequest(cs::Sequence seq, uint32_t idx, cs::PublicKeys confidants);
+    void sendStateRequest(const csdb::Address& contract_abs_addr, const cs::PublicKeys& confidants);
     void getStateRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
-    void sendStateReply(const cs::PublicKey& respondent, const cs::Bytes state);
+    void sendStateReply(const cs::PublicKey& respondent, const csdb::Address& contract_abs_addr, const cs::Bytes& data);
     void getStateReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
     // syncro get functions
@@ -229,7 +229,7 @@ public:
 
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;
-    using SmartStageRequestSignal = cs::Signal<void(uint8_t, cs::Sequence, uint32_t, uint8_t, uint8_t, cs::PublicKey&)>;
+    using SmartStageRequestSignal = cs::Signal<void(uint8_t, uint64_t, uint8_t, uint8_t, cs::PublicKey&)>;
     using StopSignal = cs::Signal<void()>;
 
     // args: [failed list, restart list]
