@@ -58,7 +58,8 @@ public:
         Id
     };
 
-    explicit BlockChain(csdb::Address genesisAddress, csdb::Address startAddress);
+    explicit BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
+                        bool recreateIndex = false);
     ~BlockChain();
 
     bool init(const std::string& path);
@@ -362,6 +363,8 @@ private:
 
     // may be modified once in uuid() method:
     mutable uint64_t uuid_ = 0;
+    bool recreateIndex;
+    std::map<csdb::Address, csdb::PoolHash> lapoos;
 };
 
 class TransactionsIterator {

@@ -17,14 +17,12 @@
 
 #include <client/config.hpp>
 
-//#define RECREATE_INDEX
-
 using namespace cs;
 namespace fs = boost::filesystem;
 
 static const char* cashesPath = "./cashes";
 
-BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
+BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress, bool recreateIndex)
 : good_(false)
 , dbLock_()
 , genesisAddress_(genesisAddress)
@@ -32,7 +30,8 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , walletIds_(new WalletsIds)
 , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
-, cacheMutex_() {
+, cacheMutex_()
+, recreateIndex(recreateIndex) {
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
 
     createCashesPath();
@@ -78,18 +77,15 @@ bool BlockChain::init(const std::string& path) {
         std::cout << "Done\n";
     }
 
-#if defined(RECREATE_INDEX)
-    for (uint32_t seq = 0; seq <= getLastSequence(); ++seq) {
-        auto pool = loadBlock(seq);
-        createTransactionsIndex(pool);
+    if (recreateIndex) {
+        recreateIndex = false;
+        lapoos.clear();
+        cslog() << "Recreated index 0 -> " << getLastSequence()
+                << ". Continue to keep it actual from new blocks.";
     }
 
-    cslog() << "Recreated the index 0->" << getLastSequence() << ". Finishing with error now. Because we can";
-    return false;
-#else
     good_ = true;
     return true;
-#endif
 }
 
 bool BlockChain::isGood() const {
@@ -130,6 +126,9 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         }
         walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
     }
+    if (recreateIndex) {
+        createTransactionsIndex(block);
+    }
 }
 
 bool BlockChain::postInitFromDB() {
@@ -146,22 +145,19 @@ bool BlockChain::postInitFromDB() {
 }
 
 void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
-#ifdef RECREATE_INDEX
-    static std::map<csdb::Address, csdb::PoolHash> lapoos;
-#endif
-
-    // Update
     std::set<csdb::Address> indexedAddrs;
 
     auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
         auto key = getAddressByType(addr, BlockChain::AddressType::PublicKey);
         if (indexedAddrs.insert(key).second) {
-#ifdef RECREATE_INDEX
-            csdb::PoolHash lapoo = lapoos[key];
-            lapoos[key] = pool.hash();
-#else
-            csdb::PoolHash lapoo = getLastTransaction(key).pool_hash();
-#endif
+            csdb::PoolHash lapoo;
+            if (recreateIndex) {
+                lapoo = lapoos[key];
+                lapoos[key] = pool.hash();
+            }
+            else {
+                lapoo = getLastTransaction(key).pool_hash();
+            }
             std::lock_guard<decltype(dbLock_)> l(dbLock_);
             storage_.set_previous_transaction_block(key, pool.hash(), lapoo);
         }
