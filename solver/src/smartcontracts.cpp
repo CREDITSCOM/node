@@ -2423,6 +2423,7 @@ bool SmartContracts::wait_until_executor(unsigned int test_freq, unsigned int ma
         cswarning() << kLogPrefix << "wait for executor prior to continue read blockchain DB";
         std::this_thread::sleep_for(std::chrono::seconds(test_freq));
     }
+    executor_ready = true;
     return true;
 }
 
