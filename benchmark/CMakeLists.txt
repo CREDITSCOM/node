@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(benchmark)
 
 # add new benches here
+add_subdirectory(testbench)
 add_subdirectory(lmdbbench)
 
 set(CMAKE_CXX_STANDARD 17)
