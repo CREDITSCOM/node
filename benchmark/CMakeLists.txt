@@ -10,7 +10,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(${PROJECT_NAME} STATIC "./include/timeoutexception.hpp"
                                    "./include/benchmark.hpp"
-                                   "./src/benchmark.cpp")
+                                   "./src/benchmark.cpp"
+                                   "./include/framework.hpp")
 
 target_include_directories(${PROJECT_NAME} PUBLIC "./include")
 target_include_directories(${PROJECT_NAME} PUBLIC "./lmdbxx")
