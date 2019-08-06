@@ -46,17 +46,12 @@ APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor
 }
 
 void APIHandler::run() {
-    if (!s_blockchain.isGood()) {
+    if (!s_blockchain.isGood())
         return;
-    }
-
 #ifdef MONITOR_NODE
     stats.run(stats_);
 #endif
-    tm.run();  // Run this AFTER updating all the caches for maximal efficiency
-
     state_updater_running.test_and_set(std::memory_order_acquire);
-    //state_updater = std::thread([this]() { state_updater_work_function(); });
 }
 
 APIHandler::~APIHandler() {
@@ -1911,7 +1906,7 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
             putTokenInfo(tok, fromByteArray(t.first.public_key()), t.second);
 
             // filters
-            if ((tok.name.find(filters.name) != -1 && tok.code.find(filters.code) != -1 && tok.tokenStandard == filters.tokenStandard ) ||
+            if ((tok.name.find(filters.name) != std::string::npos && tok.code.find(filters.code) != std::string::npos && tok.tokenStandard == filters.tokenStandard ) ||
                 (tok.name.find(filters.name) && tok.code.find(filters.code) && !tok.tokenStandard) ||
                 (tok.name.find(filters.name) && filters.code.empty() && !tok.tokenStandard) ||
                 (filters.name.empty() && tok.code.find(filters.code) && tok.tokenStandard) ||

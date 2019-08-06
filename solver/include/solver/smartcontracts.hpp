@@ -300,7 +300,7 @@ public:
 
     void init(const cs::PublicKey&, Node* node);
 
-    static std::string get_error_message(uint8_t code);
+    static std::string get_error_message(int8_t code);
 
     // test transaction methods
 

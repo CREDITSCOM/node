@@ -40,7 +40,7 @@ public:
     static Address from_public_key(const cs::PublicKey &key);
     static Address from_public_key(const char *key);
     static Address from_wallet_id(WalletId id);
-    std::string to_api_addr();
+    std::string to_api_addr() const;
 
     bool operator==(const Address &other) const noexcept;
     inline bool operator!=(const Address &other) const noexcept;
