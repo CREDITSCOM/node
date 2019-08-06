@@ -521,7 +521,8 @@ void Node::cleanConfirmationList(cs::RoundNumber rNum) {
 }
 
 void Node::sendStateRequest(const csdb::Address& contract_abs_addr, const cs::PublicKeys& confidants) {
-    csmeta(csdebug) << "Sending StateRequest" << cs::SmartContracts::to_base58(blockChain_, contract_abs_addr);
+    csmeta(csdebug) << cs::SmartContracts::to_base58(blockChain_, contract_abs_addr);
+
     auto round = cs::Conveyer::instance().currentRoundNumber();
     cs::Bytes message;
     cs::DataStream stream(message);
@@ -532,26 +533,28 @@ void Node::sendStateRequest(const csdb::Address& contract_abs_addr, const cs::Pu
 }
 
 void Node::getStateRequest(const uint8_t * data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey & sender) {
-    csmeta(csdebug) << "Getting StateRequest from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
     istream_.init(data, size);
     cs::PublicKey key;
     cs::Signature signature;
     istream_ >> key >> signature;
+    csdb::Address abs_addr = csdb::Address::from_public_key(key);
+
+    csmeta(csdebug) << cs::SmartContracts::to_base58(blockChain_, abs_addr) << " from "
+        << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
     if (!istream_.good() || !istream_.end()) {
         cserror() << "NODE> Bad StateRequest packet format";
         return;
     }
 
-    cs::Bytes message;
-    cs::DataStream stream(message);
+    cs::Bytes signed_bytes;
+    cs::DataStream stream(signed_bytes);
     stream << rNum << key;
-    if (!cscrypto::verifySignature(signature, sender, message.data(), message.size())) {
+    if (!cscrypto::verifySignature(signature, sender, signed_bytes.data(), signed_bytes.size())) {
         csdebug() << "NODE> StateRequest Signature is incorrect";
         return;
     }
 
-    csdb::Address abs_addr = csdb::Address::from_public_key(key);
     cs::Bytes contract_data;
     if (blockChain_.getContractData(abs_addr, contract_data)) {
         sendStateReply(sender, abs_addr, contract_data);
@@ -559,10 +562,10 @@ void Node::getStateRequest(const uint8_t * data, const std::size_t size, const c
 }
 
 void Node::sendStateReply(const cs::PublicKey& respondent, const csdb::Address& contract_abs_addr, const cs::Bytes& data) {
-    csmeta(csdebug) << "Sending state of " << cs::SmartContracts::to_base58(blockChain_, contract_abs_addr)
+    csmeta(csdebug) << cs::SmartContracts::to_base58(blockChain_, contract_abs_addr)
         << "to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
-    cs::RoundNumber round = cs::Conveyer::instance().currentRoundNumber();
 
+    cs::RoundNumber round = cs::Conveyer::instance().currentRoundNumber();
     cs::Bytes signed_data;
     cs::DataStream stream(signed_data);
     const cs::PublicKey& key = contract_abs_addr.public_key();
@@ -572,12 +575,15 @@ void Node::sendStateReply(const cs::PublicKey& respondent, const csdb::Address& 
 }
 
 void Node::getStateReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
-    csmeta(csdebug) << "Getting state from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
     istream_.init(data, size);
     cs::PublicKey key;
     cs::Bytes contract_data;
     cs::Signature signature;
     istream_ >> key >> contract_data >> signature;
+    csdb::Address abs_addr = csdb::Address::from_public_key(key);
+    
+    csmeta(csdebug) << cs::SmartContracts::to_base58(blockChain_, abs_addr) << " from "
+        << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
     if (!istream_.good() || !istream_.end()) {
         cserror() << "NODE> Bad State packet format";
@@ -593,7 +599,6 @@ void Node::getStateReply(const uint8_t* data, const std::size_t size, const cs::
     }
 
     /*Place here the function call with (state)*/
-    csdb::Address abs_addr = csdb::Address::from_public_key(key);
     solver_->smart_contracts().net_update_contract_state(abs_addr, contract_data);
 }
 
