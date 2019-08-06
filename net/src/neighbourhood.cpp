@@ -66,7 +66,7 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
         if (spended_time.count() > 10) redirect_limit = true; // 10 seconst dry run
     }
 
-    int redirect_number;
+    size_t redirect_number;
     if (redirect_limit) {
         redirect_number = std::max(neighbors_redirect_min, static_cast<int>(neighbours_.size()) / 3 + 1);
         if (redirect_number > neighbours_.size()) {
@@ -184,12 +184,11 @@ void Neighbourhood::checkSilent() {
     { // begin of scoped locked block
         cs::ScopedLock lock(mLockFlag_, nLockFlag_);
 
-        for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
+        int i = 0;
+        std::vector<int> toDisconnect;
+        for (auto conn = neighbours_.begin(), end = neighbours_.end(); conn != end; ++conn, ++i) {
             if (!(*conn)->node) {
-                ConnectionPtr tc = *conn;
-                csunused(tc);
-                disconnectNode(&*conn);
-                --conn;
+                toDisconnect.push_back(i);
                 continue;
             }
 
@@ -200,19 +199,24 @@ void Neighbourhood::checkSilent() {
             const auto packetsCount = (*(*conn)->node)->packets.load(std::memory_order_relaxed);
 
             if (packetsCount == (*conn)->lastPacketsCount) {
-                cswarning() << "Node " << (*conn)->in << " stopped responding";
-
-                ConnectionPtr tc = *conn;
-                Connection* c = *tc;
-                tc->node->connection.compare_exchange_strong(c, nullptr, std::memory_order_release, std::memory_order_relaxed);
-
-                disconnectNode(&*conn);
-                --conn;
+                toDisconnect.push_back(i);
             }
             else {
                 needRefill = false;
                 (*conn)->lastPacketsCount = packetsCount;
             }
+        }
+        for (auto it = toDisconnect.rbegin(), end = toDisconnect.rend(); it != end; ++it) {
+            auto connPtrIt = neighbours_.begin() + *it;
+            ConnectionPtr tc = *connPtrIt;
+            if (tc->node) {
+                cswarning() << "Node " << tc->in << " stopped responding";
+                Connection* c = *tc;
+                tc->node->connection.compare_exchange_strong(c, nullptr, std::memory_order_release, std::memory_order_relaxed);
+            }
+            (*connPtrIt)->connected = false;
+            (*connPtrIt)->node = RemoteNodePtr();
+            neighbours_.erase(connPtrIt);
         }
 
         if (needRefill) {
