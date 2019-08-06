@@ -410,7 +410,7 @@ public:
             return;
         }
 
-        auto closure = [=](auto... args) -> void {
+        auto closure = [=](auto&&... args) -> void {
             if (rhs) {
                 (*rhs)(std::forward<decltype(args)>(args)...);
             }

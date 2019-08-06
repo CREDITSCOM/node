@@ -49,6 +49,9 @@ public:
     virtual bool getFromTransIndex(const cs::Bytes& key, cs::Bytes* value) = 0;
 #endif
 
+    virtual bool updateContractData(const cs::Bytes& key, const cs::Bytes& data) = 0;
+    virtual bool getContractData(const cs::Bytes& key, cs::Bytes& data) = 0;
+
     class Iterator {
     protected:
         Iterator();

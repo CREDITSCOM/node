@@ -22,7 +22,10 @@ add_library(lib
   include/lib/system/scopeguard.hpp
   include/lib/system/random.hpp
   include/lib/system/reflection.hpp
+  include/lib/system/reference.hpp
   include/lib/system/console.hpp
+  include/lib/system/processexception.hpp
+  include/lib/system/process.hpp
 )
 
 if (MSVC)

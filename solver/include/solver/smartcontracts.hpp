@@ -9,7 +9,7 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
 
-#include <csnode/node.hpp>  // introduce csconnector::connector::ApiExecHandlerPtr as well
+#include <csnode/node.hpp>  // introduce csconnector::connector::ApiExecHandlerPtr at least
 
 #include <list>
 #include <mutex>
@@ -70,15 +70,17 @@ namespace trx_uf {
     // new state transaction fields
     namespace new_state {
         // new state value, new byte-code (string)
-        constexpr csdb::user_field_id_t Value = ~1;  // see apihandler.cpp #9 for currently used value ~1
+        constexpr csdb::user_field_id_t Value = -2;  // see apihandler.cpp #9 for currently used value ~1
         // reference to start transaction
         constexpr csdb::user_field_id_t RefStart = 1;
-        // fee value
+        // fee value, includes both execution fee and extra storage (delta) fee
         constexpr csdb::user_field_id_t Fee = 2;
         // return value
         constexpr csdb::user_field_id_t RetVal = 3;
+        // hash of state
+        constexpr csdb::user_field_id_t Hash = 4;
         // count of user fields
-        constexpr size_t Count = 4;
+        constexpr size_t Count = 4; // fields Value and Hash exclude each other, so the total number of fields is 4
     }  // namespace new_state
     // smart-gen transaction field
     namespace smart_gen {
@@ -141,6 +143,9 @@ inline bool operator==(const SmartContractRef& l, const SmartContractRef& r) {
 }
 
 inline bool operator<(const SmartContractRef& l, const SmartContractRef& r) {
+    if (!l.is_valid() || !r.is_valid()) {
+        return false;
+    }
     if (l.sequence < r.sequence) {
         return true;
     }
@@ -148,6 +153,13 @@ inline bool operator<(const SmartContractRef& l, const SmartContractRef& r) {
         return false;
     }
     return (l.transaction < r.transaction);
+}
+
+inline bool operator>(const SmartContractRef& l, const SmartContractRef& r) {
+    if (!l.is_valid() || !r.is_valid()) {
+        return false;
+    }
+    return !(l < r) && !(l == r);
 }
 
 // helper to print <sequence,transaction>
@@ -241,6 +253,13 @@ public:
     /* Assuming deployer.is_public_key(), not a WalletId */
     static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId, const api::SmartContractDeploy&);
 
+    // true if tr is new_state and contract state is updated
+    static bool is_state_updated(const csdb::Transaction& tr);
+
+    static bool dbcache_read(const BlockChain& blockchain, const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, std::string& state /*output*/);
+
+    static std::string get_contract_state(const BlockChain& storage, const csdb::Address& abs_addr);
+
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
@@ -250,6 +269,9 @@ public:
     // usually ordinary consensus may reject smart-related transactions
     // failed list refers to rejected calls
     void on_reject(const std::vector<Node::RefExecution>& reject_list);
+
+    // get contract state update(s) to keep cache is up-to-date
+    void on_update(const std::vector< csdb::Transaction >& states);
 
     csdb::Address absolute_address(const csdb::Address& optimized_address) const {
         return bc.getAddressByType(optimized_address, BlockChain::AddressType::PublicKey);
@@ -295,6 +317,8 @@ signals:
     SmartContractSignal signal_payable_timeout;
     // emits on every contract emitted transaction is appeared in blockchain, args are (emitted_transaction, starter_transaction):
     cs::Signal<void(const csdb::Transaction&, const csdb::Transaction&)> signal_emitted_accepted;
+    // emits on every update of contract state both during reading db and getting block in real time
+    cs::Signal<void(const csdb::Transaction& new_state_value)> contract_state_updated;
 
     // flag to always execute contracts even in normal state
     bool force_execution;
@@ -530,8 +554,10 @@ private:
         return (list.cend() != std::find(list.cbegin(), list.cend(), node_id));
     }
 
-    static csdb::Transaction get_transaction(BlockChain& storage, const SmartContractRef& contract);
+public:
+    static csdb::Transaction get_transaction(const BlockChain& storage, const SmartContractRef& contract);
 
+private:
     // non-static variant
     csdb::Transaction get_transaction(const SmartContractRef& contract) const {
         return SmartContracts::get_transaction(bc, contract);
@@ -571,7 +597,7 @@ private:
     }
 
     // blocking call
-    bool execute(/*[in,out]*/ SmartExecutionData& data);
+    bool execute(/*[in,out]*/ SmartExecutionData& data, bool validationMode);
 
     // blocking call
     bool update_metadata(const api::SmartContractInvocation& contract, StateItem& state);
@@ -647,6 +673,62 @@ private:
     bool implements_payable(PayableStatus val) {
         return (val == PayableStatus::Implemented || val == PayableStatus::ImplementedVer1);
     }
+
+    // cache states in db operations
+
+    bool dbcache_update(const csdb::Address& abs_addr, const SmartContractRef& ref_start, const std::string& state, bool force_update = false);
+
+    bool dbcache_read(const csdb::Address& abs_addr, SmartContractRef& ref_start /*output*/, std::string& state /*output*/);
+
+    /**
+     * block current thread until executor become available test_period_sec
+     *
+     * @author  Alexander Avramenko
+     * @date    27.06.2019
+     *
+     * @param   test_period_sec Interval in seconds between tests &amp; outputs to console of
+     *  diagnostic warning.
+     *
+     * @returns True if it succeeds, false if wait has stopped and executor is still unavailable.
+     */
+
+    bool wait_until_executor(unsigned int test_period_sec);
+
+    /**
+     * Gets transaction with actual state on basis of new_state transaction in blockchain
+     *
+     * @author  Alexander Avramenko
+     * @date    01.07.2019
+     *
+     * @param   hashed_state  The new_state transaction with hash of state.
+     *
+     * @returns The transaction with actual state.
+     */
+
+    csdb::Transaction get_actual_state(const csdb::Transaction& hashed_state);
+
+    /**
+     * called from public method on_store_block()
+     *
+     * @author  Alexander Avramenko
+     * @date    22.07.2019
+     *
+     * @param   block   The block.
+     */
+
+    void on_store_block_impl(const csdb::Pool& block);
+
+    /**
+     * called from public method on_read_block()
+     *
+     * @author  Alexander Avramenko
+     * @date    22.07.2019
+     *
+     * @param           block       The block.
+     * @param [in,out]  should_stop If non-null, true if should stop.
+     */
+
+    void on_read_block_impl(const csdb::Pool& block, bool* should_stop);
 };
 
 }  // namespace cs

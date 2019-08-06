@@ -2,6 +2,7 @@
 #define BLOCK_VALIDATOR_PLUGINS_HPP
 
 #include <vector>
+#include <list>
 
 #include <cscrypto/cryptotypes.hpp>
 #include <csdb/amount.hpp>
@@ -11,6 +12,9 @@
 #include <lib/system/common.hpp>
 
 namespace cs {
+
+    class SmartContracts;
+    struct SmartContractRef;
 
 class ValidationPlugin {
 public:
@@ -39,6 +43,8 @@ protected:
     auto& getPrevBlock() {
         return blockValidator_.prevBlock_;
     }
+
+    const cs::SmartContracts* getSmartContracts() const;
 
 private:
     BlockValidator& blockValidator_;
@@ -130,5 +136,74 @@ public:
 private:
     bool checkSignature(const csdb::Transaction&);
 };
+
+class AccountBalanceChecker : public ValidationPlugin
+{
+public:
+
+    AccountBalanceChecker(BlockValidator& bv, const char* base58_key);
+
+    ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+
+    csdb::Address abs_addr;
+    csdb::Address opt_addr;
+
+    struct Transaction
+    {
+        size_t seq;
+        size_t idx;
+        csdb::Transaction t;
+    };
+    std::vector<Transaction> all_transactions;
+
+    struct ExtraFee
+    {
+        double fee;
+        std::string comment;
+    };
+
+    struct Income
+    {
+        size_t idx;
+        double sum;
+        std::list<ExtraFee> extra_fee;
+    };
+    std::list<Income> incomes;
+
+    struct Expense
+    {
+        size_t idx;
+        double sum;
+        std::list<ExtraFee> extra_fee;
+    };
+    std::list<Expense> expenses;
+
+    double balance;
+
+    struct InvalidOperation
+    {
+        size_t idx;
+        double start_balance;
+        double sum;
+        double result_balance;
+        std::list<ExtraFee> extra_fee;
+    };
+    std::list<InvalidOperation> invalid_ops;
+
+    bool iam_contract{ false };
+
+    //std::list<double> balance_history;
+    
+    std::list<size_t> inprogress;
+    
+    double get_wallet_balance();
+    double balance_error{ 0 };
+
+    void erase_inprogress(const cs::SmartContractRef& ref);
+    //double rollback_execution(size_t idx);
+};
+
 }  // namespace cs
 #endif  // BLOCK_VALIDATOR_PLUGINS_HPP

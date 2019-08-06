@@ -15,6 +15,8 @@
 #include <cscrypto/cscrypto.hpp>
 #include <smartcontracts.hpp>
 
+#include <base58.h>
+
 #ifdef _MSC_VER
 #include <intrin.h>
 #endif
@@ -28,8 +30,27 @@ const uint8_t kBlockVerToSwitchCountedFees = 0;
 
 namespace cs {
 
+const cs::SmartContracts* ValidationPlugin::getSmartContracts() const {
+    const auto ptr = blockValidator_.node_.getSolver();
+    if (ptr == nullptr) {
+        return nullptr;
+    }
+    return &ptr->smart_contracts();
+}
+
 ValidationPlugin::ErrorType
 SmartStateValidator::validateBlock(const csdb::Pool& block) {
+
+    if (block.sequence() < 90728) {
+        // skip unable-to-validate contracts
+        return ErrorType::noError;
+    }
+
+    if (block.sequence() < 3302505) {
+        // skip invalid contracts until first valid
+        return ErrorType::noError;
+    }
+
     const auto& transactions = block.transactions();
     for (const auto& t : transactions) {
         if (SmartContracts::is_new_state(t) && !checkNewState(t)) {
@@ -66,9 +87,9 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
         cserror() << kLogPrefix << "incorrect reference to start transaction";
         return false;
     }
-    std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
-    auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
+    executor::Executor::ExecuteTransactionInfo info{};
     info.transaction = block.transactions().at(ref.transaction);
+    info.sequence = ref.sequence;
     info.feeLimit = csdb::Amount(info.transaction.max_fee().to_double()); // specify limit as SmartContracts::execute() does
     info.convention = executor::Executor::MethodNameConvention::Default;
     if (!is_smart(info.transaction)) {
@@ -86,7 +107,7 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
         //    }
         //}
     }
-    auto opt_result = executorPtr->getExecutor().executeTransaction(smarts, std::string{} /*no force new_state required*/);
+    auto opt_result = executorPtr->getExecutor().reexecuteContract(info, std::string{} /*no force new_state required*/);
     if (!opt_result.has_value()) {
         cserror() << kLogPrefix << "execution of transaction failed";
         return false;
@@ -98,16 +119,15 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
     }
     auto& main_result = result.smartsRes.front();
 
-    std::string newState = t.user_field(trx_uf::new_state::Value).value<std::string>();
-    const std::string& realNewState = main_result.newState;
-    if (newState.empty()) {
-        if (!realNewState.empty()) {
+    if (!cs::SmartContracts::is_state_updated(t)) {
+        if (!main_result.newState.empty()) {
             csdebug() << kLogPrefix << "new state of trx is empty, but real new state is not";
         }
         return true;
     }
     else {
-        if (newState != realNewState) {
+        std::string newState = cs::SmartContracts::get_contract_state(getBlockChain(), t.target());
+        if (newState != main_result.newState) {
             cserror() << kLogPrefix << "new state of trx in blockchain doesn't match real new state";
             return false;
         }
@@ -378,5 +398,287 @@ bool TransactionsChecker::checkSignature(const csdb::Transaction& t) {
     return t.verify_signature(t.source().public_key());
   }
 }
+
+//
+// AccountChecker
+// 
+
+AccountBalanceChecker::AccountBalanceChecker(BlockValidator& bv, const char* base58_key)
+    : ValidationPlugin(bv)
+{
+    cs::Bytes account_key;
+    if (DecodeBase58(std::string(base58_key), account_key)) {
+        abs_addr = csdb::Address::from_public_key(account_key);
+    }
+}
+
+ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Pool& block) {
+
+    constexpr double epsilon = 0.000001;
+    const cs::Sequence seq = block.sequence();
+
+    // test execution timeouts
+    if (!inprogress.empty()) {
+        while (!inprogress.empty()) {
+            size_t idx = inprogress.front();
+            if (idx <= all_transactions.size()) {
+                auto& item = all_transactions[idx];
+                if (seq > item.seq && seq - item.seq <= Consensus::MaxRoundsCancelContract) {
+                    // no timeout yet
+                    break;
+                }
+                // roll back canceled call
+                double return_sum = item.t.amount().to_double();
+                balance += return_sum;
+                incomes.push_back(Income{ idx, return_sum, std::list<ExtraFee>{} });
+                // erase item in progress
+                for (auto it = inprogress.cbegin(); it != inprogress.cend(); ++it) {
+                    if (*it == idx) {
+                        inprogress.erase(it);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    size_t t_idx = 0;
+    // stores every new_state contract's address to detect emitted transactions
+    bool possible_emitted = false;
+    csdb::Address emitted_src_abs_addr{};
+    csdb::Address emitted_src_opt_addr{};
+
+    //bool possible_error = false;
+    constexpr size_t StopOn = 99;
+
+    for (const auto& t : block.transactions()) {
+
+        size_t cnt_all_transactions = all_transactions.size();
+
+        // get opt_addr if it has not got yet
+        if (!opt_addr.is_wallet_id()) {
+            if (t.target() == abs_addr || t.source() == abs_addr) {
+                for (const auto& w : block.newWallets()) {
+                    if (w.addressId_.trxInd_ == t_idx) {
+                        if (w.addressId_.addressType_ == csdb::Pool::NewWalletInfo::AddressIsSource) {
+                            if (t.source() == abs_addr) {
+                                opt_addr = csdb::Address::from_wallet_id(w.walletId_);
+                            }
+                            break;
+                        }
+                        else if (w.addressId_.addressType_ == csdb::Pool::NewWalletInfo::AddressIsTarget) {
+                            if (t.target() == abs_addr) {
+                                opt_addr = csdb::Address::from_wallet_id(w.walletId_);
+                            }
+                            break;
+                        }
+                        else {
+                            cswarning() << kLogPrefix << "failed to get opt_addr for account";
+                        }
+                    }
+                }
+            }
+        }
+
+        double new_balance = balance;
+        std::list<ExtraFee> extra_fee;
+        bool call_to_contract = false;
+
+        // process smart contract
+        if (cs::SmartContracts::is_smart_contract(t)) {
+            possible_emitted = false;
+            call_to_contract = cs::SmartContracts::is_executable(t);
+            if (call_to_contract) {
+                if (!iam_contract) {
+                    if (t.target() == opt_addr || t.target() == abs_addr) {
+                        if (cs::SmartContracts::is_deploy(t)) {
+                            iam_contract = true;
+                        }
+                        else {
+                        }
+                    }
+                }
+            }
+            else if (cs::SmartContracts::is_new_state(t)) {
+                if (!iam_contract) {
+
+                    csdb::UserField fld = t.user_field(cs::trx_uf::new_state::RefStart);
+                    if (fld.is_valid()) {
+                        SmartContractRef ref_start(fld);
+                        csdb::Transaction starter = cs::SmartContracts::get_transaction(getBlockChain(), ref_start);
+                        if (starter.is_valid()) {
+                            if (starter.source() == opt_addr || starter.source() == abs_addr) {
+                                if (!cs::SmartContracts::is_state_updated(t)) {
+                                    // rollback execution
+                                    for (auto it = inprogress.cbegin(); it != inprogress.cend(); ++it) {
+                                        size_t idx = *it;
+                                        if (idx < all_transactions.size()) {
+                                            const auto& item = all_transactions[idx];
+                                            if (item.seq == ref_start.sequence && item.idx == ref_start.transaction) {
+                                                // roll back canceled call
+                                                double return_sum = item.t.amount().to_double();
+                                                new_balance += return_sum;
+                                                // erase item in progress
+                                                inprogress.erase(it);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                else {
+                                    // my account had to pay
+                                    new_balance -= t.counted_fee().to_double();
+                                    possible_emitted = true;
+                                    emitted_src_abs_addr = t.source();
+                                    // assume WalletsIds have already updated
+                                    csdb::internal::WalletId wid;
+                                    if (getBlockChain().findWalletId(emitted_src_abs_addr, wid)) {
+                                        emitted_src_opt_addr = csdb::Address::from_wallet_id(wid);
+                                    }
+                                    all_transactions.emplace_back(Transaction{ block.sequence(), t_idx, t.clone() });
+                                    erase_inprogress(ref_start);
+                                }
+                            
+                                // execution fee is always paid
+                                fld = t.user_field(cs::trx_uf::new_state::Fee);
+                                if (fld.is_valid()) {
+                                    csdb::Amount fee = fld.value<csdb::Amount>();
+                                    extra_fee.emplace_back(ExtraFee{ fee.to_double(), "exec fee" });
+                                }
+                            }
+                        }
+                    }
+
+                }
+            }
+        }
+        else if (possible_emitted) {
+            // test emitted transactions, initer have to pay fee for them 
+            if (t.source() == emitted_src_abs_addr || t.source() == emitted_src_opt_addr) {
+                extra_fee.emplace_back(ExtraFee{t.counted_fee().to_double(), "emitted fee"});
+                // if contract send transaction not to my account and I should pay fee, store it
+                if (t.target() != abs_addr && t.target() != opt_addr) {
+                    /* Transaction& tmp =*/ all_transactions.emplace_back(Transaction{ block.sequence(), t_idx, t.clone() });
+                }
+            }
+            else {
+                possible_emitted = false;
+            }
+        }
+        else {
+            // test is my account replenishes payable contract
+            if (t.source() == abs_addr || t.source() == opt_addr) {
+                const cs::SmartContracts* psmarts = getSmartContracts();
+                if (psmarts != nullptr) {
+                    if (psmarts->is_known_smart_contract(t.target())) {
+                        call_to_contract = true;
+                    }
+                }
+            }
+        }
+         
+        // process as target
+        if (t.target() == opt_addr || t.target() == abs_addr) {
+           /* Transaction& tmp =*/ all_transactions.emplace_back(Transaction{ block.sequence(), t_idx, t.clone() });
+            double sum = t.amount().to_double();
+            new_balance = balance + sum;
+            if (call_to_contract) {
+                inprogress.push_back(all_transactions.size() - 1);
+            }
+        }
+
+        // process as source
+        if (t.source() == opt_addr || t.source() == abs_addr) {
+            /*Transaction& tmp =*/ all_transactions.emplace_back(Transaction{ block.sequence(), t_idx, t.clone() });
+            double sum = t.amount().to_double();
+            new_balance = balance - sum;
+            if (!iam_contract) {
+                // contract does not pay for emitted transaction(s)
+                new_balance -= t.counted_fee().to_double();
+            }
+            if (call_to_contract) {
+                //possible_error = true;
+                inprogress.push_back(all_transactions.size() - 1);
+            }
+        }
+
+        if (!extra_fee.empty()) {
+            for (const auto& e : extra_fee) {
+                new_balance -= e.fee;
+            }
+        }
+
+
+        if (fabs(new_balance - balance) > DBL_EPSILON) {
+
+            // update balance, fix invalid operations
+            if (new_balance < -DBL_EPSILON) {
+                invalid_ops.emplace_back(InvalidOperation{ all_transactions.size() - 1, balance, new_balance - balance, new_balance, extra_fee });
+            }
+
+            if (new_balance > balance) {
+                incomes.push_back(Income{ all_transactions.size() - 1, new_balance - balance, extra_fee });
+            }
+            else {
+                expenses.push_back(Expense{ all_transactions.size() - 1, new_balance - balance, extra_fee });
+            }
+            balance = new_balance;
+        }
+
+        ++t_idx;
+    }
+
+    double wallet_balance = get_wallet_balance();
+    double new_balance_error = wallet_balance - balance;
+    if (inprogress.empty() && fabs(new_balance_error - balance_error) > epsilon) {
+        cserror() << kLogPrefix << "balance " << balance << " mismatch wallet_balance " << wallet_balance;
+        balance_error = new_balance_error;
+    }
+
+    return ValidationPlugin::ErrorType::noError;
+}
+
+double AccountBalanceChecker::get_wallet_balance() {
+    BlockChain::WalletData data;
+    csdb::internal::WalletId id;
+    if (getBlockChain().findWalletData(abs_addr, data, id)) {
+        return data.balance_.to_double();
+    }
+    return 0;
+}
+
+void AccountBalanceChecker::erase_inprogress(const cs::SmartContractRef& ref) {
+    size_t idx = 0;
+    for (const auto& item: all_transactions) {
+        if (item.seq == ref.sequence && item.idx == ref.transaction) {
+            const auto it_erase = std::find(inprogress.cbegin(), inprogress.cend(), idx);
+            if (it_erase != inprogress.cend()) {
+                inprogress.erase(it_erase);
+                break;
+            }
+        }
+        ++idx;
+    }
+
+}
+
+//double AccountBalanceChecker::rollback_execution(size_t idx) {
+//    double sum = 0;
+//    if (idx <= all_transactions.size()) {
+//        auto& item = all_transactions[idx];
+//        // roll back canceled call
+//        double return_sum = item.t.amount().to_double();
+//        sum += return_sum;
+//        incomes.push_back(Income{ idx, return_sum, std::list<ExtraFee>{} });
+//        // erase item in progress
+//        for (auto it = inprogress.cbegin(); it != inprogress.cend(); ++it) {
+//            if (*it == idx) {
+//                inprogress.erase(it);
+//                break;
+//            }
+//        }
+//    }
+//    return sum;
+//}
 
 } // namespace cs
