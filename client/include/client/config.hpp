@@ -135,6 +135,10 @@ public:
         return apiData_;
     }
 
+    bool recreateIndex() const {
+        return recreateIndex_;
+    }
+
     const cs::PublicKey& getMyPublicKey() const {
         return publicKey_;
     }
@@ -199,6 +203,7 @@ private:
     ApiData apiData_;
 
     bool alwaysExecuteContracts_ = false;
+    bool recreateIndex_ = false;
 };
 
 #endif  // CONFIG_HPP

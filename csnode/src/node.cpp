@@ -37,7 +37,7 @@ const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000
 Node::Node(const Config& config)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
-, blockChain_(genesisAddress_, startAddress_)
+, blockChain_(genesisAddress_, startAddress_, config.recreateIndex())
 , ostream_(&packStreamAllocator_, nodeIdKey_)
 , stat_()
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
