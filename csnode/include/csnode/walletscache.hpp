@@ -54,9 +54,7 @@ public:
 #ifdef MONITOR_NODE
         uint64_t createTime_ = 0;        
 #endif
-#ifdef TRANSACTIONS_INDEX
         csdb::TransactionID lastTransaction_;
-#endif
     };
 
     struct TrustedData {

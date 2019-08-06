@@ -1665,7 +1665,6 @@ void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const gene
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
-#ifdef TRANSACTIONS_INDEX
 void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return, int64_t offset, int64_t limit) {
     if (!validatePagination(_return, *this, offset, limit))
         return;
@@ -1765,8 +1764,6 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
-
-#endif
 
 void APIHandler::TokenWalletTransfersGet(api::TokenTransfersResult& _return, const general::Address& token, const general::Address& address, int64_t offset, int64_t limit) {
     const csdb::Address wallet = BlockChain::getAddressFromKey(address);

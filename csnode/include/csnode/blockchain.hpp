@@ -58,7 +58,8 @@ public:
         Id
     };
 
-    explicit BlockChain(csdb::Address genesisAddress, csdb::Address startAddress);
+    explicit BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
+                        bool recreateIndex = false);
     ~BlockChain();
 
     bool init(const std::string& path);
@@ -241,7 +242,6 @@ public:
 #endif
     uint32_t getTransactionsCount(const csdb::Address&);
 
-#ifdef TRANSACTIONS_INDEX
     csdb::TransactionID getLastTransaction(const csdb::Address&) const;
     csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
 
@@ -250,7 +250,6 @@ public:
     uint64_t getTransactionsCount() const {
         return total_transactions_count_;
     }
-#endif
 
     const csdb::Address& getGenesisAddress() const;
 
@@ -262,9 +261,7 @@ private:
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
 
     void writeGenesisBlock();
-#ifdef TRANSACTIONS_INDEX
     void createTransactionsIndex(csdb::Pool&);
-#endif
 
     void logBlockInfo(csdb::Pool& pool);
 
@@ -309,7 +306,6 @@ private:
     std::unique_ptr<cs::WalletsPools> walletsPools_;
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
-#ifdef TRANSACTIONS_INDEX
     uint64_t total_transactions_count_ = 0;
 
     struct NonEmptyBlockData {
@@ -319,7 +315,6 @@ private:
     std::map<csdb::PoolHash, NonEmptyBlockData> previousNonEmpty_;
 
     NonEmptyBlockData lastNonEmptyBlock_;
-#endif
 
     /**
      * @fn    std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, std::optional<cs::PrivateKey> writer_key);
@@ -368,6 +363,8 @@ private:
 
     // may be modified once in uuid() method:
     mutable uint64_t uuid_ = 0;
+    bool recreateIndex;
+    std::map<csdb::Address, csdb::PoolHash> lapoos;
 };
 
 class TransactionsIterator {
@@ -389,11 +386,7 @@ public:
     }
 
 private:
-#ifdef TRANSACTIONS_INDEX
     void setFromTransId(const csdb::TransactionID&);
-#else
-    void setFromHash(const csdb::PoolHash&);
-#endif
 
     BlockChain& bc_;
 

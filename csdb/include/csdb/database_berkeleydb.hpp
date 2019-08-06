@@ -38,10 +38,8 @@ private:
     bool write_batch(const ItemList&) final;
     IteratorPtr new_iterator() final;
 
-#ifdef TRANSACTIONS_INDEX
     bool putToTransIndex(const cs::Bytes& key, const cs::Bytes& value) override final;
     bool getFromTransIndex(const cs::Bytes& key, cs::Bytes* value) override final;
-#endif
 
     bool updateContractData(const cs::Bytes& key, const cs::Bytes& data) override;
     bool getContractData(const cs::Bytes& key, cs::Bytes& data) override;
@@ -59,9 +57,7 @@ private:
     std::unique_ptr<Db> db_blocks_;
     std::unique_ptr<Db> db_seq_no_;
     std::unique_ptr<Db> db_contracts_;
-#ifdef TRANSACTIONS_INDEX
     std::unique_ptr<Db> db_trans_idx_;
-#endif
     std::thread logfile_thread_;
     bool quit_ = false;
 };

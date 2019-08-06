@@ -647,10 +647,8 @@ public:
     void TokenInfoGet(api::TokenInfoResult&, const general::Address&) override;
     void TokenHoldersGet(api::TokenHoldersResult&, const general::Address&, int64_t offset, int64_t limit, const TokenHoldersSortField order, const bool desc) override;
     void TokensListGet(api::TokensListResult&, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc, const TokenFilters& filters) override;
-#ifdef TRANSACTIONS_INDEX
     void TokenTransfersListGet(api::TokenTransfersResult&, int64_t offset, int64_t limit) override;
     void TransactionsListGet(api::TransactionsGetResult&, int64_t offset, int64_t limit) override;
-#endif
     void WalletsGet(api::WalletsGetResult& _return, int64_t offset, int64_t limit, int8_t ordCol, bool desc) override;
     void TrustedGet(api::TrustedGetResult& _return, int32_t page) override;
     ////////new
