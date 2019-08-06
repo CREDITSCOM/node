@@ -30,6 +30,8 @@ public:
         return db_.last_;
     }
 
+    void close();
+
     bool onReadBlock(const csdb::Pool& block);
     bool onStoreBlock(const csdb::Pool& block);
 

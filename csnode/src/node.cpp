@@ -65,6 +65,7 @@ Node::Node(const Config& config)
 }
 
 Node::~Node() {
+    std::cout << "Desturctor called\n";
     sendingTimer_.stop();
 
     delete solver_;

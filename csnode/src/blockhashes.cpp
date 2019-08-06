@@ -17,6 +17,16 @@ BlockHashes::BlockHashes(const std::string& path)
     initialization();
 }
 
+void BlockHashes::close() {
+    if (seqDb_.isOpen()) {
+        seqDb_.close();
+    }
+
+    if (hashDb_.isOpen()) {
+        hashDb_.close();
+    }
+}
+
 bool BlockHashes::onNextBlock(const csdb::Pool& block, bool fastMode) {
     cs::Sequence seq = block.sequence();
 

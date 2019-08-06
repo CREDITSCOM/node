@@ -841,6 +841,7 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
 void BlockChain::close() {
     cs::Lock lock(dbLock_);
     storage_.close();
+    blockHashes_->close();
 }
 
 bool BlockChain::getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const {
