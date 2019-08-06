@@ -35,8 +35,8 @@ protected:
         future = Future{};
     }
 
-    template <typename T, typename K>
-    static void monitor(std::shared_ptr<T> future, const K& max) {
+    template <typename T>
+    static void monitor(std::shared_ptr<T> future, std::chrono::seconds max) {
         auto now = std::chrono::steady_clock::now();
         std::chrono::milliseconds ms(0);
 
