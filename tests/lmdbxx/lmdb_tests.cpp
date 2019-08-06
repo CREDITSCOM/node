@@ -127,7 +127,7 @@ TEST(Lmdbxx, TestMappedSize) {
 
     cs::Console::writeLine("Key + value size ", key.size() + value.size());
 
-    db.setMapSize(cs::Lmdb::DefaultMapSize);
+    db.setMapSize(cs::Lmdb::Default1GbMapSize);
     db.insert(key, value);
 
     ASSERT_TRUE(db.isKeyExists(key));
@@ -153,11 +153,13 @@ TEST(Lmdbxx, TestAutoMapSizeIncrease) {
         ++reallocatesCount;
     });
 
+    db.setMapSize(9000);
+    db.setIncreaseSize(50000);
     db.open();
 
     std::string key = "Key";
     std::string value = "Value";
-    constexpr size_t count = 50000;
+    constexpr size_t count = 1000;
 
     for (size_t i = 0; i < count; ++i) {
         auto newKey = key + std::to_string(i);
