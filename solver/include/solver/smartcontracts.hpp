@@ -763,12 +763,13 @@ private:
      * @author  Alexander Avramenko
      * @date    01.07.2019
      *
-     * @param   hashed_state  The new_state transaction with hash of state.
+     * @param   hashed_state    The new_state transaction with hash of state.
+     * @param   reading_db      True if reading database is going on.
      *
      * @returns The transaction with actual state.
      */
 
-    csdb::Transaction get_actual_state(const csdb::Transaction& hashed_state);
+    csdb::Transaction get_actual_state(const csdb::Transaction& hashed_state, bool reading_db);
 
     /**
      * Executes the next block action both while reading DB and assembling new blocks on-the-go
