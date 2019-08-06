@@ -263,7 +263,7 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
 }
 
 /*static*/
-std::string SmartContracts::get_error_message(uint8_t code) {
+std::string SmartContracts::get_error_message(int8_t code) {
     using namespace cs::error;
     switch (code) {
     case ContractError:
@@ -289,7 +289,7 @@ std::string SmartContracts::get_error_message(uint8_t code) {
         return "executor is disconnected or unavailable, or incompatible";
     }
     std::ostringstream os;
-    os << "Error code " << (unsigned int)code;
+    os << "Error code " << (int)code;
     return os.str();
 }
 
