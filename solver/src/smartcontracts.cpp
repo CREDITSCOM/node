@@ -921,7 +921,7 @@ CallsQueueScheduler& SmartContracts::getScheduler() {
     return scheduler;
 }
 
-csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hashed_state) {
+csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hashed_state, bool reading_db) {
     if (!is_new_state(hashed_state)) {
         return csdb::Transaction{};
     }
@@ -974,7 +974,9 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                         else {
                             cswarning() << kLogPrefix << "incorrect " << ref_start << " state in cache, request from other nodes";
                             // request correct state in network and return empty new_state transaction as "no valid state available"
-                            net_request_contract_state(req_abs_addr);
+                            if (!reading_db) {
+                                net_request_contract_state(req_abs_addr);
+                            }
                             tr_state.add_user_field(new_state::Value, std::string{});
                         }
                     }
@@ -989,7 +991,9 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                         // test it is explicit "primary" call, otherwise request state in network
                         csdb::Address primary_abs_addr = absolute_address(tr_start.target());
                         if (req_abs_addr != primary_abs_addr) {
-                            net_request_contract_state(req_abs_addr);
+                            if (!reading_db) {
+                                net_request_contract_state(req_abs_addr);
+                            }
                         }
                         else {
                             SmartExecutionData exe_data;
@@ -1045,11 +1049,7 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                                             hash_result += cs::Utils::byteStreamToHex(actual_hash.data(), actual_hash.size());
                                             hash_result += ")";
                                         }
-                                        std::string print_addr;
-                                        print_addr = " (";
-                                        print_addr += to_base58(req_abs_addr);
-                                        print_addr += ") ";
-                                        csdebug() << kLogPrefix << "state of " << ref_start << print_addr << " is updated, stored hash is "
+                                        csdebug() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start << " has updated, stored hash is "
                                             << hash_result << ", new size is " << state.size();
                                     }
                                 }
@@ -1944,7 +1944,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         }
     }
 
-    csdb::Transaction t_state = get_actual_state(t);
+    csdb::Transaction t_state = get_actual_state(t, reading_db);
     if (!t_state.is_valid()) {
         cserror() << kLogPrefix << ref_start << " state is not updated, transaction does not contain it";
         return false;
@@ -1974,8 +1974,8 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         // create or get contract state item
         StateItem& item = known_contracts[abs_addr];
         // update state value in cache if it is older then or equal to or unset
-        bool force_update_contracts_cache = true;
-        if (force_update_contracts_cache || !item.ref_cache.is_valid() || item.ref_cache < ref_start || item.ref_cache == ref_start) {
+        constexpr bool force_update_contracts_cache = true; // until TokenMaster to become more smart
+        if constexpr (force_update_contracts_cache || !item.ref_cache.is_valid() || item.ref_cache < ref_start || item.ref_cache == ref_start) {
             if (!dbcache_update(abs_addr, ref_start, state_value, force_update_contracts_cache)) {
                 if (reading_db) {
                     // update state in memory cache
@@ -1983,6 +1983,9 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
                     SmartContractRef ref_from_db;
                     if (dbcache_read(abs_addr, ref_from_db /*output*/, state_from_db /*output*/)) {
                         if (!state_from_db.empty()) {
+
+                            // do not update item.state with state_from_db, otherwise validation by execute is not possible!
+                            
                             item.ref_cache = ref_from_db;
                             if (ref_from_db == ref_start) {
                                 cs::Sequence seq = bc.getLastSequence();
@@ -1992,7 +1995,6 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
                             else {
                                 csdetails() << kLogPrefix << to_base58(abs_addr) << " state after " << ref_start << " is overridden by "
                                     << ref_from_db << " in DB";
-                                // do not update state in cache, otherwise validation by execute is not possible!
                             }
                         }
                     }
@@ -2438,6 +2440,13 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
     stream >> ref.sequence >> ref.transaction >> ref.hash >> state;
     if (stream.isValid() && !stream.isAvailable(1)) {
         if (dbcache_update(contract_abs_addr, ref, state, false)) {
+            if (in_known_contracts(contract_abs_addr)) {
+                auto& item = known_contracts[contract_abs_addr];
+                item.state = state;
+                item.ref_cache = ref;
+                item.ref_execute = ref;
+                csdebug() << kLogPrefix << to_base58(contract_abs_addr) << " state has updated from net package with " << ref << " state value";
+            }
             return;
         }
         else {
