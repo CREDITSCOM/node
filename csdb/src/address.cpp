@@ -153,7 +153,7 @@ Address Address::from_public_key(const char* key) {
     return res;
 }
 
-std::string Address::to_api_addr() {
+std::string Address::to_api_addr() const {
     return std::string(d->data_.public_key.begin(), d->data_.public_key.end());
 }
 
