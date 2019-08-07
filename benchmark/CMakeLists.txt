@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(benchmark)
 
 # add new benches here
+add_subdirectory(testbench)
 add_subdirectory(lmdbbench)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -10,7 +11,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(${PROJECT_NAME} STATIC "./include/timeoutexception.hpp"
                                    "./include/benchmark.hpp"
-                                   "./src/benchmark.cpp")
+                                   "./src/benchmark.cpp"
+                                   "./include/framework.hpp")
 
 target_include_directories(${PROJECT_NAME} PUBLIC "./include")
 target_include_directories(${PROJECT_NAME} PUBLIC "./lmdbxx")
