@@ -1309,8 +1309,8 @@ void SmartContracts::remove_from_queue(const SmartContractRef& item, bool skip_l
     }
     if (it->executions.empty()) {
         // unlock anyway if removed from queue only when executions are empty
-        remove_from_queue(it, skip_log);
         update_lock_status(it->abs_addr, false, skip_log);
+        remove_from_queue(it, skip_log);
     }
 }
 
