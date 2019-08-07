@@ -517,6 +517,13 @@ bool DatabaseBerkeleyDB::getFromTransIndex(const cs::Bytes &key, cs::Bytes *valu
     return true;
 }
 
+void DatabaseBerkeleyDB::truncateTransIndex() {
+    if (!db_trans_idx_) {
+        return;
+    }
+    db_trans_idx_->truncate(nullptr, nullptr, 0);
+}
+
 bool DatabaseBerkeleyDB::updateContractData(const cs::Bytes& key, const cs::Bytes& data) {
     if (!db_contracts_) {
         set_last_error(NotOpen);

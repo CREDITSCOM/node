@@ -40,6 +40,7 @@ private:
 
     bool putToTransIndex(const cs::Bytes& key, const cs::Bytes& value) override final;
     bool getFromTransIndex(const cs::Bytes& key, cs::Bytes* value) override final;
+    void truncateTransIndex() override final;
 
     bool updateContractData(const cs::Bytes& key, const cs::Bytes& data) override;
     bool getContractData(const cs::Bytes& key, cs::Bytes& data) override;
