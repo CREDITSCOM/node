@@ -845,6 +845,7 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
 void BlockChain::close() {
     cs::Lock lock(dbLock_);
     storage_.close();
+    cs::Connector::disconnect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     blockHashes_->close();
 }
 
