@@ -1,5 +1,4 @@
 #include <base58.h>
-#include <fstream>
 #include <csdb/currency.hpp>
 #include <lib/system/hash.hpp>
 #include <lib/system/logger.hpp>
@@ -15,6 +14,7 @@
 #include <solver/smartcontracts.hpp>
 
 #include <boost/filesystem.hpp>
+#include <boost/iostreams/device/mapped_file.hpp>
 
 #include <client/config.hpp>
 
@@ -26,26 +26,75 @@ const char* cashesPath = "./cashes";
 const std::string lastIndexedPath = std::string(cashesPath) + "/last_indexed";
 cs::Sequence lastIndexedPool;
 
+using FileSource = boost::iostreams::mapped_file_source;
+using FileSink = boost::iostreams::mapped_file_sink;
+
+template <class BoostMMapedFile>
+class MMappedFileWrap {
+public:
+    MMappedFileWrap(const std::string& path,
+            size_t maxSize = boost::iostreams::mapped_file::max_length,
+            bool createNew = true) {
+        try {
+            if (!createNew) {
+                file_.open(path, maxSize);
+            }
+            else {
+                boost::iostreams::mapped_file_params params;
+                params.path = path;
+                params.new_file_size = maxSize;
+                file_.open(params);
+            }
+        }
+        catch (std::exception& e) {
+            cserror() << e.what();
+        }
+        catch (...) {
+            cserror() << __FILE__ << ", "
+                      << __LINE__
+                      << " exception ...";
+        }
+    }
+
+    bool isOpen() {
+        return file_.is_open();
+    }
+
+    ~MMappedFileWrap() {
+        if (isOpen()) {
+            file_.close();
+        }
+    }
+
+    template<typename T>
+    T* data() {
+        return isOpen() ? (T*)file_.data() : nullptr;
+    }
+
+private:
+    BoostMMapedFile file_;
+};
+
 inline void checkLastIndFile(bool& recreateIndex) {
     fs::path p(lastIndexedPath);
     if (!fs::is_regular_file(p)) {
         recreateIndex = true;
         return;
     }
-    std::ifstream f(lastIndexedPath);
-    if (!f.is_open()) {
-        recreateIndex = true;
+    MMappedFileWrap<FileSource> f(lastIndexedPath, sizeof(cs::Sequence), false);
+    if (!f.isOpen()) {
+        recreateIndex = true; 
         return;
     }
-    f >> lastIndexedPool;
+    lastIndexedPool = *(f.data<const cs::Sequence>());
 }
 
 inline void updateLastIndFile() {
-    std::ofstream f(lastIndexedPath);
-    if (!f.is_open()) {
-        return;
+    static MMappedFileWrap<FileSink> f(lastIndexedPath, sizeof(cs::Sequence));
+    auto ptr = f.data<cs::Sequence>();
+    if (ptr) {
+        *ptr = lastIndexedPool;
     }
-    f << lastIndexedPool;
 }
 } // namespace
 
