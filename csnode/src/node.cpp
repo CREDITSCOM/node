@@ -2249,15 +2249,21 @@ void Node::sendHash(cs::RoundNumber round) {
     cs::DataStream stream(message);
     cs::Byte myTrustedSize = 0;
     cs::Byte myRealTrustedSize = 0;
-    uint64_t timeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
-    csdebug() << "TimeStamp = " << std::to_string(timeStamp);
+
+    uint64_t lastTimeStamp = std::atoll(getBlockChain().getLastTimeStamp().c_str());
+    uint64_t currentTimeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
+    if (currentTimeStamp < lastTimeStamp) {
+        currentTimeStamp = lastTimeStamp + 1;
+    }
+    csdebug() << "TimeStamp = " << std::to_string(currentTimeStamp);
+
     if (cs::Conveyer::instance().currentRoundNumber() > 1) {
         cs::Bytes lastTrusted = getBlockChain().getLastRealTrusted();
         myTrustedSize = static_cast<uint8_t>(lastTrusted.size());
         myRealTrustedSize = cs::TrustedMask::trustedSize(lastTrusted);
     }
     csdb::PoolHash tmp = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
-    stream << tmp.to_binary() << myTrustedSize << myRealTrustedSize << timeStamp << round << subRound_;
+    stream << tmp.to_binary() << myTrustedSize << myRealTrustedSize << currentTimeStamp << round << subRound_;
     cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
     cs::Bytes messageToSend(message.data(), message.data() + message.size() - sizeof(cs::RoundNumber) - sizeof(cs::Byte));
     sendToConfidants(MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
