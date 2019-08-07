@@ -1589,16 +1589,22 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             }
         }
 
-        // finalize new_state transaction, data_item.result.smartsRes always non-empty
-        if (!data_item.error.empty()) {
+        // finalize new_state transaction
+        if (!data_item.error.empty() || data_item.result.smartsRes.empty()) {
             cswarning() << kLogPrefix << "execution of " << data_item.contract_ref << " is failed: " << data_item.error << ", new state is empty";
             // result contains empty USRFLD[state::Value]
             result.add_user_field(new_state::Value, std::string{});
-            // result contains error code from ret_val
-            set_return_value(result, data_item.result.smartsRes.front().retValue);
+            // smartRes or result contains error code for retVal
+            if (!data_item.result.smartsRes.empty()) {
+                set_return_value(result, data_item.result.smartsRes.front().retValue);
+            }
+            else {
+                set_return_value(result, data_item.result.response.code);
+            }
             packet.addTransaction(result);
         }
         else {
+            // could not get here if smartRes empty (see if())
             const auto& execution_result = data_item.result.smartsRes.front();
             csdb::Address primary_abs_addr = absolute_address(result.target());
             if (execution_result.states.count(primary_abs_addr) == 0) {
