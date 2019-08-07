@@ -794,6 +794,10 @@ void Storage::set_previous_transaction_block(const Address& addr, const PoolHash
   d->db->putToTransIndex(key, os.buffer());
 }
 
+void Storage::truncate_trxs_index() {
+    d->db->truncateTransIndex();
+}
+
 bool Storage::get_contract_data(const Address& abs_addr /*input*/, cs::Bytes& data /*output*/) const {
     const auto& pk = abs_addr.public_key();
     cs::Bytes bytes(pk.size());

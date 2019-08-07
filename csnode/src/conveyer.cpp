@@ -208,7 +208,9 @@ void cs::ConveyerBase::setTable(const RoundTable& table) {
 
     {
         cs::SharedLock lock(sharedMutex_);
-        std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes), [this](const auto& hash) { return (pimpl_->packetsTable.count(hash) == 0u); });
+        std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes), [this](const auto& hash) {
+            return (pimpl_->packetsTable.count(hash) == 0u);
+        });
     }
 
     csdebug() << csname() << "Needed round hashes count " << neededHashes.size();
@@ -351,7 +353,7 @@ bool cs::ConveyerBase::isSyncCompleted(cs::RoundNumber round) const {
     cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
     if (!meta) {
-        cswarning() << csname() << "Needed hashes of " << round << " round not found, looks like old round packet received";
+        cswarning() << csname() << "Needed hashes of " << round << " round not found";
         return true;
     }
 

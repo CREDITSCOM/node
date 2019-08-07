@@ -102,13 +102,17 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         cs::Lock lock(dbLock_);
         uuid_ = uuidFromBlock(block);
         csdebug() << "Blockchain: UUID = " << uuid_;
+        if (recreateIndex) {
+            std::lock_guard<decltype(dbLock_)> l(dbLock_);
+            storage_.truncate_trxs_index();
+        }
     }
     if (!updateWalletIds(block, *walletsCacheUpdater_.get())) {
         cserror() << "Blockchain: updateWalletIds() failed on block #" << block.sequence();
         *shouldStop = true;
     }
     else {
-        if (!blockHashes_->onReadBlock(block)) {
+        if (!blockHashes_->onNextBlock(block)) {
             cserror() << "Blockchain: blockHashes_->onReadBlock(block) failed on block #" << block.sequence();
             *shouldStop = true;
         }
@@ -841,6 +845,7 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
 void BlockChain::close() {
     cs::Lock lock(dbLock_);
     storage_.close();
+    cs::Connector::disconnect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     blockHashes_->close();
 }
 
@@ -882,7 +887,7 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
         const auto& currentRoundConfidants = nextPool.confidants();
         walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants, *this);
         walletsPools_->loadNextBlock(nextPool);
-        if (!blockHashes_->onStoreBlock(nextPool)) {
+        if (!blockHashes_->onNextBlock(nextPool)) {
             cslog() << "Error writing DB structure";
         }
     }

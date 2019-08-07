@@ -159,13 +159,16 @@ TEST(Lmdbxx, TestAutoMapSizeIncrease) {
 
     std::string key = "Key";
     std::string value = "Value";
-    constexpr size_t count = 1000;
+    constexpr size_t count = 10000;
 
     for (size_t i = 0; i < count; ++i) {
         auto newKey = key + std::to_string(i);
         auto newValue = value + std::to_string(i);
 
         db.insert(newKey, newValue);
+
+        auto temp = db.value<std::string>(newKey);
+        ASSERT_EQ(temp, newValue);
     }
 
     ASSERT_EQ(db.size(), count);
