@@ -47,6 +47,7 @@ public:
 
     virtual bool putToTransIndex(const cs::Bytes& key, const cs::Bytes& value) = 0;
     virtual bool getFromTransIndex(const cs::Bytes& key, cs::Bytes* value) = 0;
+    virtual void truncateTransIndex() = 0;
 
     virtual bool updateContractData(const cs::Bytes& key, const cs::Bytes& data) = 0;
     virtual bool getContractData(const cs::Bytes& key, cs::Bytes& data) = 0;

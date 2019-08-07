@@ -132,6 +132,10 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         cs::Lock lock(dbLock_);
         uuid_ = uuidFromBlock(block);
         csdebug() << "Blockchain: UUID = " << uuid_;
+        if (recreateIndex) {
+            std::lock_guard<decltype(dbLock_)> l(dbLock_);
+            storage_.truncate_trxs_index();
+        }
     }
     if (!updateWalletIds(block, *walletsCacheUpdater_.get())) {
         cserror() << "Blockchain: updateWalletIds() failed on block #" << block.sequence();

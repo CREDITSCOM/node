@@ -226,6 +226,7 @@ public:
     // And now for something completely different
     PoolHash get_previous_transaction_block(const Address&, const PoolHash&) const;
     void set_previous_transaction_block(const Address&, const PoolHash& currTransBlock, const PoolHash& prevTransBlock);
+    void truncate_trxs_index();
 
     /**
      * @brief size возвращает количество пулов в хранилище
