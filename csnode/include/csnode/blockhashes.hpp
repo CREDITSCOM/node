@@ -31,9 +31,7 @@ public:
     }
 
     void close();
-
-    bool onReadBlock(const csdb::Pool& block);
-    bool onStoreBlock(const csdb::Pool& block);
+    bool onNextBlock(const csdb::Pool& block);
 
     csdb::PoolHash find(cs::Sequence seq) const;
     cs::Sequence find(const csdb::PoolHash& hash) const;
@@ -52,16 +50,6 @@ private:
 
     cs::Lmdb seqDb_;
     cs::Lmdb hashDb_;
-
-    std::map<cs::Sequence, csdb::PoolHash> memoryCache1_;
-    std::map<cs::Sequence, csdb::PoolHash> memoryCache2_;
-    std::map<cs::Sequence, csdb::PoolHash>* activeMemoryCache_;
-    std::atomic<bool> isFlushCompleted_;
-
-    void flushMemoryCache();
-
-    bool onNextBlock(const csdb::Pool& block, bool fastMode);
-    bool waitFlushCompleted(uint32_t sleepMsec, uint32_t count);
 };
 }  // namespace cs
 

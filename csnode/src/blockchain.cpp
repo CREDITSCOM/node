@@ -142,7 +142,7 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         *shouldStop = true;
     }
     else {
-        if (!blockHashes_->onReadBlock(block)) {
+        if (!blockHashes_->onNextBlock(block)) {
             cserror() << "Blockchain: blockHashes_->onReadBlock(block) failed on block #" << block.sequence();
             *shouldStop = true;
         }
@@ -918,7 +918,7 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
         const auto& currentRoundConfidants = nextPool.confidants();
         walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants, *this);
         walletsPools_->loadNextBlock(nextPool);
-        if (!blockHashes_->onStoreBlock(nextPool)) {
+        if (!blockHashes_->onNextBlock(nextPool)) {
             cslog() << "Error writing DB structure";
         }
     }
