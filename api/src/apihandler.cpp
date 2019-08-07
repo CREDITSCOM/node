@@ -14,6 +14,8 @@
 using namespace api;
 using namespace ::apache;
 
+constexpr const int64_t kMaxRequestTransactions = 100;
+
 apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& solver, executor::Executor& executor, const csconnector::Config& config)
 : executor_(executor)
 , blockchain_(blockchain)
@@ -867,7 +869,12 @@ void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offs
     _return.count = uint32_t(sequence + 1);
 }
 
-void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const PoolHash& hash, const int64_t offset, const int64_t limit) {
+void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const PoolHash& hash, const int64_t offset, const int64_t const_limit) {
+    //if (!validatePagination(_return, *this, offset, const_limit)) {
+    //    return;
+    //}
+    auto limit = std::min(const_limit, kMaxRequestTransactions);
+    limit = std::max(const_limit, 0i64);
     const csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
     csdb::Pool pool = executor_.loadBlockApi(poolHash);
 
