@@ -27,13 +27,17 @@ public:
         DefaultIncreaseSize = DefaultMapSize/2
     };
 
+    enum Flags : unsigned int {
+        DefaultEnvFlags = MDB_NOSYNC | MDB_WRITEMAP | MDB_MAPASYNC
+    };
+
     explicit Lmdb(const std::string& path, const unsigned int flags = lmdb::env::default_flags);
     ~Lmdb() noexcept;
 
     /// database settings
 
     // opens lmdb
-    void open(const unsigned int flags = lmdb::env::default_flags,
+    void open(const unsigned int flags = Flags::DefaultEnvFlags,
               const lmdb::mode mode = lmdb::env::default_mode) {
         try {
             env_.open(path_.c_str(), flags, mode);
