@@ -25,6 +25,8 @@ void BlockHashes::close() {
     if (hashDb_.isOpen()) {
         hashDb_.close();
     }
+
+    while (!isFlushCompleted_);
 }
 
 bool BlockHashes::onNextBlock(const csdb::Pool& block, bool fastMode) {
@@ -163,12 +165,15 @@ csdb::PoolHash BlockHashes::getLast() {
     if (!activeMemoryCache_->empty()) {
         return activeMemoryCache_->crbegin()->second;
     }
+
     if (!waitFlushCompleted(20, 25)) {
         return csdb::PoolHash{};
     }
+
     if (seqDb_.size() == 0) {
         return csdb::PoolHash{};
     }
+
     auto pair = seqDb_.last<cs::Sequence, cs::Bytes>();
     return csdb::PoolHash::from_binary(std::move(pair.second));
 }

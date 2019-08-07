@@ -12,7 +12,7 @@ cs::Lmdb::Lmdb(const std::string& path, const unsigned int flags) try : env_(env
     const auto res = fs::is_directory(dbPath, code);
 
     if (!res) {
-        std::cout << "Lmdb path doesn not exist, creating path " << dbPath.string() << std::endl;
+        std::cout << "Lmdb path does not exist, creating path " << dbPath.string() << std::endl;
         fs::create_directory(dbPath);
     }
 }
