@@ -87,7 +87,7 @@ public:
   using TaskIterator = std::list<Task>::iterator;
   void releaseTask(TaskIterator&);
   void rejectLast();
-  size_t getSize() { return size_; }
+  size_t getSize() { return size_.load(std::memory_order_relaxed); }
 
 private:
   std::list<Task> queue_;
