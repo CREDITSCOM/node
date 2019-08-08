@@ -263,7 +263,28 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
     while (isDrop) {
         if (N == 0) {
             csdebug() << "There is no nodes with valid TimeStamp";
-            return std::to_string(0);
+            int N0 = 0;
+            int sx0 = 0;
+            for (auto& it : stageOneStorage) {
+                int64_t tStamp;
+                try {
+                    tStamp = std::stoll(it.roundTimeStamp);
+                }
+                catch (...) {
+                    cswarning() << log_prefix << "incompatible timestamp received from [" << (int)it.sender << "]";
+                    continue;
+                }
+                ++N0;
+                sx0 += tStamp;
+            }
+
+            if (N0 > 0) {
+                return std::to_string(sx0/N0);
+            }
+            else {
+                return std::to_string(lastTimeStamp + 100);
+            }
+
         }
         double N_1 = 1. / N;
         mean = sx * N_1;
