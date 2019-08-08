@@ -1,4 +1,5 @@
 #include <base58.h>
+#include <fstream>
 #include <csdb/currency.hpp>
 #include <lib/system/hash.hpp>
 #include <lib/system/logger.hpp>
@@ -20,7 +21,33 @@
 using namespace cs;
 namespace fs = boost::filesystem;
 
-static const char* cashesPath = "./cashes";
+namespace {
+const char* cashesPath = "./cashes";
+const std::string lastIndexedPath = std::string(cashesPath) + "/last_indexed";
+cs::Sequence lastIndexedPool;
+
+inline void checkLastIndFile(bool& recreateIndex) {
+    fs::path p(lastIndexedPath);
+    if (!fs::is_regular_file(p)) {
+        recreateIndex = true;
+        return;
+    }
+    std::ifstream f(lastIndexedPath);
+    if (!f.is_open()) {
+        recreateIndex = true;
+        return;
+    }
+    f >> lastIndexedPool;
+}
+
+inline void updateLastIndFile() {
+    std::ofstream f(lastIndexedPath);
+    if (!f.is_open()) {
+        return;
+    }
+    f << lastIndexedPool;
+}
+} // namespace
 
 BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress, bool recreateIndex)
 : good_(false)
@@ -35,6 +62,9 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
 
     createCashesPath();
+    if (!recreateIndex) {
+        checkLastIndFile(recreateIndex);
+    }
 
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
     blockHashes_ = std::make_unique<cs::BlockHashes>(cashesPath);
@@ -130,7 +160,7 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         }
         walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
     }
-    if (recreateIndex) {
+    if (recreateIndex || lastIndexedPool < block.sequence()) {
         createTransactionsIndex(block);
     }
 }
@@ -182,6 +212,8 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
         lastNonEmptyBlock_.hash = pool.hash();
         lastNonEmptyBlock_.transCount = static_cast<uint32_t>(pool.transactions().size());
     }
+    lastIndexedPool = pool.sequence();
+    updateLastIndFile();
 }
 
 cs::Sequence BlockChain::getLastSequence() const {
