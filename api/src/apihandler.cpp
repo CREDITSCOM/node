@@ -874,7 +874,7 @@ void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const P
     //    return;
     //}
     auto limit = std::min(const_limit, kMaxRequestTransactions);
-    limit = std::max(const_limit, 0i64);
+    limit = std::max(const_limit, int64_t(0));
     const csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
     csdb::Pool pool = executor_.loadBlockApi(poolHash);
 
