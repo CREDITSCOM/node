@@ -182,7 +182,6 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         uuid_ = uuidFromBlock(block);
         csdebug() << "Blockchain: UUID = " << uuid_;
         if (recreateIndex) {
-            std::lock_guard<decltype(dbLock_)> l(dbLock_);
             storage_.truncate_trxs_index();
         }
     }
