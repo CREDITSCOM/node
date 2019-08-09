@@ -270,12 +270,23 @@ cs::Sequence BlockChain::getLastSequence() const {
     if (deferredBlock_.is_valid()) {
         return deferredBlock_.sequence();
     }
-    else if (!blockHashes_->empty()) {
-        return blockHashes_->getDbStructure().last_;
+    // try to sequence get from blockHashes
+    cs::Sequence seq = blockHashes_->find(storage_.last_hash());
+    if (seq != kWrongSequence) {
+        return seq;
     }
-    else {
-        return 0;
+    // the last possible way (actually, blockchain does not allow "wholes" in sequences)
+    return storage_.size() - 1;
+}
+
+csdb::PoolHash BlockChain::getLastHash() const {
+    std::lock_guard lock(dbLock_);
+
+    if (deferredBlock_.is_valid()) {
+        return deferredBlock_.hash().clone();
     }
+
+    return storage_.last_hash();
 }
 
 std::string BlockChain::getLastTimeStamp() const {
@@ -359,16 +370,6 @@ void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<vo
     func(*wd);
 }
 #endif
-
-csdb::PoolHash BlockChain::getLastHash() const {
-    std::lock_guard lock(dbLock_);
-
-    if (deferredBlock_.is_valid()) {
-        return deferredBlock_.hash().clone();
-    }
-
-    return storage_.last_hash();
-}
 
 size_t BlockChain::getSize() const {
     std::lock_guard lock(dbLock_);
@@ -456,27 +457,12 @@ void BlockChain::removeLastBlock() {
         return;
     }
 
-    const auto lastHash = blockHashes_->getLast();
-    const csdb::PoolHash poolHash = pool.hash();
-
-    if (lastHash == poolHash) {
-        auto removed = blockHashes_->removeLast();
-        csmeta(csdebug) << "Remove last hash is ok, sequence: " << pool.sequence();
-    }
-    else {
-        csmeta(cserror) << "Error! Last pool hash mismatch";
-        const auto findSequence = blockHashes_->find(poolHash);
-        csmeta(cserror) << "Block hashes size: " << blockHashes_->size() << ", Pool sequence: " << pool.sequence() << ", in Block hashes sequence: " << findSequence
-                        << (findSequence != 0 ? "" : " (hash not found)");
-        // if (findSequence == 0) {
-        //  for (std::size_t i = 0; i < bh.size(); ++i) {
-        //    csmeta(csdebug) << "Block hash [" << i << "]: " << bh[i].to_string();
-        //  }
-        //}
+    // to be sure, try to remove both sequence and hash
+    if (!blockHashes_->remove(pool.sequence())) {
+        blockHashes_->remove(pool.hash());
     }
 
     total_transactions_count_ -= pool.transactions().size();
-
     removeWalletsInPoolFromCache(pool);
 
     emit removeBlockEvent(pool.sequence());
