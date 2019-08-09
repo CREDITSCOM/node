@@ -18,7 +18,7 @@ set (Boost_USE_STATIC_LIBS ON)
 set (Boost_USE_STATIC_RUNTIME ON)
 set (BOOST_ALL_DYN_LINK OFF)
 
-find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem)
+find_package (Boost 1.66.0 REQUIRED COMPONENTS iostreams thread system filesystem)
 if (Boost_FOUND)
   # From the offical documentation:
   # Add include directories to the build. [...] If the SYSTEM option is given,
@@ -88,7 +88,7 @@ add_library(csnode
   src/roundpackage.cpp
 )
 
-target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 lmdbxx Boost::thread)
+target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 lmdbxx ${Boost_LIBRARIES})
 
 target_include_directories(${PROJECT_NAME} PUBLIC
                                          ${CMAKE_CURRENT_SOURCE_DIR}/include

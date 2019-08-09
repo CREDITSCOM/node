@@ -14,13 +14,89 @@
 #include <solver/smartcontracts.hpp>
 
 #include <boost/filesystem.hpp>
+#include <boost/iostreams/device/mapped_file.hpp>
 
 #include <client/config.hpp>
 
 using namespace cs;
 namespace fs = boost::filesystem;
 
-static const char* cashesPath = "./cashes";
+namespace {
+const char* cashesPath = "./cashes";
+const std::string lastIndexedPath = std::string(cashesPath) + "/last_indexed";
+cs::Sequence lastIndexedPool;
+
+using FileSource = boost::iostreams::mapped_file_source;
+using FileSink = boost::iostreams::mapped_file_sink;
+
+template <class BoostMMapedFile>
+class MMappedFileWrap {
+public:
+    MMappedFileWrap(const std::string& path,
+            size_t maxSize = boost::iostreams::mapped_file::max_length,
+            bool createNew = true) {
+        try {
+            if (!createNew) {
+                file_.open(path, maxSize);
+            }
+            else {
+                boost::iostreams::mapped_file_params params;
+                params.path = path;
+                params.new_file_size = maxSize;
+                file_.open(params);
+            }
+        }
+        catch (std::exception& e) {
+            cserror() << e.what();
+        }
+        catch (...) {
+            cserror() << __FILE__ << ", "
+                      << __LINE__
+                      << " exception ...";
+        }
+    }
+
+    bool isOpen() {
+        return file_.is_open();
+    }
+
+    ~MMappedFileWrap() {
+        if (isOpen()) {
+            file_.close();
+        }
+    }
+
+    template<typename T>
+    T* data() {
+        return isOpen() ? (T*)file_.data() : nullptr;
+    }
+
+private:
+    BoostMMapedFile file_;
+};
+
+inline void checkLastIndFile(bool& recreateIndex) {
+    fs::path p(lastIndexedPath);
+    if (!fs::is_regular_file(p)) {
+        recreateIndex = true;
+        return;
+    }
+    MMappedFileWrap<FileSource> f(lastIndexedPath, sizeof(cs::Sequence), false);
+    if (!f.isOpen()) {
+        recreateIndex = true; 
+        return;
+    }
+    lastIndexedPool = *(f.data<const cs::Sequence>());
+}
+
+inline void updateLastIndFile() {
+    static MMappedFileWrap<FileSink> f(lastIndexedPath, sizeof(cs::Sequence));
+    auto ptr = f.data<cs::Sequence>();
+    if (ptr) {
+        *ptr = lastIndexedPool;
+    }
+}
+} // namespace
 
 BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress, bool recreateIndex)
 : good_(false)
@@ -35,6 +111,9 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
 
     createCashesPath();
+    if (!recreateIndex) {
+        checkLastIndFile(recreateIndex);
+    }
 
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
     blockHashes_ = std::make_unique<cs::BlockHashes>(cashesPath);
@@ -103,7 +182,6 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         uuid_ = uuidFromBlock(block);
         csdebug() << "Blockchain: UUID = " << uuid_;
         if (recreateIndex) {
-            std::lock_guard<decltype(dbLock_)> l(dbLock_);
             storage_.truncate_trxs_index();
         }
     }
@@ -130,7 +208,7 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         }
         walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
     }
-    if (recreateIndex) {
+    if (recreateIndex || lastIndexedPool < block.sequence()) {
         createTransactionsIndex(block);
     }
 }
@@ -182,6 +260,8 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
         lastNonEmptyBlock_.hash = pool.hash();
         lastNonEmptyBlock_.transCount = static_cast<uint32_t>(pool.transactions().size());
     }
+    lastIndexedPool = pool.sequence();
+    updateLastIndFile();
 }
 
 cs::Sequence BlockChain::getLastSequence() const {
