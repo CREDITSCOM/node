@@ -23,7 +23,7 @@ template<class InputIt>
 std::vector<typename std::iterator_traits<InputIt>::value_type> sample(InputIt first, InputIt last, size_t n) {
     static std::mt19937 engine{std::random_device{}()};
 
-    InputIt nth = next(first, n);
+    InputIt nth = next(first, static_cast<std::ptrdiff_t>(n));
     std::vector<typename std::iterator_traits<InputIt>::value_type> result{first, nth};
     size_t k = n + 1;
     for (InputIt it = nth; it != last; ++it, ++k) {
@@ -34,7 +34,7 @@ std::vector<typename std::iterator_traits<InputIt>::value_type> sample(InputIt f
     return result;
 }
 
-const int neighbors_redirect_min = 6;
+const size_t kNeighborsRedirectMin = 6;
 }  // anonimous namespace
 
 Neighbourhood::Neighbourhood(Transport* net)
@@ -57,26 +57,26 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
 
     if (neighbours_.size() == 0) return false;
 
-    static bool redirect_limit = false;
-    static auto start_time = std::chrono::high_resolution_clock::now();
+    static bool redirectLimit = false;
+    static auto startTime = std::chrono::high_resolution_clock::now();
 
-    if (!redirect_limit) {
+    if (!redirectLimit) {
         auto now_time = std::chrono::high_resolution_clock::now();
-        auto spended_time = std::chrono::duration_cast<std::chrono::seconds>(now_time - start_time);
-        if (spended_time.count() > 10) redirect_limit = true; // 10 seconst dry run
+        auto spended_time = std::chrono::duration_cast<std::chrono::seconds>(now_time - startTime);
+        if (spended_time.count() > 10) redirectLimit = true; // 10 seconst dry run
     }
 
-    size_t redirect_number;
-    if (redirect_limit) {
-        redirect_number = std::max(neighbors_redirect_min, static_cast<int>(neighbours_.size()) / 3 + 1);
-        if (redirect_number > neighbours_.size()) {
-            redirect_number = neighbours_.size();
+    size_t redirectNumber;
+    if (redirectLimit) {
+        redirectNumber = std::max(kNeighborsRedirectMin, neighbours_.size() / 3 + 1);
+        if (redirectNumber > neighbours_.size()) {
+            redirectNumber = neighbours_.size();
         }
     } else {
-        redirect_number = neighbours_.size();
+        redirectNumber = neighbours_.size();
     }
 
-    auto selection = sample(std::begin(neighbours_), std::end(neighbours_), redirect_number);
+    auto selection = sample(std::begin(neighbours_), std::end(neighbours_), redirectNumber);
     bool sent = false;
     for (auto& nb : selection) {
         bool found = false;
@@ -241,7 +241,7 @@ void Neighbourhood::checkNeighbours() {
 
     {
         cs::Lock lock(nLockFlag_);
-        size = neighbours_.size();
+        size = uint32_t(neighbours_.size());
     }
 
     if (size < MinNeighbours) {
@@ -306,7 +306,7 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
 
 uint32_t Neighbourhood::size() const {
     cs::Lock lock(nLockFlag_);
-    return neighbours_.size();
+    return static_cast<uint32_t>(neighbours_.size());
 }
 
 uint32_t Neighbourhood::getNeighboursCountWithoutSS() const {
@@ -829,7 +829,7 @@ ConnectionPtr Neighbourhood::getNeighbour(const std::size_t number) {
         return ConnectionPtr();
     }
 
-    ConnectionPtr candidate = *(neighbours_.begin() + number);
+    ConnectionPtr candidate = *(neighbours_.begin() + static_cast<std::ptrdiff_t>(number));
 
     if (!candidate) {
         return ConnectionPtr();

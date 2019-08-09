@@ -111,7 +111,7 @@ void Network::readerRoutine(const Config& config) {
     }
 
     boost::system::error_code lastError;
-    size_t packetSize;
+    size_t packetSize = 0;
 
     while (stopReaderRoutine == false) {  // changed from true
         auto& task = iPacMan_.allocNext();
