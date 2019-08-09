@@ -14,8 +14,6 @@
 using namespace api;
 using namespace ::apache;
 
-constexpr const int64_t kMaxRequestTransactions = 100;
-constexpr const int64_t _0i64 = int64_t(0);
 inline int64_t limitPage(int64_t value) {
     return std::max(int64_t(0), std::min(value, int64_t(100)));
 }
