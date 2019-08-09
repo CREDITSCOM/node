@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <charconv>
+#include <string_view>
 
 #include <lmdbexception.hpp>
 
@@ -330,6 +331,10 @@ protected:
         return value;
     }
 
+    auto cast(const char* value) const {
+        return std::string_view(value, std::strlen(value));
+    }
+
     template<typename T>
     T createResult(const lmdb::val& value) const {
         if constexpr (IsArray<T>::value) {
@@ -344,6 +349,9 @@ protected:
             std::from_chars(value.data(), value.data() + value.size(), result);
 
             return result;
+        }
+        else if constexpr (std::is_same_v<std::string_view, T>) {
+            return std::string_view(value.data(), value.size());
         }
         else {
             return T(value.data(), value.data() + value.size());
