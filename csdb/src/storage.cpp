@@ -204,16 +204,16 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
         }
 
         bool test_failed = false;
+        last_hash = p.hash();
+        count_pool++;
 
         emit read_block_event(p, &test_failed);
-
         if (test_failed) {
             set_last_error(Storage::DataIntegrityError, "Data integrity error: client reported violation of logic in pool %d", p.sequence());
             return false;
         }
 
-        update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
-        count_pool++;
+        //update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
         progress.poolsProcessed++;
 
         if (callback != nullptr) {
@@ -225,22 +225,25 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     }
 
     // Посмотрим, сколько у нас завершённых цепочек.
-    if ([this, &heads]() -> bool {
-            for (const auto it : heads) {
-                if (!it.second.next_.is_empty())
-                    continue;
+    //if ([this, &heads]() -> bool {
+    //        for (const auto it : heads) {
+    //            if (!it.second.next_.is_empty())
+    //                continue;
 
-                if (!last_hash.is_empty())
-                    return false;
+    //            if (!last_hash.is_empty())
+    //                return false;
 
-                last_hash = it.first;
-            }
-            return true;
-        }()) {
-        set_last_error();
-        return true;
-    }
+    //            last_hash = it.first;
+    //        }
+    //        return true;
+    //    }()) {
+    //    set_last_error();
+    //    return true;
+    //}
+    
+    return true;
 
+#if 0
     std::stringstream ss;
     ss << "More than one chains or orphan chains. List follows:" << std::endl;
     for (auto ith = heads.begin(); ith != heads.end(); ++ith) {
@@ -257,6 +260,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     set_last_error(Storage::ChainError, ss.str());
 
     return false;
+#endif
 }
 
 void Storage::priv::write_routine() {
