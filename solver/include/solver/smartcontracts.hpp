@@ -334,7 +334,7 @@ public:
         return get_smart_contract_impl(tr);
     }
 
-    csdb::Transaction get_contract_starter(const csdb::Transaction& contract_state);
+    csdb::Transaction get_contract_call(const csdb::Transaction& contract_state);
 
     // get & handle rejected transactions from smart contract(s)
     // usually ordinary consensus may reject smart-related transactions

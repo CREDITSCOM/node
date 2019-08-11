@@ -197,6 +197,7 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
 
 SmartContracts::~SmartContracts() = default;
 
+/*public*/
 void SmartContracts::init(const cs::PublicKey& id, Node* node) {
     cs::Lock lock(public_access_lock);
 
@@ -497,6 +498,17 @@ bool SmartContracts::is_payable_target(const csdb::Transaction& tr) {
     return is_payable(abs_addr);
 }
 
+/*public*/
+csdb::Transaction SmartContracts::get_contract_call(const csdb::Transaction& contract_state) {
+    cs::Lock lock(public_access_lock);
+    csdb::UserField fld = contract_state.user_field(trx_uf::new_state::RefStart);
+    if (fld.is_valid()) {
+        SmartContractRef ref(fld);
+        return get_transaction(ref, absolute_address(contract_state.target()));
+    }
+    return csdb::Transaction{};
+}
+
 csdb::Transaction SmartContracts::get_transaction(const SmartContractRef& contract, const csdb::Address& abs_addr) const {
     queue_const_iterator it_queue = find_in_queue(contract);
     if (it_queue != exe_queue.cend()) {
@@ -780,6 +792,7 @@ SmartContractStatus SmartContracts::get_smart_contract_status(const csdb::Addres
     return SmartContractStatus::Idle;
 }
 
+/*public*/
 bool SmartContracts::executionAllowed() {
     cs::Lock lock(public_access_lock);
 
@@ -796,6 +809,7 @@ bool SmartContracts::executionAllowed() {
     return executor_ready;
 }
 
+/*public*/
 bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
     cs::Lock lock(public_access_lock);
 
@@ -1769,6 +1783,8 @@ csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item, in
 // the aim is
 //  - to perform consensus on successful + 1st rejected execution again
 //  - re-execute valid but "compromised" by rejected items executions
+
+/*public*/
 void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_list) {
 
     if (reject_list.empty()) {
@@ -1885,6 +1901,7 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
     test_exe_queue(false /*skip_log*/);
 }
 
+/*public*/
 void SmartContracts::on_update(const std::vector< csdb::Transaction >& states) {
     cs::Lock lock(public_access_lock);
 
