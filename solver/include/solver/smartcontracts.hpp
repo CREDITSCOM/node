@@ -234,6 +234,7 @@ struct SmartExecutionData {
     executor::Executor::ExecuteResult result;
     std::string error;
     std::string explicit_last_state;
+    csdb::Address abs_addr;
 
     void setError(int8_t code, const char* message) {
         if (!result.smartsRes.empty()) {
@@ -332,6 +333,8 @@ public:
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
     }
+
+    csdb::Transaction get_contract_call(const csdb::Transaction& contract_state);
 
     // get & handle rejected transactions from smart contract(s)
     // usually ordinary consensus may reject smart-related transactions
@@ -453,6 +456,10 @@ private:
         SmartContractRef ref_execute;
         // Reference to execution which state is cached in DB
         SmartContractRef ref_cache;
+        // deploy transaction referenced by ref_deploy
+        csdb::Transaction deploy{};
+        // the last execute transaction referenced by ref_execute
+        csdb::Transaction execute{};
         // current state which is result of last successful execution / deploy
         std::string state;
         // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
@@ -469,6 +476,8 @@ private:
     struct ExecutionItem {
         // reference to smart in block chain (block/transaction) that spawns execution
         SmartContractRef ref_start;
+        // starter transaction
+        csdb::Transaction transaction{};
         // max fee taken from contract starter transaction
         csdb::Amount avail_fee;
         // new_state fee prediction
@@ -568,6 +577,15 @@ private:
 
     Node* pnode;
 
+    queue_const_iterator find_in_queue(const SmartContractRef& item) const {
+        for (auto it = exe_queue.cbegin(); it != exe_queue.cend(); ++it) {
+            if (std::find(it->executions.cbegin(), it->executions.cend(), item) != it->executions.cend()) {
+                return it;
+            }
+        }
+        return exe_queue.cend();
+    }
+
     queue_iterator find_in_queue(const SmartContractRef& item) {
         for (auto it = exe_queue.begin(); it != exe_queue.end(); ++it) {
             if (std::find(it->executions.cbegin(), it->executions.cend(), item) != it->executions.cend()) {
@@ -575,6 +593,16 @@ private:
             }
         }
         return exe_queue.end();
+    }
+
+    execution_const_iterator find_in_queue_item(queue_const_iterator qit, const SmartContractRef& item) const {
+        auto it = qit->executions.cbegin();
+        for (; it != qit->executions.cend(); ++it) {
+            if (it->ref_start == item) {
+                break;
+            }
+        }
+        return it;
     }
 
     execution_iterator find_in_queue_item(queue_iterator qit, const SmartContractRef& item) {
@@ -634,9 +662,7 @@ public:
 
 private:
     // non-static variant
-    csdb::Transaction get_transaction(const SmartContractRef& contract) const {
-        return SmartContracts::get_transaction(bc, contract);
-    }
+    csdb::Transaction get_transaction(const SmartContractRef& contract, const csdb::Address& abs_addr) const;
 
     void enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_log);
 
@@ -678,9 +704,9 @@ private:
     void add_uses_from(const csdb::Address& abs_addr, const std::string& method, std::vector<csdb::Address>& uses);
 
     // extracts and returns name of method executed by referenced transaction
-    std::string print_executed_method(const SmartContractRef& ref);
+    std::string print_executed_method(const csdb::Transaction& exe_transaction);
 
-    std::string get_executed_method_name(const SmartContractRef& ref);
+    std::string get_executed_method_name(const csdb::Transaction& exe_transaction);
 
     // calculates from block a one smart round costs
     csdb::Amount smart_round_fee(const csdb::Pool& block);
