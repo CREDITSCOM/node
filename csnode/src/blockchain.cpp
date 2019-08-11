@@ -206,7 +206,10 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         }
         walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
     }
-    if (recreateIndex || lastIndexedPool < block.sequence()) {
+    if (!recreateIndex) {
+        recreateIndex = (lastIndexedPool < block.sequence());
+    }
+    if (recreateIndex) {
         createTransactionsIndex(block);
     }
 }
