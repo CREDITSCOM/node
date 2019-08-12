@@ -1488,11 +1488,6 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
 void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     csdebug() << __func__;
-    if (cs::Conveyer::instance().currentRoundNumber() % 10 == 0) {
-        csdebug() << "Nothing will be sent R = " << cs::Conveyer::instance().currentRoundNumber() << ", SubRound = " << static_cast<int>(subRound_) 
-            << ", recdBangs.size() = " << recdBangs.size();
-            return;
-    }
 
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -2130,6 +2125,48 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         csdebug() << "NODE> RoundPackage could not be parsed";
         return;
     }
+
+    uint64_t lastTimeStamp;
+    uint64_t currentTimeStamp;
+    uint64_t rpTimeStamp;
+    try {
+        lastTimeStamp = std::stoll(getBlockChain().getLastTimeStamp());
+    }
+    catch (...) {
+        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
+    }
+
+    try {
+        currentTimeStamp = std::stoll(cs::Utils::currentTimestamp());
+    }
+    catch (...) {
+        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
+    }
+
+    try {
+        rpTimeStamp = std::stoll(rPackage.poolMetaInfo().timestamp);
+    }
+    catch (...) {
+        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
+    }
+    
+    if(rPackage.roundTable().round > conveyer.currentRoundNumber() + 1) {
+        uint64_t delta;
+        if (lastTimeStamp > currentTimeStamp) {
+            delta = lastTimeStamp - currentTimeStamp;
+        }
+        else {
+            delta = currentTimeStamp - lastTimeStamp;
+        }
+        uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
+        
+        if ( speed < 50) {
+            cserror() << "just got RoundPackage can't be created with the speed " << speed << " bps";
+            return;
+        }
+    }
+
+
     csdebug() << "---------------------------------- RoundPackage #" << rPackage.roundTable().round << " --------------------------------------------- \n" 
         <<  rPackage.toString() 
         <<  "\n-----------------------------------------------------------------------------------------------------------------------------";
