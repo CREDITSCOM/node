@@ -193,6 +193,9 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
             *shouldStop = true;
         }
         else {
+            if (recreateIndex || lastIndexedPool < block.sequence()) {
+                createTransactionsIndex(block);
+            }
             const auto cnt_tr = block.transactions_count();
             if (cnt_tr > 0) {
                 total_transactions_count_ += cnt_tr;
@@ -205,12 +208,6 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
             }
         }
         walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
-    }
-    if (!recreateIndex) {
-        recreateIndex = (lastIndexedPool < block.sequence());
-    }
-    if (recreateIndex) {
-        createTransactionsIndex(block);
     }
 }
 
