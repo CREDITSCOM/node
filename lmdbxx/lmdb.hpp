@@ -398,7 +398,7 @@ protected:
 
         auto freeSpace = metaInfo.me_mapsize - (metaStats.ms_psize * metaInfo.me_last_pgno);
 
-        if (freeSpace < increaseSize_/2) {
+        if (freeSpace < increaseSize_) {
             auto newSize = mapSize() + increaseSize_;
             setMapSize(newSize);
 
