@@ -26,7 +26,7 @@ public:
     enum Options : size_t {
         DefaultMapSize = 10485760,
         Default1GbMapSize = 1UL * 1024UL * 1024UL * 1024UL,
-        DefaultIncreaseSize = DefaultMapSize/2
+        DefaultIncreaseSize = DefaultMapSize
     };
 
     enum Flags : unsigned int {
@@ -398,7 +398,7 @@ protected:
 
         auto freeSpace = metaInfo.me_mapsize - (metaStats.ms_psize * metaInfo.me_last_pgno);
 
-        if (freeSpace < increaseSize_) {
+        if (freeSpace < increaseSize_/2) {
             auto newSize = mapSize() + increaseSize_;
             setMapSize(newSize);
 
