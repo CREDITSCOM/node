@@ -291,6 +291,8 @@ private:
     void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id, const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset,
                          uint64_t limit);
 
+    void updateNonEmptyBlocks(const csdb::Pool&);
+
     bool good_;
 
     mutable std::recursive_mutex dbLock_;
@@ -363,7 +365,7 @@ private:
 
     // may be modified once in uuid() method:
     mutable uint64_t uuid_ = 0;
-    bool recreateIndex;
+    bool recreateIndex_;
     std::map<csdb::Address, csdb::PoolHash> lapoos;
 };
 

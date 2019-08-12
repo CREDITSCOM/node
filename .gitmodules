@@ -19,3 +19,6 @@
 [submodule "third-party/lmdbxx"]
 	path = third-party/lmdbxx
 	url = https://github.com/drycpp/lmdbxx.git
+[submodule "third-party/nameof"]
+	path = third-party/nameof
+	url = https://github.com/Neargye/nameof.git
