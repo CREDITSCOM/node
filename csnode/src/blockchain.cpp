@@ -105,12 +105,12 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
-, recreateIndex(recreateIndex) {
+, recreateIndex_(recreateIndex) {
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
 
     createCashesPath();
-    if (!recreateIndex) {
-        checkLastIndFile(recreateIndex);
+    if (!recreateIndex_) {
+        checkLastIndFile(recreateIndex_);
     }
 
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
@@ -154,8 +154,8 @@ bool BlockChain::init(const std::string& path) {
         std::cout << "Done\n";
     }
 
-    if (recreateIndex) {
-        recreateIndex = false;
+    if (recreateIndex_) {
+        recreateIndex_ = false;
         lapoos.clear();
         cslog() << "Recreated index 0 -> " << getLastSequence()
                 << ". Continue to keep it actual from new blocks.";
@@ -179,7 +179,7 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         cs::Lock lock(dbLock_);
         uuid_ = uuidFromBlock(block);
         csdebug() << "Blockchain: UUID = " << uuid_;
-        if (recreateIndex) {
+        if (recreateIndex_) {
             storage_.truncate_trxs_index();
         }
     }
@@ -193,7 +193,7 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
             *shouldStop = true;
         }
         else {
-            if (recreateIndex || lastIndexedPool < block.sequence()) {
+            if (recreateIndex_ || lastIndexedPool < block.sequence()) {
                 createTransactionsIndex(block);
             }
             const auto cnt_tr = block.transactions_count();
@@ -231,7 +231,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
         auto key = getAddressByType(addr, BlockChain::AddressType::PublicKey);
         if (indexedAddrs.insert(key).second) {
             csdb::PoolHash lapoo;
-            if (recreateIndex) {
+            if (recreateIndex_) {
                 lapoo = lapoos[key];
                 lapoos[key] = pool.hash();
             }

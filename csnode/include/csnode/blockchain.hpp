@@ -363,7 +363,7 @@ private:
 
     // may be modified once in uuid() method:
     mutable uint64_t uuid_ = 0;
-    bool recreateIndex;
+    bool recreateIndex_;
     std::map<csdb::Address, csdb::PoolHash> lapoos;
 };
 
