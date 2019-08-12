@@ -171,13 +171,14 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     cswarning() << "-----------------------------------------------------------";
 
     istream_.init(data, size);
-    istream_ >> subRound_;
-    uint8_t deltaBang = subRound_ - recdBangs[rNum];
-    if (subRound_ <= recdBangs[rNum] && !(subRound_ < Consensus::MaxSubroundDelta && recdBangs[rNum] > std::numeric_limits<uint8_t>::max() - Consensus::MaxSubroundDelta)) {
-        cswarning() << "Old Big Bang received: " << rNum << "." << static_cast<int>(subRound_) << " is <= " << rNum << "." << static_cast<int>(recdBangs[rNum]);
+    uint8_t tmp = 0;
+    istream_ >> tmp;
+    if (tmp <= recdBangs[rNum] && !(tmp < Consensus::MaxSubroundDelta && recdBangs[rNum] > std::numeric_limits<uint8_t>::max() - Consensus::MaxSubroundDelta)) {
+        cswarning() << "Old Big Bang received: " << rNum << "." << static_cast<int>(tmp) << " is <= " << rNum << "." << static_cast<int>(recdBangs[rNum]);
         return;
     }
-    
+    subRound_ = tmp;
+
     // cache
     auto cachedRound = conveyer.currentRoundNumber();
 
