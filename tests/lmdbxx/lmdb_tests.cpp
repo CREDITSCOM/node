@@ -1,6 +1,9 @@
 #include "gtest/gtest.h"
 
 #include <memory>
+#include <random>
+#include <vector>
+#include <utility>
 
 #include <boost/filesystem.hpp>
 #include <lib/system/console.hpp>
@@ -78,6 +81,22 @@ TEST(Lmdbxx, InsertTrivial) {
 
     auto v = db->value<long>(key);
     ASSERT_EQ(value, v);
+}
+
+TEST(Lmdbxx, InsertAndRemove) {
+    auto db = createDb();
+    db->open();
+
+    std::string key = "1111";
+    db->insert(key, "value");
+    db->insert("2222", "value");
+
+    ASSERT_EQ(db->size(), 2);
+
+    db->remove(key);
+    db->remove("2222");
+
+    ASSERT_EQ(db->size(), 0);
 }
 
 TEST(Lmdbxx, LastPair) {
@@ -193,13 +212,78 @@ TEST(Lmdbxx, TestDefaultValueRewrite) {
     ASSERT_EQ(db->value<std::string>(key), value);
 }
 
-TEST(Lmdb, TestStringView) {
+TEST(Lmdbxx, TestStringView) {
     auto db = createDb();
     db->open();
 
     db->insert("Key", "Value");
 
     ASSERT_TRUE(db->value<std::string_view>("Key") == "Value");
+}
+
+using Elements = std::pair<std::string, std::string>;
+using KeyValueStorage = std::vector<Elements>;
+
+struct Storage {
+static inline Elements getElementFromStorage(KeyValueStorage& storage) {
+    static std::default_random_engine engine(std::random_device{}());
+
+    [[maybe_unused]] std::mt19937 mersenneTwister(engine);
+    std::uniform_int_distribution<int> distribution(0, static_cast<int>(storage.size() - 1));
+
+    auto index = static_cast<size_t>(distribution(engine));
+
+    KeyValueStorage::iterator iter = storage.begin();
+    std::advance(iter, index);
+
+    auto elements = (*iter);
+    storage.erase(iter);
+
+    return elements;
+}
+};
+
+TEST(Lmdbxx, HighLoadTest) {
+    auto db = createDb();
+    db->open();
+
+    cs::Connector::connect(&db->failed, [](const auto& e) {
+        cs::Console::writeLine("Error in database ", e.what());
+    });
+
+    constexpr size_t elementsCount = 50000;
+
+    std::string key = "Key";
+    std::string value = "Value";
+
+    KeyValueStorage storage;
+    storage.reserve(elementsCount);
+
+    for (size_t i = 0; i < elementsCount; ++i) {
+        auto str = std::to_string(i);
+
+        auto k = key + str;
+        auto v = value + str;
+
+        db->insert(k, v);
+        storage.push_back(std::make_pair(std::move(k), std::move(v)));
+    }
+
+    ASSERT_EQ(db->size(), storage.size());
+
+    // try to load
+    while (!storage.empty()) {
+        auto [k, v] = Storage::getElementFromStorage(storage);
+
+        {
+            auto expectedValue = db->value<std::string_view>(k);
+            ASSERT_EQ(expectedValue, v);
+        }
+
+        db->remove(k);
+    }
+
+    ASSERT_TRUE(db->size() == 0);
 }
 
 TEST(Lmdbxx, DISABLED_InsertInDifferentTables) {
