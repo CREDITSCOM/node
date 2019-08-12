@@ -1743,16 +1743,16 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
     }
     // hash of part received message
     stage.messageHash = cscrypto::calculateHash(stage.message.data(), stage.message.size());
+    if (!cscrypto::verifySignature(stage.signature, sender, stage.messageHash.data(), stage.messageHash.size())) {
+        cswarning() << "NODE> Smart stage One from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " -  WRONG SIGNATURE!!!";//
+        return;
+    }
     if (!stage.fillFromBinary()) {
         return;
     }
     cs::Sequence block = cs::SmartConsensus::blockPart(stage.id);
     uint32_t transaction = cs::SmartConsensus::transactionPart(stage.id);
     csdebug() << "SmartStageOne messageHash: " << cs::Utils::byteStreamToHex(stage.messageHash.data(), stage.messageHash.size());
-    if (!cscrypto::verifySignature(stage.signature, sender, stage.messageHash.data(), stage.messageHash.size())) {
-        cswarning() << "NODE> Smart stage One from T[" << static_cast<int>(stage.sender) << "] {" << block << '.' << transaction << "} -  WRONG SIGNATURE!!!";//
-        return;
-    }
     csdebug() << __func__ << ": starting {" << block << '.' << transaction << '}';
     
     csmeta(csdebug) << "Sender: " << static_cast<int>(stage.sender) << ", sender key: " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << std::endl

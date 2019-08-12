@@ -311,6 +311,10 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
 void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& currentTimeStamp, cs::StageThree& stage3) {
     csmeta(csdetails) << "start";
     cs::Conveyer& conveyer = cs::Conveyer::instance();
+    if (conveyer.roundTable(conveyer.currentRoundNumber()) == nullptr) {
+        // test if is full round data available (metaStarage[r] + roundtable in metastorage[r])
+        return;
+    }
     cs::RoundTable table;
     //TODO: place here adjustTrustedCandidates() call
     table.round = conveyer.currentRoundNumber() + 1;
@@ -324,7 +328,10 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     std::string timeStamp = conveyer.currentRoundNumber() == 1 ? currentTimeStamp : chooseTimeStamp(stage3.realTrustedMask);
     poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
     poolMetaInfo.timestamp = std::move(timeStamp);
-    poolMetaInfo.characteristic.mask = conveyer.characteristic(conveyer.currentRoundNumber())->mask;
+    auto ptr = conveyer.characteristic(conveyer.currentRoundNumber());
+    if (ptr == nullptr) {
+        poolMetaInfo.characteristic.mask = ptr->mask;
+    }
     //const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
     //if (confirmation.has_value()) {
     //    poolMetaInfo.confirmationMask = confirmation.value().mask;
