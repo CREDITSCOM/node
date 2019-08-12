@@ -243,10 +243,10 @@ public:
     uint32_t getTransactionsCount(const csdb::Address&);
 
     csdb::TransactionID getLastTransaction(const csdb::Address&) const;
-    csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
+    cs::Sequence getPreviousPoolSeq(const csdb::Address&, cs::Sequence) const;
 
-    std::pair<csdb::PoolHash, uint32_t> getLastNonEmptyBlock();
-    std::pair<csdb::PoolHash, uint32_t> getPreviousNonEmptyBlock(const csdb::PoolHash&);
+    std::pair<cs::Sequence, uint32_t> getLastNonEmptyBlock();
+    std::pair<cs::Sequence, uint32_t> getPreviousNonEmptyBlock(cs::Sequence);
     uint64_t getTransactionsCount() const {
         return total_transactions_count_;
     }
@@ -309,10 +309,10 @@ private:
     uint64_t total_transactions_count_ = 0;
 
     struct NonEmptyBlockData {
-        csdb::PoolHash hash;
+        cs::Sequence poolSeq;
         uint32_t transCount = 0;
     };
-    std::map<csdb::PoolHash, NonEmptyBlockData> previousNonEmpty_;
+    std::map<cs::Sequence, NonEmptyBlockData> previousNonEmpty_;
 
     NonEmptyBlockData lastNonEmptyBlock_;
 
@@ -364,7 +364,7 @@ private:
     // may be modified once in uuid() method:
     mutable uint64_t uuid_ = 0;
     bool recreateIndex;
-    std::map<csdb::Address, csdb::PoolHash> lapoos;
+    std::map<csdb::Address, cs::Sequence> lapoos;
 };
 
 class TransactionsIterator {

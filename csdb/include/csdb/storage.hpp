@@ -224,8 +224,8 @@ public:
     Transaction get_last_by_target(Address target) const noexcept;
 
     // And now for something completely different
-    PoolHash get_previous_transaction_block(const Address&, const PoolHash&) const;
-    void set_previous_transaction_block(const Address&, const PoolHash& currTransBlock, const PoolHash& prevTransBlock);
+    cs::Sequence get_previous_transaction_block(const Address&, cs::Sequence) const;
+    void set_previous_transaction_block(const Address&, cs::Sequence currTransBlock, cs::Sequence prevTransBlock);
     void truncate_trxs_index();
 
     /**
@@ -267,7 +267,7 @@ public:
      * \используется для входного параметра addr в виде id кошелька
      */
     bool get_from_blockchain(const Address& addr /*input*/, int64_t innerId /*input*/,
-                             const PoolHash& lastTrxPh, Transaction& trx /*output*/) const;
+                             cs::Sequence lastTrxPs, Transaction& trx /*output*/) const;
 
     /**
      * Gets contract data from storage.
@@ -313,7 +313,7 @@ public signals:
     const ReadBlockSignal& readBlockEvent() const;
 
 private:
-  static cs::Bytes get_trans_index_key(const Address&, const PoolHash&);
+  static cs::Bytes get_trans_index_key(const Address&, cs::Sequence);
   Pool pool_load_internal(const PoolHash& hash, const bool metaOnly, size_t& trxCnt) const;
 
   ::std::shared_ptr<priv> d;

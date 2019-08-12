@@ -44,16 +44,16 @@ class Pool;
  * к валидному идентификатору с помощью метода \ref TransactionID::from_string.
  *
  * Единственное специфицируемая часть содержимого класса - это возможность получить
- * \ref PoolHash для пула, в который помещена транзакция.
+ * \ref cs::Sequence для пула, в который помещена транзакция.
  */
 class TransactionID {
     SHARED_DATA_CLASS_DECLARE(TransactionID)
 public:
     /// \deprecated Конструктор будет удалён в следующих версиях.
-    TransactionID(PoolHash poolHash, cs::Sequence index);
+    TransactionID(cs::Sequence poolSeq, cs::Sequence index);
 
     bool is_valid() const noexcept;
-    PoolHash pool_hash() const noexcept;
+    cs::Sequence pool_seq() const noexcept;
 
     /// \deprecated Метод будет удалён в следующих версиях.
     cs::Sequence index() const noexcept;

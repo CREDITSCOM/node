@@ -337,9 +337,9 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
         wallData.balance_ -= csdb::Amount(tr.max_fee().to_double());
     }
     else if (SmartContracts::is_new_state(tr)) {
-        WalletsCache::RefContractCall stateRef{ blockchain.getSequenceByHash(tr.id().pool_hash()), uint32_t(tr.id().index()) };
+        WalletsCache::RefContractCall stateRef{ tr.id().pool_seq(), uint32_t(tr.id().index()) };
         if (isCanceledSmart(initTransaction.target(), initRef)) {
-            cs::SmartContractRef ref(initTransaction.id().pool_hash(), initRef.sequence, initRef.transaction);
+            cs::SmartContractRef ref(blockchain.getHashBySequence(initTransaction.id().pool_seq()), initRef.sequence, initRef.transaction);
             csdebug() << "WalletsCache: (deprecated behaviour) timeout was detected for " << ref
                 << " before, new_state found in block " << WithDelimiters(stateRef.sequence);
             wallData.balance_ -= csdb::Amount(initTransaction.max_fee().to_double())

@@ -200,10 +200,10 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
             if (cnt_tr > 0) {
                 total_transactions_count_ += cnt_tr;
 
-                if (lastNonEmptyBlock_.transCount && block.hash() != lastNonEmptyBlock_.hash) {
-                    previousNonEmpty_[block.hash()] = lastNonEmptyBlock_;
+                if (lastNonEmptyBlock_.transCount && block.sequence() != lastNonEmptyBlock_.poolSeq) {
+                    previousNonEmpty_[block.sequence()] = lastNonEmptyBlock_;
                 }
-                lastNonEmptyBlock_.hash = block.hash();
+                lastNonEmptyBlock_.poolSeq = block.sequence();
                 lastNonEmptyBlock_.transCount = static_cast<uint32_t>(block.transactions().size());
             }
         }
@@ -230,16 +230,16 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
     auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
         auto key = getAddressByType(addr, BlockChain::AddressType::PublicKey);
         if (indexedAddrs.insert(key).second) {
-            csdb::PoolHash lapoo;
+            cs::Sequence lapoo;
             if (recreateIndex) {
                 lapoo = lapoos[key];
-                lapoos[key] = pool.hash();
+                lapoos[key] = pool.sequence();
             }
             else {
-                lapoo = getLastTransaction(key).pool_hash();
+                lapoo = getLastTransaction(key).pool_seq();
             }
             std::lock_guard<decltype(dbLock_)> l(dbLock_);
-            storage_.set_previous_transaction_block(key, pool.hash(), lapoo);
+            storage_.set_previous_transaction_block(key, pool.sequence(), lapoo);
         }
     };
 
@@ -251,11 +251,11 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
     if (pool.transactions().size()) {
         total_transactions_count_ += pool.transactions().size();
 
-        if (lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash) {
-            previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
+        if (lastNonEmptyBlock_.transCount && pool.sequence() != lastNonEmptyBlock_.poolSeq) {
+            previousNonEmpty_[pool.sequence()] = lastNonEmptyBlock_;
         }
 
-        lastNonEmptyBlock_.hash = pool.hash();
+        lastNonEmptyBlock_.poolSeq = pool.sequence();
         lastNonEmptyBlock_.transCount = static_cast<uint32_t>(pool.transactions().size());
     }
     lastIndexedPool = pool.sequence();
@@ -417,13 +417,13 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
     std::lock_guard l(dbLock_);
     csdb::Transaction transaction;
 
-    if (deferredBlock_.hash() == transId.pool_hash()) {
+    if (deferredBlock_.sequence() == transId.pool_seq()) {
         transaction = deferredBlock_.transaction(transId).clone();
         transaction.set_time(deferredBlock_.get_time());
     }
     else {
         transaction = storage_.transaction(transId);
-        transaction.set_time(storage_.pool_load(transId.pool_hash()).get_time());
+        transaction.set_time(storage_.pool_load(transId.pool_seq()).get_time());
     }
 
     return transaction;
@@ -915,7 +915,7 @@ void BlockChain::close() {
 
 bool BlockChain::getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const {
     cs::Lock lock(dbLock_);
-    return storage_.get_from_blockchain(addr, innerId, getLastTransaction(addr).pool_hash(), result);
+    return storage_.get_from_blockchain(addr, innerId, getLastTransaction(addr).pool_seq(), result);
 }
 
 bool BlockChain::updateContractData(const csdb::Address& abs_addr, const cs::Bytes& data) const {
@@ -1487,25 +1487,25 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) co
     return wallDataPtr->lastTransaction_;
 }
 
-csdb::PoolHash BlockChain::getPreviousPoolHash(const csdb::Address& addr, const csdb::PoolHash& ph) {
+cs::Sequence BlockChain::getPreviousPoolSeq(const csdb::Address& addr, cs::Sequence ps) const {
     std::lock_guard lock(dbLock_);
-    return storage_.get_previous_transaction_block(getAddressByType(addr, BlockChain::AddressType::PublicKey), ph);
+    return storage_.get_previous_transaction_block(getAddressByType(addr, AddressType::PublicKey), ps);
 }
 
-std::pair<csdb::PoolHash, uint32_t> BlockChain::getLastNonEmptyBlock() {
+std::pair<cs::Sequence, uint32_t> BlockChain::getLastNonEmptyBlock() {
     std::lock_guard lock(dbLock_);
-    return std::make_pair(lastNonEmptyBlock_.hash, lastNonEmptyBlock_.transCount);
+    return std::make_pair(lastNonEmptyBlock_.poolSeq, lastNonEmptyBlock_.transCount);
 }
 
-std::pair<csdb::PoolHash, uint32_t> BlockChain::getPreviousNonEmptyBlock(const csdb::PoolHash& ph) {
+std::pair<cs::Sequence, uint32_t> BlockChain::getPreviousNonEmptyBlock(cs::Sequence seq) {
     std::lock_guard lock(dbLock_);
-    const auto it = previousNonEmpty_.find(ph);
+    const auto it = previousNonEmpty_.find(seq);
 
     if (it != previousNonEmpty_.end()) {
-        return std::make_pair(it->second.hash, it->second.transCount);
+        return std::make_pair(it->second.poolSeq, it->second.transCount);
     }
 
-    return std::pair<csdb::PoolHash, uint32_t>();
+    return std::pair<cs::Sequence, uint32_t>(cs::kWrongSequence, 0);
 }
 
 TransactionsIterator::TransactionsIterator(BlockChain& bc, const csdb::Address& addr)
@@ -1516,7 +1516,7 @@ TransactionsIterator::TransactionsIterator(BlockChain& bc, const csdb::Address& 
 
 void TransactionsIterator::setFromTransId(const csdb::TransactionID& lTrans) {
     if (lTrans.is_valid()) {
-        lapoo_ = bc_.loadBlock(lTrans.pool_hash());
+        lapoo_ = bc_.loadBlock(lTrans.pool_seq());
         it_ = lapoo_.transactions().rbegin() + (lapoo_.transactions().size() - lTrans.index() - 1);
     }
     else {
@@ -1537,8 +1537,8 @@ void TransactionsIterator::next() {
 
     // Oops, no more in this blockfTransactionsListGet
     if (it_ == lapoo_.transactions().rend()) {
-        auto ph = bc_.getPreviousPoolHash(addr_, lapoo_.hash());
-        lapoo_ = bc_.loadBlock(ph);
+        auto ps = bc_.getPreviousPoolSeq(addr_, lapoo_.sequence());
+        lapoo_ = bc_.loadBlock(ps);
 
         if (lapoo_.is_valid()) {
             it_ = lapoo_.transactions().rbegin();

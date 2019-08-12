@@ -219,14 +219,14 @@ general::Amount convertAmount(const csdb::Amount& amount) {
 api::TransactionId convert_transaction_id(const csdb::TransactionID& trid) {
     api::TransactionId result_id;
     result_id.index = (uint32_t) trid.index();
-    result_id.poolHash = fromByteArray(trid.pool_hash().to_binary());
+    result_id.poolSeq = trid.pool_seq();
     result_id.__isset.index = true;
-    result_id.__isset.poolHash = true;
+    result_id.__isset.poolSeq = true;
     return result_id;
 }
 
 csdb::TransactionID convert_transaction_id(const api::TransactionId& trid) {
-    return csdb::TransactionID(csdb::PoolHash::from_binary(toByteArray(trid.poolHash)), trid.index);
+    return csdb::TransactionID(trid.poolSeq, trid.index);
 }
 
 bool is_smart(const csdb::Transaction& tr) {
@@ -299,7 +299,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
 
     result.trxn.timeCreation = transaction.get_time();
 
-    result.trxn.poolNumber = executor_.loadBlockApi(transaction.id().pool_hash()).sequence();
+    result.trxn.poolNumber = executor_.loadBlockApi(transaction.id().pool_seq()).sequence();
 
     if (is_smart(transaction)) {
         using namespace cs::trx_uf;
@@ -412,7 +412,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     if (is_smart(transaction)) {
         auto opers = lockedReference(this->smart_operations);
         auto state_id = (*opers)[transaction.id()].stateTransaction;
-        if (!state_id.pool_hash().is_empty()) {
+        if (state_id.is_valid()) {
             stateTrx = executor_.loadTransactionApi(state_id);
         }
     }
@@ -423,7 +423,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         return result;
 
     // 2) fill ExtraFee for state transaction
-    auto pool = executor_.loadBlockApi(stateTrx.id().pool_hash());
+    auto pool = executor_.loadBlockApi(stateTrx.id().pool_seq());
     auto transactions = pool.transactions();
     ExtraFee extraFee;
     extraFee.transactionId = convert_transaction_id(stateTrx.id());
@@ -522,8 +522,7 @@ std::vector<api::SealedTransaction> APIHandler::extractTransactions(const csdb::
 }
 
 void APIHandler::TransactionGet(TransactionGetResult& _return, const TransactionId& transactionId) {
-    const csdb::PoolHash poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
-    const csdb::TransactionID tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
+    const csdb::TransactionID tmpTransactionId = csdb::TransactionID(transactionId.poolSeq, (transactionId.index));
     csdb::Transaction transaction = executor_.loadTransactionApi(tmpTransactionId);
     _return.found = transaction.is_valid();
     if (_return.found)
@@ -592,7 +591,7 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
 	if (tr.user_field(0).is_valid())
 		res.transactionsCount = s_blockchain.getTransactionsCount(tr.target());
 
-    auto pool = executor_.loadBlockApi(tr.id().pool_hash());
+    auto pool = executor_.loadBlockApi(tr.id().pool_seq());
     res.createTime = pool.get_time();
 
     return res;
@@ -969,7 +968,7 @@ void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
         periodStats.transactionsCount += (uint32_t)transactionsCount;
 
         for (size_t i = 0; i < transactionsCount; ++i) {
-            const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+            const auto& transaction = pool.transaction(csdb::TransactionID(pool.sequence(), i));
 
 #ifdef MONITOR_NODE
             if (is_smart(transaction) || is_smart_state(transaction))
@@ -1004,7 +1003,7 @@ void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
             periodStats.transactionsCount += (uint32_t)transactionsCount;
 
             for (size_t i = 0; i < transactionsCount; ++i) {
-                const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+                const auto& transaction = pool.transaction(csdb::TransactionID(pool.sequence(), i));
 
                 if (transaction.source() == s_blockchain.getGenesisAddress())
                     continue;
@@ -1037,7 +1036,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
 
     if (is_smart_state(trxn)) {
         cs::SmartContractRef scr(trxn.user_field(cs::trx_uf::new_state::RefStart));
-        csdb::TransactionID trId(scr.hash, scr.transaction);
+        csdb::TransactionID trId(scr.sequence, scr.transaction);
         auto execTrans = s_blockchain.loadBlock(scr.sequence).transactions()[scr.transaction];
 
         if ((execTrans.is_valid() && is_smart(execTrans)) ||
@@ -1375,7 +1374,7 @@ void addTokenResult(api::TokenTransfersResult& _return, const csdb::Address& tok
     transfer.amount = TokensMaster::getAmount(smart);
     transfer.initiator = fromByteArray(handler.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
 
-    transfer.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
+    transfer.transaction.poolSeq = tr.id().pool_seq();
     transfer.transaction.index = (uint32_t) tr.id().index();
     transfer.time = atoll(pool.user_field(0).value<std::string>().c_str());
     _return.transfers.push_back(transfer);
@@ -1385,7 +1384,7 @@ void addTokenResult(api::TokenTransactionsResult& _return, const csdb::Address& 
                     const api::SmartContractInvocation& smart, const std::pair<csdb::Address, csdb::Address>&, BlockChain& handler) {
     api::TokenTransaction trans;
     trans.token = fromByteArray(token.public_key());
-    trans.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
+    trans.transaction.poolSeq = tr.id().pool_seq();
     trans.transaction.index = (uint32_t) tr.id().index();
     trans.time = atoll(pool.user_field(0).value<std::string>().c_str());
     trans.initiator = fromByteArray(handler.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
@@ -1476,7 +1475,7 @@ void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const s
         if (is_smart_state(*trIt)) {
             cs::SmartContractRef smart_ref;
             smart_ref.from_user_field(trIt->user_field(cs::trx_uf::new_state::RefStart));
-            l_id.emplace_back(csdb::TransactionID(smart_ref.hash, smart_ref.transaction));
+            l_id.emplace_back(csdb::TransactionID(smart_ref.sequence, smart_ref.transaction));
         }
         else if (is_smart(*trIt)) {
             auto it = std::find(l_id.begin(), l_id.end(), trIt->id());
@@ -1639,8 +1638,7 @@ void APIHandler::TokenTransfersGet(api::TokenTransfersResult& _return, const gen
 }
 
 void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const general::Address& token, const TransactionId& id) {
-    const csdb::PoolHash poolhash = csdb::PoolHash::from_binary(toByteArray(id.poolHash));
-    const csdb::TransactionID trxn_id = csdb::TransactionID(poolhash, id.index);
+    const csdb::TransactionID trxn_id = csdb::TransactionID(id.poolSeq, id.index);
     const csdb::Transaction trxn = executor_.loadTransactionApi(trxn_id);
     const csdb::Address addr = BlockChain::getAddressFromKey(token);
 
@@ -1657,7 +1655,7 @@ void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const gene
         return;
     }
 
-    const auto pool = executor_.loadBlockApi(trxn.id().pool_hash());
+    const auto pool = executor_.loadBlockApi(trxn.id().pool_seq());
     const auto smart = fetch_smart(trxn);
     const auto addr_pk = s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
     const auto addrPair = TokensMaster::getTransferData(addr_pk, smart.method, smart.params);
@@ -1708,23 +1706,23 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
 
     uint64_t totalTransfers = 0;
     std::map<csdb::Address, std::string> tokenCodes;
-    std::multimap<csdb::PoolHash, csdb::Address> tokenTransPools;
+    std::multimap<cs::Sequence, csdb::Address> tokenTransPools;
 
     tm.applyToInternal([&totalTransfers, &tokenCodes, &tokenTransPools, this](const TokensMap& tm, const HoldersMap&) {
         for (auto& t : tm) {
             totalTransfers += t.second.transfersCount;
             tokenCodes[t.first] = t.second.symbol;
-            tokenTransPools.insert(std::make_pair(s_blockchain.getLastTransaction(t.first).pool_hash(), t.first));
+            tokenTransPools.insert(std::make_pair(s_blockchain.getLastTransaction(t.first).pool_seq(), t.first));
         }
     });
 
     _return.count = uint32_t(totalTransfers);
 
-    csdb::PoolHash pooh = s_blockchain.getLastNonEmptyBlock().first;
-    while (limit && !pooh.is_empty() && tokenTransPools.size()) {
-        auto it = tokenTransPools.find(pooh);
+    cs::Sequence seq = s_blockchain.getLastNonEmptyBlock().first;
+    while (limit && seq != cs::kWrongSequence && tokenTransPools.size()) {
+        auto it = tokenTransPools.find(seq);
         if (it != tokenTransPools.end()) {
-            auto pool = executor_.loadBlockApi(pooh);
+            auto pool = executor_.loadBlockApi(seq);
 
             for (auto& t : pool.transactions()) {
                 if (!is_smart(t)) {
@@ -1750,19 +1748,19 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
             }
 
             do {
-                const auto lPh = s_blockchain.getPreviousPoolHash(it->second, it->first);
+                const auto lPs = s_blockchain.getPreviousPoolSeq(it->second, it->first);
                 const auto lAddr = it->second;
 
                 tokenTransPools.erase(it);
-                if (!lPh.is_empty()) {
-                    tokenTransPools.insert(std::make_pair(lPh, lAddr));
+                if (lPs != cs::kWrongSequence) {
+                    tokenTransPools.insert(std::make_pair(lPs, lAddr));
                 }
 
-                it = tokenTransPools.find(pooh);
+                it = tokenTransPools.find(seq);
             } while (it != tokenTransPools.end());
         }
 
-        pooh = s_blockchain.getPreviousNonEmptyBlock(pooh).first;
+        seq = s_blockchain.getPreviousNonEmptyBlock(seq).first;
     }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
