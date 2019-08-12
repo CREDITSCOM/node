@@ -14,7 +14,9 @@
 using namespace api;
 using namespace ::apache;
 
-constexpr const int64_t kMaxRequestTransactions = 100;
+inline int64_t limitPage(int64_t value) {
+    return std::clamp(value, int64_t(0), int64_t(100));
+}
 
 apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& solver, executor::Executor& executor, const csconnector::Config& config)
 : executor_(executor)
@@ -316,7 +318,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
                     api::TokenDeployTransInfo dti;
                     dti.name = it->second.name;
                     dti.code = it->second.symbol;
-                    dti.tokenStandard = it->second.tokenStandard;
+                    dti.tokenStandard = int32_t(it->second.tokenStandard);
                     result.trxn.smartInfo.__set_v_tokenDeploy(dti);
                 }
             });
@@ -530,7 +532,8 @@ void APIHandler::TransactionGet(TransactionGetResult& _return, const Transaction
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, std::to_string(transaction.counted_fee().to_double()));
 }
 
-void APIHandler::TransactionsGet(TransactionsGetResult& _return, const general::Address& address, const int64_t _offset, const int64_t limit) {
+void APIHandler::TransactionsGet(TransactionsGetResult& _return, const general::Address& address, const int64_t _offset, const int64_t const_limit) {
+    auto limit = limitPage(const_limit);
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::Transactions transactions;
     if (limit > 0) {
@@ -873,8 +876,7 @@ void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const P
     //if (!validatePagination(_return, *this, offset, const_limit)) {
     //    return;
     //}
-    auto limit = std::min(const_limit, kMaxRequestTransactions);
-    limit = std::max(const_limit, int64_t(0));
+    auto limit = limitPage(const_limit);
     const csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
     csdb::Pool pool = executor_.loadBlockApi(poolHash);
 
@@ -1170,13 +1172,8 @@ void APIHandler::GetLastHash(api::PoolHash& _return) {
 }
 
 void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::PoolHash& api_hash, const int64_t const_limit) {
-    if (const_limit <= 0 || const_limit > 100) {
-        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-        return;
-    }
-
     auto hash = csdb::PoolHash::from_binary(toByteArray(api_hash));
-    auto limit = const_limit;
+    auto limit = limitPage(const_limit);
 
     bool limSet = false;
 
@@ -1237,7 +1234,7 @@ void APIHandler::WaitForSmartTransaction(api::TransactionId& _return, const gene
 
 void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, const int64_t _offset, const int64_t _limit) {
     int64_t offset = _offset;
-    int64_t limit = _limit;
+    int64_t limit = limitPage(_limit);
 
     auto locked_smart_origin = lockedReference(this->smart_origin);
 
@@ -1268,6 +1265,8 @@ void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& /* obsolet
 }
 
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const general::Address& address, const std::vector<int64_t>& v) {
+    csunused(v);
+    csunused(address);
 #if 0
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     for (auto inner_id : v) {
@@ -1327,6 +1326,8 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
 }
 
 void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, const general::Address& address, const int64_t id) {
+    csunused(id);
+    csunused(address);
 #if 0
     csdb::Transaction trx;
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
@@ -1532,7 +1533,7 @@ void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return, 
         return;
     }
 
-    _return.tokenStandard = methodsResult.tokenStandard;
+    _return.tokenStandard = int32_t(methodsResult.tokenStandard);
     _return.byteCodeObjects = std::move(result.byteCodeObjects);
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
