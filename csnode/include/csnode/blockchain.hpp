@@ -291,6 +291,8 @@ private:
     void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id, const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset,
                          uint64_t limit);
 
+    void updateNonEmptyBlocks(const csdb::Pool&);
+
     bool good_;
 
     mutable std::recursive_mutex dbLock_;

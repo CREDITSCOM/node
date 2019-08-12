@@ -164,7 +164,6 @@ void Node::initCurrentRP() {
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
-    static std::map<cs::RoundNumber, uint8_t> recdBangs;
     auto& conveyer = cs::Conveyer::instance();
 
     cswarning() << "-----------------------------------------------------------";
@@ -173,12 +172,12 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
     istream_.init(data, size);
     istream_ >> subRound_;
-
-    if (subRound_ <= recdBangs[rNum]) {
+    uint8_t deltaBang = subRound_ - recdBangs[rNum];
+    if (subRound_ <= recdBangs[rNum] && !(subRound_ < Consensus::MaxSubroundDelta && recdBangs[rNum] > std::numeric_limits<uint8_t>::max() - Consensus::MaxSubroundDelta)) {
         cswarning() << "Old Big Bang received: " << rNum << "." << static_cast<int>(subRound_) << " is <= " << rNum << "." << static_cast<int>(recdBangs[rNum]);
         return;
     }
-
+    
     // cache
     auto cachedRound = conveyer.currentRoundNumber();
 
@@ -2126,6 +2125,48 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         csdebug() << "NODE> RoundPackage could not be parsed";
         return;
     }
+
+    uint64_t lastTimeStamp;
+    uint64_t currentTimeStamp;
+    uint64_t rpTimeStamp;
+    try {
+        lastTimeStamp = std::stoll(getBlockChain().getLastTimeStamp());
+    }
+    catch (...) {
+        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
+    }
+
+    try {
+        currentTimeStamp = std::stoll(cs::Utils::currentTimestamp());
+    }
+    catch (...) {
+        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
+    }
+
+    try {
+        rpTimeStamp = std::stoll(rPackage.poolMetaInfo().timestamp);
+    }
+    catch (...) {
+        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
+    }
+    
+    if(rPackage.roundTable().round > conveyer.currentRoundNumber() + 1) {
+        uint64_t delta;
+        if (lastTimeStamp > currentTimeStamp) {
+            delta = lastTimeStamp - currentTimeStamp;
+        }
+        else {
+            delta = currentTimeStamp - lastTimeStamp;
+        }
+        uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
+        
+        if ( speed < 50) {
+            cserror() << "just got RoundPackage can't be created with the speed " << speed << " bps";
+            return;
+        }
+    }
+
+
     csdebug() << "---------------------------------- RoundPackage #" << rPackage.roundTable().round << " --------------------------------------------- \n" 
         <<  rPackage.toString() 
         <<  "\n-----------------------------------------------------------------------------------------------------------------------------";
@@ -2196,6 +2237,15 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     // update sub round and max heighbours sequence
     subRound_ = rPackage.subRound();
     maxNeighboursSequence_ = rPackage.roundTable().round;
+
+    auto it = recdBangs.begin();
+    while (it != recdBangs.end()) {
+        if (it->first < rPackage.roundTable().round) {
+            it = recdBangs.erase(it);
+            continue;
+        }
+        ++it;
+    }
 
     cs::PacketsHashes hashes = rPackage.roundTable().hashes;
     cs::PublicKeys confidants = rPackage.roundTable().confidants;
