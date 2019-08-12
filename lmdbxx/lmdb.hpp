@@ -186,16 +186,13 @@ public:
                 const unsigned int flags = lmdb::dbi::default_flags) {
         try {
             auto transaction = lmdb::txn::begin(env_, nullptr);
-            auto dbi = lmdb::dbi::open(transaction, name);
-            auto cursor = lmdb::cursor::open(transaction, dbi);
+            auto dbi = lmdb::dbi::open(transaction, name, flags);
 
             lmdb::val key(reinterpret_cast<const void*>(data), size);
-            const auto result = cursor.get(key, nullptr, MDB_SET);
+            const auto result = dbi.del(transaction, key);
 
             if (result) {
-                lmdb::cursor_del(cursor.handle(), flags);
                 transaction.commit();
-
                 emit removed(data, size);
             }
 
@@ -331,6 +328,7 @@ protected:
         return value;
     }
 
+    // decays T(&)[size] to const char*
     auto cast(const char* value) const {
         return std::string_view(value, std::strlen(value));
     }
