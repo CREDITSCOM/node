@@ -221,6 +221,27 @@ TEST(Lmdbxx, TestStringView) {
     ASSERT_TRUE(db->value<std::string_view>("Key") == "Value");
 }
 
+TEST(Lmdbxx, TestLongValuesArrayCast) {
+    auto db = createDb();
+    db->open();
+
+    unsigned short value1 = std::numeric_limits<decltype(value1)>::max();
+    unsigned int value2 = std::numeric_limits<decltype(value2)>::max();
+    unsigned long long value3 = std::numeric_limits<decltype(value3)>::max();
+
+    db->insert("Key1", value1);
+    db->insert("Key2", value2);
+    db->insert("Key3", value3);
+
+    auto expectedValue1 = db->value<decltype(value1)>("Key1");
+    auto expectedValue2 = db->value<decltype(value2)>("Key2");
+    auto expectedValue3 = db->value<decltype(value3)>("Key3");
+
+    ASSERT_EQ(value1, expectedValue1);
+    ASSERT_EQ(value2, expectedValue2);
+    ASSERT_EQ(value3, expectedValue3);
+}
+
 using Elements = std::pair<std::string, std::string>;
 using KeyValueStorage = std::vector<Elements>;
 
@@ -283,7 +304,7 @@ TEST(Lmdbxx, HighLoadTest) {
         db->remove(k);
     }
 
-    ASSERT_TRUE(db->size() == 0);
+    ASSERT_TRUE(db->isEmpty());
 }
 
 TEST(Lmdbxx, DISABLED_InsertInDifferentTables) {

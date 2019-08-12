@@ -2,6 +2,7 @@
 #define LMDBXX_HPP
 
 #include <cassert>
+#include <numeric>
 #include <charconv>
 #include <string_view>
 
@@ -136,6 +137,11 @@ public:
         }
 
         return size_t{};
+    }
+
+    // checks empty database or not
+    bool isEmpty() const {
+        return size() == 0;
     }
 
     /// transactions
@@ -317,10 +323,14 @@ protected:
 
     template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
     auto cast(const T& value) const {
-        std::array<char, sizeof(T)> bytes{};
-        std::to_chars(bytes.data(), bytes.data() + bytes.size(), value);
+        static std::array<char, std::numeric_limits<T>::digits10 * 2> bytes{};
+        const auto result = std::to_chars(bytes.data(), bytes.data() + bytes.size(), value);
 
-        return bytes;
+        if (result.ec != std::errc{}) {
+            return std::string_view{};
+        }
+
+        return std::string_view(bytes.data(), result.ptr - bytes.data());
     }
 
     template<typename T, typename = std::enable_if_t<!std::is_integral_v<T>>>
@@ -334,6 +344,16 @@ protected:
     }
 
     template<typename T>
+    T allocateResult(const char* data, size_t size) const {
+        if constexpr (std::is_signed_v<T>) {
+            return static_cast<T>(std::stoll(std::string(data, size)));
+        }
+        else {
+            return static_cast<T>(std::stoull(std::string(data, size)));
+        }
+    }
+
+    template<typename T>
     T createResult(const lmdb::val& value) const {
         if constexpr (IsArray<T>::value) {
             T array;
@@ -344,7 +364,11 @@ protected:
         }
         else if constexpr (std::is_integral_v<T>) {
             T result = 0;
-            std::from_chars(value.data(), value.data() + value.size(), result);
+            const auto res = std::from_chars(value.data(), value.data() + value.size(), result);
+
+            if (res.ec != std::errc{}) {
+                return allocateResult<T>(value.data(), value.size());
+            }
 
             return result;
         }
