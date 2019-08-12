@@ -1488,11 +1488,6 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
 void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     csdebug() << __func__;
-    if (cs::Conveyer::instance().currentRoundNumber() % 10 == 0) {
-        csdebug() << "Nothing will be sent R = " << cs::Conveyer::instance().currentRoundNumber() << ", SubRound = " << static_cast<int>(subRound_) 
-            << ", recdBangs.size() = " << recdBangs.size();
-            return;
-    }
 
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -2130,6 +2125,48 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         csdebug() << "NODE> RoundPackage could not be parsed";
         return;
     }
+
+    uint64_t lastTimeStamp;
+    uint64_t currentTimeStamp;
+    uint64_t rpTimeStamp;
+    try {
+        lastTimeStamp = std::stoll(getBlockChain().getLastTimeStamp());
+    }
+    catch (...) {
+        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
+    }
+
+    try {
+        currentTimeStamp = std::stoll(cs::Utils::currentTimestamp());
+    }
+    catch (...) {
+        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
+    }
+
+    try {
+        rpTimeStamp = std::stoll(rPackage.poolMetaInfo().timestamp);
+    }
+    catch (...) {
+        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
+    }
+    
+    if(rPackage.roundTable().round > conveyer.currentRoundNumber() + 1) {
+        uint64_t delta;
+        if (lastTimeStamp > currentTimeStamp) {
+            delta = lastTimeStamp - currentTimeStamp;
+        }
+        else {
+            delta = currentTimeStamp - lastTimeStamp;
+        }
+        uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
+        
+        if ( speed < 50) {
+            cserror() << "just got RoundPackage can't be created with the speed " << speed << " bps";
+            return;
+        }
+    }
+
+
     csdebug() << "---------------------------------- RoundPackage #" << rPackage.roundTable().round << " --------------------------------------------- \n" 
         <<  rPackage.toString() 
         <<  "\n-----------------------------------------------------------------------------------------------------------------------------";
@@ -2262,15 +2299,21 @@ void Node::sendHash(cs::RoundNumber round) {
     cs::DataStream stream(message);
     cs::Byte myTrustedSize = 0;
     cs::Byte myRealTrustedSize = 0;
-    uint64_t timeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
-    csdebug() << "TimeStamp = " << std::to_string(timeStamp);
+
+    uint64_t lastTimeStamp = std::atoll(getBlockChain().getLastTimeStamp().c_str());
+    uint64_t currentTimeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
+    if (currentTimeStamp < lastTimeStamp) {
+        currentTimeStamp = lastTimeStamp + 1;
+    }
+    csdebug() << "TimeStamp = " << std::to_string(currentTimeStamp);
+
     if (cs::Conveyer::instance().currentRoundNumber() > 1) {
         cs::Bytes lastTrusted = getBlockChain().getLastRealTrusted();
         myTrustedSize = static_cast<uint8_t>(lastTrusted.size());
         myRealTrustedSize = cs::TrustedMask::trustedSize(lastTrusted);
     }
     csdb::PoolHash tmp = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
-    stream << tmp.to_binary() << myTrustedSize << myRealTrustedSize << timeStamp << round << subRound_;
+    stream << tmp.to_binary() << myTrustedSize << myRealTrustedSize << currentTimeStamp << round << subRound_;
     cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
     cs::Bytes messageToSend(message.data(), message.data() + message.size() - sizeof(cs::RoundNumber) - sizeof(cs::Byte));
     sendToConfidants(MsgTypes::BlockHash, round, subRound_, messageToSend, signature);

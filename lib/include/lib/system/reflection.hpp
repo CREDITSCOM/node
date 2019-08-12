@@ -1,6 +1,8 @@
 #ifndef REFLECTION_HPP
 #define REFLECTION_HPP
 
+#include <nameof.hpp>
+
 #include <utility>
 #include <string>
 #include <vector>
