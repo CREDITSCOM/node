@@ -164,7 +164,6 @@ void Node::initCurrentRP() {
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
-    static std::map<cs::RoundNumber, uint8_t> recdBangs;
     auto& conveyer = cs::Conveyer::instance();
 
     cswarning() << "-----------------------------------------------------------";
@@ -173,12 +172,12 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
     istream_.init(data, size);
     istream_ >> subRound_;
-
-    if (subRound_ <= recdBangs[rNum]) {
+    uint8_t deltaBang = subRound_ - recdBangs[rNum];
+    if (subRound_ <= recdBangs[rNum] && !(subRound_ < Consensus::MaxSubroundDelta && recdBangs[rNum] > std::numeric_limits<uint8_t>::max() - Consensus::MaxSubroundDelta)) {
         cswarning() << "Old Big Bang received: " << rNum << "." << static_cast<int>(subRound_) << " is <= " << rNum << "." << static_cast<int>(recdBangs[rNum]);
         return;
     }
-
+    
     // cache
     auto cachedRound = conveyer.currentRoundNumber();
 
@@ -1489,6 +1488,11 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
 void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     csdebug() << __func__;
+    if (cs::Conveyer::instance().currentRoundNumber() % 10 == 0) {
+        csdebug() << "Nothing will be sent R = " << cs::Conveyer::instance().currentRoundNumber() << ", SubRound = " << static_cast<int>(subRound_) 
+            << ", recdBangs.size() = " << recdBangs.size();
+            return;
+    }
 
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -2196,6 +2200,15 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     // update sub round and max heighbours sequence
     subRound_ = rPackage.subRound();
     maxNeighboursSequence_ = rPackage.roundTable().round;
+
+    auto it = recdBangs.begin();
+    while (it != recdBangs.end()) {
+        if (it->first < rPackage.roundTable().round) {
+            it = recdBangs.erase(it);
+            continue;
+        }
+        ++it;
+    }
 
     cs::PacketsHashes hashes = rPackage.roundTable().hashes;
     cs::PublicKeys confidants = rPackage.roundTable().confidants;
