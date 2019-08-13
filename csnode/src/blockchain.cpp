@@ -207,10 +207,10 @@ inline void BlockChain::updateNonEmptyBlocks(const csdb::Pool& pool) {
     if (cntTr > 0) {
         total_transactions_count_ += cntTr;
 
-        if (lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash) {
-            previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
+        if (lastNonEmptyBlock_.transCount && pool.sequence() != lastNonEmptyBlock_.poolSeq) {
+            previousNonEmpty_[pool.sequence()] = lastNonEmptyBlock_;
         }
-        lastNonEmptyBlock_.hash = pool.hash();
+        lastNonEmptyBlock_.poolSeq = pool.sequence();
         lastNonEmptyBlock_.transCount = static_cast<uint32_t>(cntTr);
     }
 }
