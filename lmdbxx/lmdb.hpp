@@ -3,13 +3,17 @@
 
 #include <cassert>
 #include <numeric>
-#include <charconv>
+#include <string>
 #include <string_view>
 
 #include <lmdbexception.hpp>
 
 #include <lib/system/signals.hpp>
 #include <lib/system/reflection.hpp>
+
+#ifndef __APPLE__
+#include <charconv>
+#endif
 
 namespace cs {
 using FlushSignal = cs::Signal<void()>;
@@ -323,6 +327,7 @@ protected:
 
     template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
     auto cast(const T& value) const {
+#ifndef __APPLE__
         static std::array<char, std::numeric_limits<T>::digits10 * 2> bytes{};
         const auto result = std::to_chars(bytes.data(), bytes.data() + bytes.size(), value);
 
@@ -331,6 +336,9 @@ protected:
         }
 
         return std::string_view(bytes.data(), result.ptr - bytes.data());
+#else
+        return std::to_string(value);
+#endif
     }
 
     template<typename T, typename = std::enable_if_t<!std::is_integral_v<T>>>
@@ -363,6 +371,7 @@ protected:
             return array;
         }
         else if constexpr (std::is_integral_v<T>) {
+#ifndef __APPLE__
             T result = 0;
             const auto res = std::from_chars(value.data(), value.data() + value.size(), result);
 
@@ -371,6 +380,9 @@ protected:
             }
 
             return result;
+#else
+            return allocateResult<T>(value.data(), value.size());
+#endif
         }
         else if constexpr (std::is_same_v<std::string_view, T>) {
             return std::string_view(value.data(), value.size());
