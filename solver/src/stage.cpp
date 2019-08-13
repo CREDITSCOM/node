@@ -180,17 +180,22 @@ namespace cs {
     {
         std::string a; //fees
         DataStream stream(message.data(), message.size());
-        stream >> sender;
-        stream >> id;
+        stream >> sender; //is not larger than confidants number
+        stream >> id; //is in the range of current smart IDs
         //bad implementation
         size_t fees_size;
-        stream >> fees_size; //fees
+        stream >> fees_size; //fees is equal the conf amount
+ 
         int32_t fee_integral;
         uint64_t fee_fracture;
         for (size_t i = 0; i < fees_size; ++i) {
             fee_integral = 0;
             fee_fracture = 0;
             stream >> fee_integral >> fee_fracture;
+            if (fee_integral < 0 || fee_fracture > csdb::Amount::AMOUNT_MAX_FRACTION) {
+                csdebug() << __func__ << ": Invalid fee value: "  << fee_integral << ", " << fee_fracture;
+                return false;
+            }
             csdb::Amount fee{ fee_integral, fee_fracture, csdb::Amount::AMOUNT_MAX_FRACTION };
             fees.push_back(fee);
         }
