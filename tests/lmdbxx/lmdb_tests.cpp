@@ -247,14 +247,12 @@ using KeyValueStorage = std::vector<Elements>;
 
 struct Storage {
 static inline Elements getElementFromStorage(KeyValueStorage& storage) {
-    static std::default_random_engine engine(std::random_device{}());
-
-    [[maybe_unused]] std::mt19937 mersenneTwister(engine);
+    [[maybe_unused]] static std::mt19937 mersenneTwister(std::random_device{}());
     std::uniform_int_distribution<int> distribution(0, static_cast<int>(storage.size() - 1));
 
-    auto index = static_cast<size_t>(distribution(engine));
+    auto index = static_cast<size_t>(distribution(mersenneTwister));
+    auto iter = storage.begin();
 
-    KeyValueStorage::iterator iter = storage.begin();
     std::advance(iter, index);
 
     auto elements = (*iter);
