@@ -429,6 +429,7 @@ void Network::processorRoutine() {
             auto task = iPacMan_.getNextTask(is_empty);
             if (is_empty) break;
             processTask(task);
+            last_processed_time.store(task->timestamp, std::memory_order_relaxed);
             task.release();
         }
 #endif

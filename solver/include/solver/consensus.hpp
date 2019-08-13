@@ -58,6 +58,9 @@ public:
     /** @brief   Max subround delta */
     constexpr static uint8_t MaxSubroundDelta = 10;
 
+    /** @brief   Max subround delta */
+    constexpr static uint64_t MaxRoundTimerFree = 5;
+
     /** @brief   Max timeout (msec) to execute smart contract */
     constexpr static uint32_t T_smart_contract = 60000;
 

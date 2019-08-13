@@ -681,7 +681,7 @@ private:
     };
 
     struct HashState {
-        std::string hash;
+        cs::Hash hash;
         std::string retVal;
         bool isOld{false};
         bool condFlg{false};
