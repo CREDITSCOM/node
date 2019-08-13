@@ -2,6 +2,7 @@
 #define LMDBXX_HPP
 
 #include <cassert>
+#include <numeric>
 #include <charconv>
 #include <string_view>
 
@@ -25,7 +26,7 @@ public:
     enum Options : size_t {
         DefaultMapSize = 10485760,
         Default1GbMapSize = 1UL * 1024UL * 1024UL * 1024UL,
-        DefaultIncreaseSize = DefaultMapSize/2
+        DefaultIncreaseSize = DefaultMapSize
     };
 
     enum Flags : unsigned int {
@@ -138,6 +139,11 @@ public:
         return size_t{};
     }
 
+    // checks empty database or not
+    bool isEmpty() const {
+        return size() == 0;
+    }
+
     /// transactions
 
     // inserts pair of key/value to database as byte stream,
@@ -186,16 +192,13 @@ public:
                 const unsigned int flags = lmdb::dbi::default_flags) {
         try {
             auto transaction = lmdb::txn::begin(env_, nullptr);
-            auto dbi = lmdb::dbi::open(transaction, name);
-            auto cursor = lmdb::cursor::open(transaction, dbi);
+            auto dbi = lmdb::dbi::open(transaction, name, flags);
 
             lmdb::val key(reinterpret_cast<const void*>(data), size);
-            const auto result = cursor.get(key, nullptr, MDB_SET);
+            const auto result = dbi.del(transaction, key);
 
             if (result) {
-                lmdb::cursor_del(cursor.handle(), flags);
                 transaction.commit();
-
                 emit removed(data, size);
             }
 
@@ -320,10 +323,14 @@ protected:
 
     template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
     auto cast(const T& value) const {
-        std::array<char, sizeof(T)> bytes{};
-        std::to_chars(bytes.data(), bytes.data() + bytes.size(), value);
+        static std::array<char, std::numeric_limits<T>::digits10 * 2> bytes{};
+        const auto result = std::to_chars(bytes.data(), bytes.data() + bytes.size(), value);
 
-        return bytes;
+        if (result.ec != std::errc{}) {
+            return std::string_view{};
+        }
+
+        return std::string_view(bytes.data(), result.ptr - bytes.data());
     }
 
     template<typename T, typename = std::enable_if_t<!std::is_integral_v<T>>>
@@ -331,8 +338,19 @@ protected:
         return value;
     }
 
+    // decays T(&)[size] to const char*
     auto cast(const char* value) const {
         return std::string_view(value, std::strlen(value));
+    }
+
+    template<typename T>
+    T allocateResult(const char* data, size_t size) const {
+        if constexpr (std::is_signed_v<T>) {
+            return static_cast<T>(std::stoll(std::string(data, size)));
+        }
+        else {
+            return static_cast<T>(std::stoull(std::string(data, size)));
+        }
     }
 
     template<typename T>
@@ -346,7 +364,11 @@ protected:
         }
         else if constexpr (std::is_integral_v<T>) {
             T result = 0;
-            std::from_chars(value.data(), value.data() + value.size(), result);
+            const auto res = std::from_chars(value.data(), value.data() + value.size(), result);
+
+            if (res.ec != std::errc{}) {
+                return allocateResult<T>(value.data(), value.size());
+            }
 
             return result;
         }

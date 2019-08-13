@@ -105,12 +105,12 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
-, recreateIndex(recreateIndex) {
+, recreateIndex_(recreateIndex) {
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
 
     createCashesPath();
-    if (!recreateIndex) {
-        checkLastIndFile(recreateIndex);
+    if (!recreateIndex_) {
+        checkLastIndFile(recreateIndex_);
     }
 
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
@@ -154,8 +154,8 @@ bool BlockChain::init(const std::string& path) {
         std::cout << "Done\n";
     }
 
-    if (recreateIndex) {
-        recreateIndex = false;
+    if (recreateIndex_) {
+        recreateIndex_ = false;
         lapoos.clear();
         cslog() << "Recreated index 0 -> " << getLastSequence()
                 << ". Continue to keep it actual from new blocks.";
@@ -179,7 +179,7 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         cs::Lock lock(dbLock_);
         uuid_ = uuidFromBlock(block);
         csdebug() << "Blockchain: UUID = " << uuid_;
-        if (recreateIndex) {
+        if (recreateIndex_) {
             storage_.truncate_trxs_index();
         }
     }
@@ -193,21 +193,25 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
             *shouldStop = true;
         }
         else {
-            if (recreateIndex || lastIndexedPool < block.sequence()) {
+            if (recreateIndex_ || lastIndexedPool < block.sequence()) {
                 createTransactionsIndex(block);
             }
-            const auto cnt_tr = block.transactions_count();
-            if (cnt_tr > 0) {
-                total_transactions_count_ += cnt_tr;
-
-                if (lastNonEmptyBlock_.transCount && block.sequence() != lastNonEmptyBlock_.poolSeq) {
-                    previousNonEmpty_[block.sequence()] = lastNonEmptyBlock_;
-                }
-                lastNonEmptyBlock_.poolSeq = block.sequence();
-                lastNonEmptyBlock_.transCount = static_cast<uint32_t>(block.transactions().size());
-            }
+            updateNonEmptyBlocks(block);
         }
         walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
+    }
+}
+
+inline void BlockChain::updateNonEmptyBlocks(const csdb::Pool& pool) {
+    const auto cntTr = pool.transactions_count();
+    if (cntTr > 0) {
+        total_transactions_count_ += cntTr;
+
+        if (lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash) {
+            previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
+        }
+        lastNonEmptyBlock_.hash = pool.hash();
+        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(cntTr);
     }
 }
 
@@ -231,7 +235,7 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
         auto key = getAddressByType(addr, BlockChain::AddressType::PublicKey);
         if (indexedAddrs.insert(key).second) {
             cs::Sequence lapoo;
-            if (recreateIndex) {
+            if (recreateIndex_) {
                 lapoo = lapoos[key];
                 lapoos[key] = pool.sequence();
             }
@@ -248,16 +252,6 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
         lbd(tr.target());
     }
 
-    if (pool.transactions().size()) {
-        total_transactions_count_ += pool.transactions().size();
-
-        if (lastNonEmptyBlock_.transCount && pool.sequence() != lastNonEmptyBlock_.poolSeq) {
-            previousNonEmpty_[pool.sequence()] = lastNonEmptyBlock_;
-        }
-
-        lastNonEmptyBlock_.poolSeq = pool.sequence();
-        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(pool.transactions().size());
-    }
     lastIndexedPool = pool.sequence();
     updateLastIndFile();
 }
@@ -599,6 +593,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
     // pool signatures check: end
 
     createTransactionsIndex(pool);
+    updateNonEmptyBlocks(pool);
 
     if (!updateFromNextBlock(pool)) {
         csmeta(cserror) << "Error in updateFromNextBlock()";

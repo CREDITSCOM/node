@@ -418,6 +418,7 @@ private:
     cs::Bytes lastTrustedMask_;
     std::unique_ptr<cs::BlockValidator> blockValidator_;
     std::vector<cs::RoundPackage> roundPackageCache_;
+    std::map<cs::RoundNumber, uint8_t> recdBangs;
 
     bool alwaysExecuteContracts_ = false;
 };

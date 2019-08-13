@@ -784,8 +784,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
     solver.send_wallet_transaction(send_transaction);
 
-    if (deploy) {
-        std::string hashState;
+    cs::Hash hashState;
+    if (deploy) {        
         auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) {
             hashState = ss.hash;
             if (!ss.condFlg)
@@ -797,15 +797,14 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
             return;
         }
-        if (hashState.empty()) {
+        if(hashState == cs::Zero::hash) {
             _return.status.code = ERROR_CODE;
             _return.status.message = "new hash of state is empty!";
             return;
         }     
     }
     else {
-        std::string hashState, retVal;
-
+        std::string retVal;
         auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) {
             if(!ss.condFlg)
                 return false;
@@ -1070,9 +1069,15 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
             { // signal to end waiting for a transaction
                 auto hashStateInst(lockedReference(this->hashStateSL));
                 (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
-                    auto newHash = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();
-                    auto retVal = trxn.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();
-                    return HashState{ newHash, retVal, newHash == oldHash.hash, true };
+                    HashState res;
+                    cs::Hash newHash;
+                    auto newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();    
+                    if (!newHashStr.empty())
+                        std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
+                    res.retVal = trxn.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();                                    
+                    res.isOld   = (newHash == oldHash.hash);
+                    res.condFlg = true;
+                    return res;
                     });
             }
 
