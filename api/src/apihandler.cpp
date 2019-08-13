@@ -845,38 +845,25 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
-    if (!validatePagination(_return, *this, offset, const_limit)) {
-        return;
-    }
+    cs::Sequence limit = limitPage(const_limit);
 
     uint64_t sequence = s_blockchain.getLastSequence();
     if ((uint64_t)offset > sequence) {
         return;
     }
 
-    _return.pools.reserve(const_limit);
+    _return.pools.reserve(limit);
 
-    csdb::PoolHash hash;
-    try {
-        hash = s_blockchain.getHashBySequence(sequence - offset);
-    }
-    catch (...) {
-        return;
-    }
-    if (hash.is_empty()) {
-        return;
-    }
-    PoolListGetStable(_return, fromByteArray(hash.to_binary()), const_limit);
+    PoolListGetStable(_return, sequence - offset, limit);
     _return.count = uint32_t(sequence + 1);
 }
 
-void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const PoolHash& hash, const int64_t offset, const int64_t const_limit) {
+void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const int64_t sequence, const int64_t offset, const int64_t const_limit) {
     //if (!validatePagination(_return, *this, offset, const_limit)) {
     //    return;
     //}
     auto limit = limitPage(const_limit);
-    const csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
-    csdb::Pool pool = executor_.loadBlockApi(poolHash);
+    csdb::Pool pool = executor_.loadBlockApi(cs::Sequence(sequence));
 
     if (pool.is_valid()) {
         _return.transactions = extractTransactions(pool, limit, offset);
@@ -885,14 +872,13 @@ void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const P
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
-void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const PoolHash& hash, const int64_t index) {
+void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const int64_t sequence, const int64_t index) {
     csunused(index);
-    const csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
-    csdb::Pool pool = executor_.loadBlockApi(poolHash);
+    csdb::Pool pool = executor_.loadBlockApi(cs::Sequence(sequence));
     _return.isFound = pool.is_valid();
 
     if (_return.isFound) {
-        _return.pool = convertPool(poolHash);
+        _return.pool = convertPool(pool);
     }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -1175,37 +1161,36 @@ void APIHandler::GetLastHash(api::PoolHash& _return) {
     return;
 }
 
-void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::PoolHash& api_hash, const int64_t const_limit) {
-    auto hash = csdb::PoolHash::from_binary(toByteArray(api_hash));
+void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const int64_t sequence, const int64_t const_limit) {
     auto limit = limitPage(const_limit);
-
+    cs::Sequence seq = cs::Sequence(sequence);
+    if (seq < 0) {
+        return;
+    }
     bool limSet = false;
 
-    while (limit && !hash.is_empty()) {
-        auto cch = poolCache.find(hash);
+    while (limit) {
+        auto cch = poolCache.find(sequence);
 
         if (cch == poolCache.end()) {
-            auto pool = executor_.loadBlockApi(hash);
+            auto pool = executor_.loadBlockApi(seq);
             api::Pool apiPool = convertPool(pool);
             _return.pools.push_back(apiPool);
-            poolCache.insert(cch, std::make_pair(hash, apiPool));
-            hash = pool.previous_hash();
-
+            poolCache.insert(cch, std::make_pair(seq, apiPool));
             if (!limSet) {
-                _return.count = uint32_t(pool.sequence() + 1);
+                _return.count = uint32_t(seq + 1);
                 limSet = true;
             }
         }
         else {
             _return.pools.push_back(cch->second);
-            hash = csdb::PoolHash::from_binary(toByteArray(cch->second.prevHash));
-
             if (!limSet) {
                 _return.count = uint32_t(cch->second.poolNumber + 1);
                 limSet = true;
             }
         }
 
+        --seq;
         --limit;
     }
 }
