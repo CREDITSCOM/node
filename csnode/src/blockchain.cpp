@@ -196,18 +196,22 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
             if (recreateIndex_ || lastIndexedPool < block.sequence()) {
                 createTransactionsIndex(block);
             }
-            const auto cnt_tr = block.transactions_count();
-            if (cnt_tr > 0) {
-                total_transactions_count_ += cnt_tr;
-
-                if (lastNonEmptyBlock_.transCount && block.hash() != lastNonEmptyBlock_.hash) {
-                    previousNonEmpty_[block.hash()] = lastNonEmptyBlock_;
-                }
-                lastNonEmptyBlock_.hash = block.hash();
-                lastNonEmptyBlock_.transCount = static_cast<uint32_t>(block.transactions().size());
-            }
+            updateNonEmptyBlocks(block);
         }
         walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
+    }
+}
+
+inline void BlockChain::updateNonEmptyBlocks(const csdb::Pool& pool) {
+    const auto cntTr = pool.transactions_count();
+    if (cntTr > 0) {
+        total_transactions_count_ += cntTr;
+
+        if (lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash) {
+            previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
+        }
+        lastNonEmptyBlock_.hash = pool.hash();
+        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(cntTr);
     }
 }
 
@@ -248,16 +252,6 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
         lbd(tr.target());
     }
 
-    if (pool.transactions().size()) {
-        total_transactions_count_ += pool.transactions().size();
-
-        if (lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash) {
-            previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
-        }
-
-        lastNonEmptyBlock_.hash = pool.hash();
-        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(pool.transactions().size());
-    }
     lastIndexedPool = pool.sequence();
     updateLastIndFile();
 }
@@ -599,6 +593,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
     // pool signatures check: end
 
     createTransactionsIndex(pool);
+    updateNonEmptyBlocks(pool);
 
     if (!updateFromNextBlock(pool)) {
         csmeta(cserror) << "Error in updateFromNextBlock()";
