@@ -1,7 +1,9 @@
 #include <framework.hpp>
-
 #include <vector>
+
+#ifdef __cpp_lib_memory_resource
 #include <memory_resource>
+#endif
 
 class A {
 public:
@@ -27,6 +29,7 @@ static void testDefaultAllocation() {
     storage.clear();
 }
 
+#ifdef __cpp_lib_memory_resource
 static char resourceBuffer[sizeof(A) * allocationsCount];
 static std::pmr::monotonic_buffer_resource resource{ resourceBuffer, sizeof(resourceBuffer), std::pmr::new_delete_resource() };
 
@@ -45,12 +48,15 @@ static void testMemorySourceAllocation() {
     cs::Framework::execute(&memorySourceAllocation);
     storage.clear();
 }
+#endif
 
 int main() {
     storage.resize(allocationsCount);
 
     testDefaultAllocation();
+#ifdef __cpp_lib_memory_resource
     testMemorySourceAllocation();
+#endif
 
     return 0;
 }
