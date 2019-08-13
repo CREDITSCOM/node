@@ -1102,7 +1102,7 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
     test_contracts_locks();
 
     const auto seq = block.sequence();
-    if (seq >= 4500088) {
+    if (seq == 4432461 || seq == 4500088) {
         static int cnt = 0;
         ++cnt;
     }

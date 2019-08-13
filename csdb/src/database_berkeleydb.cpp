@@ -321,7 +321,8 @@ bool DatabaseBerkeleyDB::get(const uint32_t seq_no, cs::Bytes *value) {
     }
 
     Dbt_safe db_value;
-    Dbt_copy<uint32_t> db_seq_no(seq_no);
+    // storage wants to load blocks by 0-based index: 1 => pool[0], 2 => pool[1] etc.
+    Dbt_copy<uint32_t> db_seq_no(seq_no + 1);
 
     int status = db_blocks_->get(nullptr, &db_seq_no, &db_value, 0);
     if (status != 0) {
