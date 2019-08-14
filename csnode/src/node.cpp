@@ -2165,8 +2165,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
             }
             uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
         
-            if ( speed < 50) {
-                cserror() << "just got RoundPackage can't be created with the speed " << speed << " bps";
+            if (speed < 50) {
+                cserror() << "just got RoundPackage can't be created in " << speed << " msec per block";
                 return;
             }
         }
