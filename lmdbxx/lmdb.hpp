@@ -3,13 +3,17 @@
 
 #include <cassert>
 #include <numeric>
-#include <charconv>
+#include <string>
 #include <string_view>
 
 #include <lmdbexception.hpp>
 
 #include <lib/system/signals.hpp>
 #include <lib/system/reflection.hpp>
+
+#ifndef __APPLE__
+#include <charconv>
+#endif
 
 namespace cs {
 using FlushSignal = cs::Signal<void()>;
@@ -42,7 +46,7 @@ public:
     void open(const unsigned int flags = Flags::DefaultEnvFlags,
               const lmdb::mode mode = lmdb::env::default_mode) {
         try {
-            env_.open(path_.c_str(), flags, mode);
+            env_->open(path_.c_str(), flags, mode);
             isOpen_ = true;
         }
         catch(const lmdb::error& error) {
@@ -51,7 +55,7 @@ public:
     }
 
     void close() {
-        env_.close();
+        env_->close();
         isOpen_ = false;
     }
 
@@ -62,7 +66,7 @@ public:
 
     void setFlags(const unsigned int flags, const bool onoff = true) {
         try {
-            env_.set_flags(flags, onoff);
+            env_->set_flags(flags, onoff);
         }
         catch(const lmdb::error& error) {
             raise(error);
@@ -71,7 +75,7 @@ public:
 
     void setMaxReaders(std::size_t count) {
         try {
-            env_.set_max_readers(static_cast<unsigned int>(count));
+            env_->set_max_readers(static_cast<unsigned int>(count));
         }
         catch(const lmdb::error& error) {
             raise(error);
@@ -80,7 +84,7 @@ public:
 
     void setMaxDbs(std::size_t count) {
         try {
-            env_.set_max_dbs(static_cast<MDB_dbi>(count));
+            env_->set_max_dbs(static_cast<MDB_dbi>(count));
         }
         catch(const lmdb::error& error) {
             raise(error);
@@ -90,7 +94,7 @@ public:
     // sets mapped size in bytes
     void setMapSize(std::size_t size) {
         try {
-            env_.set_mapsize(size);
+            env_->set_mapsize(size);
         }
         catch(const lmdb::error& error) {
             raise(error);
@@ -127,7 +131,7 @@ public:
     // name - table name at current path, nullptr if only one table exist
     size_t size(const char* name = nullptr) const {
         try {
-            auto transaction = lmdb::txn::begin(env_, nullptr, MDB_RDONLY);
+            auto transaction = lmdb::txn::begin(*env_, nullptr, MDB_RDONLY);
             auto dbi = lmdb::dbi::open(transaction, name);
 
             return dbi.size(transaction);
@@ -155,7 +159,7 @@ public:
         checkMapSize();
 
         try {
-            auto transaction = lmdb::txn::begin(env_);
+            auto transaction = lmdb::txn::begin(*env_);
             auto dbi = lmdb::dbi::open(transaction, name);
 
             lmdb::val key(reinterpret_cast<const void*>(keyData), keySize);
@@ -191,7 +195,7 @@ public:
     bool remove(const char* data, size_t size, const char* name = nullptr,
                 const unsigned int flags = lmdb::dbi::default_flags) {
         try {
-            auto transaction = lmdb::txn::begin(env_, nullptr);
+            auto transaction = lmdb::txn::begin(*env_, nullptr);
             auto dbi = lmdb::dbi::open(transaction, name, flags);
 
             lmdb::val key(reinterpret_cast<const void*>(data), size);
@@ -224,7 +228,7 @@ public:
     // name - table name at current path
     bool isKeyExists(const char* data, size_t size, const char* name = nullptr) const {
         try {
-            auto transaction = lmdb::txn::begin(env_, nullptr, MDB_RDONLY);
+            auto transaction = lmdb::txn::begin(*env_, nullptr, MDB_RDONLY);
             auto dbi = lmdb::dbi::open(transaction, name);
             auto cursor = lmdb::cursor::open(transaction, dbi);
 
@@ -250,7 +254,7 @@ public:
     template<typename T>
     T value(const char* data, size_t size, const char* name = nullptr) const {
         try {
-            auto transaction = lmdb::txn::begin(env_, nullptr, MDB_RDONLY);
+            auto transaction = lmdb::txn::begin(*env_, nullptr, MDB_RDONLY);
             auto dbi = lmdb::dbi::open(transaction, name);
             auto cursor = lmdb::cursor::open(transaction, dbi);
 
@@ -286,7 +290,7 @@ public:
         static_assert(!std::is_floating_point_v<Key> && !std::is_floating_point_v<Value>, "Floating point value does not support");
 
         try {
-            auto transaction = lmdb::txn::begin(env_, nullptr, MDB_RDONLY);
+            auto transaction = lmdb::txn::begin(*env_, nullptr, MDB_RDONLY);
             auto dbi = lmdb::dbi::open(transaction, name);
             auto cursor = lmdb::cursor::open(transaction, dbi);
 
@@ -309,7 +313,7 @@ public:
 protected:
     void flushImpl(bool force) {
         try {
-            env_.sync(force);
+            env_->sync(force);
             emit flushed();
         }
         catch(const lmdb::error& error) {
@@ -323,6 +327,7 @@ protected:
 
     template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
     auto cast(const T& value) const {
+#ifndef __APPLE__
         static std::array<char, std::numeric_limits<T>::digits10 * 2> bytes{};
         const auto result = std::to_chars(bytes.data(), bytes.data() + bytes.size(), value);
 
@@ -331,6 +336,9 @@ protected:
         }
 
         return std::string_view(bytes.data(), result.ptr - bytes.data());
+#else
+        return std::to_string(value);
+#endif
     }
 
     template<typename T, typename = std::enable_if_t<!std::is_integral_v<T>>>
@@ -363,6 +371,7 @@ protected:
             return array;
         }
         else if constexpr (std::is_integral_v<T>) {
+#ifndef __APPLE__
             T result = 0;
             const auto res = std::from_chars(value.data(), value.data() + value.size(), result);
 
@@ -371,6 +380,9 @@ protected:
             }
 
             return result;
+#else
+            return allocateResult<T>(value.data(), value.size());
+#endif
         }
         else if constexpr (std::is_same_v<std::string_view, T>) {
             return std::string_view(value.data(), value.size());
@@ -382,13 +394,13 @@ protected:
 
     Info info() const {
         Info temp{};
-        mdb_env_info(env_.handle(), &temp);
+        mdb_env_info(env_->handle(), &temp);
         return temp;
     }
 
     Stats stats() const {
         Stats temp{};
-        mdb_env_stat(env_.handle(), &temp);
+        mdb_env_stat(env_->handle(), &temp);
         return temp;
     }
 
@@ -406,12 +418,12 @@ protected:
         }
     }
 
-    lmdb::env environment(const unsigned flags) const {
-        return lmdb::env::create(flags);
+    auto environment(const unsigned flags) const {
+        return std::make_unique<lmdb::env>(lmdb::env::create(flags));
     }
 
 private:
-    lmdb::env env_;
+    std::unique_ptr<lmdb::env> env_;
     std::string path_;
 
     bool isOpen_ = false;
