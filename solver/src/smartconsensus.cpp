@@ -25,7 +25,7 @@ SmartConsensus::SmartConsensus() {
 }
 
 SmartConsensus::~SmartConsensus() {
-    cslog() << kLogPrefix << "======================  SMART-ROUND " << RefFormatter{ smartRoundNumber_, smartTransaction_ } << " END =====================";
+    cslog() << kLogPrefix << "======================  SMART-ROUND " << FormatRef{ smartRoundNumber_, smartTransaction_ } << " END =====================";
     killTimer();
     pnode_->removeSmartConsensus(id());
     cs::Connector::disconnect(&pnode_->gotSmartStageOne, this, &cs::SmartConsensus::addSmartStageOne);
@@ -75,6 +75,9 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             if (fld.is_valid()) {
                 executor_fees.push_back(fld.value<csdb::Amount>());
             }
+            else {
+                executor_fees.push_back(csdb::Amount(0));
+            }
             // break;
             // creating fee free copy of state transaction
             tmpNewState.set_amount(tr.amount());
@@ -84,8 +87,8 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             tmpNewState.set_counted_fee(tr.counted_fee());
             tmpNewState.set_currency(tr.currency());
             tmpNewState.set_innerID(tr.innerID());
+            tmpNewState.set_max_fee(tr.max_fee());
 
-            tmpNewState.add_user_field(trx_uf::new_state::Count, tr.user_field(trx_uf::new_state::Count));
             tmpNewState.add_user_field(trx_uf::new_state::RefStart, tr.user_field(trx_uf::new_state::RefStart));
             tmpNewState.add_user_field(trx_uf::new_state::RetVal, tr.user_field(trx_uf::new_state::RetVal));
             //tmpNewState.add_user_field(trx_uf::new_state::Value, tr.user_field(trx_uf::new_state::Value));
@@ -112,22 +115,22 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     }
 
     if (!newStates.empty()) {
-        finalStateTransaction_ = newStates.back();
+        finalStateTransaction_ = newStates;
     }
     else {
         csdebug() << kLogPrefix << "There is no state transactions in the package";
-        finalStateTransaction_ = lastEmptyNewState;
+        finalStateTransaction_.push_back(lastEmptyNewState);
     }
 
 
 
     if (/*!primary_new_state_found || */0 == smartRoundNumber_ || std::numeric_limits<uint32_t>::max() == smartTransaction_) {
-        cserror() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+        cserror() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " smart contract result packet must contain new state transaction";
         return false;
     }
 
-    csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " consensus for " << tmpNewStates_.size()
         << " job(s) starting on R-" << cs::Conveyer::instance().currentRoundNumber() << "... ";
 
@@ -135,18 +138,18 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     ownSmartsConfNum_ = calculateSmartsConfNum();
     refreshSmartStagesStorage();
     if (ownSmartsConfNum_ == cs::InvalidConfidantIndex) {
-        cserror() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+        cserror() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " cannot determine own number in confidant list";
         return false;
     }
 
-    cslog() << "======================  SMART-ROUND: " << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+    cslog() << "======================  SMART-ROUND: " << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " [" << static_cast<int>(ownSmartsConfNum_) << "] =========================";
     std::string strFees;
     for (auto it : executor_fees) {
         strFees += (it.to_string(18) + ", ");
     }
-    csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " SMART confidants (" << smartConfidants_.size() << "), proposed fee(s): " << strFees;
 
     // pack_.transactions(0).user_field(1) = 0;
@@ -180,13 +183,13 @@ uint8_t SmartConsensus::calculateSmartsConfNum() {
         if (e == pnode_->getNodeIdKey()) {
             ownSmartConfNumber = i;
         }
-        csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ } << " [" << static_cast<int>(i) << "] "
+        csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " [" << static_cast<int>(i) << "] "
                   << (ownSmartConfNumber != cs::InvalidConfidantIndex && i == ownSmartConfNumber ? "me" : cs::Utils::byteStreamToHex(e.data(), e.size()));
         ++i;
     }
 
     if (ownSmartConfNumber == cs::InvalidConfidantIndex) {
-        csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+        csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " This NODE is not a confidant one for this smart-contract consensus round";
     }
 
@@ -273,7 +276,7 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
         // csdebug() << log_prefix << "[" << i << "] - " << static_cast<int>(smartStageOneStorage_.at(i).sender);
         stagesPlot = stagesPlot + '[' + std::to_string(static_cast<int>(smartStageOneStorage_.at(i).sender)) + "] ";
     }
-    csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ } << "  <-- SMART-Stage-1 " << stagesPlot;
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << "  <-- SMART-Stage-1 " << stagesPlot;
     st2.signatures.at(stage.sender) = stage.signature;
     st2.hashes.at(stage.sender) = stage.messageHash;
     if (smartStageOneEnough()) {
@@ -313,7 +316,7 @@ void SmartConsensus::addSmartStageTwo(cs::StageTwoSmarts& stage, bool send) {
         smartStageTwoStorage_.at(stage.sender) = stage;
         stagesPlot = stagesPlot + '[' + std::to_string(static_cast<int>(smartStageTwoStorage_.at(i).sender)) + "] ";
     }
-    csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << "  <-- SMART-Stage-2 - SmartRound {" << blockPart(stage.id) << '.' << transactionPart(stage.id) << "} " << stagesPlot;
     if (smartStageTwoEnough()) {
         killTimer();
@@ -397,11 +400,11 @@ void SmartConsensus::processStages() {
     }
     const size_t lowerTrustedLimit = static_cast<size_t>(smartConfidants_.size() / 2. + 1.);
     if (cnt_active < lowerTrustedLimit) {
-        cslog() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+        cslog() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " smart consensus is NOT achieved, the state transaction won't send to the conveyer";
         return;
     }
-    csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " smart consensus achieved";
 
     if (hash_t.empty()) {
@@ -411,7 +414,7 @@ void SmartConsensus::processStages() {
     if (k < 0) {
         k = -k;
     }
-    csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " smart consensus result 1 from 3";
     size_t idx_writer = static_cast<size_t>(k % cnt_active);
     size_t idx = 0;
@@ -438,7 +441,7 @@ void SmartConsensus::processStages() {
         }
     }
     std::vector <csdb::Amount> finalFees = calculateFinalFee(sumFees, idx);
-    csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " smart consensus result 2 from 3";
     idx = 0;
     for (size_t i = st3.writer; i < cnt + st3.writer; ++i) {
@@ -453,7 +456,7 @@ void SmartConsensus::processStages() {
     createFinalTransactionSet(finalFees);
     st3.packageSignature =
         cscrypto::generateSignature(pnode_->getSolver()->getPrivateKey(), finalSmartTransactionPack_.hash().toBinary().data(), finalSmartTransactionPack_.hash().toBinary().size());
-    csmeta(cslog) << "done";
+    csmeta(csdetails) << "done";
     st3.id = id();
     st3.sender = ownSmartsConfNum_;
     st3.iteration = 0U;
@@ -491,7 +494,7 @@ void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) 
 
     auto lambda = [this](const cs::StageThreeSmarts& stageFrom, cs::Bytes hash) {
         if (!cscrypto::verifySignature(stageFrom.packageSignature, smartConfidants().at(stageFrom.sender), hash.data(), hash.size())) {
-            cslog() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+            cslog() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
             << " ____ The signature is not valid";
             return;  // returns this function if the signature of smartco
         }
@@ -499,7 +502,7 @@ void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) 
     };
 
     if (send) {
-        csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ } << " ____ 1.";
+        csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " ____ 1.";
         pnode_->sendSmartStageThree(smartConfidants_, stage);
         smartStageThreeSent_ = true;
     }
@@ -525,12 +528,12 @@ void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) 
         smartStageThreeStorage_.at(stage.sender) = stage;
         for (auto& it : smartStageThreeTempStorage_) {
             lambda(it, finalSmartTransactionPack_.hash().toBinary());
-            csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ } << " <-- SMART-Stage-3 [" << static_cast<int>(stage.sender)
+            csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " <-- SMART-Stage-3 [" << static_cast<int>(stage.sender)
                       << "] = " << smartStage3StorageSize();
         }
     }
 
-    csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ } << " <-- SMART-Stage-3 [" << static_cast<int>(stage.sender)
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " <-- SMART-Stage-3 [" << static_cast<int>(stage.sender)
               << "] = " << smartStage3StorageSize();
     if (smartStageThreeSent_ && smartStageThreeEnough()) {
         killTimer();
@@ -552,17 +555,34 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
     /*bool primary_new_state_found = false;*/
     size_t counter = 0;
     for (const auto& tr : currentSmartTransactionPack_.transactions()) {
-        if (/*!primary_new_state_found && */SmartContracts::is_new_state(tr)) {
-            /*primary_new_state_found = true;*/
-            tmpNewStates_[counter].add_user_field(trx_uf::new_state::Fee, finalFees[counter]);
-            finalSmartTransactionPack_.addTransaction(tmpNewStates_[counter]);
+        if (SmartContracts::is_new_state(tr)) {
+            if (counter < tmpNewStates_.size() && counter < finalFees.size()) {
+                auto tmp = tmpNewStates_[counter];
+                tmp.add_user_field(trx_uf::new_state::Fee, finalFees[counter]);
+                finalSmartTransactionPack_.addTransaction(tmp);
+            }
             ++counter;
         }
         else {
             finalSmartTransactionPack_.addTransaction(tr);
         }
     }
-    finalSmartTransactionPack_.addStateTransaction(finalStateTransaction_);
+    for(auto& it : finalStateTransaction_) {
+        size_t state_size = std::numeric_limits<size_t>::max();
+        csdb::UserField fld = it.user_field(cs::trx_uf::new_state::Value);
+        if (fld.is_valid()) {
+            std::string state = fld.value<std::string>();
+            state_size = state.size();
+
+        }
+        if (state_size <= Consensus::MaxContractStateSizeToSync) {
+            finalSmartTransactionPack_.addStateTransaction(it);
+            csdebug() << kLogPrefix << "contract state of size " << state_size << " included in package";
+        }
+        else {
+            csdebug() << kLogPrefix << "contract state is too large, size is " << state_size << "b, not included in package";
+        }
+    }
     finalSmartTransactionPack_.makeHash();
 }
 
@@ -575,27 +595,27 @@ void SmartConsensus::sendFinalTransactionSet() {
     for (auto& st : smartStageThreeStorage_) {
         if (st.sender != cs::ConfidantConsts::InvalidConfidantIndex) {
             if (finalSmartTransactionPack_.addSignature(st.sender, st.packageSignature)) {
-                csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+                csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
                     << " signature of T[" << static_cast<int>(st.sender) << "] added to the Transactions Packet";
             }
             else {
-                csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+                csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
                 << " signature of T[" << static_cast<int>(st.sender) << "] isn't added";
             }
         }
     }
-    csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ } << " adding separate package with "
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " adding separate package with "
         << finalSmartTransactionPack_.signatures().size() << " signatures";
     conv.addSeparatePacket(finalSmartTransactionPack_);
 
-    csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " ==============================================> SEND RESULT TO CONVEYER, packet hash "
         << finalSmartTransactionPack_.hash().toString();
 }
 
-void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRound, uint32_t startTransaction, uint8_t requesterNumber, uint8_t requiredNumber,
+void SmartConsensus::gotSmartStageRequest(uint8_t msgType, uint64_t smartID, uint8_t requesterNumber, uint8_t requiredNumber,
                                           const cs::PublicKey& requester) {
-    if (smartRoundNumber_ != smartRound || smartTransaction_ != startTransaction) {
+    if (smartID !=id()) {
         return;
     }
 
@@ -617,7 +637,7 @@ void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRou
                     pnode_->smartStageEmptyReply(requesterNumber);
                 }
                 else {
-                    pnode_->sendSmartStageReply(smartStageOneStorage_.at(requiredNumber).message, smartRoundNumber_, smartStageOneStorage_.at(requiredNumber).signature,
+                    pnode_->sendSmartStageReply(smartStageOneStorage_.at(requiredNumber).message, smartStageOneStorage_.at(requiredNumber).signature,
                                                 MsgTypes::FirstSmartStage, requester);
                 }
             }
@@ -628,7 +648,7 @@ void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRou
                     pnode_->smartStageEmptyReply(requesterNumber);
                 }
                 else {
-                    pnode_->sendSmartStageReply(smartStageTwoStorage_.at(requiredNumber).message, smartRoundNumber_, smartStageTwoStorage_.at(requiredNumber).signature,
+                    pnode_->sendSmartStageReply(smartStageTwoStorage_.at(requiredNumber).message, smartStageTwoStorage_.at(requiredNumber).signature,
                                                 MsgTypes::FirstSmartStage, requester);
                 }
             }
@@ -639,7 +659,7 @@ void SmartConsensus::gotSmartStageRequest(uint8_t msgType, cs::Sequence smartRou
                     pnode_->smartStageEmptyReply(requesterNumber);
                 }
                 else {
-                    pnode_->sendSmartStageReply(smartStageThreeStorage_.at(requiredNumber).message, smartRoundNumber_, smartStageThreeStorage_.at(requiredNumber).signature,
+                    pnode_->sendSmartStageReply(smartStageThreeStorage_.at(requiredNumber).message, smartStageThreeStorage_.at(requiredNumber).signature,
                                                 MsgTypes::FirstSmartStage, requester);
                 }
             }
@@ -674,7 +694,7 @@ bool SmartConsensus::smartStageEnough(const std::vector<T>& smartStageStorage, c
     else {
         cSize = smartConfidants_.size();
     }
-    csdebug() << kLogPrefix << RefFormatter{ smartRoundNumber_, smartTransaction_ }
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << ' ' << funcName << " completed " << stageSize << " of " << cSize;
     return stageSize == cSize;
 }
@@ -746,7 +766,7 @@ void SmartConsensus::requestSmartStages(int st) {
 
         if (sender == cs::ConfidantConsts::InvalidConfidantIndex) {
             if (i != ownSmartsConfNum_ && i != sender && smartConfidantExist(i)) {
-                pnode_->smartStageRequest(msg, smartRoundNumber_, smartTransaction_, smartConfidants_.at(i), ownSmartsConfNum_, i);
+                pnode_->smartStageRequest(msg, id(), smartConfidants_.at(i), ownSmartsConfNum_, i);
             }
             isRequested = true;
         }
@@ -783,7 +803,7 @@ void SmartConsensus::requestSmartStagesNeighbors(int st) {
 
         if (required == cs::ConfidantConsts::InvalidConfidantIndex) {
             if (idx != ownSmartsConfNum_ && idx != required && smartConfidantExist(idx)) {
-                pnode_->smartStageRequest(messageType, smartRoundNumber_, smartTransaction_, smartConfidants_.at(idx), ownSmartsConfNum_, required);
+                pnode_->smartStageRequest(messageType, id(), smartConfidants_.at(idx), ownSmartsConfNum_, required);
                 isRequested = true;
             }
         }

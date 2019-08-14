@@ -77,7 +77,7 @@ void WalletsCache::ProcessorBase::invokeReplenishPayableContract(const csdb::Tra
     WalletData& wallData = getWalletData(id, wallAddress);
     wallData.balance_ -= transaction.amount();
     setModified(id);
-    data_.smartPayableTransactions_.push_back(transaction);
+    data_.smartPayableTransactions_.push_back(transaction.id());
 
     if (!SmartContracts::is_executable(transaction)) {
         WalletId sourceId{};
@@ -115,7 +115,8 @@ void WalletsCache::ProcessorBase::smartSourceTransactionReleased(const csdb::Tra
     setModified(initId);
 }
 
-void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::Transaction& transaction, const csdb::Amount& execFee) {
+void WalletsCache::ProcessorBase::rollbackExceededTimeoutContract(const csdb::Transaction& transaction, const WalletsCache::RefContractCall& ref,
+    const csdb::Amount& execFee /*= 0*/) {
     csdb::Address wallAddress = transaction.source();
     if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
         return;
@@ -131,15 +132,19 @@ void WalletsCache::ProcessorBase::rollbackReplenishPayableContract(const csdb::T
     wallData.balance_ += transaction.amount() + csdb::Amount(transaction.max_fee().to_double()) - csdb::Amount(transaction.counted_fee().to_double());
 
     if (SmartContracts::is_executable(transaction)) {
-        data_.closedSmarts_.push_back(transaction);
+        auto it = data_.canceledSmarts_.find(transaction.target());
+        if (it == data_.canceledSmarts_.end()) {
+            data_.canceledSmarts_.insert(std::make_pair(transaction.target(), std::list< RefContractCall >{ ref }));
+        }
+        else {
+            it->second.push_front( ref );
+        }
     }
     else {
-        for (auto it = data_.smartPayableTransactions_.begin(); it != data_.smartPayableTransactions_.end(); it++) {
-            if (it->source() == transaction.source() && it->innerID() == transaction.innerID()) {
-                data_.smartPayableTransactions_.erase(it);
-                wallData.balance_ -= execFee;
-                break;
-            }
+        auto it = std::find(data_.smartPayableTransactions_.cbegin(), data_.smartPayableTransactions_.cend(), transaction.id());
+        if (it != data_.smartPayableTransactions_.cend()) {
+            data_.smartPayableTransactions_.erase(it);
+            wallData.balance_ -= execFee;
         }
     }
 
@@ -249,10 +254,6 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithExecFee(const csdb::T
         cswarning() << __func__ << ": transaction is not new state";
         return;
     }
-    if (isClosedSmart(transaction)) {
-        cserror() << "This transaction must be blocked in consensus";
-        return;
-    }
     SmartContractRef smartRef(transaction.user_field(trx_uf::new_state::RefStart));
     if (!smartRef.is_valid()) {
         cserror() << __func__ << ": incorrect reference to starter transaction in new state";
@@ -301,18 +302,29 @@ double WalletsCache::ProcessorBase::load(const csdb::Transaction& tr, const Bloc
 
 double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain) {
     csdb::Address wallAddress;
-
     bool smartIniter = false;
+    csdb::Transaction initTransaction;
+    cs::WalletsCache::RefContractCall initRef{ std::numeric_limits<cs::Sequence>::max(), std::numeric_limits<uint32_t>::max() };
     if (SmartContracts::is_new_state(tr)) {
-        wallAddress = findSmartContractIniter(tr, blockchain);
+        csdb::UserField fld = tr.user_field(cs::trx_uf::new_state::RefStart);
+        if (fld.is_valid()) {
+            cs::SmartContractRef ref(fld);
+            csdb::Pool pool = blockchain.loadBlock(ref.sequence);
+            if (pool.is_valid() && pool.transactions_count() > ref.transaction) {
+                initTransaction = pool.transactions()[ref.transaction];
+                wallAddress = initTransaction.source();
+            }
+            initRef.sequence = ref.sequence;
+            initRef.transaction = uint32_t(ref.transaction);
+        }
         smartIniter = true;
     }
     else {
         wallAddress = tr.source();
     }
-
-    if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_)
+    if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
         return 0;
+    }
 
     WalletId id{};
     if (!findWalletId(wallAddress, id)) {
@@ -323,20 +335,24 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 
     if (SmartContracts::is_executable(tr)) {
         wallData.balance_ -= csdb::Amount(tr.max_fee().to_double());
-        checkClosedSmart(tr);
     }
     else if (SmartContracts::is_new_state(tr)) {
-        csdb::Transaction initTransaction = findSmartContractInitTrx(tr, blockchain);
-        if (isClosedSmart(initTransaction)) {
-            cserror() << "This transaction must be blocked in consensus!";
-            wallData.balance_ -= csdb::Amount(initTransaction.max_fee().to_double()) + csdb::Amount(initTransaction.counted_fee().to_double());
+        WalletsCache::RefContractCall stateRef{ blockchain.getSequenceByHash(tr.id().pool_hash()), uint32_t(tr.id().index()) };
+        if (isCanceledSmart(initTransaction.target(), initRef)) {
+            cs::SmartContractRef ref(initTransaction.id().pool_hash(), initRef.sequence, initRef.transaction);
+            csdebug() << "WalletsCache: (deprecated behaviour) timeout was detected for " << ref
+                << " before, new_state found in block " << WithDelimiters(stateRef.sequence);
+            wallData.balance_ -= csdb::Amount(initTransaction.max_fee().to_double())
+                               + csdb::Amount(initTransaction.counted_fee().to_double())
+                               - initTransaction.amount();
         }
+        checkCanceledSmart(initTransaction.target(), initRef);
         if (SmartContracts::is_executable(initTransaction)) {
             wallData.balance_ += csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()) -
                                  csdb::Amount(tr.counted_fee().to_double()) - csdb::Amount(tr.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
         }
         else {
-            checkSmartWaitingForMoney(initTransaction, tr);
+            checkSmartWaitingForMoney(initTransaction, initRef, tr);
         }
         //
         WalletId id_s{};
@@ -348,10 +364,10 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
 		WalletData& wallData_s = getWalletData(id_s, tr.source());
 		++wallData_s.transNum_;
         wallData_s.trxTail_.push(tr.innerID());
-
-#ifdef MONITOR_NODE              
+        cs::Bytes tmp;
+        tmp.assign(wallData_s.address_.cbegin(), wallData_s.address_.cend());
+        csdetails() << "Wallets: innerID of (new_state) " << EncodeBase58(tmp) << " <- " << tr.innerID();
         wallData_s.lastTransaction_ = tr.id();
-#endif
         setModified(id_s);
         //
     }
@@ -363,48 +379,61 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
         wallData.balance_ -= tr.amount();
 		++wallData.transNum_;
         wallData.trxTail_.push(tr.innerID());
+        cs::Bytes tmp;
+        tmp.assign(wallData.address_.cbegin(), wallData.address_.cend());
+        csdetails() << "Wallets: innerID of " << EncodeBase58(tmp) << " <- " << tr.innerID();
 
 #ifdef MONITOR_NODE        
         setWalletTime(wallData.address_, tr.get_time());
 #endif
-
-#ifdef TRANSACTIONS_INDEX
         wallData.lastTransaction_ = tr.id();
-#endif
     }
 
     setModified(id);
     return tr.counted_fee().to_double();
 }
 
-bool WalletsCache::ProcessorBase::isClosedSmart(const csdb::Transaction& transaction) {
-    for (auto& smart : data_.closedSmarts_) {
-        if (smart.target() == transaction.target()) {
-            return true;
-        }
+bool WalletsCache::ProcessorBase::isCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref) {
+    auto it = data_.canceledSmarts_.find(contract_addr);
+    if (it == data_.canceledSmarts_.end()) {
+        return false;
     }
-    return false;
+    return it->second.end() != std::find_if(it->second.begin(), it->second.end(),
+        [&](const RefContractCall& item) { return item.sequence == ref.sequence && item.transaction == ref.transaction; });
 }
 
-void WalletsCache::ProcessorBase::checkClosedSmart(const csdb::Transaction& transaction) {
-    for (auto it = data_.closedSmarts_.begin(); it != data_.closedSmarts_.end(); ++it) {
-        if (it->target() == transaction.target()) {
-            data_.closedSmarts_.erase(it);
-        }
+void WalletsCache::ProcessorBase::checkCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref) {
+    auto it = data_.canceledSmarts_.find(contract_addr);
+    if (it == data_.canceledSmarts_.end()) {
+        return;
     }
-}
-
-void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction) {
-    if (!cs::SmartContracts::is_state_updated(newStateTransaction)) {
-        return rollbackReplenishPayableContract(initTransaction, csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>()));
-    }
-    bool waitingSmart = false;
-    for (auto it = data_.smartPayableTransactions_.begin(); it != data_.smartPayableTransactions_.end(); it++) {
-        if (it->source() == initTransaction.source() && it->innerID() == initTransaction.innerID()) {
-            data_.smartPayableTransactions_.erase(it);
-            waitingSmart = true;
+    for (auto i = it->second.cbegin(); i != it->second.cend(); ++i) {
+        if (i->sequence <= ref.sequence || (i->sequence == ref.sequence && i->transaction <= ref.transaction)) {
+            it->second.erase(i, it->second.cend());
             break;
         }
+    }
+    if (it->second.empty()) {
+        data_.canceledSmarts_.erase(it);
+    }
+}
+
+void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction,
+    const WalletsCache::RefContractCall& initRef, const csdb::Transaction& newStateTransaction) {
+    if (!cs::SmartContracts::is_state_updated(newStateTransaction)) {
+        csdb::Amount fee(0);
+        csdb::UserField fld = newStateTransaction.user_field(trx_uf::new_state::Fee);
+        if (fld.is_valid()) {
+            fee = fld.value<csdb::Amount>();
+        }
+        rollbackExceededTimeoutContract(initTransaction, initRef);
+        return;
+    }
+    bool waitingSmart = false;
+    auto it = std::find(data_.smartPayableTransactions_.cbegin(), data_.smartPayableTransactions_.cend(), initTransaction.id());
+    if (it != data_.smartPayableTransactions_.cend()) {
+        data_.smartPayableTransactions_.erase(it);
+        waitingSmart = true;
     }
 
     if (waitingSmart) {
@@ -438,40 +467,6 @@ void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transact
     }
 }
 
-csdb::Address WalletsCache::findSmartContractIniter(const csdb::Transaction& tr, const BlockChain& blockchain) {
-    csdb::Transaction t = findSmartContractInitTrx(tr, blockchain);
-    if (t.is_valid()) {
-        return t.source();
-    }
-    return csdb::Address{};
-}
-
-csdb::Transaction WalletsCache::findSmartContractInitTrx(const csdb::Transaction& tr, const BlockChain& blockchain) {
-    if (!SmartContracts::is_new_state(tr)) {
-        cserror() << "Wallets cache: incorrect new_state transaction to get starter";
-        return csdb::Transaction{};
-    }
-    SmartContractRef smartRef(tr.user_field(trx_uf::new_state::RefStart));
-    if (!smartRef.is_valid()) {
-        cserror() << "Wallets cache: incorrect reference to starter transaction in new_state";
-        return csdb::Transaction{};
-    }
-    csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
-    if (!pool.is_valid()) {
-        cserror() << "Wallets cache: failed load block with starter for new_state";
-        return csdb::Transaction{};
-    }
-    auto& transactions = pool.transactions();
-    if (transactions.size() > smartRef.transaction) {
-        csdb::Transaction trWithIniter = pool.transactions()[smartRef.transaction];
-        if (trWithIniter.id() == smartRef.getTransactionID()) {
-            return trWithIniter;
-        }
-    }
-    cserror() << "Wallets cache: incorrect starter transaction for new_state";
-    return csdb::Transaction{};
-}
-
 void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) {
     csdb::Address wallAddress = tr.target();
 
@@ -494,10 +489,7 @@ void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) 
 #ifdef MONITOR_NODE
     setWalletTime(wallData.address_, tr.get_time());
 #endif
-
-#ifdef TRANSACTIONS_INDEX
     wallData.lastTransaction_ = tr.id();
-#endif
 }
 
 bool WalletsCache::Initer::findWalletId(const csdb::Address& address, WalletId& id) {

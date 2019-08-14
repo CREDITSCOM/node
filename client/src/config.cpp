@@ -65,6 +65,7 @@ const std::string ARG_NAME_DB_PATH = "db-path";
 const std::string ARG_NAME_PUBLIC_KEY_FILE = "public-key-file";
 const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
 const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
+const std::string ARG_NAME_RECREATE_INDEX = "recreate-index";
 
 const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
 
@@ -154,6 +155,7 @@ void Config::dumpJSONKeys(const std::string& fName) const {
 Config Config::read(po::variables_map& vm, bool seedEnter) {
     Config result = readFromFile(getArgFromCmdLine(vm, ARG_NAME_CONFIG_FILE, DEFAULT_PATH_TO_CONFIG));
 
+    result.recreateIndex_ = vm.count(ARG_NAME_RECREATE_INDEX);
     result.pathToDb_ = getArgFromCmdLine(vm, ARG_NAME_DB_PATH, DEFAULT_PATH_TO_DB);
 
     if (!result.good_) return result;
@@ -548,7 +550,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
 
             if (flag == 'g') {
                 std::vector<uint8_t> skBytes;
-                auto ms = cscrypto::keys_derivation::generateMaterSeed();
+                auto ms = cscrypto::keys_derivation::generateMasterSeed();
                 auto keys = cscrypto::keys_derivation::deriveKeyPair(ms, DEFAULT_NODE_KEY_ID);
                 privateKey_ = keys.second;
                 publicKey_ = keys.first;

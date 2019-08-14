@@ -56,7 +56,18 @@ void TrustedStage1State::on(SolverContext& context) {
 }
 
 void TrustedStage1State::finalizeStage(SolverContext& context) {
-    stage.roundTimeStamp = cs::Utils::currentTimestamp();
+    
+    //if(context.own_conf_number() == 1 && cs::Conveyer::instance().currentRoundNumber() > 10) {
+    //    stage.roundTimeStamp = std::to_string(std::stoll(cs::Utils::currentTimestamp()) + 10000); 
+    //} 
+    //else {
+    uint64_t lastTimeStamp = std::atoll(context.blockchain().getLastTimeStamp().c_str());
+    uint64_t currentTimeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
+    if (currentTimeStamp < lastTimeStamp) {
+        currentTimeStamp = lastTimeStamp + 1;
+    }
+    stage.roundTimeStamp = std::to_string(currentTimeStamp);
+        /*}*/
     stage.toBytes();
     stage.messageHash = cscrypto::calculateHash(stage.messageBytes.data(), stage.messageBytes.size());
     cs::Bytes messageToSign;

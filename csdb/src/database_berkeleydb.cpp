@@ -1,5 +1,6 @@
 #include <db_cxx.h>
 #include <cassert>
+#include <cstdio>
 #include <cstdlib>
 #include <exception>
 
@@ -69,8 +70,8 @@ DatabaseBerkeleyDB::DatabaseBerkeleyDB()
 : env_(0u)
 , db_blocks_(nullptr)
 , db_seq_no_(nullptr)
-, db_contracts_(nullptr) {
-}
+, db_contracts_(nullptr)
+, db_trans_idx_(nullptr) {}
 
 DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
     std::cout << "Attempt db_blocks_ to close...\n" << std::flush;
@@ -82,10 +83,42 @@ DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
     std::cout << "Attempt db_contracts_ to close...\n" << std::flush;
     db_contracts_->close(0);
     std::cout << "DB db_contracts_ was closed.\n" << std::flush;
-#ifdef TRANSACTIONS_INDEX
+    std::cout << "Attempt db_trans_idx_ to close...\n" << std::flush;
     db_trans_idx_->close(0);
-#endif
+    std::cout << "DB db_trans_idx_ was closed.\n" << std::flush;
+    if (logfile_thread_.joinable()) {
+        quit_ = true;
+        logfile_thread_.join();
+    }
     env_.close(0);
+}
+
+void DatabaseBerkeleyDB::logfile_routine() {
+    int cnt = 0;
+    /* Check once every 5 minutes. */
+    for (;; std::this_thread::sleep_for(std::chrono::seconds(1))) {
+        if (quit_) break;
+        if (++cnt % 300 == 0) {
+            int ret;
+            char **begin, **list;
+            env_.txn_checkpoint(0, 0, DB_FORCE);
+
+            /* Get the list of log files. */
+            if (env_.log_archive(&list, DB_ARCH_ABS) != 0) {
+                continue;
+            }
+
+            /* Remove the log files. */
+            if (list != 0) {
+                for (begin = list; *list != NULL; ++list) {
+                    if ((ret = ::remove(*list)) != 0) {
+                        cslog() << "Can't remove " << *list << " error = " << ret;
+                    }
+                }
+                free(begin);
+            }
+        }
+    }
 }
 
 void DatabaseBerkeleyDB::set_last_error_from_berkeleydb(int status) {
@@ -120,6 +153,7 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
     db_blocks_.reset(nullptr);
     db_seq_no_.reset(nullptr);
     db_contracts_.reset(nullptr);
+    db_trans_idx_.reset(nullptr);
 
     env_.log_set_config(DB_LOG_AUTO_REMOVE, 1);
 
@@ -145,39 +179,33 @@ bool DatabaseBerkeleyDB::open(const std::string &path) {
         }
     });
 
-#ifdef TRANSACTIONS_INDEX
-    auto db_trans_idx = new Db(&env_, 0);
-#endif
-
     if (!status) {
-        decltype(db_blocks_) db_blocks(new Db(&env_, 0));
+        auto db_blocks = new Db(&env_, 0);
         status = db_blocks->open(txn, "blockchain.db", NULL, DB_RECNO, DB_CREATE | DB_READ_UNCOMMITTED, 0);
-        db_blocks_.swap(db_blocks);
+        db_blocks_.reset(db_blocks);
     }
     if (!status) {
-        decltype(db_seq_no_) db_seq_no(new Db(&env_, 0));
+        auto db_seq_no = new Db(&env_, 0);
         status = db_seq_no->open(txn, "sequence.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
-        db_seq_no_.swap(db_seq_no);
+        db_seq_no_.reset(db_seq_no);
     }
     if (status == 0) {
         // until the explanation found suppress exceptions particularly on db close()
-        decltype(db_contracts_) db_contracts(new Db(&env_, 0/*DB_CXX_NO_EXCEPTIONS*/));
+        auto db_contracts = new Db(&env_, 0/*DB_CXX_NO_EXCEPTIONS*/);
         status = db_contracts->open(txn, "contracts.db", NULL, DB_HASH, DB_CREATE | DB_READ_UNCOMMITTED, 0);
-        db_contracts_.swap(db_contracts);
+        db_contracts_.reset(db_contracts);
+    }
+    if (!status) {
+        auto db_trans_idx = new Db(&env_, 0);
+        status = db_trans_idx->open(NULL, "index.db", NULL, DB_BTREE, DB_CREATE, 0);
+        db_trans_idx_.reset(db_trans_idx);
     }
     if (status) {
         set_last_error_from_berkeleydb(status);
         return false;
     }
 
-#ifdef TRANSACTIONS_INDEX
-    status = db_trans_idx->open(NULL, "index.db", NULL, DB_BTREE, DB_CREATE, 0);
-    if (status) {
-        set_last_error_from_berkeleydb(status);
-        return false;
-    }
-    db_trans_idx_.reset(db_trans_idx);
-#endif
+    logfile_thread_ = std::thread(&DatabaseBerkeleyDB::logfile_routine, this);
 
     set_last_error();
     return true;
@@ -256,6 +284,29 @@ bool DatabaseBerkeleyDB::get(const cs::Bytes &key, cs::Bytes *value) {
     auto begin = static_cast<uint8_t *>(db_value.get_data());
     value->assign(begin, begin + db_value.get_size());
     set_last_error();
+    return true;
+}
+
+// sequnce from block hash
+bool DatabaseBerkeleyDB::seq_no(const cs::Bytes& key, uint32_t* value) {
+    if (value == nullptr) {
+        set_last_error(InvalidArgument);
+        return false;
+    }
+    if (!db_blocks_) {
+        set_last_error(NotOpen);
+        return false;
+    }
+
+    Dbt_copy<cs::Bytes> db_key(key);
+    Dbt_copy<uint32_t> db_seq_no;
+    int status = db_seq_no_->get(nullptr, &db_key, &db_seq_no, DB_READ_UNCOMMITTED);
+    if (status) {
+        set_last_error_from_berkeleydb(status);
+        return false;
+    }
+    
+    *value = *static_cast<uint32_t*>(db_seq_no.get_data());
     return true;
 }
 
@@ -426,7 +477,6 @@ DatabaseBerkeleyDB::IteratorPtr DatabaseBerkeleyDB::new_iterator() {
     return Database::IteratorPtr(new DatabaseBerkeleyDB::Iterator(cursorp));
 }
 
-#ifdef TRANSACTIONS_INDEX
 bool DatabaseBerkeleyDB::putToTransIndex(const cs::Bytes &key, const cs::Bytes &value) {
     if (!db_trans_idx_) {
         set_last_error(NotOpen);
@@ -466,7 +516,13 @@ bool DatabaseBerkeleyDB::getFromTransIndex(const cs::Bytes &key, cs::Bytes *valu
     set_last_error();
     return true;
 }
-#endif
+
+void DatabaseBerkeleyDB::truncateTransIndex() {
+    if (!db_trans_idx_) {
+        return;
+    }
+    db_trans_idx_->truncate(nullptr, nullptr, 0);
+}
 
 bool DatabaseBerkeleyDB::updateContractData(const cs::Bytes& key, const cs::Bytes& data) {
     if (!db_contracts_) {

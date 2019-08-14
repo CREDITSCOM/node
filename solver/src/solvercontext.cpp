@@ -27,6 +27,10 @@ csdb::PoolHash SolverContext::spoileHash(const csdb::PoolHash& hashToSpoil, cons
     return core.pnode->spoileHash(hashToSpoil, pKey);
 }
 
+uint64_t SolverContext::lastTimeStamp() {
+    return core.lastTimeStamp();
+}
+
 void SolverContext::sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respondent) {
     // either RVO or string's move constructor used:
     return core.pnode->sendHashReply(hash, respondent);

@@ -32,6 +32,10 @@ using boost::asio::buffer;
 
 const ip::udp::socket::message_flags NO_FLAGS = 0;
 
+static std::atomic<std::chrono::time_point<std::chrono::high_resolution_clock>>
+    last_processed_time{std::chrono::high_resolution_clock::now()};
+const double lag_limit = 1000.;
+
 static ip::udp::socket bindSocket(io_context& context, Network* net, const EndpointData& data, bool ipv6 = true) {
     try {
         ip::udp::socket sock(context, ipv6 ? ip::udp::v6() : ip::udp::v4());
@@ -107,7 +111,7 @@ void Network::readerRoutine(const Config& config) {
     }
 
     boost::system::error_code lastError;
-    size_t packetSize;
+    size_t packetSize = 0;
 
     while (stopReaderRoutine == false) {  // changed from true
         auto& task = iPacMan_.allocNext();
@@ -123,7 +127,30 @@ void Network::readerRoutine(const Config& config) {
             continue;
         }
 
-        packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize), task.sender, NO_FLAGS, lastError);
+        double currentLag = std::chrono::duration<double, std::milli>(
+            std::chrono::high_resolution_clock::now() -
+                last_processed_time.load(std::memory_order_relaxed)).count();
+
+        if (currentLag > lag_limit && iPacMan_.getSize() > 2) {
+            while (currentLag > lag_limit && iPacMan_.getSize() > 2) {
+                std::this_thread::yield();
+                packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize),
+                    task.sender, NO_FLAGS, lastError);
+                currentLag = std::chrono::duration<double, std::milli>(
+                    std::chrono::high_resolution_clock::now() -
+                        last_processed_time.load(std::memory_order_relaxed)).count();
+                if (currentLag < lag_limit || iPacMan_.getSize() < 2) {
+                    task.timestamp = std::chrono::high_resolution_clock::now();
+                    break;
+                }
+                csdetails() << "Current lag = " << currentLag << "ms queue size = " <<
+                    iPacMan_.getSize() << " - spin";
+            }
+        } else {
+            packetSize = sock->receive_from(buffer(task.pack.data(), Packet::MaxSize),
+                task.sender, NO_FLAGS, lastError);
+            task.timestamp = std::chrono::high_resolution_clock::now();
+        }
 
         while (!task.pack.region_.get()) {
             cswarning() << "net: invalid input packet";
@@ -133,7 +160,8 @@ void Network::readerRoutine(const Config& config) {
             static constexpr size_t limit = 100;
             auto size = (task.pack.size() <= limit) ? task.pack.size() : limit;
 
-            cswarning() << "from socket Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task.pack.data()), size);
+            cswarning() << "from socket Header is not valid: " << 
+                cs::Utils::byteStreamToHex(static_cast<const char*>(task.pack.data()), size);
         }
 
         if (!lastError) {
@@ -145,8 +173,9 @@ void Network::readerRoutine(const Config& config) {
                 reject = true;
             }
             else if (!task.pack.hasValidFragmentation()) {
-                cswarning() << "Incorrect fragment identity in message or too many fragments, drop (" << task.pack.getFragmentId() << " from " << task.pack.getFragmentsNum()
-                            << "), sender " << task.sender;
+                cswarning() << "Incorrect fragment identity in message or too many fragments, drop (" <<
+                    task.pack.getFragmentId() << " from " << task.pack.getFragmentsNum() <<
+                        "), sender " << task.sender;
                 reject = true;
             }
 
@@ -155,7 +184,6 @@ void Network::readerRoutine(const Config& config) {
             }
             else {
                 iPacMan_.enQueueLast();
-
 #ifdef LOG_NET
                 csdebug(logger::Net) << "<-- " << packetSize << " bytes from " << task.sender << " " << task.pack;
 #endif
@@ -239,8 +267,8 @@ void Network::writerRoutine(const Config& config) {
             continue;
         }
 
-        if (tasks > 200) {
-            cswarning() << "strange: too many tasks " << tasks;
+        if (tasks > 600) {
+            csdetails() << "(informational) current task quantity more then normal: " << tasks;
         }
 
         msg.resize(tasks);
@@ -368,6 +396,7 @@ void Network::processorRoutine() {
                 continue;
             }
             processTask(task);
+            last_processed_time.store(task->timestamp, std::memory_order_relaxed);
             task.release();
         }
 #endif
@@ -400,6 +429,7 @@ void Network::processorRoutine() {
             auto task = iPacMan_.getNextTask(is_empty);
             if (is_empty) break;
             processTask(task);
+            last_processed_time.store(task->timestamp, std::memory_order_relaxed);
             task.release();
         }
 #endif

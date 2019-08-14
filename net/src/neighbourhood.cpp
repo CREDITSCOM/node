@@ -1,4 +1,9 @@
 /* Send blaming letters to @yrtimd */
+
+#include <algorithm>
+#include <iterator>
+#include <random>
+
 #include "neighbourhood.hpp"
 #include "transport.hpp"
 
@@ -6,18 +11,37 @@
 #include <csnode/blockchain.hpp>
 #include <lib/system/random.hpp>
 
-Neighbourhood::Neighbourhood(Transport* net)
-: transport_(net)
-, connectionsAllocator_(MaxConnections + 1)
-, nLockFlag_()
-, mLockFlag_() {
-}
-
+namespace {
 template <typename T>
 T getSecureRandom() {
     T result;
     cscrypto::fillBufWithRandomBytes(static_cast<void*>(&result), sizeof(T));
     return result;
+}
+
+template<class InputIt>
+std::vector<typename std::iterator_traits<InputIt>::value_type> sample(InputIt first, InputIt last, size_t n) {
+    static std::mt19937 engine{std::random_device{}()};
+
+    InputIt nth = next(first, static_cast<std::ptrdiff_t>(n));
+    std::vector<typename std::iterator_traits<InputIt>::value_type> result{first, nth};
+    size_t k = n + 1;
+    for (InputIt it = nth; it != last; ++it, ++k) {
+        size_t r = std::uniform_int_distribution<size_t>{0, k}(engine);
+        if (r < n)
+            result[r] = *it;
+    }
+    return result;
+}
+
+const size_t kNeighborsRedirectMin = 6;
+}  // anonimous namespace
+
+Neighbourhood::Neighbourhood(Transport* net)
+: transport_(net)
+, connectionsAllocator_(MaxConnections + 1)
+, nLockFlag_()
+, mLockFlag_() {
 }
 
 bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
@@ -31,9 +55,30 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
         return result;
     }
 
-    bool sent = false;
+    if (neighbours_.size() == 0) return false;
 
-    for (auto& nb : neighbours_) {
+    static bool redirectLimit = false;
+    static auto startTime = std::chrono::high_resolution_clock::now();
+
+    if (!redirectLimit) {
+        auto now_time = std::chrono::high_resolution_clock::now();
+        auto spended_time = std::chrono::duration_cast<std::chrono::seconds>(now_time - startTime);
+        if (spended_time.count() > 10) redirectLimit = true; // 10 seconst dry run
+    }
+
+    size_t redirectNumber;
+    if (redirectLimit) {
+        redirectNumber = std::max(kNeighborsRedirectMin, neighbours_.size() / 3 + 1);
+        if (redirectNumber > neighbours_.size()) {
+            redirectNumber = neighbours_.size();
+        }
+    } else {
+        redirectNumber = neighbours_.size();
+    }
+
+    auto selection = sample(std::begin(neighbours_), std::end(neighbours_), redirectNumber);
+    bool sent = false;
+    for (auto& nb : selection) {
         bool found = false;
         for (auto ptr = bp.receivers; ptr != bp.recEnd; ++ptr) {
             if (*ptr == nb->id) {
@@ -139,12 +184,11 @@ void Neighbourhood::checkSilent() {
     { // begin of scoped locked block
         cs::ScopedLock lock(mLockFlag_, nLockFlag_);
 
-        for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
+        int i = 0;
+        std::vector<int> toDisconnect;
+        for (auto conn = neighbours_.begin(), end = neighbours_.end(); conn != end; ++conn, ++i) {
             if (!(*conn)->node) {
-                ConnectionPtr tc = *conn;
-                csunused(tc);
-                disconnectNode(conn);
-                --conn;
+                toDisconnect.push_back(i);
                 continue;
             }
 
@@ -155,19 +199,24 @@ void Neighbourhood::checkSilent() {
             const auto packetsCount = (*(*conn)->node)->packets.load(std::memory_order_relaxed);
 
             if (packetsCount == (*conn)->lastPacketsCount) {
-                cswarning() << "Node " << (*conn)->in << " stopped responding";
-
-                ConnectionPtr tc = *conn;
-                Connection* c = *tc;
-                tc->node->connection.compare_exchange_strong(c, nullptr, std::memory_order_release, std::memory_order_relaxed);
-
-                disconnectNode(conn);
-                --conn;
+                toDisconnect.push_back(i);
             }
             else {
                 needRefill = false;
                 (*conn)->lastPacketsCount = packetsCount;
             }
+        }
+        for (auto it = toDisconnect.rbegin(), end = toDisconnect.rend(); it != end; ++it) {
+            auto connPtrIt = neighbours_.begin() + *it;
+            ConnectionPtr tc = *connPtrIt;
+            if (tc->node) {
+                cswarning() << "Node " << tc->in << " stopped responding";
+                Connection* c = *tc;
+                tc->node->connection.compare_exchange_strong(c, nullptr, std::memory_order_release, std::memory_order_relaxed);
+            }
+            (*connPtrIt)->connected = false;
+            (*connPtrIt)->node = RemoteNodePtr();
+            neighbours_.erase(connPtrIt);
         }
 
         if (needRefill) {
@@ -192,7 +241,7 @@ void Neighbourhood::checkNeighbours() {
 
     {
         cs::Lock lock(nLockFlag_);
-        size = neighbours_.size();
+        size = uint32_t(neighbours_.size());
     }
 
     if (size < MinNeighbours) {
@@ -200,14 +249,12 @@ void Neighbourhood::checkNeighbours() {
     }
 }
 
-template <typename Vec>
-static ConnectionPtr* findInVec(const Connection::Id& id, Vec& vec) {
+static ConnectionPtr* findInVec(const Connection::Id& id, std::deque<ConnectionPtr>& vec) {
     for (auto it = vec.begin(); it != vec.end(); ++it) {
         if ((*it)->id == id) {
-            return it;
+            return &*it;
         }
     }
-
     return nullptr;
 }
 
@@ -259,7 +306,7 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
 
 uint32_t Neighbourhood::size() const {
     cs::Lock lock(nLockFlag_);
-    return neighbours_.size();
+    return static_cast<uint32_t>(neighbours_.size());
 }
 
 uint32_t Neighbourhood::getNeighboursCountWithoutSS() const {
@@ -376,13 +423,16 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
         return;
     }
 
-    neighbours_.emplace(conn);
+    neighbours_.emplace(neighbours_.end(), conn);
 }
 
 void Neighbourhood::disconnectNode(ConnectionPtr* connPtr) {
     (*connPtr)->connected = false;
     (*connPtr)->node = RemoteNodePtr();
-    neighbours_.remove(connPtr);
+    auto res = std::find(neighbours_.begin(), neighbours_.end(), *connPtr);
+    if (res != neighbours_.end()) {
+      neighbours_.erase(res);
+    }
 }
 
 void Neighbourhood::gotRegistration(Connection&& conn, RemoteNodePtr node) {
@@ -613,7 +663,7 @@ void Neighbourhood::pourByNeighbours(const Packet* pack, const uint32_t packNum)
                 i = 0;
             }
 
-            conn = neighbours_.begin() + i;
+            conn = &neighbours_[i];
             ++i;
         }
 
@@ -779,7 +829,7 @@ ConnectionPtr Neighbourhood::getNeighbour(const std::size_t number) {
         return ConnectionPtr();
     }
 
-    ConnectionPtr candidate = *(neighbours_.begin() + number);
+    ConnectionPtr candidate = *(neighbours_.begin() + static_cast<std::ptrdiff_t>(number));
 
     if (!candidate) {
         return ConnectionPtr();

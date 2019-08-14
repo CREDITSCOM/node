@@ -18,6 +18,9 @@ public:
     /** @brief   The default state timeout */
     constexpr static unsigned int DefaultStateTimeout = 5000;
 
+    /** @brief   The default state timeout */
+    constexpr static uint64_t DefaultTimeStampRange = 30000;
+
     /** @brief   Maximum time in msec to wait new round after consensus achieved, after that waiting trusted nodes
      * activates */
     constexpr static unsigned int PostConsensusTimeout = 60000;
@@ -52,6 +55,12 @@ public:
     /** @brief   Max timeout (msec) to wait stages (Trusted-2,3) */
     constexpr static uint32_t T_stage_request = 2000;
 
+    /** @brief   Max subround delta */
+    constexpr static uint8_t MaxSubroundDelta = 10;
+
+    /** @brief   Max subround delta */
+    constexpr static uint64_t MaxRoundTimerFree = 5;
+
     /** @brief   Max timeout (msec) to execute smart contract */
     constexpr static uint32_t T_smart_contract = 60000;
 
@@ -71,5 +80,9 @@ public:
     constexpr static unsigned int MaxRoundsExecuteContract = 95;
 
     /** @brief True to disable, false to enable the trusted request to become trusted next round again */
-    constexpr static bool DisableTrustedRequestNextRound = true;
+    constexpr static bool DisableTrustedRequestNextRound = false;
+
+    /** The max contract's state size in bytes to synchronize it between node via conveyer. Otherwise, every node must get new state
+    itself or make individual request to dedicated trusted nodes*/
+    constexpr static size_t MaxContractStateSizeToSync = 8192;
 };

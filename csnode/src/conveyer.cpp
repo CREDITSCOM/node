@@ -98,18 +98,24 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
 }
 
 void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
+    cs::TransactionsPacketHash hash = packet.hash();
     csdebug() << csname() << "Add separate transactions packet to conveyer, transactions " << packet.transactionsCount();
     cs::Lock lock(sharedMutex_);
 
-    // add current packet
-    pimpl_->packetQueue.push(packet);
+    if (auto iterator = pimpl_->packetsTable.find(hash); iterator == pimpl_->packetsTable.end()) {
+        // add current packet
+        pimpl_->packetQueue.push(packet);
+    }
+    else {
+        csdebug() << csname() << "Same separate packet already is in table: " << hash.toString();
+    }
 }
 
 void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packet) {
     cs::TransactionsPacketHash hash = packet.hash();
     cs::Lock lock(sharedMutex_);
 
-    if (auto iterator = pimpl_->packetsTable.find(hash); iterator == pimpl_->packetsTable.end()) {
+    if (!isPacketAtCache(packet)) {
         pimpl_->packetsTable.emplace(std::move(hash), packet);
     }
     else {
@@ -202,7 +208,9 @@ void cs::ConveyerBase::setTable(const RoundTable& table) {
 
     {
         cs::SharedLock lock(sharedMutex_);
-        std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes), [this](const auto& hash) { return (pimpl_->packetsTable.count(hash) == 0u); });
+        std::copy_if(hashes.begin(), hashes.end(), std::back_inserter(neededHashes), [this](const auto& hash) {
+            return (pimpl_->packetsTable.count(hash) == 0u);
+        });
     }
 
     csdebug() << csname() << "Needed round hashes count " << neededHashes.size();
@@ -345,7 +353,7 @@ bool cs::ConveyerBase::isSyncCompleted(cs::RoundNumber round) const {
     cs::ConveyerMeta* meta = pimpl_->metaStorage.get(round);
 
     if (!meta) {
-        cswarning() << csname() << "Needed hashes of " << round << " round not found, looks like old round packet received";
+        cswarning() << csname() << "Needed hashes of " << round << " round not found";
         return true;
     }
 
@@ -667,7 +675,7 @@ void cs::ConveyerBase::flushTransactions() {
 
             auto hash = packet.hash();
 
-            if (auto iter = pimpl_->packetsTable.find(hash); iter == pimpl_->packetsTable.end()) {
+            if (!isPacketAtCache(packet)) {
                 pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
             }
             else {
@@ -696,6 +704,25 @@ cs::TransactionsPacketTable& cs::ConveyerBase::poolTable(cs::RoundNumber round) 
     }
 
     return pimpl_->packetsTable;
+}
+
+bool cs::ConveyerBase::isPacketAtCache(const cs::TransactionsPacket& packet) {
+    auto hash = packet.hash();
+    auto iter = pimpl_->packetsTable.find(hash);
+
+    if (iter != pimpl_->packetsTable.end()) {
+        return true;
+    }
+
+    for (const auto& element : pimpl_->metaStorage) {
+        auto metaIter = element.meta.hashTable.find(hash);
+
+        if (metaIter != element.meta.hashTable.end()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 cs::Conveyer& cs::Conveyer::instance() {

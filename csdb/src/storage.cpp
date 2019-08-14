@@ -204,16 +204,16 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
         }
 
         bool test_failed = false;
+        last_hash = p.hash();
+        count_pool++;
 
         emit read_block_event(p, &test_failed);
-
         if (test_failed) {
             set_last_error(Storage::DataIntegrityError, "Data integrity error: client reported violation of logic in pool %d", p.sequence());
             return false;
         }
 
-        update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
-        count_pool++;
+        //update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
         progress.poolsProcessed++;
 
         if (callback != nullptr) {
@@ -225,22 +225,25 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     }
 
     // Посмотрим, сколько у нас завершённых цепочек.
-    if ([this, &heads]() -> bool {
-            for (const auto it : heads) {
-                if (!it.second.next_.is_empty())
-                    continue;
+    //if ([this, &heads]() -> bool {
+    //        for (const auto it : heads) {
+    //            if (!it.second.next_.is_empty())
+    //                continue;
 
-                if (!last_hash.is_empty())
-                    return false;
+    //            if (!last_hash.is_empty())
+    //                return false;
 
-                last_hash = it.first;
-            }
-            return true;
-        }()) {
-        set_last_error();
-        return true;
-    }
+    //            last_hash = it.first;
+    //        }
+    //        return true;
+    //    }()) {
+    //    set_last_error();
+    //    return true;
+    //}
+    
+    return true;
 
+#if 0
     std::stringstream ss;
     ss << "More than one chains or orphan chains. List follows:" << std::endl;
     for (auto ith = heads.begin(); ith != heads.end(); ++ith) {
@@ -257,6 +260,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     set_last_error(Storage::ChainError, ss.str());
 
     return false;
+#endif
 }
 
 void Storage::priv::write_routine() {
@@ -638,50 +642,28 @@ Wallet Storage::wallet(const Address& addr) const {
     return Wallet::get(addr);
 }
 
-bool Storage::get_from_blockchain(const Address& addr /*input*/, const int64_t& innerId /*input*/, Transaction& trx /*output*/) const {
-    Pool curPool;
-    cs::Sequence curIdx = cs::numeric_cast<cs::Sequence>(innerId);
-    bool is_in_blockchain = false;
-
-    auto nextIt = [this, &curPool, &curIdx]() -> bool {
-        if (curPool.is_valid()) {
-            if (curIdx) {
-                curIdx--;
-                return true;
-            }
-            else {
-                do {
-                    curPool = pool_load(curPool.previous_hash());
-                } while (curPool.is_valid() && !(curPool.transactions_count()));
-                if (curPool.is_valid()) {
-                    curIdx = static_cast<cs::Sequence>(curPool.transactions_count() - 1);
-                    return true;
-                }
-            }
+static bool checkPool(const Pool& pool, const Address& addr,
+                      int64_t innerId, Transaction& trx) {
+    const auto& trxs = pool.transactions();
+    for (const auto& t : trxs) {
+        if (t.source() == addr && t.innerID() == innerId) {
+            trx = t;
+            return true;
         }
-        else {
-            curPool = pool_load(last_hash());
-            while (curPool.is_valid() && !(curPool.transactions_count())) {
-                curPool = pool_load(curPool.previous_hash());
-            }
-            if (curPool.is_valid()) {
-                curIdx = static_cast<cs::Sequence>(curPool.transactions_count() - 1);
-                return true;
-            }
-        }
-        return false;
-    };
+    }
+    return false;
+}
 
-    do {
-        const Transaction trx_curr = curPool.transaction(curIdx);
-        if (trx_curr.source() == addr && trx_curr.innerID() == innerId) {
-            is_in_blockchain = true;
-            trx = trx_curr;
-            break;
+bool Storage::get_from_blockchain(const Address& addr, int64_t innerId,
+                                  const PoolHash& lastTrxPh, Transaction& trx) const {
+    auto poolHash = lastTrxPh;
+    while (!poolHash.is_empty()) {
+        if (checkPool(pool_load(poolHash), addr, innerId, trx)) {
+            return true;
         }
-    } while (nextIt());
-
-    return is_in_blockchain;
+        poolHash = get_previous_transaction_block(addr, poolHash);
+    }
+    return false;
 }
 
 const ReadBlockSignal& Storage::readBlockEvent() const {
@@ -786,7 +768,6 @@ Transaction Storage::get_last_by_target(Address target) const noexcept {
     return Transaction{};
 }
 
-#ifdef TRANSACTIONS_INDEX
 cs::Bytes Storage::get_trans_index_key(const Address& addr, const PoolHash& ph) {
     ::csdb::priv::obstream os;
     addr.put(os);
@@ -794,7 +775,7 @@ cs::Bytes Storage::get_trans_index_key(const Address& addr, const PoolHash& ph) 
     return os.buffer();
 }
 
-PoolHash Storage::get_previous_transaction_block(const Address& addr, const PoolHash& ph) {
+PoolHash Storage::get_previous_transaction_block(const Address& addr, const PoolHash& ph) const {
     PoolHash result;
 
     const auto key = get_trans_index_key(addr, ph);
@@ -817,7 +798,9 @@ void Storage::set_previous_transaction_block(const Address& addr, const PoolHash
   d->db->putToTransIndex(key, os.buffer());
 }
 
-#endif
+void Storage::truncate_trxs_index() {
+    d->db->truncateTransIndex();
+}
 
 bool Storage::get_contract_data(const Address& abs_addr /*input*/, cs::Bytes& data /*output*/) const {
     const auto& pk = abs_addr.public_key();
@@ -831,6 +814,63 @@ bool Storage::update_contract_data(const Address& abs_addr /*input*/, const cs::
     cs::Bytes bytes(pk.size());
     bytes.assign(pk.cbegin(), pk.cend());
     return d->db->updateContractData(bytes, data);
+}
+
+cs::Sequence Storage::pool_sequence(const PoolHash& hash) const {
+    cs::Sequence seq = std::numeric_limits<cs::Sequence>::max();
+    if (!isOpen()) {
+        d->set_last_error(NotOpen);
+        return seq;
+    }
+
+    if (hash.is_empty()) {
+        d->set_last_error(InvalidParameter, "%s: Empty hash passed", funcName());
+        return seq;
+    }
+
+    uint32_t tmp;
+    if (d->db->seq_no(hash.to_binary(), &tmp)) {
+        seq = tmp;
+    }
+    return seq;
+}
+
+csdb::PoolHash Storage::pool_hash(cs::Sequence sequence) const {
+    if (!isOpen()) {
+        d->set_last_error(NotOpen);
+        return PoolHash{};
+    }
+
+    Pool res;
+    cs::Bytes data;
+
+    if (!d->db->get(static_cast<uint32_t>(sequence), &data)) {
+        {
+            std::unique_lock<std::mutex> lock2(d->write_lock);
+            for (auto& poolToWrite : d->write_queue) {
+                if (poolToWrite.sequence() == sequence) {
+                    res = poolToWrite;
+                    break;
+                }
+            }
+        }
+
+        if (!d->db->get(static_cast<uint32_t>(sequence), &data)) {
+            d->set_last_error(DatabaseError);
+            return PoolHash{};
+        }
+    }
+
+    res = Pool::from_binary(std::move(data));
+    if (!res.is_valid()) {
+        d->set_last_error(DataIntegrityError);
+        return PoolHash{};
+    }
+    else {
+        d->set_last_error();
+    }
+
+    return res.hash();
 }
 
 }  // namespace csdb

@@ -13,9 +13,7 @@ WalletsState::WalletsState(const BlockChain& blockchain, size_t initialWalletsNu
 WalletsState::WalletsExisting::WalletsExisting(const BlockChain& blockchain, size_t initialWalletsNum /*=*/)
 : blockchain_(blockchain) {
     modified_.resize(initialWalletsNum, true);
-    storage_.resize(initialWalletsNum);
-    for (auto& el : storage_)
-        el = new WalletData{};
+    storage_.reserve(initialWalletsNum);
 }
 
 WalletsState::WalletsExisting::~WalletsExisting() {

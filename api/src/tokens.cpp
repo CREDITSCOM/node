@@ -127,61 +127,6 @@ static bool javaTypesEqual(const std::string& goodType, const std::string& quest
     return true;
 }
 
-TokenStandart TokensMaster::getTokenStandart(const std::vector<general::MethodDescription>& methods) {
-    const static std::map<std::string, std::pair<std::string, std::vector<std::string>>> StandartMethods = {
-        {"getName", {"java.lang.string", {}}},
-        {"getSymbol", {"java.lang.string", {}}},
-        {"getDecimal", {"int", {}}},
-        {"setFrozen", {"boolean", {"boolean"}}},
-        {"totalSupply", {"java.lang.string", {}}},
-        {"balanceOf", {"java.lang.string", {"java.lang.string"}}},
-        {"allowance", {"java.lang.string", {"java.lang.string", "java.lang.string"}}},
-        {"transfer", {"boolean", {"java.lang.string", "java.lang.string"}}},
-        {"transferFrom", {"boolean", {"java.lang.string", "java.lang.string", "java.lang.string"}}},
-        {"approve", {"void", {"java.lang.string", "java.lang.string"}}},
-        {"burn", {"boolean", {"java.lang.string"}}},
-        {"register", {"void", {}}},
-        {"buyTokens", {"boolean", {"java.lang.string"}}}};
-
-    const static auto findPos = [](const std::string& key) { return std::distance(StandartMethods.begin(), StandartMethods.find(key)); };
-    const static std::pair<size_t, size_t> extendedPositions = {findPos("register"), findPos("buyTokens")};
-
-    std::vector<bool> gotMethods(StandartMethods.size(), false);
-    for (auto& m : methods) {
-        auto smIt = StandartMethods.find(m.name);
-
-        if (smIt != StandartMethods.end()) {
-            if (smIt->second.second.size() != m.arguments.size() || !javaTypesEqual(smIt->second.first, m.returnType))
-                continue;
-
-            bool argsMatch = true;
-            for (uint32_t i = 0; i < m.arguments.size(); ++i) {
-                if (!javaTypesEqual(smIt->second.second[i], m.arguments[i].type)) {
-                    argsMatch = false;
-                    break;
-                }
-            }
-
-            if (argsMatch)
-                gotMethods[std::distance(StandartMethods.begin(), smIt)] = true;
-        }
-    }
-
-    bool canBeCredits = true;
-    bool canBeCreditsExtended = true;
-    for (uint8_t i = 0; i < gotMethods.size(); ++i) {
-        if (!gotMethods[i]) {
-            canBeCreditsExtended = false;
-            if (i != extendedPositions.first && i != extendedPositions.second) {
-                canBeCredits = false;
-                break;
-            }
-        }
-    }
-
-    return canBeCreditsExtended ? TokenStandart::CreditsExtended : (canBeCredits ? TokenStandart::CreditsBasic : TokenStandart::NotAToken);
-}
-
 template <typename T>
 T getVariantAs(const general::Variant&);
 template <>
@@ -212,93 +157,33 @@ void executeAndCall(api::APIHandler* p_api, const general::Address& addr, const 
 void TokensMaster::refreshTokenState(const csdb::Address& token, const std::string& newState) {
     bool present = false;
     auto byteCodeObjects = api_->getSmartByteCode(token, present);
-    if (!present)
-        return;
-
-    const auto pk = token.public_key();
-    general::Address addr = std::string((char*)pk.data(), pk.size());
+    if (!present || byteCodeObjects.empty()) return;
 
     std::string name, symbol, totalSupply;
+    csdb::Address deployer = tokens_[token].owner;
 
-    if (byteCodeObjects.empty())
-        return;
-    csdb::Address deployer;
-    {
-        std::lock_guard<decltype(dataMut_)> l(dataMut_);
-        deployer = tokens_[token].owner;
-    }
+    general::Address addr   = std::string((char*)token.public_key().data(), token.public_key().size());
     general::Address dpAddr = std::string((char*)deployer.public_key().data(), deployer.public_key().size());
 
     executeAndCall<std::string>(api_, dpAddr, addr, byteCodeObjects, newState, "getName", std::vector<general::Variant>(),
                                 [&name](const std::string& newName) { name = newName.substr(0, 255); });
 
-    executeAndCall<std::string>(api_, dpAddr, addr, byteCodeObjects, newState, "getSymbol", std::vector<general::Variant>(), [&symbol](const std::string& newSymb) {
-        symbol.clear();
-
-        for (uint32_t i = 0; i < newSymb.size(); ++i) {
-            if (i >= 4)
-                break;
-            symbol.push_back((char)std::toupper(newSymb[i]));
-        }
-    });
-
     executeAndCall<std::string>(api_, dpAddr, addr, byteCodeObjects, newState, "totalSupply", std::vector<general::Variant>(),
-                                [&totalSupply](const std::string& newSupp) { totalSupply = tryExtractAmount(newSupp); });
+        [&totalSupply](const std::string& newSupp) { totalSupply = tryExtractAmount(newSupp); });
 
-    std::vector<csdb::Address> holders;
-
-    {
-        std::lock_guard<decltype(dataMut_)> l(dataMut_);
-        auto& t = tokens_[token];
-        t.name = name;
-        t.symbol = symbol;
-        t.totalSupply = totalSupply;
-
-        holders.reserve(t.holders.size());
-        for (auto& h : t.holders)
-            holders.push_back(h.first);
-    }
-
-    std::vector<std::vector<general::Variant>> holderKeysParams;
-    holderKeysParams.reserve(holders.size());
-    for (auto& h : holders) {
-        general::Variant var;
-        // var.__set_v_string('"' + EncodeBase58(h.public_key()) + '"');
-        auto key = h.public_key();
-        var.__set_v_string(EncodeBase58(cs::Bytes(key.begin(), key.end())));
-        holderKeysParams.push_back(std::vector<general::Variant>(1, var));
-    }
-
-    executor::ExecuteByteCodeMultipleResult result;
-    if (byteCodeObjects.empty())
-        return;
-
-    executor::SmartContractBinary smartContractBinary;
-    smartContractBinary.contractAddress = addr;
-    smartContractBinary.object.byteCodeObjects = byteCodeObjects;
-    smartContractBinary.object.instance = newState;
-    smartContractBinary.stateCanModify = 0;
-
-    api_->getExecutor().executeByteCodeMultiple(result, dpAddr, smartContractBinary, "balanceOf", holderKeysParams, 100, executor::Executor::kUseLastSequence);
-
-    if (!result.status.code && (result.results.size() == holders.size())) {
-        std::lock_guard<decltype(dataMut_)> l(dataMut_);
-        auto& t = tokens_[token];
-
-        for (uint32_t i = 0; i < holders.size(); ++i) {
-            const auto& res = result.results[i];
-            if (!res.status.code) {
-                auto& oldBalance = t.holders[holders[i]].balance;
-                // auto newBalance = tryExtractAmount('"' + getVariantAs<std::string>(res.ret_val) + '"');
-                auto newBalance = tryExtractAmount(getVariantAs<std::string>(res.ret_val));
-                if (isZeroAmount(newBalance) && !isZeroAmount(oldBalance))
-                    --t.realHoldersCount;
-                else if (isZeroAmount(oldBalance) && !isZeroAmount(newBalance))
-                    ++t.realHoldersCount;
-                oldBalance = newBalance;
+    executeAndCall<std::string>(api_, dpAddr, addr, byteCodeObjects, newState, "getSymbol", std::vector<general::Variant>(),
+        [&symbol](const std::string& newSymb) {
+            symbol.clear();
+            for (uint32_t i = 0; i < newSymb.size(); ++i) {
+                if (i >= 4) break;
+                symbol.push_back((char)std::toupper(newSymb[i]));
             }
-        }
-    }
+        });  
+
+    auto& t       = tokens_[token];
+    t.name        = name;
+    t.symbol      = symbol;
+    t.totalSupply = totalSupply;     
 }
 
 /* Call under data lock only */
@@ -316,88 +201,76 @@ TokensMaster::TokensMaster(api::APIHandler* api)
 }
 
 TokensMaster::~TokensMaster() {
-    running_.store(false);
-
-    if (tokThread_.joinable()) {
-        tokCv_.notify_all();
-        tokThread_.join();
-    }
 }
 
-void TokensMaster::run() {
-    running_.store(true);
+void TokensMaster::updateTokenChaches(const csdb::Address& addr, const std::string& newState, const TokenInvocationData::Params& ps) {
+    std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
+    auto tIt = tokens_.find(addr);
+    if (tIt == tokens_.end())
+        return;  // Ignore if not-a-token
 
-    tokThread_ = std::thread([this]() {
-        while (running_.load()) {
-            std::unique_lock<std::mutex> l(cvMut_);
-            while (!deployQueue_.empty()) {
-                DeployTask dt = std::move(deployQueue_.front());
-                deployQueue_.pop();
-                l.unlock();
+    initiateHolder(tIt->second, tIt->first, ps.initiator);
+    ++tIt->second.transactionsCount;
 
-                executor::GetContractMethodsResult methodsResult;
+    if (isTransfer(ps.method, ps.params)) {
+        ++tIt->second.transfersCount;
+        auto trPair = getTransferData(ps.initiator, ps.method, ps.params);
+        if (trPair.first.is_valid())
+            initiateHolder(tIt->second, tIt->first, trPair.first, true);
+        if (trPair.second.is_valid())
+            initiateHolder(tIt->second, tIt->first, trPair.second, true);
+    }
+    else if (tIt->second.tokenStandard == TokenStandard::CreditsExtended) {
+        csdb::Address regDude = tryGetRegisterData(ps.method, ps.params);
+        if (regDude.is_valid())
+            initiateHolder(tIt->second, tIt->first, regDude);
+    }
 
-                // try { api_->executor_.getOrigExecutor(); }
-                // catch (...) { std::cout << "executor dosent run!" << std::endl; return; }
+    // Balance update   
+    auto refreshBalance = [&](const csdb::Address& addrBalance) {
+        auto getCurrBalance = [&](const csdb::Address& addrOwner) -> std::string {
+            bool present = false;
+            auto byteCodeObjects = api_->getSmartByteCode(addr, present);
+            if (!present || byteCodeObjects.empty()) return "0";
 
-                if (!dt.byteCodeObjects.empty()) {
-                    api_->getExecutor().getContractMethods(methodsResult, dt.byteCodeObjects);
-                    if (!methodsResult.status.code) {
-                        auto ts = getTokenStandart(methodsResult.methods);
-                        if (ts != TokenStandart::NotAToken) {
-                            Token t;
-                            t.standart = ts;
-                            t.owner = dt.deployer;
+            general::Address addrToken{ addr.public_key().begin(), addr.public_key().end() };
 
-                            {
-                                std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
-                                tokens_[dt.address] = t;
-                            }
-                        }
-                    }
-                }
+            auto dpAddrPK = tokens_[addr].owner.public_key();
+            general::Address dpAddr{ dpAddrPK.begin(), dpAddrPK.end() };
 
-                l.lock();
-            }
+            // param: owner
+            std::vector<general::Variant> param(1);
+            std::string addrOwnerStr = addrOwner.to_api_addr();
+            param[0].__set_v_string(EncodeBase58({ addrOwnerStr.begin(), addrOwnerStr.end() }));
+            //
+            std::string retBalance{ "0" };
+            executeAndCall<std::string>(api_, dpAddr, addrToken, byteCodeObjects, newState, "balanceOf", param,
+                [&retBalance](const std::string& balance) { retBalance = balance; });
+            return retBalance;
+        };
+        auto& t = tokens_[addr];      
+        auto& currBalance = t.holders[addrBalance].balance;
+        auto newBalance = getCurrBalance(addrBalance);
 
-            decltype(newExecutes_) executes;
-            std::swap(executes, newExecutes_);
-            l.unlock();
+        if (!isZeroAmount(currBalance) && isZeroAmount(newBalance))
+            --t.realHoldersCount;
+        if (isZeroAmount(currBalance) && !isZeroAmount(newBalance))
+            ++t.realHoldersCount;
+        currBalance = newBalance;
+    };
 
-            for (auto& st : executes) {
-                {
-                    std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
-                    auto tIt = tokens_.find(st.first);
-                    if (tIt == tokens_.end())
-                        continue;  // Ignore if not-a-token
-
-                    for (auto& ps : st.second.invocations) {
-                        initiateHolder(tIt->second, tIt->first, ps.initiator);
-                        ++tIt->second.transactionsCount;
-
-                        if (isTransfer(ps.method, ps.params)) {
-                            ++tIt->second.transfersCount;
-                            auto trPair = getTransferData(ps.initiator, ps.method, ps.params);
-                            if (trPair.first.is_valid())
-                                initiateHolder(tIt->second, tIt->first, trPair.first, true);
-                            if (trPair.second.is_valid())
-                                initiateHolder(tIt->second, tIt->first, trPair.second, true);
-                        }
-                        else if (tIt->second.standart == TokenStandart::CreditsExtended) {
-                            csdb::Address regDude = tryGetRegisterData(ps.method, ps.params);
-                            if (regDude.is_valid())
-                                initiateHolder(tIt->second, tIt->first, regDude);
-                        }
-                    }
-                }
-
-                refreshTokenState(st.first, st.second.newState);
-            }
-
-            l.lock();
-            tokCv_.wait(l);
-        }
-    });
+    if (ps.method == "transfer" && ps.params.size() == 2) {
+        refreshBalance(ps.initiator);
+        refreshBalance(tryExtractPublicKey(ps.params[0].v_string));
+    }
+    else if (ps.method == "transferFrom" && ps.params.size() == 3) {
+        refreshBalance(tryExtractPublicKey(ps.params[0].v_string));
+        refreshBalance(tryExtractPublicKey(ps.params[1].v_string));
+    }
+    else if(ps.method.empty()){ // deploy token
+        refreshBalance(tokens_[addr].owner);
+    }
+    refreshTokenState(addr, newState);
 }
 
 void TokensMaster::checkNewDeploy(const csdb::Address& sc, const csdb::Address& deployer, const api::SmartContractInvocation& sci) {
@@ -406,19 +279,22 @@ void TokensMaster::checkNewDeploy(const csdb::Address& sc, const csdb::Address& 
     dt.deployer = deployer;
     dt.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
 
-    TokenInvocationData tdo;
+    executor::GetContractMethodsResult methodsResult;
+    if (!dt.byteCodeObjects.empty()) {
+        api_->getExecutor().getContractMethods(methodsResult, dt.byteCodeObjects);
+        if (!methodsResult.status.code) {
+            if (methodsResult.tokenStandard != TokenStandard::NotAToken) {
+                Token t;
+                t.tokenStandard = methodsResult.tokenStandard;
+                t.owner = dt.deployer;
 
-    TokenInvocationData::Params ps;
-    ps.initiator = deployer;
-    tdo.invocations.push_back(ps);
-
-    {
-        std::lock_guard<decltype(cvMut_)> l(cvMut_);
-        /* It is important to do this under one lock */
-        deployQueue_.push(dt);
+                {
+                    std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
+                    tokens_[dt.address] = t;
+                }
+            }
+        }
     }
-
-    tokCv_.notify_all();
 }
 
 void TokensMaster::checkNewState(const csdb::Address& sc, const csdb::Address& initiator, const api::SmartContractInvocation& sci, const std::string& newState) {
@@ -426,15 +302,7 @@ void TokensMaster::checkNewState(const csdb::Address& sc, const csdb::Address& i
     ps.initiator = initiator;
     ps.method = sci.method;
     ps.params = sci.params;
-
-    {
-        std::lock_guard<decltype(cvMut_)> l(cvMut_);
-        auto& tid = newExecutes_[sc];
-        tid.newState = newState;
-        tid.invocations.push_back(ps);
-    }
-
-    tokCv_.notify_all();
+    updateTokenChaches(sc, newState, ps);
 }
 
 void TokensMaster::applyToInternal(const std::function<void(const TokensMap&, const HoldersMap&)> func) {
@@ -478,8 +346,6 @@ TokensMaster::TokensMaster(api::APIHandler*) {
 }
 TokensMaster::~TokensMaster() {
 }
-void TokensMaster::run() {
-}
 void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&) {
 }
 void TokensMaster::checkNewState(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) {
@@ -494,9 +360,6 @@ std::pair<csdb::Address, csdb::Address> TokensMaster::getTransferData(const csdb
 }
 std::string TokensMaster::getAmount(const api::SmartContractInvocation&) {
     return "";
-}
-TokenStandart TokensMaster::getTokenStandart(const std::vector<general::MethodDescription>&) {
-    return TokenStandart::NotAToken;
 }
 
 /*void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&) { }

@@ -642,6 +642,10 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
             return node_->getRoundPackRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::EmptyRoundPack:
             return node_->getEmptyRoundPack(data, size, rNum, firstPack.getSender());
+        case MsgTypes::StateRequest:
+            return node_->getStateRequest(data, size, rNum, firstPack.getSender());
+        case MsgTypes::StateReply:
+            return node_->getStateReply(data, size, rNum, firstPack.getSender());
         default:
             cserror() << "TRANSPORT> Unknown message type " << Packet::messageTypeToString(type) << " pack round " << rNum;
             break;
@@ -1216,6 +1220,9 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
 
     return true;
 }
+
+// Turn on testing blockchain ID in PING packets to prevent nodes from confuse alien ones
+#define PING_WITH_BCHID
 
 void Transport::sendPingPack(const Connection& conn) {
     cs::Sequence seq = node_->getBlockChain().getLastSequence();

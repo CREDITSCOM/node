@@ -1,107 +1,99 @@
 #include <csnode/blockhashes.hpp>
+
+#include <conveyer.hpp>
 #include <cstring>
-#include <fstream>
+
 #include <lib/system/logger.hpp>
 
+static const char* seqPath = "/seqdb";
+static const char* hashPath = "/hashdb";
+
 namespace cs {
-BlockHashes::BlockHashes()
-: db_{}
-, isDbInited_(false) {
+BlockHashes::BlockHashes(const std::string& path)
+: seqDb_(path + seqPath)
+, hashDb_(path + hashPath) {
+    initialization();
 }
 
-void BlockHashes::initStart() {
-}
-
-bool BlockHashes::initFromPrevBlock(csdb::Pool prevBlock) {
-    cs::Sequence seq = prevBlock.sequence();
-    db_.last_ = seq;
-    if (!isDbInited_) {
-        db_.first_ = 0;
-        db_.last_ = seq;
-        hashes_.reserve(db_.last_ + 1);
-        isDbInited_ = true;
+void BlockHashes::close() {
+    if (seqDb_.isOpen()) {
+        seqDb_.close();
     }
 
-    hashes_.emplace_back(prevBlock.hash());
-    return true;
-}
-
-void BlockHashes::initFinish() {
-    if (hashes_.size() >= 2) {
-        size_t lh = 0;
-        size_t rh = hashes_.size() - 1;
-        while (lh < rh) {
-            std::swap(hashes_[lh++], hashes_[rh--]);
-        }
-    }
-
-    for (const auto& hash : hashes_) {
-        cslog() << "READ> " << hash.to_string();
+    if (hashDb_.isOpen()) {
+        hashDb_.close();
     }
 }
 
-bool BlockHashes::loadNextBlock(csdb::Pool nextBlock) {
-    cs::Sequence seq = nextBlock.sequence();
-    if (!isDbInited_) {
-        db_.first_ = 0;
-        db_.last_ = seq;
-        isDbInited_ = true;
-    }
-    else if (seq <= db_.last_) {
-        csdebug() << __func__ << ": seq <= db_.last_";
-        return false;
+size_t BlockHashes::size() const {
+    return seqDb_.size();
+}
+
+bool BlockHashes::onNextBlock(const csdb::Pool& block) {
+    cs::Sequence seq = block.sequence();
+
+    auto hash = block.hash();
+    auto cachedHash = find(seq);
+
+    if (cachedHash == hash) {
+        return true;
     }
 
-    if (seq != hashes_.size()) {
-        csdebug() << __func__ << ": seq != hashes_.size()";
-        return false;  // see BlockChain::putBlock
-    }
+    seqDb_.insert(seq, hash.to_binary());
+    hashDb_.insert(hash.to_binary(), seq);
 
-    hashes_.emplace_back(nextBlock.hash());
-    db_.last_ = seq;
     return true;
 }
 
 csdb::PoolHash BlockHashes::find(cs::Sequence seq) const {
-    if (empty()) {
-        return csdb::PoolHash();
-    }
-    const auto& range = getDbStructure();
-    if (seq < range.first_ || range.last_ < seq) {
-        return csdb::PoolHash();
-    }
-    return hashes_[seq];
-}
-
-cs::Sequence BlockHashes::find(csdb::PoolHash hash) const {
-    const auto result = std::find(hashes_.cbegin(), hashes_.cend(), hash);
-
-    if (result != hashes_.cend()) {
-        return std::distance(hashes_.cbegin(), result);
-    }
-
-    return 0;
-}
-
-csdb::PoolHash BlockHashes::removeLast() {
-    if (hashes_.empty()) {
+    if (seqDb_.size() == 0 || !seqDb_.isKeyExists(seq)) {
         return csdb::PoolHash{};
     }
-    const auto result = hashes_.back();
-    hashes_.pop_back();
-    --db_.last_;
-    return result;
+
+    auto value = seqDb_.value<cs::Bytes>(seq);
+    return csdb::PoolHash::from_binary(std::move(value));
 }
 
-csdb::PoolHash BlockHashes::getLast() const {
-    if (hashes_.empty()) {
-        return csdb::PoolHash{};
+cs::Sequence BlockHashes::find(const csdb::PoolHash& hash) const {
+    if (hashDb_.size() == 0 || hash.is_empty() || !hashDb_.isKeyExists(hash.to_binary())) {
+        return cs::kWrongSequence;
     }
-    return hashes_.back();
+
+    return hashDb_.value<cs::Sequence>(hash.to_binary());
 }
 
-const std::vector<csdb::PoolHash>& BlockHashes::getHashes() const {
-    return hashes_;
+bool BlockHashes::remove(cs::Sequence sequence) {
+    auto hash = find(sequence);
+    if (hash.is_empty()) {
+        return false;
+    }
+    seqDb_.remove(sequence);
+    hashDb_.remove(hash.to_binary());
+    return true;
 }
 
+bool BlockHashes::remove(const csdb::PoolHash& hash) {
+    auto sequence = find(hash);
+    if (sequence == kWrongSequence) {
+        return false;
+    }
+    seqDb_.remove(sequence);
+    hashDb_.remove(hash.to_binary());
+    return true;
+}
+
+void BlockHashes::onDbFailed(const LmdbException& exception) {
+    cswarning() << csfunc() << ", block hashes database exception: " << exception.what();
+}
+
+void BlockHashes::initialization() {
+    cs::Connector::connect(&seqDb_.failed, this, &BlockHashes::onDbFailed);
+    cs::Connector::connect(&hashDb_.failed, this, &BlockHashes::onDbFailed);
+
+    seqDb_.setMapSize(cs::Lmdb::Default1GbMapSize);
+    hashDb_.setMapSize(cs::Lmdb::Default1GbMapSize);
+
+    seqDb_.open();
+    hashDb_.open();
+}
 }  // namespace cs

@@ -1,48 +1,40 @@
 #ifndef BLOCKHASHES_HPP
 #define BLOCKHASHES_HPP
 
+#include <map>
+
 #include <csdb/pool.hpp>
-#include <vector>
+#include <lmdb.hpp>
 
 namespace cs {
 class BlockHashes {
 public:
-    struct DbStructure {
-        cs::Sequence first_;
-        cs::Sequence last_;
-    };
-
-public:
-    BlockHashes();
-
-    const DbStructure& getDbStructure() const {
-        return db_;
-    }
+    explicit BlockHashes(const std::string& path);
+    ~BlockHashes() = default;
 
     bool empty() const {
-        return hashes_.empty();
+        return size() == 0;
     }
 
-    void initStart();
-    bool initFromPrevBlock(csdb::Pool prevBlock);
-    void initFinish();
-    bool loadNextBlock(csdb::Pool nextBlock);
+    size_t size() const;
+
+    void close();
+    bool onNextBlock(const csdb::Pool& block);
 
     csdb::PoolHash find(cs::Sequence seq) const;
+    cs::Sequence find(const csdb::PoolHash& hash) const;
 
-    cs::Sequence find(csdb::PoolHash hash) const;
+    bool remove(cs::Sequence);
+    bool remove(const csdb::PoolHash& hash);
 
-    csdb::PoolHash removeLast();
-
-    csdb::PoolHash getLast() const;
-
-    const std::vector<csdb::PoolHash>& getHashes() const;
+private slots:
+    void onDbFailed(const cs::LmdbException& exception);
 
 private:
-    std::vector<csdb::PoolHash> hashes_;
+    void initialization();
 
-    DbStructure db_;
-    bool isDbInited_;
+    cs::Lmdb seqDb_;
+    cs::Lmdb hashDb_;
 };
 }  // namespace cs
 

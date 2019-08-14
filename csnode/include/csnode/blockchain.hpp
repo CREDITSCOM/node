@@ -58,7 +58,8 @@ public:
         Id
     };
 
-    explicit BlockChain(csdb::Address genesisAddress, csdb::Address startAddress);
+    explicit BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
+                        bool recreateIndex = false);
     ~BlockChain();
 
     bool init(const std::string& path);
@@ -195,8 +196,9 @@ public slots:
     void onPayableContractReplenish(const csdb::Transaction& starter) {
         this->walletsCacheUpdater_->invokeReplenishPayableContract(starter);
     }
-    void onPayableContractTimeout(const csdb::Transaction& starter) {
-        this->walletsCacheUpdater_->rollbackReplenishPayableContract(starter);
+    void onContractTimeout(const csdb::Transaction& starter, cs::Sequence sequence) {
+        cs::WalletsCache::RefContractCall ref{ sequence, uint32_t(starter.id().index()) };
+        this->walletsCacheUpdater_->rollbackExceededTimeoutContract(starter, ref);
     }
     void onContractEmittedAccepted(const csdb::Transaction& emitted, const csdb::Transaction& starter) {
         this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter);
@@ -222,6 +224,7 @@ public:
     csdb::PoolHash getLastHash() const;
     cs::Sequence getLastSequence() const;
     csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
+    cs::Sequence getSequenceByHash(const csdb::PoolHash&) const;
 
     // get inner data (from caches)
 
@@ -237,10 +240,9 @@ public:
     void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
     void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>); 
 #endif
-	uint32_t getTransactionsCount(const csdb::Address&);
+    uint32_t getTransactionsCount(const csdb::Address&);
 
-#ifdef TRANSACTIONS_INDEX
-    csdb::TransactionID getLastTransaction(const csdb::Address&);
+    csdb::TransactionID getLastTransaction(const csdb::Address&) const;
     csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
 
     std::pair<csdb::PoolHash, uint32_t> getLastNonEmptyBlock();
@@ -248,7 +250,6 @@ public:
     uint64_t getTransactionsCount() const {
         return total_transactions_count_;
     }
-#endif
 
     const csdb::Address& getGenesisAddress() const;
 
@@ -256,12 +257,11 @@ public:
     bool getContractData(const csdb::Address& abs_addr, cs::Bytes& data) const;
 
 private:
+    void createCashesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
 
     void writeGenesisBlock();
-#ifdef TRANSACTIONS_INDEX
     void createTransactionsIndex(csdb::Pool&);
-#endif
 
     void logBlockInfo(csdb::Pool& pool);
 
@@ -291,6 +291,8 @@ private:
     void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id, const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset,
                          uint64_t limit);
 
+    void updateNonEmptyBlocks(const csdb::Pool&);
+
     bool good_;
 
     mutable std::recursive_mutex dbLock_;
@@ -306,7 +308,6 @@ private:
     std::unique_ptr<cs::WalletsPools> walletsPools_;
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
-#ifdef TRANSACTIONS_INDEX
     uint64_t total_transactions_count_ = 0;
 
     struct NonEmptyBlockData {
@@ -316,7 +317,6 @@ private:
     std::map<csdb::PoolHash, NonEmptyBlockData> previousNonEmpty_;
 
     NonEmptyBlockData lastNonEmptyBlock_;
-#endif
 
     /**
      * @fn    std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool pool, std::optional<cs::PrivateKey> writer_key);
@@ -365,6 +365,8 @@ private:
 
     // may be modified once in uuid() method:
     mutable uint64_t uuid_ = 0;
+    bool recreateIndex_;
+    std::map<csdb::Address, csdb::PoolHash> lapoos;
 };
 
 class TransactionsIterator {
@@ -386,11 +388,7 @@ public:
     }
 
 private:
-#ifdef TRANSACTIONS_INDEX
     void setFromTransId(const csdb::TransactionID&);
-#else
-    void setFromHash(const csdb::PoolHash&);
-#endif
 
     BlockChain& bc_;
 

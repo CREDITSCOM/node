@@ -13,13 +13,92 @@
 #include <csnode/nodeutils.hpp>
 #include <solver/smartcontracts.hpp>
 
+#include <boost/filesystem.hpp>
+#include <boost/iostreams/device/mapped_file.hpp>
+
 #include <client/config.hpp>
 
-//#define RECREATE_INDEX
-
 using namespace cs;
+namespace fs = boost::filesystem;
 
-BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
+namespace {
+const char* cashesPath = "./cashes";
+const std::string lastIndexedPath = std::string(cashesPath) + "/last_indexed";
+cs::Sequence lastIndexedPool;
+
+using FileSource = boost::iostreams::mapped_file_source;
+using FileSink = boost::iostreams::mapped_file_sink;
+
+template <class BoostMMapedFile>
+class MMappedFileWrap {
+public:
+    MMappedFileWrap(const std::string& path,
+            size_t maxSize = boost::iostreams::mapped_file::max_length,
+            bool createNew = true) {
+        try {
+            if (!createNew) {
+                file_.open(path, maxSize);
+            }
+            else {
+                boost::iostreams::mapped_file_params params;
+                params.path = path;
+                params.new_file_size = maxSize;
+                file_.open(params);
+            }
+        }
+        catch (std::exception& e) {
+            cserror() << e.what();
+        }
+        catch (...) {
+            cserror() << __FILE__ << ", "
+                      << __LINE__
+                      << " exception ...";
+        }
+    }
+
+    bool isOpen() {
+        return file_.is_open();
+    }
+
+    ~MMappedFileWrap() {
+        if (isOpen()) {
+            file_.close();
+        }
+    }
+
+    template<typename T>
+    T* data() {
+        return isOpen() ? (T*)file_.data() : nullptr;
+    }
+
+private:
+    BoostMMapedFile file_;
+};
+
+inline void checkLastIndFile(bool& recreateIndex) {
+    fs::path p(lastIndexedPath);
+    if (!fs::is_regular_file(p)) {
+        recreateIndex = true;
+        return;
+    }
+    MMappedFileWrap<FileSource> f(lastIndexedPath, sizeof(cs::Sequence), false);
+    if (!f.isOpen()) {
+        recreateIndex = true; 
+        return;
+    }
+    lastIndexedPool = *(f.data<const cs::Sequence>());
+}
+
+inline void updateLastIndFile() {
+    static MMappedFileWrap<FileSink> f(lastIndexedPath, sizeof(cs::Sequence));
+    auto ptr = f.data<cs::Sequence>();
+    if (ptr) {
+        *ptr = lastIndexedPool;
+    }
+}
+} // namespace
+
+BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress, bool recreateIndex)
 : good_(false)
 , dbLock_()
 , genesisAddress_(genesisAddress)
@@ -27,10 +106,17 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress)
 , walletIds_(new WalletsIds)
 , walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
-, cacheMutex_() {
+, cacheMutex_()
+, recreateIndex_(recreateIndex) {
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
+
+    createCashesPath();
+    if (!recreateIndex_) {
+        checkLastIndFile(recreateIndex_);
+    }
+
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
-    blockHashes_ = std::make_unique<cs::BlockHashes>();
+    blockHashes_ = std::make_unique<cs::BlockHashes>(cashesPath);
 }
 
 BlockChain::~BlockChain() {
@@ -70,18 +156,15 @@ bool BlockChain::init(const std::string& path) {
         std::cout << "Done\n";
     }
 
-#if defined(TRANSACTIONS_INDEX) && defined(RECREATE_INDEX)
-    for (uint32_t seq = 0; seq <= getLastSequence(); ++seq) {
-        auto pool = loadBlock(seq);
-        createTransactionsIndex(pool);
+    if (recreateIndex_) {
+        recreateIndex_ = false;
+        lapoos.clear();
+        cslog() << "Recreated index 0 -> " << getLastSequence()
+                << ". Continue to keep it actual from new blocks.";
     }
 
-    cslog() << "Recreated the index 0->" << getLastSequence() << ". Finishing with error now. Because we can";
-    return false;
-#else
     good_ = true;
     return true;
-#endif
 }
 
 bool BlockChain::isGood() const {
@@ -98,31 +181,39 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         cs::Lock lock(dbLock_);
         uuid_ = uuidFromBlock(block);
         csdebug() << "Blockchain: UUID = " << uuid_;
+        if (recreateIndex_) {
+            storage_.truncate_trxs_index();
+        }
     }
     if (!updateWalletIds(block, *walletsCacheUpdater_.get())) {
         cserror() << "Blockchain: updateWalletIds() failed on block #" << block.sequence();
         *shouldStop = true;
     }
     else {
-        walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
-        if (!blockHashes_->initFromPrevBlock(block)) {
-            cserror() << "Blockchain: blockHashes_->initFromPrevBlock(block) failed on block #" << block.sequence();
+        if (!blockHashes_->onNextBlock(block)) {
+            cserror() << "Blockchain: blockHashes_->onReadBlock(block) failed on block #" << block.sequence();
             *shouldStop = true;
         }
         else {
-#ifdef TRANSACTIONS_INDEX
-            const auto cnt_tr = block.transactions_count();
-            if (cnt_tr > 0) {
-                total_transactions_count_ += cnt_tr;
-
-                if (lastNonEmptyBlock_.transCount && block.hash() != lastNonEmptyBlock_.hash) {
-                    previousNonEmpty_[block.hash()] = lastNonEmptyBlock_;
-                }
-                lastNonEmptyBlock_.hash = block.hash();
-                lastNonEmptyBlock_.transCount = static_cast<uint32_t>(block.transactions().size());
+            if (recreateIndex_ || lastIndexedPool < block.sequence()) {
+                createTransactionsIndex(block);
             }
-#endif
+            updateNonEmptyBlocks(block);
         }
+        walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
+    }
+}
+
+inline void BlockChain::updateNonEmptyBlocks(const csdb::Pool& pool) {
+    const auto cntTr = pool.transactions_count();
+    if (cntTr > 0) {
+        total_transactions_count_ += cntTr;
+
+        if (lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash) {
+            previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
+        }
+        lastNonEmptyBlock_.hash = pool.hash();
+        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(cntTr);
     }
 }
 
@@ -139,24 +230,20 @@ bool BlockChain::postInitFromDB() {
     return true;
 }
 
-#ifdef TRANSACTIONS_INDEX
 void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
-#ifdef RECREATE_INDEX
-    static std::map<csdb::Address, csdb::PoolHash> lapoos;
-#endif
-
-    // Update
     std::set<csdb::Address> indexedAddrs;
 
     auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
         auto key = getAddressByType(addr, BlockChain::AddressType::PublicKey);
         if (indexedAddrs.insert(key).second) {
-#ifdef RECREATE_INDEX
-            csdb::PoolHash lapoo = lapoos[key];
-            lapoos[key] = pool.hash();
-#else
-            csdb::PoolHash lapoo = getLastTransaction(key).pool_hash();
-#endif
+            csdb::PoolHash lapoo;
+            if (recreateIndex_) {
+                lapoo = lapoos[key];
+                lapoos[key] = pool.hash();
+            }
+            else {
+                lapoo = getLastTransaction(key).pool_hash();
+            }
             std::lock_guard<decltype(dbLock_)> l(dbLock_);
             storage_.set_previous_transaction_block(key, pool.hash(), lapoo);
         }
@@ -167,18 +254,9 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
         lbd(tr.target());
     }
 
-    if (pool.transactions().size()) {
-        total_transactions_count_ += pool.transactions().size();
-
-        if (lastNonEmptyBlock_.transCount && pool.hash() != lastNonEmptyBlock_.hash) {
-            previousNonEmpty_[pool.hash()] = lastNonEmptyBlock_;
-        }
-
-        lastNonEmptyBlock_.hash = pool.hash();
-        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(pool.transactions().size());
-    }
+    lastIndexedPool = pool.sequence();
+    updateLastIndFile();
 }
-#endif
 
 cs::Sequence BlockChain::getLastSequence() const {
     std::lock_guard lock(dbLock_);
@@ -186,12 +264,23 @@ cs::Sequence BlockChain::getLastSequence() const {
     if (deferredBlock_.is_valid()) {
         return deferredBlock_.sequence();
     }
-    else if (!blockHashes_->empty()) {
-        return blockHashes_->getDbStructure().last_;
+    // try to sequence get from blockHashes
+    cs::Sequence seq = blockHashes_->find(storage_.last_hash());
+    if (seq != kWrongSequence) {
+        return seq;
     }
-    else {
-        return 0;
+    // the last possible way (actually, blockchain does not allow "wholes" in sequences)
+    return storage_.size() - 1;
+}
+
+csdb::PoolHash BlockChain::getLastHash() const {
+    std::lock_guard lock(dbLock_);
+
+    if (deferredBlock_.is_valid()) {
+        return deferredBlock_.hash().clone();
     }
+
+    return storage_.last_hash();
 }
 
 std::string BlockChain::getLastTimeStamp() const {
@@ -275,16 +364,6 @@ void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<vo
     func(*wd);
 }
 #endif
-
-csdb::PoolHash BlockChain::getLastHash() const {
-    std::lock_guard lock(dbLock_);
-
-    if (deferredBlock_.is_valid()) {
-        return deferredBlock_.hash().clone();
-    }
-
-    return storage_.last_hash();
-}
 
 size_t BlockChain::getSize() const {
     std::lock_guard lock(dbLock_);
@@ -372,30 +451,12 @@ void BlockChain::removeLastBlock() {
         return;
     }
 
-    const auto lastHash = blockHashes_->getLast();
-    const csdb::PoolHash poolHash = pool.hash();
-
-    if (lastHash == poolHash) {
-        blockHashes_->removeLast();
-        csmeta(csdebug) << "Remove last hash is ok, sequence: " << pool.sequence();
-    }
-    else {
-        csmeta(cserror) << "Error! Last pool hash mismatch";
-        const auto findSequence = blockHashes_->find(poolHash);
-        const auto& bh = blockHashes_->getHashes();
-        csmeta(cserror) << "Block hashes size: " << bh.size() << ", Pool sequence: " << pool.sequence() << ", in Block hashes sequence: " << findSequence
-                        << (findSequence != 0 ? "" : " (hash not found)");
-        // if (findSequence == 0) {
-        //  for (std::size_t i = 0; i < bh.size(); ++i) {
-        //    csmeta(csdebug) << "Block hash [" << i << "]: " << bh[i].to_string();
-        //  }
-        //}
+    // to be sure, try to remove both sequence and hash
+    if (!blockHashes_->remove(pool.sequence())) {
+        blockHashes_->remove(pool.hash());
     }
 
-#ifdef TRANSACTIONS_INDEX
     total_transactions_count_ -= pool.transactions().size();
-#endif
-
     removeWalletsInPoolFromCache(pool);
 
     emit removeBlockEvent(pool.sequence());
@@ -533,9 +594,8 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
     }
     // pool signatures check: end
 
-#ifdef TRANSACTIONS_INDEX
     createTransactionsIndex(pool);
-#endif
+    updateNonEmptyBlocks(pool);
 
     if (!updateFromNextBlock(pool)) {
         csmeta(cserror) << "Error in updateFromNextBlock()";
@@ -553,7 +613,27 @@ csdb::PoolHash BlockChain::getHashBySequence(cs::Sequence seq) const {
         return deferredBlock_.hash().clone();
     }
 
-    return blockHashes_->find(seq);
+    csdb::PoolHash tmp = blockHashes_->find(seq);
+    if (!tmp.is_empty()) {
+        return tmp;
+    }
+
+    return storage_.pool_hash(seq);
+}
+
+cs::Sequence BlockChain::getSequenceByHash(const csdb::PoolHash& hash) const {
+    std::lock_guard lock(dbLock_);
+    
+    if (deferredBlock_.hash() == hash) {
+        return deferredBlock_.sequence();
+    }
+
+    cs::Sequence seq = blockHashes_->find(hash);
+    if (seq != kWrongSequence) {
+        return seq;
+    }
+
+    return storage_.pool_sequence(hash);
 }
 
 uint64_t BlockChain::getWalletsCountWithBalance() {
@@ -826,11 +906,13 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
 void BlockChain::close() {
     cs::Lock lock(dbLock_);
     storage_.close();
+    cs::Connector::disconnect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
+    blockHashes_->close();
 }
 
 bool BlockChain::getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const {
     cs::Lock lock(dbLock_);
-    return storage_.get_from_blockchain(addr, innerId, result);
+    return storage_.get_from_blockchain(addr, innerId, getLastTransaction(addr).pool_hash(), result);
 }
 
 bool BlockChain::updateContractData(const csdb::Address& abs_addr, const cs::Bytes& data) const {
@@ -841,6 +923,16 @@ bool BlockChain::updateContractData(const csdb::Address& abs_addr, const cs::Byt
 bool BlockChain::getContractData(const csdb::Address& abs_addr, cs::Bytes& data) const {
     cs::Lock lock(dbLock_);
     return storage_.get_contract_data(abs_addr, data);
+}
+
+void BlockChain::createCashesPath() {
+    fs::path dbPath(cashesPath);
+    boost::system::error_code code;
+    const auto res = fs::is_directory(dbPath, code);
+
+    if (!res) {
+        fs::create_directory(dbPath);
+    }
 }
 
 bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
@@ -856,7 +948,7 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
         const auto& currentRoundConfidants = nextPool.confidants();
         walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants, *this);
         walletsPools_->loadNextBlock(nextPool);
-        if (!blockHashes_->loadNextBlock(nextPool)) {
+        if (!blockHashes_->onNextBlock(nextPool)) {
             cslog() << "Error writing DB structure";
         }
     }
@@ -1372,8 +1464,7 @@ uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
 //    return uuidFromBlock(loadBlock(1));
 //}
 
-#ifdef TRANSACTIONS_INDEX
-csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) {
+csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) const {
     std::lock_guard lock(cacheMutex_);
     WalletId id;
 
@@ -1455,54 +1546,3 @@ void TransactionsIterator::next() {
         }
     }
 }
-
-#else
-
-void TransactionsIterator::setFromHash(const csdb::PoolHash& ph) {
-    auto hash = ph;
-    bool found = false;
-
-    while (!found) {
-        lapoo_ = bc_.loadBlock(hash);
-
-        if (!lapoo_.is_valid()) {
-            break;
-        }
-
-        for (it_ = lapoo_.transactions().rbegin(); it_ != lapoo_.transactions().rend(); ++it_) {
-            if (bc_.isEqual(it_->source(), addr_) || bc_.isEqual(it_->target(), addr_)) {
-                found = true;
-                break;
-            }
-        }
-
-        hash = lapoo_.previous_hash();
-    }
-}
-
-TransactionsIterator::TransactionsIterator(BlockChain& bc, const csdb::Address& addr)
-: bc_(bc)
-, addr_(addr) {
-    setFromHash(bc_.getLastHash());
-}
-
-bool TransactionsIterator::isValid() const {
-    return lapoo_.is_valid();
-}
-
-void TransactionsIterator::next() {
-    bool found = false;
-
-    while (++it_ != lapoo_.transactions().rend()) {
-        if (bc_.isEqual(it_->source(), addr_) || bc_.isEqual(it_->target(), addr_)) {
-            found = true;
-            break;
-        }
-    }
-
-    if (!found) {
-        setFromHash(lapoo_.previous_hash());
-    }
-}
-
-#endif

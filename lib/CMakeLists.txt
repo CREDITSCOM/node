@@ -22,6 +22,7 @@ add_library(lib
   include/lib/system/scopeguard.hpp
   include/lib/system/random.hpp
   include/lib/system/reflection.hpp
+  include/lib/system/reference.hpp
   include/lib/system/console.hpp
   include/lib/system/processexception.hpp
   include/lib/system/process.hpp
@@ -36,7 +37,7 @@ endif(MSVC)
 target_include_directories(lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
     )
 
-target_link_libraries(lib rang cscrypto)
+target_link_libraries(lib rang cscrypto nameof)
 
 set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)

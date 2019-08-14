@@ -132,7 +132,7 @@ void SolverCore::setState(const StatePtr& pState) {
     }
 
     if (pstate) {
-        csdebug() << log_prefix << "pstate-off";
+        csdetails() << log_prefix << "pstate-off";
         pstate->off(*pcontext);
     }
     if (Consensus::Log) {
@@ -212,20 +212,36 @@ bool SolverCore::stateFailed(Result res) {
 //  }
 //}
 
-std::string SolverCore::chooseTimeStamp() {
+uint64_t SolverCore::lastTimeStamp() {
+    int64_t lts;
+    try {
+        lts = std::stoll(pnode->getBlockChain().getLastTimeStamp());
+    }
+    catch (...) {
+        csdebug() << "Timestamp was announced as zero";
+        return 0;
+    }
+    return lts;
+}
+
+std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
     int64_t lastTimeStamp;
     try {
       lastTimeStamp = std::stoll(pnode->getBlockChain().getLastTimeStamp());
     } catch(...) {
+        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
       return std::to_string(0);
     }
 
     std::list<double> stamps;
     double sx = 0, sx2 = 0;
-    double mean;
+    double mean = 0.0;
     int N = 0;
     for (auto& it : stageOneStorage) {
-        if (!it.roundTimeStamp.empty()) {
+        if (it.sender >= cs::Conveyer::instance().confidantsCount()) {
+            continue;
+        }
+        if (!it.roundTimeStamp.empty() && mask[it.sender] != cs::ConfidantConsts::InvalidConfidantIndex) {
             int64_t tStamp;
             try {
                 tStamp = std::stoll(it.roundTimeStamp);
@@ -247,7 +263,28 @@ std::string SolverCore::chooseTimeStamp() {
     while (isDrop) {
         if (N == 0) {
             csdebug() << "There is no nodes with valid TimeStamp";
-            return std::to_string(0);
+            int N0 = 0;
+            int sx0 = 0;
+            for (auto& it : stageOneStorage) {
+                int64_t tStamp;
+                try {
+                    tStamp = std::stoll(it.roundTimeStamp);
+                }
+                catch (...) {
+                    cswarning() << log_prefix << "incompatible timestamp received from [" << (int)it.sender << "]";
+                    continue;
+                }
+                ++N0;
+                sx0 += tStamp;
+            }
+
+            if (N0 > 0) {
+                return std::to_string(sx0/N0);
+            }
+            else {
+                return std::to_string(lastTimeStamp + 100);
+            }
+
         }
         double N_1 = 1. / N;
         mean = sx * N_1;
@@ -271,9 +308,13 @@ std::string SolverCore::chooseTimeStamp() {
 }
 
 // TODO: this function is to be implemented the block and RoundTable building <====
-void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& /*currentTimeStamp*/, cs::StageThree& stage3) {
+void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::PacketsHashes& hashes, std::string&& currentTimeStamp, cs::StageThree& stage3) {
     csmeta(csdetails) << "start";
     cs::Conveyer& conveyer = cs::Conveyer::instance();
+    if (conveyer.roundTable(conveyer.currentRoundNumber()) == nullptr) {
+        // test if is full round data available (metaStarage[r] + roundtable in metastorage[r])
+        return;
+    }
     cs::RoundTable table;
     //TODO: place here adjustTrustedCandidates() call
     table.round = conveyer.currentRoundNumber() + 1;
@@ -284,17 +325,20 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
 
     // only for new consensus
     cs::PoolMetaInfo poolMetaInfo;
-    std::string timeStamp = chooseTimeStamp();
+    std::string timeStamp = conveyer.currentRoundNumber() == 1 ? currentTimeStamp : chooseTimeStamp(stage3.realTrustedMask);
     poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
     poolMetaInfo.timestamp = std::move(timeStamp);
-    poolMetaInfo.characteristic.mask = conveyer.characteristic(conveyer.currentRoundNumber())->mask;
+    auto ptr = conveyer.characteristic(conveyer.currentRoundNumber());
+    if (ptr != nullptr) {
+        poolMetaInfo.characteristic.mask = ptr->mask;
+    }
     //const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
     //if (confirmation.has_value()) {
     //    poolMetaInfo.confirmationMask = confirmation.value().mask;
     //    poolMetaInfo.confirmations = confirmation.value().signatures;
     //}
 
-    csdetails() << log_prefix << "timestamp: " << poolMetaInfo.timestamp;
+    csdebug() << log_prefix << "timestamp: " << poolMetaInfo.timestamp;
     for (std::size_t i = 0; i < hashes.size(); ++i) {
         csdetails() << log_prefix << '\t' << i << ". " << hashes[i].toString();
     }
