@@ -1041,7 +1041,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
     if (is_smart_state(trxn)) {
         cs::SmartContractRef scr(trxn.user_field(cs::trx_uf::new_state::RefStart));
         csdb::TransactionID trId(scr.hash, scr.transaction);
-        auto execTrans = solver.smart_contracts().get_contract_call(trxn); //s_blockchain.loadBlock(scr.sequence).transactions()[scr.transaction];
+        const auto execTrans = solver.smart_contracts().get_contract_call(trxn);
 
         if ((execTrans.is_valid() && is_smart(execTrans)) ||
             execTrans.amount().to_double()) { // payable
