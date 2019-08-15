@@ -324,6 +324,8 @@ public:
     struct ExecuteTransactionInfo {
         // transaction to execute contract
         csdb::Transaction transaction;
+        // transaction containing deploy info
+        csdb::Transaction deploy;
         // pass method name convention
         MethodNameConvention convention;
         // max allowed fee
