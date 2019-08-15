@@ -334,7 +334,9 @@ public:
         return get_smart_contract_impl(tr);
     }
 
-    csdb::Transaction get_contract_call(const csdb::Transaction& contract_state);
+    csdb::Transaction get_contract_call(const csdb::Transaction& contract_state) const;
+
+    csdb::Transaction get_contract_deploy(const csdb::Address& addr) const;
 
     // get & handle rejected transactions from smart contract(s)
     // usually ordinary consensus may reject smart-related transactions
@@ -663,6 +665,8 @@ public:
 private:
     // non-static variant
     csdb::Transaction get_transaction(const SmartContractRef& contract, const csdb::Address& abs_addr) const;
+
+    csdb::Transaction get_deploy_transaction(const csdb::Address& abs_addr) const;
 
     void enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_log);
 
