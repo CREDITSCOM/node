@@ -570,7 +570,8 @@ private:
 
     // is locked in all non-static public methods
     // is locked in const methods also
-    mutable cs::SpinLock public_access_lock = ATOMIC_FLAG_INIT;
+    //mutable cs::SpinLock public_access_lock = ATOMIC_FLAG_INIT;
+    mutable std::mutex public_access_lock;
 
     using queue_iterator = std::list<QueueItem>::iterator;
     using queue_const_iterator = std::list<QueueItem>::const_iterator;
