@@ -55,7 +55,7 @@ csdb::PoolHash BlockHashes::find(cs::Sequence seq) const {
 }
 
 cs::Sequence BlockHashes::find(const csdb::PoolHash& hash) const {
-    if (hashDb_.size() == 0 || hash.is_empty() || !hashDb_.isKeyExists(hash.to_binary())) {
+    if (hash.is_empty() || hashDb_.size() == 0 || !hashDb_.isKeyExists(hash.to_binary())) {
         return cs::kWrongSequence;
     }
 
