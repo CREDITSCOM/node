@@ -205,19 +205,19 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     while (lastSequence >= rNum) {
         if (countRemoved == 0) {
             // the 1st time
-            csdebug() << "NODE> remove " << lastSequence - rNum << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+            csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
         }
 
         blockChain_.removeLastBlock();
-        cs::RoundNumber tmp = blockChain_.getLastSequence();
+        cs::RoundNumber tmp_seq = blockChain_.getLastSequence();
 
-        if (lastSequence == tmp) {
+        if (lastSequence == tmp_seq) {
             csdebug() << "NODE> cancel remove blocks operation (last removal is failed)";
             break;
         }
 
         ++countRemoved;
-        lastSequence = tmp;
+        lastSequence = tmp_seq;
     }
 
     if (countRemoved > 0) {
