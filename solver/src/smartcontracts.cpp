@@ -1999,8 +1999,13 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         // create or get contract state item
         StateItem& item = known_contracts[abs_addr];
         // update state value in cache if it is older then or equal to or unset
+#if defined(MONITOR_NODE) || defined(WEB_WALLET_NODE)
         constexpr bool force_update_contracts_cache = true; // until TokenMaster to become more smart
         if constexpr (force_update_contracts_cache || !item.ref_cache.is_valid() || item.ref_cache < ref_start || item.ref_cache == ref_start) {
+#else
+        constexpr bool force_update_contracts_cache = false; // until TokenMaster to become more smart
+        if (force_update_contracts_cache || !item.ref_cache.is_valid() || item.ref_cache < ref_start || item.ref_cache == ref_start) {
+#endif
             if (!dbcache_update(abs_addr, ref_start, state_value, force_update_contracts_cache)) {
                 if (reading_db) {
                     // update state in memory cache

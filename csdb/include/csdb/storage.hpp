@@ -11,8 +11,9 @@
 #include <string>
 #include <vector>
 
-#include "csdb/database.hpp"
-#include "csdb/transaction.hpp"
+#include <csdb/database.hpp>
+#include <csdb/transaction.hpp>
+#include <csdb/internal/shared_data_ptr_implementation.hpp>
 
 #include <lib/system/common.hpp>
 #include <lib/system/signals.hpp>
