@@ -1509,6 +1509,11 @@ api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& a
         abs_addr = s_blockchain.getAddressByType(addr, BlockChain::AddressType::PublicKey);
     }
 
+    const auto deploy = solver.smart_contracts().get_contract_deploy(addr);
+    if (deploy.is_valid()) {
+        return fetch_smart(deploy);
+    }
+
     decltype(auto) locked_smart_origin = lockedReference(this->smart_origin);
 
     auto it = locked_smart_origin->find(abs_addr);
