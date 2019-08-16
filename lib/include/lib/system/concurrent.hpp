@@ -399,7 +399,7 @@ private:
     cs::SpinLock lock_{ATOMIC_FLAG_INIT};
     S hash_;
 
-	const unsigned int WAIT_SECONDS_TIME{ 30 };
+    const unsigned int kWaitSecondsTime{ 30 };
 
 public:
     inline WorkerQueue() noexcept
@@ -415,10 +415,10 @@ public:
     template <typename T>
     bool waitTillFront(const T& t) {
         std::unique_lock lock(lock_);
-        auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(WAIT_SECONDS_TIME), [&]() { return t(hash_); });
+        auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(kWaitSecondsTime), [&]() { return t(hash_); });
         tidMap_.erase(std::this_thread::get_id());
         conditionalVariable_.notify_all();
-		return res;
+        return res;
     }
 
     void yield() {
