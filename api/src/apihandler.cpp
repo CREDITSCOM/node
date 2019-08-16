@@ -934,8 +934,12 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
         SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
         return;
     }
-    _return.smartContract = fetch_smart_body(executor_.loadTransactionApi(smartrid));
     const csdb::Address adrs = BlockChain::getAddressFromKey(address);
+    auto transaction = solver.smart_contracts().get_contract_deploy(adrs);
+    if (!transaction.is_valid()) {
+        transaction = executor_.loadTransactionApi(smartrid);
+    }
+    _return.smartContract = fetch_smart_body(transaction);
     _return.smartContract.objectState = cs::SmartContracts::get_contract_state(s_blockchain, adrs);
 
     SetResponseStatus(_return.status, !_return.smartContract.address.empty() ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
@@ -1037,7 +1041,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
     if (is_smart_state(trxn)) {
         cs::SmartContractRef scr(trxn.user_field(cs::trx_uf::new_state::RefStart));
         csdb::TransactionID trId(scr.hash, scr.transaction);
-        auto execTrans = s_blockchain.loadBlock(scr.sequence).transactions()[scr.transaction];
+        const auto execTrans = solver.smart_contracts().get_contract_call(trxn);
 
         if ((execTrans.is_valid() && is_smart(execTrans)) ||
             execTrans.amount().to_double()) { // payable
@@ -1250,8 +1254,11 @@ void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, 
             --offset;
         }
         else if (limit) {
-            auto trid = p.second;
-            auto tr = executor_.loadTransactionApi(trid);
+            auto tr = solver.smart_contracts().get_contract_deploy(p.first);
+            if (!tr.is_valid()) {
+                auto trid = p.second;
+                tr = executor_.loadTransactionApi(trid);
+            }
             _return.smartContractsList.push_back(fetch_smart_body(tr));
             --limit;
         }
@@ -2067,7 +2074,7 @@ void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
 ////////new
 
 void APIHandler::SyncStateGet(api::SyncStateResult& _return) {
-    _return.lastBlock = executor_.loadBlockApi(s_blockchain.getLastHash()).sequence();
+    _return.lastBlock = s_blockchain.getLastSequence();
     _return.currRound = cs::Conveyer::instance().currentRoundNumber();
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
@@ -2247,7 +2254,8 @@ namespace executor {
             return std::nullopt;
         }
         const auto& head_transaction = smarts[0].transaction;
-        if (!head_transaction.is_valid()) {
+        const auto& deployTrxn = smarts[0].deploy;
+        if (!head_transaction.is_valid() || !deployTrxn.is_valid()) {
             return std::nullopt;
         }
         // all smarts must have the same initiator and address
@@ -2263,18 +2271,17 @@ namespace executor {
         auto smartTarget = blockchain_.getAddressByType(target, BlockChain::AddressType::PublicKey);
 
         // get deploy transaction
-        csdb::Transaction deployTrxn;
-        const auto isdeploy = isDeploy(head_transaction);
-        if (!isdeploy) {  // execute
-            const auto optDeployId = getDeployTrxn(smartTarget);
-            if (!optDeployId.has_value()) {
-                return std::nullopt;
-            }
-            deployTrxn = loadTransactionApi(optDeployId.value());
-        }
-        else {
-            deployTrxn = head_transaction;
-        }
+        const auto isdeploy = (head_transaction.id() == deployTrxn.id()); //isDeploy(head_transaction);
+        //if (!isdeploy) {  // execute
+        //    const auto optDeployId = getDeployTrxn(smartTarget);
+        //    if (!optDeployId.has_value()) {
+        //        return std::nullopt;
+        //    }
+        //    deployTrxn = loadTransactionApi(optDeployId.value());
+        //}
+        //else {
+        //    deployTrxn = head_transaction;
+        //}
 
         // fill smartContractBinary
         const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(cs::trx_uf::deploy::Code).value<std::string>());
@@ -2404,25 +2411,25 @@ namespace executor {
     std::optional<Executor::ExecuteResult> Executor::reexecuteContract(ExecuteTransactionInfo& contract, std::string forceContractState) {
         std::lock_guard lock(callExecutorLock_);  // temporary solution
 
-        if (!contract.transaction.is_valid()) {
+        if (!contract.transaction.is_valid() || !contract.deploy.is_valid()) {
             return std::nullopt;
         }
         auto smartSource = blockchain_.getAddressByType(contract.transaction.source(), BlockChain::AddressType::PublicKey);
         auto smartTarget = blockchain_.getAddressByType(contract.transaction.target(), BlockChain::AddressType::PublicKey);
 
         // get deploy transaction
-        csdb::Transaction deployTrxn;
-        const auto isdeploy = isDeploy(contract.transaction);
-        if (!isdeploy) {  // execute
-            const auto optDeployId = getDeployTrxn(smartTarget);
-            if (!optDeployId.has_value()) {
-                return std::nullopt;
-            }
-            deployTrxn = loadTransactionApi(optDeployId.value());
-        }
-        else {
-            deployTrxn = contract.transaction;
-        }
+        const csdb::Transaction& deployTrxn = contract.deploy;
+        const auto isdeploy = (contract.deploy.id() == contract.transaction.id()); // isDeploy(contract.transaction);
+        //if (!isdeploy) {  // execute
+        //    const auto optDeployId = getDeployTrxn(smartTarget);
+        //    if (!optDeployId.has_value()) {
+        //        return std::nullopt;
+        //    }
+        //    deployTrxn = loadTransactionApi(optDeployId.value());
+        //}
+        //else {
+        //    deployTrxn = contract.transaction;
+        //}
 
         // fill smartContractBinary
         const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());

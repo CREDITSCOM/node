@@ -33,7 +33,6 @@ The node consists of the following elements:</p>
 <li>Compiler with C++17 support</li>
 <li><a href="https://cmake.org/download/">Cmake 3.11</a> or newest</li>
 <li> Requirements fo building <a href="https://thrift.apache.org/docs/install/">Apache Thrift</a></li>
-<li><a href="https://github.com/jedisct1/libsodium">libsodium</a></li>
 <li>The building Berkeley DB distribution uses the Free Software Foundation's autoconf and libtool tools to build on UNIX platforms.</li>
 
 On Windows:<br/>
