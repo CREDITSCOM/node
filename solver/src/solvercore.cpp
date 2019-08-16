@@ -329,7 +329,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
     poolMetaInfo.timestamp = std::move(timeStamp);
     auto ptr = conveyer.characteristic(conveyer.currentRoundNumber());
-    if (ptr == nullptr) {
+    if (ptr != nullptr) {
         poolMetaInfo.characteristic.mask = ptr->mask;
     }
     //const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());

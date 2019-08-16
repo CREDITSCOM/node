@@ -205,19 +205,19 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     while (lastSequence >= rNum) {
         if (countRemoved == 0) {
             // the 1st time
-            csdebug() << "NODE> remove " << lastSequence - rNum << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+            csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
         }
 
         blockChain_.removeLastBlock();
-        cs::RoundNumber tmp = blockChain_.getLastSequence();
+        cs::RoundNumber tmp_seq = blockChain_.getLastSequence();
 
-        if (lastSequence == tmp) {
+        if (lastSequence == tmp_seq) {
             csdebug() << "NODE> cancel remove blocks operation (last removal is failed)";
             break;
         }
 
         ++countRemoved;
-        lastSequence = tmp;
+        lastSequence = tmp_seq;
     }
 
     if (countRemoved > 0) {
@@ -2127,43 +2127,48 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    uint64_t lastTimeStamp;
-    uint64_t currentTimeStamp;
-    uint64_t rpTimeStamp;
-    try {
-        lastTimeStamp = std::stoll(getBlockChain().getLastTimeStamp());
-    }
-    catch (...) {
-        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
-    }
-
-    try {
-        currentTimeStamp = std::stoll(cs::Utils::currentTimestamp());
-    }
-    catch (...) {
-        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
-    }
-
-    try {
-        rpTimeStamp = std::stoll(rPackage.poolMetaInfo().timestamp);
-    }
-    catch (...) {
-        csdebug() << "ChooseTimeStamp - Timestamp was announced as zero";
-    }
-    
-    if(rPackage.roundTable().round > conveyer.currentRoundNumber() + 1) {
-        uint64_t delta;
-        if (lastTimeStamp > currentTimeStamp) {
-            delta = lastTimeStamp - currentTimeStamp;
+    if(conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree) {
+        uint64_t lastTimeStamp;
+        uint64_t currentTimeStamp;
+        uint64_t rpTimeStamp;
+        try {
+            lastTimeStamp = std::stoll(getBlockChain().getLastTimeStamp());
         }
-        else {
-            delta = currentTimeStamp - lastTimeStamp;
-        }
-        uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
-        
-        if ( speed < 50) {
-            cserror() << "just got RoundPackage can't be created with the speed " << speed << " bps";
+        catch (...) {
+            csdebug() << __func__ << ": last block Timestamp was announced as zero";
             return;
+        }
+
+        try {
+            currentTimeStamp = std::stoll(cs::Utils::currentTimestamp());
+        }
+        catch (...) {
+            csdebug() << __func__ << ": current Timestamp was announced as zero";
+            return;
+        }
+
+        try {
+            rpTimeStamp = std::stoll(rPackage.poolMetaInfo().timestamp);
+        }
+        catch (...) {
+            csdebug() << __func__ << ": just received roundPackage Timestamp was announced as zero";
+            return;
+        }
+    
+        if(rPackage.roundTable().round > conveyer.currentRoundNumber() + 1) {
+            uint64_t delta;
+            if (lastTimeStamp > currentTimeStamp) {
+                delta = lastTimeStamp - currentTimeStamp;
+            }
+            else {
+                delta = currentTimeStamp - lastTimeStamp;
+            }
+            uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
+        
+            if (speed < 50) {
+                cserror() << "just got RoundPackage can't be created in " << speed << " msec per block";
+                return;
+            }
         }
     }
 

@@ -334,7 +334,9 @@ public:
         return get_smart_contract_impl(tr);
     }
 
-    csdb::Transaction get_contract_call(const csdb::Transaction& contract_state);
+    csdb::Transaction get_contract_call(const csdb::Transaction& contract_state) const;
+
+    csdb::Transaction get_contract_deploy(const csdb::Address& addr) const;
 
     // get & handle rejected transactions from smart contract(s)
     // usually ordinary consensus may reject smart-related transactions
@@ -568,7 +570,8 @@ private:
 
     // is locked in all non-static public methods
     // is locked in const methods also
-    mutable cs::SpinLock public_access_lock = ATOMIC_FLAG_INIT;
+    //mutable cs::SpinLock public_access_lock = ATOMIC_FLAG_INIT;
+    mutable std::mutex public_access_lock;
 
     using queue_iterator = std::list<QueueItem>::iterator;
     using queue_const_iterator = std::list<QueueItem>::const_iterator;
@@ -663,6 +666,8 @@ public:
 private:
     // non-static variant
     csdb::Transaction get_transaction(const SmartContractRef& contract, const csdb::Address& abs_addr) const;
+
+    csdb::Transaction get_deploy_transaction(const csdb::Address& abs_addr) const;
 
     void enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_log);
 

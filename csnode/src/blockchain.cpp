@@ -34,24 +34,26 @@ class MMappedFileWrap {
 public:
     MMappedFileWrap(const std::string& path,
             size_t maxSize = boost::iostreams::mapped_file::max_length,
-            bool createNew = true) try {
-        if (!createNew) {
-            file_.open(path, maxSize);
+            bool createNew = true) {
+        try {
+            if (!createNew) {
+                file_.open(path, maxSize);
+            }
+            else {
+                boost::iostreams::mapped_file_params params;
+                params.path = path;
+                params.new_file_size = maxSize;
+                file_.open(params);
+            }
         }
-        else {
-            boost::iostreams::mapped_file_params params;
-            params.path = path;
-            params.new_file_size = maxSize;
-            file_.open(params);
+        catch (std::exception& e) {
+            cserror() << e.what();
         }
-    }
-    catch (std::exception& e) {
-        cserror() << e.what();
-    }
-    catch (...) {
-        cserror() << __FILE__ << ", "
-                  << __LINE__
-                  << " exception ...";
+        catch (...) {
+            cserror() << __FILE__ << ", "
+                      << __LINE__
+                      << " exception ...";
+        }
     }
 
     bool isOpen() {

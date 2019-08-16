@@ -499,14 +499,23 @@ bool SmartContracts::is_payable_target(const csdb::Transaction& tr) {
 }
 
 /*public*/
-csdb::Transaction SmartContracts::get_contract_call(const csdb::Transaction& contract_state) {
+csdb::Transaction SmartContracts::get_contract_call(const csdb::Transaction& contract_state) const {
     cs::Lock lock(public_access_lock);
+
     csdb::UserField fld = contract_state.user_field(trx_uf::new_state::RefStart);
     if (fld.is_valid()) {
         SmartContractRef ref(fld);
         return get_transaction(ref, absolute_address(contract_state.target()));
     }
     return csdb::Transaction{};
+}
+
+/*public*/
+csdb::Transaction SmartContracts::get_contract_deploy(const csdb::Address& addr) const {
+    cs::Lock lock(public_access_lock);
+
+    const csdb::Address abs_addr = absolute_address(addr);
+    return get_deploy_transaction(abs_addr);
 }
 
 csdb::Transaction SmartContracts::get_transaction(const SmartContractRef& contract, const csdb::Address& abs_addr) const {
@@ -530,6 +539,17 @@ csdb::Transaction SmartContracts::get_transaction(const SmartContractRef& contra
         }
     }
     return SmartContracts::get_transaction(bc, contract);
+}
+
+csdb::Transaction SmartContracts::get_deploy_transaction(const csdb::Address& abs_addr) const {
+    auto it_state = known_contracts.find(abs_addr);
+    if (it_state != known_contracts.cend()) {
+        const auto& contract = it_state->second;
+        if (contract.deploy.is_valid()) {
+            return contract.deploy;
+        }
+    }
+    return csdb::Transaction{};
 }
 
 void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_log) {
@@ -1001,6 +1021,7 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                         else {
                             SmartExecutionData exe_data;
                             exe_data.contract_ref = ref_start;
+                            exe_data.abs_addr = req_abs_addr;
                             exe_data.executor_fee = csdb::Amount(tr_start.max_fee().to_double());
                             if (!SmartContracts::is_deploy(tr_start)) {
                                 if (in_known_contracts(req_abs_addr)) {
@@ -1347,6 +1368,7 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
     std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
     auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
     info.transaction = transaction;
+    info.deploy = get_deploy_transaction(data.abs_addr);
     info.sequence = data.contract_ref.sequence;
     // data.executor_fee bring all available fee for future execution:
     info.feeLimit = data.executor_fee;
