@@ -2365,22 +2365,31 @@ void SmartContracts::test_contracts_locks() {
         }
     }
     // no running items, ensure no locked contracts
-    for (auto& item : known_contracts) {
-        if (item.second.is_locked) {
-            item.second.is_locked = false;
-            csdebug() << kLogPrefix << "find locked contract " << to_base58(item.first) << " which is not executed now, unlock";
-        }
+    if (!locked_contracts.empty()) {
+        csdebug() << kLogPrefix << "find " << locked_contracts.size() << "  locked contract(s) which is not executed now, unlock";
+        locked_contracts.clear();
     }
 }
 
 void SmartContracts::update_lock_status(const csdb::Address& abs_addr, bool value, bool skip_log) {
-    auto it = known_contracts.find(abs_addr);
-    if (it != known_contracts.end()) {
-        if (it->second.is_locked != value) {
-            if (!skip_log) {
-                csdebug() << kLogPrefix << (value ? "lock" : "unlock") << " contract " << to_base58(abs_addr);
+    if (value) {
+        const auto result = locked_contracts.insert(abs_addr);
+        if (!skip_log) {
+            if (result.second) {
+                csdebug() << kLogPrefix << "lock contract " << to_base58(abs_addr);
             }
-            it->second.is_locked = value;
+            else {
+                csdebug() << kLogPrefix << "ignore duplicated " << to_base58(abs_addr) << " lock";
+            }
+        }
+    }
+    else {
+        auto it = locked_contracts.find(abs_addr);
+        if (it != locked_contracts.end()) {
+            locked_contracts.erase(it);
+            if (!skip_log) {
+                csdebug() << kLogPrefix << "unlock contract " << to_base58(abs_addr);
+            }
         }
     }
 }

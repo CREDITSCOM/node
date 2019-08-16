@@ -448,8 +448,6 @@ private:
 
     // defines current contract state, the contracts cache is a container of every contract state
     struct StateItem {
-        // is temporary locked from execution until current execution completed
-        bool is_locked{ false };
         // payable() method is implemented
         PayableStatus payable{ PayableStatus::Unknown };
         // reference to deploy transaction
@@ -470,6 +468,8 @@ private:
 
     // last contract's state storage
     std::map<csdb::Address, StateItem> known_contracts;
+
+    std::set<csdb::Address> locked_contracts;
 
     // contract replenish transactions stored during reading from DB on stratup
     std::vector<SmartContractRef> uncompleted_contracts;
@@ -721,12 +721,7 @@ private:
     }
 
     bool is_locked(const csdb::Address& abs_addr) const {
-        const auto it = known_contracts.find(abs_addr);
-        if (it != known_contracts.cend()) {
-            return it->second.is_locked;
-        }
-        // only known contracts are allowed to execute!
-        return true;
+        return (locked_contracts.find(abs_addr) != locked_contracts.cend());
     }
 
     void update_lock_status(const csdb::Address& abs_addr, bool value, bool skip_log);
