@@ -8,7 +8,9 @@
 
 #include <string>
 #include <vector>
-#include "csdb/internal/shared_data.hpp"
+
+#include <csdb/internal/shared_data.hpp>
+#include <csdb/internal/shared_data_ptr_implementation.hpp>
 
 namespace csdb {
 

@@ -12,15 +12,15 @@
 #include <string>
 #include <vector>
 
+#include <csdb/address.hpp>
+#include <csdb/internal/shared_data.hpp>
+#include <csdb/internal/shared_data_ptr_implementation.hpp>
+#include <csdb/internal/types.hpp>
+#include <csdb/storage.hpp>
+#include <csdb/transaction.hpp>
+#include <csdb/user_field.hpp>
+
 #include <lib/system/common.hpp>
-
-#include "csdb/address.hpp"
-#include "csdb/internal/shared_data.hpp"
-#include "csdb/internal/types.hpp"
-#include "csdb/storage.hpp"
-#include "csdb/transaction.hpp"
-#include "csdb/user_field.hpp"
-
 #include <cscrypto/cscrypto.hpp>
 
 namespace csdb {

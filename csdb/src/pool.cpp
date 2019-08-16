@@ -14,12 +14,11 @@
 #include <x86intrin.h>
 #endif
 
-#include "csdb/csdb.hpp"
+#include <csdb/csdb.hpp>
+#include <csdb/internal/utils.hpp>
 
-#include "binary_streams.hpp"
-#include "csdb/internal/shared_data_ptr_implementation.hpp"
-#include "csdb/internal/utils.hpp"
 #include "priv_crypto.hpp"
+#include "binary_streams.hpp"
 #include "transaction_p.hpp"
 
 namespace csdb {
