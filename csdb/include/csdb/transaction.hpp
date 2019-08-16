@@ -8,12 +8,12 @@
 
 #include <set>
 
-#include "csdb/user_field.hpp"
+#include <csdb/user_field.hpp>
+#include <csdb/internal/shared_data.hpp>
+#include <csdb/internal/shared_data_ptr_implementation.hpp>
+#include <csdb/internal/types.hpp>
 
-#include "csdb/internal/shared_data.hpp"
-#include "csdb/internal/types.hpp"
-
-#include "lib/system/common.hpp"
+#include <lib/system/common.hpp>
 
 namespace csdb {
 
