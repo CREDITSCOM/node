@@ -357,7 +357,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
         //
         WalletId id_s{};
         if (!findWalletId(tr.source(), id_s)) {
-            cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
+            cserror() << "Cannot find source wallet, source is " << tr.source().to_string();
             return 0;
         }
 
