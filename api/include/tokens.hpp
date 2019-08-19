@@ -32,18 +32,17 @@ enum TokenStandard {
 struct Token {
     int64_t tokenStandard;
     csdb::Address owner;
-
-    std::string name;
-    std::string symbol;
-    std::string totalSupply;
-
     uint64_t transactionsCount = 0;
     uint64_t transfersCount = 0;
-
     uint64_t realHoldersCount = 0;  // Non-zero balance
 
+    // Tmp—ache: name, symbol, totalSupply, balance
+    std::string name { "not loaded" };
+    std::string symbol { "not loaded" };
+    std::string totalSupply { "not loaded" };
+
     struct HolderInfo {
-        std::string balance = "0";
+        std::string balance { "not loaded" };
         uint64_t transfersCount = 0;
     };
     std::map<HolderKey, HolderInfo> holders;  // Including guys with zero balance
@@ -61,7 +60,7 @@ public:
 
     void checkNewState(const csdb::Address& sc, const csdb::Address& initiator, const api::SmartContractInvocation&, const std::string& newState);
 
-    void applyToInternal(const std::function<void(const TokensMap&, const HoldersMap&)>);
+    void loadTokenInfo(const std::vector<csdb::Address>& vaddr, const std::function<void(const TokensMap&, const HoldersMap&)>);
 
     static bool isTransfer(const std::string& method, const std::vector<general::Variant>& params);
 

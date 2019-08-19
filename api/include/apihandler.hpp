@@ -689,7 +689,7 @@ private:
 
     using client_type           = executor::ContractExecutorConcurrentClient;
     using smartHashStateEntry   = cs::WorkerQueue<HashState>;
-
+   
     BlockChain& s_blockchain;
     cs::SolverCore& solver;
 #ifdef MONITOR_NODE
