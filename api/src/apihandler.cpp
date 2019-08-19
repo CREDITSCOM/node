@@ -1511,6 +1511,7 @@ api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& a
 
     const auto deploy = solver.smart_contracts().get_contract_deploy(addr);
     if (deploy.is_valid()) {
+        present = true;
         return fetch_smart(deploy);
     }
 
