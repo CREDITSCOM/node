@@ -177,14 +177,17 @@ uint64_t BlockChain::uuid() const {
 }
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
-    if (block.sequence() == 1) {
+    auto blockSeq = block.sequence();
+    if (blockSeq == 0 && recreateIndex_) {
+        cs::Lock lock(dbLock_);
+        storage_.truncate_trxs_index();
+    }
+    if (blockSeq == 1) {
         cs::Lock lock(dbLock_);
         uuid_ = uuidFromBlock(block);
         csdebug() << "Blockchain: UUID = " << uuid_;
-        if (recreateIndex_) {
-            storage_.truncate_trxs_index();
-        }
     }
+
     if (!updateWalletIds(block, *walletsCacheUpdater_.get())) {
         cserror() << "Blockchain: updateWalletIds() failed on block #" << block.sequence();
         *shouldStop = true;
