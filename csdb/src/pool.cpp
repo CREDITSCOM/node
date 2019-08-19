@@ -63,6 +63,10 @@ bool PoolHash::operator<(const PoolHash& other) const noexcept {
     return (d != other.d) && (d->value < other.d->value);
 }
 
+size_t PoolHash::calcHash() const noexcept {
+    return *reinterpret_cast<const size_t *>(d->value.data());
+}
+
 PoolHash PoolHash::from_string(const ::std::string& str) {
     const cs::Bytes hash = ::csdb::internal::from_hex(str);
     const size_t sz = hash.size();

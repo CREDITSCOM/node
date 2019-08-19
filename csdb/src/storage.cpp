@@ -10,6 +10,10 @@
 #include <stdexcept>
 #include <thread>
 
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/member.hpp>
+
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
@@ -22,6 +26,8 @@
 #include <csdb/wallet.hpp>
 
 #include "binary_streams.hpp"
+
+using namespace boost::multi_index;
 
 namespace {
 struct last_error_struct {
@@ -141,12 +147,42 @@ private:
     std::mutex write_lock;
     std::condition_variable write_cond_var;
 
-private signals:
-    ReadBlockSignal read_block_event;
+    struct PoolElement {
+        cs::Sequence seq; struct bySequence {};
+        PoolHash hash;  struct byHash {};
+        Pool pool;
+    };
 
-    // TODO: Добавить кеш для хранения последних вычитанных пулов транзакций
+    typedef multi_index_container<
+        PoolElement,
+        indexed_by<
+            hashed_unique<
+                tag<PoolElement::bySequence>, member<
+                    PoolElement, cs::Sequence, &PoolElement::seq
+                >
+            >,
+            hashed_unique<
+                tag<PoolElement::byHash>, member<
+                    PoolElement, PoolHash, &PoolElement::hash
+                >
+            >
+        >
+    > PoolCache;
+    PoolCache pools_cache;
+    static const size_t cacheSize = 10000;
+
+    void pools_cache_insert(const cs::Sequence& seq, const PoolHash &hash, const Pool &pool) {
+        if (pools_cache.size() == cacheSize) {
+            auto random = pools_cache.begin();
+            pools_cache.erase(random);
+        }
+        pools_cache.insert({seq, hash, pool});
+    }
 
     friend class ::csdb::Storage;
+
+private signals:
+    ReadBlockSignal read_block_event;
 };
 
 void Storage::priv::set_last_error(Storage::Error error, const ::std::string& message) {
@@ -199,6 +235,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
         cs::Bytes v = it->value();
 
         Pool p = Pool::from_binary(std::move(v));
+        pools_cache_insert(p.sequence(), p.hash(), p);
         if (!p.is_valid()) {
             set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool for key'.");
             return false;
@@ -241,7 +278,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     //    set_last_error();
     //    return true;
     //}
-    
+
     return true;
 
 #if 0
@@ -434,6 +471,8 @@ bool Storage::pool_save(Pool pool) {
         }
     }
 
+    d->pools_cache_insert(pool.sequence(), pool.hash(), pool);
+
     d->set_last_error();
     return true;
 }
@@ -452,6 +491,21 @@ Pool Storage::pool_load_internal(const PoolHash& hash, const bool metaOnly, size
     Pool res;
     bool needParseData = true;
     cs::Bytes data;
+
+    const auto &index = d->pools_cache.get<Storage::priv::PoolElement::byHash>();
+    auto it = index.find(hash);
+    if (it != index.end()) {
+        res = (*it).pool;
+        if (!res.is_valid()) {
+            d->set_last_error(DataIntegrityError, "%s: Error decoding pool [hash: %s]", funcName(), hash.to_string().c_str());
+            return Pool{};
+        }
+        else {
+            d->set_last_error();
+        }
+        trxCnt = res.transactions().size();
+        return res;
+    }
 
     if (!d->db->get(hash.to_binary(), &data)) {
         {
@@ -478,6 +532,7 @@ Pool Storage::pool_load_internal(const PoolHash& hash, const bool metaOnly, size
         }
         else {
             res = Pool::from_binary(std::move(data));
+            trxCnt = res.transactions().size();
         }
     }
 
@@ -531,6 +586,20 @@ Pool Storage::pool_load(const cs::Sequence sequence) const {
     Pool res;
     bool needParseData = true;
     cs::Bytes data;
+
+    const auto &index = d->pools_cache.get<Storage::priv::PoolElement::bySequence>();
+    auto it = index.find(sequence);
+    if (it != index.end()) {
+        res = (*it).pool;
+        if (!res.is_valid()) {
+            d->set_last_error(DataIntegrityError);
+            return Pool{};
+        }
+        else {
+            d->set_last_error();
+        }
+        return res;
+    }
 
     if (!d->db->get(static_cast<uint32_t>(sequence), &data)) {
         {

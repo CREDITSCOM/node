@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/functional/hash.hpp>
+
 #include <csdb/address.hpp>
 #include <csdb/internal/shared_data.hpp>
 #include <csdb/internal/shared_data_ptr_implementation.hpp>
@@ -63,6 +65,7 @@ public:
      * использования класса в качестве ключа.
      */
     bool operator<(const PoolHash& other) const noexcept;
+    size_t calcHash() const noexcept;
 
     static PoolHash calc_from_data(const cs::Bytes& data);
 
@@ -316,5 +319,15 @@ inline bool PoolHash::operator !=(const PoolHash &other) const noexcept
   return !operator ==(other);
 }
 }  // namespace csdb
+
+namespace boost {
+template <>
+class hash<csdb::PoolHash> {
+public:
+    size_t operator()(const csdb::PoolHash &obj) const {
+        return obj.calcHash();
+    }
+};
+}  // namespace boost
 
 #endif // _CREDITS_CSDB_POOL_H_INCLUDED_
