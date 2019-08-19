@@ -1171,19 +1171,23 @@ void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const int64_
     if (seq < 0) {
         return;
     }
+    csmeta(csdebug) << "sequence " << seq << ", limit " << limit;
     bool limSet = false;
 
     while (limit) {
-        auto cch = poolCache.find(sequence);
+        auto lockedPoolCache = lockedReference(this->poolCache);
+        auto cch = lockedPoolCache->find(seq);
 
-        if (cch == poolCache.end()) {
+        if (cch == lockedPoolCache->end()) {
             auto pool = executor_.loadBlockApi(seq);
-            api::Pool apiPool = convertPool(pool);
-            _return.pools.push_back(apiPool);
-            poolCache.insert(cch, std::make_pair(seq, apiPool));
-            if (!limSet) {
-                _return.count = uint32_t(seq + 1);
-                limSet = true;
+            if (pool.is_valid()) {
+                api::Pool apiPool = convertPool(pool);
+                _return.pools.push_back(apiPool);
+                lockedPoolCache->insert(cch, std::make_pair(seq, apiPool));
+                if (!limSet) {
+                    _return.count = uint32_t(seq + 1);
+                    limSet = true;
+                }
             }
         }
         else {

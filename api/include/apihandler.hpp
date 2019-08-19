@@ -748,7 +748,7 @@ private:
 
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployed_by_creator;
     //cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
-    std::map<cs::Sequence, api::Pool> poolCache;
+    cs::SpinLockable < std::map<cs::Sequence, api::Pool> > poolCache;
     std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
     std::thread state_updater;
 
