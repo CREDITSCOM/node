@@ -257,7 +257,7 @@ public:
     bool getContractData(const csdb::Address& abs_addr, cs::Bytes& data) const;
 
 private:
-    void createCashesPath();
+    void createCachesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
 
     void writeGenesisBlock();

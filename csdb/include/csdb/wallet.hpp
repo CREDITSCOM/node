@@ -6,9 +6,10 @@
 #ifndef _CREDITS_CSDB_WALLET_H_INCLUDED_
 #define _CREDITS_CSDB_WALLET_H_INCLUDED_
 
-#include "csdb/currency.hpp"
-#include "csdb/internal/shared_data.hpp"
-#include "csdb/storage.hpp"
+#include <csdb/currency.hpp>
+#include <csdb/internal/shared_data.hpp>
+#include <csdb/internal/shared_data_ptr_implementation.hpp>
+#include <csdb/storage.hpp>
 
 namespace csdb {
 
