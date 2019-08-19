@@ -2337,7 +2337,7 @@ void SmartContracts::update_status(QueueItem& item, cs::RoundNumber r, SmartCont
                         os << " (started from " << WithDelimiters(item.seq_start) << ')';
                         extra_info = os.str();
                     }
-                    csdebug() << kLogPrefix << to_base58(t.target()) << ' ' << execution.ref_start
+                    csdetails() << kLogPrefix << to_base58(t.target()) << ' ' << execution.ref_start
                         << " is finished with timeout on " << WithDelimiters(r) << extra_info;
                 }
                 else {
