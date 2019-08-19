@@ -59,8 +59,6 @@ Node::Node(const Config& config)
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     alwaysExecuteContracts_ = config.alwaysExecuteContracts();
-    maxNeighboursSequence_ = blockChain_.getLastSequence();
-
     good_ = init(config);
 }
 
@@ -114,6 +112,7 @@ bool Node::init(const Config& config) {
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
     initCurrentRP();
+    maxNeighboursSequence_ = blockChain_.getLastSequence();
     return true;
 }
 
@@ -205,19 +204,19 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     while (lastSequence >= rNum) {
         if (countRemoved == 0) {
             // the 1st time
-            csdebug() << "NODE> remove " << lastSequence - rNum << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+            csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
         }
 
         blockChain_.removeLastBlock();
-        cs::RoundNumber tmp = blockChain_.getLastSequence();
+        cs::RoundNumber tmp_seq = blockChain_.getLastSequence();
 
-        if (lastSequence == tmp) {
+        if (lastSequence == tmp_seq) {
             csdebug() << "NODE> cancel remove blocks operation (last removal is failed)";
             break;
         }
 
         ++countRemoved;
-        lastSequence = tmp;
+        lastSequence = tmp_seq;
     }
 
     if (countRemoved > 0) {

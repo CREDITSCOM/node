@@ -334,7 +334,9 @@ public:
         return get_smart_contract_impl(tr);
     }
 
-    csdb::Transaction get_contract_call(const csdb::Transaction& contract_state);
+    csdb::Transaction get_contract_call(const csdb::Transaction& contract_state) const;
+
+    csdb::Transaction get_contract_deploy(const csdb::Address& addr) const;
 
     // get & handle rejected transactions from smart contract(s)
     // usually ordinary consensus may reject smart-related transactions
@@ -446,8 +448,6 @@ private:
 
     // defines current contract state, the contracts cache is a container of every contract state
     struct StateItem {
-        // is temporary locked from execution until current execution completed
-        bool is_locked{ false };
         // payable() method is implemented
         PayableStatus payable{ PayableStatus::Unknown };
         // reference to deploy transaction
@@ -468,6 +468,8 @@ private:
 
     // last contract's state storage
     std::map<csdb::Address, StateItem> known_contracts;
+
+    std::set<csdb::Address> locked_contracts;
 
     // contract replenish transactions stored during reading from DB on stratup
     std::vector<SmartContractRef> uncompleted_contracts;
@@ -568,7 +570,8 @@ private:
 
     // is locked in all non-static public methods
     // is locked in const methods also
-    mutable cs::SpinLock public_access_lock = ATOMIC_FLAG_INIT;
+    //mutable cs::SpinLock public_access_lock = ATOMIC_FLAG_INIT;
+    mutable std::mutex public_access_lock;
 
     using queue_iterator = std::list<QueueItem>::iterator;
     using queue_const_iterator = std::list<QueueItem>::const_iterator;
@@ -664,6 +667,8 @@ private:
     // non-static variant
     csdb::Transaction get_transaction(const SmartContractRef& contract, const csdb::Address& abs_addr) const;
 
+    csdb::Transaction get_deploy_transaction(const csdb::Address& abs_addr) const;
+
     void enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_log);
 
     // perform async execution via API to remote executor
@@ -716,12 +721,7 @@ private:
     }
 
     bool is_locked(const csdb::Address& abs_addr) const {
-        const auto it = known_contracts.find(abs_addr);
-        if (it != known_contracts.cend()) {
-            return it->second.is_locked;
-        }
-        // only known contracts are allowed to execute!
-        return true;
+        return (locked_contracts.find(abs_addr) != locked_contracts.cend());
     }
 
     void update_lock_status(const csdb::Address& abs_addr, bool value, bool skip_log);

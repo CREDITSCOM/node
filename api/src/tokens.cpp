@@ -155,7 +155,7 @@ void executeAndCall(api::APIHandler* p_api, const general::Address& addr, const 
 		handler(getVariantAs<RetType>(result.results[0].ret_val));
 }
 
-void TokensMaster::refreshTokenState(const csdb::Address& token, const std::string& newState) {
+void TokensMaster::refreshTokenState(const csdb::Address& token, const std::string& newState, bool checkBalance) {
     bool present = false;
     auto byteCodeObjects = api_->getSmartByteCode(token, present);
     if (!present || byteCodeObjects.empty()) return;
@@ -187,43 +187,45 @@ void TokensMaster::refreshTokenState(const csdb::Address& token, const std::stri
     t.totalSupply = totalSupply;     
 
     // balance
-    executor::ExecuteByteCodeMultipleResult result;
-    if (byteCodeObjects.empty())
-        return;
+    if (checkBalance) {
+        executor::ExecuteByteCodeMultipleResult result;
+        if (byteCodeObjects.empty())
+            return;
 
-    executor::SmartContractBinary smartContractBinary;
-    smartContractBinary.contractAddress         = addr;
-    smartContractBinary.object.byteCodeObjects  = byteCodeObjects;
-    smartContractBinary.object.instance         = newState;
-    smartContractBinary.stateCanModify          = 0;
+        executor::SmartContractBinary smartContractBinary;
+        smartContractBinary.contractAddress = addr;
+        smartContractBinary.object.byteCodeObjects = byteCodeObjects;
+        smartContractBinary.object.instance = newState;
+        smartContractBinary.stateCanModify = 0;
 
-    std::vector<csdb::Address> holders;
-    holders.reserve(t.holders.size());
-    for (auto& h : t.holders)
-        holders.push_back(h.first);
+        std::vector<csdb::Address> holders;
+        holders.reserve(t.holders.size());
+        for (auto& h : t.holders)
+            holders.push_back(h.first);
 
-    std::vector<std::vector<general::Variant>> holderKeysParams;
-    holderKeysParams.reserve(holders.size());
-    for (auto& h : holders) {
-        general::Variant var;
-        auto key = h.public_key();
-        var.__set_v_string(EncodeBase58(cs::Bytes(key.begin(), key.end())));
-        holderKeysParams.push_back(std::vector<general::Variant>(1, var));
-    }
+        std::vector<std::vector<general::Variant>> holderKeysParams;
+        holderKeysParams.reserve(holders.size());
+        for (auto& h : holders) {
+            general::Variant var;
+            auto key = h.public_key();
+            var.__set_v_string(EncodeBase58(cs::Bytes(key.begin(), key.end())));
+            holderKeysParams.push_back(std::vector<general::Variant>(1, var));
+        }
 
-    api_->getExecutor().executeByteCodeMultiple(result, dpAddr, smartContractBinary, "balanceOf", holderKeysParams, 100, executor::Executor::kUseLastSequence);
-    
-    ++t.realHoldersCount = 0;
-    if (!result.status.code && (result.results.size() == holders.size())) {
-        auto& t = tokens_[token];
-        for (uint32_t i = 0; i < holders.size(); ++i) {
-            const auto& res = result.results[i];
-            if (!res.status.code) {
-                t.holders[holders[i]].balance = tryExtractAmount(getVariantAs<std::string>(res.ret_val));
-                ++t.realHoldersCount;
+        api_->getExecutor().executeByteCodeMultiple(result, dpAddr, smartContractBinary, "balanceOf", holderKeysParams, 100, executor::Executor::kUseLastSequence);
+
+        ++t.realHoldersCount = 0;
+        if (!result.status.code && (result.results.size() == holders.size())) {
+            auto& t = tokens_[token];
+            for (uint32_t i = 0; i < holders.size(); ++i) {
+                const auto& res = result.results[i];
+                if (!res.status.code) {
+                    t.holders[holders[i]].balance = tryExtractAmount(getVariantAs<std::string>(res.ret_val));
+                    ++t.realHoldersCount;
+                }
             }
         }
-    }    
+    }
 }
 
 /* Call under data lock only */
@@ -301,8 +303,22 @@ void TokensMaster::checkNewState(const csdb::Address& sc, const csdb::Address& i
     updateTokenChaches(sc, newState, ps);
 }
 
-void TokensMaster::loadTokenInfo(const std::vector<csdb::Address>& vtokenAddr, const std::function<void(const TokensMap&, const HoldersMap&)> func) {
+void TokensMaster::loadTokenInfo(const std::vector<csdb::Address>& vtokenAddr, const std::function<void(const TokensMap&, const HoldersMap&)> func, bool needLoad) {
     std::lock_guard<decltype(dataMut_)> l(dataMut_);
+    if (!needLoad) {
+        func(tokens_, holders_);
+        return;
+    }
+    auto freeChache = [&tokens_ = tokens_](const csdb::Address& addr, bool checkBalance = true) {
+        tokens_[addr].name = "not loaded";
+        tokens_[addr].symbol = "not loaded";
+        tokens_[addr].totalSupply = "not loaded";
+        if (checkBalance) {
+            for (auto& h : tokens_[addr].holders)
+                h.second.balance = "not loaded";
+        }
+    };
+
     if (!vtokenAddr.empty()) {
         TokensMap loadedToken;
         for (const auto& addr : vtokenAddr) {
@@ -310,16 +326,16 @@ void TokensMaster::loadTokenInfo(const std::vector<csdb::Address>& vtokenAddr, c
             loadedToken[addr] = tokens_[addr];
         }       
         func(loadedToken, holders_);     
-        for (const auto& addr : vtokenAddr) {
-            tokens_[addr].name        = "not loaded";
-            tokens_[addr].symbol      = "not loaded";
-            tokens_[addr].totalSupply = "not loaded";
-            for (auto& h : tokens_[addr].holders)
-                h.second.balance = "not loaded";
-        }
+        for (const auto& addr : vtokenAddr)
+            freeChache(addr);
     }
-    else
+    else {
+        for (const auto& tk : tokens_) // need for sort
+            refreshTokenState(tk.first, cs::SmartContracts::get_contract_state(api_->get_s_blockchain(), tk.first), false);
         func(tokens_, holders_);
+        for (const auto& tk : tokens_)
+            freeChache(tk.first, false);
+    }
 }
 
 bool TokensMaster::isTransfer(const std::string& method, const std::vector<general::Variant>& params) {
@@ -362,7 +378,7 @@ void TokensMaster::checkNewDeploy(const csdb::Address&, const csdb::Address&, co
 }
 void TokensMaster::checkNewState(const csdb::Address&, const csdb::Address&, const api::SmartContractInvocation&, const std::string&) {
 }
-void TokensMaster::loadTokenInfo(const std::vector<csdb::Address>&, const std::function<void(const TokensMap&, const HoldersMap&)>) {
+void TokensMaster::loadTokenInfo(const std::vector<csdb::Address>&, const std::function<void(const TokensMap&, const HoldersMap&)>, bool) {
 }
 bool TokensMaster::isTransfer(const std::string&, const std::vector<general::Variant>&) {
     return false;

@@ -22,8 +22,8 @@ using namespace cs;
 namespace fs = boost::filesystem;
 
 namespace {
-const char* cashesPath = "./cashes";
-const std::string lastIndexedPath = std::string(cashesPath) + "/last_indexed";
+const char* cachesPath = "./caches";
+const std::string lastIndexedPath = std::string(cachesPath) + "/last_indexed";
 cs::Sequence lastIndexedPool;
 
 using FileSource = boost::iostreams::mapped_file_source;
@@ -110,13 +110,13 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , recreateIndex_(recreateIndex) {
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
 
-    createCashesPath();
+    createCachesPath();
     if (!recreateIndex_) {
         checkLastIndFile(recreateIndex_);
     }
 
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
-    blockHashes_ = std::make_unique<cs::BlockHashes>(cashesPath);
+    blockHashes_ = std::make_unique<cs::BlockHashes>(cachesPath);
 }
 
 BlockChain::~BlockChain() {
@@ -392,11 +392,10 @@ csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
         // deferredBlock already composed:
         return deferredBlock_.clone();
     }
-    // storage loads blocks by 1-based index: 1 => pool[0], 2 => pool[1] etc.
     if (sequence > getLastSequence()) {
         return csdb::Pool{};
     }
-    return storage_.pool_load(sequence + 1);
+    return storage_.pool_load(sequence);
 }
 
 csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) const {
@@ -925,8 +924,8 @@ bool BlockChain::getContractData(const csdb::Address& abs_addr, cs::Bytes& data)
     return storage_.get_contract_data(abs_addr, data);
 }
 
-void BlockChain::createCashesPath() {
-    fs::path dbPath(cashesPath);
+void BlockChain::createCachesPath() {
+    fs::path dbPath(cachesPath);
     boost::system::error_code code;
     const auto res = fs::is_directory(dbPath, code);
 

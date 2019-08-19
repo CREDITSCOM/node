@@ -499,14 +499,23 @@ bool SmartContracts::is_payable_target(const csdb::Transaction& tr) {
 }
 
 /*public*/
-csdb::Transaction SmartContracts::get_contract_call(const csdb::Transaction& contract_state) {
+csdb::Transaction SmartContracts::get_contract_call(const csdb::Transaction& contract_state) const {
     cs::Lock lock(public_access_lock);
+
     csdb::UserField fld = contract_state.user_field(trx_uf::new_state::RefStart);
     if (fld.is_valid()) {
         SmartContractRef ref(fld);
         return get_transaction(ref, absolute_address(contract_state.target()));
     }
     return csdb::Transaction{};
+}
+
+/*public*/
+csdb::Transaction SmartContracts::get_contract_deploy(const csdb::Address& addr) const {
+    cs::Lock lock(public_access_lock);
+
+    const csdb::Address abs_addr = absolute_address(addr);
+    return get_deploy_transaction(abs_addr);
 }
 
 csdb::Transaction SmartContracts::get_transaction(const SmartContractRef& contract, const csdb::Address& abs_addr) const {
@@ -530,6 +539,17 @@ csdb::Transaction SmartContracts::get_transaction(const SmartContractRef& contra
         }
     }
     return SmartContracts::get_transaction(bc, contract);
+}
+
+csdb::Transaction SmartContracts::get_deploy_transaction(const csdb::Address& abs_addr) const {
+    auto it_state = known_contracts.find(abs_addr);
+    if (it_state != known_contracts.cend()) {
+        const auto& contract = it_state->second;
+        if (contract.deploy.is_valid()) {
+            return contract.deploy;
+        }
+    }
+    return csdb::Transaction{};
 }
 
 void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_log) {
@@ -1001,6 +1021,7 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                         else {
                             SmartExecutionData exe_data;
                             exe_data.contract_ref = ref_start;
+                            exe_data.abs_addr = req_abs_addr;
                             exe_data.executor_fee = csdb::Amount(tr_start.max_fee().to_double());
                             if (!SmartContracts::is_deploy(tr_start)) {
                                 if (in_known_contracts(req_abs_addr)) {
@@ -1343,6 +1364,7 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
     std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
     auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
     info.transaction = transaction;
+    info.deploy = get_deploy_transaction(data.abs_addr);
     info.sequence = data.contract_ref.sequence;
     // data.executor_fee bring all available fee for future execution:
     info.feeLimit = data.executor_fee;
@@ -1977,8 +1999,13 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         // create or get contract state item
         StateItem& item = known_contracts[abs_addr];
         // update state value in cache if it is older then or equal to or unset
+#if defined(MONITOR_NODE) || defined(WEB_WALLET_NODE)
         constexpr bool force_update_contracts_cache = true; // until TokenMaster to become more smart
         if constexpr (force_update_contracts_cache || !item.ref_cache.is_valid() || item.ref_cache < ref_start || item.ref_cache == ref_start) {
+#else
+        constexpr bool force_update_contracts_cache = false; // until TokenMaster to become more smart
+        if (force_update_contracts_cache || !item.ref_cache.is_valid() || item.ref_cache < ref_start || item.ref_cache == ref_start) {
+#endif
             if (!dbcache_update(abs_addr, ref_start, state_value, force_update_contracts_cache)) {
                 if (reading_db) {
                     // update state in memory cache
@@ -2339,22 +2366,31 @@ void SmartContracts::test_contracts_locks() {
         }
     }
     // no running items, ensure no locked contracts
-    for (auto& item : known_contracts) {
-        if (item.second.is_locked) {
-            item.second.is_locked = false;
-            csdebug() << kLogPrefix << "find locked contract " << to_base58(item.first) << " which is not executed now, unlock";
-        }
+    if (!locked_contracts.empty()) {
+        csdebug() << kLogPrefix << "find " << locked_contracts.size() << "  locked contract(s) which is not executed now, unlock";
+        locked_contracts.clear();
     }
 }
 
 void SmartContracts::update_lock_status(const csdb::Address& abs_addr, bool value, bool skip_log) {
-    auto it = known_contracts.find(abs_addr);
-    if (it != known_contracts.end()) {
-        if (it->second.is_locked != value) {
-            if (!skip_log) {
-                csdebug() << kLogPrefix << (value ? "lock" : "unlock") << " contract " << to_base58(abs_addr);
+    if (value) {
+        const auto result = locked_contracts.insert(abs_addr);
+        if (!skip_log) {
+            if (result.second) {
+                csdebug() << kLogPrefix << "lock contract " << to_base58(abs_addr);
             }
-            it->second.is_locked = value;
+            else {
+                csdebug() << kLogPrefix << "ignore duplicated " << to_base58(abs_addr) << " lock";
+            }
+        }
+    }
+    else {
+        auto it = locked_contracts.find(abs_addr);
+        if (it != locked_contracts.end()) {
+            locked_contracts.erase(it);
+            if (!skip_log) {
+                csdebug() << kLogPrefix << "unlock contract " << to_base58(abs_addr);
+            }
         }
     }
 }
