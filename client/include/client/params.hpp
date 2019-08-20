@@ -17,6 +17,7 @@
 #define DEFAULT_CURRENCY 1
 
 #if defined(MONITOR_NODE) || defined(WEB_WALLET_NODE)
+#define PROFILE_API
 #define TOKENS_CACHE
 #endif
 

@@ -76,6 +76,11 @@ inline static std::ostream& operator<<(std::ostream& os, const std::array<T, Siz
 ///
 class Utils {
 public:
+    enum class TimeFormat {
+        Default,    // Hours:Minutes:Seconds
+        DefaultMs   // Default + :Milliseconds
+    };
+
     ///
     /// Fills hash with first size of symbols
     ///
@@ -88,7 +93,7 @@ public:
     ///
     /// Returns current time in string representation
     ///
-    static std::string formattedCurrentTime() {
+    static std::string formattedCurrentTime(TimeFormat format = TimeFormat::Default) {
         auto now = std::chrono::system_clock::now();
         auto in_time_t = std::chrono::system_clock::to_time_t(now);
 
@@ -100,6 +105,11 @@ public:
         localtime_s(&result, &in_time_t);
         ss << std::put_time(&result, "%H:%M:%S");
 #endif
+        if (format == TimeFormat::DefaultMs) {
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+            ss << "." << ms.count();
+        }
+
         return ss.str();
     }
 
