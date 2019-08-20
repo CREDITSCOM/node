@@ -7,7 +7,8 @@
 #define _CREDITS_CSDB_PRIVATE_CRYPTO_H_H_INCLUDED_
 
 #include <cinttypes>
-#include "csdb/internal/types.hpp"
+
+#include <csdb/internal/types.hpp>
 
 #ifndef CSDB_UNIT_TEST
 #include "cscrypto/cscrypto.hpp"

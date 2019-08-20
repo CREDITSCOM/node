@@ -77,6 +77,13 @@ private:
     friend class Storage;
 };
 
+class PoolHash::priv : public ::csdb::internal::shared_data {
+public:
+    cs::Bytes value;
+    DEFAULT_PRIV_CLONE();
+};
+SHARED_DATA_CLASS_IMPLEMENTATION_INLINE(PoolHash)
+
 class Pool {
     SHARED_DATA_CLASS_DECLARE(Pool)
 public:

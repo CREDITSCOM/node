@@ -13,11 +13,12 @@
 #include <string>
 #include <type_traits>
 #include <utility>
-#include "csdb/internal/types.hpp"
 
-#include "integral_encdec.hpp"
+#include <csdb/internal/types.hpp>
 
 #include <lib/system/common.hpp>
+
+#include "integral_encdec.hpp"
 
 namespace csdb {
 namespace priv {

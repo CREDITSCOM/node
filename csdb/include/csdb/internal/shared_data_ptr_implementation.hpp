@@ -167,8 +167,41 @@ inline void shared_data_ptr<T>::detach() {
     }                                                                                                         \
     UNIT_TEST_METHODS_IMPLEMENTATION(class_name)
 
+#define SHARED_DATA_CLASS_IMPLEMENTATION_INLINE(class_name)                                                   \
+    template class ::csdb::internal::shared_data_ptr<class_name::priv>;                                       \
+    inline class_name::class_name()                                                                           \
+    : d(new class_name::priv) {                                                                               \
+        static_assert(std::is_base_of<::csdb::internal::shared_data, class_name::priv>::value,                \
+                      "class `" #class_name "::priv` must be derived from `::csdb::internal::shared_data`."); \
+    }                                                                                                         \
+    inline class_name::class_name(const class_name &o) noexcept                                               \
+    : d(o.d) {                                                                                                \
+    }                                                                                                         \
+    inline class_name::class_name(class_name &&o) noexcept                                                    \
+    : d(std::move(o.d)) {                                                                                     \
+    }                                                                                                         \
+    inline class_name &class_name::operator=(const class_name &o) noexcept {                                  \
+        if (&o != this) {                                                                                     \
+            d = o.d;                                                                                          \
+        }                                                                                                     \
+        return *this;                                                                                         \
+    }                                                                                                         \
+    inline class_name &class_name::operator=(class_name &&o) noexcept {                                       \
+        d = std::move(o.d);                                                                                   \
+        return *this;                                                                                         \
+    }                                                                                                         \
+    inline class_name::class_name(priv *source)                                                               \
+    : d(source) {                                                                                             \
+    }                                                                                                         \
+    inline class_name::~class_name() {                                                                        \
+    }                                                                                                         \
+    inline class_name class_name::clone() const {                                                             \
+        return class_name(new priv(d->clone()));                                                              \
+    }                                                                                                         \
+    UNIT_TEST_METHODS_IMPLEMENTATION(class_name)
+
 #define DEFAULT_PRIV_CLONE() \
-    priv clone() const {     \
+    inline priv clone() const {     \
         return priv(*this);  \
     }
 

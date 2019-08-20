@@ -91,6 +91,44 @@ private:
     friend class ::csdb::priv::ibstream;
 };
 
+class UserField::priv : public ::csdb::internal::shared_data {
+    inline priv()
+    : type_(UserField::Unknown)
+    , i_value_(0) {
+    }
+
+    inline priv(uint64_t value)
+    : type_(UserField::Integer)
+    , i_value_(value) {
+    }
+
+    inline priv(const ::std::string& value)
+    : type_(UserField::String)
+    , i_value_(0)
+    , s_value_(value) {
+    }
+
+    inline priv(const ::csdb::Amount& value)
+    : type_(UserField::Amount)
+    , i_value_(0)
+    , a_value_(value) {
+    }
+
+    inline void put(::csdb::priv::obstream& os) const;
+    inline void put_for_sig(::csdb::priv::obstream& os) const;
+    inline bool get(::csdb::priv::ibstream& is);
+    inline bool is_equal(const priv* other) const;
+
+    DEFAULT_PRIV_CLONE()
+
+    UserField::Type type_;
+    uint64_t i_value_;
+    ::std::string s_value_;
+    ::csdb::Amount a_value_;
+    friend class UserField;
+};
+SHARED_DATA_CLASS_IMPLEMENTATION_INLINE(UserField)
+
 inline bool UserField::operator !=(const UserField& other) const noexcept
 {
   return !operator ==(other);

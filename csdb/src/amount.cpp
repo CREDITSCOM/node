@@ -1,4 +1,4 @@
-#include "csdb/amount.hpp"
+#include <csdb/amount.hpp>
 
 #include <algorithm>
 #include <cstdio>

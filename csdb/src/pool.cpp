@@ -1,4 +1,4 @@
-#include "csdb/pool.hpp"
+#include <csdb/pool.hpp>
 
 #include <algorithm>
 #include <iomanip>
@@ -17,18 +17,11 @@
 #include <csdb/csdb.hpp>
 #include <csdb/internal/utils.hpp>
 
+#include "transaction_p.hpp"
 #include "priv_crypto.hpp"
 #include "binary_streams.hpp"
-#include "transaction_p.hpp"
 
 namespace csdb {
-
-class PoolHash::priv : public ::csdb::internal::shared_data {
-public:
-    cs::Bytes value;
-    DEFAULT_PRIV_CLONE();
-};
-SHARED_DATA_CLASS_IMPLEMENTATION(PoolHash)
 
 bool PoolHash::is_empty() const noexcept {
     return d->value.empty();

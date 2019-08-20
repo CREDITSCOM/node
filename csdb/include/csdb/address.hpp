@@ -65,6 +65,20 @@ private:
     friend class Storage;
 };
 
+class Address::priv : public ::csdb::internal::shared_data {
+    union {
+        cs::PublicKey public_key;
+        WalletId wallet_id;
+    } data_{};
+
+    bool is_wallet_id_ = false;
+
+    DEFAULT_PRIV_CLONE()
+
+    friend class ::csdb::Address;
+};
+SHARED_DATA_CLASS_IMPLEMENTATION_INLINE(Address)
+
 inline bool Address::operator!=(const Address &other) const noexcept {
     return !operator==(other);
 }

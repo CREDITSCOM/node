@@ -2,37 +2,11 @@
 
 #include <map>
 
-#include <csdb/address.hpp>
 #include <csdb/amount.hpp>
 #include <csdb/csdb.hpp>
 #include <csdb/pool.hpp>
 
 namespace csdb {
-
-class Wallet::priv : public ::csdb::internal::shared_data {
-    priv() = default;
-
-    explicit priv(Address address)
-    : address_(address) {
-    }
-
-    Address address_;
-    std::map<Currency, Amount> amounts_;
-
-    priv clone() const {
-        priv result;
-
-        result.address_ = address_.clone();
-
-        for (auto &am : amounts_)
-            result.amounts_[am.first.clone()] = am.second;
-
-        return result;
-    }
-
-    friend class Wallet;
-};
-SHARED_DATA_CLASS_IMPLEMENTATION(Wallet)
 
 bool Wallet::is_valid() const noexcept {
     return d->address_.is_valid();

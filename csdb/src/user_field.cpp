@@ -4,127 +4,94 @@
 
 namespace csdb {
 
-class UserField::priv : public ::csdb::internal::shared_data {
-    inline priv()
-    : type_(UserField::Unknown)
-    , i_value_(0) {
+inline void UserField::priv::put(::csdb::priv::obstream& os) const {
+    switch (type_) {
+        case UserField::Integer:
+            os.put(type_);
+            os.put(i_value_);
+            break;
+
+        case UserField::String:
+            os.put(type_);
+            os.put(s_value_);
+            break;
+
+        case UserField::Amount:
+            os.put(type_);
+            os.put(a_value_);
+            break;
+
+        default:
+            break;
     }
+}
 
-    inline priv(uint64_t value)
-    : type_(UserField::Integer)
-    , i_value_(value) {
+inline void UserField::priv::put_for_sig(::csdb::priv::obstream& os) const {
+    switch (type_) {
+        case UserField::Integer:
+            os.put(i_value_);
+            break;
+
+        case UserField::String:
+            os.put(s_value_);
+            break;
+
+        case UserField::Amount:
+            os.put(a_value_);
+            break;
+
+        default:
+            break;
     }
+}
 
-    inline priv(const ::std::string& value)
-    : type_(UserField::String)
-    , i_value_(0)
-    , s_value_(value) {
+inline bool UserField::priv::get(::csdb::priv::ibstream& is) {
+    UserField::Type type;
+    if (!is.get(type)) {
+        return false;
     }
-
-    inline priv(const ::csdb::Amount& value)
-    : type_(UserField::Amount)
-    , i_value_(0)
-    , a_value_(value) {
-    }
-
-    inline void put(::csdb::priv::obstream& os) const {
-        switch (type_) {
-            case UserField::Integer:
-                os.put(type_);
-                os.put(i_value_);
-                break;
-
-            case UserField::String:
-                os.put(type_);
-                os.put(s_value_);
-                break;
-
-            case UserField::Amount:
-                os.put(type_);
-                os.put(a_value_);
-                break;
-
-            default:
-                break;
-        }
-    }
-
-    inline void put_for_sig(::csdb::priv::obstream& os) const {
-        switch (type_) {
-            case UserField::Integer:
-                os.put(i_value_);
-                break;
-
-            case UserField::String:
-                os.put(s_value_);
-                break;
-
-            case UserField::Amount:
-                os.put(a_value_);
-                break;
-
-            default:
-                break;
-        }
-    }
-
-    inline bool get(::csdb::priv::ibstream& is) {
-        UserField::Type type;
-        if (!is.get(type)) {
-            return false;
-        }
-        switch (type) {
-            case UserField::Integer:
-                if (!is.get(i_value_)) {
-                    return false;
-                }
-                break;
-
-            case UserField::String:
-                if (!is.get(s_value_)) {
-                    return false;
-                }
-                break;
-
-            case UserField::Amount:
-                if (!is.get(a_value_)) {
-                    return false;
-                }
-                break;
-
-            default:
+    switch (type) {
+        case UserField::Integer:
+            if (!is.get(i_value_)) {
                 return false;
-        }
-        type_ = type;
-        return true;
-    }
+            }
+            break;
 
-    inline bool is_equal(const priv* other) const {
-        if (type_ != other->type_) {
+        case UserField::String:
+            if (!is.get(s_value_)) {
+                return false;
+            }
+            break;
+
+        case UserField::Amount:
+            if (!is.get(a_value_)) {
+                return false;
+            }
+            break;
+
+        default:
             return false;
-        }
+    }
+    type_ = type;
+    return true;
+}
 
-        switch (type_) {
-            case UserField::Integer:
-                return (i_value_ == other->i_value_);
-            case UserField::String:
-                return (s_value_ == other->s_value_);
-            case UserField::Amount:
-                return (a_value_ == other->a_value_);
-            default:
-                return true;
-        }
+inline bool UserField::priv::is_equal(const priv* other) const {
+    if (type_ != other->type_) {
+        return false;
     }
 
-    DEFAULT_PRIV_CLONE()
-
-    UserField::Type type_;
-    uint64_t i_value_;
-    ::std::string s_value_;
-    ::csdb::Amount a_value_;
-    friend class UserField;
-};
-SHARED_DATA_CLASS_IMPLEMENTATION(UserField)
+    switch (type_) {
+        case UserField::Integer:
+            return (i_value_ == other->i_value_);
+        case UserField::String:
+            return (s_value_ == other->s_value_);
+        case UserField::Amount:
+            return (a_value_ == other->a_value_);
+        default:
+            return true;
+    }
+}
 
 template <>
 UserField::UserField(uint64_t value)

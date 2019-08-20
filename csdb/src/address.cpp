@@ -1,4 +1,4 @@
-#include "csdb/address.hpp"
+#include <csdb/address.hpp>
 
 #include <array>
 #include <boost/functional/hash.hpp>
@@ -11,20 +11,6 @@
 #include "priv_crypto.hpp"
 
 namespace csdb {
-
-class Address::priv : public ::csdb::internal::shared_data {
-    union {
-        cs::PublicKey public_key;
-        WalletId wallet_id;
-    } data_{};
-
-    bool is_wallet_id_ = false;
-
-    DEFAULT_PRIV_CLONE()
-
-    friend class ::csdb::Address;
-};
-SHARED_DATA_CLASS_IMPLEMENTATION(Address)
 
 bool Address::is_valid() const noexcept {
     return is_public_key() || is_wallet_id();
