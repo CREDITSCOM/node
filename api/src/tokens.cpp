@@ -216,7 +216,6 @@ void TokensMaster::refreshTokenState(const csdb::Address& token, const std::stri
 
         ++t.realHoldersCount = 0;
         if (!result.status.code && (result.results.size() == holders.size())) {
-            auto& t = tokens_[token];
             for (uint32_t i = 0; i < holders.size(); ++i) {
                 const auto& res = result.results[i];
                 if (!res.status.code) {
@@ -246,6 +245,7 @@ TokensMaster::~TokensMaster() {
 }
 
 void TokensMaster::updateTokenChaches(const csdb::Address& addr, const std::string& newState, const TokenInvocationData::Params& ps) {
+    csunused(newState);
     std::lock_guard<decltype(dataMut_)> lInt(dataMut_);
     auto tIt = tokens_.find(addr);
     if (tIt == tokens_.end())
