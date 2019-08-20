@@ -189,7 +189,7 @@ namespace cs {
     binaryRepresentation_.clear();
     binaryRepresentation_.reserve(expectedMessageSize);
     cs::DataStream stream(binaryRepresentation_);
-    uint8_t subRound = 0;
+    //uint8_t subRound = 0;
     uint8_t iteration = 0;
     stream << roundTable_.confidants;
     stream << poolMetaInfo_.realTrustedMask;

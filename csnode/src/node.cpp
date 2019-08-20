@@ -2087,6 +2087,7 @@ bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& curre
 
     return true;
 }
+
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
     csdebug() << "NODE> next round table received, round: " << rNum;
     csmeta(csdetails) << "started";
@@ -2126,7 +2127,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    if(conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree) {
+    if(conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree && getBlockChain().getLastSequence() > 0) {
         uint64_t lastTimeStamp;
         uint64_t currentTimeStamp;
         uint64_t rpTimeStamp;
