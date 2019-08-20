@@ -107,7 +107,7 @@ public:
 #endif
         if (format == TimeFormat::DefaultMs) {
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-            ss << ":" << ms.count();
+            ss << "." << ms.count();
         }
 
         return ss.str();
