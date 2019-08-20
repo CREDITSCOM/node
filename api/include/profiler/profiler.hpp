@@ -48,12 +48,13 @@ public:
              typename = std::enable_if_t<std::is_same_v<TimePoint, Result>>>
     void add(const std::string& message, const TimePoint& point) {
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(point);
+        auto format = message + ", ";
 
         if (duration.count() != 0) {
-            add(message + std::to_string(duration.count()) + " ms");
+            add(format + std::to_string(duration.count()) + " ms");
         }
         else {
-            add(message + std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(point).count()) + " ns");
+            add(format + std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(point).count()) + " ns");
         }
     }
 

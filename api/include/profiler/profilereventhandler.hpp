@@ -11,7 +11,7 @@ class ProfilerEventHandler : public apache::thrift::server::TServerEventHandler 
 public:
     virtual void processContext(void* serverContext,
                                 apache::thrift::stdcxx::shared_ptr<apache::thrift::protocol::TTransport> transport) override {
-        cs::ProfilerFileLogger::instance().add("From ip " + transport->getOrigin());
+        cs::ProfilerFileLogger::instance().add("From address " + transport->getOrigin());
         apache::thrift::server::TServerEventHandler::processContext(serverContext, transport);
     }
 };

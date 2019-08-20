@@ -30,7 +30,7 @@ bool cs::ProfilerFileLogger::isRunning() const {
 }
 
 void cs::ProfilerFileLogger::add(const std::string& message) {
-    while (!queue_.push(cs::Utils::formattedCurrentTime() + std::string(", ") + message));
+    while (!queue_.push(cs::Utils::formattedCurrentTime(cs::Utils::TimeFormat::DefaultMs) + std::string(" ") + message));
     variable_.notify_one();
 }
 
