@@ -59,8 +59,6 @@ Node::Node(const Config& config)
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     alwaysExecuteContracts_ = config.alwaysExecuteContracts();
-    maxNeighboursSequence_ = blockChain_.getLastSequence();
-
     good_ = init(config);
 }
 
@@ -114,6 +112,7 @@ bool Node::init(const Config& config) {
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
     initCurrentRP();
+    maxNeighboursSequence_ = blockChain_.getLastSequence();
     return true;
 }
 

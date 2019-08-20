@@ -14,12 +14,11 @@
 #include <x86intrin.h>
 #endif
 
-#include "csdb/csdb.hpp"
+#include <csdb/csdb.hpp>
+#include <csdb/internal/utils.hpp>
 
-#include "binary_streams.hpp"
-#include "csdb/internal/shared_data_ptr_implementation.hpp"
-#include "csdb/internal/utils.hpp"
 #include "priv_crypto.hpp"
+#include "binary_streams.hpp"
 #include "transaction_p.hpp"
 
 namespace csdb {
@@ -62,6 +61,10 @@ bool PoolHash::operator==(const PoolHash& other) const noexcept {
 
 bool PoolHash::operator<(const PoolHash& other) const noexcept {
     return (d != other.d) && (d->value < other.d->value);
+}
+
+size_t PoolHash::calcHash() const noexcept {
+    return *reinterpret_cast<const size_t *>(d->value.data());
 }
 
 PoolHash PoolHash::from_string(const ::std::string& str) {
