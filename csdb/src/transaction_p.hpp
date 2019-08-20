@@ -7,18 +7,16 @@
 #ifndef _CREDITS_CSDB_TRANSACTION_PRIVATE_H_INCLUDED_
 #define _CREDITS_CSDB_TRANSACTION_PRIVATE_H_INCLUDED_
 
-#include "csdb/transaction.hpp"
+#include <csdb/transaction.hpp>
 
 #include <limits>
 #include <map>
 
-#include "csdb/internal/shared_data_ptr_implementation.hpp"
-
-#include "csdb/address.hpp"
-#include "csdb/amount.hpp"
-#include "csdb/amount_commission.hpp"
-#include "csdb/currency.hpp"
-#include "csdb/pool.hpp"
+#include <csdb/address.hpp>
+#include <csdb/amount.hpp>
+#include <csdb/amount_commission.hpp>
+#include <csdb/currency.hpp>
+#include <csdb/pool.hpp>
 
 namespace csdb {
 
