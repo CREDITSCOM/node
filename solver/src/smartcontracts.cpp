@@ -666,7 +666,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_
                         }
                     }
                     if (!in_known_contracts(u)) {
-                        cslog() << kLogPrefix << "call to unknown contract declared in executing item, cancel " << new_item;
+                        cslog() << kLogPrefix << "call to unknown contract " << to_base58(u) << " declared in " << new_item << ", cancel ";
                         remove_from_queue(new_item, skip_log);
                         // also removes parent "it" from exe_queue if empty
                         return;
