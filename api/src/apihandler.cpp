@@ -1516,11 +1516,6 @@ api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& a
     }
 
     decltype(auto) locked_smart_origin = lockedReference(this->smart_origin);
-
-    auto it = locked_smart_origin->find(abs_addr);
-    if ((present = (it != locked_smart_origin->end()))) {
-        return fetch_smart(executor_.loadTransactionApi(it->second));
-    }
     return api::SmartContractInvocation{};
 }
 
