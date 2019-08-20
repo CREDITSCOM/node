@@ -25,7 +25,7 @@ bool WalletsIds::Normal::insert(const WalletAddress& address, WalletId id) {
         return false;
     }
     else if (address.is_public_key()) {
-        std::pair<Data::const_iterator, bool> res = norm_.data_.insert(std::make_pair(address, id));
+        auto res = norm_.data_.insert({address, id});
         if (res.second && id >= norm_.nextId_) {
             if (id >= numeric_limits<WalletId>::max() / 2)
                 throw runtime_error("idNormal >= numeric_limits<WalletId>::max() / 2");
@@ -44,10 +44,12 @@ bool WalletsIds::Normal::find(const WalletAddress& address, WalletId& id) const 
         return true;
     }
     else if (address.is_public_key()) {
-        Data::const_iterator it = norm_.data_.find(address);
-        if (it == norm_.data_.end())
+        const auto &index = norm_.data_.get<Wallet::byAddress>();
+        auto it = index.find(address);
+        if (it == index.end()) {
             return false;
-        id = it->second;
+        }
+        id = (*it).id;
         return true;
     }
     cserror() << "Wrong address";
@@ -55,19 +57,14 @@ bool WalletsIds::Normal::find(const WalletAddress& address, WalletId& id) const 
 }
 
 bool WalletsIds::Normal::findaddr(const WalletId& id, WalletAddress& address) const {
-    bool flgfind = false;
-    for (auto& it : norm_.data_) {
-        if (it.second == id) {
-            flgfind = true;
-            address = it.first;
-            break;
-        }
+    const auto &index = norm_.data_.get<Wallet::byId>();
+    auto it = index.find(id);
+    if (it == index.end()) {
+        cserror() << "Wrong WalletId";
+        return false;
     }
-    if (flgfind)
-        return true;
-
-    cserror() << "Wrong WalletId";
-    return false;
+    address = (*it).address;
+    return true;
 }
 
 bool WalletsIds::Normal::get(const WalletAddress& address, WalletId& id) {
@@ -76,13 +73,13 @@ bool WalletsIds::Normal::get(const WalletAddress& address, WalletId& id) {
         return false;
     }
     else if (address.is_public_key()) {
-        std::pair<Data::const_iterator, bool> res = norm_.data_.insert(std::make_pair(address, norm_.nextId_));
+        auto res = norm_.data_.insert({address, norm_.nextId_});
         if (res.second) {
             if (norm_.nextId_ >= numeric_limits<WalletId>::max() / 2)
                 throw runtime_error("nextId_ >= numeric_limits<WalletId>::max() / 2");
             ++norm_.nextId_;
         }
-        id = res.first->second;
+        id = (*res.first).id;
         return res.second;
     }
     cserror() << "Wrong address";
@@ -94,17 +91,14 @@ bool WalletsIds::Normal::remove(const WalletAddress& address) {
         cserror() << __func__ << ": wrong address type";
         return false;
     }
-    csdebug() << "Keys before erasing address " << address.to_string();
-    for (auto& it : norm_.data_) {
-        csdebug() << it.second << " - " << it.first.to_string();
-    }
-    norm_.data_.erase(address);
-    if (norm_.nextId_ > 0) {
-        --norm_.nextId_;
-    }
-    csdebug() << "Keys after erasing";
-    for (auto& it : norm_.data_) {
-        csdebug() << it.second << " - " << it.first.to_string();
+
+    const auto &index = norm_.data_.get<Wallet::byAddress>();
+    auto it = index.find(address);
+    if (it != index.end()) {
+        norm_.data_.erase(it);
+        if (norm_.nextId_ > 0) {
+            --norm_.nextId_;
+        }
     }
     return true;
 }
@@ -136,16 +130,19 @@ bool WalletsIds::Special::insertNormal(const WalletAddress& address, WalletId id
         return false;
     }
     else if (address.is_public_key()) {
-        std::pair<Data::iterator, bool> res = norm_.data_.insert(std::make_pair(address, idNormal));
+        auto res = norm_.data_.insert({address, idNormal});
 
         const bool isInserted = res.second;
-        auto& value = res.first->second;
+        auto& value = (*res.first).id;
 
         if (!isInserted) {
-            if (!isSpecial(value))
+            if (!isSpecial(value)) {
                 return false;
+            }
             idSpecial = value;
-            value = idNormal;
+            auto &index = norm_.data_.get<Wallet::byId>();
+            auto it = norm_.data_.project<Wallet::byId>(res.first);
+            index.modify(it, Wallet::idChange(idNormal));
         }
 
         if (idNormal >= norm_.nextId_) {
@@ -166,13 +163,13 @@ bool WalletsIds::Special::findAnyOrInsertSpecial(const WalletAddress& address, W
         return true;
     }
     else if (address.is_public_key()) {
-        std::pair<Data::const_iterator, bool> res = norm_.data_.insert(std::make_pair(address, nextIdSpecial_));
+        auto res = norm_.data_.insert({address, nextIdSpecial_});
         if (res.second) {
             if (nextIdSpecial_ == numeric_limits<WalletId>::max())
                 throw runtime_error("nextIdSpecial_ == numeric_limits<WalletId>::max()");
             ++nextIdSpecial_;
         }
-        id = res.first->second;
+        id = (*res.first).id;
         return true;
     }
     cserror() << "Wrong address";

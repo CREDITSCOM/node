@@ -9,6 +9,8 @@
 #include <functional>
 #include <string>
 
+#include <boost/functional/hash.hpp>
+
 #include <lib/system/common.hpp>
 
 #include <csdb/internal/shared_data.hpp>
@@ -78,5 +80,15 @@ public:
     }
 };
 }  // namespace std
+
+namespace boost {
+template <>
+class hash<csdb::Address> {
+public:
+    size_t operator()(const csdb::Address &obj) const {
+        return obj.calcHash();
+    }
+};
+}  // namespace boost
 
 #endif // _CREDITS_CSDB_ADDRESS_H_INCLUDED_
