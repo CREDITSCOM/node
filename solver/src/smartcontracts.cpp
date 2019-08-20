@@ -1062,19 +1062,16 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                                         tr_state.add_user_field(new_state::Value, state);
                                         // test actual hash
                                         cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)state.data(), state.size());
-                                        std::string hash_result;
                                         if (actual_hash == hash) {
-                                            hash_result = "OK";
+											csdetails() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start
+												<< " has updated, stored hash is OK, new size is " << state.size();
                                         }
                                         else {
-                                            hash_result = "WRONG: ";
-                                            hash_result += cs::Utils::byteStreamToHex(hash.data(), hash.size());
-                                            hash_result += " (expected ";
-                                            hash_result += cs::Utils::byteStreamToHex(actual_hash.data(), actual_hash.size());
-                                            hash_result += ")";
-                                        }
-                                        csdebug() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start << " has updated, stored hash is "
-                                            << hash_result << ", new size is " << state.size();
+											csdebug() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start
+												<< " has updated, stored hash is WRONG: " << cs::Utils::byteStreamToHex(hash.data(), hash.size())
+												<< " (expected " << cs::Utils::byteStreamToHex(actual_hash.data(), actual_hash.size())
+												<< "), new size is " << state.size();
+										}
                                     }
                                 }
                             }
@@ -2344,7 +2341,7 @@ void SmartContracts::update_status(QueueItem& item, cs::RoundNumber r, SmartCont
                         os << " (started from " << WithDelimiters(item.seq_start) << ')';
                         extra_info = os.str();
                     }
-                    csdebug() << kLogPrefix << to_base58(t.target()) << ' ' << execution.ref_start
+                    csdetails() << kLogPrefix << to_base58(t.target()) << ' ' << execution.ref_start
                         << " is finished with timeout on " << WithDelimiters(r) << extra_info;
                 }
                 else {
