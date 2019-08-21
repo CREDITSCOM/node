@@ -110,7 +110,7 @@ void SolverCore::gotHash(const cs::StageHash&& sHash) {
     }
     recv_hash.push_back(sHash);
 
-    cs::Sequence delta = cs::Conveyer::instance().currentRoundNumber() - pnode->getBlockChain().getLastSequence();
+    cs::Sequence delta = cs::Conveyer::instance().currentRoundNumber() - pnode->getBlockChain().getLastSeq();
     if (delta > 1) {
         //recv_hash.push_back(std::make_pair<>(sHash.hash, sHash.sender));
         csdebug() << "SolverCore: cache hash until last block ready";
