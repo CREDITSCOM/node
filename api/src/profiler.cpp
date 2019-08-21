@@ -30,7 +30,8 @@ bool cs::ProfilerFileLogger::isRunning() const {
 }
 
 void cs::ProfilerFileLogger::add(const std::string& message) {
-    while (!queue_.push(cs::Utils::formattedCurrentTime(cs::Utils::TimeFormat::DefaultMs) + std::string(" ") + message));
+    auto target = cs::Utils::formattedCurrentTime(cs::Utils::TimeFormat::DefaultMs) + std::string(" ") + message;
+    while (!queue_.push(target));
     variable_.notify_one();
 }
 
@@ -50,7 +51,7 @@ cs::ProfilerFileLogger::ProfilerFileLogger(size_t size)
 }
 
 void cs::ProfilerFileLogger::eventLoop() {
-    while (isRunning_) {
+    while (isRunning_.load(std::memory_order_acquire)) {
         std::unique_lock lock(mutex_);
         variable_.wait(lock, [this] {
             return queue_.read_available() || !isRunning();
