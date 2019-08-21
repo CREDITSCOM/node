@@ -479,7 +479,7 @@ private:
     uint64_t generateAccessId(cs::Sequence explicit_sequence) {
         std::lock_guard lk(mutex_);
         ++lastAccessId_;
-        accessSequence_[lastAccessId_] = (explicit_sequence != kUseLastSequence ? explicit_sequence : blockchain_.getLastSequence());
+        accessSequence_[lastAccessId_] = (explicit_sequence != kUseLastSequence ? explicit_sequence : blockchain_.getLastSeq());
         return lastAccessId_;
     }
 
