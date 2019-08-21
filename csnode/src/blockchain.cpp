@@ -129,7 +129,7 @@ bool BlockChain::init(const std::string& path) {
     csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
         ++totalLoaded;
         if (progress.poolsProcessed % 1000 == 0) {
-            std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << "";
+            std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << std::flush;
         }
         return false;
     };
