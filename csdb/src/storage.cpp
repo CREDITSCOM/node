@@ -534,6 +534,7 @@ Pool Storage::pool_load_internal(const PoolHash& hash, const bool metaOnly, size
         else {
             res = Pool::from_binary(std::move(data));
             trxCnt = res.transactions().size();
+            d->pools_cache_insert(res.sequence(), res.hash(), res);
         }
     }
 
@@ -622,6 +623,7 @@ Pool Storage::pool_load(const cs::Sequence sequence) const {
 
     if (needParseData) {
         res = Pool::from_binary(std::move(data));
+        d->pools_cache_insert(res.sequence(), res.hash(), res);
     }
 
     if (!res.is_valid()) {
