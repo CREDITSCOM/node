@@ -126,6 +126,7 @@ bool BlockChain::init(const std::string& path) {
     cslog() << "Trying to open DB...";
 
     size_t totalLoaded = 0;
+    lastSequence_ = 0;
     csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
         ++totalLoaded;
         if (progress.poolsProcessed % 1000 == 0) {
@@ -148,20 +149,11 @@ bool BlockChain::init(const std::string& path) {
             return false;
         }
         writeGenesisBlock();
-		lastSequence_ = 0;
     }
     else {
         if (!postInitFromDB()) {
             return false;
         }
-		if (storage_.size() > 0) {
-			lastSequence_ = totalLoaded - 1;
-		}
-		else {
-			lastSequence_ = 0;
-			cserror() << "Storage size is zero, but last hash isn't empty";
-			return false;
-		}
     }
 
     if (recreateIndex_) {
@@ -186,6 +178,7 @@ uint64_t BlockChain::uuid() const {
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
     auto blockSeq = block.sequence();
+    lastSequence_ = blockSeq;
     if (blockSeq == 0 && recreateIndex_) {
       cs::Lock lock(dbLock_);
       storage_.truncate_trxs_index();
