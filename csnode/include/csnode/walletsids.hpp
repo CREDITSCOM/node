@@ -85,11 +85,6 @@ private:
     struct Wallet {
         WalletAddress address; struct byAddress {};
         WalletId id;  struct byId {};
-        struct idChange : public std::unary_function<Wallet, void> {
-            idChange(const WalletId& id) : id_(id) {}
-            void operator()(Wallet& w) { w.id = id_; }
-            WalletId id_;
-        };
     };
 
     using Data = multi_index_container<

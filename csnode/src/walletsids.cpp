@@ -142,7 +142,7 @@ bool WalletsIds::Special::insertNormal(const WalletAddress& address, WalletId id
             idSpecial = value;
             auto &index = norm_.data_.get<Wallet::byId>();
             auto it = norm_.data_.project<Wallet::byId>(res.first);
-            index.modify(it, Wallet::idChange(idNormal));
+            index.modify(it, [=](Wallet& wallet) { wallet.id = idNormal; });
         }
 
         if (idNormal >= norm_.nextId_) {

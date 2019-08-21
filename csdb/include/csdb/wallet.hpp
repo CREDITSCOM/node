@@ -6,6 +6,8 @@
 #ifndef _CREDITS_CSDB_WALLET_H_INCLUDED_
 #define _CREDITS_CSDB_WALLET_H_INCLUDED_
 
+#include <map>
+
 #include <csdb/address.hpp>
 #include <csdb/currency.hpp>
 #include <csdb/internal/shared_data.hpp>
