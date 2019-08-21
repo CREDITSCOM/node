@@ -9,6 +9,8 @@
 #include <functional>
 #include <string>
 
+#include <boost/functional/hash.hpp>
+
 #include <lib/system/common.hpp>
 
 #include <csdb/internal/shared_data.hpp>
@@ -63,6 +65,20 @@ private:
     friend class Storage;
 };
 
+class Address::priv : public ::csdb::internal::shared_data {
+    union {
+        cs::PublicKey public_key;
+        WalletId wallet_id;
+    } data_{};
+
+    bool is_wallet_id_ = false;
+
+    DEFAULT_PRIV_CLONE()
+
+    friend class ::csdb::Address;
+};
+SHARED_DATA_CLASS_IMPLEMENTATION_INLINE(Address)
+
 inline bool Address::operator!=(const Address &other) const noexcept {
     return !operator==(other);
 }
@@ -78,5 +94,15 @@ public:
     }
 };
 }  // namespace std
+
+namespace boost {
+template <>
+class hash<csdb::Address> {
+public:
+    size_t operator()(const csdb::Address &obj) const {
+        return obj.calcHash();
+    }
+};
+}  // namespace boost
 
 #endif // _CREDITS_CSDB_ADDRESS_H_INCLUDED_

@@ -1,11 +1,17 @@
 #ifndef WALLET_IDS_HPP
 #define WALLET_IDS_HPP
 
-#include <csdb/address.hpp>
 #include <memory>
 #include <type_traits>
-#include <unordered_map>
-#include "csdb/internal/types.hpp"
+
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/member.hpp>
+
+#include <csdb/address.hpp>
+#include <csdb/internal/types.hpp>
+
+using namespace boost::multi_index;
 
 namespace cs {
 
@@ -76,7 +82,32 @@ public:
     }
 
 private:
-    using Data = std::unordered_map<WalletAddress, WalletId>;
+    struct Wallet {
+        WalletAddress address; struct byAddress {};
+        WalletId id;  struct byId {};
+        struct idChange : public std::unary_function<Wallet, void> {
+            idChange(const WalletId& id) : id_(id) {}
+            void operator()(Wallet& w) { w.id = id_; }
+            WalletId id_;
+        };
+    };
+
+    using Data = multi_index_container<
+        Wallet,
+        indexed_by<
+            hashed_unique<
+                tag<Wallet::byAddress>, member<
+                    Wallet, WalletAddress, &Wallet::address
+                >
+            >,
+            hashed_unique<
+                tag<Wallet::byId>, member<
+                    Wallet, WalletId, &Wallet::id
+                >
+            >
+        >
+    >;
+
     Data data_;
     WalletId nextId_;
     std::unique_ptr<Special> special_;

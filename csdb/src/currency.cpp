@@ -4,13 +4,6 @@
 
 namespace csdb {
 
-class Currency::priv : public ::csdb::internal::shared_data {
-public:
-    uint8_t id = 0;
-    DEFAULT_PRIV_CLONE()
-};
-SHARED_DATA_CLASS_IMPLEMENTATION(Currency)
-
 Currency::Currency(const uint8_t &id)
 : Currency() {
     d->id = id;

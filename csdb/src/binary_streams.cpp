@@ -1,5 +1,6 @@
-#include "binary_streams.hpp"
 #include <cstring>
+
+#include "binary_streams.hpp"
 #include "integral_encdec.hpp"
 
 namespace csdb {

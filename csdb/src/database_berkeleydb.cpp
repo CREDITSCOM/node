@@ -6,8 +6,8 @@
 
 #include <boost/filesystem.hpp>
 
-#include "csdb/database_berkeleydb.hpp"
-#include "csdb/pool.hpp"
+#include <csdb/database_berkeleydb.hpp>
+#include <csdb/pool.hpp>
 
 #include "priv_crypto.hpp"
 

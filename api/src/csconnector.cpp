@@ -29,7 +29,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 : executor_(executor::Executor::getInstance(&m_blockchain, solver, config.executor_port, config.executor_ip, config.executor_cmdline))
 , api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, executor_, config))
 , apiexec_handler(make_shared<apiexec::APIEXECHandler>(m_blockchain, *solver, executor_, config))
-, p_api_processor(make_shared<api::APIProcessor>(api_handler))
+, p_api_processor(make_shared<connector::ApiProcessor>(api_handler))
 , p_apiexec_processor(make_shared<apiexec::APIEXECProcessor>(apiexec_handler))
 #ifdef BINARY_TCP_API
 , server(p_api_processor, make_shared<TServerSocket>(config.port, kServerRWTimeoutMillis, kServerRWTimeoutMillis),
@@ -44,6 +44,9 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
     make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 {
+#ifdef PROFILE_API
+    server.setServerEventHandler(make_shared<cs::ProfilerEventHandler>());
+#endif
 
 #ifdef BINARY_TCP_EXECAPI
     exec_server_port = uint16_t(config.apiexec_port);

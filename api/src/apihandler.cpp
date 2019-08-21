@@ -1509,12 +1509,13 @@ api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& a
         abs_addr = s_blockchain.getAddressByType(addr, BlockChain::AddressType::PublicKey);
     }
 
-    decltype(auto) locked_smart_origin = lockedReference(this->smart_origin);
-
-    auto it = locked_smart_origin->find(abs_addr);
-    if ((present = (it != locked_smart_origin->end()))) {
-        return fetch_smart(executor_.loadTransactionApi(it->second));
+    const auto deploy = solver.smart_contracts().get_contract_deploy(addr);
+    if (deploy.is_valid()) {
+        present = true;
+        return fetch_smart(deploy);
     }
+
+    decltype(auto) locked_smart_origin = lockedReference(this->smart_origin);
     return api::SmartContractInvocation{};
 }
 
