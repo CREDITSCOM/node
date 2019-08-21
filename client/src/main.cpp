@@ -13,7 +13,9 @@
 #include <lib/system/logger.hpp>
 #include <net/transport.hpp>
 
-#include "config.hpp"
+#include <config.hpp>
+#include <params.hpp>
+#include <version.hpp>
 
 // diagnostic output
 #if defined(_MSC_VER)
@@ -183,6 +185,16 @@ int main(int argc, char* argv[]) {
 
     if (vm.count("version")) {
         cslog() << "Node version is " << Config::getNodeVersion();
+#ifdef MONITOR_NODE
+        cslog() << "Monitor version";
+#endif
+#ifdef WEB_WALLET_NODE
+        cslog() << "Wallet version";
+#endif
+        cslog() << "Git info:";
+        cslog() << "Build SHA1: " << client::Version::GIT_SHA1;
+        cslog() << "Date: " << client::Version::GIT_DATE;
+        cslog() << "Subject: " << client::Version::GIT_COMMIT_SUBJECT;
         return 0;
     }
 
