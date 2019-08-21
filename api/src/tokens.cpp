@@ -310,9 +310,9 @@ void TokensMaster::loadTokenInfo(const std::vector<csdb::Address>& vtokenAddr, c
         return;
     }
     auto freeChache = [&tokens_ = tokens_](const csdb::Address& addr, bool checkBalance = true) {
-        tokens_[addr].name = "not loaded";
-        tokens_[addr].symbol = "not loaded";
-        tokens_[addr].totalSupply = "not loaded";
+        tokens_[addr].name          = "not loaded";
+        tokens_[addr].symbol        = "not loaded";
+        tokens_[addr].totalSupply   = "not loaded";
         if (checkBalance) {
             for (auto& h : tokens_[addr].holders)
                 h.second.balance = "not loaded";
@@ -322,12 +322,14 @@ void TokensMaster::loadTokenInfo(const std::vector<csdb::Address>& vtokenAddr, c
     if (!vtokenAddr.empty()) {
         TokensMap loadedToken;
         for (const auto& addr : vtokenAddr) {
+            if (tokens_.find(addr) == tokens_.end())
+                continue;
             refreshTokenState(addr, cs::SmartContracts::get_contract_state(api_->get_s_blockchain(), addr));
             loadedToken[addr] = tokens_[addr];
         }       
-        func(loadedToken, holders_);     
-        for (const auto& addr : vtokenAddr)
-            freeChache(addr);
+        func(loadedToken, holders_);
+        for (const auto& itLoaded : loadedToken)
+            freeChache(itLoaded.first);
     }
     else {
         for (const auto& tk : tokens_) // need for sort
