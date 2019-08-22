@@ -801,7 +801,6 @@ bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& p
 
             if (!insertNewWalletId(newWallAddress, newWall.walletId_, proc)) {
                 cserror() << "Wallet was already added as new";
-                return false;
             }
         }
     }
