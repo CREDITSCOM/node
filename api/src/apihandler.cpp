@@ -1071,11 +1071,12 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 }
             }
 
+            cs::Hash newHash;
             { // signal to end waiting for a transaction
                 auto hashStateInst(lockedReference(this->hashStateSL));
                 (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
                     HashState res;
-                    cs::Hash newHash;
+                    
                     auto newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();    
                     if (!newHashStr.empty())
                         std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
@@ -1086,15 +1087,17 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                     });
             }
 
-            auto caller_pk = s_blockchain.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
+            if (newHash != cs::Zero::hash) { // update tokens
+                auto caller_pk = s_blockchain.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
 
-            if (is_smart_deploy(smart))
-                tm.checkNewDeploy(target_pk, caller_pk, smart);
+                if (is_smart_deploy(smart))
+                    tm.checkNewDeploy(target_pk, caller_pk, smart);
 
-            // state also will be updated in update_smart_state_slot()
-            std::string newState = cs::SmartContracts::get_contract_state(s_blockchain, target_pk);
-            if (!newState.empty())
-                tm.checkNewState(target_pk, caller_pk, smart, newState);
+                // state also will be updated in update_smart_state_slot()
+                std::string newState = cs::SmartContracts::get_contract_state(s_blockchain, target_pk);
+                if (!newState.empty())
+                    tm.checkNewState(target_pk, caller_pk, smart, newState);
+            }
         }
     }
     else {
