@@ -45,6 +45,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 #endif
 {
 #ifdef PROFILE_API
+    cs::ProfilerFileLogger::bufferSize = 1000;
     server.setServerEventHandler(make_shared<cs::ProfilerEventHandler>());
 #endif
 
