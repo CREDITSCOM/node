@@ -30,12 +30,11 @@ bool cs::ProfilerFileLogger::isRunning() const {
 }
 
 void cs::ProfilerFileLogger::add(const std::string& message) {
-    while (!queue_.push(cs::Utils::formattedCurrentTime(cs::Utils::TimeFormat::DefaultMs) + std::string(" ") + message));
-    variable_.notify_one();
-}
+    auto time = cs::Utils::formattedCurrentTime(cs::Utils::TimeFormat::DefaultMs);
+    Data data { message, std::move(time) };
 
-void cs::ProfilerFileLogger::add(const std::string& message, size_t time) {
-    add(message + std::to_string(time));
+    while (!queue_.push(data));
+    variable_.notify_one();
 }
 
 cs::ProfilerFileLogger::ProfilerFileLogger(size_t size)
@@ -50,17 +49,17 @@ cs::ProfilerFileLogger::ProfilerFileLogger(size_t size)
 }
 
 void cs::ProfilerFileLogger::eventLoop() {
-    while (isRunning_) {
+    while (isRunning_.load(std::memory_order_acquire)) {
         std::unique_lock lock(mutex_);
         variable_.wait(lock, [this] {
             return queue_.read_available() || !isRunning();
         });
 
         while (queue_.read_available() != 0) {
-            std::string message;
-            while (!queue_.pop(message));
+            Data data;
+            while (!queue_.pop(data));
 
-            buffer_.push_back(std::move(message));
+            buffer_.push_back(std::move(data));
         }
 
         std::ofstream file(fileName_, std::ofstream::trunc);
@@ -69,7 +68,8 @@ void cs::ProfilerFileLogger::eventLoop() {
             auto length = static_cast<size_t>(std::distance(iter, buffer_.end()));
             auto index = buffer_.size() - length;
 
-            file << formatter(*iter, index) << "\n";
+            const Data& data = *iter;
+            file << formatter(data.message, data.time, index) << "\n";
         }
     }
 }
