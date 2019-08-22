@@ -37,7 +37,7 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
         return;
     }
 
-    const cs::Sequence lastWrittenSequence = blockChain_->getLastSequence();
+    const cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
 
     if (lastWrittenSequence >= roundNum) {
         const bool isFinished = showSyncronizationProgress(lastWrittenSequence);
@@ -130,7 +130,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
                     << "], id: " << packetNum;
 
     /// TODO Fix numeric cast from RoundNum to cs::Sequence
-    cs::Sequence lastWrittenSequence = blockChain_->getLastSequence();
+    cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
     const cs::Sequence oldLastWrittenSequence = lastWrittenSequence;
     const std::size_t oldCachedBlocksSize = blockChain_->getCachedBlocksSize();
 
@@ -153,7 +153,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
 
         if (blockChain_->storeBlock(pool, true /*by_sync*/)) {
             blockChain_->testCachedBlocks();
-            lastWrittenSequence = blockChain_->getLastSequence();
+            lastWrittenSequence = blockChain_->getLastSeq();
         }
     }
 
@@ -214,7 +214,7 @@ bool cs::PoolSynchronizer::isFastMode() const {
         return false;
     }
 
-    const cs::Sequence sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSequence() - blockChain_->getCachedBlocksSize();
+    const cs::Sequence sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSeq() - blockChain_->getCachedBlocksSize();
     return sum > static_cast<cs::Sequence>(syncData_.blockPoolsCount * 3);  // roundDifferentForSync_
 }
 
@@ -395,7 +395,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
         return true;
     }
 
-    const cs::Sequence lastWrittenSequence = blockChain_->getLastSequence();
+    const cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
 
     // remove unnecessary sequnces
     removeExistingSequence(lastWrittenSequence, SequenceRemovalAccuracy::LOWER_BOUND);
@@ -604,7 +604,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
 }
 
 bool cs::PoolSynchronizer::isLastRequest() const {
-    const auto sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSequence() - blockChain_->getCachedBlocksSize();
+    const auto sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSeq() - blockChain_->getCachedBlocksSize();
     return sum <= syncData_.blockPoolsCount;
 }
 

@@ -126,10 +126,11 @@ bool BlockChain::init(const std::string& path) {
     cslog() << "Trying to open DB...";
 
     size_t totalLoaded = 0;
+    lastSequence_ = 0;
     csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
         ++totalLoaded;
         if (progress.poolsProcessed % 1000 == 0) {
-            std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << "";
+            std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << std::flush;
         }
         return false;
     };
@@ -153,13 +154,12 @@ bool BlockChain::init(const std::string& path) {
         if (!postInitFromDB()) {
             return false;
         }
-        std::cout << "Done\n";
     }
 
     if (recreateIndex_) {
         recreateIndex_ = false;
         lapoos.clear();
-        cslog() << "Recreated index 0 -> " << getLastSequence()
+        cslog() << "Recreated index 0 -> " << getLastSeq()
                 << ". Continue to keep it actual from new blocks.";
     }
 
@@ -178,6 +178,7 @@ uint64_t BlockChain::uuid() const {
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
     auto blockSeq = block.sequence();
+    lastSequence_ = blockSeq;
     if (blockSeq == 0 && recreateIndex_) {
       cs::Lock lock(dbLock_);
       storage_.truncate_trxs_index();
@@ -259,21 +260,6 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
 
     lastIndexedPool = pool.sequence();
     updateLastIndFile();
-}
-
-cs::Sequence BlockChain::getLastSequence() const {
-    std::lock_guard lock(dbLock_);
-
-    if (deferredBlock_.is_valid()) {
-        return deferredBlock_.sequence();
-    }
-    // try to sequence get from blockHashes
-    cs::Sequence seq = blockHashes_->find(storage_.last_hash());
-    if (seq != kWrongSequence) {
-        return seq;
-    }
-    // the last possible way (actually, blockchain does not allow "wholes" in sequences)
-    return storage_.size() - 1;
 }
 
 csdb::PoolHash BlockChain::getLastHash() const {
@@ -395,7 +381,7 @@ csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
         // deferredBlock already composed:
         return deferredBlock_.clone();
     }
-    if (sequence > getLastSequence()) {
+    if (sequence > getLastSeq()) {
         return csdb::Pool{};
     }
     return storage_.pool_load(sequence);
@@ -457,7 +443,7 @@ void BlockChain::removeLastBlock() {
     if (!blockHashes_->remove(pool.sequence())) {
         blockHashes_->remove(pool.hash());
     }
-
+	--lastSequence_;
     total_transactions_count_ -= pool.transactions().size();
     removeWalletsInPoolFromCache(pool);
 
@@ -1044,7 +1030,7 @@ bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address& addr) cons
 }
 
 std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrusted) {
-    const auto last_seq = getLastSequence();
+    const auto last_seq = getLastSeq();
     const auto pool_seq = pool.sequence();
 
     csdebug() << "BLOCKCHAIN> finish & store block #" << pool_seq << " to chain";
@@ -1101,6 +1087,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
         // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
         deferredBlock_ = pool;
+		lastSequence_ = pool.sequence();
         if (finalizeBlock(deferredBlock_, isTrusted, lastConfidants)) {
             csdebug() << "The block is correct";
         }
@@ -1208,7 +1195,7 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
 bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     csdebug() << csfunc() << ":";
 
-    const auto lastSequence = getLastSequence();
+    const auto lastSequence = getLastSeq();
     const auto poolSequence = pool.sequence();
 
     if (poolSequence <= lastSequence) {
@@ -1297,7 +1284,7 @@ void BlockChain::testCachedBlocks() {
         return;
     }
 
-    auto lastSeq = getLastSequence() + 1;
+    auto lastSeq = getLastSeq() + 1;
     // clear unnecessary sequence
     if (cachedBlocks_.cbegin()->first < lastSeq) {
         auto it = cachedBlocks_.lower_bound(lastSeq);
@@ -1339,7 +1326,8 @@ std::size_t BlockChain::getCachedBlocksSize() const {
 }
 
 std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const {
-    const auto firstSequence = getLastSequence() + 1;
+	cs::Sequence seq = getLastSeq();
+    const auto firstSequence = seq + 1;
     const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
 
     if (firstSequence >= currentRoundNumber) {
@@ -1547,4 +1535,8 @@ void TransactionsIterator::next() {
             }
         }
     }
+}
+
+cs::Sequence BlockChain::getLastSeq() const{
+	return lastSequence_;
 }

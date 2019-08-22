@@ -135,6 +135,8 @@ public:
     bool updateLastBlock(cs::RoundPackage& rPackage);
     bool updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom);
     bool deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool);
+	cs::Sequence getLastSeq() const;
+
     /**
      * @fn    std::size_t BlockChain::getCachedBlocksSize() const;
      *
@@ -214,7 +216,7 @@ public:
     csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
     void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
     csdb::Pool getLastBlock() const {
-        return loadBlock(getLastSequence());
+		return loadBlock(getLastSeq());
     }
 
     // info
@@ -222,7 +224,6 @@ public:
     size_t getSize() const;
     uint64_t getWalletsCountWithBalance();
     csdb::PoolHash getLastHash() const;
-    cs::Sequence getLastSequence() const;
     csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
     cs::Sequence getSequenceByHash(const csdb::PoolHash&) const;
 
@@ -259,7 +260,6 @@ public:
 private:
     void createCachesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
-
     void writeGenesisBlock();
     void createTransactionsIndex(csdb::Pool&);
 
@@ -367,6 +367,7 @@ private:
     mutable uint64_t uuid_ = 0;
     bool recreateIndex_;
     std::map<csdb::Address, csdb::PoolHash> lapoos;
+	std::atomic<cs::Sequence> lastSequence_;
 };
 
 class TransactionsIterator {

@@ -850,7 +850,7 @@ void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offs
         return;
     }
 
-    uint64_t sequence = s_blockchain.getLastSequence();
+    uint64_t sequence = s_blockchain.getLastSeq();
     if ((uint64_t)offset > sequence) {
         return;
     }
@@ -2089,7 +2089,7 @@ void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
 ////////new
 
 void APIHandler::SyncStateGet(api::SyncStateResult& _return) {
-    _return.lastBlock = s_blockchain.getLastSequence();
+    _return.lastBlock = s_blockchain.getLastSeq();
     _return.currRound = cs::Conveyer::instance().currentRoundNumber();
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
@@ -2097,7 +2097,7 @@ void APIHandler::SyncStateGet(api::SyncStateResult& _return) {
 void apiexec::APIEXECHandler::GetSeed(apiexec::GetSeedResult& _return, const general::AccessID accessId) {
     if (accessId == executor::Executor::ACCESS_ID_RESERVE::GETTER) { // for getter
         std::default_random_engine random(std::random_device{}());
-        const auto randSequence = random() % blockchain_.getLastSequence();
+        const auto randSequence = random() % blockchain_.getLastSeq();
         const auto hash         = ::csdb::priv::crypto::calc_hash(blockchain_.getHashBySequence(randSequence).to_binary());
         _return.seed.assign(hash.begin(), hash.end());
         return;

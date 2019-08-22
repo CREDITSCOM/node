@@ -15,10 +15,19 @@
 #include <boost/circular_buffer.hpp>
 
 namespace cs {
-using ProfilerFileLoggerFormatter = std::function<std::string(const std::string&, size_t)>; // message - from logger buffer, size_t - index of message at buffer
+// you can use user defined formatter, args are:
+// message - logger buffer message,
+// time - formatted time stamp,
+// index - index of message at buffer
+using ProfilerFileLoggerFormatter = std::function<std::string(const std::string& message, const std::string& time, size_t index)>;
 
 // logs messages to file
 class ProfilerFileLogger {
+    struct Data {
+        std::string message;
+        std::string time;
+    };
+
 public:
     enum Options {
         DefaultBufferSize = 100
@@ -35,14 +44,15 @@ public:
     inline static size_t bufferSize = Options::DefaultBufferSize;
     inline static std::string fileName = "profiler.txt";
     inline static std::string path = "profiler";
-    inline static ProfilerFileLoggerFormatter formatter = [](const std::string& message, size_t){ return message; };
+    inline static ProfilerFileLoggerFormatter formatter = [](const std::string& message, const std::string& time, size_t) {
+        return time + std::string(" ") + message;
+    };
 
     void stop();
     void start();
     bool isRunning() const;
 
     void add(const std::string& message);
-    void add(const std::string& message, size_t time);
 
     template<typename TimePoint, typename Result = decltype(std::declval<std::chrono::steady_clock::time_point>() - std::declval<std::chrono::steady_clock::time_point>()),
              typename = std::enable_if_t<std::is_same_v<TimePoint, Result>>>
@@ -65,8 +75,8 @@ protected:
 private:
     std::string fileName_;
 
-    boost::circular_buffer<std::string> buffer_;
-    boost::lockfree::spsc_queue<std::string> queue_;
+    boost::circular_buffer<Data> buffer_;
+    boost::lockfree::spsc_queue<Data> queue_;
 
     std::mutex mutex_;
     std::condition_variable variable_;
