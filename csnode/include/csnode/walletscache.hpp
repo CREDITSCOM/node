@@ -73,7 +73,7 @@ public:
         csdb::Amount totalFee;
     };
 
-    static void convert(const csdb::Address& address, WalletData::Address& walletAddress);
+    void convert(const csdb::Address& address, WalletData::Address& walletAddress) const;
     static void convert(const WalletData::Address& walletAddress, csdb::Address& address);
 
     void iterateOverWallets(const std::function<bool(const WalletData::Address&, const WalletData&)>);

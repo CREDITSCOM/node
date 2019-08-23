@@ -11,8 +11,16 @@ const uint8_t kUntrustedMarker = 255;
 }  // namespace
 
 namespace cs {
-void WalletsCache::convert(const csdb::Address& address, WalletData::Address& walletAddress) {
-    walletAddress = address.public_key();
+void WalletsCache::convert(const csdb::Address& address, WalletData::Address& walletAddress) const {
+    if (address.is_public_key()) {
+        walletAddress = address.public_key();
+    }
+    else {
+        csdb::Address res;
+        if (walletsIds_.normal().findaddr(address.wallet_id(), res)) {
+            walletAddress = res.public_key();
+        }
+    }
 }
 
 void WalletsCache::convert(const WalletData::Address& walletAddress, csdb::Address& address) {
@@ -142,7 +150,7 @@ void WalletsCache::Updater::smartSourceTransactionReleased(const csdb::Transacti
 }
 
 void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transaction& transaction, const WalletsCache::RefContractCall& ref,
-    const csdb::Amount& execFee /*= 0*/) {
+                                                            const csdb::Amount& execFee /*= 0*/) {
     csdb::Address wallAddress = transaction.source();
     if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
         return;
@@ -486,7 +494,7 @@ WalletsCache::WalletData& WalletsCache::Updater::getWalletData(WalletId id, cons
 
     if (!data_.wallets_[id]) {
         data_.wallets_[id] = new WalletData{};
-        convert(address, data_.wallets_[id]->address_);
+        data_.convert(address, data_.wallets_[id]->address_);
     }
 
     return *data_.wallets_[id];
