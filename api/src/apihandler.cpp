@@ -130,10 +130,8 @@ void APIHandler::WalletDataGet(WalletDataGetResult& _return, const general::Addr
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
-        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+    if (!s_blockchain.findWalletData(addr, wallData, wallId))
         return;
-    }
     _return.walletData.walletId = wallId;
     _return.walletData.balance.integral = wallData.balance_.integral();
     _return.walletData.balance.fraction = static_cast<decltype(_return.walletData.balance.fraction)>(wallData.balance_.fraction());
