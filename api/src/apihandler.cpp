@@ -1056,23 +1056,21 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 }
             }
 
-            cs::Hash newHash;
+            HashState res;
             { // signal to end waiting for a transaction
                 auto hashStateInst(lockedReference(this->hashStateSL));
                 (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
-                    HashState res;
-                    
-                    auto newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();    
+                    auto newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();
                     if (!newHashStr.empty())
                         std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
-                    res.retVal = trxn.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();                                    
-                    res.isOld   = (newHash == oldHash.hash);
+                    res.retVal = trxn.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();
+                    res.isOld = (res.hash == oldHash.hash);
                     res.condFlg = true;
                     return res;
                     });
             }
 
-            if (newHash != cs::Zero::hash) { // update tokens
+            if (res.hash != cs::Zero::hash) { // update tokens
                 auto caller_pk = s_blockchain.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
 
                 if (is_smart_deploy(smart))
