@@ -271,9 +271,7 @@ private:
     void onReadFromDB(csdb::Pool block, bool* shouldStop);
     bool postInitFromDB();
 
-    template <typename WalletCacheProcessor>
-    bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
-    bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Initer& initer);
+    bool updateWalletIds(const csdb::Pool& pool, cs::WalletsCache::Updater& updater);
     bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
     void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);

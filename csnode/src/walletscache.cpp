@@ -6,11 +6,8 @@
 #include <lib/system/logger.hpp>
 #include <solver/smartcontracts.hpp>
 
-using namespace std;
-
 namespace {
 const uint8_t kUntrustedMarker = 255;
-
 }  // namespace
 
 namespace cs {
@@ -35,124 +32,19 @@ WalletsCache::~WalletsCache() {
         delete el;
 }
 
-std::unique_ptr<WalletsCache::Initer> WalletsCache::createIniter() {
-    return std::unique_ptr<Initer>(new Initer(*this));
-}
-
 std::unique_ptr<WalletsCache::Updater> WalletsCache::createUpdater() {
     return std::unique_ptr<Updater>(new Updater(*this));
 }
 
-// Initer
-WalletsCache::Initer::Initer(WalletsCache& data)
-: ProcessorBase(data) {
-    walletsSpecial_.reserve(data_.config_.initialWalletsNum_);
-}
-
-void WalletsCache::Initer::loadPrevBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
-    load(curr, confidants, blockchain);
-}
-
 // Updater
 WalletsCache::Updater::Updater(WalletsCache& data)
-: ProcessorBase(data) {
+: data_(data) {
     modified_.resize(data.wallets_.size(), false);
 }
 
-void WalletsCache::Updater::loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
+void WalletsCache::Updater::loadNextBlock(csdb::Pool& pool, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
     modified_.reset();
-    load(curr, confidants, blockchain);
-}
 
-void WalletsCache::ProcessorBase::invokeReplenishPayableContract(const csdb::Transaction& transaction) {
-    csdb::Address wallAddress = transaction.target();
-    if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
-        return;
-    }
-    WalletId id{};
-    if (!findWalletId(wallAddress, id)) {
-        cserror() << "Cannot find target wallet, target is " << wallAddress.to_string();
-        return;
-    }
-    WalletData& wallData = getWalletData(id, wallAddress);
-    wallData.balance_ -= transaction.amount();
-    setModified(id);
-    data_.smartPayableTransactions_.push_back(transaction.id());
-
-    if (!SmartContracts::is_executable(transaction)) {
-        WalletId sourceId{};
-        csdb::Address sourceAddress = transaction.source();
-        if (!findWalletId(sourceAddress, sourceId)) {
-            cserror() << "Cannot find source wallet, source is " << sourceAddress.to_string();
-            return;
-        }
-        WalletData& sourceWallData = getWalletData(sourceId, sourceAddress);
-        sourceWallData.balance_ += csdb::Amount(transaction.counted_fee().to_double()) - csdb::Amount(transaction.max_fee().to_double());
-        setModified(sourceId);
-    }
-}
-
-void WalletsCache::ProcessorBase::smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx) {
-    csdb::Address smartSourceAddress = smartSourceTrx.source();
-    csdb::Address initAddress = initTrx.source();
-    auto countedFee = csdb::Amount(smartSourceTrx.counted_fee().to_double());
-    WalletId smartId{};
-    WalletId initId{};
-    if (!findWalletId(smartSourceAddress, smartId)) {
-        cserror() << "Cannot find source wallet, source is " << smartSourceAddress.to_string();
-        return;
-    }
-    if (!findWalletId(initAddress, initId)) {
-        cserror() << "Cannot find source wallet, source is " << initAddress.to_string();
-        return;
-    }
-    WalletData& smartWallData = getWalletData(smartId, smartSourceAddress);
-    smartWallData.balance_ += countedFee;
-    WalletData& initWallData = getWalletData(initId, initAddress);
-    initWallData.balance_ -= countedFee;
-
-    setModified(smartId);
-    setModified(initId);
-}
-
-void WalletsCache::ProcessorBase::rollbackExceededTimeoutContract(const csdb::Transaction& transaction, const WalletsCache::RefContractCall& ref,
-    const csdb::Amount& execFee /*= 0*/) {
-    csdb::Address wallAddress = transaction.source();
-    if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
-        return;
-    }
-
-    WalletId id{};
-    if (!findWalletId(wallAddress, id)) {
-        cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
-        return;
-    }
-
-    WalletData& wallData = getWalletData(id, wallAddress);
-    wallData.balance_ += transaction.amount() + csdb::Amount(transaction.max_fee().to_double()) - csdb::Amount(transaction.counted_fee().to_double());
-
-    if (SmartContracts::is_executable(transaction)) {
-        auto it = data_.canceledSmarts_.find(transaction.target());
-        if (it == data_.canceledSmarts_.end()) {
-            data_.canceledSmarts_.insert(std::make_pair(transaction.target(), std::list< RefContractCall >{ ref }));
-        }
-        else {
-            it->second.push_front( ref );
-        }
-    }
-    else {
-        auto it = std::find(data_.smartPayableTransactions_.cbegin(), data_.smartPayableTransactions_.cend(), transaction.id());
-        if (it != data_.smartPayableTransactions_.cend()) {
-            data_.smartPayableTransactions_.erase(it);
-            wallData.balance_ -= execFee;
-        }
-    }
-
-    setModified(id);
-}
-
-// ProcessorBase
-void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
     csdb::Pool::Transactions& transactions = pool.transactions();
     csdb::Amount totalAmountOfCountedFee = 0;
 #ifdef MONITOR_NODE
@@ -197,8 +89,96 @@ void WalletsCache::ProcessorBase::load(csdb::Pool& pool, const cs::ConfidantsKey
     setWalletTime(wrWall, timeStamp);
 #endif
 }
+
+void WalletsCache::Updater::invokeReplenishPayableContract(const csdb::Transaction& transaction) {
+    csdb::Address wallAddress = transaction.target();
+    if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
+        return;
+    }
+    WalletId id{};
+    if (!findWalletId(wallAddress, id)) {
+        cserror() << "Cannot find target wallet, target is " << wallAddress.to_string();
+        return;
+    }
+    WalletData& wallData = getWalletData(id, wallAddress);
+    wallData.balance_ -= transaction.amount();
+    setModified(id);
+    data_.smartPayableTransactions_.push_back(transaction.id());
+
+    if (!SmartContracts::is_executable(transaction)) {
+        WalletId sourceId{};
+        csdb::Address sourceAddress = transaction.source();
+        if (!findWalletId(sourceAddress, sourceId)) {
+            cserror() << "Cannot find source wallet, source is " << sourceAddress.to_string();
+            return;
+        }
+        WalletData& sourceWallData = getWalletData(sourceId, sourceAddress);
+        sourceWallData.balance_ += csdb::Amount(transaction.counted_fee().to_double()) - csdb::Amount(transaction.max_fee().to_double());
+        setModified(sourceId);
+    }
+}
+
+void WalletsCache::Updater::smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx) {
+    csdb::Address smartSourceAddress = smartSourceTrx.source();
+    csdb::Address initAddress = initTrx.source();
+    auto countedFee = csdb::Amount(smartSourceTrx.counted_fee().to_double());
+    WalletId smartId{};
+    WalletId initId{};
+    if (!findWalletId(smartSourceAddress, smartId)) {
+        cserror() << "Cannot find source wallet, source is " << smartSourceAddress.to_string();
+        return;
+    }
+    if (!findWalletId(initAddress, initId)) {
+        cserror() << "Cannot find source wallet, source is " << initAddress.to_string();
+        return;
+    }
+    WalletData& smartWallData = getWalletData(smartId, smartSourceAddress);
+    smartWallData.balance_ += countedFee;
+    WalletData& initWallData = getWalletData(initId, initAddress);
+    initWallData.balance_ -= countedFee;
+
+    setModified(smartId);
+    setModified(initId);
+}
+
+void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transaction& transaction, const WalletsCache::RefContractCall& ref,
+    const csdb::Amount& execFee /*= 0*/) {
+    csdb::Address wallAddress = transaction.source();
+    if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_) {
+        return;
+    }
+
+    WalletId id{};
+    if (!findWalletId(wallAddress, id)) {
+        cserror() << "Cannot find source wallet, source is " << wallAddress.to_string();
+        return;
+    }
+
+    WalletData& wallData = getWalletData(id, wallAddress);
+    wallData.balance_ += transaction.amount() + csdb::Amount(transaction.max_fee().to_double()) - csdb::Amount(transaction.counted_fee().to_double());
+
+    if (SmartContracts::is_executable(transaction)) {
+        auto it = data_.canceledSmarts_.find(transaction.target());
+        if (it == data_.canceledSmarts_.end()) {
+            data_.canceledSmarts_.insert(std::make_pair(transaction.target(), std::list< RefContractCall >{ ref }));
+        }
+        else {
+            it->second.push_front( ref );
+        }
+    }
+    else {
+        auto it = std::find(data_.smartPayableTransactions_.cbegin(), data_.smartPayableTransactions_.cend(), transaction.id());
+        if (it != data_.smartPayableTransactions_.cend()) {
+            data_.smartPayableTransactions_.erase(it);
+            wallData.balance_ -= execFee;
+        }
+    }
+
+    setModified(id);
+}
+
 #ifdef MONITOR_NODE
-bool WalletsCache::ProcessorBase::setWalletTime(const WalletData::Address& address, const uint64_t& p_timeStamp) {
+bool WalletsCache::Updater::setWalletTime(const WalletData::Address& address, const uint64_t& p_timeStamp) {
     for (auto& it : data_.wallets_) {
         if (it != nullptr && it->address_ == address) {
             it->createTime_ = p_timeStamp;
@@ -209,7 +189,7 @@ bool WalletsCache::ProcessorBase::setWalletTime(const WalletData::Address& addre
 }
 #endif
 
-void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(const csdb::Amount& totalFee, const cs::ConfidantsKeys& confidants, const std::vector<uint8_t>& realTrusted) {
+void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& totalFee, const cs::ConfidantsKeys& confidants, const std::vector<uint8_t>& realTrusted) {
     if (!confidants.size()) {
         cslog() << "WALLETS CACHE>> NO CONFIDANTS";
         return;
@@ -249,7 +229,7 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithFee(const csdb::Amoun
     }
 }
 
-void WalletsCache::ProcessorBase::fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction, const BlockChain& blockchain) {
+void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction, const BlockChain& blockchain) {
     if (!SmartContracts::is_new_state(transaction)) {
         cswarning() << __func__ << ": transaction is not new state";
         return;
@@ -295,12 +275,12 @@ void WalletsCache::ProcessorBase::fundConfidantsWalletsWithExecFee(const csdb::T
     }
 }
 
-double WalletsCache::ProcessorBase::load(const csdb::Transaction& tr, const BlockChain& blockchain) {
+double WalletsCache::Updater::load(const csdb::Transaction& tr, const BlockChain& blockchain) {
     loadTrxForTarget(tr);
     return loadTrxForSource(tr, blockchain);
 }
 
-double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain) {
+double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain) {
     csdb::Address wallAddress;
     bool smartIniter = false;
     csdb::Transaction initTransaction;
@@ -354,7 +334,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
         else {
             checkSmartWaitingForMoney(initTransaction, initRef, tr);
         }
-        //
+
         WalletId id_s{};
         if (!findWalletId(tr.source(), id_s)) {
             cserror() << "Cannot find source wallet, source is " << tr.source().to_string();
@@ -369,7 +349,6 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
         csdetails() << "Wallets: innerID of (new_state) " << EncodeBase58(tmp) << " <- " << tr.innerID();
         wallData_s.lastTransaction_ = tr.id();
         setModified(id_s);
-        //
     }
     else {
         wallData.balance_ -= csdb::Amount(tr.counted_fee().to_double());
@@ -393,7 +372,7 @@ double WalletsCache::ProcessorBase::loadTrxForSource(const csdb::Transaction& tr
     return tr.counted_fee().to_double();
 }
 
-bool WalletsCache::ProcessorBase::isCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref) {
+bool WalletsCache::Updater::isCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref) {
     auto it = data_.canceledSmarts_.find(contract_addr);
     if (it == data_.canceledSmarts_.end()) {
         return false;
@@ -402,7 +381,7 @@ bool WalletsCache::ProcessorBase::isCanceledSmart(const csdb::Address& contract_
         [&](const RefContractCall& item) { return item.sequence == ref.sequence && item.transaction == ref.transaction; });
 }
 
-void WalletsCache::ProcessorBase::checkCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref) {
+void WalletsCache::Updater::checkCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref) {
     auto it = data_.canceledSmarts_.find(contract_addr);
     if (it == data_.canceledSmarts_.end()) {
         return;
@@ -418,8 +397,9 @@ void WalletsCache::ProcessorBase::checkCanceledSmart(const csdb::Address& contra
     }
 }
 
-void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction,
-    const WalletsCache::RefContractCall& initRef, const csdb::Transaction& newStateTransaction) {
+void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction,
+                                                      const WalletsCache::RefContractCall& initRef,
+                                                      const csdb::Transaction& newStateTransaction) {
     if (!cs::SmartContracts::is_state_updated(newStateTransaction)) {
         csdb::Amount fee(0);
         csdb::UserField fld = newStateTransaction.user_field(trx_uf::new_state::Fee);
@@ -467,7 +447,7 @@ void WalletsCache::ProcessorBase::checkSmartWaitingForMoney(const csdb::Transact
     }
 }
 
-void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) {
+void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr) {
     csdb::Address wallAddress = tr.target();
 
     if (wallAddress == data_.genesisAddress_ || wallAddress == data_.startAddress_)
@@ -492,44 +472,24 @@ void WalletsCache::ProcessorBase::loadTrxForTarget(const csdb::Transaction& tr) 
     wallData.lastTransaction_ = tr.id();
 }
 
-bool WalletsCache::Initer::findWalletId(const csdb::Address& address, WalletId& id) {
-    if (!data_.walletsIds_.special().findAnyOrInsertSpecial(address, id))
-        return false;
-    return true;
-}
-
 bool WalletsCache::Updater::findWalletId(const csdb::Address& address, WalletId& id) {
-    if (!data_.walletsIds_.normal().find(address, id))
+    if (!data_.walletsIds_.normal().find(address, id)) {
         return false;
-    return true;
-}
-
-WalletsCache::WalletData& WalletsCache::ProcessorBase::getWalletData(Data& wallets, WalletId id, const csdb::Address& address) {
-    id = WalletsIds::Special::makeNormal(id);
-
-    if (id >= wallets.size())
-        wallets.resize(id + 1);
-
-    if (!wallets[id]) {
-        wallets[id] = new WalletData{};
-        convert(address, wallets[id]->address_);
     }
-
-    return *wallets[id];
-}
-
-WalletsCache::WalletData& WalletsCache::Initer::getWalletData(WalletId id, const csdb::Address& address) {
-    if (WalletsIds::Special::isSpecial(id))
-        return ProcessorBase::getWalletData(walletsSpecial_, id, address);
-    else
-        return ProcessorBase::getWalletData(data_.wallets_, id, address);
+    return true;
 }
 
 WalletsCache::WalletData& WalletsCache::Updater::getWalletData(WalletId id, const csdb::Address& address) {
-    return ProcessorBase::getWalletData(data_.wallets_, id, address);
-}
+    if (id >= data_.wallets_.size()) {
+        data_.wallets_.resize(id + 1);
+    }
 
-void WalletsCache::Initer::setModified(WalletId) {
+    if (!data_.wallets_[id]) {
+        data_.wallets_[id] = new WalletData{};
+        convert(address, data_.wallets_[id]->address_);
+    }
+
+    return *data_.wallets_[id];
 }
 
 void WalletsCache::Updater::setModified(WalletId id) {
@@ -539,39 +499,6 @@ void WalletsCache::Updater::setModified(WalletId id) {
         return;
     }
     modified_.set(id);
-}
-
-bool WalletsCache::Initer::moveData(WalletId srcIdSpecial, WalletId destIdNormal) {
-    if (!WalletsIds::Special::isSpecial(srcIdSpecial))
-        return false;
-    srcIdSpecial = WalletsIds::Special::makeNormal(srcIdSpecial);
-
-    if (srcIdSpecial >= walletsSpecial_.size())
-        return false;
-    if (!walletsSpecial_[srcIdSpecial]) {
-        cserror() << "Src wallet data should not be empty";
-        return false;
-    }
-
-    if (destIdNormal >= data_.wallets_.size())
-        data_.wallets_.resize(destIdNormal + 1);
-    if (data_.wallets_[destIdNormal]) {
-        cserror() << "Dest wallet data should be empty";
-        //        return false; // examine it
-    }
-    data_.wallets_[destIdNormal] = walletsSpecial_[srcIdSpecial];
-    walletsSpecial_[srcIdSpecial] = nullptr;
-    return true;
-}
-
-bool WalletsCache::Initer::isFinishedOk() const {
-    for (const auto& ptr : walletsSpecial_) {
-        if (ptr) {
-            cserror() << "Some new wallet was not added to block";
-            return false;
-        }
-    }
-    return true;
 }
 
 const WalletsCache::WalletData* WalletsCache::Updater::findWallet(WalletId id) const {

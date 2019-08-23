@@ -786,8 +786,7 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address wallP
     }
 }
 
-template <typename WalletCacheProcessor>
-bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc) {
+bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletsCache::Updater& proc) {
     try {
         std::lock_guard lock(cacheMutex_);
 
@@ -811,24 +810,6 @@ bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& p
     catch (...) {
         cserror() << "Exc=...";
         return false;
-    }
-
-    return true;
-}
-
-bool BlockChain::insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, WalletsCache::Initer& initer) {
-    WalletId idSpecial{};
-
-    if (!walletIds_->special().insertNormal(newWallAddress, newWalletId, idSpecial)) {
-        cserror() << "Cannot add new wallet";
-        return false;
-    }
-
-    if (WalletsIds::Special::isSpecial(idSpecial)) {
-        if (!initer.moveData(idSpecial, newWalletId)) {
-            cserror() << "Cannot move special wallet id data to newWalletId: idSpecial=" << idSpecial << " newWalletId=" << newWalletId;
-            return false;
-        }
     }
 
     return true;
