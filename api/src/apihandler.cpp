@@ -1505,6 +1505,7 @@ api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& a
         present = true;
         return fetch_smart(deploy);
     }
+
     return api::SmartContractInvocation{};
 }
 
