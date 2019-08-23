@@ -1506,7 +1506,6 @@ api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& a
         return fetch_smart(deploy);
     }
 
-    decltype(auto) locked_smart_origin = lockedReference(this->smart_origin);
     return api::SmartContractInvocation{};
 }
 
