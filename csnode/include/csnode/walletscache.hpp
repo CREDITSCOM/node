@@ -167,9 +167,6 @@ public:
     WalletsCache(const WalletsCache&&) = delete;
     WalletsCache& operator=(const WalletsCache&&) = delete;
 
-    //static csdb::Address findSmartContractIniter(const csdb::Transaction& tr, const BlockChain& blockchain);
-    //static csdb::Transaction findSmartContractInitTrx(const csdb::Transaction& tr, const BlockChain& blockchain);
-
     std::unique_ptr<Initer> createIniter();
     std::unique_ptr<Updater> createUpdater();
 

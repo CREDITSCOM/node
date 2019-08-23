@@ -575,61 +575,27 @@ bool WalletsCache::Initer::isFinishedOk() const {
 }
 
 const WalletsCache::WalletData* WalletsCache::Updater::findWallet(WalletId id) const {
-    if (id >= data_.wallets_.size())
+    if (id >= data_.wallets_.size()) {
         return nullptr;
+    }
     return data_.wallets_[id];
 }
 
 void WalletsCache::iterateOverWallets(const std::function<bool(const WalletData::Address&, const WalletData&)> func) {
-    /*for (const auto& wdp : data_) {
-      if (!func(wdp.first, wdp.second))
-        break;
-    }*/
-
     for (const auto& wdp : wallets_) {
-        if (wdp != nullptr && !func(wdp->address_, *wdp))
+        if (wdp != nullptr && !func(wdp->address_, *wdp)) {
             break;
+        }
     }
 }
 
 #ifdef MONITOR_NODE
 void WalletsCache::iterateOverWriters(const std::function<bool(const WalletData::Address&, const TrustedData&)> func) {
     for (const auto& wrd : trusted_info_) {
-        if (!func(wrd.first, wrd.second))
+        if (!func(wrd.first, wrd.second)) {
             break;
+        }
     }
 }
 #endif
-
-/*void WalletsCache::load(csdb::Pool& curr, Mode mode)
-{
-  PoolHash poolHash;
-  convert(curr.hash(), poolHash);
-  //csdebug() << __FUNCTION__ << ": mode=" << mode << " poolHash=" << poolHash << " trxNum=" << curr.transactions_count();
-
-  const uint64_t timeStamp = atoll(curr.user_field(0).value<std::string>().c_str());
-
-  auto* walDataPtr = getWalletData(curr.writer_public_key(), timeStamp);
-  WalletsCache::WalletData& walWriter = *walDataPtr;
-#ifdef MONITOR_NODE
-  auto wrWall = curr.writer_public_key();
-  auto wrWrIt = writers_.find(curr.writer_public_key());
-  if (wrWrIt == writers_.end()) {
-    auto res = writers_.insert(std::make_pair(curr.writer_public_key(), TrustedData()));
-    wrWrIt = res.first;
-  }
-
-  ++wrWrIt->second.times;
-#endif
-
-  for (size_t i = 0; i < curr.transactions_count(); i++)
-  {
-    csdb::Transaction tr = curr.transaction(i);
-#ifdef MONITOR_NODE
-    wrWrIt->second.totalFee += tr.counted_fee();
-#endif
-    load(tr, mode, poolHash, walWriter, timeStamp);
-  }
-}*/
-
 }  // namespace cs
