@@ -135,6 +135,8 @@ public:
     bool updateLastBlock(cs::RoundPackage& rPackage);
     bool updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom);
     bool deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool);
+	cs::Sequence getLastSeq() const;
+
     /**
      * @fn    std::size_t BlockChain::getCachedBlocksSize() const;
      *
@@ -214,7 +216,7 @@ public:
     csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
     void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
     csdb::Pool getLastBlock() const {
-        return loadBlock(getLastSequence());
+		return loadBlock(getLastSeq());
     }
 
     // info
@@ -222,7 +224,6 @@ public:
     size_t getSize() const;
     uint64_t getWalletsCountWithBalance();
     csdb::PoolHash getLastHash() const;
-    cs::Sequence getLastSequence() const;
     csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
     cs::Sequence getSequenceByHash(const csdb::PoolHash&) const;
 
@@ -243,10 +244,10 @@ public:
     uint32_t getTransactionsCount(const csdb::Address&);
 
     csdb::TransactionID getLastTransaction(const csdb::Address&) const;
-    csdb::PoolHash getPreviousPoolHash(const csdb::Address&, const csdb::PoolHash&);
+    cs::Sequence getPreviousPoolSeq(const csdb::Address&, cs::Sequence) const;
 
-    std::pair<csdb::PoolHash, uint32_t> getLastNonEmptyBlock();
-    std::pair<csdb::PoolHash, uint32_t> getPreviousNonEmptyBlock(const csdb::PoolHash&);
+    std::pair<cs::Sequence, uint32_t> getLastNonEmptyBlock();
+    std::pair<cs::Sequence, uint32_t> getPreviousNonEmptyBlock(cs::Sequence);
     uint64_t getTransactionsCount() const {
         return total_transactions_count_;
     }
@@ -259,7 +260,6 @@ public:
 private:
     void createCachesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
-
     void writeGenesisBlock();
     void createTransactionsIndex(csdb::Pool&);
 
@@ -311,10 +311,10 @@ private:
     uint64_t total_transactions_count_ = 0;
 
     struct NonEmptyBlockData {
-        csdb::PoolHash hash;
+        cs::Sequence poolSeq;
         uint32_t transCount = 0;
     };
-    std::map<csdb::PoolHash, NonEmptyBlockData> previousNonEmpty_;
+    std::map<cs::Sequence, NonEmptyBlockData> previousNonEmpty_;
 
     NonEmptyBlockData lastNonEmptyBlock_;
 
@@ -366,7 +366,8 @@ private:
     // may be modified once in uuid() method:
     mutable uint64_t uuid_ = 0;
     bool recreateIndex_;
-    std::map<csdb::Address, csdb::PoolHash> lapoos;
+    std::map<csdb::Address, cs::Sequence> lapoos;
+	std::atomic<cs::Sequence> lastSequence_;
 };
 
 class TransactionsIterator {

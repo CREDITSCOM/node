@@ -219,14 +219,14 @@ general::Amount convertAmount(const csdb::Amount& amount) {
 api::TransactionId convert_transaction_id(const csdb::TransactionID& trid) {
     api::TransactionId result_id;
     result_id.index = (uint32_t) trid.index();
-    result_id.poolHash = fromByteArray(trid.pool_hash().to_binary());
+    result_id.poolSeq = trid.pool_seq();
     result_id.__isset.index = true;
-    result_id.__isset.poolHash = true;
+    result_id.__isset.poolSeq = true;
     return result_id;
 }
 
 csdb::TransactionID convert_transaction_id(const api::TransactionId& trid) {
-    return csdb::TransactionID(csdb::PoolHash::from_binary(toByteArray(trid.poolHash)), trid.index);
+    return csdb::TransactionID(trid.poolSeq, trid.index);
 }
 
 bool is_smart(const csdb::Transaction& tr) {
@@ -299,7 +299,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
 
     result.trxn.timeCreation = transaction.get_time();
 
-    result.trxn.poolNumber = executor_.loadBlockApi(transaction.id().pool_hash()).sequence();
+    result.trxn.poolNumber = executor_.loadBlockApi(transaction.id().pool_seq()).sequence();
 
     if (is_smart(transaction)) {
         using namespace cs::trx_uf;
@@ -311,7 +311,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
 
         if (is_smart_deploy(sci)) {
             result.trxn.type = api::TransactionType::TT_SmartDeploy;
-            tm.applyToInternal([&isToken, &target, &result](const TokensMap& tokens, const HoldersMap&) {
+            tm.loadTokenInfo(std::vector<csdb::Address>(1, target), [&isToken, &target, &result](const TokensMap& tokens, const HoldersMap&) {
                 auto it = tokens.find(target);
                 if (it != tokens.end()) {
                     isToken = true;
@@ -334,7 +334,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
             bool isTransfer = TokensMaster::isTransfer(sci.method, sci.params);
             result.trxn.type = api::TransactionType::TT_SmartExecute;
             if (isTransfer) {
-                tm.applyToInternal([&isToken, &isTransfer, &target, &result](const TokensMap& tokens, const HoldersMap&) {
+                tm.loadTokenInfo(std::vector<csdb::Address>(1, target), [&isToken, &isTransfer, &target, &result](const TokensMap& tokens, const HoldersMap&) {
                     auto it = tokens.find(target);
                     if (it != tokens.end()) {
                         isToken = true;
@@ -412,7 +412,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     if (is_smart(transaction)) {
         auto opers = lockedReference(this->smart_operations);
         auto state_id = (*opers)[transaction.id()].stateTransaction;
-        if (!state_id.pool_hash().is_empty()) {
+        if (state_id.is_valid()) {
             stateTrx = executor_.loadTransactionApi(state_id);
         }
     }
@@ -423,7 +423,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         return result;
 
     // 2) fill ExtraFee for state transaction
-    auto pool = executor_.loadBlockApi(stateTrx.id().pool_hash());
+    auto pool = executor_.loadBlockApi(stateTrx.id().pool_seq());
     auto transactions = pool.transactions();
     ExtraFee extraFee;
     extraFee.transactionId = convert_transaction_id(stateTrx.id());
@@ -522,8 +522,7 @@ std::vector<api::SealedTransaction> APIHandler::extractTransactions(const csdb::
 }
 
 void APIHandler::TransactionGet(TransactionGetResult& _return, const TransactionId& transactionId) {
-    const csdb::PoolHash poolhash = csdb::PoolHash::from_binary(toByteArray(transactionId.poolHash));
-    const csdb::TransactionID tmpTransactionId = csdb::TransactionID(poolhash, (transactionId.index));
+    const csdb::TransactionID tmpTransactionId = csdb::TransactionID(transactionId.poolSeq, (transactionId.index));
     csdb::Transaction transaction = executor_.loadTransactionApi(tmpTransactionId);
     _return.found = transaction.is_valid();
     if (_return.found)
@@ -575,7 +574,7 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
     res.address = fromByteArray(s_blockchain.getAddressByType(tr.target(), BlockChain::AddressType::PublicKey).public_key());
 
 #ifdef TOKENS_CACHE
-    tm.applyToInternal([&tr, &res](const TokensMap& tokens, const HoldersMap&) {
+    tm.loadTokenInfo(std::vector<csdb::Address>(1, tr.target()), [&tr, &res](const TokensMap& tokens, const HoldersMap&) {
         auto it = tokens.find(tr.target());
         if (it != tokens.end())
             res.smartContractDeploy.tokenStandard = it->second.tokenStandard;
@@ -592,7 +591,7 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
 	if (tr.user_field(0).is_valid())
 		res.transactionsCount = s_blockchain.getTransactionsCount(tr.target());
 
-    auto pool = executor_.loadBlockApi(tr.id().pool_hash());
+    auto pool = executor_.loadBlockApi(tr.id().pool_seq());
     res.createTime = pool.get_time();
 
     return res;
@@ -846,38 +845,25 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
-    if (!validatePagination(_return, *this, offset, const_limit)) {
-        return;
-    }
+    cs::Sequence limit = limitPage(const_limit);
 
-    uint64_t sequence = s_blockchain.getLastSequence();
+    uint64_t sequence = s_blockchain.getLastSeq();
     if ((uint64_t)offset > sequence) {
         return;
     }
 
-    _return.pools.reserve(const_limit);
+    _return.pools.reserve(limit);
 
-    csdb::PoolHash hash;
-    try {
-        hash = s_blockchain.getHashBySequence(sequence - offset);
-    }
-    catch (...) {
-        return;
-    }
-    if (hash.is_empty()) {
-        return;
-    }
-    PoolListGetStable(_return, fromByteArray(hash.to_binary()), const_limit);
+    PoolListGetStable(_return, sequence - offset, limit);
     _return.count = uint32_t(sequence + 1);
 }
 
-void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const PoolHash& hash, const int64_t offset, const int64_t const_limit) {
+void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const int64_t sequence, const int64_t offset, const int64_t const_limit) {
     //if (!validatePagination(_return, *this, offset, const_limit)) {
     //    return;
     //}
     auto limit = limitPage(const_limit);
-    const csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
-    csdb::Pool pool = executor_.loadBlockApi(poolHash);
+    csdb::Pool pool = executor_.loadBlockApi(cs::Sequence(sequence));
 
     if (pool.is_valid()) {
         _return.transactions = extractTransactions(pool, limit, offset);
@@ -886,14 +872,13 @@ void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const P
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
-void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const PoolHash& hash, const int64_t index) {
+void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const int64_t sequence, const int64_t index) {
     csunused(index);
-    const csdb::PoolHash poolHash = csdb::PoolHash::from_binary(toByteArray(hash));
-    csdb::Pool pool = executor_.loadBlockApi(poolHash);
+    csdb::Pool pool = executor_.loadBlockApi(cs::Sequence(sequence));
     _return.isFound = pool.is_valid();
 
     if (_return.isFound) {
-        _return.pool = convertPool(poolHash);
+        _return.pool = convertPool(pool);
     }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -972,7 +957,7 @@ void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
         periodStats.transactionsCount += (uint32_t)transactionsCount;
 
         for (size_t i = 0; i < transactionsCount; ++i) {
-            const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+            const auto& transaction = pool.transaction(csdb::TransactionID(pool.sequence(), i));
 
 #ifdef MONITOR_NODE
             if (is_smart(transaction) || is_smart_state(transaction))
@@ -1007,7 +992,7 @@ void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
             periodStats.transactionsCount += (uint32_t)transactionsCount;
 
             for (size_t i = 0; i < transactionsCount; ++i) {
-                const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+                const auto& transaction = pool.transaction(csdb::TransactionID(pool.sequence(), i));
 
                 if (transaction.source() == s_blockchain.getGenesisAddress())
                     continue;
@@ -1040,7 +1025,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
 
     if (is_smart_state(trxn)) {
         cs::SmartContractRef scr(trxn.user_field(cs::trx_uf::new_state::RefStart));
-        csdb::TransactionID trId(scr.hash, scr.transaction);
+        csdb::TransactionID trId(scr.sequence, scr.transaction);
         const auto execTrans = solver.smart_contracts().get_contract_call(trxn);
 
         if ((execTrans.is_valid() && is_smart(execTrans)) ||
@@ -1071,11 +1056,12 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 }
             }
 
+            cs::Hash newHash;
             { // signal to end waiting for a transaction
                 auto hashStateInst(lockedReference(this->hashStateSL));
                 (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
                     HashState res;
-                    cs::Hash newHash;
+                    
                     auto newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();    
                     if (!newHashStr.empty())
                         std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
@@ -1086,15 +1072,17 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                     });
             }
 
-            auto caller_pk = s_blockchain.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
+            if (newHash != cs::Zero::hash) { // update tokens
+                auto caller_pk = s_blockchain.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
 
-            if (is_smart_deploy(smart))
-                tm.checkNewDeploy(target_pk, caller_pk, smart);
+                if (is_smart_deploy(smart))
+                    tm.checkNewDeploy(target_pk, caller_pk, smart);
 
-            // state also will be updated in update_smart_state_slot()
-            std::string newState = cs::SmartContracts::get_contract_state(s_blockchain, target_pk);
-            if (!newState.empty())
-                tm.checkNewState(target_pk, caller_pk, smart, newState);
+                // state also will be updated in update_smart_state_slot()
+                std::string newState = cs::SmartContracts::get_contract_state(s_blockchain, target_pk);
+                if (!newState.empty())
+                    tm.checkNewState(target_pk, caller_pk, smart, newState);
+            }
         }
     }
     else {
@@ -1180,37 +1168,40 @@ void APIHandler::GetLastHash(api::PoolHash& _return) {
     return;
 }
 
-void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const api::PoolHash& api_hash, const int64_t const_limit) {
-    auto hash = csdb::PoolHash::from_binary(toByteArray(api_hash));
+void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const int64_t sequence, const int64_t const_limit) {
     auto limit = limitPage(const_limit);
-
+    cs::Sequence seq = cs::Sequence(sequence);
+    if (seq < 0) {
+        return;
+    }
+    csmeta(csdebug) << "sequence " << seq << ", limit " << limit;
     bool limSet = false;
 
-    while (limit && !hash.is_empty()) {
-        auto cch = poolCache.find(hash);
+    while (limit) {
+        auto lockedPoolCache = lockedReference(this->poolCache);
+        auto cch = lockedPoolCache->find(seq);
 
-        if (cch == poolCache.end()) {
-            auto pool = executor_.loadBlockApi(hash);
-            api::Pool apiPool = convertPool(pool);
-            _return.pools.push_back(apiPool);
-            poolCache.insert(cch, std::make_pair(hash, apiPool));
-            hash = pool.previous_hash();
-
-            if (!limSet) {
-                _return.count = uint32_t(pool.sequence() + 1);
-                limSet = true;
+        if (cch == lockedPoolCache->end()) {
+            auto pool = executor_.loadBlockApi(seq);
+            if (pool.is_valid()) {
+                api::Pool apiPool = convertPool(pool);
+                _return.pools.push_back(apiPool);
+                lockedPoolCache->insert(cch, std::make_pair(seq, apiPool));
+                if (!limSet) {
+                    _return.count = uint32_t(seq + 1);
+                    limSet = true;
+                }
             }
         }
         else {
             _return.pools.push_back(cch->second);
-            hash = csdb::PoolHash::from_binary(toByteArray(cch->second.prevHash));
-
             if (!limSet) {
                 _return.count = uint32_t(cch->second.poolNumber + 1);
                 limSet = true;
             }
         }
 
+        --seq;
         --limit;
     }
 }
@@ -1387,7 +1378,7 @@ void addTokenResult(api::TokenTransfersResult& _return, const csdb::Address& tok
     transfer.amount = TokensMaster::getAmount(smart);
     transfer.initiator = fromByteArray(handler.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
 
-    transfer.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
+    transfer.transaction.poolSeq = tr.id().pool_seq();
     transfer.transaction.index = (uint32_t) tr.id().index();
     transfer.time = atoll(pool.user_field(0).value<std::string>().c_str());
     _return.transfers.push_back(transfer);
@@ -1397,7 +1388,7 @@ void addTokenResult(api::TokenTransactionsResult& _return, const csdb::Address& 
                     const api::SmartContractInvocation& smart, const std::pair<csdb::Address, csdb::Address>&, BlockChain& handler) {
     api::TokenTransaction trans;
     trans.token = fromByteArray(token.public_key());
-    trans.transaction.poolHash = fromByteArray(tr.id().pool_hash().to_binary());
+    trans.transaction.poolSeq = tr.id().pool_seq();
     trans.transaction.index = (uint32_t) tr.id().index();
     trans.time = atoll(pool.user_field(0).value<std::string>().c_str());
     trans.initiator = fromByteArray(handler.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
@@ -1429,7 +1420,7 @@ void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensM
     bool tokenFound = false;
     std::string code;
 
-    tm.applyToInternal([&addr, &tokenFound, &transfersOnly, &filterByWallet, &code, &wallet, &_return](const TokensMap& tm, const HoldersMap&) {
+    tm.loadTokenInfo(std::vector<csdb::Address>(1, addr), [&addr, &tokenFound, &transfersOnly, &filterByWallet, &code, &wallet, &_return](const TokensMap& tm, const HoldersMap&) {
         auto it = tm.find(addr);
         tokenFound = !(it == tm.end());
         if (tokenFound) {
@@ -1488,7 +1479,7 @@ void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const s
         if (is_smart_state(*trIt)) {
             cs::SmartContractRef smart_ref;
             smart_ref.from_user_field(trIt->user_field(cs::trx_uf::new_state::RefStart));
-            l_id.emplace_back(csdb::TransactionID(smart_ref.hash, smart_ref.transaction));
+            l_id.emplace_back(csdb::TransactionID(smart_ref.sequence, smart_ref.transaction));
         }
         else if (is_smart(*trIt)) {
             auto it = std::find(l_id.begin(), l_id.end(), trIt->id());
@@ -1513,13 +1504,6 @@ api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& a
     if (deploy.is_valid()) {
         present = true;
         return fetch_smart(deploy);
-    }
-
-    decltype(auto) locked_smart_origin = lockedReference(this->smart_origin);
-
-    auto it = locked_smart_origin->find(abs_addr);
-    if ((present = (it != locked_smart_origin->end()))) {
-        return fetch_smart(executor_.loadTransactionApi(it->second));
     }
     return api::SmartContractInvocation{};
 }
@@ -1623,7 +1607,7 @@ void APIHandler::ExecuteCountGet(ExecuteCountGetResult& _return, const std::stri
 
 void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
-    tm.applyToInternal([&_return, &addr](const TokensMap& tokens, const HoldersMap& holders) {
+    tm.loadTokenInfo(std::vector(1, addr), [&_return, &addr](const TokensMap& tokens, const HoldersMap& holders) {
         auto holderIt = holders.find(addr);
         if (holderIt != holders.end()) {
             for (const auto& tokAddr : holderIt->second) {
@@ -1657,13 +1641,12 @@ void APIHandler::TokenTransfersGet(api::TokenTransfersResult& _return, const gen
 }
 
 void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const general::Address& token, const TransactionId& id) {
-    const csdb::PoolHash poolhash = csdb::PoolHash::from_binary(toByteArray(id.poolHash));
-    const csdb::TransactionID trxn_id = csdb::TransactionID(poolhash, id.index);
+    const csdb::TransactionID trxn_id = csdb::TransactionID(id.poolSeq, id.index);
     const csdb::Transaction trxn = executor_.loadTransactionApi(trxn_id);
     const csdb::Address addr = BlockChain::getAddressFromKey(token);
 
     std::string code{};
-    tm.applyToInternal([&addr, &code](const TokensMap& tm, const HoldersMap&) {
+    tm.loadTokenInfo(std::vector(1, addr), [&addr, &code](const TokensMap& tm, const HoldersMap&) {
         const auto it = tm.find(addr);
         if (it != tm.cend()) {
             code = it->second.symbol;
@@ -1675,7 +1658,7 @@ void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const gene
         return;
     }
 
-    const auto pool = executor_.loadBlockApi(trxn.id().pool_hash());
+    const auto pool = executor_.loadBlockApi(trxn.id().pool_seq());
     const auto smart = fetch_smart(trxn);
     const auto addr_pk = s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
     const auto addrPair = TokensMaster::getTransferData(addr_pk, smart.method, smart.params);
@@ -1725,31 +1708,26 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
     }
 
     uint64_t totalTransfers = 0;
-    std::map<csdb::Address, std::string> tokenCodes;
-    std::multimap<csdb::PoolHash, csdb::Address> tokenTransPools;
+    std::multimap<cs::Sequence, csdb::Address> tokenTransPools;
 
-    tm.applyToInternal([&totalTransfers, &tokenCodes, &tokenTransPools, this](const TokensMap& tm, const HoldersMap&) {
+    tm.loadTokenInfo({}, [&totalTransfers, &tokenTransPools, this](const TokensMap& tm, const HoldersMap&) {
         for (auto& t : tm) {
             totalTransfers += t.second.transfersCount;
-            tokenCodes[t.first] = t.second.symbol;
-            tokenTransPools.insert(std::make_pair(s_blockchain.getLastTransaction(t.first).pool_hash(), t.first));
+            tokenTransPools.insert(std::make_pair(s_blockchain.getLastTransaction(t.first).pool_seq(), t.first));
         }
-    });
+    }, false);
 
     _return.count = uint32_t(totalTransfers);
 
-    csdb::PoolHash pooh = s_blockchain.getLastNonEmptyBlock().first;
-    while (limit && !pooh.is_empty() && tokenTransPools.size()) {
-        auto it = tokenTransPools.find(pooh);
+    std::vector<csdb::Address> tokenAddrs;
+    cs::Sequence seq = s_blockchain.getLastNonEmptyBlock().first;
+    while (limit && seq != cs::kWrongSequence && tokenTransPools.size()) {
+        auto it = tokenTransPools.find(seq);
         if (it != tokenTransPools.end()) {
-            auto pool = executor_.loadBlockApi(pooh);
+            auto pool = executor_.loadBlockApi(seq);
 
             for (auto& t : pool.transactions()) {
                 if (!is_smart(t)) {
-                    continue;
-                }
-                auto tIt = tokenCodes.find(s_blockchain.getAddressByType(t.target(), BlockChain::AddressType::PublicKey));
-                if (tIt == tokenCodes.end()) {
                     continue;
                 }
                 const auto smart = fetch_smart(t);
@@ -1761,27 +1739,35 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
                 }
                 csdb::Address target_pk = s_blockchain.getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
                 auto addrPair = TokensMaster::getTransferData(target_pk, smart.method, smart.params);
-                addTokenResult(_return, target_pk, tIt->second, pool, t, smart, addrPair, s_blockchain);
+                addTokenResult(_return, target_pk, "", pool, t, smart, addrPair, s_blockchain);
+                tokenAddrs.push_back(target_pk);
                 if (--limit == 0) {
                     break;
                 }
             }
 
             do {
-                const auto lPh = s_blockchain.getPreviousPoolHash(it->second, it->first);
+                const auto lPs = s_blockchain.getPreviousPoolSeq(it->second, it->first);
                 const auto lAddr = it->second;
 
                 tokenTransPools.erase(it);
-                if (!lPh.is_empty()) {
-                    tokenTransPools.insert(std::make_pair(lPh, lAddr));
+                if (lPs != cs::kWrongSequence) {
+                    tokenTransPools.insert(std::make_pair(lPs, lAddr));
                 }
 
-                it = tokenTransPools.find(pooh);
+                it = tokenTransPools.find(seq);
             } while (it != tokenTransPools.end());
         }
 
-        pooh = s_blockchain.getPreviousNonEmptyBlock(pooh).first;
+        seq = s_blockchain.getPreviousNonEmptyBlock(seq).first;
     }
+
+    tm.loadTokenInfo(tokenAddrs, [&_return](const TokensMap& tm, const HoldersMap&) {
+        for (auto& transfer : _return.transfers) {
+            if(auto it = tm.find(BlockChain::getAddressFromKey(transfer.token)); it != tm.end())
+                transfer.code = it->second.symbol;
+        }
+    });
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
@@ -1799,7 +1785,7 @@ void APIHandler::TokenInfoGet(api::TokenInfoResult& _return, const general::Addr
     bool found = false;
 
     const csdb::Address addr = BlockChain::getAddressFromKey(token);
-    tm.applyToInternal([&token, &addr, &found, &_return](const TokensMap& tm, const HoldersMap&) {
+    tm.loadTokenInfo(std::vector<csdb::Address>(1, addr), [&token, &addr, &found, &_return](const TokensMap& tm, const HoldersMap&) {
         auto tIt = tm.find(addr);
         if (tIt != tm.end()) {
             found = true;
@@ -1854,7 +1840,7 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
     }
 
     const csdb::Address addr = BlockChain::getAddressFromKey(token);
-    tm.applyToInternal([&token, &addr, &found, &offset, &limit, &_return, comparator](const TokensMap& tm, const HoldersMap&) {
+    tm.loadTokenInfo(std::vector<csdb::Address>(1, addr), [&token, &addr, &found, &offset, &limit, &_return, comparator](const TokensMap& tm, const HoldersMap&) {
         auto tIt = tm.find(addr);
         if (tIt != tm.end()) {
             found = true;
@@ -1921,25 +1907,16 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
             break;
     };
 
-    tm.applyToInternal([&, comparator](const TokensMap& tm, const HoldersMap&) {
-        _return.count = (uint32_t) tm.size();
+    std::vector<csdb::Address> sortTokenAddrs;
+    tm.loadTokenInfo({}, [&, comparator](const TokensMap& tm, const HoldersMap&) {
+        _return.count = (uint32_t)tm.size();
         applyToSortedMap(tm, comparator, [&](const TokensMap::value_type& t) {
-            if (--offset >= 0) {
+            if (--offset >= 0)
                 return true;
-            }
 
             api::TokenInfo tok;
             putTokenInfo(tok, fromByteArray(t.first.public_key()), t.second);
-
-            // filters
-            if ((tok.name.find(filters.name) != std::string::npos && tok.code.find(filters.code) != std::string::npos && tok.tokenStandard == filters.tokenStandard ) ||
-                (tok.name.find(filters.name) && tok.code.find(filters.code) && !tok.tokenStandard) ||
-                (tok.name.find(filters.name) && filters.code.empty() && !tok.tokenStandard) ||
-                (filters.name.empty() && tok.code.find(filters.code) && tok.tokenStandard) ||
-                (filters.name.empty() && tok.code.find(filters.code) && !tok.tokenStandard) ||
-                (filters.name.empty() && filters.code.empty() && tok.tokenStandard) ||
-                (filters.name.empty() && filters.code.empty() && !tok.tokenStandard))
-                    _return.tokens.push_back(tok);      
+            sortTokenAddrs.push_back(BlockChain::getAddressFromKey(tok.address));
 
             if (--limit == 0)
                 return false;
@@ -1947,6 +1924,22 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
             return true;
         });
     });
+
+    tm.loadTokenInfo(sortTokenAddrs, [&](const TokensMap& tm, const HoldersMap&) {
+        api::TokenInfo tok;
+        for (auto t : tm) {
+            if ((t.second.name.find(filters.name) != std::string::npos && t.second.symbol.find(filters.code) != std::string::npos && t.second.tokenStandard == filters.tokenStandard) ||
+                (t.second.name.find(filters.name) && t.second.symbol.find(filters.code) && !t.second.tokenStandard) ||
+                (t.second.name.find(filters.name) && filters.code.empty() && !t.second.tokenStandard) ||
+                (filters.name.empty() && t.second.symbol.find(filters.code) && t.second.tokenStandard) ||
+                (filters.name.empty() && t.second.symbol.find(filters.code) && !t.second.tokenStandard) ||
+                (filters.name.empty() && filters.code.empty() && t.second.tokenStandard) ||
+                (filters.name.empty() && filters.code.empty() && !t.second.tokenStandard)) {
+                    putTokenInfo(tok, fromByteArray(t.first.public_key()), t.second);
+                    _return.tokens.push_back(tok);
+            }
+        }
+    });   
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
@@ -2080,7 +2073,7 @@ void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
 ////////new
 
 void APIHandler::SyncStateGet(api::SyncStateResult& _return) {
-    _return.lastBlock = s_blockchain.getLastSequence();
+    _return.lastBlock = s_blockchain.getLastSeq();
     _return.currRound = cs::Conveyer::instance().currentRoundNumber();
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
@@ -2088,7 +2081,7 @@ void APIHandler::SyncStateGet(api::SyncStateResult& _return) {
 void apiexec::APIEXECHandler::GetSeed(apiexec::GetSeedResult& _return, const general::AccessID accessId) {
     if (accessId == executor::Executor::ACCESS_ID_RESERVE::GETTER) { // for getter
         std::default_random_engine random(std::random_device{}());
-        const auto randSequence = random() % blockchain_.getLastSequence();
+        const auto randSequence = random() % blockchain_.getLastSeq();
         const auto hash         = ::csdb::priv::crypto::calc_hash(blockchain_.getHashBySequence(randSequence).to_binary());
         _return.seed.assign(hash.begin(), hash.end());
         return;

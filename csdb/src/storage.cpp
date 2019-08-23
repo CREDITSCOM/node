@@ -5,6 +5,7 @@
 #include <condition_variable>
 #include <cstdarg>
 #include <deque>
+#include <limits>
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
@@ -533,6 +534,7 @@ Pool Storage::pool_load_internal(const PoolHash& hash, const bool metaOnly, size
         else {
             res = Pool::from_binary(std::move(data));
             trxCnt = res.transactions().size();
+            d->pools_cache_insert(res.sequence(), res.hash(), res);
         }
     }
 
@@ -621,6 +623,7 @@ Pool Storage::pool_load(const cs::Sequence sequence) const {
 
     if (needParseData) {
         res = Pool::from_binary(std::move(data));
+        d->pools_cache_insert(res.sequence(), res.hash(), res);
     }
 
     if (!res.is_valid()) {
@@ -725,13 +728,13 @@ static bool checkPool(const Pool& pool, const Address& addr,
 }
 
 bool Storage::get_from_blockchain(const Address& addr, int64_t innerId,
-                                  const PoolHash& lastTrxPh, Transaction& trx) const {
-    auto poolHash = lastTrxPh;
-    while (!poolHash.is_empty()) {
-        if (checkPool(pool_load(poolHash), addr, innerId, trx)) {
+                                  cs::Sequence lastTrxPs, Transaction& trx) const {
+    auto poolSeq = lastTrxPs;
+    while (poolSeq != cs::kWrongSequence) {
+        if (checkPool(pool_load(poolSeq), addr, innerId, trx)) {
             return true;
         }
-        poolHash = get_previous_transaction_block(addr, poolHash);
+        poolSeq = get_previous_transaction_block(addr, poolSeq);
     }
     return false;
 }
@@ -749,7 +752,7 @@ std::vector<Transaction> Storage::transactions(const Address& addr, size_t limit
 
     auto seekIt = [this, &curPool, &curIdx](const TransactionID& id) -> bool {
         if (id.is_valid()) {
-            curPool = pool_load(id.pool_hash());
+            curPool = pool_load(id.pool_seq());
             if (curPool.is_valid() && id.index() < curPool.transactions_count()) {
                 curIdx = id.index();
                 return true;
@@ -806,7 +809,7 @@ Transaction Storage::transaction(const TransactionID& id) const {
         return Transaction{};
     }
 
-    return pool_load(id.pool_hash()).transaction(id);
+    return pool_load(id.pool_seq()).transaction(id);
 }
 
 Transaction Storage::get_last_by_source(Address source) const noexcept {
@@ -838,34 +841,34 @@ Transaction Storage::get_last_by_target(Address target) const noexcept {
     return Transaction{};
 }
 
-cs::Bytes Storage::get_trans_index_key(const Address& addr, const PoolHash& ph) {
+cs::Bytes Storage::get_trans_index_key(const Address& addr, cs::Sequence seq) {
     ::csdb::priv::obstream os;
     addr.put(os);
-    ph.put(os);
+    os.put(seq);
     return os.buffer();
 }
 
-PoolHash Storage::get_previous_transaction_block(const Address& addr, const PoolHash& ph) const {
-    PoolHash result;
+cs::Sequence Storage::get_previous_transaction_block(const Address& addr, cs::Sequence seq) const {
+    cs::Sequence result = cs::kWrongSequence;
 
-    const auto key = get_trans_index_key(addr, ph);
+    const auto key = get_trans_index_key(addr, seq);
     cs::Bytes data;
 
     if (d->db->getFromTransIndex(key, &data)) {
         ::csdb::priv::ibstream is(data.data(), data.size());
-        result.get(is);
+        is.get(result);
     }
 
     return result;
 }
 
-void Storage::set_previous_transaction_block(const Address& addr, const PoolHash& currTransBlock, const PoolHash& prevTransBlock) {
-  const auto key = get_trans_index_key(addr, currTransBlock);
+void Storage::set_previous_transaction_block(const Address& addr, cs::Sequence currTransBlock, cs::Sequence prevTransBlock) {
+    const auto key = get_trans_index_key(addr, currTransBlock);
 
-  ::csdb::priv::obstream os;
-  prevTransBlock.put(os);
+    ::csdb::priv::obstream os;
+    os.put(prevTransBlock);
 
-  d->db->putToTransIndex(key, os.buffer());
+    d->db->putToTransIndex(key, os.buffer());
 }
 
 void Storage::truncate_trxs_index() {

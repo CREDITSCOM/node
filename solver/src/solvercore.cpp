@@ -326,7 +326,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     // only for new consensus
     cs::PoolMetaInfo poolMetaInfo;
     std::string timeStamp = conveyer.currentRoundNumber() == 1 ? currentTimeStamp : chooseTimeStamp(stage3.realTrustedMask);
-    poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSequence() + 1;  // change for roundNumber
+    poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSeq() + 1;  // change for roundNumber
     poolMetaInfo.timestamp = std::move(timeStamp);
     auto ptr = conveyer.characteristic(conveyer.currentRoundNumber());
     if (ptr != nullptr) {
@@ -427,9 +427,24 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         deferredBlock_ = tmpPool;
     }
     deferredBlock_.to_byte_stream(binSize);
-    deferredBlock_.hash();
     csdetails() << log_prefix << "pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+
+    size_t cnt_total = deferredBlock_.transactions_count();
+    if (cnt_total > 0) {
+        size_t cnt = std::min(cnt_total, size_t(5));
+        std::ostringstream os;
+        os << "counted fee (total " << cnt_total << "): ";
+        const auto& trxs = deferredBlock_.transactions();
+        for (size_t i = 0; i < cnt; ++i) {
+            if (i > 0) {
+                os << ',';
+            }
+            os << trxs[i].counted_fee().to_double();
+        }
+        csdebug() << log_prefix << os.str();
+    }
     const auto lastHashBin = deferredBlock_.hash().to_binary();
+
     std::copy(lastHashBin.cbegin(), lastHashBin.cend(), stage3.blockHash.begin());
     stage3.blockSignature = cscrypto::generateSignature(private_key, stage3.blockHash.data(), stage3.blockHash.size());
 

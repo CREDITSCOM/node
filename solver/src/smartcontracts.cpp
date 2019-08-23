@@ -666,7 +666,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_
                         }
                     }
                     if (!in_known_contracts(u)) {
-                        cslog() << kLogPrefix << "call to unknown contract declared in executing item, cancel " << new_item;
+                        cslog() << kLogPrefix << "call to unknown contract " << to_base58(u) << " declared in " << new_item << ", cancel ";
                         remove_from_queue(new_item, skip_log);
                         // also removes parent "it" from exe_queue if empty
                         return;
@@ -748,7 +748,7 @@ void SmartContracts::test_exe_queue(bool reading_db) {
         if (!reading_db) {
             csdebug() << kLogPrefix << "set running status to " << FormatRef(it->seq_enqueue) << " containing " << it->executions.size() << " jobs";
         }
-        update_status(*it, bc.getLastSequence(), SmartContractStatus::Running, reading_db);
+        update_status(*it, bc.getLastSeq(), SmartContractStatus::Running, reading_db);
 
         if (!reading_db) {
             // call to executor only if is trusted relatively to this contract
@@ -1092,7 +1092,7 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
 /*public*/
 void SmartContracts::on_store_block(const csdb::Pool& block) {
     cs::RoundNumber cur_round = Conveyer::instance().currentRoundNumber();
-    cs::Sequence last_block = bc.getLastSequence();
+    cs::Sequence last_block = bc.getLastSeq();
 
     cs::Lock lock(public_access_lock);
     bool should_stop = false;
@@ -1120,6 +1120,10 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
     test_contracts_locks();
 
     const auto seq = block.sequence();
+    if (seq == 4432461 || seq == 4500088) {
+        static int cnt = 0;
+        ++cnt;
+    }
     for (auto& item : exe_queue) {
         if (item.status != SmartContractStatus::Running && item.status != SmartContractStatus::Finished) {
             continue;
@@ -1279,7 +1283,7 @@ SmartContracts::queue_iterator SmartContracts::remove_from_queue(SmartContracts:
                 csdebug() << "\t" << item.ref_start << "->" << print_executed_method(item.transaction);
             }
         }
-        const cs::Sequence seq = bc.getLastSequence();
+        const cs::Sequence seq = bc.getLastSeq();
         const cs::Sequence seq_cancel = it->seq_start + Consensus::MaxRoundsCancelContract;
         if (!skip_log && seq >= it->seq_start + Consensus::MaxRoundsExecuteContract && seq < seq_cancel) {
             csdebug() << kLogPrefix << seq_cancel - seq << " round(s) remains until unconditional timeout";
@@ -1310,7 +1314,7 @@ void SmartContracts::remove_from_queue(const SmartContractRef& item, bool skip_l
         return;
     }
     // find older items of the same contract and cancel them
-    cs::Sequence seq = bc.getLastSequence();
+    cs::Sequence seq = bc.getLastSeq();
     for (queue_iterator it_older = exe_queue.begin(); it_older != it; ++it_older) {
         if (it_older->abs_addr == it->abs_addr) {
             csdebug() << kLogPrefix << to_base58(it->abs_addr) << ' ' << FormatRef(it_older->seq_enqueue)
@@ -1540,7 +1544,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             // already finished (by timeout), no transaction required
             return;
         }
-        update_status(*it, bc.getLastSequence(), SmartContractStatus::Finished, false /*skip_log*/);
+        update_status(*it, bc.getLastSeq(), SmartContractStatus::Finished, false /*skip_log*/);
     }
     else {
         return;
@@ -1810,7 +1814,7 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
         return;
     }
 
-    cs::RoundNumber current_sequence = bc.getLastSequence();
+    cs::RoundNumber current_sequence = bc.getLastSeq();
 
     cs::Lock lock(public_access_lock);
 
@@ -2015,7 +2019,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
                             
                             item.ref_cache = ref_from_db;
                             if (ref_from_db == ref_start) {
-                                cs::Sequence seq = bc.getLastSequence();
+                                cs::Sequence seq = bc.getLastSeq();
                                 csdebug() << kLogPrefix << to_base58(abs_addr) << " state after " << ref_start << " has reached cache in DB on "
                                     << WithDelimiters(seq);
                             }

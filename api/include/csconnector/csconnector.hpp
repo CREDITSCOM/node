@@ -23,6 +23,11 @@
 #include <memory>
 #include <thread>
 
+#ifdef PROFILE_API
+#include <profiler/profilerprocessor.hpp>
+#include <profiler/profilereventhandler.hpp>
+#endif
+
 namespace csconnector {
 
 struct Config {
@@ -41,6 +46,12 @@ public:
     using ApiHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<api::APIHandler>;
     using ApiExecHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<apiexec::APIEXECHandler>;
 
+#ifdef PROFILE_API
+    using ApiProcessor = cs::ProfilerProcessor;
+#else
+    using ApiProcessor = ::api::APIProcessor;
+#endif
+
     explicit connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config = Config{});
     ~connector();
 
@@ -51,7 +62,7 @@ public:
         if (!*should_stop) {
             api_handler->updateSmartCachesPool(pool);
 #ifdef MONITOR_NODE
-			api_handler->collect_all_stats_slot(pool);
+            api_handler->collect_all_stats_slot(pool);
 #endif
         }
     }
@@ -70,7 +81,8 @@ private:
     executor::Executor& executor_;
     ApiHandlerPtr api_handler;
     ApiExecHandlerPtr apiexec_handler;
-    ::apache::thrift::stdcxx::shared_ptr<::api::APIProcessor> p_api_processor;
+
+    ::apache::thrift::stdcxx::shared_ptr<ApiProcessor> p_api_processor;
     ::apache::thrift::stdcxx::shared_ptr<::apiexec::APIEXECProcessor> p_apiexec_processor;
 #ifdef BINARY_TCP_API
     ::apache::thrift::server::TThreadedServer server;

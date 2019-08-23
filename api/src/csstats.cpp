@@ -46,7 +46,7 @@ StatsPerPeriod csstats::collectStats(const Periods& periods) {
             periodStats.transactionsCount += static_cast<uint32_t>(transactionsCount);
 
             for (std::size_t i = 0; i < transactionsCount; ++i) {
-                const auto& transaction = pool.transaction(csdb::TransactionID(pool.hash(), i));
+                const auto& transaction = pool.transaction(csdb::TransactionID(pool.sequence(), i));
 #ifdef MONITOR_NODE
                 if (is_smart(transaction) || is_smart_state(transaction))
                     ++periodStats.transactionsSmartCount;

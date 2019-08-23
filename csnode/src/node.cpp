@@ -112,7 +112,7 @@ bool Node::init(const Config& config) {
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
     initCurrentRP();
-    maxNeighboursSequence_ = blockChain_.getLastSequence();
+    maxNeighboursSequence_ = blockChain_.getLastSeq();
     return true;
 }
 
@@ -148,14 +148,14 @@ void Node::flushCurrentTasks() {
 
 void Node::initCurrentRP() {
     cs::RoundPackage rp;
-    if (getBlockChain().getLastSequence() == 0) {
+    if (getBlockChain().getLastSeq() == 0) {
         cs::RoundTable rt;
         rt.round = 0;
         rp.updateRoundTable(rt);
     }
     else {
         cs::RoundTable rt;
-        rt.round = getBlockChain().getLastSequence();
+        rt.round = getBlockChain().getLastSeq();
         rt.confidants = getBlockChain().getLastBlock().confidants();
         rp.updateRoundTable(rt);
     }
@@ -166,7 +166,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     auto& conveyer = cs::Conveyer::instance();
 
     cswarning() << "-----------------------------------------------------------";
-    cswarning() << "NODE> BigBang #" << rNum << ": last written #" << blockChain_.getLastSequence() << ", current #" << conveyer.currentRoundNumber();
+    cswarning() << "NODE> BigBang #" << rNum << ": last written #" << blockChain_.getLastSeq() << ", current #" << conveyer.currentRoundNumber();
     cswarning() << "-----------------------------------------------------------";
 
     istream_.init(data, size);
@@ -199,7 +199,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
     // this evil code sould be removed after examination
     cs::Sequence countRemoved = 0;
-    cs::Sequence lastSequence = blockChain_.getLastSequence();
+    cs::Sequence lastSequence = blockChain_.getLastSeq();
 
     while (lastSequence >= rNum) {
         if (countRemoved == 0) {
@@ -208,7 +208,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         }
 
         blockChain_.removeLastBlock();
-        cs::RoundNumber tmp_seq = blockChain_.getLastSequence();
+        cs::RoundNumber tmp_seq = blockChain_.getLastSeq();
 
         if (lastSequence == tmp_seq) {
             csdebug() << "NODE> cancel remove blocks operation (last removal is failed)";
@@ -475,8 +475,8 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     csdebug() << "NODE> Sequence " << rPackage.poolMetaInfo().sequenceNumber << ", mask size " << rPackage.poolMetaInfo().characteristic.mask.size();
     csdebug() << "NODE> Time: " << rPackage.poolMetaInfo().timestamp;
 
-    if (blockChain_.getLastSequence() > rPackage.poolMetaInfo().sequenceNumber) {
-        csmeta(cswarning) << "blockChain last seq: " << blockChain_.getLastSequence() 
+    if (blockChain_.getLastSeq() > rPackage.poolMetaInfo().sequenceNumber) {
+        csmeta(cswarning) << "blockChain last seq: " << blockChain_.getLastSeq() 
             << " > pool meta info seq: " << rPackage.poolMetaInfo().sequenceNumber;
         return;
     }
@@ -723,7 +723,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 
     csdebug() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ", id: " << packetNum;
 
-    if (sequences.front() > blockChain_.getLastSequence()) {
+    if (sequences.front() > blockChain_.getLastSeq()) {
         csdebug() << "NODE> Get block request> The requested block: " << sequences.front() << " is beyond last written sequence";
         return;
     }
@@ -854,7 +854,7 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
         }
 
         // if next block maybe stored, the last written sequence maybe updated, so deferred consensus maybe resumed
-        if (blockChain_.getLastSequence() + 1 == cs::Conveyer::instance().currentRoundNumber()) {
+        if (blockChain_.getLastSeq() + 1 == cs::Conveyer::instance().currentRoundNumber()) {
             csdebug() << "NODE> got all blocks written in current round";
             startConsensus();
         }
@@ -920,7 +920,7 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
 
     if (maxPingSynchroDelay_ <= delta.count()) {
         delta = std::chrono::milliseconds(0);
-        auto lastSequence = blockChain_.getLastSequence();
+        auto lastSequence = blockChain_.getLastSeq();
 
         if (lastSequence < sequence) {
             cswarning() << "Last sequence is lower than network max sequence, trying to request round table";
@@ -1018,7 +1018,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
             return MessageActions::Drop;
         }
 
-        if (rNum > blockChain_.getLastSequence() + cs::Conveyer::HashTablesStorageCapacity) {
+        if (rNum > blockChain_.getLastSeq() + cs::Conveyer::HashTablesStorageCapacity) {
             // too many rounds behind the global round
             return MessageActions::Drop;
         }
@@ -2087,6 +2087,7 @@ bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& curre
 
     return true;
 }
+
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
     csdebug() << "NODE> next round table received, round: " << rNum;
     csmeta(csdetails) << "started";
@@ -2126,7 +2127,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    if(conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree) {
+    if(conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree && getBlockChain().getLastSeq() > 0) {
         uint64_t lastTimeStamp;
         uint64_t currentTimeStamp;
         uint64_t rpTimeStamp;
@@ -2188,7 +2189,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     cs::Signatures poolSignatures;
     cs::PublicKeys confidants;
     if (rPackage.roundTable().round > 2/* && confirmationList_.size() > 0*/) { //Here we have problems when the trusted have the first block and the others do not!!!
-        auto conf = confirmationList_.find(rPackage.roundTable().round - 1/*getBlockChain().getLastSequence() + 1*/);
+        auto conf = confirmationList_.find(rPackage.roundTable().round - 1/*getBlockChain().getLastSeq() + 1*/);
         if (!conf.has_value()) {
             csdebug() << "Can't find confirmation - leave getRoundPackage()";
             confirmationList_.add(rPackage.roundTable().round, false, rPackage.roundTable().confidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.trustedSignatures());
@@ -2208,7 +2209,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
             }
         }
 
-        if (!receivingSignatures(rPackage, confidants) && storedRound == getBlockChain().getLastSequence()) {
+        if (!receivingSignatures(rPackage, confidants) && storedRound == getBlockChain().getLastSeq()) {
             return;
         }
     }
@@ -2294,7 +2295,7 @@ void Node::sendHash(cs::RoundNumber round) {
         return;
     }
 
-    if (blockChain_.getLastSequence() != round - 1) {
+    if (blockChain_.getLastSeq() != round - 1) {
         // should not send hash until have got proper block sequence
         return;
     }
@@ -2441,7 +2442,7 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
 
 void Node::emptyRoundPackReply(const cs::PublicKey& respondent) {
     csdebug() << "NODE> sending empty roundPack reply to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
-    cs::Sequence seq = getBlockChain().getLastSequence();
+    cs::Sequence seq = getBlockChain().getLastSeq();
     cs::Bytes bytes;
     cs::DataStream stream(bytes);
     stream << seq;
@@ -2457,7 +2458,7 @@ void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNu
     cs::Bytes bytes;
     cs::DataStream stream(bytes);
     stream << rNum;
-    if (rNum <= getBlockChain().getLastSequence()) {
+    if (rNum <= getBlockChain().getLastSeq()) {
         return;
     }
     if (!cscrypto::verifySignature(signature, sender, bytes.data(), bytes.size())) {
@@ -2635,7 +2636,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
 
     cslog() << s;
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
-    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSequence()) << ", neighbours = " << transport_->getNeighboursCount();
+    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq()) << ", neighbours = " << transport_->getNeighboursCount();
 
     if (Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 || Transport::cntExtraLargeNotSent > 0) {
         cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments << " / " << Transport::cntExtraLargeNotSent;
@@ -2681,7 +2682,7 @@ void Node::startConsensus() {
     transport_->processPostponed(roundNumber);
 
     // claim the trusted role only if have got proper blockchain:
-    if (roundNumber == blockChain_.getLastSequence() + 1) {
+    if (roundNumber == blockChain_.getLastSeq() + 1) {
         sendHash(roundNumber);
     }
 }

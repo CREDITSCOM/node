@@ -1,4 +1,4 @@
-#include "csdb/transaction.hpp"
+#include <csdb/transaction.hpp>
 #include "transaction_p.hpp"
 
 #include <cinttypes>
@@ -7,29 +7,28 @@
 #include <sstream>
 
 #include <cscrypto/cscrypto.hpp>
-#include "binary_streams.hpp"
-#include "csdb/address.hpp"
-#include "csdb/amount.hpp"
-#include "csdb/currency.hpp"
-#include "csdb/internal/types.hpp"
-#include "csdb/pool.hpp"
+#include <csdb/address.hpp>
+#include <csdb/amount.hpp>
+#include <csdb/currency.hpp>
+#include <csdb/internal/types.hpp>
+#include <csdb/pool.hpp>
 
+#include "binary_streams.hpp"
 #include "priv_crypto.hpp"
 
 namespace csdb {
 
 SHARED_DATA_CLASS_IMPLEMENTATION(TransactionID)
 
-TransactionID::TransactionID(PoolHash poolHash, cs::Sequence index)
-: d(new priv(poolHash, index)) {
-}
+TransactionID::TransactionID(cs::Sequence pool_seq, cs::Sequence index)
+    : d(new priv(pool_seq, index)) {}
 
 bool TransactionID::is_valid() const noexcept {
-    return !d->pool_hash_.is_empty();
+    return d->pool_seq_ != cs::kWrongSequence;
 }
 
-PoolHash TransactionID::pool_hash() const noexcept {
-    return d->pool_hash_;
+cs::Sequence TransactionID::pool_seq() const noexcept {
+    return d->pool_seq_;
 }
 
 cs::Sequence TransactionID::index() const noexcept {
@@ -38,7 +37,7 @@ cs::Sequence TransactionID::index() const noexcept {
 
 std::string TransactionID::to_string() const noexcept {
     std::ostringstream os;
-    os << d->pool_hash_.to_string() << ':' << std::hex << std::setfill('0') << std::setw(8) << d->index_;
+    os << d->pool_seq_ << ':' << d->index_;
     return os.str();
 }
 
@@ -46,14 +45,14 @@ TransactionID TransactionID::from_string(const ::std::string& str) {
     TransactionID res;
     auto pos = str.find(':');
     if (::std::string::npos != pos) {
-        PoolHash ph = PoolHash::from_string(::std::string(str, 0, pos));
-        if (!ph.is_empty()) {
+        char* end;
+        uintmax_t pSeq = strtoumax(str.c_str(), &end, 10);
+        if (end == str.c_str() + pos) {
             const char* start = str.c_str() + pos + 1;
             if ('\0' != (*start)) {
-                char* end = nullptr;
                 uintmax_t idx = strtoumax(start, &end, 10);
                 if ((end != start) && ('\0' == (*end))) {
-                    res.d->pool_hash_ = ph;
+                    res.d->pool_seq_ = static_cast<cs::Sequence>(pSeq);
                     res.d->index_ = static_cast<cs::Sequence>(idx);
                 }
             }
@@ -63,7 +62,7 @@ TransactionID TransactionID::from_string(const ::std::string& str) {
 }
 
 bool TransactionID::operator==(const TransactionID& other) const noexcept {
-    return pool_hash() == other.pool_hash() && index() == other.index();
+    return pool_seq() == other.pool_seq() && index() == other.index();
 }
 
 bool TransactionID::operator!=(const TransactionID& other) const noexcept {
@@ -71,19 +70,19 @@ bool TransactionID::operator!=(const TransactionID& other) const noexcept {
 }
 
 bool TransactionID::operator<(const TransactionID& other) const noexcept {
-    if (pool_hash() == other.pool_hash())
+    if (pool_seq() == other.pool_seq())
         return index() < other.index();
     else
-        return pool_hash() < other.pool_hash();
+        return pool_seq() < other.pool_seq();
 }
 
 void TransactionID::put(::csdb::priv::obstream& os) const {
-    os.put(d->pool_hash_);
+    os.put(d->pool_seq_);
     os.put(d->index_);
 }
 
 bool TransactionID::get(::csdb::priv::ibstream& is) {
-    return is.get(d->pool_hash_) && is.get(d->index_);
+    return is.get(d->pool_seq_) && is.get(d->index_);
 }
 
 SHARED_DATA_CLASS_IMPLEMENTATION(Transaction)

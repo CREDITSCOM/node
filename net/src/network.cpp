@@ -404,7 +404,7 @@ void Network::processorRoutine() {
 #ifdef WIN32
         while (true) {
             auto ret = WaitForSingleObject(readerEvent_, 50);  // timeout 50ms
-            if (ret != WAIT_TIMEOUT) {
+            if (ret != WAIT_TIMEOUT || iPacMan_.getSize()) {
                 break;
             }
             externals.callAll();

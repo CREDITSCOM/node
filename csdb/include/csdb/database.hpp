@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-#include "csdb/internal/types.hpp"
+#include <csdb/internal/types.hpp>
 
 namespace csdb {
 class Database {

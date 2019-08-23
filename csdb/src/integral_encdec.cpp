@@ -5,7 +5,7 @@
 #include <intrin.h>
 #endif
 
-#include "csdb/internal/endian.hpp"
+#include <csdb/internal/endian.hpp>
 
 namespace csdb {
 namespace priv {

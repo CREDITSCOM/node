@@ -479,7 +479,7 @@ private:
     uint64_t generateAccessId(cs::Sequence explicit_sequence) {
         std::lock_guard lk(mutex_);
         ++lastAccessId_;
-        accessSequence_[lastAccessId_] = (explicit_sequence != kUseLastSequence ? explicit_sequence : blockchain_.getLastSequence());
+        accessSequence_[lastAccessId_] = (explicit_sequence != kUseLastSequence ? explicit_sequence : blockchain_.getLastSeq());
         return lastAccessId_;
     }
 
@@ -607,8 +607,8 @@ public:
     void PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t limit) override;
 
     // Get pool info by pool hash. Starts looking from last one (head pool).
-    void PoolInfoGet(api::PoolInfoGetResult& _return, const api::PoolHash& hash, const int64_t index) override;
-    void PoolTransactionsGet(api::PoolTransactionsGetResult& _return, const api::PoolHash& hash, const int64_t offset, const int64_t limit) override;
+    void PoolInfoGet(api::PoolInfoGetResult& _return, const int64_t sequence, const int64_t index) override;
+    void PoolTransactionsGet(api::PoolTransactionsGetResult& _return, const int64_t sequence, const int64_t offset, const int64_t limit) override;
     void StatsGet(api::StatsGetResult& _return) override;
 
     void SmartContractGet(api::SmartContractGetResult& _return, const general::Address& address) override;
@@ -618,7 +618,7 @@ public:
     void SmartContractAddressesListGet(api::SmartContractAddressesListGetResult& _return, const general::Address& deployer) override;
 
     void GetLastHash(api::PoolHash& _return) override;
-    void PoolListGetStable(api::PoolListGetResult& _return, const api::PoolHash& hash, const int64_t limit) override;
+    void PoolListGetStable(api::PoolListGetResult& _return, const int64_t sequence, const int64_t limit) override;
 
     void WaitForSmartTransaction(api::TransactionId& _return, const general::Address& smart_public) override;
 
@@ -691,7 +691,7 @@ private:
 
     using client_type           = executor::ContractExecutorConcurrentClient;
     using smartHashStateEntry   = cs::WorkerQueue<HashState>;
-
+   
     BlockChain& s_blockchain;
     cs::SolverCore& solver;
 #ifdef MONITOR_NODE
@@ -748,7 +748,7 @@ private:
 
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployed_by_creator;
     //cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
-    std::map<csdb::PoolHash, api::Pool> poolCache;
+    cs::SpinLockable < std::map<cs::Sequence, api::Pool> > poolCache;
     std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
     std::thread state_updater;
 

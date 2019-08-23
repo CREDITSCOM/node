@@ -347,15 +347,15 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             gotSSPingWhiteNode(task);
             break;
         case NetworkCommand::SSLastBlock:
-            gotSSLastBlock(task, node_->getBlockChain().getLastSequence(), node_->getBlockChain().getLastHash(),
+            gotSSLastBlock(task, node_->getBlockChain().getLastSeq(), node_->getBlockChain().getLastHash(),
                 node_->canBeTrusted(true /*crirical, all trusted required*/));
             break;
         case NetworkCommand::SSSpecificBlock: {
             cs::RoundNumber round = 0;
             iPackStream_ >> round;
 
-            if (node_->getBlockChain().getLastSequence() < round) {
-                gotSSLastBlock(task, node_->getBlockChain().getLastSequence(), node_->getBlockChain().getLastHash(), false);
+            if (node_->getBlockChain().getLastSeq() < round) {
+                gotSSLastBlock(task, node_->getBlockChain().getLastSeq(), node_->getBlockChain().getLastHash(), false);
             }
             else {
                 gotSSLastBlock(task, round, node_->getBlockChain().getHashBySequence(round),
@@ -1225,7 +1225,7 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
 #define PING_WITH_BCHID
 
 void Transport::sendPingPack(const Connection& conn) {
-    cs::Sequence seq = node_->getBlockChain().getLastSequence();
+    cs::Sequence seq = node_->getBlockChain().getLastSeq();
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
     oPackStream_ << NetworkCommand::Ping << conn.id << seq << myPublicKey_;
