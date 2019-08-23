@@ -666,7 +666,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_
                         }
                     }
                     if (!in_known_contracts(u)) {
-                        cslog() << kLogPrefix << "call to unknown contract declared in executing item, cancel " << new_item;
+                        cslog() << kLogPrefix << "call to unknown contract " << to_base58(u) << " declared in " << new_item << ", cancel ";
                         remove_from_queue(new_item, skip_log);
                         // also removes parent "it" from exe_queue if empty
                         return;
@@ -1120,6 +1120,10 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
     test_contracts_locks();
 
     const auto seq = block.sequence();
+    if (seq == 4432461 || seq == 4500088) {
+        static int cnt = 0;
+        ++cnt;
+    }
     for (auto& item : exe_queue) {
         if (item.status != SmartContractStatus::Running && item.status != SmartContractStatus::Finished) {
             continue;

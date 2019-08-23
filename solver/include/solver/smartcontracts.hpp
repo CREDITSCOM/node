@@ -195,7 +195,7 @@ struct SmartContractRef {
     void from_user_field(const csdb::UserField& fld);
 
     csdb::TransactionID getTransactionID() const {
-        return csdb::TransactionID(hash, transaction);
+        return csdb::TransactionID(sequence, transaction);
     }
 };
 

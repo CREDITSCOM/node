@@ -464,7 +464,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
         updateHash();
 
         for (size_t idx = 0; idx < transactions_.size(); ++idx) {
-            transactions_[idx].d->_update_id(hash_, idx);
+            transactions_[idx].d->_update_id(sequence_, idx);
         }
     }
 
@@ -612,7 +612,7 @@ const std::vector<cs::Signature>& Pool::roundConfirmations() const noexcept {
 }
 
 Transaction Pool::transaction(TransactionID id) const {
-    if ((!d->is_valid_) || (!d->read_only_) || (!id.is_valid()) || (id.pool_hash() != d->hash_) || (d->transactions_.size() <= id.d->index_)) {
+    if ((!d->is_valid_) || (!d->read_only_) || (!id.is_valid()) || (id.pool_seq() != d->sequence_) || (d->transactions_.size() <= id.d->index_)) {
         return Transaction{};
     }
     return d->transactions_[id.d->index_];

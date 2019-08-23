@@ -505,7 +505,9 @@ private:
 public:
     SpinLockedRef(SpinLockable<T>& lockable)
     : lockable_(&lockable) {
-        while (this->lockable_->af.test_and_set(std::memory_order_acquire));
+        while (this->lockable_->af.test_and_set(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
     }
 
     ~SpinLockedRef() {

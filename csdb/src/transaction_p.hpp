@@ -9,6 +9,7 @@
 
 #include <csdb/transaction.hpp>
 
+#include <limits>
 #include <map>
 
 #include <csdb/address.hpp>
@@ -20,28 +21,24 @@
 namespace csdb {
 
 class TransactionID::priv : public ::csdb::internal::shared_data {
-    inline priv()
-    : index_(0) {
-    }
+    inline priv() : pool_seq_(cs::kWrongSequence), index_(0) {}
 
-    inline priv(PoolHash pool_hash, cs::Sequence index)
-    : pool_hash_(pool_hash)
-    , index_(index) {
-    }
+    inline priv(cs::Sequence pool_seq, cs::Sequence index)
+        : pool_seq_(pool_seq) , index_(index) {}
 
-    inline void _update(PoolHash pool_hash, cs::Sequence index) {
-        pool_hash_ = pool_hash;
+    inline void _update(cs::Sequence pool_seq, cs::Sequence index) {
+        pool_seq_ = pool_seq;
         index_ = index;
     }
 
     priv clone() const {
         priv result;
-        result.pool_hash_ = pool_hash_.clone();
+        result.pool_seq_ = pool_seq_;
         result.index_ = index_;
         return result;
     }
 
-    PoolHash pool_hash_;
+    cs::Sequence pool_seq_;
     cs::Sequence index_ = 0;
     friend class TransactionID;
     friend class Transaction;
@@ -85,8 +82,8 @@ class Transaction::priv : public ::csdb::internal::shared_data {
     , signature_(signature) {
     }
 
-    inline void _update_id(PoolHash pool_hash, cs::Sequence index) {
-        id_.d->_update(pool_hash, index);
+    inline void _update_id(cs::Sequence pool_seq, cs::Sequence index) {
+        id_.d->_update(pool_seq, index);
         read_only_ = true;
     }
 
