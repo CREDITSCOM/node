@@ -186,6 +186,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token, const std::stri
     t.symbol      = symbol;
     t.totalSupply = totalSupply;     
 
+#ifdef SLOW_WORK
     // balance
     if (checkBalance) {
         executor::ExecuteByteCodeMultipleResult result;
@@ -225,6 +226,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token, const std::stri
             }
         }
     }
+#endif
 }
 
 /* Call under data lock only */
@@ -332,11 +334,15 @@ void TokensMaster::loadTokenInfo(const std::vector<csdb::Address>& vtokenAddr, c
             freeChache(itLoaded.first);
     }
     else {
+#ifdef SLOW_WORK
         for (const auto& tk : tokens_) // need for sort
             refreshTokenState(tk.first, cs::SmartContracts::get_contract_state(api_->get_s_blockchain(), tk.first), false);
+#endif        
         func(tokens_, holders_);
+#ifdef SLOW_WORK
         for (const auto& tk : tokens_)
             freeChache(tk.first, false);
+#endif
     }
 }
 

@@ -1606,7 +1606,17 @@ void APIHandler::ExecuteCountGet(ExecuteCountGetResult& _return, const std::stri
 
 void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
-    tm.loadTokenInfo(std::vector(1, addr), [&_return, &addr](const TokensMap& tokens, const HoldersMap& holders) {
+    std::vector<csdb::Address> vtokenAddr;
+    tm.loadTokenInfo({}, [&vtokenAddr, &addr](const TokensMap& tokens, const HoldersMap& holders) {
+        if (auto holderIt = holders.find(addr); holderIt != holders.end()) {
+            for (const auto& tokAddr : holderIt->second) {
+                if (tokens.find(tokAddr) != tokens.end())
+                    vtokenAddr.push_back(tokAddr);
+            }
+        }
+        }, false);
+
+    tm.loadTokenInfo(vtokenAddr, [&_return, &addr](const TokensMap& tokens, const HoldersMap& holders) {
         auto holderIt = holders.find(addr);
         if (holderIt != holders.end()) {
             for (const auto& tokAddr : holderIt->second) {
@@ -1884,14 +1894,23 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
 
     switch (order) {
         case TL_Code:
+#ifdef SLOW_WORK
             comparator = getComparator<VT>(&Token::symbol, desc);
             break;
+#endif
+            [[fallthrough]];
         case TL_Name:
+#ifdef SLOW_WORK
             comparator = getComparator<VT>(&Token::name, desc);
             break;
+#endif
+            [[fallthrough]];
         case TL_Address:
+#ifdef SLOW_WORK
             comparator = [desc](const VT& lhs, const VT& rhs) { return desc ^ (lhs.first < rhs.first); };
             break;
+#endif
+            [[fallthrough]];
         case TL_TotalSupply:
             comparator = [desc](const VT& lhs, const VT& rhs) { return desc ^ (stod(lhs.second.totalSupply) < stod(rhs.second.totalSupply)); };
             break;
