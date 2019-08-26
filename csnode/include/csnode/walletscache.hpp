@@ -31,14 +31,8 @@ constexpr size_t InitialWalletsNum = 1 * 24 * 1024;
 class WalletsCache {
 public:
     using WalletId = csdb::internal::WalletId;
-    using Mask = boost::dynamic_bitset<uint64_t>;
 
-    struct Config {
-        size_t initialWalletsNum_ = InitialWalletsNum;
-    };
-
-    WalletsCache(const Config& config, csdb::Address genesisAddress, csdb::Address startAddress, WalletsIds& walletsIds);
-    ~WalletsCache();
+    WalletsCache(WalletsIds& walletsIds);
 
     WalletsCache(const WalletsCache&) = delete;
     WalletsCache& operator=(const WalletsCache&) = delete;
@@ -54,17 +48,13 @@ public:
     };
 
     struct WalletData {
-        using Address = cs::PublicKey;
-
-        Address address_;
         csdb::Amount balance_;
         TransactionsTail trxTail_;
 		uint64_t transNum_ = 0;
-
+        csdb::TransactionID lastTransaction_;
 #ifdef MONITOR_NODE
         uint64_t createTime_ = 0;        
 #endif
-        csdb::TransactionID lastTransaction_;
     };
 
     struct TrustedData {
@@ -73,13 +63,10 @@ public:
         csdb::Amount totalFee;
     };
 
-    void convert(const csdb::Address& address, WalletData::Address& walletAddress) const;
-    static void convert(const WalletData::Address& walletAddress, csdb::Address& address);
-
-    void iterateOverWallets(const std::function<bool(const WalletData::Address&, const WalletData&)>);
+    void iterateOverWallets(const std::function<bool(const PublicKey&, const WalletData&)>);
 
 #ifdef MONITOR_NODE
-    void iterateOverWriters(const std::function<bool(const WalletData::Address&, const TrustedData&)>);
+    void iterateOverWriters(const std::function<bool(const PublicKey&, const TrustedData&)>);
 #endif
 
     uint64_t getCount() const {
@@ -87,18 +74,15 @@ public:
     }
 
 private:
-    const Config config_;
     WalletsIds& walletsIds_;
-    const csdb::Address genesisAddress_;
-    const csdb::Address startAddress_;
+
     std::list<csdb::TransactionID> smartPayableTransactions_;
-    std::map< csdb::Address, std::list<RefContractCall> > canceledSmarts_;
+    std::map<csdb::Address, std::list<RefContractCall>> canceledSmarts_;
+    std::map<PublicKey, WalletData> wallets_;
 
 #ifdef MONITOR_NODE
-    std::map<WalletData::Address, TrustedData> trusted_info_;
+    std::map<PublicKey, TrustedData> trusted_info_;
 #endif
-
-    std::vector<WalletData*> wallets_;
 };
 
 class WalletsCache::Updater {
@@ -107,17 +91,15 @@ public:
 
     void loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
 
-    const WalletData* findWallet(WalletId id) const;
-    const Mask& getModified() const { return modified_; }
+    const WalletData* findWallet(const PublicKey&) const;
 
     void invokeReplenishPayableContract(const csdb::Transaction&);
     void rollbackExceededTimeoutContract(const csdb::Transaction&, const WalletsCache::RefContractCall&, const csdb::Amount& execFee = 0);
     void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx);
 
 private:
-    bool findWalletId(const csdb::Address& address, WalletId& id);
-    WalletData& getWalletData(WalletId id, const csdb::Address& address);
-    void setModified(WalletId id);
+    WalletData& getWalletData(const PublicKey&);
+    WalletData& getWalletData(const csdb::Address&);
 
     double load(const csdb::Transaction& tr, const BlockChain& blockchain);
     double loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain);
@@ -130,11 +112,12 @@ private:
     bool isCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref);
     void checkCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref);
 
+    PublicKey toPublicKey(const csdb::Address&) const;
+
 #ifdef MONITOR_NODE
-    bool setWalletTime(const WalletData::Address& address, const uint64_t& p_timeStamp);
+    bool setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp);
 #endif
 
-    Mask modified_;
     WalletsCache& data_;
 };
 } // namespace cs

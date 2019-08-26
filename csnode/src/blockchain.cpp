@@ -104,7 +104,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , genesisAddress_(genesisAddress)
 , startAddress_(startAddress)
 , walletIds_(new WalletsIds)
-, walletsCacheStorage_(new WalletsCache(WalletsCache::Config(), genesisAddress, startAddress, *walletIds_))
+, walletsCacheStorage_(new WalletsCache(*walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
 , recreateIndex_(recreateIndex) {
@@ -222,11 +222,12 @@ inline void BlockChain::updateNonEmptyBlocks(const csdb::Pool& pool) {
 }
 
 bool BlockChain::postInitFromDB() {
-    auto func = [](const WalletData::Address&, const WalletData& wallet) {
+    auto func = [](const cs::PublicKey& key, const WalletData& wallet) {
         double bal = wallet.balance_.to_double();
         if (bal < -std::numeric_limits<double>::min()) {
-            csdebug() << "Wallet with negative balance (" << bal << ") detected: " << cs::Utils::byteStreamToHex(wallet.address_.data(), wallet.address_.size()) << " ("
-                      << EncodeBase58(wallet.address_.data(), wallet.address_.data() + wallet.address_.size()) << ")";
+            csdebug() << "Wallet with negative balance (" << bal << ") detected: "
+                      << cs::Utils::byteStreamToHex(key.data(), key.size()) << " ("
+                      << EncodeBase58(key.data(), key.data() + key.size()) << ")";
         }
         return true;
     };
@@ -331,7 +332,7 @@ void BlockChain::writeGenesisBlock() {
     genesis.to_byte_stream(bSize);
 }
 
-void BlockChain::iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)> func) {
+void BlockChain::iterateOverWallets(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::WalletData&)> func) {
     std::lock_guard lock(cacheMutex_);
     walletsCacheStorage_->iterateOverWallets(func);
 }
@@ -628,9 +629,9 @@ uint64_t BlockChain::getWalletsCountWithBalance() {
     std::lock_guard lock(cacheMutex_);
 
     uint64_t count = 0;
-    auto proc = [&](const WalletData::Address& addr, const WalletData& wallet) {
+    auto proc = [&](const cs::PublicKey&, const WalletData& wallet) {
         constexpr csdb::Amount zero_balance(0);
-        if (!addr.empty() && wallet.balance_ >= zero_balance) {
+        if (wallet.balance_ >= zero_balance) {
             count++;
         }
         return true;
@@ -716,13 +717,14 @@ bool BlockChain::findDataForTransactions(csdb::Address address, csdb::Address& w
     if (address.is_wallet_id()) {
         id = address.wallet_id();
 
-        const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
+        auto pubKey = getAddressByType(address, AddressType::PublicKey);
+        const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
         if (!wallDataPtr) {
             return false;
         }
 
-        WalletsCache::convert(wallDataPtr->address_, wallPubKey);
+        wallPubKey = pubKey;
     }
     else
     {
@@ -952,7 +954,8 @@ bool BlockChain::findWalletData(WalletId id, WalletData& wallData) const {
 }
 
 bool BlockChain::findWalletData_Unsafe(WalletId id, WalletData& wallData) const {
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
+    auto pubKey = getAddressByType(csdb::Address::from_wallet_id(id), AddressType::PublicKey);
+    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (wallDataPtr) {
         wallData = *wallDataPtr;
@@ -960,17 +963,6 @@ bool BlockChain::findWalletData_Unsafe(WalletId id, WalletData& wallData) const 
     }
 
     return false;
-}
-
-bool BlockChain::getModifiedWallets(Mask& dest) const {
-    std::lock_guard lock(cacheMutex_);
-
-    bool isNewModified = (walletsCacheUpdater_->getModified().size() != dest.size()) || walletsCacheUpdater_->getModified().any();
-
-    dest.resize(walletsCacheUpdater_->getModified().size(), true);
-    dest |= walletsCacheUpdater_->getModified();
-
-    return isNewModified;
 }
 
 bool BlockChain::findWalletId(const WalletAddress& address, WalletId& id) const {
@@ -1396,17 +1388,9 @@ bool BlockChain::isEqual(const csdb::Address& laddr, const csdb::Address& raddr)
 
 uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
     std::lock_guard lock(cacheMutex_);
-    WalletId id;
 
-    if (addr.is_wallet_id()) {
-        id = addr.wallet_id();
-    }
-
-    else if (!walletIds_->normal().find(addr, id)) {
-        return 0;
-    }
-
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
+    auto pubKey = getAddressByType(addr, AddressType::PublicKey);
+    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (!wallDataPtr) {
         return 0;
@@ -1436,16 +1420,9 @@ uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
 
 csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) const {
     std::lock_guard lock(cacheMutex_);
-    WalletId id;
 
-    if (addr.is_wallet_id()) {
-        id = addr.wallet_id();
-    }
-    else if (!walletIds_->normal().find(addr, id)) {
-        return csdb::TransactionID();
-    }
-
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(id);
+    auto pubKey = getAddressByType(addr, AddressType::PublicKey);
+    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (!wallDataPtr) {
         return csdb::TransactionID();

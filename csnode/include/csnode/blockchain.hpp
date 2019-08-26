@@ -214,7 +214,7 @@ public:
     csdb::Pool loadBlock(const cs::Sequence sequence) const;
     csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
     csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
-    void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
+    void iterateOverWallets(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::WalletData&)>);
     csdb::Pool getLastBlock() const {
 		return loadBlock(getLastSeq());
     }
@@ -234,11 +234,9 @@ public:
     bool findWalletId(const WalletAddress& address, WalletId& id) const;
     // wallet transactions: pools cache + db search
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
-    // wallets modified by last new block
-    bool getModifiedWallets(Mask& dest) const;
 
 #ifdef MONITOR_NODE
-    void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
+    void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);
     void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>); 
 #endif
     uint32_t getTransactionsCount(const csdb::Address&);
