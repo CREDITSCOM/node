@@ -1,7 +1,10 @@
 #ifndef WALLETS_CACHE_HPP
 #define WALLETS_CACHE_HPP
 
-#include <boost/dynamic_bitset.hpp>
+#include <list>
+#include <memory>
+#include <unordered_map>
+
 #include <cscrypto/cscrypto.hpp>
 #include <csdb/address.hpp>
 #include <csdb/amount.hpp>
@@ -9,12 +12,21 @@
 #include <csdb/transaction.hpp>
 #include <csnode/nodecore.hpp>
 #include <csnode/transactionstail.hpp>
-#include <list>
-#include <map>
-#include <memory>
-#include <vector>
 
 #include <lib/system/common.hpp>
+
+namespace std {
+template<>
+class hash<cs::PublicKey> {
+public:
+    size_t operator()(const cs::PublicKey& obj) const {
+        static_assert(sizeof(size_t) < sizeof(cs::PublicKey));
+        size_t res;
+        std::copy(obj.data(), obj.data() + sizeof(res), &res);
+        return res;
+    }
+};
+} // namespace std
 
 class BlockChain;
 
@@ -29,8 +41,6 @@ class WalletsIds;
 
 class WalletsCache {
 public:
-    using WalletId = csdb::internal::WalletId;
-
     WalletsCache(WalletsIds& walletsIds);
 
     WalletsCache(const WalletsCache&) = delete;
@@ -77,7 +87,7 @@ private:
 
     std::list<csdb::TransactionID> smartPayableTransactions_;
     std::map<csdb::Address, std::list<RefContractCall>> canceledSmarts_;
-    std::map<PublicKey, WalletData> wallets_;
+    std::unordered_map<PublicKey, WalletData> wallets_;
 
 #ifdef MONITOR_NODE
     std::map<PublicKey, TrustedData> trusted_info_;

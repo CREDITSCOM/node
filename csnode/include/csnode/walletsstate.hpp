@@ -10,19 +10,6 @@
 #include <csnode/transactionstail.hpp>
 #include <csnode/walletscache.hpp>
 
-namespace std {
-template<>
-class hash<cs::PublicKey> {
-public:
-    size_t operator()(const cs::PublicKey& obj) const {
-        static_assert(sizeof(size_t) < sizeof(cs::PublicKey));
-        size_t res;
-        std::copy(obj.data(), obj.data() + sizeof(res), &res);
-        return res;
-    }
-};
-} // namespace std
-
 class BlockChain;
 
 namespace cs {
