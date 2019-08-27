@@ -42,7 +42,7 @@ struct Token {
     std::string totalSupply { "not loaded" };
 
     struct HolderInfo {
-        std::string balance { "not loaded" };
+        std::string balance { "0" };
         uint64_t transfersCount = 0;
     };
     std::map<HolderKey, HolderInfo> holders;  // Including guys with zero balance
@@ -60,7 +60,7 @@ public:
 
     void checkNewState(const csdb::Address& sc, const csdb::Address& initiator, const api::SmartContractInvocation&, const std::string& newState);
 
-    void loadTokenInfo(const std::vector<csdb::Address>& vaddr, const std::function<void(const TokensMap&, const HoldersMap&)>, bool needLoad = true);
+    void loadTokenInfo(const std::vector<csdb::Address>& vaddr, const std::function<void(const TokensMap&, const HoldersMap&)>);
 
     static bool isTransfer(const std::string& method, const std::vector<general::Variant>& params);
 
