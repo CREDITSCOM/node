@@ -1258,7 +1258,7 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
                     csdb::Transaction starter = get_transaction(contract_item.ref_execute, abs_addr);
                     if (starter.is_valid()) {
                         if (!reading_db) {
-                            csdebug() << kLogPrefix << "found emitted transaction in " << contract_item.ref_execute;
+                            csdetails() << kLogPrefix << "found emitted transaction in " << contract_item.ref_execute;
                         }
                         emit signal_emitted_accepted(tr, starter);
                     }
@@ -1647,7 +1647,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                                 // is not by primary contract emitted
                                 continue;
                             }
-                            csdebug() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " emitted transaction";
+                            csdetails() << kLogPrefix << "set innerID = " << next_id << " in " << data_item.contract_ref << " emitted transaction";
                             // auto inner id generating
                             csdb::Transaction tmp(
                                 ++next_id,

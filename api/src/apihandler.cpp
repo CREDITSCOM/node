@@ -130,10 +130,8 @@ void APIHandler::WalletDataGet(WalletDataGetResult& _return, const general::Addr
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
-        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+    if (!s_blockchain.findWalletData(addr, wallData, wallId))
         return;
-    }
     _return.walletData.walletId = wallId;
     _return.walletData.balance.integral = wallData.balance_.integral();
     _return.walletData.balance.fraction = static_cast<decltype(_return.walletData.balance.fraction)>(wallData.balance_.fraction());
@@ -1606,7 +1604,18 @@ void APIHandler::ExecuteCountGet(ExecuteCountGetResult& _return, const std::stri
 
 void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
-    tm.loadTokenInfo(std::vector(1, addr), [&_return, &addr](const TokensMap& tokens, const HoldersMap& holders) {
+
+    std::vector<csdb::Address> vtokenAddr;
+    tm.loadTokenInfo({}, [&vtokenAddr, &addr](const TokensMap& tokens, const HoldersMap& holders) {
+            if (auto holderIt = holders.find(addr); holderIt != holders.end()) {
+                for (const auto& tokAddr : holderIt->second) {
+                    if (tokens.find(tokAddr) != tokens.end())
+                        vtokenAddr.push_back(tokAddr);
+                }
+            }
+        });
+ 
+    tm.loadTokenInfo(vtokenAddr, [&_return, &addr](const TokensMap& tokens, const HoldersMap& holders) {
         auto holderIt = holders.find(addr);
         if (holderIt != holders.end()) {
             for (const auto& tokAddr : holderIt->second) {
@@ -1714,7 +1723,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
             totalTransfers += t.second.transfersCount;
             tokenTransPools.insert(std::make_pair(s_blockchain.getLastTransaction(t.first).pool_seq(), t.first));
         }
-    }, false);
+    });
 
     _return.count = uint32_t(totalTransfers);
 
@@ -1782,7 +1791,6 @@ void APIHandler::TokenTransactionsGet(api::TokenTransactionsResult& _return, con
 
 void APIHandler::TokenInfoGet(api::TokenInfoResult& _return, const general::Address& token) {
     bool found = false;
-
     const csdb::Address addr = BlockChain::getAddressFromKey(token);
     tm.loadTokenInfo(std::vector<csdb::Address>(1, addr), [&token, &addr, &found, &_return](const TokensMap& tm, const HoldersMap&) {
         auto tIt = tm.find(addr);
@@ -1791,7 +1799,6 @@ void APIHandler::TokenInfoGet(api::TokenInfoResult& _return, const general::Addr
             putTokenInfo(_return.token, token, tIt->second);
         }
     });
-
     SetResponseStatus(_return.status, found ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
 }
 
@@ -1884,16 +1891,25 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
 
     switch (order) {
         case TL_Code:
+#ifdef SLOW_WORK
             comparator = getComparator<VT>(&Token::symbol, desc);
             break;
+#endif
+            [[fallthrough]];
         case TL_Name:
+#ifdef SLOW_WORK
             comparator = getComparator<VT>(&Token::name, desc);
             break;
+#endif
+            [[fallthrough]];
+        case TL_TotalSupply:
+#ifdef SLOW_WORK
+            comparator = [desc](const VT& lhs, const VT& rhs) { return desc ^ (stod(lhs.second.totalSupply) < stod(rhs.second.totalSupply)); };
+            break;
+#endif
+            [[fallthrough]];
         case TL_Address:
             comparator = [desc](const VT& lhs, const VT& rhs) { return desc ^ (lhs.first < rhs.first); };
-            break;
-        case TL_TotalSupply:
-            comparator = [desc](const VT& lhs, const VT& rhs) { return desc ^ (stod(lhs.second.totalSupply) < stod(rhs.second.totalSupply)); };
             break;
         case TL_HoldersCount:
             comparator = getComparator<VT>(&Token::realHoldersCount, desc);
