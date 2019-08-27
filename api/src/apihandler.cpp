@@ -2204,7 +2204,7 @@ namespace executor {
         catch (::apache::thrift::transport::TTransportException& x) {
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-                reCreationOriginExecutor();
+                recreateOriginExecutor();
             }
             _return.status.code = 1;
             _return.status.message = x.what();
@@ -2215,7 +2215,6 @@ namespace executor {
         }
         --execCount_;
         deleteAccessId(access_id);
-        disconnect();
     }
 
     std::optional<std::string> Executor::getState(const csdb::Address& p_address) {
@@ -2573,7 +2572,7 @@ namespace executor {
         catch (::apache::thrift::transport::TTransportException& x) {
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-                reCreationOriginExecutor();
+                recreateOriginExecutor();
             }
             originExecuteRes.resp.status.code = cs::error::ThriftException;
             originExecuteRes.resp.status.message = x.what();
@@ -2586,7 +2585,7 @@ namespace executor {
         --execCount_;
         if (!isGetter)
             deleteAccessId(access_id);
-        disconnect();
+
         originExecuteRes.acceessId = access_id;
         return std::make_optional<OriginExecuteResult>(std::move(originExecuteRes));
     }
