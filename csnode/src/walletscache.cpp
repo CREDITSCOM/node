@@ -381,6 +381,10 @@ const WalletsCache::WalletData* WalletsCache::Updater::findWallet(const PublicKe
     return &(it->second);
 }
 
+const WalletsCache::WalletData* WalletsCache::Updater::findWallet(const csdb::Address& addr) const {
+    return findWallet(toPublicKey(addr));
+}
+
 void WalletsCache::iterateOverWallets(const std::function<bool(const PublicKey&, const WalletData&)> func) {
     for (const auto& wallet : wallets_) {
         if (!func(wallet.first, wallet.second)) {

@@ -255,6 +255,10 @@ public:
     bool updateContractData(const csdb::Address& abs_addr, const cs::Bytes& data) const;
     bool getContractData(const csdb::Address& abs_addr, cs::Bytes& data) const;
 
+    auto getCacheUpdater() const {
+        return walletsCacheUpdater_;
+    }
+
 private:
     void createCachesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
@@ -300,7 +304,7 @@ private:
     const csdb::Address startAddress_;
     std::unique_ptr<cs::WalletsIds> walletIds_;
     std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
-    std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
+    std::shared_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
     std::unique_ptr<cs::WalletsPools> walletsPools_;
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 

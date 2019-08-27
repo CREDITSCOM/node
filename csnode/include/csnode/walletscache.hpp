@@ -26,7 +26,6 @@ class Transaction;
 namespace cs {
 
 class WalletsIds;
-constexpr size_t InitialWalletsNum = 1 * 24 * 1024;
 
 class WalletsCache {
 public:
@@ -92,10 +91,13 @@ public:
     void loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
 
     const WalletData* findWallet(const PublicKey&) const;
+    const WalletData* findWallet(const csdb::Address&) const;
 
     void invokeReplenishPayableContract(const csdb::Transaction&);
     void rollbackExceededTimeoutContract(const csdb::Transaction&, const WalletsCache::RefContractCall&, const csdb::Amount& execFee = 0);
     void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx);
+
+    PublicKey toPublicKey(const csdb::Address&) const;
 
 private:
     WalletData& getWalletData(const PublicKey&);
@@ -111,8 +113,6 @@ private:
     void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const WalletsCache::RefContractCall& initRef, const csdb::Transaction& newStateTransaction);
     bool isCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref);
     void checkCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref);
-
-    PublicKey toPublicKey(const csdb::Address&) const;
 
 #ifdef MONITOR_NODE
     bool setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp);

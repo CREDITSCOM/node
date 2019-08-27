@@ -273,16 +273,12 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     csdb::Currency currency = transaction.currency();
     csdb::Address address = transaction.source();
     if (address.is_wallet_id()) {
-        BlockChain::WalletData data_to_fetch_pulic_key;
-        s_blockchain.findWalletData(transaction.source().wallet_id(), data_to_fetch_pulic_key);
-        address = csdb::Address::from_public_key(data_to_fetch_pulic_key.address_);
+        address = s_blockchain.getAddressByType(transaction.source(), BlockChain::AddressType::PublicKey);
     }
 
     csdb::Address target = transaction.target();
     if (target.is_wallet_id()) {
-        BlockChain::WalletData data_to_fetch_pulic_key;
-        s_blockchain.findWalletData(transaction.target().wallet_id(), data_to_fetch_pulic_key);
-        target = csdb::Address::from_public_key(data_to_fetch_pulic_key.address_);
+        target = s_blockchain.getAddressByType(transaction.target(), BlockChain::AddressType::PublicKey);
     }
 
     result.id = convert_transaction_id(transaction.id());
@@ -1960,9 +1956,9 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
 }
 
 //////////Wallets
-typedef std::list<std::pair<const cs::WalletsCache::WalletData::Address*, const cs::WalletsCache::WalletData*>> WCSortedList;
+typedef std::list<std::pair<const cs::PublicKey*, const cs::WalletsCache::WalletData*>> WCSortedList;
 template <typename T>
-void walletStep(const cs::WalletsCache::WalletData::Address* addr, const cs::WalletsCache::WalletData* wd, const uint64_t num,
+void walletStep(const cs::PublicKey* addr, const cs::WalletsCache::WalletData* wd, const uint64_t num,
                 std::function<const T&(const cs::WalletsCache::WalletData&)> getter, std::function<bool(const T&, const T&)> comparator, WCSortedList& lst) {
     assert(num > 0);
 
@@ -1987,7 +1983,7 @@ void iterateOverWallets(std::function<const T&(const cs::WalletsCache::WalletDat
     using Comparer = std::function<bool(const T&, const T&)>;
     Comparer comparator = desc ? Comparer(std::greater<T>()) : Comparer(std::less<T>());
 
-    bc.iterateOverWallets([&lst, num, getter, comparator](const cs::WalletsCache::WalletData::Address& addr, const cs::WalletsCache::WalletData& wd) {
+    bc.iterateOverWallets([&lst, num, getter, comparator](const cs::PublicKey& addr, const cs::WalletsCache::WalletData& wd) {
         if (!addr.empty() && wd.balance_ >= csdb::Amount(0)) {
             walletStep(&addr, &wd, num, getter, comparator, lst);
         }
