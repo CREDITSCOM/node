@@ -1,7 +1,6 @@
 #ifndef WALLETS_STATE_HPP
 #define WALLETS_STATE_HPP
 
-#include <memory>
 #include <unordered_map>
 
 #include <csdb/address.hpp>
@@ -9,8 +8,6 @@
 #include <csdb/internal/types.hpp>
 #include <csnode/transactionstail.hpp>
 #include <csnode/walletscache.hpp>
-
-class BlockChain;
 
 namespace cs {
 class WalletsCache;
@@ -29,15 +26,14 @@ public:
         TransactionsTail trxTail_{};
     };
 
-    explicit WalletsState(const BlockChain&);
+    explicit WalletsState(const WalletsCache::Updater& cacheUpd) : wallCache_(cacheUpd) {}
     WalletData& getData(const WalletAddress& address);
 
-    void updateFromSource();
+    void updateFromSource() { storage_.clear(); }
 
 private:
-    std::shared_ptr<WalletsCache::Updater> cacheSptr_;
+    const WalletsCache::Updater& wallCache_;
     std::unordered_map<PublicKey, WalletData> storage_;
 };
 }  // namespace cs
-
 #endif // WALLETS_STATE_HPP

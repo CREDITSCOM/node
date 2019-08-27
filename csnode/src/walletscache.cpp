@@ -210,11 +210,6 @@ void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transac
     }
 }
 
-double WalletsCache::Updater::load(const csdb::Transaction& tr, const BlockChain& blockchain) {
-    loadTrxForTarget(tr);
-    return loadTrxForSource(tr, blockchain);
-}
-
 double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain) {
     csdb::Address wallAddress;
     bool smartIniter = false;
@@ -363,26 +358,6 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr) {
     setWalletTime(toPublicKey(tr.target()), tr.get_time());
 #endif
     wallData.lastTransaction_ = tr.id();
-}
-
-WalletsCache::WalletData& WalletsCache::Updater::getWalletData(const PublicKey& key) {
-    return data_.wallets_[key];
-}
-
-WalletsCache::WalletData& WalletsCache::Updater::getWalletData(const csdb::Address& addr) {
-    return data_.wallets_[toPublicKey(addr)];
-}
-
-const WalletsCache::WalletData* WalletsCache::Updater::findWallet(const PublicKey& key) const {
-    auto it = data_.wallets_.find(key);
-    if (it == data_.wallets_.end()) {
-        return nullptr;
-    }
-    return &(it->second);
-}
-
-const WalletsCache::WalletData* WalletsCache::Updater::findWallet(const csdb::Address& addr) const {
-    return findWallet(toPublicKey(addr));
 }
 
 void WalletsCache::iterateOverWallets(const std::function<bool(const PublicKey&, const WalletData&)> func) {

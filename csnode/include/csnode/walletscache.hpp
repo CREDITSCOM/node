@@ -22,7 +22,7 @@ public:
     size_t operator()(const cs::PublicKey& obj) const {
         static_assert(sizeof(size_t) < sizeof(cs::PublicKey));
         size_t res;
-        std::copy(obj.data(), obj.data() + sizeof(res), &res);
+        std::copy(obj.data(), obj.data() + sizeof(res), reinterpret_cast<uint8_t*>(&res));
         return res;
     }
 };
@@ -130,5 +130,31 @@ private:
 
     WalletsCache& data_;
 };
+
+inline const WalletsCache::WalletData* WalletsCache::Updater::findWallet(const PublicKey& key) const {
+    auto it = data_.wallets_.find(key);
+    if (it == data_.wallets_.end()) {
+        return nullptr;
+    }
+    return &(it->second);
+}
+
+inline const WalletsCache::WalletData* WalletsCache::Updater::findWallet(const csdb::Address& addr) const {
+    return findWallet(toPublicKey(addr));
+}
+
+inline WalletsCache::WalletData& WalletsCache::Updater::getWalletData(const PublicKey& key) {
+    return data_.wallets_[key];
+}
+
+inline WalletsCache::WalletData& WalletsCache::Updater::getWalletData(const csdb::Address& addr) {
+    return data_.wallets_[toPublicKey(addr)];
+}
+
+inline double WalletsCache::Updater::load(const csdb::Transaction& t, const BlockChain& bc) {
+    loadTrxForTarget(t);
+    return loadTrxForSource(t, bc);
+}
+
 } // namespace cs
 #endif // WALLETS_CACHE_HPP
