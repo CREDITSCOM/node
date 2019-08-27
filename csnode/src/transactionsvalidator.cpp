@@ -180,7 +180,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
     }
 
     if (wallState.balance_ < zeroBalance_ && !SmartContracts::is_new_state(trx)) {
-        csdebug() << kLogPrefix << "transaction[" << trxInd << "] results to potentially negative balance " << wallState.balance_.to_double();
+        csdetails() << kLogPrefix << "transaction[" << trxInd << "] results to potentially negative balance " << wallState.balance_.to_double();
         // will be checked in rejected smarts
         if (context.smart_contracts().is_known_smart_contract(trx.source())) {
             return false;
@@ -255,7 +255,7 @@ size_t TransactionsValidator::makeSmartsValid(SolverContext& context, RejectedSm
         if (s.absolute_address(smarts[i].first.source()) == s.absolute_address(source) && smarts[i].second < maskSize) {
             maskIncluded[smarts[i].second] = kValidMarker;
             ++restoredCounter;
-            csdebug() << kLogPrefix << "balance of transation[" << smarts[i].second << "] source is replenished by other transaction";
+            csdetails() << kLogPrefix << "balance of transation[" << smarts[i].second << "] source is replenished by other transaction";
 
             WalletsState::WalletId walletId{};
             WalletsState::WalletData& wallState = walletsState_.getData(smarts[i].first.source(), walletId);

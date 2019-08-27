@@ -270,7 +270,11 @@ TEST(Lmdbxx, HighLoadTest) {
         cs::Console::writeLine("Error in database ", e.what());
     });
 
+#ifdef NDEBUG
     constexpr size_t elementsCount = 50000;
+#else
+    constexpr size_t elementsCount = 1000;
+#endif
 
     std::string key = "Key";
     std::string value = "Value";

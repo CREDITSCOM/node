@@ -130,10 +130,8 @@ void APIHandler::WalletDataGet(WalletDataGetResult& _return, const general::Addr
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
-        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+    if (!s_blockchain.findWalletData(addr, wallData, wallId))
         return;
-    }
     _return.walletData.walletId = wallId;
     _return.walletData.balance.integral = wallData.balance_.integral();
     _return.walletData.balance.fraction = static_cast<decltype(_return.walletData.balance.fraction)>(wallData.balance_.fraction());
@@ -1606,16 +1604,17 @@ void APIHandler::ExecuteCountGet(ExecuteCountGetResult& _return, const std::stri
 
 void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
+
     std::vector<csdb::Address> vtokenAddr;
     tm.loadTokenInfo({}, [&vtokenAddr, &addr](const TokensMap& tokens, const HoldersMap& holders) {
-        if (auto holderIt = holders.find(addr); holderIt != holders.end()) {
-            for (const auto& tokAddr : holderIt->second) {
-                if (tokens.find(tokAddr) != tokens.end())
-                    vtokenAddr.push_back(tokAddr);
+            if (auto holderIt = holders.find(addr); holderIt != holders.end()) {
+                for (const auto& tokAddr : holderIt->second) {
+                    if (tokens.find(tokAddr) != tokens.end())
+                        vtokenAddr.push_back(tokAddr);
+                }
             }
-        }
-        }, false);
-
+        });
+ 
     tm.loadTokenInfo(vtokenAddr, [&_return, &addr](const TokensMap& tokens, const HoldersMap& holders) {
         auto holderIt = holders.find(addr);
         if (holderIt != holders.end()) {
@@ -1724,7 +1723,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
             totalTransfers += t.second.transfersCount;
             tokenTransPools.insert(std::make_pair(s_blockchain.getLastTransaction(t.first).pool_seq(), t.first));
         }
-    }, false);
+    });
 
     _return.count = uint32_t(totalTransfers);
 
@@ -1792,7 +1791,6 @@ void APIHandler::TokenTransactionsGet(api::TokenTransactionsResult& _return, con
 
 void APIHandler::TokenInfoGet(api::TokenInfoResult& _return, const general::Address& token) {
     bool found = false;
-
     const csdb::Address addr = BlockChain::getAddressFromKey(token);
     tm.loadTokenInfo(std::vector<csdb::Address>(1, addr), [&token, &addr, &found, &_return](const TokensMap& tm, const HoldersMap&) {
         auto tIt = tm.find(addr);
@@ -1801,7 +1799,6 @@ void APIHandler::TokenInfoGet(api::TokenInfoResult& _return, const general::Addr
             putTokenInfo(_return.token, token, tIt->second);
         }
     });
-
     SetResponseStatus(_return.status, found ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
 }
 
@@ -1905,14 +1902,14 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
             break;
 #endif
             [[fallthrough]];
-        case TL_Address:
+        case TL_TotalSupply:
 #ifdef SLOW_WORK
-            comparator = [desc](const VT& lhs, const VT& rhs) { return desc ^ (lhs.first < rhs.first); };
+            comparator = [desc](const VT& lhs, const VT& rhs) { return desc ^ (stod(lhs.second.totalSupply) < stod(rhs.second.totalSupply)); };
             break;
 #endif
             [[fallthrough]];
-        case TL_TotalSupply:
-            comparator = [desc](const VT& lhs, const VT& rhs) { return desc ^ (stod(lhs.second.totalSupply) < stod(rhs.second.totalSupply)); };
+        case TL_Address:
+            comparator = [desc](const VT& lhs, const VT& rhs) { return desc ^ (lhs.first < rhs.first); };
             break;
         case TL_HoldersCount:
             comparator = getComparator<VT>(&Token::realHoldersCount, desc);
@@ -2223,7 +2220,7 @@ namespace executor {
         catch (::apache::thrift::transport::TTransportException& x) {
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-                reCreationOriginExecutor();
+                recreateOriginExecutor();
             }
             _return.status.code = 1;
             _return.status.message = x.what();
@@ -2234,7 +2231,6 @@ namespace executor {
         }
         --execCount_;
         deleteAccessId(access_id);
-        disconnect();
     }
 
     std::optional<std::string> Executor::getState(const csdb::Address& p_address) {
@@ -2592,7 +2588,7 @@ namespace executor {
         catch (::apache::thrift::transport::TTransportException& x) {
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-                reCreationOriginExecutor();
+                recreateOriginExecutor();
             }
             originExecuteRes.resp.status.code = cs::error::ThriftException;
             originExecuteRes.resp.status.message = x.what();
@@ -2605,7 +2601,7 @@ namespace executor {
         --execCount_;
         if (!isGetter)
             deleteAccessId(access_id);
-        disconnect();
+
         originExecuteRes.acceessId = access_id;
         return std::make_optional<OriginExecuteResult>(std::move(originExecuteRes));
     }
