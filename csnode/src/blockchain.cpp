@@ -338,18 +338,15 @@ void BlockChain::iterateOverWallets(const std::function<bool(const cs::PublicKey
 }
 
 #ifdef MONITOR_NODE
-void BlockChain::iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)> func) {
+void BlockChain::iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)> func) {
     std::lock_guard lock(cacheMutex_);
     walletsCacheStorage_->iterateOverWriters(func);
 }
 
 void BlockChain::applyToWallet(const csdb::Address& addr, const std::function<void(const cs::WalletsCache::WalletData&)> func) {
     std::lock_guard lock(cacheMutex_);
-    WalletId id;
-    if (!walletIds_->normal().find(addr, id)) {
-        return;
-    }
-    auto wd = walletsCacheUpdater_->findWallet(id);
+    auto pub = getAddressByType(addr, BlockChain::AddressType::PublicKey);
+    auto wd = walletsCacheUpdater_->findWallet(pub.public_key());
 
     func(*wd);
 }

@@ -2047,7 +2047,7 @@ void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
     uint32_t limit = PER_PAGE;
     uint32_t total = 0;
 
-    s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::WalletsCache::WalletData::Address& addr, const cs::WalletsCache::TrustedData& wd) {
+    s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::PublicKey& addr, const cs::WalletsCache::TrustedData& wd) {
         if (addr.empty()) {
             return true;
         }

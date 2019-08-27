@@ -163,7 +163,7 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
             walletData.balance_ += feeToEachConfidant;
 
 #ifdef MONITOR_NODE
-            auto it_writer = data_.trusted_info_.find(walletData.address_);
+            auto it_writer = data_.trusted_info_.find(confidants[i]);
             it_writer->second.totalFee += feeToEachConfidant;
 #endif
 
@@ -288,7 +288,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr, cons
                     << " <- " << tr.innerID();
 
 #ifdef MONITOR_NODE        
-        setWalletTime(wallData.address_, tr.get_time());
+        setWalletTime(pubKey, tr.get_time());
 #endif
     }
 
