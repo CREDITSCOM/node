@@ -444,6 +444,7 @@ void BlockChain::removeLastBlock() {
 	--lastSequence_;
     total_transactions_count_ -= pool.transactions().size();
     removeWalletsInPoolFromCache(pool);
+    removeLastBlockFromTrxIndex(pool);
 
     emit removeBlockEvent(pool.sequence());
 
@@ -459,6 +460,30 @@ csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
         csdb::internal::WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(key.data());
         csdb::Address res = csdb::Address::from_wallet_id(id);
         return res;
+    }
+}
+
+void BlockChain::removeLastBlockFromTrxIndex(const csdb::Pool& pool) {
+    std::set<csdb::Address> uniqueAddresses;
+
+    auto lbd = [&uniqueAddresses, this](const csdb::Address& addr, cs::Sequence sq) {
+        auto key = getAddressByType(addr, AddressType::PublicKey);
+        if (uniqueAddresses.insert(key).second) {
+            std::lock_guard<decltype(dbLock_)> l(dbLock_);
+            storage_.remove_last_from_trx_index(key, sq);
+        }
+    };
+
+    for (const auto& t : pool.transactions()) {
+        lbd(t.source(), lastIndexedPool);
+        lbd(t.target(), lastIndexedPool);
+    }
+    --lastIndexedPool;
+    updateLastIndFile();
+
+    if (lastNonEmptyBlock_.poolSeq == pool.sequence()) {
+        lastNonEmptyBlock_ = previousNonEmpty_[lastNonEmptyBlock_.poolSeq];
+        previousNonEmpty_.erase(pool.sequence());
     }
 }
 
