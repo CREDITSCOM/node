@@ -465,10 +465,28 @@ csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
 
 void BlockChain::removeLastBlockFromTrxIndex(const csdb::Pool& pool) {
     std::set<csdb::Address> uniqueAddresses;
+    std::vector<std::pair<cs::PublicKey, csdb::TransactionID>> updates;
 
-    auto lbd = [&uniqueAddresses, this](const csdb::Address& addr, cs::Sequence sq) {
+    auto lbd = [&updates, &uniqueAddresses, this](const csdb::Address& addr, cs::Sequence sq) {
         auto key = getAddressByType(addr, AddressType::PublicKey);
+
         if (uniqueAddresses.insert(key).second) {
+            auto it = TransactionsIterator(*this, addr);
+            it.next();
+            bool found = false;
+
+            for (; it.isValid(); it.next()) {
+                if (it->id().pool_seq() < sq) {
+                    updates.push_back(std::make_pair(key.public_key(), it->id()));
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                updates.push_back(std::make_pair(key.public_key(),
+                                                 csdb::TransactionID(kWrongSequence, kWrongSequence)));
+            }
+
             std::lock_guard<decltype(dbLock_)> l(dbLock_);
             storage_.remove_last_from_trx_index(key, sq);
         }
@@ -484,6 +502,11 @@ void BlockChain::removeLastBlockFromTrxIndex(const csdb::Pool& pool) {
     if (lastNonEmptyBlock_.poolSeq == pool.sequence()) {
         lastNonEmptyBlock_ = previousNonEmpty_[lastNonEmptyBlock_.poolSeq];
         previousNonEmpty_.erase(pool.sequence());
+    }
+
+    if (updates.size()) {
+        std::lock_guard l(cacheMutex_);
+        walletsCacheUpdater_->updateLastTransactions(updates);
     }
 }
 
