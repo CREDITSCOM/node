@@ -115,6 +115,7 @@ public:
     }
 
     void removeWalletsInPoolFromCache(const csdb::Pool& pool);
+    void removeLastBlockFromTrxIndex(const csdb::Pool&);
     void removeLastBlock();
 
     // updates fees in every transaction

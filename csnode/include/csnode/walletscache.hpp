@@ -4,6 +4,7 @@
 #include <list>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 #include <cscrypto/cscrypto.hpp>
 #include <csdb/address.hpp>
@@ -106,6 +107,8 @@ public:
     void invokeReplenishPayableContract(const csdb::Transaction&);
     void rollbackExceededTimeoutContract(const csdb::Transaction&, const WalletsCache::RefContractCall&, const csdb::Amount& execFee = 0);
     void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx);
+
+    void updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>&);
 
     PublicKey toPublicKey(const csdb::Address&) const;
 

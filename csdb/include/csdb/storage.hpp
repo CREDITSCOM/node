@@ -227,6 +227,7 @@ public:
     // And now for something completely different
     cs::Sequence get_previous_transaction_block(const Address&, cs::Sequence) const;
     void set_previous_transaction_block(const Address&, cs::Sequence currTransBlock, cs::Sequence prevTransBlock);
+    void remove_last_from_trx_index(const Address&, cs::Sequence lastIndexed);
     void truncate_trxs_index();
 
     /**

@@ -360,6 +360,16 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr) {
     wallData.lastTransaction_ = tr.id();
 }
 
+void WalletsCache::Updater::updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>& updates) {
+    for (const auto& u : updates) {
+        auto it = std::find_if(data_.wallets_.begin(), data_.wallets_.end(), [&u](auto& wall) {
+                               return wall.first == u.first; });
+        if (it != data_.wallets_.end()) {
+            it->second.lastTransaction_ = u.second;
+        }
+    }
+}
+
 void WalletsCache::iterateOverWallets(const std::function<bool(const PublicKey&, const WalletData&)> func) {
     for (const auto& wallet : wallets_) {
         if (!func(wallet.first, wallet.second)) {
