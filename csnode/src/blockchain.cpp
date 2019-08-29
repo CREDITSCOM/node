@@ -619,7 +619,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
             csmeta(csdebug) << "The number of signatures is sufficient and all of them are OK!";
         }
         else {
-            cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
+            cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB. It will be automatically written, when we get proper data";
             return false;
         }
     }
@@ -1203,7 +1203,7 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
 
     }
     else {
-        cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB";
+        cswarning() << "Some of Pool Signatures aren't valid. The pool will not be written to DB. It will be automatically written, when we get proper data";
         return false;
     }
     return true;

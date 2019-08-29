@@ -273,6 +273,7 @@ bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
 void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
     if (size >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
+		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
         return;
     }
     const auto packEnd = pack + size;
@@ -285,6 +286,7 @@ void Transport::deliverDirect(const Packet* pack, const uint32_t size, Connectio
 void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     if (size >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
+		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
         return;
     }
     const auto packEnd = pack + size;
@@ -667,6 +669,7 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
 void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhenResend) {
     if (packNum >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
+		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << packNum;
         return;
     }
     nh_.pourByNeighbours(pack, packNum);
