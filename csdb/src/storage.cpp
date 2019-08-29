@@ -871,6 +871,10 @@ void Storage::set_previous_transaction_block(const Address& addr, cs::Sequence c
     d->db->putToTransIndex(key, os.buffer());
 }
 
+void Storage::remove_last_from_trx_index(const Address& addr, cs::Sequence lastIndexed) {
+    d->db->removeLastFromTrxIndex(get_trans_index_key(addr, lastIndexed));
+}
+
 void Storage::truncate_trxs_index() {
     d->db->truncateTransIndex();
 }

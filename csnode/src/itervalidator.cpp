@@ -153,7 +153,6 @@ void IterValidator::checkTransactionsSignatures(SolverContext& context, const Tr
 }
 
 bool IterValidator::checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction) {
-    BlockChain::WalletData data_to_fetch_pulic_key;
     csdb::Address src = transaction.source();
     // TODO: is_known_smart_contract() does not recognize not yet deployed contract, so all transactions emitted in constructor
     // currently will be rejected
@@ -164,8 +163,8 @@ bool IterValidator::checkTransactionSignature(SolverContext& context, const csdb
     }
     if (!SmartContracts::is_new_state(transaction) && !smartSourceTransaction) {
         if (src.is_wallet_id()) {
-            context.blockchain().findWalletData(src.wallet_id(), data_to_fetch_pulic_key);
-            return transaction.verify_signature(data_to_fetch_pulic_key.address_);
+            auto pub = context.blockchain().getAddressByType(src, BlockChain::AddressType::PublicKey);
+            return transaction.verify_signature(pub.public_key());
         }
         return transaction.verify_signature(src.public_key());
     }

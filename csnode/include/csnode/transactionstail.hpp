@@ -3,6 +3,8 @@
 
 #include "bitheap.hpp"
 
+#include <sstream>
+
 namespace cs {
 class TransactionsTail {
 public:
