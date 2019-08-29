@@ -2220,9 +2220,10 @@ namespace executor {
 
     void Executor::executeByteCodeMultiple(ExecuteByteCodeMultipleResult& _return, const ::general::Address& initiatorAddress, const SmartContractBinary& invokedContract,
         const std::string& method, const std::vector<std::vector<::general::Variant>>& params, const int64_t executionTime, cs::Sequence sequence) {
-        if (!connect()) {
+        if (!isConnect()) {
             _return.status.code = 1;
             _return.status.message = "No executor connection!";
+            notifyError();
             return;
         }
         const auto access_id = generateAccessId(sequence);
@@ -2584,7 +2585,8 @@ namespace executor {
         const SmartContractBinary& smartContractBinary, std::vector<MethodHeader>& methodHeader, bool isGetter, cs::Sequence explicit_sequence) {
         constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
         OriginExecuteResult originExecuteRes{};
-        if (!connect()) {
+        if (!isConnect()) {
+            notifyError();
             return std::nullopt;
         }
 
