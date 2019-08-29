@@ -13,6 +13,11 @@
 
 #ifndef __APPLE__
 #include <charconv>
+
+#ifndef __cpp_lib_to_chars
+#define LMDBXX_FP_SUPPORT   // floating point lmdbxx support (as string convertions)
+#endif
+
 #endif
 
 namespace cs {
@@ -180,8 +185,6 @@ public:
     void insert(const Key& key, const Value& value,
                 const char* name = nullptr,
                 const unsigned int flags = lmdb::dbi::default_flags) {
-        static_assert(!std::is_floating_point_v<Key> && !std::is_floating_point_v<Value>, "Floating point value does not support");
-
         decltype(auto) k = cast(key);
         decltype(auto) v = cast(value);
 
@@ -218,8 +221,6 @@ public:
     // removes key/value pair by key as data/size method entity
     template<typename Key>
     bool remove(const Key& key, const char* name = nullptr, const unsigned int flags = lmdb::dbi::default_flags) {
-        static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
-
         decltype(auto) k = cast(key);
         return remove(reinterpret_cast<const char*>(k.data()), k.size(), name, flags);
     }
@@ -244,8 +245,6 @@ public:
 
     template<typename Key>
     bool isKeyExists(const Key& key, const char* name = nullptr) const {
-        static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
-
         decltype(auto) k = cast(key);
         return isKeyExists(reinterpret_cast<const char*>(k.data()), k.size(), name);
     }
@@ -278,8 +277,6 @@ public:
     // any key with data/size methods
     template<typename T, typename Key>
     T value(const Key& key) const {
-        static_assert(!std::is_floating_point_v<Key>, "Floating point value does not support");
-
         decltype(auto) k = cast(key);
         return value<T>(reinterpret_cast<const char*>(k.data()), k.size());
     }
@@ -287,8 +284,6 @@ public:
     // returns last pair of key/value inserted to database
     template<typename Key, typename Value>
     std::pair<Key, Value> last(const char* name = nullptr) const {
-        static_assert(!std::is_floating_point_v<Key> && !std::is_floating_point_v<Value>, "Floating point value does not support");
-
         try {
             auto transaction = lmdb::txn::begin(*env_, nullptr, MDB_RDONLY);
             auto dbi = lmdb::dbi::open(transaction, name);
@@ -325,23 +320,32 @@ protected:
         emit failed(LmdbException(error));
     }
 
-    template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
+    template<typename T, typename = std::enable_if_t<(std::is_integral_v<T> || std::is_floating_point_v<T>)>>
     auto cast(const T& value) const {
 #ifndef __APPLE__
-        static std::array<char, std::numeric_limits<T>::digits10 * 2> bytes{};
-        const auto result = std::to_chars(bytes.data(), bytes.data() + bytes.size(), value);
+#ifdef  LMDBXX_FP_SUPPORT
+        if constexpr (std::is_integral_v<T>) {
+#endif
+            static std::array<char, std::numeric_limits<T>::digits10 * 2> bytes{};
+            const auto result = std::to_chars(bytes.data(), bytes.data() + bytes.size(), value);
 
-        if (result.ec != std::errc{}) {
-            return std::string_view{};
+            if (result.ec != std::errc{}) {
+                return std::string_view{};
+            }
+
+            return std::string_view(bytes.data(), result.ptr - bytes.data());
+#ifdef  LMDBXX_FP_SUPPORT
         }
-
-        return std::string_view(bytes.data(), result.ptr - bytes.data());
+        else if constexpr (std::is_floating_point_v<T>) {
+            return std::to_string(value);
+        }
+#endif
 #else
         return std::to_string(value);
 #endif
     }
 
-    template<typename T, typename = std::enable_if_t<!std::is_integral_v<T>>>
+    template<typename T, typename = std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T>>>
     const T& cast(const T& value) const {
         return value;
     }
@@ -353,11 +357,18 @@ protected:
 
     template<typename T>
     T allocateResult(const char* data, size_t size) const {
-        if constexpr (std::is_signed_v<T>) {
-            return static_cast<T>(std::stoll(std::string(data, size)));
+        static_assert (std::is_integral_v<T> || std::is_floating_point_v<T>, "Allocate result supports only integral or floating-point types");
+
+        if constexpr (std::is_integral_v<T>) {
+            if constexpr (std::is_signed_v<T>) {
+                return static_cast<T>(std::stoll(std::string(data, size)));
+            }
+            else {
+                return static_cast<T>(std::stoull(std::string(data, size)));
+            }
         }
         else {
-            return static_cast<T>(std::stoull(std::string(data, size)));
+            return static_cast<T>(std::stod(std::string(data, size)));
         }
     }
 
@@ -370,16 +381,25 @@ protected:
 
             return array;
         }
-        else if constexpr (std::is_integral_v<T>) {
+        else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) {
 #ifndef __APPLE__
-            T result = 0;
-            const auto res = std::from_chars(value.data(), value.data() + value.size(), result);
+#ifdef LMDBXX_FP_SUPPORT
+            if constexpr (std::is_integral_v<T>) {
+#endif
+                T result = 0;
+                const auto res = std::from_chars(value.data(), value.data() + value.size(), result);
 
-            if (res.ec != std::errc{}) {
+                if (res.ec != std::errc{}) {
+                    return allocateResult<T>(value.data(), value.size());
+                }
+
+                return result;
+#ifdef LMDBXX_FP_SUPPORT
+            }
+            else if constexpr (std::is_floating_point_v<T>) {
                 return allocateResult<T>(value.data(), value.size());
             }
-
-            return result;
+#endif
 #else
             return allocateResult<T>(value.data(), value.size());
 #endif
