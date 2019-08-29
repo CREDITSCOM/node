@@ -346,7 +346,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
             handleTransitions(Event::Stage3NonComplete);
             break;
         case Result::Failure:
-            cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null");
+            cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null  - Consensus state can't be completed. Trying to resolve ... ");
             removeDeferredBlock(deferredBlock_.sequence());
             handleTransitions(Event::SetNormal);
             break;
