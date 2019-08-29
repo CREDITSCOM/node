@@ -339,7 +339,9 @@ void Network::writerRoutine(const Config& config) {
         int tasks = writerTaskCount_;
         writerTaskCount_ = 0;
         writerLock.clear(std::memory_order_release);  // release lock
-
+		//if (tasks > 100) {
+		//	csinfo() << __func__ << ": got package of " << tasks << " tasks";
+		//}
         for (int i = 0; i < tasks; i++) {
             bool is_empty = false;
             auto task = oPacMan_.getNextTask(is_empty);
@@ -423,7 +425,9 @@ void Network::processorRoutine() {
         int tasks = readerTaskCount_;
         readerTaskCount_ = 0;
         readerLock.clear(std::memory_order_release);  // release lock
-
+		//if (tasks > 100) {
+		//	csinfo() << __func__ << ": got package of " << tasks << " tasks";
+		//}
         for (int i = 0; i < tasks; i++) {
             bool is_empty = false;
             auto task = iPacMan_.getNextTask(is_empty);
@@ -652,6 +656,10 @@ void Network::sendInit() {
 }
 
 void Network::registerMessage(Packet* pack, const uint32_t size) {
+	
+	if (size >= 1000) {
+		csinfo() << "Found large message, size = " << size;
+	}
     if (size >= Packet::MaxFragments) {
         cserror() << "Too much fragments in message to send (" << size << "), ignore";
         return;

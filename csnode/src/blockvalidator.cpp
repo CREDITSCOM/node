@@ -11,7 +11,7 @@ namespace cs {
 BlockValidator::BlockValidator(Node& node)
 : node_(node)
 , bc_(node_.getBlockChain())
-, wallets_(::std::make_shared<WalletsState>(node_.getBlockChain())) {
+, wallets_(::std::make_shared<WalletsState>(bc_.getCacheUpdater())) {
     plugins_.insert(std::make_pair(hashIntergrity, std::make_unique<HashValidator>(*this)));
     plugins_.insert(std::make_pair(blockNum, std::make_unique<BlockNumValidator>(*this)));
     plugins_.insert(std::make_pair(timestamp, std::make_unique<TimestampValidator>(*this)));

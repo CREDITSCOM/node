@@ -244,39 +244,53 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
 
     auto lamda = [this](const cs::StageThree& stageFrom, const cs::StageThree& stageTo) {
         const cs::Conveyer& conveyer = cs::Conveyer::instance();
-        bool somethingInvalid = false;
+        bool markedUntrusted = false;
         if (stageTo.realTrustedMask[stageFrom.sender] == cs::ConfidantConsts::InvalidConfidantIndex) {
-            cswarning() << "The node, who sent this stage was marked as untrusted";
-            somethingInvalid = true;
+            markedUntrusted = true;
         }
-
+		bool invalidBlockSignatures = false;
         if (!cscrypto::verifySignature(stageFrom.blockSignature, conveyer.confidantByIndex(stageFrom.sender), stageTo.blockHash.data(), stageTo.blockHash.size())) {
-            cswarning() << "Block Signatures are not valid ! -> ";
-            somethingInvalid = true;
+			invalidBlockSignatures = true;
         }
-
+		bool invalidRoundSignatures = false;
         if (!cscrypto::verifySignature(stageFrom.roundSignature, conveyer.confidantByIndex(stageFrom.sender), stageTo.roundHash.data(), stageTo.roundHash.size())) {
-            cswarning() << "Round Signatures are not valid !";
-            somethingInvalid = true;
+			invalidRoundSignatures = true;
         }
-
+		bool invalidTrustedSignatures = false;
         if (!cscrypto::verifySignature(stageFrom.trustedSignature, conveyer.confidantByIndex(stageFrom.sender), stageTo.trustedHash.data(), stageTo.trustedHash.size())) {
-            cswarning() << "Trusted Signatures are not valid !";
-            somethingInvalid = true;
+			invalidTrustedSignatures = true;
         }
-
+		bool invalidRealTrustedMask = false;
         if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask) || stageTo.realTrustedMask[stageFrom.sender] == cs::ConfidantConsts::InvalidConfidantIndex) {
-            cswarning() << "Real Trusted are not valid !";
-            somethingInvalid = true;
+			invalidRealTrustedMask = true;
         }
-
+		bool invalidWriter = false;
         if (!(stageFrom.writer == stageTo.writer)) {
-            cswarning() << "Writer is not valid !";
-            somethingInvalid = true;
+			invalidWriter = true;
         }
 
-        if (somethingInvalid) {
+        if (markedUntrusted || invalidBlockSignatures || invalidRoundSignatures || invalidTrustedSignatures || invalidRealTrustedMask || invalidWriter){
+			cswarning() << "Stage3 from T[" << static_cast<int>(stageFrom.sender) << "] - final check ... NOT PASSED! This problem will be resolved automatically.";
+			csdebug() << "The stage below has next problems:";
+			if (markedUntrusted) {
+				csdebug() << "--> The node, that sent this stage was marked as untrusted";
+			}
             if (stageTo.realTrustedMask[stageFrom.sender] != cs::ConfidantConsts::InvalidConfidantIndex) {
+				if (invalidBlockSignatures) {
+					csdebug() << "--> Block Signatures are not valid";
+				}
+				if (invalidRoundSignatures) {
+					csdebug() << "--> Round Signatures are not valid.";
+				}
+				if (invalidTrustedSignatures) {
+					csdebug() << "--> Trusted Signatures are not valid.";
+				}
+				if (invalidRealTrustedMask) {
+					csdebug() << "--> Real Trusted are not valid.";
+				}
+				if (invalidWriter) {
+					csdebug() << "--> Writer is not valid.";
+				}
                 csdebug() << cs::StageThree::toString(stageFrom);
                 realTrustedSetValue(stageFrom.sender, cs::ConfidantConsts::InvalidConfidantIndex);
             }
@@ -288,7 +302,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
         //}
         trueStageThreeStorage.emplace_back(stageFrom);
         addRoundSignature(stageFrom);
-        csdebug() << "Stage3 [" << static_cast<int>(stageFrom.sender) << "] - signatures are OK";
+        csdebug() << "Stage3 from T[" << static_cast<int>(stageFrom.sender) << "] - final check ... passed!";
     };
 
     switch (flagg) {
@@ -332,7 +346,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
             handleTransitions(Event::Stage3NonComplete);
             break;
         case Result::Failure:
-            cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null");
+            cserror() << "SolverCore: error in state " << (pstate ? pstate->name() : "null  - Consensus state can't be completed. Trying to resolve ... ");
             removeDeferredBlock(deferredBlock_.sequence());
             handleTransitions(Event::SetNormal);
             break;

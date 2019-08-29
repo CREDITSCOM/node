@@ -497,6 +497,24 @@ bool DatabaseBerkeleyDB::putToTransIndex(const cs::Bytes &key, const cs::Bytes &
     return true;
 }
 
+bool DatabaseBerkeleyDB::removeLastFromTrxIndex(const cs::Bytes &key) {
+    if (!db_trans_idx_) {
+        set_last_error(NotOpen);
+        return false;
+    }
+
+    Dbt_copy<cs::Bytes> db_key(key);
+
+    int status = db_trans_idx_->del(nullptr, &db_key, 0);
+    if (status != 0) {
+        set_last_error_from_berkeleydb(status);
+        return false;
+    }
+
+    set_last_error();
+    return true;
+}
+
 bool DatabaseBerkeleyDB::getFromTransIndex(const cs::Bytes &key, cs::Bytes *value) {
     if (!db_trans_idx_) {
         set_last_error(NotOpen);

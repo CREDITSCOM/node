@@ -112,96 +112,90 @@ public:  // wrappers
         const std::string& method, const std::vector<std::vector<::general::Variant>>& params, const int64_t executionTime, cs::Sequence sequence);
 
     void getContractMethods(GetContractMethodsResult& _return, const std::vector<::general::ByteCodeObject>& byteCodeObjects) {
-        if (!connect()) {
-            _return.status.code = 1;
-            _return.status.message = "No executor connection!";
-            return;
-        }
         try {
             std::shared_lock lock(sharedErrorMutex_);
             origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
         }
-        catch (::apache::thrift::transport::TTransportException & x) {
+        catch (const ::apache::thrift::transport::TTransportException& x) {
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-                reCreationOriginExecutor();
+                recreateOriginExecutor();
+                notifyError();
             }
+
             _return.status.code = 1;
             _return.status.message = x.what();
         }
-        catch( std::exception & x ) {
+        catch(const std::exception& x ) {
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
-        disconnect();
     }
 
     void getContractVariables(GetContractVariablesResult& _return, const std::vector<::general::ByteCodeObject>& byteCodeObjects, const std::string& contractState) {
-        if (!connect()) {
-            _return.status.code = 1;
-            _return.status.message = "No executor connection!";
-            return;
-        }
         try {
             std::shared_lock lock(sharedErrorMutex_);
             origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
         }
-        catch (::apache::thrift::transport::TTransportException & x) {
+        catch (const ::apache::thrift::transport::TTransportException& x) {
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-                reCreationOriginExecutor();
+                recreateOriginExecutor();
+                notifyError();
             }
+
             _return.status.code = 1;
             _return.status.message = x.what();
         }
-        catch( std::exception & x ) {
+        catch(const std::exception& x ) {
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
-        disconnect();
     }
 
     void compileSourceCode(CompileSourceCodeResult& _return, const std::string& sourceCode) {
-        if (!connect()) {
-            _return.status.code = 1;
-            _return.status.message = "No executor connection!";
-            return;
-        }
         try {
             std::shared_lock slk(sharedErrorMutex_);
             origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
         }
-        catch (::apache::thrift::transport::TTransportException & x) {
+        catch (::apache::thrift::transport::TTransportException& x) {
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-                reCreationOriginExecutor();
+                recreateOriginExecutor();
+                notifyError();
             }
+
             _return.status.code = 1;
             _return.status.message = x.what();
         }
-        catch( std::exception & x ) {
+        catch(const std::exception& x ) {
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
-        disconnect();
     }
 
 public:
-
-    ~Executor() {
-        stop();
-    }
-
     static Executor& getInstance(const BlockChain* p_blockchain = nullptr, const cs::SolverCore* solver = nullptr, const int p_exec_port = 0,
         const std::string p_exec_ip = std::string{}, const std::string p_exec_cmdline = std::string{}) {  // singlton
         static Executor executor(*p_blockchain, *solver, p_exec_port, p_exec_ip, p_exec_cmdline);
         return executor;
     }
 
+    bool isConnect() const {
+        return executorTransport_->isOpen();
+    }
+
     void stop() {
         requestStop_ = true;
+
         // wake up watching thread if it sleeps
-        cvErrorConnect_.notify_one();
+        notifyError();
     }
 
     std::optional<cs::Sequence> getSequence(const general::AccessID& accessId) {
@@ -353,7 +347,7 @@ public:
         csdb::Transaction send_transaction;
         const auto source = BlockChain::getAddressFromKey(transaction.source);
         const uint64_t WALLET_DENOM = csdb::Amount::AMOUNT_MAX_FRACTION;  // 1'000'000'000'000'000'000ull;
-        send_transaction.set_amount(csdb::Amount(transaction.amount.integral, transaction.amount.fraction, WALLET_DENOM));
+        send_transaction.set_amount(csdb::Amount(transaction.amount.integral, uint64_t(transaction.amount.fraction), WALLET_DENOM));
         BlockChain::WalletData wallData{};
         BlockChain::WalletId id{};
 
@@ -363,7 +357,7 @@ public:
         send_transaction.set_currency(csdb::Currency(1));
         send_transaction.set_source(source);
         send_transaction.set_target(BlockChain::getAddressFromKey(transaction.target));
-        send_transaction.set_max_fee(csdb::AmountCommission((uint16_t)transaction.fee.commission));
+        send_transaction.set_max_fee(csdb::AmountCommission(uint16_t(transaction.fee.commission)));
         send_transaction.set_innerID(transaction.id & 0x3fffffffffff);
 
         // TODO Change Thrift to avoid copy
@@ -374,10 +368,6 @@ public:
             signature.fill(0);
         send_transaction.set_signature(signature);
         return send_transaction;
-    }
-
-    bool isConnect() {
-        return isConnect_;
     }
 
     void state_update(const csdb::Pool& pool);
@@ -424,48 +414,83 @@ public slots:
         state_update(block);
     }
 
+    void onExecutorStarted() {
+        if (!isConnect()) {
+            connect();
+        }
+    }
+
+    void onExecutorFinished() {
+        if (!executorProcess_->isRunning() && !requestStop_) {
+            executorProcess_->launch(cs::Process::Options::None);
+        }
+    }
+
+    void onExecutorProcessError(const cs::ProcessException& exception) {
+        cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
+    }
+
 private:
     std::map<general::Address, general::AccessID> lockSmarts;
     explicit Executor(const BlockChain& p_blockchain, const cs::SolverCore& solver, int p_exec_port,
-        const std::string p_exec_ip, const std::string p_exec_cmdline)
+        const std::string& p_exec_ip, const std::string& p_exec_cmdline)
     : blockchain_(p_blockchain)
     , solver_(solver)
-    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
-        ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(p_exec_ip, p_exec_port)))
+    , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(p_exec_ip, p_exec_port))
+    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
     , origExecutor_(
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
-        std::thread th([=]() {
-            std::string executor_cmdline = p_exec_cmdline;
-            std::unique_ptr<cs::Process> executor_process;
-            if(!executor_cmdline.empty()) {
-                executor_process = std::make_unique<cs::Process>(executor_cmdline);
-                executor_process->launch(cs::Process::Options::None);
-            }
-            while (true) {
-                if (isConnect_) {
-                    static std::mutex mt;
-                    std::unique_lock ulk(mt);
-                    cvErrorConnect_.wait(ulk, [&] { return !isConnect_ || requestStop_; });
+        std::string executorCmdline = p_exec_cmdline;
+
+        socket_->setSendTimeout(kSendTimeout);
+        socket_->setRecvTimeout(kReceiveTimeout);
+
+        if (executorCmdline.empty()) {
+            cswarning() << "Executor command line args are empty, process would not be created";
+            return;
+        }
+
+        executorProcess_ = std::make_unique<cs::Process>(executorCmdline);
+
+        cs::Connector::connect(&executorProcess_->started, this, &Executor::onExecutorStarted);
+        cs::Connector::connect(&executorProcess_->finished, this, &Executor::onExecutorFinished);
+        cs::Connector::connect(&executorProcess_->errorOccured, this, &Executor::onExecutorProcessError);
+
+        executorProcess_->launch(cs::Process::Options::None);
+        while (!executorProcess_->isRunning());
+
+        std::thread thread([this]() {
+            while(!requestStop_) {
+                if (isConnect()) {
+                    static std::mutex mutex;
+                    std::unique_lock lock(mutex);
+
+                    cvErrorConnect_.wait(lock, [&] {
+                        return !isConnect() || requestStop_;
+                    });
                 }
 
-                if (requestStop_) {
-                    break;
+                static const int kReconnectTime = 2;
+                std::this_thread::sleep_for(std::chrono::seconds(kReconnectTime));
+
+                if (!isConnect()) {
+                    connect();
                 }
-                static const int RECONNECT_TIME = 10;
-                std::this_thread::sleep_for(std::chrono::seconds(RECONNECT_TIME));
-                if (!executor_process || executor_process->isRunning()) {
-                    if (connect())
-                        disconnect();
-                }
-                else {
-                    executor_process->launch(cs::Process::Options::None);
-                }
-            }
-            if (executor_process) {
-                executor_process->terminate();
             }
         });
-        th.detach();
+
+        thread.detach();
+    }
+
+    ~Executor() {
+        stop();
+
+        if (executorProcess_) {
+            if (executorProcess_->isRunning()) {
+                disconnect();
+                executorProcess_->terminate();
+            }
+        }
     }
 
     struct OriginExecuteResult {
@@ -480,11 +505,11 @@ private:
         std::lock_guard lk(mutex_);
         ++lastAccessId_;
         accessSequence_[lastAccessId_] = (explicit_sequence != kUseLastSequence ? explicit_sequence : blockchain_.getLastSeq());
-        return lastAccessId_;
+        return static_cast<uint64_t>(lastAccessId_);
     }
 
     uint64_t getFutureAccessId() {
-        return lastAccessId_ + 1;
+        return static_cast<uint64_t>(lastAccessId_ + 1);
     }
 
     void deleteAccessId(const general::AccessID& p_access_id) {
@@ -498,18 +523,13 @@ private:
 
     bool connect() {
         try {
-            if (executorTransport_->isOpen()) {
-                executorTransport_->close();
-            }
-
             executorTransport_->open();
-            isConnect_ = true;
         }
         catch (...) {
-            isConnect_ = false;
-            cvErrorConnect_.notify_one();
+            notifyError();
         }
-        return isConnect_;
+
+        return executorTransport_->isOpen();
     }
 
     void disconnect() {
@@ -517,17 +537,22 @@ private:
             executorTransport_->close();
         }
         catch (::apache::thrift::transport::TTransportException&) {
-            isConnect_ = false;
-            cvErrorConnect_.notify_one();
+            notifyError();
         }
+    }
+
+    void notifyError() {
+        cvErrorConnect_.notify_one();
     }
 
     //
     using OriginExecutor = executor::ContractExecutorConcurrentClient;
     using BinaryProtocol = apache::thrift::protocol::TBinaryProtocol;
     std::shared_mutex sharedErrorMutex_;
-    void reCreationOriginExecutor() {
-        std::lock_guard glk(sharedErrorMutex_);
+
+    void recreateOriginExecutor() {
+        std::lock_guard lock(sharedErrorMutex_);
+        disconnect();
         origExecutor_.reset(new OriginExecutor(::apache::thrift::stdcxx::make_shared<BinaryProtocol>(executorTransport_)));
     }
     //
@@ -535,8 +560,12 @@ private:
 private:
     const BlockChain& blockchain_;
     const cs::SolverCore& solver_;
+
+    ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TSocket> socket_;
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executorTransport_;
+
     std::unique_ptr<executor::ContractExecutorConcurrentClient> origExecutor_;
+    std::unique_ptr<cs::Process> executorProcess_;
 
     general::AccessID lastAccessId_{};
     std::map<general::AccessID, cs::Sequence> accessSequence_;
@@ -549,9 +578,13 @@ private:
     std::atomic_size_t execCount_{0};
 
     std::condition_variable cvErrorConnect_;
-    std::atomic_bool isConnect_{ false };
     std::atomic_bool requestStop_{ false };
-    const uint16_t EXECUTOR_VERSION = 2;
+
+    const int16_t EXECUTOR_VERSION = 2;
+
+    // timeout in ms
+    const int kSendTimeout = 4000;
+    const int kReceiveTimeout = 4000;
 
     // temporary solution?
     std::mutex callExecutorLock_;

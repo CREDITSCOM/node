@@ -292,8 +292,8 @@ void TokensMaster::updateTokenChaches(const csdb::Address& addr, const std::stri
                 [&retBalance](const std::string& balance) { retBalance = balance; });
 
             if (!std::all_of(retBalance.begin(), retBalance.end(), [](char ch) { return (isdigit(ch) || ch == '.'); })) {
+                csdebug() << "executor returns balance as " << retBalance;
                 retBalance = "0";
-                cserror() << "executor return text balance!";
             }
             return retBalance;
         };
