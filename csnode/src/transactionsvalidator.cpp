@@ -127,8 +127,8 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
                         ok = true;
                         payableMaxFees_.insert(std::make_pair(smarts.absolute_address(initTransaction.source()), leftFromMaxFee));
                     }
+                    break;
                 }
-                break;
             }
             if (!ok) {
                 cslog() << kLogPrefix << __func__ << ": reject contract emitted transaction, new_state not found in block";
