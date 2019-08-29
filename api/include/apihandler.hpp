@@ -436,11 +436,14 @@ private:
         const std::string& p_exec_ip, const std::string& p_exec_cmdline)
     : blockchain_(p_blockchain)
     , solver_(solver)
-    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
-        ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(p_exec_ip, p_exec_port)))
+    , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(p_exec_ip, p_exec_port))
+    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
     , origExecutor_(
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
         std::string executorCmdline = p_exec_cmdline;
+
+        socket_->setSendTimeout(kSendTimeout);
+        socket_->setRecvTimeout(kReceiveTimeout);
 
         if (executorCmdline.empty()) {
             cswarning() << "Executor command line args are empty, process would not be created";
@@ -561,7 +564,10 @@ private:
 private:
     const BlockChain& blockchain_;
     const cs::SolverCore& solver_;
+
+    ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TSocket> socket_;
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executorTransport_;
+
     std::unique_ptr<executor::ContractExecutorConcurrentClient> origExecutor_;
     std::unique_ptr<cs::Process> executorProcess_;
 
@@ -577,7 +583,12 @@ private:
 
     std::condition_variable cvErrorConnect_;
     std::atomic_bool requestStop_{ false };
+
     const int16_t EXECUTOR_VERSION = 2;
+
+    // timeout in ms
+    const int kSendTimeout = 4000;
+    const int kReceiveTimeout = 4000;
 
     // temporary solution?
     std::mutex callExecutorLock_;

@@ -70,13 +70,11 @@ bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, con
         rejectedNewStates_.push_back(smarts.absolute_address(trx.source()));
         return false;
     }
-    WalletsState::WalletId initTrxId{};
-    WalletsState::WalletData& initTrxWallState = walletsState_.getData(initTransaction.source(), initTrxId);
+    WalletsState::WalletData& initTrxWallState = walletsState_.getData(initTransaction.source());
     csdb::Amount newBalance = initTrxWallState.balance_ + csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double()) -
                               trx.amount() - feeForExecution - csdb::Amount(trx.counted_fee().to_double());
 
     initTrxWallState.balance_ = newBalance;
-    walletsState_.setModified(initTrxId);
 
     if (initTrxWallState.balance_ < zeroBalance_) {
         cslog() << kLogPrefix << __func__ << ": reject new_state transaction, initier is out of funds";
@@ -155,9 +153,7 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
 
 bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, const Transactions& trxs, size_t trxInd) {
     const auto& trx = trxs[trxInd];
-    WalletsState::WalletId walletId{};
-    WalletsState::WalletData& wallState = walletsState_.getData(trx.source(), walletId);
-    walletsState_.setModified(walletId);
+    WalletsState::WalletData& wallState = walletsState_.getData(trx.source());
 
     if (!wallState.trxTail_.isAllowed(trx.innerID())) {
         csdebug() << kLogPrefix << "reject transaction, duplicated or incorrect innerID " << trx.innerID() << ", allowed " << wallState.trxTail_.printRange();
@@ -198,12 +194,10 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
 }
 
 bool TransactionsValidator::validateTransactionAsTarget(const csdb::Transaction& trx) {
-    WalletsState::WalletId walletId{};
-    WalletsState::WalletData& wallState = walletsState_.getData(trx.target(), walletId);
+    WalletsState::WalletData& wallState = walletsState_.getData(trx.target());
 
     wallState.balance_ = wallState.balance_ + trx.amount();
 
-    walletsState_.setModified(walletId);
     return true;
 }
 
@@ -218,8 +212,7 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
 
     for (const auto& t : trxs) {
         if (i < maskSize && smarts.is_known_smart_contract(t.source()) && !SmartContracts::is_new_state(t)) {
-            WalletsState::WalletId id{};
-            WalletsState::WalletData& wallState = walletsState_.getData(t.source(), id);
+            WalletsState::WalletData& wallState = walletsState_.getData(t.source());
             if (wallState.balance_ < zeroBalance_) {
                 rejectedSmarts.push_back(std::make_pair(t, i));
             }
@@ -235,8 +228,7 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
         auto it = std::find_if(rejectedSmarts.cbegin(), rejectedSmarts.cend(),
                                [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == smarts.absolute_address(initTransaction.target())); });
         if (it != rejectedSmarts.end()) {
-            WalletsState::WalletId walletId{};
-            WalletsState::WalletData& wallState = walletsState_.getData(it->first.source(), walletId);
+            WalletsState::WalletData& wallState = walletsState_.getData(it->first.source());
             wallState.balance_ += initTransaction.amount();
             if (wallState.balance_ >= zeroBalance_) {
                 restoredCounter += makeSmartsValid(context, rejectedSmarts, it->first.source(), maskIncluded);
@@ -257,12 +249,10 @@ size_t TransactionsValidator::makeSmartsValid(SolverContext& context, RejectedSm
             ++restoredCounter;
             csdetails() << kLogPrefix << "balance of transation[" << smarts[i].second << "] source is replenished by other transaction";
 
-            WalletsState::WalletId walletId{};
-            WalletsState::WalletData& wallState = walletsState_.getData(smarts[i].first.source(), walletId);
+            WalletsState::WalletData& wallState = walletsState_.getData(smarts[i].first.source());
             wallState.trxTail_.push(smarts[i].first.innerID());
             trxList_[smarts[i].second] = wallState.lastTrxInd_;
             wallState.lastTrxInd_ = static_cast<decltype(wallState.lastTrxInd_)>(smarts[i].second);
-            walletsState_.setModified(walletId);
         }
     }
     return restoredCounter;
@@ -322,8 +312,7 @@ bool TransactionsValidator::removeTransactions_PositiveOne(SolverContext& contex
             continue;
         }
 
-        WalletsState::WalletId walletId{};
-        Node& destNode = walletsState_.getData(trx.target(), walletId);
+        Node& destNode = walletsState_.getData(trx.target());
 
         const bool isTrxPositive = (trx.amount() <= destNode.balance_);
 
@@ -363,8 +352,7 @@ bool TransactionsValidator::removeTransactions_PositiveAll(SolverContext& contex
     for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext) {
         const csdb::Transaction& trx = trxs[trxInd];
 
-        WalletsState::WalletId walletId{};
-        Node& destNode = walletsState_.getData(trx.target(), walletId);
+        Node& destNode = walletsState_.getData(trx.target());
         const bool isTrxPositive = (trx.amount() <= destNode.balance_);
 
         if (!isTrxPositive) {
@@ -418,8 +406,7 @@ bool TransactionsValidator::removeTransactions_NegativeOne(SolverContext& contex
             continue;
         }
 
-        WalletsState::WalletId walletId{};
-        Node& destNode = walletsState_.getData(trx.target(), walletId);
+        Node& destNode = walletsState_.getData(trx.target());
 
         maskIncluded[trxInd] = kInvalidMarker;
 
@@ -454,8 +441,7 @@ bool TransactionsValidator::removeTransactions_NegativeAll(SolverContext& contex
     for (TransactionIndex trxInd = *prevNext; trxInd != WalletsState::noInd_; trxInd = *prevNext) {
         const csdb::Transaction& trx = trxs[trxInd];
 
-        WalletsState::WalletId walletId{};
-        Node& destNode = walletsState_.getData(trx.target(), walletId);
+        Node& destNode = walletsState_.getData(trx.target());
 
         maskIncluded[trxInd] = kInvalidMarker;
 

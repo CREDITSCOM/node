@@ -88,7 +88,7 @@ SolverCore::SolverCore(Node* pNode, csdb::Address GenesisAddress, csdb::Address 
     addr_start = StartAddress;
     pnode = pNode;
     auto& bc = pNode->getBlockChain();
-    pws = std::make_unique<cs::WalletsState>(bc);
+    pws = std::make_unique<cs::WalletsState>(bc.getCacheUpdater());
     psmarts = std::make_unique<cs::SmartContracts>(bc, scheduler);
 }
 
