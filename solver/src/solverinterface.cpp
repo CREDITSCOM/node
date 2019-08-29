@@ -262,7 +262,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
         }
 		bool invalidRealTrustedMask = false;
         if (!(stageFrom.realTrustedMask == stageTo.realTrustedMask) || stageTo.realTrustedMask[stageFrom.sender] == cs::ConfidantConsts::InvalidConfidantIndex) {
-			bool invalidRealTrustedMask = false;
+			invalidRealTrustedMask = true;
         }
 		bool invalidWriter = false;
         if (!(stageFrom.writer == stageTo.writer)) {
