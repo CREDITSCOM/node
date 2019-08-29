@@ -665,9 +665,13 @@ public:
         return executor_;
     }
 
+    bool isBDLoaded() { return isBDLoaded_; }
+    
 private:
     ::csstats::AllStats stats_;
     executor::Executor& executor_;
+
+    bool isBDLoaded_{ false };
 
     struct smart_trxns_queue {
         cs::SpinLock lock{ATOMIC_FLAG_INIT};
@@ -784,7 +788,7 @@ private:
 
     std::optional<std::string> checkTransaction(const ::api::Transaction&);
 
-    TokensMaster tm;
+    TokensMaster tm_;
 
     const uint8_t ERROR_CODE = 1;
 
