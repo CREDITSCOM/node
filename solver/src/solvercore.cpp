@@ -446,12 +446,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     const auto lastHashBin = deferredBlock_.hash().to_binary();
 
     std::copy(lastHashBin.cbegin(), lastHashBin.cend(), stage3.blockHash.begin());
-	if (stage3.sender == 1 && conveyer.currentRoundNumber() > 10) {
-		stage3.blockSignature = Zero::signature;
-	}
-	else {
-		stage3.blockSignature = cscrypto::generateSignature(private_key, stage3.blockHash.data(), stage3.blockHash.size());
-	}
+	stage3.blockSignature = cscrypto::generateSignature(private_key, stage3.blockHash.data(), stage3.blockHash.size());
 
 
     //pnode->prepareRoundTable(table, poolMetaInfo, stage3);
