@@ -470,7 +470,7 @@ private:
                     });
                 }
 
-                static const int kReconnectTime = 5;
+                static const int kReconnectTime = 2;
                 std::this_thread::sleep_for(std::chrono::seconds(kReconnectTime));
 
                 if (!isConnect()) {
@@ -523,10 +523,6 @@ private:
 
     bool connect() {
         try {
-            if (executorTransport_->isOpen()) {
-                executorTransport_->close();
-            }
-
             executorTransport_->open();
         }
         catch (...) {

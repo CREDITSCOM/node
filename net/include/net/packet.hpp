@@ -282,7 +282,7 @@ public:
         return packetSize;
     }
 
-    // returns true if is not fragmented or has valid fragmebtation data
+    // returns true if is not fragmented or has valid fragmentation data
     bool hasValidFragmentation() const {
         if (isFragmented()) {
             const auto fragment = getFragmentId();
