@@ -94,10 +94,6 @@ class SolverCore;
 class SmartContracts;
 }
 
-namespace csconnector {
-struct Config;
-}
-
 namespace executor {
 class APIResponse;
 class ContractExecutorConcurrentClient;
@@ -482,8 +478,8 @@ private:
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
         std::string executorCmdline = config_.getApiSettings().executorCmdLine;
 
-        socket_->setSendTimeout(kSendTimeout);
-        socket_->setRecvTimeout(kReceiveTimeout);
+        socket_->setSendTimeout(config_.getApiSettings().executorSendTimeout);
+        socket_->setRecvTimeout(config_.getApiSettings().executorReceiveTimeout);
 
         if (executorCmdline.empty()) {
             cswarning() << "Executor command line args are empty, process would not be created";
@@ -627,10 +623,6 @@ private:
 
     const int16_t EXECUTOR_VERSION = 2;
 
-    // timeout in ms
-    int kSendTimeout = 0;
-    int kReceiveTimeout = 0;
-
     // temporary solution?
     std::mutex callExecutorLock_;
 };
@@ -638,7 +630,7 @@ private:
 namespace apiexec {
 class APIEXECHandler : public APIEXECNull, public APIHandlerBase {
 public:
-    explicit APIEXECHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const csconnector::Config& config);
+    explicit APIEXECHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
     APIEXECHandler(const APIEXECHandler&) = delete;
     void GetSeed(apiexec::GetSeedResult& _return, const general::AccessID accessId) override;
     void SendTransaction(apiexec::SendTransactionResult& _return, const general::AccessID accessId, const api::Transaction& transaction) override;
@@ -667,7 +659,7 @@ public:
 
 class APIHandler : public APIHandlerInterface {
 public:
-    explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const csconnector::Config& config);
+    explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
     ~APIHandler() override;
 
     APIHandler(const APIHandler&) = delete;

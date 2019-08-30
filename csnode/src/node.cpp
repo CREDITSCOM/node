@@ -77,11 +77,11 @@ Node::~Node() {
 bool Node::init(const Config& config) {
 #ifdef NODE_API
     std::cout << "Init API... ";
-    const auto& settings = config.getApiSettings();
-    api_ = std::make_unique<csconnector::connector>(
-        blockChain_, solver_,
-        csconnector::Config{settings.port, settings.ajaxPort, settings.executorPort, settings.apiexecPort, settings.executorCmdLine });
+
+    api_ = std::make_unique<csconnector::connector>(blockChain_, solver_, config);
+
     std::cout << "Done\n";
+
     cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
 #endif  // NODE_API
