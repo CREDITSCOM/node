@@ -48,7 +48,7 @@ Node::Node(const Config& config)
     poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
     executor::ExecutorSettings::set(cs::makeReference(blockChain_),
-                                    cs::makeReference(*solver_),
+                                    cs::makeReference(solver_),
                                     cs::makeReference(config));
 
     auto& executor = executor::Executor::getInstance();
