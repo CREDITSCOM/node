@@ -517,7 +517,7 @@ private:
                     break;
                 }
 
-                static const int kReconnectTime = 5;
+                static const int kReconnectTime = 2;
                 std::this_thread::sleep_for(std::chrono::seconds(kReconnectTime));
 
                 if (!isConnected()) {
@@ -563,10 +563,6 @@ private:
 
     bool connect() {
         try {
-            if (executorTransport_->isOpen()) {
-                executorTransport_->close();
-            }
-
             executorTransport_->open();
         }
         catch (...) {
@@ -739,9 +735,13 @@ public:
         return executor_;
     }
 
+    bool isBDLoaded() { return isBDLoaded_; }
+    
 private:
     ::csstats::AllStats stats_;
     executor::Executor& executor_;
+
+    bool isBDLoaded_{ false };
 
     struct smart_trxns_queue {
         cs::SpinLock lock{ATOMIC_FLAG_INIT};
@@ -858,7 +858,7 @@ private:
 
     std::optional<std::string> checkTransaction(const ::api::Transaction&);
 
-    TokensMaster tm;
+    TokensMaster tm_;
 
     const uint8_t ERROR_CODE = 1;
 
