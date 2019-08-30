@@ -29,7 +29,7 @@ void RoundStat::onRoundStart(RoundNumber round) {
         if (round > node_start_round) {
             cnt_r = round - node_start_round;
         }
-        auto ave_round_ms = totalDurationMs_ / cnt_r;
+        ave_round_ms = totalDurationMs_ / cnt_r;
 
         // shortest_rounds.insert(last_round_ms);
         // longest_rounds.insert(last_round_ms);
@@ -74,5 +74,10 @@ void RoundStat::onReadBlock(csdb::Pool block, bool* /*should_stop*/) {
 void RoundStat::onStoreBlock(csdb::Pool block) {
     totalAcceptedTransactions_ += block.transactions_count();
 }
+
+size_t RoundStat::getAveTime() {
+    return ave_round_ms;
+}
+
 
 }  // namespace cs
