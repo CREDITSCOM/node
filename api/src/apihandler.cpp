@@ -1,6 +1,7 @@
 #include <apihandler.hpp>
 
 #include <csnode/conveyer.hpp>
+#include <csnode/transactionsiterator.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 #include <solver/smartcontracts.hpp>
@@ -18,14 +19,14 @@ inline int64_t limitPage(int64_t value) {
     return std::clamp(value, int64_t(0), int64_t(100));
 }
 
-apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& solver, executor::Executor& executor, const csconnector::Config& config)
+apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& solver, executor::Executor& executor, const Config& config)
 : executor_(executor)
 , blockchain_(blockchain)
 , solver_(solver) {
     csunused(config);
 }
 
-APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const csconnector::Config&)
+APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config&)
 : executor_(executor)
 , s_blockchain(blockchain)
 , solver(_solver)
@@ -1502,7 +1503,7 @@ void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensM
 
 void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)> func) {
     std::list<csdb::TransactionID> l_id;
-    for (auto trIt = TransactionsIterator(s_blockchain, addr); trIt.isValid(); trIt.next()) {
+    for (auto trIt = cs::TransactionsIterator(s_blockchain, addr); trIt.isValid(); trIt.next()) {
         if (is_smart_state(*trIt)) {
             cs::SmartContractRef smart_ref;
             smart_ref.from_user_field(trIt->user_field(cs::trx_uf::new_state::RefStart));
@@ -2210,7 +2211,7 @@ namespace executor {
 
     void Executor::executeByteCodeMultiple(ExecuteByteCodeMultipleResult& _return, const ::general::Address& initiatorAddress, const SmartContractBinary& invokedContract,
         const std::string& method, const std::vector<std::vector<::general::Variant>>& params, const int64_t executionTime, cs::Sequence sequence) {
-        if (!isConnect()) {
+        if (!isConnected()) {
             _return.status.code = 1;
             _return.status.message = "No executor connection!";
             notifyError();
@@ -2575,7 +2576,7 @@ namespace executor {
         const SmartContractBinary& smartContractBinary, std::vector<MethodHeader>& methodHeader, bool isGetter, cs::Sequence explicit_sequence) {
         constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
         OriginExecuteResult originExecuteRes{};
-        if (!isConnect()) {
+        if (!isConnected()) {
             notifyError();
             return std::nullopt;
         }

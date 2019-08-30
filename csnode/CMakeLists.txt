@@ -48,6 +48,7 @@ add_library(csnode
   include/csnode/conveyer.hpp
   include/csnode/transactionspacket.hpp
   include/csnode/transactionstail.hpp
+  include/csnode/transactionsiterator.hpp
   include/csnode/walletscache.hpp
   include/csnode/walletsids.hpp
   include/csnode/walletspools.hpp
@@ -77,6 +78,7 @@ add_library(csnode
   src/poolsynchronizer.cpp
   src/fee.cpp
   src/transactionsvalidator.cpp
+  src/transactionsiterator.cpp
   src/walletsstate.cpp
   src/roundstat.cpp
   src/confirmationlist.cpp
