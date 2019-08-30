@@ -36,7 +36,7 @@ private:
 
     std::reference_wrapper<T> reference_;
 
-    template<typename T>
+    template<typename K>
     friend class Reference;
 };
 
