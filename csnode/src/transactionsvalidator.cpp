@@ -126,8 +126,8 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
                         }
                         ok = true;
                         payableMaxFees_.insert(std::make_pair(smarts.absolute_address(initTransaction.source()), leftFromMaxFee));
+                        break;
                     }
-                    break;
                 }
             }
             if (!ok) {
