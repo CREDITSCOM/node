@@ -1,15 +1,14 @@
 #include <csnode/transactionsiterator.hpp>
 
-#include <csdb/address.hpp>
-#include <csdb/pool.hpp>
-#include <csdb/transaction.hpp>
 #include <csnode/blockchain.hpp>
+#include <lib/system/logger.hpp>
 
 namespace cs {
 
 TransactionsIterator::TransactionsIterator(BlockChain& bc,
                                            const csdb::Address& addr)
-        : bc_(bc) , addr_(addr) {
+        : bc_(bc),
+          addr_(bc_.getAddressByType(addr, BlockChain::AddressType::PublicKey)) {
     setFromTransId(bc_.getLastTransaction(addr));
 }
 
@@ -37,8 +36,20 @@ void TransactionsIterator::next() {
     }
 
     if (it_ == lapoo_.transactions().rend()) {
+    // no more transactions in lapoo_ with addr_
+    // load previous pool from blockchain
         auto ps = bc_.getPreviousPoolSeq(addr_, lapoo_.sequence());
         lapoo_ = bc_.loadBlock(ps);
+
+        while (lapoo_.is_valid() && !lapoo_.transactions_count()) {
+        // case of inconsistent index.db
+            cserror() << "TransactionsIterator: "
+                      << "Empty pool in transactions index detected: "
+                      << "sequence is " << lapoo_.sequence()
+                      << " , address is " << addr_.to_string();
+            ps = bc_.getPreviousPoolSeq(addr_, lapoo_.sequence());
+            lapoo_ = bc_.loadBlock(ps);
+        }
 
         if (lapoo_.is_valid()) {
             it_ = lapoo_.transactions().rbegin();
