@@ -159,6 +159,11 @@ inline std::ostream& operator<<(std::ostream& os, const FormatRef& format) {
     return os;
 }
 
+inline std::ostream& operator <<(std::ostream& os, const csdb::TransactionID& tid) {
+    os << FormatRef(tid.pool_seq(), (uint32_t)tid.index());
+    return os;
+}
+
 struct SmartContractRef {
     // block hash
     csdb::PoolHash hash;
@@ -288,7 +293,7 @@ using SmartContractExecutedSignal = cs::Signal<void(cs::TransactionsPacket)>;
 
 // to inform subscribed slots on deploy/execution/replenish completion or timeout
 // passes to every slot the "starter" transaction
-using SmartContractSignal = cs::Signal<void(const csdb::Transaction&, cs::Sequence)>;
+using SmartContractSignal = cs::Signal<void(const csdb::Transaction&)>;
 
 class SmartContracts final {
 public:

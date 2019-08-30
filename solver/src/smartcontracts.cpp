@@ -1244,7 +1244,7 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
                 if (!reading_db) {
                     csdebug() << kLogPrefix << "found contract replenish " << FormatRef(block.sequence(), tr_idx);
                 }
-                emit signal_payable_invoke(tr, seq);
+                emit signal_payable_invoke(tr);
                 enqueue(block, tr_idx, reading_db);
             }
             else {
@@ -2334,7 +2334,7 @@ void SmartContracts::update_status(QueueItem& item, cs::RoundNumber r, SmartCont
             for (const auto& execution : item.executions) {
                 const csdb::Transaction& t = execution.transaction;
                 if (t.is_valid()) {
-                    emit signal_contract_timeout(t, r);
+                    emit signal_contract_timeout(t);
                     std::string extra_info;
                     if (execution.ref_start.sequence != item.seq_start) {
                         std::ostringstream os;
