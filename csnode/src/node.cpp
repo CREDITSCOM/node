@@ -47,8 +47,11 @@ Node::Node(const Config& config)
     std::cout << "Done\n";
     poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
-    const auto& settings = config.getApiSettings();
-    auto& executor = executor::Executor::getInstance(&blockChain_, solver_, settings.executorPort, settings.executorHost, settings.executorCmdLine);
+    executor::ExecutorSettings::set(cs::makeReference(blockChain_),
+                                    cs::makeReference(*solver_),
+                                    cs::makeReference(config));
+
+    auto& executor = executor::Executor::getInstance();
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);

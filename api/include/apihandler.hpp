@@ -30,11 +30,16 @@
 #include <queue>
 
 #include <client/params.hpp>
+#include <client/config.hpp>
+
+#include <lib/system/reference.hpp>
 #include <lib/system/concurrent.hpp>
 #include <lib/system/process.hpp>
 
 #include "tokens.hpp"
 
+#include <tuple>
+#include <any>
 #include <optional>
 
 #include <csdb/currency.hpp>
@@ -99,6 +104,41 @@ class ContractExecutorConcurrentClient;
 }  // namespace executor
 
 namespace executor {
+class Executor;
+
+struct ExecutorSettings {
+    using Types = std::tuple<cs::Reference<const BlockChain>,
+                             cs::Reference<const cs::SolverCore>,
+                             cs::Reference<const Config>>;
+
+    static void set(cs::Reference<const BlockChain> blockchain,
+                    cs::Reference<const cs::SolverCore> solver,
+                    cs::Reference<const Config> config) {
+        blockchain_ = blockchain;
+        solver_ = solver;
+        config_ = config;
+    }
+
+private:
+    static Types get() {
+        auto tuple = std::make_tuple(std::any_cast<cs::Reference<const BlockChain>>(blockchain_),
+                                     std::any_cast<cs::Reference<const cs::SolverCore>>(solver_),
+                                     std::any_cast<cs::Reference<const Config>>(config_));
+
+        blockchain_.reset();
+        solver_.reset();
+        config_.reset();
+
+        return tuple;
+    }
+
+    inline static std::any blockchain_;
+    inline static std::any solver_;
+    inline static std::any config_;
+
+    friend class Executor;
+};
+
 class Executor {
 public:  // wrappers
     
@@ -181,13 +221,12 @@ public:  // wrappers
     }
 
 public:
-    static Executor& getInstance(const BlockChain* p_blockchain = nullptr, const cs::SolverCore* solver = nullptr, const int p_exec_port = 0,
-        const std::string p_exec_ip = std::string{}, const std::string p_exec_cmdline = std::string{}) {  // singlton
-        static Executor executor(*p_blockchain, *solver, p_exec_port, p_exec_ip, p_exec_cmdline);
+    static Executor& getInstance() {  // singlton
+        static Executor executor(executor::ExecutorSettings::get());
         return executor;
     }
 
-    bool isConnect() const {
+    bool isConnected() const {
         return executorTransport_->isOpen();
     }
 
@@ -415,7 +454,7 @@ public slots:
     }
 
     void onExecutorStarted() {
-        if (!isConnect()) {
+        if (!isConnected()) {
             connect();
         }
     }
@@ -432,15 +471,16 @@ public slots:
 
 private:
     std::map<general::Address, general::AccessID> lockSmarts;
-    explicit Executor(const BlockChain& p_blockchain, const cs::SolverCore& solver, int p_exec_port,
-        const std::string& p_exec_ip, const std::string& p_exec_cmdline)
-    : blockchain_(p_blockchain)
-    , solver_(solver)
-    , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(p_exec_ip, p_exec_port))
+
+    explicit Executor(const ExecutorSettings::Types& types)
+    : blockchain_(std::get<cs::Reference<const BlockChain>>(types))
+    , solver_(std::get<cs::Reference<const cs::SolverCore>>(types))
+    , config_(std::get<cs::Reference<const Config>>(types))
+    , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(config_.getApiSettings().executorHost, config_.getApiSettings().executorPort))
     , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
     , origExecutor_(
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
-        std::string executorCmdline = p_exec_cmdline;
+        std::string executorCmdline = config_.getApiSettings().executorCmdLine;
 
         socket_->setSendTimeout(kSendTimeout);
         socket_->setRecvTimeout(kReceiveTimeout);
@@ -461,19 +501,19 @@ private:
 
         std::thread thread([this]() {
             while(!requestStop_) {
-                if (isConnect()) {
+                if (isConnected()) {
                     static std::mutex mutex;
                     std::unique_lock lock(mutex);
 
                     cvErrorConnect_.wait(lock, [&] {
-                        return !isConnect() || requestStop_;
+                        return !isConnected() || requestStop_;
                     });
                 }
 
                 static const int kReconnectTime = 5;
                 std::this_thread::sleep_for(std::chrono::seconds(kReconnectTime));
 
-                if (!isConnect()) {
+                if (!isConnected()) {
                     connect();
                 }
             }
@@ -564,6 +604,7 @@ private:
 private:
     const BlockChain& blockchain_;
     const cs::SolverCore& solver_;
+    const Config& config_;
 
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TSocket> socket_;
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executorTransport_;
@@ -587,8 +628,8 @@ private:
     const int16_t EXECUTOR_VERSION = 2;
 
     // timeout in ms
-    const int kSendTimeout = 4000;
-    const int kReceiveTimeout = 4000;
+    int kSendTimeout = 0;
+    int kReceiveTimeout = 0;
 
     // temporary solution?
     std::mutex callExecutorLock_;

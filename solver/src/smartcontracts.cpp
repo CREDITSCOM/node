@@ -1463,7 +1463,7 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
         return false;
     }
     else if (test_executor_ready) {
-        executor_ready = exec_handler_ptr->getExecutor().isConnect();
+        executor_ready = exec_handler_ptr->getExecutor().isConnected();
         if (!executor_ready) {
             return false;
         }
@@ -2131,7 +2131,7 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     auto& executor_instance = exec_handler_ptr->getExecutor();
     executor_instance.getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
     if (result.status.code != 0) {
-        executor_ready = executor_instance.isConnect();
+        executor_ready = executor_instance.isConnected();
         if (!skip_log) {
             if (!result.status.message.empty()) {   
                 cswarning() << kLogPrefix << result.status.message;
@@ -2456,7 +2456,7 @@ bool SmartContracts::wait_until_executor(unsigned int test_freq, unsigned int ma
         return false;
     }
     unsigned int counter = 0;
-    while (!exec_handler_ptr->getExecutor().isConnect()) {
+    while (!exec_handler_ptr->getExecutor().isConnected()) {
         if (pnode->isStopRequested()) {
             return false;
         }

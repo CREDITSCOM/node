@@ -26,7 +26,7 @@ using namespace ::apache::thrift::protocol;
 constexpr const unsigned int kServerRWTimeoutMillis = 30000;
 
 connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config)
-: executor_(executor::Executor::getInstance(&m_blockchain, solver, config.executor_port, config.executor_ip, config.executor_cmdline))
+: executor_(executor::Executor::getInstance())
 , api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, executor_, config))
 , apiexec_handler(make_shared<apiexec::APIEXECHandler>(m_blockchain, *solver, executor_, config))
 , p_api_processor(make_shared<connector::ApiProcessor>(api_handler))
