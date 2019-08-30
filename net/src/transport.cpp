@@ -1125,17 +1125,17 @@ void Transport::askForMissingPackages() {
 
         {
             cs::Lock messageLock(msg->pLock_);
-            const auto end = msg->packets_ + msg->packetsTotal_;
 
             uint16_t start = 0;
             uint64_t mask = 0;
             uint64_t req = 0;
+            uint16_t end = msg->packets_.size();
 
-            for (auto s = msg->packets_; s != end; ++s) {
-                if (!*s) {
+            for(uint16_t i = 0; i < end; i++) {
+                if (!msg->packets_[i]) {
                     if (!mask) {
                         mask = 1;
-                        start = cs::numeric_cast<uint16_t>(s - msg->packets_);
+                        start = i;
                     }
                     req |= mask;
                 }
@@ -1143,7 +1143,7 @@ void Transport::askForMissingPackages() {
                 if (mask == maxMask) {
                     requestMissing(msg->headerHash_, start, req);
 
-                    if (s > (msg->packets_ + msg->maxFragment_) && (end - s) > 128) {
+                    if (i > msg->maxFragment_ && i >= 128) {
                         break;
                     }
 
