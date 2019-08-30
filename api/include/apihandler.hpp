@@ -223,7 +223,11 @@ public:
     }
 
     bool isConnected() const {
-        return executorTransport_->isOpen();
+        bool is_open = executorTransport_->isOpen();
+        if (!is_open) {
+            notifyError();
+        }
+        return is_open;
     }
 
     void stop() {
@@ -581,7 +585,7 @@ private:
         }
     }
 
-    void notifyError() {
+    void notifyError() const {
         cvErrorConnect_.notify_one();
     }
 
@@ -618,7 +622,7 @@ private:
     std::shared_mutex mutex_;
     std::atomic_size_t execCount_{0};
 
-    std::condition_variable cvErrorConnect_;
+    mutable std::condition_variable cvErrorConnect_;
     std::atomic_bool requestStop_{ false };
 
     const int16_t EXECUTOR_VERSION = 2;
