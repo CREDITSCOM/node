@@ -231,6 +231,13 @@ public:
 
         // wake up watching thread if it sleeps
         notifyError();
+
+        if (executorProcess_) {
+            if (executorProcess_->isRunning()) {
+                disconnect();
+                executorProcess_->terminate();
+            }
+        }
     }
 
     std::optional<cs::Sequence> getSequence(const general::AccessID& accessId) {
@@ -506,6 +513,10 @@ private:
                     });
                 }
 
+                if (requestStop_) {
+                    break;
+                }
+
                 static const int kReconnectTime = 5;
                 std::this_thread::sleep_for(std::chrono::seconds(kReconnectTime));
 
@@ -520,13 +531,6 @@ private:
 
     ~Executor() {
         stop();
-
-        if (executorProcess_) {
-            if (executorProcess_->isRunning()) {
-                disconnect();
-                executorProcess_->terminate();
-            }
-        }
     }
 
     struct OriginExecuteResult {
