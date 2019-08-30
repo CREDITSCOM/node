@@ -23,8 +23,6 @@ using namespace ::apache::thrift::server;
 using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
-constexpr const unsigned int kServerRWTimeoutMillis = 30000;
-
 connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config)
 : executor_(executor::Executor::getInstance())
 , api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, executor_, config))
@@ -32,11 +30,11 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 , p_api_processor(make_shared<connector::ApiProcessor>(api_handler))
 , p_apiexec_processor(make_shared<apiexec::APIEXECProcessor>(apiexec_handler))
 #ifdef BINARY_TCP_API
-, server(p_api_processor, make_shared<TServerSocket>(config.getApiSettings().port, kServerRWTimeoutMillis, kServerRWTimeoutMillis),
+, server(p_api_processor, make_shared<TServerSocket>(config.getApiSettings().port, config.getApiSettings().serverSendTimeout, config.getApiSettings().serverReceiveTimeout),
     make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 #ifdef AJAX_IFACE
-, ajax_server(p_api_processor, make_shared<TServerSocket>(config.getApiSettings().ajaxPort, kServerRWTimeoutMillis, kServerRWTimeoutMillis),
+, ajax_server(p_api_processor, make_shared<TServerSocket>(config.getApiSettings().ajaxPort, config.getApiSettings().ajaxServerSendTimeout, config.getApiSettings().ajaxServerReceiveTimeout),
     make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
 #ifdef BINARY_TCP_EXECAPI

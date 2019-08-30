@@ -62,6 +62,10 @@ struct ApiData {
     uint16_t apiexecPort = 9070;
     int executorSendTimeout = 4000;
     int executorReceiveTimeout = 4000;
+    int serverSendTimeout = 30000;
+    int serverReceiveTimeout = 30000;
+    int ajaxServerSendTimeout = 30000;
+    int ajaxServerReceiveTimeout = 30000;
     std::string executorHost{ "localhost" };
     std::string executorCmdLine{};
 };

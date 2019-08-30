@@ -59,6 +59,10 @@ const std::string PARAM_NAME_EXECUTOR_PORT = "executor_port";
 const std::string PARAM_NAME_APIEXEC_PORT = "apiexec_port";
 const std::string PARAM_NAME_EXECUTOR_SEND_TIMEOUT = "executor_send_timeout";
 const std::string PARAM_NAME_EXECUTOR_RECEIVE_TIMEOUT = "executor_receive_timeout";
+const std::string PARAM_NAME_SERVER_SEND_TIMEOUT = "server_send_timeout";
+const std::string PARAM_NAME_SERVER_RECEIVE_TIMEOUT = "server_receive_timeout";
+const std::string PARAM_NAME_AJAX_SERVER_SEND_TIMEOUT = "ajax_server_send_timeout";
+const std::string PARAM_NAME_AJAX_SERVER_RECEIVE_TIMEOUT = "ajax_server_receive_timeout";
 const std::string PARAM_NAME_EXECUTOR_IP = "executor_ip";
 const std::string PARAM_NAME_EXECUTOR_CMDLINE = "executor_command";
 
@@ -801,6 +805,10 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_PORT, apiData_.executorPort);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_SEND_TIMEOUT, apiData_.executorSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_RECEIVE_TIMEOUT, apiData_.executorReceiveTimeout);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_SEND_TIMEOUT, apiData_.serverSendTimeout);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_RECEIVE_TIMEOUT, apiData_.serverReceiveTimeout);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_SEND_TIMEOUT, apiData_.ajaxServerSendTimeout);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_RECEIVE_TIMEOUT, apiData_.ajaxServerReceiveTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_APIEXEC_PORT, apiData_.apiexecPort);
 
     if (data.count(PARAM_NAME_EXECUTOR_IP) > 0) {
