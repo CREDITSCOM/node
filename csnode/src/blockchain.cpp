@@ -11,6 +11,7 @@
 #include <csnode/datastream.hpp>
 #include <csnode/fee.hpp>
 #include <csnode/nodeutils.hpp>
+#include <csnode/transactionsiterator.hpp>
 #include <solver/smartcontracts.hpp>
 
 #include <boost/filesystem.hpp>
@@ -471,7 +472,7 @@ void BlockChain::removeLastBlockFromTrxIndex(const csdb::Pool& pool) {
         auto key = getAddressByType(addr, AddressType::PublicKey);
 
         if (uniqueAddresses.insert(key).second) {
-            auto it = TransactionsIterator(*this, addr);
+            auto it = cs::TransactionsIterator(*this, addr);
             it.next();
             bool found = false;
 
@@ -742,7 +743,7 @@ private:
 };
 
 void BlockChain::getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit) {
-    for (auto trIt = TransactionsIterator(*this, address); trIt.isValid(); trIt.next()) {
+    for (auto trIt = cs::TransactionsIterator(*this, address); trIt.isValid(); trIt.next()) {
         if (offset > 0) {
             --offset;
             continue;
@@ -1495,48 +1496,6 @@ std::pair<cs::Sequence, uint32_t> BlockChain::getPreviousNonEmptyBlock(cs::Seque
     }
 
     return std::pair<cs::Sequence, uint32_t>(cs::kWrongSequence, 0);
-}
-
-TransactionsIterator::TransactionsIterator(BlockChain& bc, const csdb::Address& addr)
-: bc_(bc)
-, addr_(addr) {
-    setFromTransId(bc_.getLastTransaction(addr));
-}
-
-void TransactionsIterator::setFromTransId(const csdb::TransactionID& lTrans) {
-    if (lTrans.is_valid()) {
-        lapoo_ = bc_.loadBlock(lTrans.pool_seq());
-        it_ = lapoo_.transactions().rbegin() + (lapoo_.transactions().size() - lTrans.index() - 1);
-    }
-    else {
-        lapoo_ = csdb::Pool{};
-    }
-}
-
-bool TransactionsIterator::isValid() const {
-    return lapoo_.is_valid();
-}
-
-void TransactionsIterator::next() {
-    while (++it_ != lapoo_.transactions().rend()) {
-        if (bc_.isEqual(it_->source(), addr_) || bc_.isEqual(it_->target(), addr_)) {
-            break;
-        }
-    }
-
-    // Oops, no more in this blockfTransactionsListGet
-    if (it_ == lapoo_.transactions().rend()) {
-        auto ps = bc_.getPreviousPoolSeq(addr_, lapoo_.sequence());
-        lapoo_ = bc_.loadBlock(ps);
-
-        if (lapoo_.is_valid()) {
-            it_ = lapoo_.transactions().rbegin();
-            // transactions() cannot be empty
-            if (!bc_.isEqual(it_->source(), addr_) && !bc_.isEqual(it_->target(), addr_)) {
-                next();  // next should be executed only once
-            }
-        }
-    }
 }
 
 cs::Sequence BlockChain::getLastSeq() const{

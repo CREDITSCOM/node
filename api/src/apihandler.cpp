@@ -1,6 +1,7 @@
 #include <apihandler.hpp>
 
 #include <csnode/conveyer.hpp>
+#include <csnode/transactionsiterator.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 #include <solver/smartcontracts.hpp>
@@ -1502,7 +1503,7 @@ void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensM
 
 void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)> func) {
     std::list<csdb::TransactionID> l_id;
-    for (auto trIt = TransactionsIterator(s_blockchain, addr); trIt.isValid(); trIt.next()) {
+    for (auto trIt = cs::TransactionsIterator(s_blockchain, addr); trIt.isValid(); trIt.next()) {
         if (is_smart_state(*trIt)) {
             cs::SmartContractRef smart_ref;
             smart_ref.from_user_field(trIt->user_field(cs::trx_uf::new_state::RefStart));
