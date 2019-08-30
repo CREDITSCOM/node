@@ -86,7 +86,7 @@ enum MsgTypes : uint8_t {
 
 class Packet {
 public:
-    static const uint32_t MaxSize = 1024;
+    static const uint32_t MaxSize = 1400;
     static const uint32_t MaxFragments = 4096;
 
     static const uint32_t SmartRedirectTreshold = 10000;
