@@ -83,6 +83,27 @@ TEST(Lmdbxx, InsertTrivial) {
     ASSERT_EQ(value, v);
 }
 
+TEST(Lmdbxx, InsertGetRemoveFloatingPoint) {
+    auto db = createDb();
+    db->open();
+
+    float key = 100.0f;
+    double value = 50.0;
+
+    db->insert(key, value);
+
+    ASSERT_TRUE(db->size() == 1);
+    ASSERT_TRUE(db->isKeyExists(key));
+
+    auto v = db->value<decltype(value)>(key);
+    ASSERT_EQ(int(value), int(v));
+
+    db->remove(key);
+
+    ASSERT_TRUE(db->size() == 0);
+    ASSERT_FALSE(db->isKeyExists(key));
+}
+
 TEST(Lmdbxx, InsertAndRemove) {
     auto db = createDb();
     db->open();

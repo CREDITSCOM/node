@@ -47,8 +47,11 @@ Node::Node(const Config& config)
     std::cout << "Done\n";
     poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
-    const auto& settings = config.getApiSettings();
-    auto& executor = executor::Executor::getInstance(&blockChain_, solver_, settings.executorPort, settings.executorHost, settings.executorCmdLine);
+    executor::ExecutorSettings::set(cs::makeReference(blockChain_),
+                                    cs::makeReference(*solver_),
+                                    cs::makeReference(config));
+
+    auto& executor = executor::Executor::getInstance();
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
@@ -74,11 +77,11 @@ Node::~Node() {
 bool Node::init(const Config& config) {
 #ifdef NODE_API
     std::cout << "Init API... ";
-    const auto& settings = config.getApiSettings();
-    api_ = std::make_unique<csconnector::connector>(
-        blockChain_, solver_,
-        csconnector::Config{settings.port, settings.ajaxPort, settings.executorPort, settings.apiexecPort, settings.executorCmdLine });
+
+    api_ = std::make_unique<csconnector::connector>(blockChain_, solver_, config);
+
     std::cout << "Done\n";
+
     cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
 #endif  // NODE_API
@@ -142,6 +145,7 @@ void Node::stop() {
 
 /* Requests */
 void Node::flushCurrentTasks() {
+
     transport_->addTask(ostream_.getPackets(), ostream_.getPacketsCount());
     ostream_.clear();
 }
@@ -1269,7 +1273,9 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
 
     csdetails() << "NODE> Sending broadcast data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
                 << ", msgType: " << Packet::messageTypeToString(msgType);
-
+	//if (ostream_.getPacketsCount() > 100) {
+	//	csinfo() << __func__ << ": sending " << ostream_.getPacketsCount() << " packets";
+	//}
     transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
     ostream_.clear();
 }
@@ -1567,7 +1573,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
 
     stage.messageBytes = std::move(bytes);
 
-    csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
+    csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] - preliminary check ... passed!";
 
     solver_->gotStageThree(std::move(stage), (stageThreeSent_ ? 2 : 0));
 }
@@ -2270,6 +2276,7 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     getCharacteristic(rPackage);
 
     onRoundStart(cs::Conveyer::instance().currentRoundTable());
+	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
     reviewConveyerHashes();
 
     csmeta(csdetails) << "done\n";

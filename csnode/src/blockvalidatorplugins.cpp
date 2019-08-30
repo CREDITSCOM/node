@@ -357,8 +357,7 @@ ValidationPlugin::ErrorType BalanceChecker::validateBlock(const csdb::Pool&) {
   auto wallets = getWallets();
   wallets->updateFromSource();
   for (const auto& t : trxs) {
-    WalletsState::WalletId id{};
-    const WalletsState::WalletData& wallState = wallets->getData(t.source(), id);
+    const auto& wallState = wallets->getData(t.source());
     if (wallState.balance_ < zeroBalance_) {
       cserror() << kLogPrefix << "error detected in pool " << prevBlock.sequence()
                 << ", wall address " << t.source().to_string()
@@ -399,13 +398,8 @@ ValidationPlugin::ErrorType TransactionsChecker::validateBlock(const csdb::Pool&
 bool TransactionsChecker::checkSignature(const csdb::Transaction& t) {
   if (t.source().is_wallet_id()) {
     const auto& bc = getBlockChain();
-    BlockChain::WalletData dataToFetchPublicKey;
-    if (!bc.findWalletData(t.source().wallet_id(), dataToFetchPublicKey)) {
-      cserror() << kLogPrefix << "no public key for id "
-                << t.source().wallet_id() << " in blockchain";
-      return false;
-    }
-    return t.verify_signature(dataToFetchPublicKey.address_);
+    auto pub = bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey);
+    return t.verify_signature(pub.public_key());
   } else {
     return t.verify_signature(t.source().public_key());
   }

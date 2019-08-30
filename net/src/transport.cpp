@@ -140,16 +140,18 @@ void Transport::run() {
     while (Transport::gSignalStatus == 0) {
         ++ctr;
 
-        bool askMissing = true;
+//        bool askMissing = true;
         bool resendPacks = ctr % 10 == 0;
         bool sendPing = ctr % 20 == 0;
         bool refreshLimits = ctr % 20 == 0;
         bool checkPending = ctr % 100 == 0;
         bool checkSilent = ctr % 150 == 0;
 
+/*
         if (askMissing) {
             askForMissingPackages();
         }
+*/
 
         if (checkPending) {
             nh_.checkPending(config_.getMaxNeighbours());
@@ -260,19 +262,15 @@ RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
 }
 
 bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
-    uint32_t nextBytesCount = static_cast<uint32_t>(conn.lastBytesCount.load(std::memory_order_relaxed) + pack->size());
-    if (nextBytesCount <= config_.getConnectionBandwidth()) {
-        conn.lastBytesCount.fetch_add(static_cast<uint32_t>(pack->size()), std::memory_order_relaxed);
-        net_->sendDirect(*pack, conn.getOut());
-        return true;
-    }
-
-    return false;
+    conn.lastBytesCount.fetch_add(static_cast<uint32_t>(pack->size()), std::memory_order_relaxed);
+    net_->sendDirect(*pack, conn.getOut());
+    return true;
 }
 
 void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
     if (size >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
+		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
         return;
     }
     const auto packEnd = pack + size;
@@ -285,8 +283,15 @@ void Transport::deliverDirect(const Packet* pack, const uint32_t size, Connectio
 void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     if (size >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
+		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
         return;
     }
+
+    {
+        auto lock = getNeighboursLock();
+        nh_.chooseNeighbours();
+    }
+
     const auto packEnd = pack + size;
     for (auto ptr = pack; ptr != packEnd; ++ptr) {
         sendBroadcast(ptr);
@@ -667,6 +672,7 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
 void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhenResend) {
     if (packNum >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
+        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << packNum;
         return;
     }
     nh_.pourByNeighbours(pack, packNum);
@@ -1178,11 +1184,6 @@ void Transport::registerMessage(MessagePtr msg) {
     auto& ptr = uncollected_.emplace(msg);
     //DEBUG:
     Message& message = *ptr.get();
-    size_t cnt = message.clearUnused();
-    if (cnt > 0) {
-        csdebug() << "Net: potential heap corruption detected in uncollected message fragments (" << cnt << ")";
-        Transport::cntDirtyAllocs += cnt;
-    }
 }
 
 bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {

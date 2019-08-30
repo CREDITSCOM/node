@@ -37,9 +37,9 @@ struct Token {
     uint64_t realHoldersCount = 0;  // Non-zero balance
 
     // Tmp—ache: name, symbol, totalSupply, balance
-    std::string name { "not loaded" };
-    std::string symbol { "not loaded" };
-    std::string totalSupply { "not loaded" };
+    std::string name;
+    std::string symbol;
+    std::string totalSupply;
 
     struct HolderInfo {
         std::string balance { "0" };
@@ -60,7 +60,7 @@ public:
 
     void checkNewState(const csdb::Address& sc, const csdb::Address& initiator, const api::SmartContractInvocation&, const std::string& newState);
 
-    void loadTokenInfo(const std::vector<csdb::Address>& vaddr, const std::function<void(const TokensMap&, const HoldersMap&)>);
+    void loadTokenInfo(const std::function<void(const TokensMap&, const HoldersMap&)>);
 
     static bool isTransfer(const std::string& method, const std::vector<general::Variant>& params);
 
@@ -85,9 +85,9 @@ public:
 
     void updateTokenChaches(const csdb::Address& addr, const std::string& newState, const TokenInvocationData::Params& params);
     
-private:
-    void refreshTokenState(const csdb::Address& token, const std::string& newState, bool checkBalance = true);
+    void refreshTokenState(const csdb::Address& token, const std::string& newState, bool checkBalance = false);
 
+private:
     void initiateHolder(Token&, const csdb::Address& token, const csdb::Address& holder, bool increaseTransfers = false);
 
     api::APIHandler* api_;

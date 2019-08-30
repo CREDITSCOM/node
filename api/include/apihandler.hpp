@@ -30,11 +30,16 @@
 #include <queue>
 
 #include <client/params.hpp>
+#include <client/config.hpp>
+
+#include <lib/system/reference.hpp>
 #include <lib/system/concurrent.hpp>
 #include <lib/system/process.hpp>
 
 #include "tokens.hpp"
 
+#include <tuple>
+#include <any>
 #include <optional>
 
 #include <csdb/currency.hpp>
@@ -89,16 +94,47 @@ class SolverCore;
 class SmartContracts;
 }
 
-namespace csconnector {
-struct Config;
-}
-
 namespace executor {
 class APIResponse;
 class ContractExecutorConcurrentClient;
 }  // namespace executor
 
 namespace executor {
+class Executor;
+
+struct ExecutorSettings {
+    using Types = std::tuple<cs::Reference<const BlockChain>,
+                             cs::Reference<const cs::SolverCore>,
+                             cs::Reference<const Config>>;
+
+    static void set(cs::Reference<const BlockChain> blockchain,
+                    cs::Reference<const cs::SolverCore> solver,
+                    cs::Reference<const Config> config) {
+        blockchain_ = blockchain;
+        solver_ = solver;
+        config_ = config;
+    }
+
+private:
+    static Types get() {
+        auto tuple = std::make_tuple(std::any_cast<cs::Reference<const BlockChain>>(blockchain_),
+                                     std::any_cast<cs::Reference<const cs::SolverCore>>(solver_),
+                                     std::any_cast<cs::Reference<const Config>>(config_));
+
+        blockchain_.reset();
+        solver_.reset();
+        config_.reset();
+
+        return tuple;
+    }
+
+    inline static std::any blockchain_;
+    inline static std::any solver_;
+    inline static std::any config_;
+
+    friend class Executor;
+};
+
 class Executor {
 public:  // wrappers
     
@@ -181,13 +217,12 @@ public:  // wrappers
     }
 
 public:
-    static Executor& getInstance(const BlockChain* p_blockchain = nullptr, const cs::SolverCore* solver = nullptr, const int p_exec_port = 0,
-        const std::string p_exec_ip = std::string{}, const std::string p_exec_cmdline = std::string{}) {  // singlton
-        static Executor executor(*p_blockchain, *solver, p_exec_port, p_exec_ip, p_exec_cmdline);
+    static Executor& getInstance() {  // singlton
+        static Executor executor(executor::ExecutorSettings::get());
         return executor;
     }
 
-    bool isConnect() const {
+    bool isConnected() const {
         return executorTransport_->isOpen();
     }
 
@@ -196,6 +231,13 @@ public:
 
         // wake up watching thread if it sleeps
         notifyError();
+
+        if (executorProcess_) {
+            if (executorProcess_->isRunning()) {
+                disconnect();
+                executorProcess_->terminate();
+            }
+        }
     }
 
     std::optional<cs::Sequence> getSequence(const general::AccessID& accessId) {
@@ -415,7 +457,7 @@ public slots:
     }
 
     void onExecutorStarted() {
-        if (!isConnect()) {
+        if (!isConnected()) {
             connect();
         }
     }
@@ -432,15 +474,19 @@ public slots:
 
 private:
     std::map<general::Address, general::AccessID> lockSmarts;
-    explicit Executor(const BlockChain& p_blockchain, const cs::SolverCore& solver, int p_exec_port,
-        const std::string& p_exec_ip, const std::string& p_exec_cmdline)
-    : blockchain_(p_blockchain)
-    , solver_(solver)
-    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(
-        ::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(p_exec_ip, p_exec_port)))
+
+    explicit Executor(const ExecutorSettings::Types& types)
+    : blockchain_(std::get<cs::Reference<const BlockChain>>(types))
+    , solver_(std::get<cs::Reference<const cs::SolverCore>>(types))
+    , config_(std::get<cs::Reference<const Config>>(types))
+    , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(config_.getApiSettings().executorHost, config_.getApiSettings().executorPort))
+    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
     , origExecutor_(
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
-        std::string executorCmdline = p_exec_cmdline;
+        std::string executorCmdline = config_.getApiSettings().executorCmdLine;
+
+        socket_->setSendTimeout(config_.getApiSettings().executorSendTimeout);
+        socket_->setRecvTimeout(config_.getApiSettings().executorReceiveTimeout);
 
         if (executorCmdline.empty()) {
             cswarning() << "Executor command line args are empty, process would not be created";
@@ -458,19 +504,23 @@ private:
 
         std::thread thread([this]() {
             while(!requestStop_) {
-                if (isConnect()) {
+                if (isConnected()) {
                     static std::mutex mutex;
                     std::unique_lock lock(mutex);
 
                     cvErrorConnect_.wait(lock, [&] {
-                        return !isConnect() || requestStop_;
+                        return !isConnected() || requestStop_;
                     });
                 }
 
-                static const int kReconnectTime = 5;
+                if (requestStop_) {
+                    break;
+                }
+
+                static const int kReconnectTime = 2;
                 std::this_thread::sleep_for(std::chrono::seconds(kReconnectTime));
 
-                if (!isConnect()) {
+                if (!isConnected()) {
                     connect();
                 }
             }
@@ -481,13 +531,6 @@ private:
 
     ~Executor() {
         stop();
-
-        if (executorProcess_) {
-            if (executorProcess_->isRunning()) {
-                disconnect();
-                executorProcess_->terminate();
-            }
-        }
     }
 
     struct OriginExecuteResult {
@@ -520,10 +563,6 @@ private:
 
     bool connect() {
         try {
-            if (executorTransport_->isOpen()) {
-                executorTransport_->close();
-            }
-
             executorTransport_->open();
         }
         catch (...) {
@@ -561,7 +600,11 @@ private:
 private:
     const BlockChain& blockchain_;
     const cs::SolverCore& solver_;
+    const Config& config_;
+
+    ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TSocket> socket_;
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executorTransport_;
+
     std::unique_ptr<executor::ContractExecutorConcurrentClient> origExecutor_;
     std::unique_ptr<cs::Process> executorProcess_;
 
@@ -577,6 +620,7 @@ private:
 
     std::condition_variable cvErrorConnect_;
     std::atomic_bool requestStop_{ false };
+
     const int16_t EXECUTOR_VERSION = 2;
 
     // temporary solution?
@@ -586,7 +630,7 @@ private:
 namespace apiexec {
 class APIEXECHandler : public APIEXECNull, public APIHandlerBase {
 public:
-    explicit APIEXECHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const csconnector::Config& config);
+    explicit APIEXECHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
     APIEXECHandler(const APIEXECHandler&) = delete;
     void GetSeed(apiexec::GetSeedResult& _return, const general::AccessID accessId) override;
     void SendTransaction(apiexec::SendTransactionResult& _return, const general::AccessID accessId, const api::Transaction& transaction) override;
@@ -615,7 +659,7 @@ public:
 
 class APIHandler : public APIHandlerInterface {
 public:
-    explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const csconnector::Config& config);
+    explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
     ~APIHandler() override;
 
     APIHandler(const APIHandler&) = delete;
@@ -691,9 +735,13 @@ public:
         return executor_;
     }
 
+    bool isBDLoaded() { return isBDLoaded_; }
+    
 private:
     ::csstats::AllStats stats_;
     executor::Executor& executor_;
+
+    bool isBDLoaded_{ false };
 
     struct smart_trxns_queue {
         cs::SpinLock lock{ATOMIC_FLAG_INIT};
@@ -810,7 +858,7 @@ private:
 
     std::optional<std::string> checkTransaction(const ::api::Transaction&);
 
-    TokensMaster tm;
+    TokensMaster tm_;
 
     const uint8_t ERROR_CODE = 1;
 

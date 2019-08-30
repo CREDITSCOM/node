@@ -88,7 +88,7 @@ SolverCore::SolverCore(Node* pNode, csdb::Address GenesisAddress, csdb::Address 
     addr_start = StartAddress;
     pnode = pNode;
     auto& bc = pNode->getBlockChain();
-    pws = std::make_unique<cs::WalletsState>(bc);
+    pws = std::make_unique<cs::WalletsState>(bc.getCacheUpdater());
     psmarts = std::make_unique<cs::SmartContracts>(bc, scheduler);
 }
 
@@ -188,14 +188,14 @@ void SolverCore::handleTransitions(Event evt) {
 
 bool SolverCore::stateCompleted(Result res) {
     if (Result::Failure == res) {
-        cserror() << log_prefix << "error in state " << (pstate ? pstate->name() : "null");
+        cserror() << log_prefix << "error in state " << (pstate ? pstate->name() : "null - Consensus state can't be completed. Trying to resolve ... ");
     }
     return (Result::Finish == res);
 }
 
 bool SolverCore::stateFailed(Result res) {
     if (Result::Failure == res) {
-        cserror() << log_prefix << "error in state " << (pstate ? pstate->name() : "null");
+        cserror() << log_prefix << "error in state " << (pstate ? pstate->name() : "null - Consensus state can't be completed. Trying to resolve ... ");
         return true;
     }
     return false;
@@ -446,7 +446,8 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     const auto lastHashBin = deferredBlock_.hash().to_binary();
 
     std::copy(lastHashBin.cbegin(), lastHashBin.cend(), stage3.blockHash.begin());
-    stage3.blockSignature = cscrypto::generateSignature(private_key, stage3.blockHash.data(), stage3.blockHash.size());
+	stage3.blockSignature = cscrypto::generateSignature(private_key, stage3.blockHash.data(), stage3.blockHash.size());
+
 
     //pnode->prepareRoundTable(table, poolMetaInfo, stage3);
     //csmeta(csdetails) << "end";
@@ -490,7 +491,7 @@ void SolverCore::sendRoundTable() {
 bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) {
     csmeta(csdetails) << "begin";
     if (!deferredBlock_.is_valid()) {
-        csmeta(cserror) << " ... Failed!!!";
+        csmeta(cserror) << " ... Failed - deferred block is not valid. Node will solve this problem automatically";
         return false;
     }
 
@@ -502,7 +503,7 @@ bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) 
     auto resPool = pnode->getBlockChain().createBlock(deferredBlock_);
 
     if (!resPool.has_value()) {
-        cserror() << log_prefix << "Blockchain failed to write new block";
+        cserror() << log_prefix << "Blockchain failed to write new block, it will do it later when get proper data";
         return false;
     }
     //pnode->cleanConfirmationList(deferredBlock_.sequence());

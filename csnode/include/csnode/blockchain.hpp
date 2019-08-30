@@ -115,6 +115,7 @@ public:
     }
 
     void removeWalletsInPoolFromCache(const csdb::Pool& pool);
+    void removeLastBlockFromTrxIndex(const csdb::Pool&);
     void removeLastBlock();
 
     // updates fees in every transaction
@@ -198,9 +199,8 @@ public slots:
     void onPayableContractReplenish(const csdb::Transaction& starter) {
         this->walletsCacheUpdater_->invokeReplenishPayableContract(starter);
     }
-    void onContractTimeout(const csdb::Transaction& starter, cs::Sequence sequence) {
-        cs::WalletsCache::RefContractCall ref{ sequence, uint32_t(starter.id().index()) };
-        this->walletsCacheUpdater_->rollbackExceededTimeoutContract(starter, ref);
+    void onContractTimeout(const csdb::Transaction& starter) {
+        this->walletsCacheUpdater_->rollbackExceededTimeoutContract(starter, csdb::Amount(0));
     }
     void onContractEmittedAccepted(const csdb::Transaction& emitted, const csdb::Transaction& starter) {
         this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter);
@@ -214,7 +214,7 @@ public:
     csdb::Pool loadBlock(const cs::Sequence sequence) const;
     csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
     csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
-    void iterateOverWallets(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::WalletData&)>);
+    void iterateOverWallets(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::WalletData&)>);
     csdb::Pool getLastBlock() const {
 		return loadBlock(getLastSeq());
     }
@@ -234,11 +234,9 @@ public:
     bool findWalletId(const WalletAddress& address, WalletId& id) const;
     // wallet transactions: pools cache + db search
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
-    // wallets modified by last new block
-    bool getModifiedWallets(Mask& dest) const;
 
 #ifdef MONITOR_NODE
-    void iterateOverWriters(const std::function<bool(const cs::WalletsCache::WalletData::Address&, const cs::WalletsCache::TrustedData&)>);
+    void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);
     void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>); 
 #endif
     uint32_t getTransactionsCount(const csdb::Address&);
@@ -257,6 +255,10 @@ public:
     bool updateContractData(const csdb::Address& abs_addr, const cs::Bytes& data) const;
     bool getContractData(const csdb::Address& abs_addr, cs::Bytes& data) const;
 
+    const cs::WalletsCache::Updater& getCacheUpdater() const {
+        return *(walletsCacheUpdater_.get());
+    }
+
 private:
     void createCachesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
@@ -271,9 +273,7 @@ private:
     void onReadFromDB(csdb::Pool block, bool* shouldStop);
     bool postInitFromDB();
 
-    template <typename WalletCacheProcessor>
-    bool updateWalletIds(const csdb::Pool& pool, WalletCacheProcessor& proc);
-    bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Initer& initer);
+    bool updateWalletIds(const csdb::Pool& pool, cs::WalletsCache::Updater& updater);
     bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
     void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
@@ -369,33 +369,4 @@ private:
     std::map<csdb::Address, cs::Sequence> lapoos;
 	std::atomic<cs::Sequence> lastSequence_;
 };
-
-class TransactionsIterator {
-public:
-    TransactionsIterator(BlockChain&, const csdb::Address&);
-
-    void next();
-    bool isValid() const;
-
-    const csdb::Pool& getPool() const {
-        return lapoo_;
-    }
-
-    const csdb::Transaction& operator*() const {
-        return *it_;
-    }
-    auto operator-> () const {
-        return it_;
-    }
-
-private:
-    void setFromTransId(const csdb::TransactionID&);
-
-    BlockChain& bc_;
-
-    csdb::Address addr_;
-    csdb::Pool lapoo_;
-    std::vector<csdb::Transaction>::const_reverse_iterator it_;
-};
-
 #endif  //  BLOCKCHAIN_HPP

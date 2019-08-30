@@ -86,7 +86,7 @@ enum MsgTypes : uint8_t {
 
 class Packet {
 public:
-    static const uint32_t MaxSize = 1024;
+    static const uint32_t MaxSize = 1400;
     static const uint32_t MaxFragments = 4096;
 
     static const uint32_t SmartRedirectTreshold = 10000;
@@ -282,7 +282,7 @@ public:
         return packetSize;
     }
 
-    // returns true if is not fragmented or has valid fragmebtation data
+    // returns true if is not fragmented or has valid fragmentation data
     bool hasValidFragmentation() const {
         if (isFragmented()) {
             const auto fragment = getFragmentId();
@@ -329,14 +329,13 @@ using PacketPtr = Packet*;
 class Message {
 public:
     Message() = default;
+    ~Message() = default;
 
     Message(Message&&) = default;
     Message& operator=(Message&&) = default;
 
     Message(const Message&) = delete;
     Message& operator=(const Message&) = delete;
-
-    ~Message();
 
     bool isComplete() const {
         return packetsLeft_ == 0;
@@ -373,21 +372,7 @@ public:
         return result;
     }
 
-    // scans array of future fragments and clears all dirty elements, scans only the first maxFragment elements
-    // return cleared elements count
-    size_t clearFragments() {
-        return clearBuffer(0, maxFragment_);
-    }
-
-    // scans array of future fragments and clears all dirty elements, scans only unused behind the maxFragment elements
-    // return cleared elements count
-    size_t clearUnused() {
-        return clearBuffer(maxFragment_, Packet::MaxFragments);
-    }
-
 private:
-    size_t clearBuffer(size_t from, size_t to);
-
     static RegionAllocator allocator_;
 
     void composeFullData() const;
