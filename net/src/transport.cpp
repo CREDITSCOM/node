@@ -672,7 +672,7 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
 void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhenResend) {
     if (packNum >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
-		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << packNum;
+        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << packNum;
         return;
     }
     nh_.pourByNeighbours(pack, packNum);
@@ -1184,11 +1184,6 @@ void Transport::registerMessage(MessagePtr msg) {
     auto& ptr = uncollected_.emplace(msg);
     //DEBUG:
     Message& message = *ptr.get();
-    size_t cnt = message.clearUnused();
-    if (cnt > 0) {
-        csdebug() << "Net: potential heap corruption detected in uncollected message fragments (" << cnt << ")";
-        Transport::cntDirtyAllocs += cnt;
-    }
 }
 
 bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {

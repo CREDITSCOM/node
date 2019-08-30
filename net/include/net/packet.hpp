@@ -329,14 +329,13 @@ using PacketPtr = Packet*;
 class Message {
 public:
     Message() = default;
+    ~Message() = default;
 
     Message(Message&&) = default;
     Message& operator=(Message&&) = default;
 
     Message(const Message&) = delete;
     Message& operator=(const Message&) = delete;
-
-    ~Message();
 
     bool isComplete() const {
         return packetsLeft_ == 0;
@@ -373,21 +372,7 @@ public:
         return result;
     }
 
-    // scans array of future fragments and clears all dirty elements, scans only the first maxFragment elements
-    // return cleared elements count
-    size_t clearFragments() {
-        return clearBuffer(0, maxFragment_);
-    }
-
-    // scans array of future fragments and clears all dirty elements, scans only unused behind the maxFragment elements
-    // return cleared elements count
-    size_t clearUnused() {
-        return clearBuffer(maxFragment_, Packet::MaxFragments);
-    }
-
 private:
-    size_t clearBuffer(size_t from, size_t to);
-
     static RegionAllocator allocator_;
 
     void composeFullData() const;
