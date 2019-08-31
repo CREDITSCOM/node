@@ -240,7 +240,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr, cons
     else if (SmartContracts::is_new_state(tr)) {
         if (!initTransaction.is_valid()) {
             const auto id = tr.id();
-            csdebug() << kLogPrefix << "failed to load init transaction for new state " << FormatRef(id.pool_seq(), id.index());
+            csdebug() << kLogPrefix << "failed to load init transaction for new state " << FormatRef(id.pool_seq(), (size_t)id.index());
         }
         else {
             const auto start_id = initTransaction.id();
@@ -248,7 +248,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr, cons
             const double start_max_fee = initTransaction.max_fee().to_double();
             const double start_counted_fee = initTransaction.counted_fee().to_double();
             if (isCanceledSmart(start_target, start_id)) {
-                csdebug() << "WalletsCache: (deprecated behaviour) timeout was detected for " << FormatRef(start_id.pool_seq(), start_id.index())
+                csdebug() << "WalletsCache: (deprecated behaviour) timeout was detected for " << FormatRef(start_id.pool_seq(), (size_t )start_id.index())
                     << " before, new_state found in block " << WithDelimiters(start_id.pool_seq());
                 wallData.balance_ -= (csdb::Amount(start_max_fee) + csdb::Amount(start_counted_fee) - initTransaction.amount());
             }
