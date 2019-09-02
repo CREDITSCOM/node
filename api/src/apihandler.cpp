@@ -923,7 +923,7 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
 
     if (_return.smartContract.address.empty())
         SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-    else if (_return.smartContract.objectState.empty())
+    else if (cs::SmartContracts::get_contract_state(s_blockchain, transaction.target()).empty())
         SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
     else 
         SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -1169,9 +1169,9 @@ size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper 
     auto& elt = (*locked_deployed_by_creator)[deployer];
     for (const auto& trid : elt) {
         auto tr = executor_.loadTransactionApi(trid);
-        auto smart = fetch_smart_body(tr);
-        if (smart.objectState.empty())
+        if (cs::SmartContracts::get_contract_state(s_blockchain, tr.target()).empty())
             continue;
+        auto smart = fetch_smart_body(tr);
         out.push_back(mapper(smart));
     }
 
