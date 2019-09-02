@@ -473,7 +473,6 @@ void BlockChain::removeLastBlockFromTrxIndex(const csdb::Pool& pool) {
 
         if (uniqueAddresses.insert(key).second) {
             auto it = cs::TransactionsIterator(*this, addr);
-            it.next();
             bool found = false;
 
             for (; it.isValid(); it.next()) {
