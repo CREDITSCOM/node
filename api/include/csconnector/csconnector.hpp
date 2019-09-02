@@ -16,6 +16,7 @@
 #pragma warning(pop)
 #endif
 
+#include <client/config.hpp>
 #include <client/params.hpp>
 #include <csdb/pool.hpp>
 #include <solvercore.hpp>
@@ -29,18 +30,6 @@
 #endif
 
 namespace csconnector {
-
-struct Config {
-    int port = 9090;
-#ifdef AJAX_IFACE
-    int ajax_port = 8081;
-#endif
-    int executor_port = 9080;
-    int apiexec_port = 9070;
-    std::string executor_ip{ "localhost" };
-    std::string executor_cmdline{};
-};
-
 class connector {
 public:
     using ApiHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<api::APIHandler>;
@@ -52,7 +41,7 @@ public:
     using ApiProcessor = ::api::APIProcessor;
 #endif
 
-    explicit connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config = Config{});
+    explicit connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config);
     ~connector();
 
     connector(const connector&) = delete;

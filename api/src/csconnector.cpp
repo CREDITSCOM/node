@@ -23,24 +23,22 @@ using namespace ::apache::thrift::server;
 using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
-constexpr const unsigned int kServerRWTimeoutMillis = 30000;
-
 connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config)
-: executor_(executor::Executor::getInstance(&m_blockchain, solver, config.executor_port, config.executor_ip, config.executor_cmdline))
+: executor_(executor::Executor::getInstance())
 , api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, executor_, config))
 , apiexec_handler(make_shared<apiexec::APIEXECHandler>(m_blockchain, *solver, executor_, config))
 , p_api_processor(make_shared<connector::ApiProcessor>(api_handler))
 , p_apiexec_processor(make_shared<apiexec::APIEXECProcessor>(apiexec_handler))
 #ifdef BINARY_TCP_API
-, server(p_api_processor, make_shared<TServerSocket>(config.port, kServerRWTimeoutMillis, kServerRWTimeoutMillis),
+, server(p_api_processor, make_shared<TServerSocket>(config.getApiSettings().port, config.getApiSettings().serverSendTimeout, config.getApiSettings().serverReceiveTimeout),
     make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 #ifdef AJAX_IFACE
-, ajax_server(p_api_processor, make_shared<TServerSocket>(config.ajax_port, kServerRWTimeoutMillis, kServerRWTimeoutMillis),
+, ajax_server(p_api_processor, make_shared<TServerSocket>(config.getApiSettings().ajaxPort, config.getApiSettings().ajaxServerSendTimeout, config.getApiSettings().ajaxServerReceiveTimeout),
     make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
 #ifdef BINARY_TCP_EXECAPI
-, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.apiexec_port),
+, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.getApiSettings().apiexecPort),
     make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 {
@@ -50,8 +48,8 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 #endif
 
 #ifdef BINARY_TCP_EXECAPI
-    exec_server_port = uint16_t(config.apiexec_port);
-    cslog() << "Starting executor API on port " << config.apiexec_port;
+    exec_server_port = uint16_t(config.getApiSettings().apiexecPort);
+    cslog() << "Starting executor API on port " << config.getApiSettings().apiexecPort;
     exec_thread = std::thread([this]() {
         try {
             exec_server.run();
@@ -63,11 +61,11 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 #endif
 
 #ifdef BINARY_TCP_API
-    server_port = uint16_t(config.port);
+    server_port = uint16_t(config.getApiSettings().port);
 #endif
 
 #ifdef AJAX_IFACE
-    ajax_server_port = uint16_t(config.ajax_port);
+    ajax_server_port = uint16_t(config.getApiSettings().ajaxPort);
 #endif
 }
 

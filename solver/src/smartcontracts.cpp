@@ -1244,7 +1244,7 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
                 if (!reading_db) {
                     csdebug() << kLogPrefix << "found contract replenish " << FormatRef(block.sequence(), tr_idx);
                 }
-                emit signal_payable_invoke(tr, seq);
+                emit signal_payable_invoke(tr);
                 enqueue(block, tr_idx, reading_db);
             }
             else {
@@ -1463,7 +1463,7 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
         return false;
     }
     else if (test_executor_ready) {
-        executor_ready = exec_handler_ptr->getExecutor().isConnect();
+        executor_ready = exec_handler_ptr->getExecutor().isConnected();
         if (!executor_ready) {
             return false;
         }
@@ -2131,7 +2131,7 @@ bool SmartContracts::update_metadata(const api::SmartContractInvocation& contrac
     auto& executor_instance = exec_handler_ptr->getExecutor();
     executor_instance.getContractMethods(result, contract.smartContractDeploy.byteCodeObjects);
     if (result.status.code != 0) {
-        executor_ready = executor_instance.isConnect();
+        executor_ready = executor_instance.isConnected();
         if (!skip_log) {
             if (!result.status.message.empty()) {   
                 cswarning() << kLogPrefix << result.status.message;
@@ -2334,7 +2334,7 @@ void SmartContracts::update_status(QueueItem& item, cs::RoundNumber r, SmartCont
             for (const auto& execution : item.executions) {
                 const csdb::Transaction& t = execution.transaction;
                 if (t.is_valid()) {
-                    emit signal_contract_timeout(t, r);
+                    emit signal_contract_timeout(t);
                     std::string extra_info;
                     if (execution.ref_start.sequence != item.seq_start) {
                         std::ostringstream os;
@@ -2456,7 +2456,7 @@ bool SmartContracts::wait_until_executor(unsigned int test_freq, unsigned int ma
         return false;
     }
     unsigned int counter = 0;
-    while (!exec_handler_ptr->getExecutor().isConnect()) {
+    while (!exec_handler_ptr->getExecutor().isConnected()) {
         if (pnode->isStopRequested()) {
             return false;
         }

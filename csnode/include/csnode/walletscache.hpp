@@ -52,11 +52,6 @@ public:
     class Updater;
     std::unique_ptr<Updater> createUpdater();
 
-    struct RefContractCall {
-        cs::Sequence sequence;
-        uint32_t transaction;
-    };
-
     struct WalletData {
         csdb::Amount balance_;
         TransactionsTail trxTail_;
@@ -87,7 +82,7 @@ private:
     WalletsIds& walletsIds_;
 
     std::list<csdb::TransactionID> smartPayableTransactions_;
-    std::map<csdb::Address, std::list<RefContractCall>> canceledSmarts_;
+    std::map< csdb::Address, std::list<csdb::TransactionID> > canceledSmarts_;
     std::unordered_map<PublicKey, WalletData> wallets_;
 
 #ifdef MONITOR_NODE
@@ -105,7 +100,7 @@ public:
     const WalletData* findWallet(const csdb::Address&) const;
 
     void invokeReplenishPayableContract(const csdb::Transaction&);
-    void rollbackExceededTimeoutContract(const csdb::Transaction&, const WalletsCache::RefContractCall&, const csdb::Amount& execFee = 0);
+    void rollbackExceededTimeoutContract(const csdb::Transaction&, const csdb::Amount& execFee);
     void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx);
 
     void updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>&);
@@ -123,9 +118,9 @@ private:
     void fundConfidantsWalletsWithFee(const csdb::Amount& totalFee, const cs::ConfidantsKeys& confidants, const std::vector<uint8_t>& realTrusted);
     void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction, const BlockChain& blockchain);
 
-    void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const WalletsCache::RefContractCall& initRef, const csdb::Transaction& newStateTransaction);
-    bool isCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref);
-    void checkCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref);
+    void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const csdb::Transaction& newStateTransaction);
+    bool isCanceledSmart(const csdb::Address& contract_addr, const csdb::TransactionID& tid);
+    void checkCanceledSmart(const csdb::Address& contract_addr, const csdb::TransactionID& tid);
 
 #ifdef MONITOR_NODE
     bool setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp);

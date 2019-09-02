@@ -44,19 +44,7 @@ Neighbourhood::Neighbourhood(Transport* net)
 , mLockFlag_() {
 }
 
-bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
-    bool result = false;
-
-    if (bp.sentLastTime) {
-        return true;
-    }
-
-    if (bp.attempts > MaxResendTimes || !transport_->shouldSendPacket(bp.pack)) {
-        return result;
-    }
-
-    if (neighbours_.size() == 0) return false;
-
+void Neighbourhood::chooseNeighbours() {
     static bool redirectLimit = false;
     static auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -76,9 +64,24 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
         redirectNumber = neighbours_.size();
     }
 
-    auto selection = sample(std::begin(neighbours_), std::end(neighbours_), redirectNumber);
+    selection_ = sample(std::begin(neighbours_), std::end(neighbours_), redirectNumber);
+}
+
+bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
+    bool result = false;
+
+    if (bp.sentLastTime) {
+        return true;
+    }
+
+    if (bp.attempts > MaxResendTimes || !transport_->shouldSendPacket(bp.pack)) {
+        return result;
+    }
+
+    if (neighbours_.size() == 0) return false;
+
     bool sent = false;
-    for (auto& nb : selection) {
+    for (auto& nb : selection_) {
         bool found = false;
         for (auto ptr = bp.receivers; ptr != bp.recEnd; ++ptr) {
             if (*ptr == nb->id) {
@@ -217,6 +220,7 @@ void Neighbourhood::checkSilent() {
             (*connPtrIt)->connected = false;
             (*connPtrIt)->node = RemoteNodePtr();
             neighbours_.erase(connPtrIt);
+            chooseNeighbours();
         }
 
         if (needRefill) {
@@ -424,6 +428,7 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     }
 
     neighbours_.emplace(neighbours_.end(), conn);
+    chooseNeighbours();
 }
 
 void Neighbourhood::disconnectNode(ConnectionPtr* connPtr) {
@@ -431,7 +436,8 @@ void Neighbourhood::disconnectNode(ConnectionPtr* connPtr) {
     (*connPtr)->node = RemoteNodePtr();
     auto res = std::find(neighbours_.begin(), neighbours_.end(), *connPtr);
     if (res != neighbours_.end()) {
-      neighbours_.erase(res);
+        neighbours_.erase(res);
+        chooseNeighbours();
     }
 }
 
@@ -639,7 +645,6 @@ void Neighbourhood::pourByNeighbours(const Packet* pack, const uint32_t packNum)
         for (auto ptr = pack; ptr != end; ++ptr) {
             sendByNeighbours(ptr);
         }
-
         return;
     }
 

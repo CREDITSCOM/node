@@ -147,7 +147,7 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
     if (!pack.isFragmented()) {
         return MessagePtr();
     }
-    
+
     if (!pack.hasValidFragmentation()) {
         return MessagePtr();
     }
@@ -166,9 +166,8 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
         *msgPtr = msg = msgAllocator_.emplace();
         msg->packetsLeft_ = pack.getFragmentsNum();
         msg->packetsTotal_ = pack.getFragmentsNum();
+        msg->packets_.resize(msg->packetsTotal_);
         msg->headerHash_ = pack.getHeaderHash();
-        // to ensure not to contain dirty fragments in buffer (prevent goodPlace below from to be incorrect):
-        msg->clearFragments();
         newFragmentedMsg = true;
     }
     else {
@@ -177,12 +176,11 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
 
     {
         cs::Lock lock(msg->pLock_);
-        auto goodPlace = msg->packets_ + pack.getFragmentId(); // valid fragmentation has already been tested
-
-        if (!*goodPlace) {
+        auto& goodPlace = msg->packets_[pack.getFragmentId()]; // valid fragmentation has already been tested
+        if (!goodPlace) {
             msg->maxFragment_ = std::max(pack.getFragmentsNum(), msg->maxFragment_);
             --msg->packetsLeft_;
-            *goodPlace = pack;
+            goodPlace = pack;
         }
 
         if (msg->packetsTotal_ >= 20) {
@@ -206,21 +204,17 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
 /* WARN: All the cases except FRAG + COMPRESSED have bugs in them */
 void Message::composeFullData() const {
     if (getFirstPack().isFragmented()) {
-        const Packet* pack = packets_;
-        uint32_t headersLength = pack->getHeadersLength();
+        uint32_t headersLength = packets_[0].getHeadersLength();
         uint32_t totalSize = headersLength;
 
-        for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
-            totalSize += static_cast<uint32_t>((pack->size() - headersLength));
+        for (auto& pack: packets_) {
+            totalSize += static_cast<uint32_t>((pack.size() - headersLength));
         }
 
         fullData_ = allocator_.allocateNext(totalSize);
-
         uint8_t* data = static_cast<uint8_t*>(fullData_->data());
-        pack = packets_;
-
-        for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
-            uint32_t headerSize = static_cast<uint32_t>((i == 0) ? 0 : headersLength);
+        for (auto pack = packets_.begin(), end = packets_.end(); pack != end; ++pack) {
+            uint32_t headerSize = static_cast<uint32_t>((pack == packets_.begin()) ? 0 : headersLength);
 
             uint32_t cSize = cs::numeric_cast<uint32_t>(pack->size()) - headerSize;
             auto source = (reinterpret_cast<const char*>(pack->data())) + headerSize;
@@ -228,35 +222,6 @@ void Message::composeFullData() const {
             std::copy(source, source + cSize, data);
             data += cSize;
         }
-    }
-}
-
-// scans array of future fragments and clears all dirty elements, scans all elements
-size_t Message::clearBuffer(size_t from, size_t to) {
-    if (to <= from || to >= Packet::MaxFragments) {
-        return 0;
-    }
-    size_t cnt = 0;
-    for (size_t i = from; i < to; i++) {
-        // Packet's operator bool redirects call to Packet::data_::operator bool
-        if (packets_[i]) {
-            csdebug() << "Net: potential heap corruption prevented in message.packets_[" << i << "]";
-            packets_[i] = Packet{};
-            ++cnt;
-        }
-    }
-    return cnt;
-}
-
-Message::~Message() {
-    //DEBUG: prevent corruption after heap is damaged,
-    // assume maxFragment "points" behind the last fragment,
-    // idea is to avoid call to MemPtr<> destructor on incorrect object
-    size_t count = clearUnused();
-
-    if (count > 0) {
-        csdebug() << "Net: memory corruption prevented, invalid fragments (" << count << ") is behind the max of " << maxFragment_ << " and cannot been destructed";
-        Transport::cntCorruptedFragments += count;
     }
 }
 

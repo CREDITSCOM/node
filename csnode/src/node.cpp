@@ -47,8 +47,11 @@ Node::Node(const Config& config)
     std::cout << "Done\n";
     poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
-    const auto& settings = config.getApiSettings();
-    auto& executor = executor::Executor::getInstance(&blockChain_, solver_, settings.executorPort, settings.executorHost, settings.executorCmdLine);
+    executor::ExecutorSettings::set(cs::makeReference(blockChain_),
+                                    cs::makeReference(solver_),
+                                    cs::makeReference(config));
+
+    auto& executor = executor::Executor::getInstance();
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
@@ -74,11 +77,11 @@ Node::~Node() {
 bool Node::init(const Config& config) {
 #ifdef NODE_API
     std::cout << "Init API... ";
-    const auto& settings = config.getApiSettings();
-    api_ = std::make_unique<csconnector::connector>(
-        blockChain_, solver_,
-        csconnector::Config{settings.port, settings.ajaxPort, settings.executorPort, settings.apiexecPort, settings.executorCmdLine });
+
+    api_ = std::make_unique<csconnector::connector>(blockChain_, solver_, config);
+
     std::cout << "Done\n";
+
     cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
 #endif  // NODE_API
@@ -2168,7 +2171,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
             }
             uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
         
-            if (speed < 50) {
+            if (speed < stat_.getAveTime() / 10) {
                 cserror() << "just got RoundPackage can't be created in " << speed << " msec per block";
                 return;
             }
