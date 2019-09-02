@@ -444,6 +444,7 @@ void BlockChain::removeLastBlock() {
     }
 	--lastSequence_;
     total_transactions_count_ -= pool.transactions().size();
+    walletsCacheUpdater_->loadNextBlock(pool, pool.confidants(), *this, true);
     removeWalletsInPoolFromCache(pool);
     removeLastBlockFromTrxIndex(pool);
 
