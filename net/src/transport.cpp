@@ -917,6 +917,51 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 }
 
 bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode) {
+    // receive new friends after registration on SignalServer
+    if (ssStatus_ == SSBootstrapStatus::Complete)
+    {
+        cslog() << "Receive new friedns nodes from SignalServer";
+        if (!node_->getNewFriendsNodesVerify(task->pack.getMsgData(), task->pack.getMsgSize()))
+        {
+            cswarning() << "gotSSRegistration message is incorrect: signature isn't valid";
+            return false;
+        }
+
+        uint32_t ctr = nh_.size();
+        iPackStream_.safeSkip<cs::Signature>();
+
+        uint8_t numCirc{ 0 };
+        iPackStream_ >> numCirc;
+
+        for (uint8_t i = 0; i < numCirc; ++i) {
+            EndpointData ep;
+            ep.ipSpecified = true;
+            cs::PublicKey key;
+
+            iPackStream_ >> ep.ip >> ep.port >> key;
+
+            if (!iPackStream_.good()) {
+                return false;
+            }
+
+            ++ctr;
+
+            if (!std::equal(key.cbegin(), key.cend(), config_.getMyPublicKey().cbegin())) {
+                if (ctr <= config_.getMaxNeighbours()) {
+                    nh_.establishConnection(net_->resolve(ep));
+                }
+            }
+
+            if (!nh_.canHaveNewConnection()) {
+                break;
+            }
+        }
+
+        cslog() << "Save new friends nodes";
+        return true;
+    }
+
+    // first registration on SignalServer
     if (ssStatus_ != SSBootstrapStatus::Requested) {
         cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of Requested";
         return false;
