@@ -10,7 +10,7 @@
 namespace {
 const uint8_t kUntrustedMarker = 255;
 
-inline int32_t getReadTrustedNum(const std::vector<uint8_t>& realTrusted) {
+inline int32_t getRealTrustedNum(const std::vector<uint8_t>& realTrusted) {
     int32_t res = 0;
 
     for (auto trustedMarker : realTrusted) {
@@ -155,7 +155,7 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
         cslog() << kLogPrefix << "NO CONFIDANTS";
         return;
     }
-    auto realTrustedNumber = getReadTrustedNum(realTrusted);
+    auto realTrustedNumber = getRealTrustedNum(realTrusted);
     csdb::Amount feeToEachConfidant = totalFee / realTrustedNumber;
     csdb::Amount payedFee = 0;
     int32_t numPayedTrusted = 0;
@@ -195,7 +195,7 @@ void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transac
     }
     const ConfidantsKeys& confidants = pool.confidants();
     const std::vector<uint8_t> realTrusted = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
-    auto realTrustedNumber = getReadTrustedNum(realTrusted);
+    auto realTrustedNumber = getRealTrustedNum(realTrusted);
     csdb::Amount feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>() / realTrustedNumber;
     csdb::Amount payedFee = 0;
     int32_t numPayedTrusted = 0;
