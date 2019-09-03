@@ -2058,6 +2058,24 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage) {
     performRoundPackage(rPackage, solver_->getPublicKey());
 }
 
+bool Node::getNewFriendsNodesVerify(const uint8_t* data, const size_t size)
+{
+    istream_.init(data, size);
+    istream_.safeSkip<uint8_t>();
+
+    cs::Signature sig;
+    istream_ >> sig;
+
+    if (const auto & starter_key = cs::PacketValidator::instance().getStarterKey(); !cscrypto::verifySignature(sig, starter_key, istream_.getCurrentPtr(), istream_.remainsBytes())) {
+        csdebug() << "SSKey: " << cs::Utils::byteStreamToHex(starter_key.data(), starter_key.size());
+        csdebug() << "Message to Sign: " << cs::Utils::byteStreamToHex(istream_.getCurrentPtr(), istream_.remainsBytes());
+        cswarning() << "getNewFriendsNodes message is incorrect: signature isn't valid";
+        return false;
+    }
+
+    return true;
+}
+
 bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants) {
     csdebug() << "NODE> PoolSigs Amnt = " << rPackage.poolSignatures().size()
         << ", TrustedSigs Amnt = " << rPackage.trustedSignatures().size()
