@@ -160,6 +160,12 @@ void Config::dumpJSONKeys(const std::string& fName) const {
     cscrypto::fillWithZeros(const_cast<char*>(sk58.data()), sk58.size());
 }
 
+void Config::swap(Config& config) {
+    Config temp = std::move(config);
+    config = std::move(*this);
+    (*this) = std::move(temp);
+}
+
 Config Config::read(po::variables_map& vm, bool seedEnter) {
     Config result = readFromFile(getArgFromCmdLine(vm, ARG_NAME_CONFIG_FILE, DEFAULT_PATH_TO_CONFIG));
 

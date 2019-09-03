@@ -177,6 +177,8 @@ public:
         return conveyerSendCacheValue_;
     }
 
+    void swap(Config& config);
+
 private:
     static Config readFromFile(const std::string& fileName);
     void setLoggerSettings(const boost::property_tree::ptree& config);
