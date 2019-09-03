@@ -86,20 +86,6 @@ struct PoolMetaInfo {
     std::vector <csdb::Pool::SmartSignature> smartSignatures;
 };
 
-struct HashVector {
-    cs::Byte sender;
-    cs::Hash hash;
-    cs::Signature signature;
-};
-
-constexpr std::size_t kHashVectorCount = 5;
-
-struct HashMatrix {
-    cs::Byte sender;
-    cs::HashVector hashVector[kHashVectorCount];
-    cs::Signature signature;
-};
-
 // metas
 struct PoolSyncMeta {
     csdb::Pool pool;

@@ -52,11 +52,6 @@ public:
     class Updater;
     std::unique_ptr<Updater> createUpdater();
 
-    struct RefContractCall {
-        cs::Sequence sequence;
-        uint32_t transaction;
-    };
-
     struct WalletData {
         csdb::Amount balance_;
         TransactionsTail trxTail_;
@@ -87,7 +82,7 @@ private:
     WalletsIds& walletsIds_;
 
     std::list<csdb::TransactionID> smartPayableTransactions_;
-    std::map<csdb::Address, std::list<RefContractCall>> canceledSmarts_;
+    std::map< csdb::Address, std::list<csdb::TransactionID> > canceledSmarts_;
     std::unordered_map<PublicKey, WalletData> wallets_;
 
 #ifdef MONITOR_NODE
@@ -99,14 +94,23 @@ class WalletsCache::Updater {
 public:
     Updater(WalletsCache& data);
 
-    void loadNextBlock(csdb::Pool& curr, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain);
+    void loadNextBlock(csdb::Pool& curr,
+                       const cs::ConfidantsKeys& confidants,
+                       const BlockChain& blockchain,
+                       bool inverse = false); // inverse all operations
 
     const WalletData* findWallet(const PublicKey&) const;
     const WalletData* findWallet(const csdb::Address&) const;
 
-    void invokeReplenishPayableContract(const csdb::Transaction&);
-    void rollbackExceededTimeoutContract(const csdb::Transaction&, const WalletsCache::RefContractCall&, const csdb::Amount& execFee = 0);
-    void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx);
+    void invokeReplenishPayableContract(const csdb::Transaction&, bool inverse = false);
+
+    void rollbackExceededTimeoutContract(const csdb::Transaction&,
+                                         const csdb::Amount& execFee,
+                                         bool inverse = false);
+
+    void smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx,
+                                        const csdb::Transaction& initTrx,
+                                        bool inverse = false);
 
     void updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>&);
 
@@ -116,16 +120,28 @@ private:
     WalletData& getWalletData(const PublicKey&);
     WalletData& getWalletData(const csdb::Address&);
 
-    double load(const csdb::Transaction& tr, const BlockChain& blockchain);
-    double loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain);
-    void loadTrxForTarget(const csdb::Transaction& tr);
+    double load(const csdb::Transaction& tr, const BlockChain& blockchain, bool inverse);
 
-    void fundConfidantsWalletsWithFee(const csdb::Amount& totalFee, const cs::ConfidantsKeys& confidants, const std::vector<uint8_t>& realTrusted);
-    void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction, const BlockChain& blockchain);
+    double loadTrxForSource(const csdb::Transaction& tr,
+                            const BlockChain& blockchain,
+                            bool inverse);
+    void loadTrxForTarget(const csdb::Transaction& tr, bool inverse);
 
-    void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction, const WalletsCache::RefContractCall& initRef, const csdb::Transaction& newStateTransaction);
-    bool isCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref);
-    void checkCanceledSmart(const csdb::Address& contract_addr, const WalletsCache::RefContractCall& ref);
+    void fundConfidantsWalletsWithFee(const csdb::Amount& totalFee,
+                                      const cs::ConfidantsKeys& confidants,
+                                      const std::vector<uint8_t>& realTrusted,
+                                      bool inverse);
+    void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction,
+                                          const BlockChain& blockchain,
+                                          bool inverse);
+
+    void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction,
+                                   const csdb::Transaction& newStateTransaction,
+                                   bool inverse);
+    bool isCanceledSmart(const csdb::Address& contract_addr, const csdb::TransactionID& tid);
+    void checkCanceledSmart(const csdb::Address& contract_addr,
+                            const csdb::TransactionID& tid,
+                            bool inverse);
 
 #ifdef MONITOR_NODE
     bool setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp);
@@ -154,10 +170,9 @@ inline WalletsCache::WalletData& WalletsCache::Updater::getWalletData(const csdb
     return data_.wallets_[toPublicKey(addr)];
 }
 
-inline double WalletsCache::Updater::load(const csdb::Transaction& t, const BlockChain& bc) {
-    loadTrxForTarget(t);
-    return loadTrxForSource(t, bc);
+inline double WalletsCache::Updater::load(const csdb::Transaction& t, const BlockChain& bc, bool inverse) {
+    loadTrxForTarget(t, inverse);
+    return loadTrxForSource(t, bc, inverse);
 }
-
 } // namespace cs
 #endif // WALLETS_CACHE_HPP

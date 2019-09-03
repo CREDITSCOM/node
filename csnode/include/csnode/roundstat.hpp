@@ -25,6 +25,8 @@ public:
         return totalAcceptedTransactions_;
     }
 
+    size_t getAveTime();
+
 private:
     // amount of transactions received (to verify or not or to ignore)
     size_t totalReceivedTransactions_;
@@ -36,6 +38,7 @@ private:
     size_t deferredTransactionsCount_;
     std::chrono::steady_clock::time_point startPointMs_;
     size_t totalDurationMs_;
+    size_t ave_round_ms;
 
     // std::multiset<size_t> shortestRounds_;
     // std::multiset<size_t> longestRounds_;

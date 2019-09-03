@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <unordered_map>
 
 #include <boost/functional/hash.hpp>
 

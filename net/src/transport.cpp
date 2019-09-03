@@ -140,16 +140,18 @@ void Transport::run() {
     while (Transport::gSignalStatus == 0) {
         ++ctr;
 
-        bool askMissing = true;
+//        bool askMissing = true;
         bool resendPacks = ctr % 10 == 0;
         bool sendPing = ctr % 20 == 0;
         bool refreshLimits = ctr % 20 == 0;
         bool checkPending = ctr % 100 == 0;
         bool checkSilent = ctr % 150 == 0;
 
+/*
         if (askMissing) {
             askForMissingPackages();
         }
+*/
 
         if (checkPending) {
             nh_.checkPending(config_.getMaxNeighbours());
@@ -260,14 +262,9 @@ RemoteNodePtr Transport::getPackSenderEntry(const ip::udp::endpoint& ep) {
 }
 
 bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
-    uint32_t nextBytesCount = static_cast<uint32_t>(conn.lastBytesCount.load(std::memory_order_relaxed) + pack->size());
-    if (nextBytesCount <= config_.getConnectionBandwidth()) {
-        conn.lastBytesCount.fetch_add(static_cast<uint32_t>(pack->size()), std::memory_order_relaxed);
-        net_->sendDirect(*pack, conn.getOut());
-        return true;
-    }
-
-    return false;
+    conn.lastBytesCount.fetch_add(static_cast<uint32_t>(pack->size()), std::memory_order_relaxed);
+    net_->sendDirect(*pack, conn.getOut());
+    return true;
 }
 
 void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
@@ -289,6 +286,12 @@ void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
 		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
         return;
     }
+
+    {
+        auto lock = getNeighboursLock();
+        nh_.chooseNeighbours();
+    }
+
     const auto packEnd = pack + size;
     for (auto ptr = pack; ptr != packEnd; ++ptr) {
         sendBroadcast(ptr);
@@ -669,7 +672,7 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
 void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhenResend) {
     if (packNum >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
-		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << packNum;
+        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << packNum;
         return;
     }
     nh_.pourByNeighbours(pack, packNum);
@@ -914,6 +917,51 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 }
 
 bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode) {
+    // receive new friends after registration on SignalServer
+    if (ssStatus_ == SSBootstrapStatus::Complete)
+    {
+        cslog() << "Receive new friedns nodes from SignalServer";
+        if (!node_->getNewFriendsNodesVerify(task->pack.getMsgData(), task->pack.getMsgSize()))
+        {
+            cswarning() << "gotSSRegistration message is incorrect: signature isn't valid";
+            return false;
+        }
+
+        uint32_t ctr = nh_.size();
+        iPackStream_.safeSkip<cs::Signature>();
+
+        uint8_t numCirc{ 0 };
+        iPackStream_ >> numCirc;
+
+        for (uint8_t i = 0; i < numCirc; ++i) {
+            EndpointData ep;
+            ep.ipSpecified = true;
+            cs::PublicKey key;
+
+            iPackStream_ >> ep.ip >> ep.port >> key;
+
+            if (!iPackStream_.good()) {
+                return false;
+            }
+
+            ++ctr;
+
+            if (!std::equal(key.cbegin(), key.cend(), config_.getMyPublicKey().cbegin())) {
+                if (ctr <= config_.getMaxNeighbours()) {
+                    nh_.establishConnection(net_->resolve(ep));
+                }
+            }
+
+            if (!nh_.canHaveNewConnection()) {
+                break;
+            }
+        }
+
+        cslog() << "Save new friends nodes";
+        return true;
+    }
+
+    // first registration on SignalServer
     if (ssStatus_ != SSBootstrapStatus::Requested) {
         cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of Requested";
         return false;
@@ -1122,17 +1170,17 @@ void Transport::askForMissingPackages() {
 
         {
             cs::Lock messageLock(msg->pLock_);
-            const auto end = msg->packets_ + msg->packetsTotal_;
 
             uint16_t start = 0;
             uint64_t mask = 0;
             uint64_t req = 0;
+            uint16_t end = msg->packets_.size();
 
-            for (auto s = msg->packets_; s != end; ++s) {
-                if (!*s) {
+            for(uint16_t i = 0; i < end; i++) {
+                if (!msg->packets_[i]) {
                     if (!mask) {
                         mask = 1;
-                        start = cs::numeric_cast<uint16_t>(s - msg->packets_);
+                        start = i;
                     }
                     req |= mask;
                 }
@@ -1140,7 +1188,7 @@ void Transport::askForMissingPackages() {
                 if (mask == maxMask) {
                     requestMissing(msg->headerHash_, start, req);
 
-                    if (s > (msg->packets_ + msg->maxFragment_) && (end - s) > 128) {
+                    if (i > msg->maxFragment_ && i >= 128) {
                         break;
                     }
 
@@ -1181,11 +1229,6 @@ void Transport::registerMessage(MessagePtr msg) {
     auto& ptr = uncollected_.emplace(msg);
     //DEBUG:
     Message& message = *ptr.get();
-    size_t cnt = message.clearUnused();
-    if (cnt > 0) {
-        csdebug() << "Net: potential heap corruption detected in uncollected message fragments (" << cnt << ")";
-        Transport::cntDirtyAllocs += cnt;
-    }
 }
 
 bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {

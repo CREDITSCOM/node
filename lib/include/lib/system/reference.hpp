@@ -7,31 +7,47 @@ namespace cs {
 template<typename T>
 class Reference {
 public:
-    Reference(const Reference&) = default;
-    Reference& operator=(const Reference&) = default;
+    template <typename U>
+    Reference(const Reference<U>& ref)
+    : reference_(ref.reference_) {
+    }
 
     T* operator->() const {
         return &reference_.get();
     }
 
+    operator T&() const {
+        return  reference_.get();
+    }
+
     static Reference make(T& value) {
         if constexpr (std::is_const_v<T>) {
-            return Reference{std::cref(value)};
+            return Reference<T>{std::cref(value)};
         }
         else {
-            return Reference{std::ref(value)};
+            return Reference<T>{std::ref(value)};
         }
     }
 
 private:
-    explicit Reference(const std::reference_wrapper<T>& value):reference_(value) {}
+    explicit Reference(const std::reference_wrapper<T>& value)
+    : reference_(value) {
+    }
 
     std::reference_wrapper<T> reference_;
+
+    template<typename K>
+    friend class Reference;
 };
 
 template <typename T>
-Reference<T> makeReference(T& value) {
+Reference<T> makeReference(T& value) noexcept {
     return Reference<T>::make(value);
+}
+
+template<typename T>
+Reference<T> makeReference(T* value) noexcept {
+    return makeReference(*value);
 }
 }
 

@@ -339,9 +339,6 @@ void Network::writerRoutine(const Config& config) {
         int tasks = writerTaskCount_;
         writerTaskCount_ = 0;
         writerLock.clear(std::memory_order_release);  // release lock
-		//if (tasks > 100) {
-		//	csinfo() << __func__ << ": got package of " << tasks << " tasks";
-		//}
         for (int i = 0; i < tasks; i++) {
             bool is_empty = false;
             auto task = oPacMan_.getNextTask(is_empty);
@@ -630,7 +627,6 @@ Network::Network(const Config& config, Transport* transport)
 
 bool Network::resendFragment(const cs::Hash& hash, const uint16_t id, const ip::udp::endpoint& ep) {
     MessagePtr msg;
-
     {
         cs::Lock lock(collector_.mLock_);
         msg = collector_.map_.tryStore(hash);
@@ -642,8 +638,8 @@ bool Network::resendFragment(const cs::Hash& hash, const uint16_t id, const ip::
 
     {
         cs::Lock l(msg->pLock_);
-        if (id < msg->packetsTotal_ && *(msg->packets_ + id)) {
-            sendDirect(*(msg->packets_ + id), ep);
+        if (id < msg->packetsTotal_ && msg->packets_[id]) {
+            sendDirect(msg->packets_[id], ep);
             return true;
         }
     }
@@ -656,17 +652,16 @@ void Network::sendInit() {
 }
 
 void Network::registerMessage(Packet* pack, const uint32_t size) {
-	
-	if (size >= 1000) {
-		csinfo() << "Found large message, size = " << size;
-	}
+    if (size >= 1000) {
+        csinfo() << "Found large message, size = " << size;
+    }
+
     if (size >= Packet::MaxFragments) {
         cserror() << "Too much fragments in message to send (" << size << "), ignore";
         return;
     }
 
     MessagePtr msg;
-
     {
         cs::Lock l(collector_.mLock_);
         msg = collector_.msgAllocator_.emplace();
@@ -674,12 +669,11 @@ void Network::registerMessage(Packet* pack, const uint32_t size) {
 
     msg->packetsLeft_ = 0;
     msg->packetsTotal_ = size;
+    msg->packets_.resize(size);
     msg->headerHash_ = pack->getHeaderHash();
 
-    auto packEnd = msg->packets_ + size;
-    auto rPtr = pack;
-    for (auto wPtr = msg->packets_; wPtr != packEnd; ++wPtr, ++rPtr) {
-        *wPtr = *rPtr;
+    for (auto it = msg->packets_.begin(), end = msg->packets_.end(); it != end; ++it) {
+        *it = *pack++;
     }
 
     {

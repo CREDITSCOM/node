@@ -20,7 +20,12 @@ class Transport;
 class BlockChain;
 
 const uint32_t MaxMessagesToKeep = 128;
-const uint32_t MaxResendTimes = 8;
+const uint32_t MaxResendTimes =
+#if defined(WEB_WALLET_NODE)
+8;
+#else
+4;
+#endif // !WEB_WALLET_NODE
 const cs::Sequence MaxSyncAttempts = 8;
 
 const cs::Sequence BlocksToSync = 16;
@@ -129,6 +134,7 @@ public:
 
     explicit Neighbourhood(Transport*);
 
+    void chooseNeighbours();
     void sendByNeighbours(const Packet*);
 
     void establishConnection(const ip::udp::endpoint&);
@@ -226,6 +232,7 @@ private:
     mutable std::mutex mLockFlag_;
 
     std::deque<ConnectionPtr> neighbours_;
+    std::vector<ConnectionPtr> selection_;
     FixedHashMap<ip::udp::endpoint, ConnectionPtr, uint16_t, MaxConnections> connections_;
 
     struct SenderInfo {

@@ -14,6 +14,7 @@
 
 #include <iostream>
 #include <memory>
+#include <vector>
 
 /*
     Static min memory usage (see types below):
@@ -86,7 +87,7 @@ enum MsgTypes : uint8_t {
 
 class Packet {
 public:
-    static const uint32_t MaxSize = 1024;
+    static const uint32_t MaxSize = 1400;
     static const uint32_t MaxFragments = 4096;
 
     static const uint32_t SmartRedirectTreshold = 10000;
@@ -329,6 +330,7 @@ using PacketPtr = Packet*;
 class Message {
 public:
     Message() = default;
+    ~Message() = default;
 
     Message(Message&&) = default;
     Message& operator=(Message&&) = default;
@@ -336,14 +338,12 @@ public:
     Message(const Message&) = delete;
     Message& operator=(const Message&) = delete;
 
-    ~Message();
-
     bool isComplete() const {
         return packetsLeft_ == 0;
     }
 
     const Packet& getFirstPack() const {
-        return *packets_;
+        return packets_[0];
     }
 
     const uint8_t* getFullData() const {
@@ -351,7 +351,7 @@ public:
             composeFullData();
         }
 
-        return static_cast<const uint8_t*>(fullData_->data()) + packets_->getHeadersLength();
+        return static_cast<const uint8_t*>(fullData_->data()) + packets_[0].getHeadersLength();
     }
 
     size_t getFullSize() const {
@@ -359,7 +359,7 @@ public:
             composeFullData();
         }
 
-        return fullData_->size() - packets_->getHeadersLength();
+        return fullData_->size() - packets_[0].getHeadersLength();
     }
 
     Packet extractData() const {
@@ -368,26 +368,12 @@ public:
         }
 
         Packet result(std::move(fullData_));
-        result.headersLength_ = packets_->getHeadersLength();
+        result.headersLength_ = packets_[0].getHeadersLength();
 
         return result;
     }
 
-    // scans array of future fragments and clears all dirty elements, scans only the first maxFragment elements
-    // return cleared elements count
-    size_t clearFragments() {
-        return clearBuffer(0, maxFragment_);
-    }
-
-    // scans array of future fragments and clears all dirty elements, scans only unused behind the maxFragment elements
-    // return cleared elements count
-    size_t clearUnused() {
-        return clearBuffer(maxFragment_, Packet::MaxFragments);
-    }
-
 private:
-    size_t clearBuffer(size_t from, size_t to);
-
     static RegionAllocator allocator_;
 
     void composeFullData() const;
@@ -398,7 +384,7 @@ private:
     uint32_t packetsTotal_ = 0;
 
     uint16_t maxFragment_ = 0;
-    Packet packets_[Packet::MaxFragments];
+    std::vector<Packet> packets_;
 
     cs::Hash headerHash_;
 
