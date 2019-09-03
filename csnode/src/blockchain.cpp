@@ -413,6 +413,11 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
 }
 
 void BlockChain::removeLastBlock() {
+	if (blocksToBeRemoved_ == 0) {
+		csmeta(csdebug) << "There are no blocks, allowed to be removed";
+		return;
+	}
+	--blocksToBeRemoved_;
     csmeta(csdebug) << "begin";
     csdb::Pool pool{};
 
@@ -1111,6 +1116,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         }
         else {
             csdebug() << "the signatures of the block are incorrect";
+			setBlocksToBeRemoved(1U);
             return std::nullopt;
         }
         pool = deferredBlock_.clone();
@@ -1244,13 +1250,15 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
 
     if (poolSequence == lastSequence + 1) {
         if (pool.previous_hash() != getLastHash()) {
-            csdebug() << "BLOCKCHAIN> new pool\'s prev. hash does not equal to current last hash, remove own last block and cancel store operation";
+			csdebug() << "BLOCKCHAIN> new pool\'s prev. hash does not equal to current last hash";
             if (getLastHash().is_empty()) {
                 cserror() << "BLOCKCHAIN> own last hash is empty";
             }
             if (pool.previous_hash().is_empty()) {
-                cserror() << "BLOCKCHAIN> new pool\'s prev. hash is empty";
+                cserror() << "BLOCKCHAIN> new pool\'s prev. hash is empty, don\'t write it, do not any harm to our blockchain";
+				return false;
             }
+			csdebug() <<  "BLOCKCHAIN> remove own last block and cancel store operation";
             removeLastBlock();
             return false;
         }
@@ -1273,11 +1281,15 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             csdebug() << "BLOCKCHAIN> block #" << poolSequence << " has recorded to chain successfully";
             // unable to call because stack overflow in case of huge written blocks amount possible:
             // testCachedBlocks();
+			blocksToBeRemoved_ = 0;
             return true;
         }
 
         csdebug() << "BLOCKCHAIN> failed to store block #" << poolSequence << " to chain";
-        removeLastBlock();
+		if (poolSequence == lastSequence_) {
+			removeLastBlock();
+		}
+
         return false;
     }
 
@@ -1500,4 +1512,13 @@ std::pair<cs::Sequence, uint32_t> BlockChain::getPreviousNonEmptyBlock(cs::Seque
 
 cs::Sequence BlockChain::getLastSeq() const{
 	return lastSequence_;
+}
+
+void BlockChain::setBlocksToBeRemoved(cs::Sequence number) {
+	if (blocksToBeRemoved_ > 0) {
+		csdebug() << "BLOCKCHAIN> Can't change number of blocks to be removed, because the previous removal is still not finished";
+		return;
+	}
+	csdebug() << "BLOCKCHAIN> Allowed NUMBER blocks to remove is set to " << blocksToBeRemoved_;
+	blocksToBeRemoved_ = number;
 }

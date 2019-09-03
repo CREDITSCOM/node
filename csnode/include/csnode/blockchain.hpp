@@ -235,6 +235,8 @@ public:
     // wallet transactions: pools cache + db search
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
 
+	void setBlocksToBeRemoved(cs::Sequence number);
+
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);
     void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>); 
@@ -368,5 +370,6 @@ private:
     bool recreateIndex_;
     std::map<csdb::Address, cs::Sequence> lapoos;
 	std::atomic<cs::Sequence> lastSequence_;
+	cs::Sequence blocksToBeRemoved_ = 0;
 };
 #endif  //  BLOCKCHAIN_HPP
