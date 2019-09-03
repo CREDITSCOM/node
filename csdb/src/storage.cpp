@@ -851,6 +851,11 @@ cs::Bytes Storage::get_trans_index_key(const Address& addr, cs::Sequence seq) {
 cs::Sequence Storage::get_previous_transaction_block(const Address& addr, cs::Sequence seq) const {
     cs::Sequence result = cs::kWrongSequence;
 
+    if (!isOpen()) {
+        d->set_last_error(NotOpen);
+        return result;
+    }
+
     const auto key = get_trans_index_key(addr, seq);
     cs::Bytes data;
 
@@ -862,21 +867,35 @@ cs::Sequence Storage::get_previous_transaction_block(const Address& addr, cs::Se
     return result;
 }
 
-void Storage::set_previous_transaction_block(const Address& addr, cs::Sequence currTransBlock, cs::Sequence prevTransBlock) {
+bool Storage::set_previous_transaction_block(const Address& addr, cs::Sequence currTransBlock, cs::Sequence prevTransBlock) {
+    if (!isOpen()) {
+        d->set_last_error(NotOpen);
+        return false;
+    }
+
     const auto key = get_trans_index_key(addr, currTransBlock);
 
     ::csdb::priv::obstream os;
     os.put(prevTransBlock);
 
-    d->db->putToTransIndex(key, os.buffer());
+    return d->db->putToTransIndex(key, os.buffer());
 }
 
-void Storage::remove_last_from_trx_index(const Address& addr, cs::Sequence lastIndexed) {
-    d->db->removeLastFromTrxIndex(get_trans_index_key(addr, lastIndexed));
+bool Storage::remove_last_from_trx_index(const Address& addr, cs::Sequence lastIndexed) {
+    if (!isOpen()) {
+        d->set_last_error(NotOpen);
+        return false;
+    }
+
+    return d->db->removeLastFromTrxIndex(get_trans_index_key(addr, lastIndexed));
 }
 
-void Storage::truncate_trxs_index() {
-    d->db->truncateTransIndex();
+bool Storage::truncate_trxs_index() {
+    if (!isOpen()) {
+        d->set_last_error(NotOpen);
+        return false;
+    }
+    return d->db->truncateTransIndex();
 }
 
 bool Storage::get_contract_data(const Address& abs_addr /*input*/, cs::Bytes& data /*output*/) const {
