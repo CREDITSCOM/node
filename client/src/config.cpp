@@ -42,6 +42,7 @@ const std::string PARAM_NAME_HOSTS_FILENAME = "hosts_filename";
 const std::string PARAM_NAME_USE_IPV6 = "ipv6";
 const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
+const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
 
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
@@ -682,6 +683,7 @@ Config Config::readFromFile(const std::string& fileName) {
         }
 
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
+        result.observerWaitTime_ = params.count(PARAM_NAME_OBSERVER_WAIT_TIME) ? params.get<uint64_t>(PARAM_NAME_OBSERVER_WAIT_TIME) : DEFAULT_OBSERVER_WAIT_TIME;
 
         result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE), NODE_TYPES_MAP);
 
@@ -837,4 +839,81 @@ bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const st
     }
 
     return false;
+}
+
+bool operator==(const EndpointData& lhs, const EndpointData& rhs) {
+#if !defined(BOOST_ASIO_NO_DEPRECATED)
+    boost::system::error_code ec;
+    auto result = lhs.ip.to_string(ec) == rhs.ip.to_string(ec);
+#else
+    auto result = lhs.ip.to_string() == rhs.ip.to_string();
+#endif
+    return result &&
+           lhs.port == rhs.port &&
+           lhs.ipSpecified == rhs.ipSpecified;
+}
+
+bool operator!=(const EndpointData& lhs, const EndpointData& rhs) {
+    return !(lhs == rhs);
+}
+
+bool operator==(const PoolSyncData& lhs, const PoolSyncData& rhs) {
+    return lhs.oneReplyBlock == rhs.oneReplyBlock &&
+           lhs.isFastMode == rhs.isFastMode &&
+           lhs.blockPoolsCount == rhs.blockPoolsCount &&
+           lhs.requestRepeatRoundCount && rhs.requestRepeatRoundCount &&
+           lhs.neighbourPacketsCount && rhs.neighbourPacketsCount &&
+           lhs.sequencesVerificationFrequency && rhs.sequencesVerificationFrequency;
+}
+
+bool operator!=(const PoolSyncData& lhs, const PoolSyncData& rhs) {
+    return !(lhs == rhs);
+}
+
+bool operator==(const ApiData& lhs, const ApiData& rhs) {
+    return lhs.port == rhs.port &&
+           lhs.ajaxPort == rhs.ajaxPort &&
+           lhs.executorPort == rhs.executorPort &&
+           lhs.apiexecPort == rhs.apiexecPort &&
+           lhs.executorSendTimeout == rhs.executorSendTimeout &&
+           lhs.executorReceiveTimeout == rhs.executorReceiveTimeout &&
+           lhs.serverSendTimeout == rhs.serverSendTimeout &&
+           lhs.serverReceiveTimeout == rhs.serverReceiveTimeout &&
+           lhs.ajaxServerSendTimeout == rhs.ajaxServerSendTimeout &&
+           lhs.ajaxServerReceiveTimeout == rhs.ajaxServerReceiveTimeout &&
+           lhs.executorHost == rhs.executorHost &&
+           lhs.executorCmdLine == rhs.executorCmdLine;
+}
+
+bool operator!=(const ApiData& lhs, const ApiData& rhs) {
+    return !(lhs == rhs);
+}
+
+// logger settings not checked
+bool operator==(const Config& lhs, const Config& rhs) {
+    return lhs.good_ == rhs.good_ &&
+           lhs.inputEp_ == rhs.inputEp_ &&
+           lhs.twoSockets_ == rhs.twoSockets_ &&
+           lhs.outputEp_ == rhs.outputEp_ &&
+           lhs.nType_ == rhs.nType_ &&
+           lhs.ipv6_ == rhs.ipv6_ &&
+           lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
+           lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
+           lhs.symmetric_ == rhs.symmetric_ &&
+           lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
+           lhs.bType_ == rhs.bType_ &&
+           lhs.signalServerEp_ == rhs.signalServerEp_ &&
+           lhs.bList_ == rhs.bList_ &&
+           lhs.pathToDb_ == rhs.pathToDb_ &&
+           lhs.publicKey_ == rhs.publicKey_ &&
+           lhs.privateKey_ == rhs.privateKey_ &&
+           lhs.poolSyncData_ == rhs.poolSyncData_ &&
+           lhs.apiData_ == rhs.apiData_ &&
+           lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
+           lhs.recreateIndex_ == rhs.recreateIndex_ &&
+           lhs.observerWaitTime_ == rhs.observerWaitTime_;
+}
+
+bool operator!=(const Config& lhs, const Config& rhs) {
+    return !(lhs == rhs);
 }

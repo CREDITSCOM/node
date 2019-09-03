@@ -29,18 +29,22 @@
 #include <boost/optional.hpp>
 
 #include <lz4.h>
+
 #include <cscrypto/cscrypto.hpp>
+
+#include <observer.hpp>
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
 
-Node::Node(const Config& config)
+Node::Node(const Config& config, cs::config::Observer& observer)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(genesisAddress_, startAddress_, config.recreateIndex())
 , ostream_(&packStreamAllocator_, nodeIdKey_)
 , stat_()
-, blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
+, blockValidator_(std::make_unique<cs::BlockValidator>(*this))
+, observer_(observer) {
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
     std::cout << "Start transport... ";
     transport_ = new Transport(config, this);
@@ -141,6 +145,9 @@ void Node::stop() {
     }
 
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
+
+    observer_.stop();
+    cswarning() << "[CONFIG OBSERVER STOPPED]";
 }
 
 /* Requests */
