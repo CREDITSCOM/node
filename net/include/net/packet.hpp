@@ -14,6 +14,7 @@
 
 #include <iostream>
 #include <memory>
+#include <vector>
 
 /*
     Static min memory usage (see types below):
@@ -342,7 +343,7 @@ public:
     }
 
     const Packet& getFirstPack() const {
-        return *packets_;
+        return packets_[0];
     }
 
     const uint8_t* getFullData() const {
@@ -350,7 +351,7 @@ public:
             composeFullData();
         }
 
-        return static_cast<const uint8_t*>(fullData_->data()) + packets_->getHeadersLength();
+        return static_cast<const uint8_t*>(fullData_->data()) + packets_[0].getHeadersLength();
     }
 
     size_t getFullSize() const {
@@ -358,7 +359,7 @@ public:
             composeFullData();
         }
 
-        return fullData_->size() - packets_->getHeadersLength();
+        return fullData_->size() - packets_[0].getHeadersLength();
     }
 
     Packet extractData() const {
@@ -367,7 +368,7 @@ public:
         }
 
         Packet result(std::move(fullData_));
-        result.headersLength_ = packets_->getHeadersLength();
+        result.headersLength_ = packets_[0].getHeadersLength();
 
         return result;
     }
@@ -383,7 +384,7 @@ private:
     uint32_t packetsTotal_ = 0;
 
     uint16_t maxFragment_ = 0;
-    Packet packets_[Packet::MaxFragments];
+    std::vector<Packet> packets_;
 
     cs::Hash headerHash_;
 

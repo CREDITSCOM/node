@@ -921,7 +921,12 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
     _return.smartContract = fetch_smart_body(transaction);
     _return.smartContract.objectState = cs::SmartContracts::get_contract_state(s_blockchain, adrs);
 
-    SetResponseStatus(_return.status, !_return.smartContract.address.empty() ? APIRequestStatusType::SUCCESS : APIRequestStatusType::FAILURE);
+    if (_return.smartContract.address.empty())
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+    else if (cs::SmartContracts::get_contract_state(s_blockchain, transaction.target()).empty())
+        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+    else 
+        SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     return;
 }
 
@@ -1162,8 +1167,10 @@ template <typename Mapper>
 size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out) {
     auto locked_deployed_by_creator = lockedReference(this->deployed_by_creator);
     auto& elt = (*locked_deployed_by_creator)[deployer];
-    for (auto& trid : elt) {
+    for (const auto& trid : elt) {
         auto tr = executor_.loadTransactionApi(trid);
+        if (cs::SmartContracts::get_contract_state(s_blockchain, tr.target()).empty())
+            continue;
         auto smart = fetch_smart_body(tr);
         out.push_back(mapper(smart));
     }
@@ -1178,7 +1185,10 @@ void APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return
         return smart;
     }, _return.smartContractsList));
 
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+    if(_return.smartContractsList.empty())
+        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+    else
+        SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
 void APIHandler::SmartContractAddressesListGet(api::SmartContractAddressesListGetResult& _return, const general::Address& deployer) {
@@ -1188,7 +1198,10 @@ void APIHandler::SmartContractAddressesListGet(api::SmartContractAddressesListGe
         return sc.address;
     }, _return.addressesList);
 
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+    if (_return.addressesList.empty())
+        SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
+    else
+        SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
 void APIHandler::GetLastHash(api::PoolHash& _return) {

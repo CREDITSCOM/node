@@ -19,8 +19,6 @@ public:
   MOCK_METHOD1(gotPacketHashesReply, void(cs::TransactionsPacket&& packet));
   MOCK_METHOD1(gotRound, void(cs::RoundTable&& round));
   MOCK_METHOD1(gotBlockCandidate, void(csdb::Pool&&));
-  MOCK_METHOD1(gotVector, void(cs::HashVector&&));
-  MOCK_METHOD1(gotMatrix, void(cs::HashMatrix&&));
   MOCK_METHOD2(gotHash, void(std::string&&, const cs::PublicKey&));
   MOCK_METHOD2(gotBlockRequest, void(csdb::PoolHash&&, const cs::PublicKey&));
   MOCK_METHOD1(gotBlockReply, void(csdb::Pool&&));
@@ -50,9 +48,6 @@ public:
   // remove it!!!
   MOCK_METHOD1(buildBlock, void(csdb::Pool& block));
   MOCK_METHOD0(buildTransactionList, void());
-
-  MOCK_CONST_METHOD0(getMyVector, cs::HashVector());
-  MOCK_CONST_METHOD0(getMyMatrix, cs::HashMatrix());
 
   MOCK_METHOD0(initConfRound, void());
   MOCK_METHOD0(sendZeroVector, void());
