@@ -26,6 +26,9 @@ namespace cs {
 // table for fast transactions storage
 using TransactionsPacketTable = std::map<TransactionsPacketHash, TransactionsPacket>;  // TODO: check performance of map/unordered_map
 
+// send transactions packet cache for conveyer
+using TransactionPacketSendCache = std::multimap<cs::RoundNumber, TransactionsPacketHash>;
+
 // array of packets
 using TransactionsBlock = std::vector<cs::TransactionsPacket>;
 

@@ -12,6 +12,8 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
+#include <client/config.hpp>
+
 namespace {
 cs::ConveyerBase* conveyerView = nullptr;
 std::once_flag onceFlag = {};
@@ -30,6 +32,9 @@ struct cs::ConveyerBase::Impl {
     // current round transactions packets storage
     cs::TransactionsPacketTable packetsTable;
 
+    // cached sended transactions packets
+    cs::TransactionPacketSendCache sendPacketsCache;
+
     // main conveyer meta data
     cs::ConveyerMetaStorage metaStorage;
 
@@ -38,6 +43,7 @@ struct cs::ConveyerBase::Impl {
 
     // cached active current round number
     std::atomic<cs::RoundNumber> currentRound = 0;
+    std::atomic<cs::RoundNumber> sendCacheValue;
 
     // helpers
     const cs::ConveyerMeta* validMeta() &;
@@ -63,6 +69,10 @@ cs::ConveyerBase::ConveyerBase() {
     pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
 
     std::call_once(::onceFlag, &::setup, this);
+}
+
+void cs::ConveyerBase::setSendCacheValue(cs::RoundNumber value) {
+    pimpl_->sendCacheValue.store(value, std::memory_order_release);
 }
 
 void cs::ConveyerBase::setRound(cs::RoundNumber round) {
@@ -238,7 +248,7 @@ void cs::ConveyerBase::setTable(const RoundTable& table) {
         }
     }
 
-    csmeta(csdebug) << "done, current table size " << pimpl_->packetsTable.size();
+    csmeta(csdebug) << "done, current table size " << pimpl_->packetsTable.size() << ", send cache size " << pimpl_->sendPacketsCache.size();
 }
 
 const cs::RoundTable& cs::ConveyerBase::currentRoundTable() const {
@@ -653,6 +663,11 @@ size_t cs::ConveyerBase::packetQueueTransactionsCount() const {
     return count;
 }
 
+size_t cs::ConveyerBase::sendCacheCount() const {
+    cs::SharedLock lock(sharedMutex_);
+    return pimpl_->sendPacketsCache.size();
+}
+
 std::unique_lock<cs::SharedMutex> cs::ConveyerBase::lock() const {
     return std::unique_lock<cs::SharedMutex>(sharedMutex_);
 }
@@ -661,6 +676,7 @@ void cs::ConveyerBase::flushTransactions() {
     cs::Lock lock(sharedMutex_);
 
     auto packets = pimpl_->packetQueue.pop();
+    auto round = currentRoundNumber();
 
     for (auto& packet : packets) {
         if ((packet.transactionsCount() != 0u)) {
@@ -675,6 +691,10 @@ void cs::ConveyerBase::flushTransactions() {
 
             auto hash = packet.hash();
 
+            if (!isHashAtSendCache(hash)) {
+                pimpl_->sendPacketsCache.emplace(round, hash);
+            }
+
             if (!isPacketAtCache(packet)) {
                 pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
             }
@@ -683,12 +703,24 @@ void cs::ConveyerBase::flushTransactions() {
             }
         }
     }
+
+    checkSendCache();
+}
+
+void cs::ConveyerBase::onConfigChanged(const Config& updated, const Config& previous) {
+    if (updated.conveyerSendCacheValue() == previous.conveyerSendCacheValue()) {
+        return;
+    }
+
+    pimpl_->sendCacheValue.store(updated.conveyerSendCacheValue(), std::memory_order_release);
 }
 
 void cs::ConveyerBase::removeHashesFromTable(const cs::PacketsHashes& hashes) {
     for (const auto& hash : hashes) {
         csdetails() << csname() << " remove hash " << hash.toString();
         pimpl_->packetsTable.erase(hash);
+
+        removeHashFromSendCache(hash);
     }
 }
 
@@ -723,6 +755,108 @@ bool cs::ConveyerBase::isPacketAtCache(const cs::TransactionsPacket& packet) {
     }
 
     return false;
+}
+
+bool cs::ConveyerBase::isHashAtSendCache(cs::RoundNumber round, const cs::TransactionsPacketHash& hash) {
+    auto [begin, end] = pimpl_->sendPacketsCache.equal_range(round);
+
+    for (; begin != end; ++begin) {
+        if (begin->second == hash) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool cs::ConveyerBase::isHashAtSendCache(const cs::TransactionsPacketHash& hash) {
+    for (const auto& pair : pimpl_->sendPacketsCache) {
+        if (pair.second == hash) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void cs::ConveyerBase::checkSendCache() {
+    auto round = currentRoundNumber();
+    auto sendCacheValue = pimpl_->sendCacheValue.load(std::memory_order_acquire);
+
+    if (round < sendCacheValue) {
+        return;
+    }
+
+    auto delta = round - sendCacheValue;
+
+    if (round < delta) {
+        return;
+    }
+
+    auto iterator = pimpl_->sendPacketsCache.upper_bound(delta);
+
+    if (iterator == pimpl_->sendPacketsCache.end()) {
+        if (pimpl_->sendPacketsCache.empty()) {
+            return;
+        }
+    }
+
+    // store hashes to resend
+    std::vector<cs::TransactionsPacketHash> hashes;
+    std::vector<cs::TransactionsPacketHash> notFoundHashes;
+
+    for (auto iter = pimpl_->sendPacketsCache.begin(); iter != iterator; ++iter) {
+        hashes.push_back(iter->second);
+    }
+
+    if (hashes.empty()) {
+        return;
+    }
+
+    // send it
+    for (const auto& hash : hashes) {
+        auto iter = pimpl_->packetsTable.find(hash);
+
+        if (iter != pimpl_->packetsTable.end()) {
+            iter->second.makeHash();
+
+            emit packetFlushed(iter->second);
+        }
+        else {
+            notFoundHashes.push_back(hash);
+        }
+    }
+
+    // remove from current hash
+    pimpl_->sendPacketsCache.erase(pimpl_->sendPacketsCache.begin(), iterator);
+
+    // add with new round key this hashes
+    for (const auto& hash : hashes) {
+        auto iter = std::find(notFoundHashes.begin(), notFoundHashes.end(), hash);
+
+        // if not found at broken hashes, add it again
+        if (iter == notFoundHashes.end()) {
+            pimpl_->sendPacketsCache.emplace(round, hash);
+        }
+    }
+}
+
+void cs::ConveyerBase::removeHashFromSendCache(const cs::TransactionsPacketHash& hash) {
+    auto begin = pimpl_->sendPacketsCache.begin();
+    auto end = pimpl_->sendPacketsCache.end();
+    auto iter = end;
+
+    for (; begin != end; ++begin) {
+        if (begin->second == hash) {
+            iter = begin;
+            break;
+        }
+    }
+
+    if (iter != end) {
+        csdetails() << csname() << "remove hash from send cache " << iter->second.toString();
+        pimpl_->sendPacketsCache.erase(iter);
+    }
 }
 
 cs::Conveyer& cs::Conveyer::instance() {

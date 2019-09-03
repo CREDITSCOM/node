@@ -10,6 +10,8 @@
 #include <memory>
 #include <optional>
 
+class Config;
+
 namespace csdb {
 class Transaction;
 }
@@ -42,6 +44,8 @@ public:
         MaxPacketsPerRound = 10,
         MaxQueueSize = 1000000
     };
+
+    void setSendCacheValue(cs::RoundNumber value);
 
     ///
     /// @brief Sets cached conveyer round number for utility.
@@ -280,6 +284,7 @@ public:
     /// does not flushed to network. Thread safe method.
     ///
     size_t packetQueueTransactionsCount() const;
+    size_t sendCacheCount() const;
 
     // sync, try do not use it :]
     std::unique_lock<cs::SharedMutex> lock() const;
@@ -293,12 +298,25 @@ public slots:
     /// try to send transactions packets to network
     void flushTransactions();
 
+    // chech config updation of conveyer values
+    void onConfigChanged(const Config& updated, const Config& previous);
+
 protected:
     void removeHashesFromTable(const cs::PacketsHashes& hashes);
     cs::TransactionsPacketTable& poolTable(cs::RoundNumber round);
 
     // returns true if packet is found at cache, otherwise - false
     bool isPacketAtCache(const cs::TransactionsPacket& packet);
+
+    // returns true if hash is found at send cache, otherwise - false
+    bool isHashAtSendCache(cs::RoundNumber round, const cs::TransactionsPacketHash& hash);
+    bool isHashAtSendCache(const cs::TransactionsPacketHash& hash);
+
+    // checks send cache to resend hashes if they still exists
+    void checkSendCache();
+
+    // remove this hash from send cache
+    void removeHashFromSendCache(const cs::TransactionsPacketHash& hash);
 
 private:
     struct Impl;
