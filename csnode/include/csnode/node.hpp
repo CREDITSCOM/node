@@ -31,7 +31,11 @@ class BlockValidator;
 }  // namespace cs
 
 namespace cs {
-    class RoundPackage;
+class RoundPackage;
+}
+
+namespace cs::config {
+class Observer;
 }
 
 class Node {
@@ -51,7 +55,7 @@ public:
 
     using RefExecution = std::pair<cs::Sequence, uint32_t>;
 
-    explicit Node(const Config&);
+    explicit Node(const Config& config, cs::config::Observer& observer);
     ~Node();
 
     bool isGood() const {
@@ -421,6 +425,8 @@ private:
     std::map<cs::RoundNumber, uint8_t> recdBangs;
 
     bool alwaysExecuteContracts_ = false;
+
+    cs::config::Observer& observer_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);
