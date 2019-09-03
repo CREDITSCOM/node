@@ -27,6 +27,8 @@ public:
 
     size_t getAveTime();
 
+	size_t getNodeStartRound();
+
 private:
     // amount of transactions received (to verify or not or to ignore)
     size_t totalReceivedTransactions_;
