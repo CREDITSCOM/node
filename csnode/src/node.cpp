@@ -65,6 +65,10 @@ Node::Node(const Config& config, cs::config::Observer& observer)
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
+    // connect config observer to entities
+    cs::Connector::connect(&observer_.configChanged, &cs::Conveyer::instance(), &cs::Conveyer::onConfigChanged);
+    cs::Connector::connect(&observer_.configChanged, &executor::Executor::getInstance(), &executor::Executor::onConfigChanged);
+
     alwaysExecuteContracts_ = config.alwaysExecuteContracts();
     good_ = init(config);
 }
@@ -115,11 +119,15 @@ bool Node::init(const Config& config) {
 
     std::cout << "Everything is init\n";
 
+    cs::Conveyer::instance().setSendCacheValue(config.conveyerSendCacheValue());
+
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
+
     initCurrentRP();
     maxNeighboursSequence_ = blockChain_.getLastSeq();
+
     return true;
 }
 

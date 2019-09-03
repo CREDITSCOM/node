@@ -28,6 +28,7 @@ const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::MaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
+const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;        // rounds
 
 using Port = short unsigned;
 
@@ -175,6 +176,12 @@ public:
     bool readKeys(const po::variables_map& vm);
     bool enterWithSeed();
 
+    size_t conveyerSendCacheValue() const {
+        return conveyerSendCacheValue_;
+    }
+
+    void swap(Config& config);
+
 private:
     static Config readFromFile(const std::string& fileName);
     void setLoggerSettings(const boost::property_tree::ptree& config);
@@ -224,6 +231,8 @@ private:
     bool recreateIndex_ = false;
 
     uint64_t observerWaitTime_;
+
+    size_t conveyerSendCacheValue_;
 
     friend bool operator==(const Config&, const Config&);
 };
