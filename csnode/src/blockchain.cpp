@@ -252,14 +252,18 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
             }
             std::lock_guard<decltype(dbLock_)> l(dbLock_);
             if (!storage_.set_previous_transaction_block(key, pool.sequence(), lapoo)) {
-                return; // errors in database, or handler has been deleted
+            // errors in database, or handler has been deleted
+                csdebug() << "Create trx index: can't set_previous_transaction_block"
+                          << " on pool sequence " << pool.sequence();
+                return false;
             }
         }
+        return true;
     };
 
     for (auto& tr : pool.transactions()) {
-        lbd(tr.source());
-        lbd(tr.target());
+        if (!lbd(tr.source())) return;
+        if (!lbd(tr.target())) return;
     }
 
     lastIndexedPool = pool.sequence();
