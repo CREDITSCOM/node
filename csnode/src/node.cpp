@@ -2202,7 +2202,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
             }
             uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
         
-            if (speed < stat_.getAveTime() / 10) {
+            if (speed < stat_.getAveTime() / 10 && rNum - stat_.getNodeStartRound() > Consensus::SpeedCheckRound) {
                 cserror() << "just got RoundPackage can't be created in " << speed << " msec per block";
                 return;
             }

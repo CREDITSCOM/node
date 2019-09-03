@@ -79,5 +79,9 @@ size_t RoundStat::getAveTime() {
     return ave_round_ms;
 }
 
+size_t RoundStat::getNodeStartRound() {
+	return node_start_round;
+}
+
 
 }  // namespace cs
