@@ -251,7 +251,9 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
                 lapoo = getLastTransaction(key).pool_seq();
             }
             std::lock_guard<decltype(dbLock_)> l(dbLock_);
-            storage_.set_previous_transaction_block(key, pool.sequence(), lapoo);
+            if (!storage_.set_previous_transaction_block(key, pool.sequence(), lapoo)) {
+                return; // errors in database, or handler has been deleted
+            }
         }
     };
 

@@ -2,18 +2,20 @@
 #ifndef CONFIG_HPP
 #define CONFIG_HPP
 
+#include <string>
+
 #include <boost/asio.hpp>
 #include <boost/log/utility/setup/settings.hpp>
 #include <boost/program_options.hpp>
-#include <string>
 
 #include <lib/system/common.hpp>
+
 #include <net/neighbourhood.hpp> // using Neighbourhood::MaxNeighbours constant
 
 namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
-typedef uint16_t NodeVersion;
+using NodeVersion = uint16_t;
 const NodeVersion NODE_VERSION = 421;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
@@ -25,8 +27,9 @@ const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 
 const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::MaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
+const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 
-typedef short unsigned Port;
+using Port = short unsigned;
 
 struct EndpointData {
     bool ipSpecified;
@@ -74,8 +77,11 @@ class Config {
 public:
     Config() {
     }  // necessary for testing
+
     Config(const Config&) = default;
     Config(Config&&) = default;
+    Config& operator=(const Config&) = default;
+    Config& operator=(Config&&) = default;
 
     static Config read(po::variables_map&, bool seedEnter = false);
 
@@ -162,6 +168,10 @@ public:
         return alwaysExecuteContracts_;
     }
 
+    uint64_t observerWaitTime() const {
+        return observerWaitTime_;
+    }
+
 private:
     static Config readFromFile(const std::string& fileName);
     void setLoggerSettings(const boost::property_tree::ptree& config);
@@ -210,6 +220,23 @@ private:
 
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
+
+    uint64_t observerWaitTime_;
+
+    friend bool operator==(const Config&, const Config&);
 };
+
+// all operators
+bool operator==(const EndpointData& lhs, const EndpointData& rhs);
+bool operator!=(const EndpointData& lhs, const EndpointData& rhs);
+
+bool operator==(const PoolSyncData& lhs, const PoolSyncData& rhs);
+bool operator!=(const PoolSyncData& lhs, const PoolSyncData& rhs);
+
+bool operator==(const ApiData& lhs, const ApiData& rhs);
+bool operator!=(const ApiData& lhs, const ApiData& rhs);
+
+bool operator==(const Config& lhs, const Config& rhs);
+bool operator!=(const Config& lhs, const Config& rhs);
 
 #endif  // CONFIG_HPP
