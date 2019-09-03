@@ -43,6 +43,7 @@ const std::string PARAM_NAME_USE_IPV6 = "ipv6";
 const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
+const std::string PARAM_NAME_CONVEYER_SEND_CACHE = "conveyer_send_cache_value";
 
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
@@ -159,21 +160,17 @@ void Config::dumpJSONKeys(const std::string& fName) const {
     cscrypto::fillWithZeros(const_cast<char*>(sk58.data()), sk58.size());
 }
 
-Config Config::read(po::variables_map& vm, bool seedEnter) {
+void Config::swap(Config& config) {
+    Config temp = std::move(config);
+    config = std::move(*this);
+    (*this) = std::move(temp);
+}
+
+Config Config::read(po::variables_map& vm) {
     Config result = readFromFile(getArgFromCmdLine(vm, ARG_NAME_CONFIG_FILE, DEFAULT_PATH_TO_CONFIG));
 
     result.recreateIndex_ = vm.count(ARG_NAME_RECREATE_INDEX);
     result.pathToDb_ = getArgFromCmdLine(vm, ARG_NAME_DB_PATH, DEFAULT_PATH_TO_DB);
-
-    if (!result.good_) return result;
-
-    if (!seedEnter) {
-        result.good_ = result.readKeys(getArgFromCmdLine(vm, ARG_NAME_PUBLIC_KEY_FILE, DEFAULT_PATH_TO_PUBLIC_KEY),
-                                       getArgFromCmdLine(vm, ARG_NAME_PRIVATE_KEY_FILE, DEFAULT_PATH_TO_PRIVATE_KEY), vm.count(ARG_NAME_ENCRYPT_KEY_FILE));
-    }
-    else {
-        result.good_ = result.enterWithSeed();
-    }
 
     return result;
 }
@@ -464,6 +461,7 @@ void Config::changePasswordOption(const std::string& pathToSk) {
     }
 }
 
+/*private*/
 bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt) {
     // First read private
     std::ifstream skFile(pathToSk);
@@ -643,6 +641,12 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
     return true;
 }
 
+/*public*/
+bool Config::readKeys(const po::variables_map& vm) {
+    return readKeys(getArgFromCmdLine(vm, ARG_NAME_PUBLIC_KEY_FILE, DEFAULT_PATH_TO_PUBLIC_KEY),
+        getArgFromCmdLine(vm, ARG_NAME_PRIVATE_KEY_FILE, DEFAULT_PATH_TO_PRIVATE_KEY), vm.count(ARG_NAME_ENCRYPT_KEY_FILE));
+}
+
 Config Config::readFromFile(const std::string& fileName) {
     Config result;
 
@@ -684,6 +688,7 @@ Config Config::readFromFile(const std::string& fileName) {
 
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
         result.observerWaitTime_ = params.count(PARAM_NAME_OBSERVER_WAIT_TIME) ? params.get<uint64_t>(PARAM_NAME_OBSERVER_WAIT_TIME) : DEFAULT_OBSERVER_WAIT_TIME;
+        result.conveyerSendCacheValue_ = params.count(PARAM_NAME_CONVEYER_SEND_CACHE) ? params.get<size_t>(PARAM_NAME_CONVEYER_SEND_CACHE) : DEFAULT_CONVEYER_SEND_CACHE_VALUE;
 
         result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE), NODE_TYPES_MAP);
 
@@ -911,7 +916,8 @@ bool operator==(const Config& lhs, const Config& rhs) {
            lhs.apiData_ == rhs.apiData_ &&
            lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
            lhs.recreateIndex_ == rhs.recreateIndex_ &&
-           lhs.observerWaitTime_ == rhs.observerWaitTime_;
+           lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
+           lhs.conveyerSendCacheValue_ == rhs.conveyerSendCacheValue_;
 }
 
 bool operator!=(const Config& lhs, const Config& rhs) {

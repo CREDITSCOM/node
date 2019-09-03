@@ -39,12 +39,12 @@ void cs::config::Observer::eventLoop() {
             break;
         }
 
-        Config config = Config::read(map_, map_.count("seed"));
+        Config config = Config::read(map_);
 
         if (config.isGood()) {
             if (config_ != config) {
                 emit configChanged(config, config_);
-                std::swap<Config, Config>(config_, config);
+                config_ = std::move(config);
             }
         }
         else {
