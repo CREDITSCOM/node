@@ -499,6 +499,10 @@ constexpr cs::RoundNumber getRoundTimeout(const MsgTypes type) {
         case MsgTypes::ThirdSmartStage:
         case MsgTypes::RejectedContracts:
             return 100;
+        case MsgTypes::TransactionPacket:
+        case MsgTypes::TransactionsPacketRequest:
+        case MsgTypes::TransactionsPacketReply:
+            return cs::Conveyer::MetaCapacity;
         default:
             return 5;
     }
@@ -1176,11 +1180,11 @@ void Transport::askForMissingPackages() {
             uint64_t req = 0;
             uint16_t end = msg->packets_.size();
 
-            for(uint16_t i = 0; i < end; i++) {
-                if (!msg->packets_[i]) {
+            for(uint16_t j = 0; j < end; j++) {
+                if (!msg->packets_[j]) {
                     if (!mask) {
                         mask = 1;
-                        start = i;
+                        start = j;
                     }
                     req |= mask;
                 }
@@ -1188,7 +1192,7 @@ void Transport::askForMissingPackages() {
                 if (mask == maxMask) {
                     requestMissing(msg->headerHash_, start, req);
 
-                    if (i > msg->maxFragment_ && i >= 128) {
+                    if (j > msg->maxFragment_ && j >= 128) {
                         break;
                     }
 

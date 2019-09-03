@@ -187,7 +187,6 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     cswarning() << "-----------------------------------------------------------";
     cswarning() << "NODE> BigBang #" << rNum << ": last written #" << blockChain_.getLastSeq() << ", current #" << conveyer.currentRoundNumber();
     cswarning() << "-----------------------------------------------------------";
-
     istream_.init(data, size);
     uint8_t tmp = 0;
     istream_ >> tmp;
@@ -224,6 +223,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         if (countRemoved == 0) {
             // the 1st time
             csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+			blockChain_.setBlocksToBeRemoved(lastSequence - rNum  + 1);
         }
 
         blockChain_.removeLastBlock();
@@ -277,6 +277,12 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
     if (!readRoundData(roundTable, false)) {
         cserror() << "NODE> read round data from SS failed, continue without round table";
     }
+
+	cs::Sequence lastSequence = blockChain_.getLastSeq();
+	if (lastSequence >= rNum) {
+		csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+		blockChain_.setBlocksToBeRemoved(lastSequence - rNum + 1);
+	}
 
     // update new round data from SS
     // TODO: fix sub round
@@ -2204,7 +2210,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
             }
             uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
         
-            if (speed < stat_.getAveTime() / 10) {
+            if (speed < stat_.getAveTime() / 10 && rNum - stat_.getNodeStartRound() > Consensus::SpeedCheckRound) {
                 cserror() << "just got RoundPackage can't be created in " << speed << " msec per block";
                 return;
             }
@@ -2825,6 +2831,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     if (static_cast<size_t>(badHashReplySummary) > conveyer.confidantsCount() / 2) {
         csmeta(csdebug) << "This node really have not valid HASH!!! Removing last block from DB and trying to syncronize";
         // TODO: examine what will be done without this function
+		blockChain_.setBlocksToBeRemoved(1U);
         blockChain_.removeLastBlock();
     }
 }

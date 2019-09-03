@@ -536,11 +536,16 @@ bool DatabaseBerkeleyDB::getFromTransIndex(const cs::Bytes &key, cs::Bytes *valu
     return true;
 }
 
-void DatabaseBerkeleyDB::truncateTransIndex() {
+bool DatabaseBerkeleyDB::truncateTransIndex() {
     if (!db_trans_idx_) {
-        return;
+        return false;
     }
-    db_trans_idx_->truncate(nullptr, nullptr, 0);
+    int status = db_trans_idx_->truncate(nullptr, nullptr, 0);
+    if (status) {
+        set_last_error_from_berkeleydb(status);
+        return false;
+    }
+    return true;
 }
 
 bool DatabaseBerkeleyDB::updateContractData(const cs::Bytes& key, const cs::Bytes& data) {

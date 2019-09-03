@@ -44,7 +44,10 @@ void cs::config::Observer::eventLoop() {
         if (config.isGood()) {
             if (config_ != config) {
                 emit configChanged(config, config_);
-                std::swap<Config, Config>(config_, config);
+
+				Config temp = std::move(config);
+				config = std::move(config_);
+				config_ = std::move(temp);
             }
         }
         else {

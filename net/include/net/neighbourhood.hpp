@@ -20,7 +20,12 @@ class Transport;
 class BlockChain;
 
 const uint32_t MaxMessagesToKeep = 128;
-const uint32_t MaxResendTimes = 4;
+const uint32_t MaxResendTimes =
+#if defined(WEB_WALLET_NODE)
+8;
+#else
+4;
+#endif // !WEB_WALLET_NODE
 const cs::Sequence MaxSyncAttempts = 8;
 
 const cs::Sequence BlocksToSync = 16;
