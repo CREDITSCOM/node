@@ -83,7 +83,7 @@ public:
     Config& operator=(const Config&) = default;
     Config& operator=(Config&&) = default;
 
-    static Config read(po::variables_map&, bool seedEnter = false);
+    static Config read(po::variables_map&);
 
     const EndpointData& getInputEndpoint() const {
         return inputEp_;
@@ -172,6 +172,9 @@ public:
         return observerWaitTime_;
     }
 
+    bool readKeys(const po::variables_map& vm);
+    bool enterWithSeed();
+
 private:
     static Config readFromFile(const std::string& fileName);
     void setLoggerSettings(const boost::property_tree::ptree& config);
@@ -179,7 +182,6 @@ private:
     void readApiData(const boost::property_tree::ptree& config);
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
-    bool enterWithSeed();
     void showKeys(const std::string& pk58);
     
     void changePasswordOption(const std::string& pathToSk);
