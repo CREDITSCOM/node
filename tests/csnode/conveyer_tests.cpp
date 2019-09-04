@@ -312,3 +312,35 @@ TEST(Conveyer, TestSendCache) {
     ASSERT_EQ(conveyer.sendCacheCount(), 1);
     ASSERT_EQ(pool->transactions().size(), 3);
 }
+
+TEST(Conveyer, TestRejectedHashes) {
+    bool called = false;
+
+    ConveyerTest conveyer{};
+    conveyer.setRound(0);
+    conveyer.setSendCacheValue(10);
+
+    auto packet1 = CreateTestPacket(20);
+    auto packet2 = CreateTestPacket(25);
+
+    conveyer.addTransactionsPacket(packet1);
+    conveyer.addTransactionsPacket(packet2);
+
+    conveyer.flushTransactions();
+
+    cs::Connector::connect(&conveyer.packetFlushed, [&](const auto&) {
+        called = true;
+    });
+
+    ASSERT_TRUE(conveyer.addRejectedHashToCache(packet2.hash()));
+
+    conveyer.flushTransactions();
+
+    ASSERT_FALSE(called);
+    ASSERT_FALSE(conveyer.addRejectedHashToCache(packet2.hash()));
+
+    conveyer.setRound(100);
+    conveyer.flushTransactions();
+
+    ASSERT_TRUE(called);
+}
