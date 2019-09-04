@@ -1180,7 +1180,7 @@ void Transport::askForMissingPackages() {
             uint64_t req = 0;
             uint16_t end = msg->packets_.size();
 
-            for(uint16_t j = 0; j < end; j++) {
+            for (uint16_t j = 0; j < end; j++) {
                 if (!msg->packets_[j]) {
                     if (!mask) {
                         mask = 1;

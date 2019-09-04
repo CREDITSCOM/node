@@ -497,7 +497,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     cs::TransactionsPacket invalidTransactions;
     std::vector<csdb::Transaction> stateTransactions;
 
-    bool is_state_rejected = false;
+    bool isStateRejected = false;
 
     for (const auto& hash : localHashes) {
         // try to get from meta if can
@@ -536,12 +536,12 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
                     newPool.add_smart_signature(smartSignatures);
                 }
                 else {
-                    is_state_rejected = true;
+                    isStateRejected = true;
                 }
             }
 
             // add states to cache
-            if (!is_state_rejected) {
+            if (!isStateRejected) {
                 for (const auto& transaction : packet.stateTransactions()) {
                     stateTransactions.push_back(transaction);
                 }
