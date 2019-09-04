@@ -672,6 +672,29 @@ std::unique_lock<cs::SharedMutex> cs::ConveyerBase::lock() const {
     return std::unique_lock<cs::SharedMutex>(sharedMutex_);
 }
 
+bool cs::ConveyerBase::addRejectedHashToCache(const cs::TransactionsPacketHash& hash) {
+    if (isHashAtSendCache(hash)) {
+        return false;
+    }
+
+    // look all meta storage
+    auto possiblePacket = findPacketAtMeta(hash);
+
+    if (!possiblePacket.has_value()) {
+        return false;
+    }
+
+    auto packet = std::move(possiblePacket).value();
+
+    pimpl_->sendPacketsCache.emplace(currentRoundNumber(), hash);
+
+    if (pimpl_->packetsTable.count(hash)) {
+        pimpl_->packetsTable.emplace(hash, std::move(packet));
+    }
+
+    return true;
+}
+
 void cs::ConveyerBase::flushTransactions() {
     cs::Lock lock(sharedMutex_);
 
@@ -713,6 +736,24 @@ void cs::ConveyerBase::onConfigChanged(const Config& updated, const Config& prev
     }
 
     pimpl_->sendCacheValue.store(updated.conveyerSendCacheValue(), std::memory_order_release);
+}
+
+std::optional<cs::TransactionsPacket> cs::ConveyerBase::findPacketAtMeta(const cs::TransactionsPacketHash& hash) const {
+    auto iter = pimpl_->packetsTable.find(hash);
+
+    if (iter != pimpl_->packetsTable.end()) {
+        return iter->second;
+    }
+
+    for (const auto& element : pimpl_->metaStorage) {
+        auto metaIter = element.meta.hashTable.find(hash);
+
+        if (metaIter != element.meta.hashTable.end()) {
+            return metaIter->second;
+        }
+    }
+
+    return std::nullopt;
 }
 
 void cs::ConveyerBase::removeHashesFromTable(const cs::PacketsHashes& hashes) {
