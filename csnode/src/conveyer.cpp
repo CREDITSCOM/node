@@ -673,6 +673,8 @@ std::unique_lock<cs::SharedMutex> cs::ConveyerBase::lock() const {
 }
 
 bool cs::ConveyerBase::addRejectedHashToCache(const cs::TransactionsPacketHash& hash) {
+    cs::Lock lock(sharedMutex_);
+
     if (isHashAtSendCache(hash)) {
         return false;
     }
@@ -688,7 +690,7 @@ bool cs::ConveyerBase::addRejectedHashToCache(const cs::TransactionsPacketHash& 
 
     pimpl_->sendPacketsCache.emplace(currentRoundNumber(), hash);
 
-    if (pimpl_->packetsTable.count(hash)) {
+    if (!pimpl_->packetsTable.count(hash)) {
         pimpl_->packetsTable.emplace(hash, std::move(packet));
     }
 
