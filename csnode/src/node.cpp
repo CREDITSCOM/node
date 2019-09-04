@@ -2210,8 +2210,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
             }
             uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
         
-            if (speed < stat_.getAveTime() / 10 && rNum - stat_.getNodeStartRound() > Consensus::SpeedCheckRound) {
-                cserror() << "just got RoundPackage can't be created in " << speed << " msec per block";
+            const auto ave_duration = stat_.getAveTime();
+            if (speed < ave_duration / 10 && rNum - stat_.getNodeStartRound() > Consensus::SpeedCheckRound) {
+                stat_.onRoundStart(rNum, true /*skip_logs*/);
+                cserror() << "drop RoundPackage created in " << speed << " ms/block, average ms/round is " << ave_duration;
                 return;
             }
         }
@@ -2711,7 +2713,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     }
 
     csdebug() << line2.str();
-    stat_.onRoundStart(cs::Conveyer::instance().currentRoundNumber());
+    stat_.onRoundStart(cs::Conveyer::instance().currentRoundNumber(), false /*skip_logs*/);
     csdebug() << line2.str();
 
     solver_->nextRound();

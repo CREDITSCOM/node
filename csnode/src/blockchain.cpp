@@ -419,11 +419,11 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
 }
 
 void BlockChain::removeLastBlock() {
-	if (blocksToBeRemoved_ == 0) {
-		csmeta(csdebug) << "There are no blocks, allowed to be removed";
-		return;
-	}
-	--blocksToBeRemoved_;
+    if (blocksToBeRemoved_ == 0) {
+        csmeta(csdebug) << "There are no blocks, allowed to be removed";
+        return;
+    }
+    --blocksToBeRemoved_;
     csmeta(csdebug) << "begin";
     csdb::Pool pool{};
 
@@ -453,7 +453,7 @@ void BlockChain::removeLastBlock() {
     if (!blockHashes_->remove(pool.sequence())) {
         blockHashes_->remove(pool.hash());
     }
-	--lastSequence_;
+    --lastSequence_;
     total_transactions_count_ -= pool.transactions().size();
     walletsCacheUpdater_->loadNextBlock(pool, pool.confidants(), *this, true);
     removeWalletsInPoolFromCache(pool);
@@ -1116,13 +1116,13 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
         // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
         deferredBlock_ = pool;
-		lastSequence_ = pool.sequence();
+        lastSequence_ = pool.sequence();
         if (finalizeBlock(deferredBlock_, isTrusted, lastConfidants)) {
             csdebug() << "The block is correct";
         }
         else {
             csdebug() << "the signatures of the block are incorrect";
-			setBlocksToBeRemoved(1U);
+            setBlocksToBeRemoved(1U);
             return std::nullopt;
         }
         pool = deferredBlock_.clone();

@@ -74,6 +74,14 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
             return "NodeStopRequest";
         case RejectedContracts:
             return "RejectedContracts";
+        case RoundPackRequest:
+            return "RoundPackRequest";
+        case StateRequest:
+            return "StateRequest";
+        case StateReply:
+            return "StateReply";
+        case EmptyRoundPack:
+            return "EmptyRoundPack";
         default:
             return "Unknown";
     }
