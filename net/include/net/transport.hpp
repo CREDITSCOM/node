@@ -46,6 +46,8 @@ enum class NetworkCommand : uint8_t {
     SSLastBlock = 34,
     SSReRegistration = 36,
     SSSpecificBlock = 37,
+    SSNewFriends = 38,
+    SSUpdateServer = 39
 };
 
 enum class RegistrationRefuseReasons : uint8_t {
@@ -71,7 +73,7 @@ uint16_t getHashIndex(const ip::udp::endpoint&);
 
 class Transport {
 public:
-    Transport(const Config& config, Node* node)
+    Transport(Config& config, Node* node)
     : config_(config)
     , sendPacksFlag_()
     , remoteNodes_(maxRemoteNodes_ + 1)
@@ -189,6 +191,8 @@ private:
     bool gotSSDispatch(const TaskPtr<IPacMan>&);
     bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&);
     bool gotSSLastBlock(const TaskPtr<IPacMan>&, cs::Sequence, const csdb::PoolHash&, bool canBeTrusted);
+    bool gotSSNewFriends(const TaskPtr<IPacMan>&);
+    bool gotSSUpdateServer(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
     bool gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr&);
     bool gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr&);
@@ -201,7 +205,7 @@ private:
 
     /* Actions */
     bool good_;
-    Config config_;
+    Config& config_;
 
     static const uint32_t maxPacksQueue_ = 2048;
     static const uint32_t maxRemoteNodes_ = 4096;

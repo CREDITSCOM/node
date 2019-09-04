@@ -37,7 +37,7 @@
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
 
-Node::Node(const Config& config, cs::config::Observer& observer)
+Node::Node(Config& config, cs::config::Observer& observer)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(genesisAddress_, startAddress_, config.recreateIndex())
@@ -2079,18 +2079,12 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage) {
     performRoundPackage(rPackage, solver_->getPublicKey());
 }
 
-bool Node::getNewFriendsNodesVerify(const uint8_t* data, const size_t size)
+bool Node::gotSSMessageVerify(const cs::Signature & sign, const cs::Byte* data, const size_t size)
 {
-    istream_.init(data, size);
-    istream_.safeSkip<uint8_t>();
-
-    cs::Signature sig;
-    istream_ >> sig;
-
-    if (const auto & starter_key = cs::PacketValidator::instance().getStarterKey(); !cscrypto::verifySignature(sig, starter_key, istream_.getCurrentPtr(), istream_.remainsBytes())) {
+    if (const auto & starter_key = cs::PacketValidator::instance().getStarterKey(); !cscrypto::verifySignature(sign, starter_key, data, size)) {
+        cswarning() << "SS message is incorrect: signature isn't valid";
         csdebug() << "SSKey: " << cs::Utils::byteStreamToHex(starter_key.data(), starter_key.size());
-        csdebug() << "Message to Sign: " << cs::Utils::byteStreamToHex(istream_.getCurrentPtr(), istream_.remainsBytes());
-        cswarning() << "getNewFriendsNodes message is incorrect: signature isn't valid";
+        csdebug() << "Message to Sign: " << cs::Utils::byteStreamToHex(data, size);
         return false;
     }
 
