@@ -12,7 +12,7 @@ RoundStat::RoundStat()
 , start_skip_rounds(2) {
 }
 
-void RoundStat::onRoundStart(RoundNumber round) {
+void RoundStat::onRoundStart(RoundNumber round, bool skip_logs) {
     // minimal statistics, skip 0 & 1 rounds because of possibility extra timeouts
     if (start_skip_rounds > 0) {
         start_skip_rounds--;
@@ -35,35 +35,37 @@ void RoundStat::onRoundStart(RoundNumber round) {
         // longest_rounds.insert(last_round_ms);
 
         // TODO: use more intelligent output formatting
-        std::ostringstream os;
-        constexpr size_t in_minutes = 5 * 60 * 1000;
-        constexpr size_t in_seconds = 10 * 1000;
+        if (!skip_logs) {
+            std::ostringstream os;
+            constexpr size_t in_minutes = 5 * 60 * 1000;
+            constexpr size_t in_seconds = 10 * 1000;
 
-        os << " last round ";
+            os << " last round ";
 
-        if (last_round_ms > in_minutes) {
-            os << "> " << last_round_ms / 60000 << "min";
-        }
-        else if (last_round_ms > in_seconds) {
-            os << "> " << last_round_ms / 1000 << "sec";
-        }
-        else {
-            os << last_round_ms << "ms";
-        }
+            if (last_round_ms > in_minutes) {
+                os << "> " << last_round_ms / 60000 << "min";
+            }
+            else if (last_round_ms > in_seconds) {
+                os << "> " << last_round_ms / 1000 << "sec";
+            }
+            else {
+                os << last_round_ms << "ms";
+            }
 
-        os << ", average round ";
+            os << ", average round ";
 
-        if (ave_round_ms > in_seconds) {
-            os << "> " << ave_round_ms / 1000 << "sec";
-        }
-        else {
-            os << ave_round_ms << "ms";
-        }
+            if (ave_round_ms > in_seconds) {
+                os << "> " << ave_round_ms / 1000 << "sec";
+            }
+            else {
+                os << ave_round_ms << "ms";
+            }
 
-        os << ", "
-           //<< totalReceivedTransactions_ << " viewed transactions, "
-           << WithDelimiters(totalAcceptedTransactions_) << " stored transactions.";
-        cslog() << os.str();
+            os << ", "
+                //<< totalReceivedTransactions_ << " viewed transactions, "
+                << WithDelimiters(totalAcceptedTransactions_) << " stored transactions.";
+            cslog() << os.str();
+        }
     }
 }
 
