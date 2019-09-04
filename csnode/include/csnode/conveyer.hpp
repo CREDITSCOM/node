@@ -284,10 +284,22 @@ public:
     /// does not flushed to network. Thread safe method.
     ///
     size_t packetQueueTransactionsCount() const;
+
+    ///
+    /// @brief Returns current send cache size
+    ///
     size_t sendCacheCount() const;
 
     // sync, try do not use it :]
     std::unique_lock<cs::SharedMutex> lock() const;
+
+    ///
+    /// @brief Adds transactions packet hash to send cache, key will be current round.
+    /// @param hash, Rejected from consensus.
+    /// @return returns true, if hash does not exist at send cache and exists at hash table.
+    ///  returns false if hash exists at send cache or does not found at packets table.
+    ///
+    bool addRejectedHashToCache(const cs::TransactionsPacketHash& hash);
 
 public signals:
     cs::PacketFlushSignal packetFlushed;
@@ -302,6 +314,9 @@ public slots:
     void onConfigChanged(const Config& updated, const Config& previous);
 
 protected:
+    // searches transactions packet at all conveyer cache
+    std::optional<cs::TransactionsPacket> findPacketAtMeta(const cs::TransactionsPacketHash& hash) const;
+
     void removeHashesFromTable(const cs::PacketsHashes& hashes);
     cs::TransactionsPacketTable& poolTable(cs::RoundNumber round);
 
