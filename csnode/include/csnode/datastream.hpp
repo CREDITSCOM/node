@@ -520,22 +520,6 @@ inline DataStream& operator>>(DataStream& stream, FixedString<size>& fixedString
     return stream;
 }
 
-inline DataStream& operator>>(DataStream& stream, cs::HashVector& hashVector) {
-    stream >> hashVector.sender >> hashVector.hash >> hashVector.signature;
-    return stream;
-}
-
-inline DataStream& operator>>(DataStream& stream, cs::HashMatrix& matrix) {
-    stream >> matrix.sender;
-
-    for (std::size_t i = 0; i < kHashVectorCount; ++i) {
-        stream >> matrix.hashVector[i];
-    }
-
-    stream >> matrix.signature;
-    return stream;
-}
-
 inline DataStream& operator>>(DataStream& stream, cs::TransactionsPacketHash& hash) {
     cs::Bytes bytes;
     stream >> bytes;
@@ -669,24 +653,6 @@ inline DataStream& operator<<(DataStream& stream, const std::string& data) {
 template <std::size_t size>
 inline DataStream& operator<<(DataStream& stream, const FixedString<size>& fixedString) {
     stream.addFixedString(fixedString);
-    return stream;
-}
-
-inline DataStream& operator<<(DataStream& stream, const cs::HashVector& hashVector) {
-    stream << hashVector.sender;
-    stream << hashVector.hash;
-    stream << hashVector.signature;
-    return stream;
-}
-
-inline DataStream& operator<<(DataStream& stream, const cs::HashMatrix& matrix) {
-    stream << matrix.sender;
-
-    for (std::size_t i = 0; i < kHashVectorCount; ++i) {
-        stream << matrix.hashVector[i];
-    }
-
-    stream << matrix.signature;
     return stream;
 }
 

@@ -29,18 +29,22 @@
 #include <boost/optional.hpp>
 
 #include <lz4.h>
+
 #include <cscrypto/cscrypto.hpp>
+
+#include <observer.hpp>
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
 
-Node::Node(const Config& config)
+Node::Node(const Config& config, cs::config::Observer& observer)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(genesisAddress_, startAddress_, config.recreateIndex())
 , ostream_(&packStreamAllocator_, nodeIdKey_)
 , stat_()
-, blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
+, blockValidator_(std::make_unique<cs::BlockValidator>(*this))
+, observer_(observer) {
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
     std::cout << "Start transport... ";
     transport_ = new Transport(config, this);
@@ -60,6 +64,10 @@ Node::Node(const Config& config)
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
+
+    // connect config observer to entities
+    cs::Connector::connect(&observer_.configChanged, &cs::Conveyer::instance(), &cs::Conveyer::onConfigChanged);
+    cs::Connector::connect(&observer_.configChanged, &executor::Executor::getInstance(), &executor::Executor::onConfigChanged);
 
     alwaysExecuteContracts_ = config.alwaysExecuteContracts();
     good_ = init(config);
@@ -111,11 +119,15 @@ bool Node::init(const Config& config) {
 
     std::cout << "Everything is init\n";
 
+    cs::Conveyer::instance().setSendCacheValue(config.conveyerSendCacheValue());
+
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
+
     initCurrentRP();
     maxNeighboursSequence_ = blockChain_.getLastSeq();
+
     return true;
 }
 
@@ -141,6 +153,9 @@ void Node::stop() {
     }
 
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
+
+    observer_.stop();
+    cswarning() << "[CONFIG OBSERVER STOPPED]";
 }
 
 /* Requests */
@@ -172,7 +187,6 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     cswarning() << "-----------------------------------------------------------";
     cswarning() << "NODE> BigBang #" << rNum << ": last written #" << blockChain_.getLastSeq() << ", current #" << conveyer.currentRoundNumber();
     cswarning() << "-----------------------------------------------------------";
-
     istream_.init(data, size);
     uint8_t tmp = 0;
     istream_ >> tmp;
@@ -209,6 +223,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         if (countRemoved == 0) {
             // the 1st time
             csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+			blockChain_.setBlocksToBeRemoved(lastSequence - rNum  + 1);
         }
 
         blockChain_.removeLastBlock();
@@ -262,6 +277,12 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
     if (!readRoundData(roundTable, false)) {
         cserror() << "NODE> read round data from SS failed, continue without round table";
     }
+
+	cs::Sequence lastSequence = blockChain_.getLastSeq();
+	if (lastSequence >= rNum) {
+		csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+		blockChain_.setBlocksToBeRemoved(lastSequence - rNum + 1);
+	}
 
     // update new round data from SS
     // TODO: fix sub round
@@ -2058,6 +2079,24 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage) {
     performRoundPackage(rPackage, solver_->getPublicKey());
 }
 
+bool Node::getNewFriendsNodesVerify(const uint8_t* data, const size_t size)
+{
+    istream_.init(data, size);
+    istream_.safeSkip<uint8_t>();
+
+    cs::Signature sig;
+    istream_ >> sig;
+
+    if (const auto & starter_key = cs::PacketValidator::instance().getStarterKey(); !cscrypto::verifySignature(sig, starter_key, istream_.getCurrentPtr(), istream_.remainsBytes())) {
+        csdebug() << "SSKey: " << cs::Utils::byteStreamToHex(starter_key.data(), starter_key.size());
+        csdebug() << "Message to Sign: " << cs::Utils::byteStreamToHex(istream_.getCurrentPtr(), istream_.remainsBytes());
+        cswarning() << "getNewFriendsNodes message is incorrect: signature isn't valid";
+        return false;
+    }
+
+    return true;
+}
+
 bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants) {
     csdebug() << "NODE> PoolSigs Amnt = " << rPackage.poolSignatures().size()
         << ", TrustedSigs Amnt = " << rPackage.trustedSignatures().size()
@@ -2171,8 +2210,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
             }
             uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
         
-            if (speed < stat_.getAveTime() / 10) {
-                cserror() << "just got RoundPackage can't be created in " << speed << " msec per block";
+            const auto ave_duration = stat_.getAveTime();
+            if (speed < ave_duration / 10 && rNum - stat_.getNodeStartRound() > Consensus::SpeedCheckRound) {
+                stat_.onRoundStart(rNum, true /*skip_logs*/);
+                cserror() << "drop RoundPackage created in " << speed << " ms/block, average ms/round is " << ave_duration;
                 return;
             }
         }
@@ -2672,7 +2713,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     }
 
     csdebug() << line2.str();
-    stat_.onRoundStart(cs::Conveyer::instance().currentRoundNumber());
+    stat_.onRoundStart(cs::Conveyer::instance().currentRoundNumber(), false /*skip_logs*/);
     csdebug() << line2.str();
 
     solver_->nextRound();
@@ -2792,6 +2833,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     if (static_cast<size_t>(badHashReplySummary) > conveyer.confidantsCount() / 2) {
         csmeta(csdebug) << "This node really have not valid HASH!!! Removing last block from DB and trying to syncronize";
         // TODO: examine what will be done without this function
+		blockChain_.setBlocksToBeRemoved(1U);
         blockChain_.removeLastBlock();
     }
 }

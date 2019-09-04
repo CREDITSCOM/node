@@ -1120,10 +1120,6 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
     test_contracts_locks();
 
     const auto seq = block.sequence();
-    if (seq == 4432461 || seq == 4500088) {
-        static int cnt = 0;
-        ++cnt;
-    }
     for (auto& item : exe_queue) {
         if (item.status != SmartContractStatus::Running && item.status != SmartContractStatus::Finished) {
             continue;

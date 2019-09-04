@@ -230,7 +230,7 @@ TEST(Conveyer, MainLogic) {
 
     csdb::PoolHash ph;
     cs::Bytes tmpCharacteristic;
-    cs::PoolMetaInfo pool_meta_info{ tmpCharacteristic, "1542617459297", ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}};
+    cs::PoolMetaInfo pool_meta_info{ { tmpCharacteristic }, "1542617459297", ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}};
 
     auto pool{conveyer.applyCharacteristic(pool_meta_info)};
 
@@ -239,4 +239,108 @@ TEST(Conveyer, MainLogic) {
     ASSERT_EQ(packet.transactions().at(2), pool.value().transaction(0));
     ASSERT_EQ(packet.transactions().at(9), pool.value().transaction(1));
     ASSERT_EQ(packet.transactions().at(16), pool.value().transaction(2));
+}
+
+TEST(Conveyer, TestSendCache) {
+    cs::PacketsHashes hashes;
+
+    size_t counter = 0;
+
+    ConveyerTest conveyer{};
+    conveyer.setRound(0);
+    conveyer.setSendCacheValue(10);
+
+    cs::Connector::connect(&conveyer.packetFlushed, [&](const auto& packet) {
+        if (counter < 2) {
+            hashes.push_back(packet.hash());
+        }
+
+        ++counter;
+    });
+
+    for (size_t i = 0; i < 20; ++i) {
+        size_t value = 0x1234567800000001;
+        conveyer.addTransaction(CreateTestTransaction(static_cast<int64_t>(value + i), static_cast<uint8_t>(1)));
+
+        if ((i == 9) || (i == 19)) {
+            conveyer.flushTransactions();
+        }
+    }
+
+    ASSERT_EQ(conveyer.packetQueueTransactionsCount(), 0);
+    ASSERT_EQ(conveyer.sendCacheCount(), 2);
+    ASSERT_EQ(counter, 2);
+
+    // try to resend
+    const cs::RoundNumber testRound = 100;
+
+    conveyer.setRound(testRound);
+
+    // add new ones
+    size_t value = 0x1234567800000001;
+    conveyer.addTransaction(CreateTestTransaction(static_cast<int64_t>(value + 30), static_cast<uint8_t>(1)));
+
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(counter, 5);
+    ASSERT_EQ(conveyer.sendCacheCount(), 3);
+
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(counter, 5);
+
+    cs::RoundTable table;
+    table.round = testRound;
+    table.hashes = hashes;
+
+    conveyer.setTable(std::move(table));
+
+    const auto characteristic{cs::Characteristic{{0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}}};
+    conveyer.setCharacteristic(characteristic, testRound);
+
+    csdb::PoolHash ph;
+    cs::Bytes tmpCharacteristic;
+    cs::PoolMetaInfo metaInfo{ { tmpCharacteristic }, "1542617459297", ph, testRound, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}};
+
+    auto pool { conveyer.applyCharacteristic(metaInfo) };
+
+    ASSERT_EQ(conveyer.sendCacheCount(), 1);
+
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(counter, 5);
+    ASSERT_EQ(conveyer.sendCacheCount(), 1);
+    ASSERT_EQ(pool->transactions().size(), 3);
+}
+
+TEST(Conveyer, TestRejectedHashes) {
+    bool called = false;
+
+    ConveyerTest conveyer{};
+    conveyer.setRound(0);
+    conveyer.setSendCacheValue(10);
+
+    auto packet1 = CreateTestPacket(20);
+    auto packet2 = CreateTestPacket(25);
+
+    conveyer.addTransactionsPacket(packet1);
+    conveyer.addTransactionsPacket(packet2);
+
+    conveyer.flushTransactions();
+
+    cs::Connector::connect(&conveyer.packetFlushed, [&](const auto&) {
+        called = true;
+    });
+
+    ASSERT_TRUE(conveyer.addRejectedHashToCache(packet2.hash()));
+
+    conveyer.flushTransactions();
+
+    ASSERT_FALSE(called);
+    ASSERT_FALSE(conveyer.addRejectedHashToCache(packet2.hash()));
+
+    conveyer.setRound(100);
+    conveyer.flushTransactions();
+
+    ASSERT_TRUE(called);
 }

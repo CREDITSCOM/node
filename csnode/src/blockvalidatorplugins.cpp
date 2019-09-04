@@ -629,6 +629,8 @@ ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Poo
                 expenses.push_back(Expense{ all_transactions.size() - 1, new_balance - balance, extra_fee });
             }
             balance = new_balance;
+
+            csdebug() << kLogPrefix << "balance has changed by " << FormatRef(t.id().pool_seq(), t.id().index()) << " to new value " << balance;
         }
 
         ++t_idx;
@@ -637,7 +639,7 @@ ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Poo
     double wallet_balance = get_wallet_balance();
     double new_balance_error = wallet_balance - balance;
     if (inprogress.empty() && fabs(new_balance_error - balance_error) > epsilon) {
-        cserror() << kLogPrefix << "balance " << balance << " mismatch wallet_balance " << wallet_balance;
+        cserror() << kLogPrefix << "balance " << balance << " mismatch wallet_balance " << wallet_balance << " after " << WithDelimiters(block.sequence());
         balance_error = new_balance_error;
     }
 

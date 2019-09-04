@@ -472,6 +472,18 @@ public slots:
         cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
     }
 
+    void onConfigChanged(const Config& updated, const Config& previous) {
+        if (updated.getApiSettings().executorCmdLine == previous.getApiSettings().executorCmdLine) {
+            return;
+        }
+
+        if (updated.getApiSettings().executorCmdLine.empty()) {
+            return;
+        }
+
+        executorProcess_->setProgram(updated.getApiSettings().executorCmdLine);
+    }
+
 private:
     std::map<general::Address, general::AccessID> lockSmarts;
 
@@ -483,17 +495,15 @@ private:
     , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
     , origExecutor_(
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
-        std::string executorCmdline = config_.getApiSettings().executorCmdLine;
-
         socket_->setSendTimeout(config_.getApiSettings().executorSendTimeout);
         socket_->setRecvTimeout(config_.getApiSettings().executorReceiveTimeout);
 
-        if (executorCmdline.empty()) {
+        if (config_.getApiSettings().executorCmdLine.empty()) {
             cswarning() << "Executor command line args are empty, process would not be created";
             return;
         }
 
-        executorProcess_ = std::make_unique<cs::Process>(executorCmdline);
+        executorProcess_ = std::make_unique<cs::Process>(config_.getApiSettings().executorCmdLine);
 
         cs::Connector::connect(&executorProcess_->started, this, &Executor::onExecutorStarted);
         cs::Connector::connect(&executorProcess_->finished, this, &Executor::onExecutorFinished);

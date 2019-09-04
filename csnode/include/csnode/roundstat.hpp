@@ -13,7 +13,7 @@ class RoundStat {
 public:
     RoundStat();
 
-    void onRoundStart(cs::RoundNumber round);
+    void onRoundStart(cs::RoundNumber round, bool skip_logs);
 
     // called when next block is read from database
     void onReadBlock(csdb::Pool block, bool* should_stop);
@@ -26,6 +26,8 @@ public:
     }
 
     size_t getAveTime();
+
+	size_t getNodeStartRound();
 
 private:
     // amount of transactions received (to verify or not or to ignore)

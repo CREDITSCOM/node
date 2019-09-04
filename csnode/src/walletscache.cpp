@@ -317,8 +317,10 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
             const csdb::Amount start_max_fee(initTransaction.max_fee().to_double());
             const csdb::Amount start_counted_fee(initTransaction.counted_fee().to_double());
             if (isCanceledSmart(start_target, start_id)) {
-                csdebug() << "WalletsCache: (deprecated behaviour) timeout was detected for " << FormatRef(start_id.pool_seq(), (size_t )start_id.index())
-                    << " before, new_state found in block " << WithDelimiters(start_id.pool_seq());
+                csdebug() << kLogPrefix << "(deprecated behaviour) timeout was detected in "
+                    << WithDelimiters(start_id.pool_seq() + Consensus::MaxRoundsCancelContract)
+                    << " for " << FormatRef(start_id.pool_seq(), (size_t )start_id.index())
+                    << " , then new_state found in " << WithDelimiters(tr.id().pool_seq());
                 if (!inverse) {
                     wallData.balance_ -= initTransaction.amount();
                     wallData.balance_ -= start_max_fee;
