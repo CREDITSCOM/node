@@ -166,21 +166,11 @@ void Config::swap(Config& config) {
     (*this) = std::move(temp);
 }
 
-Config Config::read(po::variables_map& vm, bool seedEnter) {
+Config Config::read(po::variables_map& vm) {
     Config result = readFromFile(getArgFromCmdLine(vm, ARG_NAME_CONFIG_FILE, DEFAULT_PATH_TO_CONFIG));
 
     result.recreateIndex_ = vm.count(ARG_NAME_RECREATE_INDEX);
     result.pathToDb_ = getArgFromCmdLine(vm, ARG_NAME_DB_PATH, DEFAULT_PATH_TO_DB);
-
-    if (!result.good_) return result;
-
-    if (!seedEnter) {
-        result.good_ = result.readKeys(getArgFromCmdLine(vm, ARG_NAME_PUBLIC_KEY_FILE, DEFAULT_PATH_TO_PUBLIC_KEY),
-                                       getArgFromCmdLine(vm, ARG_NAME_PRIVATE_KEY_FILE, DEFAULT_PATH_TO_PRIVATE_KEY), vm.count(ARG_NAME_ENCRYPT_KEY_FILE));
-    }
-    else {
-        result.good_ = result.enterWithSeed();
-    }
 
     return result;
 }
@@ -471,6 +461,7 @@ void Config::changePasswordOption(const std::string& pathToSk) {
     }
 }
 
+/*private*/
 bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt) {
     // First read private
     std::ifstream skFile(pathToSk);
@@ -648,6 +639,12 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
     }
 
     return true;
+}
+
+/*public*/
+bool Config::readKeys(const po::variables_map& vm) {
+    return readKeys(getArgFromCmdLine(vm, ARG_NAME_PUBLIC_KEY_FILE, DEFAULT_PATH_TO_PUBLIC_KEY),
+        getArgFromCmdLine(vm, ARG_NAME_PRIVATE_KEY_FILE, DEFAULT_PATH_TO_PRIVATE_KEY), vm.count(ARG_NAME_ENCRYPT_KEY_FILE));
 }
 
 Config Config::readFromFile(const std::string& fileName) {

@@ -206,11 +206,23 @@ int main(int argc, char* argv[]) {
         panic();
     }
 
-    auto config = Config::read(vm, vm.count("seed"));
+    auto config = Config::read(vm);
 
     if (!config.isGood()) {
         panic();
     }
+
+    if (vm.count("seed") == 0) {
+        if (!config.readKeys(vm)) {
+            return false;
+        }
+    }
+    else {
+        if (!config.enterWithSeed()) {
+            return false;
+        }
+    }
+
 
     if (vm.count("dumpkeys")) {
         auto fName = vm["dumpkeys"].as<std::string>();
