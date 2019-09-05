@@ -188,6 +188,7 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
     // as event receiver:
     cs::Connector::connect(&bc.storeBlockEvent, this, &SmartContracts::on_store_block);
     cs::Connector::connect(&bc.readBlockEvent(), this, &SmartContracts::on_read_block);
+    cs::Connector::connect(&bc.removeBlockEvent, this, &SmartContracts::on_remove_block);
     cs::Connector::connect(&cs::Conveyer::instance().statesCreated, this, &SmartContracts::on_update);
     // as event source:
     cs::Connector::connect(&signal_payable_invoke, &bc, &BlockChain::onPayableContractReplenish);
@@ -1108,6 +1109,11 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
 void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
     cs::Lock lock(public_access_lock);
     on_next_block_impl(block, true, should_stop);
+}
+
+/*public*/
+void SmartContracts::on_remove_block(const csdb::Pool&) {
+    // @TODO provide implementation
 }
 
 /*private*/

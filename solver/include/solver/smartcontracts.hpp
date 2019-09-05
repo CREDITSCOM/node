@@ -417,6 +417,9 @@ public slots:
     // called when next block is read from database
     void on_read_block(const csdb::Pool& block, bool* should_stop);
 
+    // called when block should be removed from database
+    void on_remove_block(const csdb::Pool& block);
+
 private:
     using trx_innerid_t = int64_t;  // see csdb/transaction.hpp near #101
 
