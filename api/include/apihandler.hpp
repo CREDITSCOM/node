@@ -156,11 +156,12 @@ public:  // wrappers
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 recreateOriginExecutor();
-                notifyError();
             }
 
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
         catch(const std::exception& x ) {
             _return.status.code = 1;
@@ -179,11 +180,12 @@ public:  // wrappers
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 recreateOriginExecutor();
-                notifyError();
             }
 
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
         catch(const std::exception& x ) {
             _return.status.code = 1;
@@ -202,11 +204,12 @@ public:  // wrappers
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 recreateOriginExecutor();
-                notifyError();
             }
 
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
         catch(const std::exception& x ) {
             _return.status.code = 1;
@@ -527,9 +530,6 @@ private:
                     break;
                 }
 
-                static const int kReconnectTime = 2;
-                std::this_thread::sleep_for(std::chrono::seconds(kReconnectTime));
-
                 if (!isConnected()) {
                     connect();
                 }
@@ -592,6 +592,10 @@ private:
     }
 
     void notifyError() {
+        if (isConnected()) {
+            disconnect();
+        }
+
         cvErrorConnect_.notify_one();
     }
 
