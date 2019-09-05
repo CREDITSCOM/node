@@ -378,9 +378,6 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
     }
 
     bool result = true;
-
-    csdebug() << "network command " << networkCommandToString(cmd);
-
     switch (cmd) {
         case NetworkCommand::Registration:
             result = gotRegistrationRequest(task, sender);
