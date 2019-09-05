@@ -29,9 +29,13 @@ inline uint16_t getHashIndex(const cs::Hash& hash) {
     return result;
 }
 
+template <>
+inline uint32_t getHashIndex(const cs::Hash& hash) {
+    return *reinterpret_cast<const uint32_t *>(hash.data());
+}
+
 template<int N>
-uint32_t MurmurHash2(const uint8_t* key)
-{
+uint32_t MurmurHash2(const uint8_t* key) {
   constexpr uint32_t m = 0x5bd1e995;
   constexpr uint32_t seed = 0;
   constexpr int r = 24;

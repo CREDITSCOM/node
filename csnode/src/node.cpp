@@ -158,13 +158,6 @@ void Node::stop() {
     cswarning() << "[CONFIG OBSERVER STOPPED]";
 }
 
-/* Requests */
-void Node::flushCurrentTasks() {
-
-    transport_->addTask(ostream_.getPackets(), ostream_.getPacketsCount());
-    ostream_.clear();
-}
-
 void Node::initCurrentRP() {
     cs::RoundPackage rp;
     if (getBlockChain().getLastSeq() == 0) {

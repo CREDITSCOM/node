@@ -5,6 +5,8 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/utils.hpp>
 
+#include <thread>
+
 #include "network.hpp"
 #include "transport.hpp"
 
@@ -140,18 +142,16 @@ void Transport::run() {
     while (Transport::gSignalStatus == 0) {
         ++ctr;
 
-//        bool askMissing = true;
-        bool resendPacks = ctr % 10 == 0;
-        bool sendPing = ctr % 20 == 0;
-        bool refreshLimits = ctr % 20 == 0;
-        bool checkPending = ctr % 100 == 0;
-        bool checkSilent = ctr % 150 == 0;
+        bool askMissing = false;
+        bool resendPacks = ctr % 11 == 0;
+        bool sendPing = ctr % 19 == 0;
+        bool refreshLimits = ctr % 23 == 0;
+        bool checkPending = ctr % 101 == 0;
+        bool checkSilent = ctr % 151 == 0;
 
-/*
         if (askMissing) {
             askForMissingPackages();
         }
-*/
 
         if (checkPending) {
             nh_.checkPending(config_.getMaxNeighbours());
@@ -267,34 +267,94 @@ bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
     return true;
 }
 
+bool Transport::sendDirectToSock(Packet* pack, const Connection& conn) {
+    conn.lastBytesCount.fetch_add(static_cast<uint32_t>(pack->size()), std::memory_order_relaxed);
+    net_->sendPackDirect(*pack, conn.getOut());
+    return true;
+}
+
 void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
     if (size >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
-		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
-        return;
+        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
     }
-    const auto packEnd = pack + size;
-    for (auto ptr = pack; ptr != packEnd; ++ptr) {
-        nh_.registerDirect(ptr, conn);
-        sendDirect(ptr, **conn);
+
+    if (size > 1000) {
+        std::vector<Packet> _packets(size);
+        for (auto& p : _packets) p = *pack++;
+        std::thread thread([=, packets = std::move(_packets)]() mutable {
+            uint32_t allSize = size, toSend, j = 0;
+            while(allSize != 0) {
+                if (allSize > 100) {
+                    toSend = 100;
+                    allSize -= 100;
+                } else {
+                    toSend = allSize;
+                    allSize = 0;
+                }
+                {
+                    for (uint32_t i = 0; i < toSend; i++) {
+                        nh_.registerDirect(&packets[j], conn);
+                        sendDirectToSock(&packets[j++], **conn);
+                    }
+                }
+                std::this_thread::yield();
+            };
+        });
+        thread.detach();
+    } else {
+        const auto packEnd = pack + size;
+        for (auto ptr = pack; ptr != packEnd; ++ptr) {
+            nh_.registerDirect(ptr, conn);
+            sendDirect(ptr, **conn);
+        }
     }
 }
 
 void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     if (size >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
-		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
-        return;
+        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
     }
 
-    {
+    if (size > 1000) {
+        std::vector<Packet> _packets(size);
+        for (auto& p : _packets) p = *pack++;
+        std::thread thread([=, packets = std::move(_packets)]() {
+            {
+                auto lock = getNeighboursLock();
+                sendLarge_.store(true, std::memory_order_relaxed);
+                nh_.chooseNeighbours();
+            }
+
+            uint32_t allSize = size, toSend, j = 0;
+            while(allSize != 0) {
+                if (allSize > 100) {
+                    toSend = 100;
+                    allSize -= 100;
+                } else {
+                    toSend = allSize;
+                    allSize = 0;
+                }
+                {
+                    auto lock = getNeighboursLock();
+                    for (uint32_t i = 0; i < toSend; i++) {
+                        nh_.sendByNeighbours(&packets[j++], true);
+                    }
+                }
+                std::this_thread::yield();
+            };
+            sendLarge_.store(false, std::memory_order_release);
+        });
+        thread.detach();
+    } else {
         auto lock = getNeighboursLock();
         nh_.chooseNeighbours();
-    }
 
-    const auto packEnd = pack + size;
-    for (auto ptr = pack; ptr != packEnd; ++ptr) {
-        sendBroadcast(ptr);
+        const auto packEnd = pack + size;
+        for (auto ptr = pack; ptr != packEnd; ++ptr) {
+            sendBroadcast(ptr);
+        }
     }
 }
 
@@ -318,6 +378,8 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
     }
 
     bool result = true;
+
+    csdebug() << "network command " << networkCommandToString(cmd);
 
     switch (cmd) {
         case NetworkCommand::Registration:
@@ -676,24 +738,6 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
         pst.incrementId = incrementWhenResend;
         sendPacks_.emplace(pst);
     }
-}
-
-void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhenResend) {
-    if (packNum >= Packet::MaxFragments) {
-        ++Transport::cntExtraLargeNotSent;
-        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << packNum;
-        return;
-    }
-    nh_.pourByNeighbours(pack, packNum);
-    if (packNum > 1) {
-        net_->registerMessage(pack, packNum);
-    }
-    registerTask(pack, 1, incrementWhenResend);
-}
-
-void Transport::clearTasks() {
-    cs::Lock lock(sendPacksFlag_);
-    sendPacks_.clear();
 }
 
 uint32_t Transport::getNeighboursCount() {
@@ -1153,17 +1197,24 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
     nh_.neighbourSentPacket(sender, pack.getHeaderHash());
 }
 
-void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
+void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender, bool resend) {
     sendPackInform(pack, sender);
+
+    if (!resend) {
+        return;
+    }
 
     if (pack.isNeighbors()) {
         return;  // Do not redirect packs
     }
 
-    if (pack.isFragmented() && pack.getFragmentsNum() > Packet::SmartRedirectTreshold) {
-        nh_.redirectByNeighbours(&pack);
-    }
-    else {
+    {
+        if (!sendLarge_.load(std::memory_order_acquire)) {
+            auto lock = getNeighboursLock();
+            nh_.chooseNeighbours();
+        }
+
+        auto lock = getNeighboursLock();
         nh_.neighbourHasPacket(sender, pack.getHash(), false);
         sendBroadcast(&pack);
     }
@@ -1194,6 +1245,7 @@ bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
         return false;
     }
 
+    auto lock = getNeighboursLock();
     nh_.neighbourHasPacket(sender, hHash, isDirect);
     return true;
 }

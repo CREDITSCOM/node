@@ -186,7 +186,7 @@ class OPackStream {
 public:
     OPackStream(RegionAllocator* allocator, const cs::PublicKey& nodeIdKey)
     : allocator_(allocator)
-    , packets_(new Packet[Packet::MaxFragments]())
+    , packets_(new Packet[200000/*Packet::MaxFragments*/]())
     , packetsEnd_(packets_)
     , senderKey_(nodeIdKey) {
     }

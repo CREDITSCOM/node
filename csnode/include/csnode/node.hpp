@@ -183,7 +183,6 @@ public:
     // syncro send functions
     void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
 
-    void flushCurrentTasks();
     void initCurrentRP();
     void becomeWriter();
 
