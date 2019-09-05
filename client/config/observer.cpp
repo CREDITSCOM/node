@@ -2,7 +2,7 @@
 
 #include <utility>
 
-#include <client/config.hpp>
+#include <config.hpp>
 
 cs::config::Observer::Observer(Config& config, boost::program_options::variables_map& map)
 : config_(config)

@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include <client/config.hpp>
+#include <config.hpp>
 #include <csconnector/csconnector.hpp>
 #include <csstats.hpp>
 

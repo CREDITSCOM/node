@@ -17,7 +17,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 
-#include <client/config.hpp>
+#include <config.hpp>
 
 using namespace cs;
 namespace fs = boost::filesystem;

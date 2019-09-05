@@ -30,7 +30,7 @@
 #include <queue>
 
 #include <client/params.hpp>
-#include <client/config.hpp>
+#include <config.hpp>
 
 #include <lib/system/reference.hpp>
 #include <lib/system/concurrent.hpp>

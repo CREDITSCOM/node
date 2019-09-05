@@ -6,7 +6,7 @@
 #include <csignal>
 #include <atomic>
 
-#include <client/config.hpp>
+#include <config.hpp>
 
 #include <csnode/node.hpp>
 #include <csnode/packstream.hpp>

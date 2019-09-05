@@ -7,12 +7,14 @@
 #endif
 #include <boost/asio.hpp>
 
-#include <client/config.hpp>
 #include <lib/system/cache.hpp>
 #include "pacmans.hpp"
 
 using io_context = boost::asio::io_context;
 
+struct EndpointData;
+
+class Config;
 class Transport;
 
 class Network {

@@ -12,7 +12,7 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
-#include <client/config.hpp>
+#include <config.hpp>
 
 namespace {
 cs::ConveyerBase* conveyerView = nullptr;
