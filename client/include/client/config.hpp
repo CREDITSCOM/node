@@ -77,6 +77,11 @@ struct ApiData {
     std::string executorCmdLine{};
 };
 
+struct ConveyerData {
+    size_t sendCacheValue = DEFAULT_CONVEYER_SEND_CACHE_VALUE;
+    size_t maxResendsSendCache = DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE;
+};
+
 class Config {
 public:
     Config() {
@@ -185,17 +190,19 @@ public:
     bool readKeys(const po::variables_map& vm);
     bool enterWithSeed();
 
-    size_t conveyerSendCacheValue() const {
-        return conveyerSendCacheValue_;
+    const ConveyerData& conveyerData() const {
+        return conveyerData_;
     }
 
     void swap(Config& config);
 
 private:
     static Config readFromFile(const std::string& fileName);
+
     void setLoggerSettings(const boost::property_tree::ptree& config);
     void readPoolSynchronizerData(const boost::property_tree::ptree& config);
     void readApiData(const boost::property_tree::ptree& config);
+    void readConveyerData(const boost::property_tree::ptree& config);
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
     void showKeys(const std::string& pk58);
@@ -241,8 +248,7 @@ private:
 
     uint64_t observerWaitTime_;
 
-    size_t conveyerSendCacheValue_;
-    size_t conveyerMaxResendsSendCache_;
+    ConveyerData conveyerData_;
 
     friend bool operator==(const Config&, const Config&);
 };
@@ -256,6 +262,9 @@ bool operator!=(const PoolSyncData& lhs, const PoolSyncData& rhs);
 
 bool operator==(const ApiData& lhs, const ApiData& rhs);
 bool operator!=(const ApiData& lhs, const ApiData& rhs);
+
+bool operator==(const ConveyerData& lhs, const ConveyerData& rhs);
+bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs);
 
 bool operator==(const Config& lhs, const Config& rhs);
 bool operator!=(const Config& lhs, const Config& rhs);

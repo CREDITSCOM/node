@@ -265,6 +265,8 @@ public slots:
 
 private:
     bool init(const Config& config);
+    void setupObserver();
+
     void sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);
 

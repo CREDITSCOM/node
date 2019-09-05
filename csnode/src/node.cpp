@@ -65,9 +65,7 @@ Node::Node(const Config& config, cs::config::Observer& observer)
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
-    // connect config observer to entities
-    cs::Connector::connect(&observer_.configChanged, &cs::Conveyer::instance(), &cs::Conveyer::onConfigChanged);
-    cs::Connector::connect(&observer_.configChanged, &executor::Executor::getInstance(), &executor::Executor::onConfigChanged);
+    setupObserver();
 
     alwaysExecuteContracts_ = config.alwaysExecuteContracts();
     good_ = init(config);
@@ -75,6 +73,7 @@ Node::Node(const Config& config, cs::config::Observer& observer)
 
 Node::~Node() {
     std::cout << "Desturctor called\n";
+
     sendingTimer_.stop();
 
     delete solver_;
@@ -92,6 +91,7 @@ bool Node::init(const Config& config) {
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
+
 #endif  // NODE_API
 
     // must call prior to blockChain_.init():
@@ -101,6 +101,7 @@ bool Node::init(const Config& config) {
     if (!blockChain_.init(config.getPathToDB())) {
         return false;
     }
+
     cslog() << "Blockchain is ready, contains " << WithDelimiters(stat_.total_transactions()) << " transactions";
 
 #ifdef NODE_API
@@ -110,16 +111,17 @@ bool Node::init(const Config& config) {
     if (!transport_->isGood()) {
         return false;
     }
+
     std::cout << "Transport is init\n";
 
     if (!solver_) {
         return false;
     }
-    std::cout << "Solver is init\n";
 
+    std::cout << "Solver is init\n";
     std::cout << "Everything is init\n";
 
-    cs::Conveyer::instance().setSendCacheValue(config.conveyerSendCacheValue());
+    cs::Conveyer::instance().setData(config.conveyerData());
 
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
@@ -129,6 +131,12 @@ bool Node::init(const Config& config) {
     maxNeighboursSequence_ = blockChain_.getLastSeq();
 
     return true;
+}
+
+void Node::setupObserver() {
+    // connect config observer to entities
+    cs::Connector::connect(&observer_.configChanged, &cs::Conveyer::instance(), &cs::Conveyer::onConfigChanged);
+    cs::Connector::connect(&observer_.configChanged, &executor::Executor::getInstance(), &executor::Executor::onConfigChanged);
 }
 
 void Node::run() {
