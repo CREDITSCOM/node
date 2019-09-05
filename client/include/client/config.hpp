@@ -28,7 +28,9 @@ const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::MaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
-const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;        // rounds
+
+const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;             // rounds
+const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
 
 const uint8_t DELTA_ROUNDS_VERIFY_NEW_SERVER = 100;
 using Port = short unsigned;
@@ -91,7 +93,7 @@ public:
     using IsConvertToString = std::enable_if_t<(std::is_convertible_v<Ts, std::string>&& ...)>;
 
     template<typename T, typename ... Ts, typename = IsConvertToString<T, Ts...>>
-    static bool replaceBlock_(T&& blockName, Ts&& ... replaceStrings);
+    static bool replaceBlock(T&& blockName, Ts&& ... replaceStrings);
 
     const EndpointData& getInputEndpoint() const {
         return inputEp_;
@@ -240,6 +242,7 @@ private:
     uint64_t observerWaitTime_;
 
     size_t conveyerSendCacheValue_;
+    size_t conveyerMaxResendsSendCache_;
 
     friend bool operator==(const Config&, const Config&);
 };
@@ -259,40 +262,39 @@ bool operator!=(const Config& lhs, const Config& rhs);
 
 
 template<typename T, typename ... Ts, typename>
-bool Config::replaceBlock_(T&& blockName, Ts&& ... replaceStrings) {
+bool Config::replaceBlock(T&& blockName, Ts&& ... replaceStrings) {
     std::ifstream in(DEFAULT_PATH_TO_CONFIG, std::ios::in);
-    if (!in)
-    {
+
+    if (!in) {
         cswarning() << "Couldn't read config file " << DEFAULT_PATH_TO_CONFIG;
         return false;
     }
-    std::string newConfig(std::istreambuf_iterator<char>{in}, {});
+
+    std::string newConfig = cs::Utils::readAllFileData(in);
 
     const std::string fullBlockName = "[" + std::string(blockName) + "]";
     const std::string fullReplaceString = fullBlockName + "\n" + ((std::string(replaceStrings) + "\n") + ...) + "\n";
 
-
-    if (const auto startPos = newConfig.find(fullBlockName); startPos != std::string::npos)
-    {
+    if (const auto startPos = newConfig.find(fullBlockName); startPos != std::string::npos) {
         const auto tmpPos = newConfig.find("[", startPos + 1);
         const auto endPos = tmpPos != std::string::npos ? tmpPos - 1 : newConfig.size();
 
         newConfig.erase(startPos, endPos - startPos + 1);
         newConfig.insert(startPos, fullReplaceString);
     }
-    else
-    {
+    else {
         newConfig += fullReplaceString;
     }
+
     in.close();
 
-
     std::ofstream out(DEFAULT_PATH_TO_CONFIG, std::ios::out | std::ios::trunc);
-    if (!out)
-    {
+
+    if (!out) {
         cswarning() << "Couldn't read config file " << DEFAULT_PATH_TO_CONFIG;
         return false;
     }
+
     out << newConfig.data();
     out.close();
 

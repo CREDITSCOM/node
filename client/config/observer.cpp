@@ -27,6 +27,12 @@ bool cs::config::Observer::isObserved() const {
     return isObserved_.load(std::memory_order_acquire);
 }
 
+void cs::config::Observer::notify() {
+    if (isObserved()) {
+        variable_.notify_one();
+    }
+}
+
 void cs::config::Observer::eventLoop() {
     isObserved_.store(true, std::memory_order_release);
 
