@@ -460,7 +460,7 @@ void BlockChain::removeLastBlock() {
     removeWalletsInPoolFromCache(pool);
     removeLastBlockFromTrxIndex(pool);
 
-    emit removeBlockEvent(pool.sequence());
+    emit removeBlockEvent(pool);
 
     csmeta(csdebug) << "done";
 }

@@ -44,6 +44,7 @@ const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
 const std::string PARAM_NAME_CONVEYER_SEND_CACHE = "conveyer_send_cache_value";
+const std::string PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE = "conveyer_max_resends_send_cache";
 
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";

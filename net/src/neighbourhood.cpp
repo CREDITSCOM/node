@@ -401,6 +401,20 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
     connectNode(node, conn);
 }
 
+
+bool Neighbourhood::updateSignalServer(const ip::udp::endpoint& in) {
+    cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_); // #!
+    
+    if (auto itServer = std::find_if(neighbours_.begin(), neighbours_.end(), [](auto const& node) { return node->isSignal; }); itServer != neighbours_.end()) {
+        itServer->get()->in = in;
+        itServer->get()->specialOut = false;
+        itServer->get()->out = {};
+        return true;
+    }
+    
+    return false;
+}
+
 /* Assuming both the mutexes have been locked */
 void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     Connection* connection = nullptr;

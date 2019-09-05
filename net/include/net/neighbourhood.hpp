@@ -139,6 +139,7 @@ public:
 
     void establishConnection(const ip::udp::endpoint&);
     void addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr);
+    bool updateSignalServer(const ip::udp::endpoint& in);
 
     void gotRegistration(Connection&&, RemoteNodePtr);
     void gotConfirmation(const Connection::Id& my, const Connection::Id& real, const ip::udp::endpoint&, const cs::PublicKey&, RemoteNodePtr);

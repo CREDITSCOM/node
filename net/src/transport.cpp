@@ -368,7 +368,12 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             }
             break;
         }
-
+        case NetworkCommand::SSNewFriends:
+            gotSSNewFriends(task);
+            break;
+        case NetworkCommand::SSUpdateServer:
+            gotSSUpdateServer(task, sender);
+            break;
         case NetworkCommand::PackInform:
             gotPackInform(task, sender);
             break;
@@ -921,72 +926,30 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 }
 
 bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode) {
-    // receive new friends after registration on SignalServer
-    if (ssStatus_ == SSBootstrapStatus::Complete)
-    {
-        cslog() << "Receive new friedns nodes from SignalServer";
-        if (!node_->getNewFriendsNodesVerify(task->pack.getMsgData(), task->pack.getMsgSize()))
-        {
-            cswarning() << "gotSSRegistration message is incorrect: signature isn't valid";
-            return false;
-        }
-
-        uint32_t ctr = nh_.size();
-        iPackStream_.safeSkip<cs::Signature>();
-
-        uint8_t numCirc{ 0 };
-        iPackStream_ >> numCirc;
-
-        for (uint8_t i = 0; i < numCirc; ++i) {
-            EndpointData ep;
-            ep.ipSpecified = true;
-            cs::PublicKey key;
-
-            iPackStream_ >> ep.ip >> ep.port >> key;
-
-            if (!iPackStream_.good()) {
-                return false;
-            }
-
-            ++ctr;
-
-            if (!std::equal(key.cbegin(), key.cend(), config_.getMyPublicKey().cbegin())) {
-                if (ctr <= config_.getMaxNeighbours()) {
-                    nh_.establishConnection(net_->resolve(ep));
-                }
-            }
-
-            if (!nh_.canHaveNewConnection()) {
-                break;
-            }
-        }
-
-        cslog() << "Save new friends nodes";
-        return true;
-    }
-
-    // first registration on SignalServer
     if (ssStatus_ != SSBootstrapStatus::Requested) {
         cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of Requested";
         return false;
     }
+    
+    if (ssStatus_ == SSBootstrapStatus::Requested) 
+    {
+        cslog() << "Connection to the Signal Server has been established";
+        nh_.addSignalServer(task->sender, ssEp_, rNode);
 
-    cslog() << "Connection to the Signal Server has been established";
-    nh_.addSignalServer(task->sender, ssEp_, rNode);
+        constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
+        size_t msg_size = task->pack.getMsgSize();
 
-    constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
-    size_t msg_size = task->pack.getMsgSize();
-
-    if (msg_size > MinRegistrationSize) {
-        if (!parseSSSignal(task)) {
-            cswarning() << "Bad Signal Server response";
+        if (msg_size > MinRegistrationSize) {
+            if (!parseSSSignal(task)) {
+                cswarning() << "Bad Signal Server response";
+            }
         }
-    }
-    else {
-        ssStatus_ = SSBootstrapStatus::RegisteredWait;
-    }
+        else {
+            ssStatus_ = SSBootstrapStatus::RegisteredWait;
+        }
 
-    return true;
+        return true;
+    }
 }
 
 bool Transport::gotSSReRegistration() {
@@ -1072,6 +1035,113 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
     csunused(lastHash);
     csunused(canBeTrusted);
 #endif
+    return true;
+}
+
+bool Transport::gotSSNewFriends(const TaskPtr<IPacMan>& task)
+{
+    cslog() << "Receive new friedns nodes from SignalServer";
+    if (ssStatus_ != SSBootstrapStatus::Complete)
+    {
+        cs::Lock lock(oLock_);
+        formSSConnectPack(config_, oPackStream_, myPublicKey_, node_->getBlockChain().uuid());
+        net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
+        cswarning() << "Ignore new friends. Registration on Signal Server because ssStatus = " + std::to_string(static_cast<int>(ssStatus_));
+        return false;
+    }
+
+    cs::Signature sign;
+    iPackStream_ >> sign;
+    
+    if (!node_->gotSSMessageVerify(sign, iPackStream_.getCurrentPtr(), iPackStream_.remainsBytes()))
+    {
+        cswarning() << "New Friends message is incorrect: signature isn't valid";
+        return false;
+    }
+
+    uint32_t ctr = nh_.size();
+    uint8_t numCirc{ 0 };
+    iPackStream_ >> numCirc;
+
+    for (uint8_t i = 0; i < numCirc; ++i) {
+        EndpointData ep;
+        ep.ipSpecified = true;
+        cs::PublicKey key;
+
+        iPackStream_ >> ep.ip >> ep.port >> key;
+
+        if (!iPackStream_.good()) {
+            return false;
+        }
+
+        ++ctr;
+
+        if (!std::equal(key.cbegin(), key.cend(), config_.getMyPublicKey().cbegin())) {
+            if (ctr <= config_.getMaxNeighbours()) {
+                nh_.establishConnection(net_->resolve(ep));
+            }
+        }
+
+        if (!nh_.canHaveNewConnection()) {
+            break;
+        }
+    }
+
+    cslog() << "Save new friends nodes";
+    return true;
+
+}
+
+bool Transport::gotSSUpdateServer(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode)
+{
+    cslog() << "Update server from SignalServer";
+
+    cs::Signature sign;
+    iPackStream_ >> sign;
+
+    if (!node_->gotSSMessageVerify(sign, iPackStream_.getCurrentPtr(), iPackStream_.remainsBytes()))
+    {
+        cswarning() << "Update Server message is incorrect: signature isn't valid";
+        return false;
+    }
+
+    cs::RoundNumber round;
+    iPackStream_ >> round;
+
+    if (const auto currentRound = cs::Conveyer::instance().currentRoundNumber(); !(currentRound <= round + DELTA_ROUNDS_VERIFY_NEW_SERVER))
+    {
+        cswarning() << "Server update failed rounds verification. Receive round = " << round << " node round = " << currentRound;
+        return false;
+    }
+    
+    EndpointData ep;
+    iPackStream_ >> ep.ip >> ep.port;
+    
+    if (!nh_.updateSignalServer(net_->resolve(ep)))
+    {
+        cswarning() << "Don't update signal server. Error updating neighbours_";
+        return false;
+    }
+    
+    // update config.ini
+    if (!Config::replaceBlock("signal_server", "ip = " + ep.ip.to_string(), "port = " + std::to_string(ep.port)))
+    {
+        cswarning() << "Don't update signal server. Error updating config";
+        return false;
+    }
+
+    // update config variable
+    node_->updateConfigFromFile();
+    
+    ssEp_ = net_->resolve(ep);
+
+    cslog() << "Registration on new Signal Server";
+    {
+        cs::Lock lock(oLock_);
+        formSSConnectPack(config_, oPackStream_, myPublicKey_, node_->getBlockChain().uuid());
+        net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
+    }
+
     return true;
 }
 
