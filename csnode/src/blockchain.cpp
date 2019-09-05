@@ -165,6 +165,7 @@ bool BlockChain::init(const std::string& path) {
     }
 
     good_ = true;
+    blocksToBeRemoved_ = totalLoaded - 1; // any amount to remave after start
     return true;
 }
 
@@ -1287,7 +1288,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             csdebug() << "BLOCKCHAIN> block #" << poolSequence << " has recorded to chain successfully";
             // unable to call because stack overflow in case of huge written blocks amount possible:
             // testCachedBlocks();
-			blocksToBeRemoved_ = 0;
+			blocksToBeRemoved_ = 1;
             return true;
         }
 
