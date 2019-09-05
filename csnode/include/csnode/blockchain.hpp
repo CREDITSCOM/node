@@ -42,6 +42,7 @@ using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 
 /** @brief   The write block or remove block signal emits when block is flushed to disk */
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
+using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
 }  // namespace cs
 
@@ -188,7 +189,7 @@ public signals:
     cs::ChangeBlockSignal cachedBlockEvent;
 
     /** @brief The remove block event. Raised when the next block is flushed to storage */
-    cs::ChangeBlockSignal removeBlockEvent;
+    cs::RemoveBlockSignal removeBlockEvent;
 
     const cs::ReadBlockSignal& readBlockEvent() const;
 
