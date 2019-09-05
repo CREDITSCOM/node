@@ -98,7 +98,7 @@ public:
     using IsConvertToString = std::enable_if_t<(std::is_convertible_v<Ts, std::string>&& ...)>;
 
     template<typename T, typename ... Ts, typename = IsConvertToString<T, Ts...>>
-    static bool replaceBlock(T&& blockName, Ts&& ... replaceStrings);
+    static bool replaceBlock(T&& blockName, Ts&& ... newLines);
 
     const EndpointData& getInputEndpoint() const {
         return inputEp_;
@@ -271,7 +271,7 @@ bool operator!=(const Config& lhs, const Config& rhs);
 
 
 template<typename T, typename ... Ts, typename>
-bool Config::replaceBlock(T&& blockName, Ts&& ... replaceStrings) {
+bool Config::replaceBlock(T&& blockName, Ts&& ... newLines) {
     std::ifstream in(DEFAULT_PATH_TO_CONFIG, std::ios::in);
 
     if (!in) {
@@ -282,7 +282,7 @@ bool Config::replaceBlock(T&& blockName, Ts&& ... replaceStrings) {
     std::string newConfig = cs::Utils::readAllFileData(in);
 
     const std::string fullBlockName = "[" + std::string(blockName) + "]";
-    const std::string fullReplaceString = fullBlockName + "\n" + ((std::string(replaceStrings) + "\n") + ...) + "\n";
+    const std::string fullReplaceString = fullBlockName + "\n" + ((std::string(newLines) + "\n") + ...) + "\n";
 
     if (const auto startPos = newConfig.find(fullBlockName); startPos != std::string::npos) {
         const auto tmpPos = newConfig.find("[", startPos + 1);

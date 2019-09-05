@@ -5,7 +5,7 @@
  *  Please don't commit these three defines
  *  below uncommented.
  */
-#define MONITOR_NODE
+//#define MONITOR_NODE
 //#define WEB_WALLET_NODE
 
 #define NODE_API

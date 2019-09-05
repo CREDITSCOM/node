@@ -1097,6 +1097,10 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     return MessageActions::Process;
 }
 
+void Node::updateConfigFromFile() {
+    observer_.notify();
+}
+
 inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
     cs::PublicKey mainNode;
 

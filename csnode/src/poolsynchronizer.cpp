@@ -267,9 +267,9 @@ void cs::PoolSynchronizer::onWriteBlock(const cs::Sequence sequence) {
     removeExistingSequence(sequence, SequenceRemovalAccuracy::EXACT);
 }
 
-void cs::PoolSynchronizer::onRemoveBlock(const cs::Sequence sequence) {
-    csmeta(csdetails) << sequence;
-    removeExistingSequence(sequence, SequenceRemovalAccuracy::UPPER_BOUND);
+void cs::PoolSynchronizer::onRemoveBlock(const csdb::Pool& pool) {
+    csmeta(csdetails) << pool.sequence();
+    removeExistingSequence(pool.sequence(), SequenceRemovalAccuracy::UPPER_BOUND);
 }
 
 //
