@@ -180,6 +180,9 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
     }
     else {
         msg = *msgPtr;
+        if (msg->packets_.size() == 0) {
+            msg->packets_.resize(msg->packetsTotal_);
+        }
     }
 
     {
@@ -205,8 +208,12 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
             }
         }
     }
-
     return msg;
+}
+
+void PacketCollector::dropMessage(MessagePtr msg) {
+    (*msg)->packetsLeft_ = (*msg)->packetsTotal_;
+    (*msg)->packets_.clear();
 }
 
 /* WARN: All the cases except FRAG + COMPRESSED have bugs in them */
