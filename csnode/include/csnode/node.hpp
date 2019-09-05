@@ -55,7 +55,7 @@ public:
 
     using RefExecution = std::pair<cs::Sequence, uint32_t>;
 
-    explicit Node(Config& config, cs::config::Observer& observer);
+    explicit Node(const Config& config, cs::config::Observer& observer);
     ~Node();
 
     bool isGood() const {
