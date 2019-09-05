@@ -194,6 +194,8 @@ public:
     // this function should filter the packages only using their roundNumber
     MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes, const cs::PublicKey);
 
+    void updateConfigFromFile();
+
     const cs::PublicKey& getNodeIdKey() const {
         return nodeIdKey_;
     }

@@ -1123,11 +1123,15 @@ bool Transport::gotSSUpdateServer(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
         return false;
     }
     
+    // update config.ini
     if (!Config::replaceBlock("signal_server", "ip = " + ep.ip.to_string(), "port = " + std::to_string(ep.port)))
     {
         cswarning() << "Don't update signal server. Error updating config";
         return false;
     }
+
+    // update config variable
+    node_->updateConfigFromFile();
     
     ssEp_ = net_->resolve(ep);
 
