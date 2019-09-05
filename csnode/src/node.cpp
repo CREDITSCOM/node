@@ -137,6 +137,7 @@ void Node::setupObserver() {
     // connect config observer to entities
     cs::Connector::connect(&observer_.configChanged, &cs::Conveyer::instance(), &cs::Conveyer::onConfigChanged);
     cs::Connector::connect(&observer_.configChanged, &executor::Executor::getInstance(), &executor::Executor::onConfigChanged);
+    cs::Connector::connect(&observer_.configChanged, transport_, &Transport::onConfigChanged);
 }
 
 void Node::run() {

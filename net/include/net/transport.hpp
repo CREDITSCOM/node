@@ -74,7 +74,7 @@ uint16_t getHashIndex(const ip::udp::endpoint&);
 
 class Transport {
 public:
-    Transport(const Config& config, Node* node)
+    explicit Transport(const Config& config, Node* node)
     : config_(config)
     , sendPacksFlag_()
     , remoteNodes_(maxRemoteNodes_ + 1)
@@ -168,6 +168,9 @@ public:
 public signals:
     PingSignal pingReceived;
 
+public slots:
+    void onConfigChanged(const Config& updated, const Config& previous);
+
 private:
     void registerTask(Packet* pack, const uint32_t packNum, const bool);
     void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
@@ -204,7 +207,7 @@ private:
 
     /* Actions */
     bool good_;
-    const Config& config_;
+    Config config_;
 
     static const uint32_t maxPacksQueue_ = 2048;
     static const uint32_t maxRemoteNodes_ = 4096;

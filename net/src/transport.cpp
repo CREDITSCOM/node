@@ -806,6 +806,15 @@ void Transport::resetNeighbours() {
     return nh_.resetSyncNeighbours();
 }
 
+void Transport::onConfigChanged(const Config& updated, const Config& previous) {
+    if (updated.getSignalServerEndpoint() == previous.getSignalServerEndpoint()) {
+        return;
+    }
+
+    cs::Lock lock(oLock_);
+    config_ = updated;
+}
+
 /* Sending network tasks */
 void Transport::sendRegistrationRequest(Connection& conn) {
     RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
