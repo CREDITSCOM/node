@@ -712,6 +712,16 @@ public:
 
     void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<::general::ByteCodeObject>& byteCodeObjects) override;
 
+    void addTokenResult(api::TokenTransfersResult& _return, const csdb::Address& token, const std::string& code, const csdb::Pool& pool, const csdb::Transaction& tr,
+        const api::SmartContractInvocation& smart, const std::pair<csdb::Address, csdb::Address>& addrPair);
+
+    void addTokenResult(api::TokenTransactionsResult& _return, const csdb::Address& token, const std::string&, const csdb::Pool& pool, const csdb::Transaction& tr,
+        const api::SmartContractInvocation& smart, const std::pair<csdb::Address, csdb::Address>&);
+
+    template <typename ResultType>
+    void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensMaster& tm, const general::Address& token, bool transfersOnly, bool filterByWallet, int64_t offset,
+        int64_t limit, const csdb::Address& wallet = csdb::Address());
+
     void ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) override;
     ////////new
     void iterateOverTokenTransactions(const csdb::Address&, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)>);
@@ -767,8 +777,8 @@ private:
     };
 
     struct HashState {
-        cs::Hash hash;
-        std::string retVal;
+        cs::Hash hash{};
+        std::string retVal{};
         bool isOld{false};
         bool condFlg{false};
     };

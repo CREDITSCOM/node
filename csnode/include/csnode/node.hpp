@@ -55,7 +55,7 @@ public:
 
     using RefExecution = std::pair<cs::Sequence, uint32_t>;
 
-    explicit Node(const Config& config, cs::config::Observer& observer);
+    explicit Node(Config& config, cs::config::Observer& observer);
     ~Node();
 
     bool isGood() const {
@@ -151,7 +151,7 @@ public:
     // called by solver, review required:
     bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
     void sendRoundTable(cs::RoundPackage& rPackage);
-    bool getNewFriendsNodesVerify(const uint8_t* data, const size_t size);
+    bool gotSSMessageVerify(const cs::Signature& sign, const cs::Byte* data, const size_t size);
 
     // transaction's pack syncro
     void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);

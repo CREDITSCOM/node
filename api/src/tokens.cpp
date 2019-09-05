@@ -210,6 +210,9 @@ void TokensMaster::refreshTokenState(const csdb::Address& token, const std::stri
             auto key = h.public_key();
             var.__set_v_string(EncodeBase58(cs::Bytes(key.begin(), key.end())));
             holderKeysParams.push_back(std::vector<general::Variant>(1, var));
+            /*if (var == "HtimoDtTYGSVotnQ5Eo4eud3FkDv5r2QYiKSZcdWP7Z8") {
+                int a = 1;
+            }*/
         }
 
         api_->getExecutor().executeByteCodeMultiple(result, dpAddr, smartContractBinary, "balanceOf", holderKeysParams, 100, executor::Executor::kUseLastSequence);
