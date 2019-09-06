@@ -378,7 +378,7 @@ bool Config::enterWithSeed() {
     std::stringstream ss(seedPhrase);
     cscrypto::mnemonic::WordList words;
     bool allValid = true;
-    
+
     for (auto it = words.begin(); it != words.end(); ++it) {
         if (!ss) {
             allValid = false;

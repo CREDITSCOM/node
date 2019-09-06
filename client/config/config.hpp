@@ -206,7 +206,7 @@ private:
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
     void showKeys(const std::string& pk58);
-    
+
     void changePasswordOption(const std::string& pathToSk);
 
     template <typename T>
@@ -225,7 +225,7 @@ private:
     uint32_t maxNeighbours_;
     uint64_t connectionBandwidth_;
 
-    bool symmetric_;
+    bool symmetric_ = false;
     EndpointData hostAddressEp_;
 
     BootstrapType bType_;
