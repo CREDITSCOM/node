@@ -35,7 +35,6 @@
 #include <lib/system/reference.hpp>
 #include <lib/system/concurrent.hpp>
 #include <lib/system/process.hpp>
-#include <lib/system/timer.hpp>
 
 #include "tokens.hpp"
 
