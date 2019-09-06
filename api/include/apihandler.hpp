@@ -533,15 +533,17 @@ private:
                     break;
                 }
 
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
                 if (executorProcess_->isRunning()) {
                     if (!isConnected()) {
                         connect();
                     }
                 }
                 else {
-                    runProcess();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                    if (!executorProcess_->isRunning()) {
+                        runProcess();
+                    }
                 }
             }
         });
