@@ -2478,7 +2478,7 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
     }
     cs::RoundPackage rp = roundPackageCache_.back();
 
-    if (rp.roundTable().round == rNum) {
+    if (rp.roundTable().round >= rNum) {
         if(!rp.roundSignatures().empty()) {
             roundPackReply(sender);
         }
