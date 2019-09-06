@@ -2362,7 +2362,7 @@ namespace executor {
                 }
             }
         }
-        smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr()));
+        smartContractBinary.stateCanModify = solver_.isContractLocked(smartTarget);
 
         // fill methodHeader
         std::vector<executor::MethodHeader> methodHeader;

@@ -156,9 +156,7 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
                 if (!invoke.usedContracts.empty()) {
                     for (const auto item : invoke.usedContracts) {
                         if (item.size() == cscrypto::kPublicKeySize) {
-                            cs::PublicKey key;
-                            std::copy(item.cbegin(), item.cend(), key.begin());
-                            const csdb::Address addr = csdb::Address::from_public_key(key); // BlockChain::getAddressFromKey(item);
+                            const csdb::Address addr = csdb::Address::from_public_key(item.c_str()); // BlockChain::getAddressFromKey(item);
                             if (addr.is_valid()) {
                                 execution.uses.push_back(addr);
                             }
