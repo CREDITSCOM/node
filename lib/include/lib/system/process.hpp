@@ -64,6 +64,8 @@ public:
     void wait();
     void terminate();
 
+    void stop();
+
     void launch(Options options = Options::None);
 
 public signals:
@@ -95,6 +97,9 @@ inline Process::~Process() noexcept {
     if (isRunning()) {
         if (!process_.wait_for(std::chrono::seconds(5))) {
             terminate();
+        }
+        else {
+            stop();
         }
     }
 }
@@ -155,6 +160,17 @@ inline void Process::terminate() {
     }
 }
 
+inline void Process::stop() {
+    try {
+        if (!io_.stopped()) {
+            io_.stop();
+        }
+    }
+    catch (const std::exception& exception) {
+        emit errorOccured(cs::ProcessException(exception.what()));
+    }
+}
+
 inline void Process::launch(Process::Options options) {
     if (isRunning()) {
         return;
@@ -180,7 +196,7 @@ inline void Process::launch(Process::Options options) {
         emit finished(code, errorCode);
     };
 
-    io_.reset();
+    io_.restart();
 
     try {
         if ((options & Options::OutToFile) && !file_.empty()) {

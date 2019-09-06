@@ -35,6 +35,7 @@
 #include <lib/system/reference.hpp>
 #include <lib/system/concurrent.hpp>
 #include <lib/system/process.hpp>
+#include <lib/system/timer.hpp>
 
 #include "tokens.hpp"
 
@@ -466,8 +467,10 @@ public slots:
     }
 
     void onExecutorFinished() {
-        if (!executorProcess_->isRunning() && !requestStop_) {
-            executorProcess_->launch(cs::Process::Options::None);
+        if (!requestStop_) {
+            cs::Concurrent::run([this] {
+                runProcess();
+            });
         }
     }
 
@@ -530,8 +533,15 @@ private:
                     break;
                 }
 
-                if (!isConnected()) {
-                    connect();
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                if (executorProcess_->isRunning()) {
+                    if (!isConnected()) {
+                        connect();
+                    }
+                }
+                else {
+                    runProcess();
                 }
             }
         });
@@ -541,6 +551,12 @@ private:
 
     ~Executor() {
         stop();
+    }
+
+    void runProcess() {
+        executorProcess_->terminate();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        executorProcess_->launch(cs::Process::Options::None);
     }
 
     struct OriginExecuteResult {
