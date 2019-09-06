@@ -71,8 +71,13 @@ private:
 
     template <typename Func>
     static void run(Func&& function) {
-        std::thread thread(std::forward<Func>(function));
-        thread.detach();
+        try {
+            std::thread thread(std::forward<Func>(function));
+            thread.detach();
+        }
+        catch (...) {
+            execute(std::forward<Func>(function));
+        }
     }
 
     template <typename T>
