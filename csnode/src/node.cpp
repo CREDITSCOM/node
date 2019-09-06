@@ -2133,6 +2133,57 @@ bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& curre
     return true;
 }
 
+bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
+    cs::Conveyer& conveyer = cs::Conveyer::instance();
+    if (conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree && getBlockChain().getLastSeq() > 0) {
+        uint64_t lastTimeStamp;
+        uint64_t currentTimeStamp;
+        uint64_t rpTimeStamp;
+        try {
+            lastTimeStamp = std::stoll(getBlockChain().getLastTimeStamp());
+        }
+        catch (...) {
+            csdebug() << __func__ << ": last block Timestamp was announced as zero";
+            return false;
+        }
+
+        try {
+            currentTimeStamp = std::stoll(cs::Utils::currentTimestamp());
+        }
+        catch (...) {
+            csdebug() << __func__ << ": current Timestamp was announced as zero";
+            return false;
+        }
+
+        try {
+            rpTimeStamp = std::stoll(rPackage.poolMetaInfo().timestamp);
+        }
+        catch (...) {
+            csdebug() << __func__ << ": just received roundPackage Timestamp was announced as zero";
+            return false;
+        }
+
+        if (rPackage.roundTable().round > conveyer.currentRoundNumber() + 1) {
+            uint64_t delta;
+            if (lastTimeStamp > currentTimeStamp) {
+                delta = lastTimeStamp - currentTimeStamp;
+            }
+            else {
+                delta = currentTimeStamp - lastTimeStamp;
+            }
+            uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
+
+            const auto ave_duration = stat_.getAveTime();
+            if (speed < ave_duration / 10 && rPackage.roundTable().round - stat_.getNodeStartRound() > Consensus::SpeedCheckRound) {
+                stat_.onRoundStart(rPackage.roundTable().round, true /*skip_logs*/);
+                cserror() << "drop RoundPackage created in " << speed << " ms/block, average ms/round is " << ave_duration;
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
     csdebug() << "NODE> next round table received, round: " << rNum;
     csmeta(csdetails) << "started";
@@ -2172,52 +2223,11 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    if(conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree && getBlockChain().getLastSeq() > 0) {
-        uint64_t lastTimeStamp;
-        uint64_t currentTimeStamp;
-        uint64_t rpTimeStamp;
-        try {
-            lastTimeStamp = std::stoll(getBlockChain().getLastTimeStamp());
-        }
-        catch (...) {
-            csdebug() << __func__ << ": last block Timestamp was announced as zero";
-            return;
-        }
-
-        try {
-            currentTimeStamp = std::stoll(cs::Utils::currentTimestamp());
-        }
-        catch (...) {
-            csdebug() << __func__ << ": current Timestamp was announced as zero";
-            return;
-        }
-
-        try {
-            rpTimeStamp = std::stoll(rPackage.poolMetaInfo().timestamp);
-        }
-        catch (...) {
-            csdebug() << __func__ << ": just received roundPackage Timestamp was announced as zero";
-            return;
-        }
-    
-        if(rPackage.roundTable().round > conveyer.currentRoundNumber() + 1) {
-            uint64_t delta;
-            if (lastTimeStamp > currentTimeStamp) {
-                delta = lastTimeStamp - currentTimeStamp;
-            }
-            else {
-                delta = currentTimeStamp - lastTimeStamp;
-            }
-            uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
-        
-            const auto ave_duration = stat_.getAveTime();
-            if (speed < ave_duration / 10 && rNum - stat_.getNodeStartRound() > Consensus::SpeedCheckRound) {
-                stat_.onRoundStart(rNum, true /*skip_logs*/);
-                cserror() << "drop RoundPackage created in " << speed << " ms/block, average ms/round is " << ave_duration;
-                return;
-            }
-        }
+    if (!rpSpeedOk(rPackage)) {
+        return;
     }
+
+    
 
 
     csdebug() << "---------------------------------- RoundPackage #" << rPackage.roundTable().round << " --------------------------------------------- \n" 

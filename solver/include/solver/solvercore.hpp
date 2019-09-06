@@ -63,6 +63,9 @@ public:
     bool addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures);
 
     void updateLastPackageSignatures();
+    uint8_t getCurrentStage3Iteration() {
+        return currentStage3iteration_;
+    }
 
     uint8_t subRound();
     // Solver "public" interface,
@@ -82,6 +85,7 @@ public:
 
     // TODO: requires revision
     const cs::PublicKey& getWriterPublicKey() const;
+
 
     void beforeNextRound();
     void nextRound();
