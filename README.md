@@ -21,10 +21,10 @@ Current node version 4.2.422
 <p>Credits Node is the main module that provide an opportunity to run a node and participate in CREDITS blockhain network. The node performs processing and storage of transactions, execution and confirmation of the terms of smart contracts, processing requests from third-party systems, and provides data upon request. Each node on the network has the same functionality.
 The node consists of the following elements:</p>
 <ul>
-<li>API</li> 
-<li>Desision-making module(Solver)</li> 
-<li>Storage(CSDB)</li> 
-<li>Transport protocol</li> 
+<li>API</li>
+<li>Desision-making module(Solver)</li>
+<li>Storage(CSDB)</li>
+<li>Transport protocol</li>
 </ul>
 
 <h2>Build dependencies</h2>
@@ -55,6 +55,7 @@ On Linux:<br/>
 >mkdir build
 >cd build
 >cmake -DCMAKE_BUILD_TYPE=Release ..
+>cd ..
 >make -j4
 
 <h2>System requirements:</h2>
@@ -98,7 +99,7 @@ Please make sure your contributions adhere to our coding guidelines:</p>
 <h3>Community links</h3>
    <a href="https://t.me/creditscom"><img src ="https://simpleicons.org/icons/telegram.svg" height=40 widht=40 ></a>
    <a href="https://twitter.com/creditscom"><img src ="https://simpleicons.org/icons/twitter.svg" height=40 widht=40 ></a>
-   <a href="https://www.reddit.com/r/CreditsOfficial/"><img src ="https://simpleicons.org/icons/reddit.svg" height=40 widht=40></a> 
+   <a href="https://www.reddit.com/r/CreditsOfficial/"><img src ="https://simpleicons.org/icons/reddit.svg" height=40 widht=40></a>
    <a href="https://medium.com/@credits"><img src="https://simpleicons.org/icons/medium.svg" height=40 widht=40></a>
    <a href="https://www.instagram.com/credits_com/"><img src="https://simpleicons.org/icons/facebook.svg" height=40 widht=40></a>
    <a href="https://www.facebook.com/creditscom"><img src="https://simpleicons.org/icons/instagram.svg" height=40 widht=40></a>
