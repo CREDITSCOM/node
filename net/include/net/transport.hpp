@@ -278,7 +278,7 @@ private:
     static constexpr uint32_t fragmentsFixedMapSize_ = 10000;
     FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, fragmentsFixedMapSize_> fragOnRound_;
 
-    std::atomic_bool sendLarge_;
+    std::atomic_bool sendLarge_ = false;
 
 public:
     inline static size_t cntDirtyAllocs = 0;

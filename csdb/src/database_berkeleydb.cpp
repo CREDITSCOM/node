@@ -415,7 +415,21 @@ public:
     }
 
     void seek_to_last() final {
-        assert(false);
+        if (it_ == nullptr) {
+            return;
+        }
+
+        Dbt key;
+        Dbt_safe value;
+
+        int ret = it_->get(&key, &value, DB_LAST);
+        if (ret == 0) {
+            set_value(value);
+            valid_ = true;
+        }
+        else {
+            valid_ = false;
+        }
     }
 
     void seek(const cs::Bytes &) final {

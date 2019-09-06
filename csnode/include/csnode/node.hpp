@@ -137,6 +137,7 @@ public:
 
     void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3);
     bool receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants);
+    bool rpSpeedOk(cs::RoundPackage& rPackage);
     void addRoundSignature(const cs::StageThree& st3);
     // smart-contracts consensus stages sending and getting
 

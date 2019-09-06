@@ -30,6 +30,8 @@ class TransactionID;
 /** @brief The read block signal, caller may assign test_failed to true if block is logically corrupted */
 using ReadBlockSignal = cs::Signal<void(const csdb::Pool& block, bool* test_failed)>;
 
+using BlockReadingStartedSingal = cs::Signal<void(cs::Sequence lastBlockNum)>;
+
 /**
  * @brief Объект хранилища.
  *
@@ -313,6 +315,7 @@ public:
 
 public signals:
     const ReadBlockSignal& readBlockEvent() const;
+    const BlockReadingStartedSingal& readingStartedEvent() const;
 
 private:
   static cs::Bytes get_trans_index_key(const Address&, cs::Sequence);
