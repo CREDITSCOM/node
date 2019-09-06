@@ -109,6 +109,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
 , recreateIndex_(recreateIndex) {
+    cs::Connector::connect(&storage_.readingStartedEvent(), this, &BlockChain::onStartReadFromDB);
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
 
     createCachesPath();
@@ -176,6 +177,12 @@ bool BlockChain::isGood() const {
 uint64_t BlockChain::uuid() const {
     cs::Lock lock(dbLock_);
     return uuid_;
+}
+
+void BlockChain::onStartReadFromDB(cs::Sequence lastWrittenPoolSeq) {
+    if (!recreateIndex_ && lastIndexedPool != lastWrittenPoolSeq) {
+        recreateIndex_ = true;
+    }
 }
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
