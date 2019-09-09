@@ -527,7 +527,7 @@ private:
                     static std::mutex mutex;
                     std::unique_lock lock(mutex);
 
-                    cvErrorConnect_.wait(lock, [&] {
+                    cvErrorConnect_.wait_for(lock, std::chrono::seconds(5), [&] {
                         return !isConnected() || requestStop_;
                     });
                 }

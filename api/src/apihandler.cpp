@@ -2271,13 +2271,19 @@ namespace executor {
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 recreateOriginExecutor();
             }
+
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
         catch (std::exception& x) {
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
+
         --execCount_;
         deleteAccessId(static_cast<general::AccessID>(access_id));
     }
@@ -2644,15 +2650,18 @@ namespace executor {
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 recreateOriginExecutor();
-                notifyError();
             }
 
             originExecuteRes.resp.status.code = cs::error::ThriftException;
             originExecuteRes.resp.status.message = x.what();
+
+            notifyError();
         }
         catch (std::exception& x) {
             originExecuteRes.resp.status.code = cs::error::StdException;
             originExecuteRes.resp.status.message = x.what();
+
+            notifyError();
         }
 
         originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - timeBeg).count();
