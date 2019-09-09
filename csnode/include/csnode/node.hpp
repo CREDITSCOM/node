@@ -82,6 +82,7 @@ public:
 
     // SOLVER3 methods
     void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
+    void setCurrentRP(const cs::RoundPackage& rp);
     void performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& sender);
     void clearRPCache(cs::RoundNumber rNum);
     void sendHash(cs::RoundNumber round);
@@ -427,6 +428,8 @@ private:
     cs::Bytes lastTrustedMask_;
     std::unique_ptr<cs::BlockValidator> blockValidator_;
     std::vector<cs::RoundPackage> roundPackageCache_;
+    cs::RoundPackage currentRp_;
+    size_t roundPackRequests_ = 0;
     std::map<cs::RoundNumber, uint8_t> recdBangs;
 
     bool alwaysExecuteContracts_ = false;

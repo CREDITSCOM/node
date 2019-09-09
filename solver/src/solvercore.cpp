@@ -519,7 +519,7 @@ void SolverCore::updateLastPackageSignatures() {
     justCreatedRoundPackage.updatePoolSignatures(lastSentSignatures_.poolSignatures);
     justCreatedRoundPackage.updateRoundSignatures(lastSentSignatures_.roundSignatures);
     justCreatedRoundPackage.updateTrustedSignatures(lastSentSignatures_.trustedConfirmation);
-
+    pnode->setCurrentRP(justCreatedRoundPackage);
     //auto ptr = pnode->getCurrentRoundPackage();
     //if (ptr != nullptr) {
     //    if (justCreatedRoundPackage.roundTable().round == ptr->roundTable().round) {
