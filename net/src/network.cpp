@@ -542,6 +542,7 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
     }
 
     resend = !(task->pack.getAddressee() == transport_->getMyPublicKey()) && resend;
+    resend = !recCounter && resend;
     transport_->redirectPacket(task->pack, remoteSender, resend);
     ++recCounter;
 }
