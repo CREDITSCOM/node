@@ -226,11 +226,7 @@ public:
     }
 
     bool isConnected() const {
-        bool is_open = executorTransport_->isOpen();
-        if (!is_open) {
-            notifyError();
-        }
-        return is_open;
+        return executorTransport_->isOpen();
     }
 
     void stop() {
