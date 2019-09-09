@@ -62,6 +62,7 @@ Node::Node(const Config& config, cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &executor::Executor::onBlockStored);
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &executor::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
+    cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
@@ -102,7 +103,7 @@ bool Node::init(const Config& config) {
         return false;
     }
 
-    cslog() << "Blockchain is ready, contains " << WithDelimiters(stat_.total_transactions()) << " transactions";
+    cslog() << "Blockchain is ready, contains " << WithDelimiters(stat_.totalTransactions()) << " transactions";
 
 #ifdef NODE_API
     api_->run();
@@ -2173,8 +2174,8 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
             }
             uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
 
-            const auto ave_duration = stat_.getAveTime();
-            if (speed < ave_duration / 10 && rPackage.roundTable().round - stat_.getNodeStartRound() > Consensus::SpeedCheckRound) {
+            const auto ave_duration = stat_.aveTime();
+            if (speed < ave_duration / 10 && rPackage.roundTable().round - stat_.nodeStartRound() > Consensus::SpeedCheckRound) {
                 stat_.onRoundStart(rPackage.roundTable().round, true /*skip_logs*/);
                 cserror() << "drop RoundPackage created in " << speed << " ms/block, average ms/round is " << ave_duration;
                 return false;
@@ -2202,6 +2203,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     // sync state check
     cs::Conveyer& conveyer = cs::Conveyer::instance();
 
+    if (stat_.isLastRoundTooLong()) {
+        poolSynchronizer_->sync(rNum, 1);
+    }
+
     if (conveyer.currentRoundNumber() == rNum && subRound_ > subRound) {
         cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
         csmeta(csdetails) << "My subRound: " << static_cast<int>(subRound_) << ", Received subRound: " << static_cast<int>(subRound);
@@ -2227,24 +2232,24 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    
-
-
     csdebug() << "---------------------------------- RoundPackage #" << rPackage.roundTable().round << " --------------------------------------------- \n" 
         <<  rPackage.toString() 
         <<  "\n-----------------------------------------------------------------------------------------------------------------------------";
 
-
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
     poolSynchronizer_->sync(conveyer.currentRoundNumber());
+
     if (poolSynchronizer_->isSyncroStarted()) {
         getCharacteristic(rPackage);
     }
+
     roundPackageCache_.push_back(rPackage);
     clearRPCache(rPackage.roundTable().round);
+
     cs::Signatures poolSignatures;
     cs::PublicKeys confidants;
+
     if (rPackage.roundTable().round > 2/* && confirmationList_.size() > 0*/) { //Here we have problems when the trusted have the first block and the others do not!!!
         auto conf = confirmationList_.find(rPackage.roundTable().round - 1/*getBlockChain().getLastSeq() + 1*/);
         if (!conf.has_value()) {
@@ -2277,6 +2282,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     currentRoundTableMessage_.round = rPackage.roundTable().round;
     currentRoundTableMessage_.sender = sender;
     currentRoundTableMessage_.message = cs::Bytes(data, data + size);
+
     performRoundPackage(rPackage, sender);
 }
 
@@ -2327,7 +2333,9 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     getCharacteristic(rPackage);
 
     onRoundStart(cs::Conveyer::instance().currentRoundTable());
-	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
+
+    csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
+
     reviewConveyerHashes();
 
     csmeta(csdetails) << "done\n";

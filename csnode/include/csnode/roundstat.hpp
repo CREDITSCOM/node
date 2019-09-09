@@ -1,33 +1,47 @@
-#pragma once
+#ifndef ROUNDSTAT_HPP
+#define ROUNDSTAT_HPP
 
 #include <csdb/pool.hpp>
-#include <lib/system/common.hpp>
 
-#include <chrono>
+#include <lib/system/common.hpp>
+#include <lib/system/signals.hpp>
+
 #include <set>
+#include <atomic>
+#include <chrono>
 
 namespace cs {
-constexpr size_t MaxStoredDurations = 1000;
+constexpr size_t kMaxStoredDurations = 1000;
+constexpr size_t kMaxRoundDelay = 30000;
 
 class RoundStat {
 public:
     RoundStat();
 
-    void onRoundStart(cs::RoundNumber round, bool skip_logs);
+    void onRoundStart(cs::RoundNumber round, bool skipLogs);
 
     // called when next block is read from database
-    void onReadBlock(csdb::Pool block, bool* should_stop);
+    void onReadBlock(csdb::Pool block, bool* shouldStop);
 
     // called when next block is stored
     void onStoreBlock(csdb::Pool block);
 
-    size_t total_transactions() const {
+    size_t totalTransactions() const {
         return totalAcceptedTransactions_;
     }
 
-    size_t getAveTime();
+    size_t aveTime();
+    size_t nodeStartRound();
 
-	size_t getNodeStartRound();
+    // returns duration from last round in ms,
+    // only if connected to transport ping signal
+    size_t lastRoundMs() const;
+
+    void resetLastRoundMs();
+    bool isLastRoundTooLong() const;
+
+public slots:
+    void onPingReceived(cs::Sequence, const cs::PublicKey&);
 
 private:
     // amount of transactions received (to verify or not or to ignore)
@@ -39,14 +53,16 @@ private:
     // amount of deferred transactions (in deferred block)
     size_t deferredTransactionsCount_;
     std::chrono::steady_clock::time_point startPointMs_;
+
     size_t totalDurationMs_;
-    size_t ave_round_ms;
+    size_t aveRoundMs_;
 
-    // std::multiset<size_t> shortestRounds_;
-    // std::multiset<size_t> longestRounds_;
+    size_t nodeStartRound_;
+    size_t startSkipRounds_;
 
-    size_t node_start_round;
-    size_t start_skip_rounds;
+    std::atomic<size_t> lastRoundMs_;
 };
 
 }  // namespace cs
+
+#endif // ROUNDSTAT_HPP
