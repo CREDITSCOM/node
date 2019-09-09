@@ -10,7 +10,7 @@
 namespace {
 const uint8_t kUntrustedMarker = 255;
 
-inline int32_t getReadTrustedNum(const std::vector<uint8_t>& realTrusted) {
+inline int32_t getRealTrustedNum(const std::vector<uint8_t>& realTrusted) {
     int32_t res = 0;
 
     for (auto trustedMarker : realTrusted) {
@@ -22,7 +22,6 @@ inline int32_t getReadTrustedNum(const std::vector<uint8_t>& realTrusted) {
 }
 
 const char* kLogPrefix = "WalletsCache: ";
-
 }  // namespace
 
 namespace cs {
@@ -43,95 +42,138 @@ PublicKey WalletsCache::Updater::toPublicKey(const csdb::Address& addr) const {
     return res.public_key();
 }
 
-void WalletsCache::Updater::loadNextBlock(csdb::Pool& pool, const cs::ConfidantsKeys& confidants, const BlockChain& blockchain) {
-    csdb::Pool::Transactions& transactions = pool.transactions();
+void WalletsCache::Updater::loadNextBlock(csdb::Pool& pool,
+                                          const cs::ConfidantsKeys& confidants,
+                                          const BlockChain& blockchain,
+                                          bool inverse /* = false */) {
+    auto& transactions = pool.transactions();
     csdb::Amount totalAmountOfCountedFee = 0;
-#ifdef MONITOR_NODE
-    auto wrWall = pool.writer_public_key();
-
-    PublicKey addr;
-    std::copy(wrWall.begin(), wrWall.end(), addr.begin());
-
-    auto it_writer = data_.trusted_info_.find(addr);
-    if (it_writer == data_.trusted_info_.end()) {
-        auto res = data_.trusted_info_.insert(std::make_pair(addr, TrustedData()));
-        it_writer = res.first;
-    }
-    ++it_writer->second.times;
-
-    PublicKey addr_trusted;
-    for (const auto& it : confidants) {
-        std::copy(it.begin(), it.end(), addr_trusted.begin());
-        auto it_trusted = data_.trusted_info_.find(addr_trusted);
-        if (it_trusted == data_.trusted_info_.end()) {
-            const auto res = data_.trusted_info_.insert(std::make_pair(addr_trusted, TrustedData()));
-            it_trusted = res.first;
-        }
-        ++it_trusted->second.times_trusted;
-    }
-#endif
 
     for (auto itTrx = transactions.begin(); itTrx != transactions.end(); ++itTrx) {
         itTrx->set_time(pool.get_time());
-        totalAmountOfCountedFee += load(*itTrx, blockchain);
+        totalAmountOfCountedFee += load(*itTrx, blockchain, inverse);
         if (SmartContracts::is_new_state(*itTrx)) {
-            fundConfidantsWalletsWithExecFee(*itTrx, blockchain);
+            fundConfidantsWalletsWithExecFee(*itTrx, blockchain, inverse);
         }
     }
 
     if (totalAmountOfCountedFee > csdb::Amount(0)) {
-        fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants, cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()));
+        fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants,
+                                     cs::Utils::bitsToMask(pool.numberTrusted(),
+                                     pool.realTrusted()), inverse);
     }
 
-    [[maybe_unused]] auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
 #ifdef MONITOR_NODE
+    const auto& wrWall = pool.writer_public_key();
+
+    auto it_writer = data_.trusted_info_.find(wrWall);
+    if (it_writer == data_.trusted_info_.end()) {
+        auto res = data_.trusted_info_.insert(std::make_pair(wrWall, TrustedData()));
+        it_writer = res.first;
+    }
+    if (!inverse) ++it_writer->second.times;
+    else --it_writer->second.times;
+
+    for (const auto& it : confidants) {
+        auto it_trusted = data_.trusted_info_.find(it);
+        if (it_trusted == data_.trusted_info_.end()) {
+            const auto res = data_.trusted_info_.insert(std::make_pair(it, TrustedData()));
+            it_trusted = res.first;
+        }
+        if (!inverse) ++it_trusted->second.times_trusted;
+        else --it_trusted->second.times_trusted;
+    }
+    auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
     setWalletTime(wrWall, timeStamp);
 #endif
 }
 
-void WalletsCache::Updater::invokeReplenishPayableContract(const csdb::Transaction& transaction) {
+void WalletsCache::Updater::invokeReplenishPayableContract(const csdb::Transaction& transaction, bool inverse /* = false */) {
     auto& wallData = getWalletData(transaction.target());
 
-    wallData.balance_ -= transaction.amount();
-    data_.smartPayableTransactions_.push_back(transaction.id());
+    if (!inverse) {
+        wallData.balance_ -= transaction.amount();
+        data_.smartPayableTransactions_.push_back(transaction.id());
+    }
+    else {
+        wallData.balance_ += transaction.amount();
+        data_.smartPayableTransactions_.remove(transaction.id());
+    }
 
     if (!SmartContracts::is_executable(transaction)) {
         auto& sourceWallData = getWalletData(transaction.source());
-        sourceWallData.balance_ += csdb::Amount(transaction.counted_fee().to_double())
-                                 - csdb::Amount(transaction.max_fee().to_double());
+        if (!inverse) {
+            sourceWallData.balance_ += csdb::Amount(transaction.counted_fee().to_double());
+            sourceWallData.balance_ -= csdb::Amount(transaction.max_fee().to_double());
+        }
+        else {
+            sourceWallData.balance_ -= csdb::Amount(transaction.counted_fee().to_double());
+            sourceWallData.balance_ += csdb::Amount(transaction.max_fee().to_double());
+        }
     }
 }
 
-void WalletsCache::Updater::smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx, const csdb::Transaction& initTrx) {
+void WalletsCache::Updater::smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx,
+                                                           const csdb::Transaction& initTrx,
+                                                           bool inverse /* = false */) {
     auto countedFee = csdb::Amount(smartSourceTrx.counted_fee().to_double());
 
     auto& smartWallData = getWalletData(smartSourceTrx.source());
-    smartWallData.balance_ += countedFee;
-
     auto& initWallData = getWalletData(initTrx.source());
-    initWallData.balance_ -= countedFee;
+
+    if (!inverse) {
+        smartWallData.balance_ += countedFee;
+        initWallData.balance_ -= countedFee;
+    }
+    else {
+        smartWallData.balance_ -= countedFee;
+        initWallData.balance_ += countedFee;
+    }
 }
 
-void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transaction& transaction, const csdb::Amount& execFee) {
+void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transaction& transaction,
+                                                            const csdb::Amount& execFee,
+                                                            bool inverse /* = false */) {
     auto& wallData = getWalletData(transaction.source());
-    wallData.balance_ += transaction.amount()
-                       + csdb::Amount(transaction.max_fee().to_double())
-                       - csdb::Amount(transaction.counted_fee().to_double());
+    if (!inverse) {
+        wallData.balance_ += transaction.amount();
+        wallData.balance_ += csdb::Amount(transaction.max_fee().to_double());
+        wallData.balance_ -= csdb::Amount(transaction.counted_fee().to_double());
+    }
+    else {
+        wallData.balance_ -= transaction.amount();
+        wallData.balance_ -= csdb::Amount(transaction.max_fee().to_double());
+        wallData.balance_ += csdb::Amount(transaction.counted_fee().to_double());
+    }
 
     if (SmartContracts::is_executable(transaction)) {
         auto it = data_.canceledSmarts_.find(transaction.target());
-        if (it == data_.canceledSmarts_.end()) {
+        if (it == data_.canceledSmarts_.end() && !inverse) {
             data_.canceledSmarts_.insert(std::make_pair(transaction.target(), std::list<csdb::TransactionID>{transaction.id()}));
         }
         else {
-            it->second.push_front(transaction.id());
+            if (!inverse) {
+                it->second.push_front(transaction.id());
+            }
+            else {
+                it->second.remove(transaction.id());
+                if (it->second.size() == 0) {
+                    data_.canceledSmarts_.erase(transaction.target());
+                }
+            }
         }
     }
     else {
         auto it = std::find(data_.smartPayableTransactions_.cbegin(), data_.smartPayableTransactions_.cend(), transaction.id());
-        if (it != data_.smartPayableTransactions_.cend()) {
+        if (it != data_.smartPayableTransactions_.cend() && !inverse) {
             data_.smartPayableTransactions_.erase(it);
             wallData.balance_ -= execFee;
+        }
+        else {
+            if (inverse) {
+                data_.smartPayableTransactions_.push_back(transaction.id());
+                wallData.balance_ += execFee;
+            }
         }
     }
 }
@@ -150,23 +192,36 @@ bool WalletsCache::Updater::setWalletTime(const PublicKey& address, const uint64
 
 void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& totalFee,
                                                          const cs::ConfidantsKeys& confidants,
-                                                         const std::vector<uint8_t>& realTrusted) {
+                                                         const std::vector<uint8_t>& realTrusted,
+                                                         bool inverse) {
     if (!confidants.size()) {
         cslog() << kLogPrefix << "NO CONFIDANTS";
         return;
     }
-    auto realTrustedNumber = getReadTrustedNum(realTrusted);
+    auto realTrustedNumber = getRealTrustedNum(realTrusted);
     csdb::Amount feeToEachConfidant = totalFee / realTrustedNumber;
     csdb::Amount payedFee = 0;
     int32_t numPayedTrusted = 0;
     for (size_t i = 0; i < confidants.size(); ++i) {
         if (i < realTrusted.size() && realTrusted[i] != kUntrustedMarker) {
             auto& walletData = getWalletData(confidants[i]);
-            walletData.balance_ += feeToEachConfidant;
+            if (!inverse) {
+                walletData.balance_ += feeToEachConfidant;
+            }
+            else {
+                walletData.balance_ -= feeToEachConfidant;
+            }
 
 #ifdef MONITOR_NODE
             auto it_writer = data_.trusted_info_.find(confidants[i]);
-            it_writer->second.totalFee += feeToEachConfidant;
+            if (it_writer != data_.trusted_info_.end()) {
+                if (!inverse) {
+                    it_writer->second.totalFee += feeToEachConfidant;
+                }
+                else {
+                    it_writer->second.totalFee -= feeToEachConfidant;
+                }
+            }
 #endif
 
             payedFee += feeToEachConfidant;
@@ -178,7 +233,9 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
     }
 }
 
-void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction, const BlockChain& blockchain) {
+void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction,
+                                                             const BlockChain& blockchain,
+                                                             bool inverse) {
     if (!SmartContracts::is_new_state(transaction)) {
         csmeta(cswarning) << "transaction is not new state";
         return;
@@ -194,15 +251,20 @@ void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transac
         return;
     }
     const ConfidantsKeys& confidants = pool.confidants();
-    const std::vector<uint8_t> realTrusted = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
-    auto realTrustedNumber = getReadTrustedNum(realTrusted);
+    std::vector<uint8_t> realTrusted = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
+    auto realTrustedNumber = getRealTrustedNum(realTrusted);
     csdb::Amount feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>() / realTrustedNumber;
     csdb::Amount payedFee = 0;
     int32_t numPayedTrusted = 0;
     for (size_t i = 0; i < confidants.size(); ++i) {
         if (i < realTrusted.size() && realTrusted[i] != kUntrustedMarker) {
             WalletData& walletData = getWalletData(confidants[i]);
-            walletData.balance_ += feeToEachConfidant;
+            if (!inverse) {
+                walletData.balance_ += feeToEachConfidant;
+            }
+            else {
+                walletData.balance_ -= feeToEachConfidant;
+            }
             payedFee += feeToEachConfidant;
             ++numPayedTrusted;
             if (numPayedTrusted == (realTrustedNumber - 1)) {
@@ -212,7 +274,9 @@ void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transac
     }
 }
 
-double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr, const BlockChain& blockchain) {
+double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
+                                               const BlockChain& blockchain,
+                                               bool inverse) {
     csdb::Address wallAddress;
     bool smartIniter = false;
     csdb::Transaction initTransaction;
@@ -235,60 +299,102 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr, cons
     auto& wallData = getWalletData(wallAddress);
 
     if (SmartContracts::is_executable(tr)) {
-        wallData.balance_ -= csdb::Amount(tr.max_fee().to_double());
+        if (!inverse) {
+            wallData.balance_ -= csdb::Amount(tr.max_fee().to_double());
+        }
+        else {
+            wallData.balance_ += csdb::Amount(tr.max_fee().to_double());
+        }
     }
     else if (SmartContracts::is_new_state(tr)) {
         if (!initTransaction.is_valid()) {
             const auto id = tr.id();
-            csdebug() << kLogPrefix << "failed to load init transaction for new state " << FormatRef(id.pool_seq(), id.index());
+            csdebug() << kLogPrefix << "failed to load init transaction for new state " << FormatRef(id.pool_seq(), (size_t)id.index());
         }
         else {
             const auto start_id = initTransaction.id();
             const auto start_target = initTransaction.target();
-            const double start_max_fee = initTransaction.max_fee().to_double();
-            const double start_counted_fee = initTransaction.counted_fee().to_double();
+            const csdb::Amount start_max_fee(initTransaction.max_fee().to_double());
+            const csdb::Amount start_counted_fee(initTransaction.counted_fee().to_double());
             if (isCanceledSmart(start_target, start_id)) {
-                csdebug() << "WalletsCache: (deprecated behaviour) timeout was detected for " << FormatRef(start_id.pool_seq(), start_id.index())
-                    << " before, new_state found in block " << WithDelimiters(start_id.pool_seq());
-                wallData.balance_ -= (csdb::Amount(start_max_fee) + csdb::Amount(start_counted_fee) - initTransaction.amount());
+                csdebug() << kLogPrefix << "(deprecated behaviour) timeout was detected in "
+                    << WithDelimiters(start_id.pool_seq() + Consensus::MaxRoundsCancelContract)
+                    << " for " << FormatRef(start_id.pool_seq(), (size_t )start_id.index())
+                    << " , then new_state found in " << WithDelimiters(tr.id().pool_seq());
+                if (!inverse) {
+                    wallData.balance_ -= initTransaction.amount();
+                    wallData.balance_ -= start_max_fee;
+                    wallData.balance_ += start_counted_fee;
+                }
+                else {
+                    wallData.balance_ += initTransaction.amount();
+                    wallData.balance_ += start_max_fee;
+                    wallData.balance_ -= start_counted_fee;
+                }
             }
-            checkCanceledSmart(start_target, start_id);
+            checkCanceledSmart(start_target, start_id, inverse);
             if (SmartContracts::is_executable(initTransaction)) {
-                wallData.balance_ += csdb::Amount(start_max_fee) - csdb::Amount(start_counted_fee) -
-                    csdb::Amount(tr.counted_fee().to_double()) - csdb::Amount(tr.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
+                if (!inverse) {
+                    wallData.balance_ += start_max_fee;
+                    wallData.balance_ -= start_counted_fee;
+                    wallData.balance_ -= csdb::Amount(tr.counted_fee().to_double());
+                    wallData.balance_ -= csdb::Amount(tr.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
+                }
+                else {
+                    wallData.balance_ -= start_max_fee;
+                    wallData.balance_ += start_counted_fee;
+                    wallData.balance_ += csdb::Amount(tr.counted_fee().to_double());
+                    wallData.balance_ += csdb::Amount(tr.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
+                }
             }
             else {
-                checkSmartWaitingForMoney(initTransaction, tr);
+                checkSmartWaitingForMoney(initTransaction, tr, inverse);
             }
         }
-		auto& wallData_s = getWalletData(tr.source());
-		++wallData_s.transNum_;
-        wallData_s.trxTail_.push(tr.innerID());
-        wallData_s.lastTransaction_ = tr.id();
+        auto& wallData_s = getWalletData(tr.source());
+        if (!inverse) {
+		    ++wallData_s.transNum_;
+            wallData_s.trxTail_.push(tr.innerID());
+            wallData_s.lastTransaction_ = tr.id();
 
-        auto pubKey = toPublicKey(tr.source());
-        csdetails() << "Wallets: innerID of (new_state) "
-                    << EncodeBase58(cs::Bytes(pubKey.begin(), pubKey.end()))
-                    << " <- " << tr.innerID();
+            auto pubKey = toPublicKey(tr.source());
+            csdetails() << "Wallets: innerID of (new_state) "
+                        << EncodeBase58(cs::Bytes(pubKey.begin(), pubKey.end()))
+                        << " <- " << tr.innerID();
+        }
+        else {
+		    --wallData_s.transNum_;
+        }
     }
     else {
-        wallData.balance_ -= csdb::Amount(tr.counted_fee().to_double());
+        if (!inverse) {
+            wallData.balance_ -= csdb::Amount(tr.counted_fee().to_double());
+        }
+        else {
+            wallData.balance_ += csdb::Amount(tr.counted_fee().to_double());
+        }
     }
 
     if (!smartIniter) {
-        wallData.balance_ -= tr.amount();
-		++wallData.transNum_;
-        wallData.trxTail_.push(tr.innerID());
-        wallData.lastTransaction_ = tr.id();
+        if (!inverse) {
+            wallData.balance_ -= tr.amount();
+		    ++wallData.transNum_;
+            wallData.trxTail_.push(tr.innerID());
+            wallData.lastTransaction_ = tr.id();
 
-        auto pubKey = toPublicKey(wallAddress);
-        csdetails() << "Wallets: innerID of "
-                    << EncodeBase58(cs::Bytes(pubKey.begin(), pubKey.end()))
-                    << " <- " << tr.innerID();
+            auto pubKey = toPublicKey(wallAddress);
+            csdetails() << "Wallets: innerID of "
+                        << EncodeBase58(cs::Bytes(pubKey.begin(), pubKey.end()))
+                        << " <- " << tr.innerID();
 
 #ifdef MONITOR_NODE        
-        setWalletTime(pubKey, tr.get_time());
+            setWalletTime(pubKey, tr.get_time());
 #endif
+        }
+        else {
+            wallData.balance_ += tr.amount();
+		    --wallData.transNum_;
+        }
     }
 
     return tr.counted_fee().to_double();
@@ -305,7 +411,21 @@ bool WalletsCache::Updater::isCanceledSmart(const csdb::Address& contract_addr, 
         [&](const csdb::TransactionID& item) { return item.pool_seq() == seq && item.index() == idx; });
 }
 
-void WalletsCache::Updater::checkCanceledSmart(const csdb::Address& contract_addr, const csdb::TransactionID& tid) {
+void WalletsCache::Updater::checkCanceledSmart(const csdb::Address& contract_addr,
+                                               const csdb::TransactionID& tid,
+                                               bool inverse) {
+
+    if (inverse) {
+        auto it = data_.canceledSmarts_.find(contract_addr);
+        if (it == data_.canceledSmarts_.end()) {
+            data_.canceledSmarts_.insert(std::make_pair(contract_addr, std::list<csdb::TransactionID>{tid}));
+        }
+        else {
+            it->second.push_front(tid);
+        }
+        return;
+    }
+
     auto it = data_.canceledSmarts_.find(contract_addr);
     if (it == data_.canceledSmarts_.end()) {
         return;
@@ -325,47 +445,69 @@ void WalletsCache::Updater::checkCanceledSmart(const csdb::Address& contract_add
 }
 
 void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction,
-                                                      const csdb::Transaction& newStateTransaction) {
+                                                      const csdb::Transaction& newStateTransaction,
+                                                      bool inverse) {
     if (!cs::SmartContracts::is_state_updated(newStateTransaction)) {
         csdb::Amount fee(0);
         csdb::UserField fld = newStateTransaction.user_field(trx_uf::new_state::Fee);
         if (fld.is_valid()) {
             fee = fld.value<csdb::Amount>();
         }
-        rollbackExceededTimeoutContract(initTransaction, fee);
+        rollbackExceededTimeoutContract(initTransaction, fee, inverse);
         return;
     }
     bool waitingSmart = false;
     auto it = std::find(data_.smartPayableTransactions_.cbegin(), data_.smartPayableTransactions_.cend(), initTransaction.id());
     if (it != data_.smartPayableTransactions_.cend()) {
-        data_.smartPayableTransactions_.erase(it);
-        waitingSmart = true;
+        if (!inverse) {
+            data_.smartPayableTransactions_.erase(it);
+            waitingSmart = true;
+        }
+    }
+    else {
+        if (inverse) {
+            data_.smartPayableTransactions_.push_back(initTransaction.id());
+
+            auto& wallDataIniter = getWalletData(initTransaction.source());
+            wallDataIniter.balance_ += csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
+            wallDataIniter.balance_ += csdb::Amount(initTransaction.counted_fee().to_double());
+            wallDataIniter.balance_ -= csdb::Amount(initTransaction.max_fee().to_double());
+            wallDataIniter.balance_ += csdb::Amount(newStateTransaction.counted_fee().to_double());
+
+            auto& wallData = getWalletData(initTransaction.target());
+            wallData.balance_ -= initTransaction.amount();
+        }
     }
 
-    if (waitingSmart) {
+    if (waitingSmart && !inverse) {
         auto& wallDataIniter = getWalletData(initTransaction.source());
-        wallDataIniter.balance_ -= csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>())
-                                 - csdb::Amount(initTransaction.counted_fee().to_double())
-                                 + csdb::Amount(initTransaction.max_fee().to_double())
-                                 - csdb::Amount(newStateTransaction.counted_fee().to_double());
+        wallDataIniter.balance_ -= csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
+        wallDataIniter.balance_ -= csdb::Amount(initTransaction.counted_fee().to_double());
+        wallDataIniter.balance_ += csdb::Amount(initTransaction.max_fee().to_double());
+        wallDataIniter.balance_ -= csdb::Amount(newStateTransaction.counted_fee().to_double());
 
         auto& wallData = getWalletData(initTransaction.target());
         wallData.balance_ += initTransaction.amount();
     }
 }
 
-void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr) {
+void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool inverse) {
     auto& wallData = getWalletData(tr.target());
-    wallData.balance_ += tr.amount();
-
-    if (tr.source() != tr.target()) { // Already counted in loadTrxForSource
-        ++wallData.transNum_;
+    if (!inverse) {
+        wallData.balance_ += tr.amount();
+#ifdef MONITOR_NODE
+        setWalletTime(toPublicKey(tr.target()), tr.get_time());
+#endif
+        wallData.lastTransaction_ = tr.id();
+    }
+    else {
+        wallData.balance_ -= tr.amount();
     }
 
-#ifdef MONITOR_NODE
-    setWalletTime(toPublicKey(tr.target()), tr.get_time());
-#endif
-    wallData.lastTransaction_ = tr.id();
+    if (tr.source() != tr.target()) { // Already counted in loadTrxForSource
+        if (!inverse) ++wallData.transNum_;
+        else --wallData.transNum_;
+    }
 }
 
 void WalletsCache::Updater::updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>& updates) {

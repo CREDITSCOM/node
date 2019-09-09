@@ -290,6 +290,7 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
             if (it == 255 || it == 254) {
                 fake_stage2(index);
             }
+            ++index;
         }
         startTimer(2);
     }

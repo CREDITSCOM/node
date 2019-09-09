@@ -5,6 +5,8 @@
 #include <lib/system/allocators.hpp>
 #include <lib/system/utils.hpp>
 
+#include <thread>
+
 #include "network.hpp"
 #include "transport.hpp"
 
@@ -140,18 +142,16 @@ void Transport::run() {
     while (Transport::gSignalStatus == 0) {
         ++ctr;
 
-//        bool askMissing = true;
-        bool resendPacks = ctr % 10 == 0;
-        bool sendPing = ctr % 20 == 0;
-        bool refreshLimits = ctr % 20 == 0;
-        bool checkPending = ctr % 100 == 0;
-        bool checkSilent = ctr % 150 == 0;
+        bool askMissing = false;
+        bool resendPacks = ctr % 11 == 0;
+        bool sendPing = ctr % 19 == 0;
+        bool refreshLimits = ctr % 23 == 0;
+        bool checkPending = ctr % 101 == 0;
+        bool checkSilent = ctr % 151 == 0;
 
-/*
         if (askMissing) {
             askForMissingPackages();
         }
-*/
 
         if (checkPending) {
             nh_.checkPending(config_.getMaxNeighbours());
@@ -267,34 +267,94 @@ bool Transport::sendDirect(const Packet* pack, const Connection& conn) {
     return true;
 }
 
+bool Transport::sendDirectToSock(Packet* pack, const Connection& conn) {
+    conn.lastBytesCount.fetch_add(static_cast<uint32_t>(pack->size()), std::memory_order_relaxed);
+    net_->sendPackDirect(*pack, conn.getOut());
+    return true;
+}
+
 void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
     if (size >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
-		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
-        return;
+        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
     }
-    const auto packEnd = pack + size;
-    for (auto ptr = pack; ptr != packEnd; ++ptr) {
-        nh_.registerDirect(ptr, conn);
-        sendDirect(ptr, **conn);
+
+    if (size > 1000) {
+        std::vector<Packet> _packets(size);
+        for (auto& p : _packets) p = *pack++;
+        std::thread thread([=, packets = std::move(_packets)]() mutable {
+            uint32_t allSize = size, toSend, j = 0;
+            while(allSize != 0) {
+                if (allSize > 100) {
+                    toSend = 100;
+                    allSize -= 100;
+                } else {
+                    toSend = allSize;
+                    allSize = 0;
+                }
+                {
+                    for (uint32_t i = 0; i < toSend; i++) {
+                        nh_.registerDirect(&packets[j], conn);
+                        sendDirectToSock(&packets[j++], **conn);
+                    }
+                }
+                std::this_thread::yield();
+            };
+        });
+        thread.detach();
+    } else {
+        const auto packEnd = pack + size;
+        for (auto ptr = pack; ptr != packEnd; ++ptr) {
+            nh_.registerDirect(ptr, conn);
+            sendDirect(ptr, **conn);
+        }
     }
 }
 
 void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     if (size >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
-		csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
-        return;
+        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
     }
 
-    {
+    if (size > 1000) {
+        std::vector<Packet> _packets(size);
+        for (auto& p : _packets) p = *pack++;
+        std::thread thread([=, packets = std::move(_packets)]() {
+            {
+                auto lock = getNeighboursLock();
+                sendLarge_.store(true, std::memory_order_relaxed);
+                nh_.chooseNeighbours();
+            }
+
+            uint32_t allSize = size, toSend, j = 0;
+            while(allSize != 0) {
+                if (allSize > 100) {
+                    toSend = 100;
+                    allSize -= 100;
+                } else {
+                    toSend = allSize;
+                    allSize = 0;
+                }
+                {
+                    auto lock = getNeighboursLock();
+                    for (uint32_t i = 0; i < toSend; i++) {
+                        nh_.sendByNeighbours(&packets[j++], true);
+                    }
+                }
+                std::this_thread::yield();
+            };
+            sendLarge_.store(false, std::memory_order_release);
+        });
+        thread.detach();
+    } else {
         auto lock = getNeighboursLock();
         nh_.chooseNeighbours();
-    }
 
-    const auto packEnd = pack + size;
-    for (auto ptr = pack; ptr != packEnd; ++ptr) {
-        sendBroadcast(ptr);
+        const auto packEnd = pack + size;
+        for (auto ptr = pack; ptr != packEnd; ++ptr) {
+            sendBroadcast(ptr);
+        }
     }
 }
 
@@ -318,7 +378,6 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
     }
 
     bool result = true;
-
     switch (cmd) {
         case NetworkCommand::Registration:
             result = gotRegistrationRequest(task, sender);
@@ -368,7 +427,12 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             }
             break;
         }
-
+        case NetworkCommand::SSNewFriends:
+            gotSSNewFriends(task);
+            break;
+        case NetworkCommand::SSUpdateServer:
+            gotSSUpdateServer(task, sender);
+            break;
         case NetworkCommand::PackInform:
             gotPackInform(task, sender);
             break;
@@ -499,6 +563,10 @@ constexpr cs::RoundNumber getRoundTimeout(const MsgTypes type) {
         case MsgTypes::ThirdSmartStage:
         case MsgTypes::RejectedContracts:
             return 100;
+        case MsgTypes::TransactionPacket:
+        case MsgTypes::TransactionsPacketRequest:
+        case MsgTypes::TransactionsPacketReply:
+            return cs::Conveyer::MetaCapacity;
         default:
             return 5;
     }
@@ -669,24 +737,6 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
     }
 }
 
-void Transport::addTask(Packet* pack, const uint32_t packNum, bool incrementWhenResend) {
-    if (packNum >= Packet::MaxFragments) {
-        ++Transport::cntExtraLargeNotSent;
-        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << packNum;
-        return;
-    }
-    nh_.pourByNeighbours(pack, packNum);
-    if (packNum > 1) {
-        net_->registerMessage(pack, packNum);
-    }
-    registerTask(pack, 1, incrementWhenResend);
-}
-
-void Transport::clearTasks() {
-    cs::Lock lock(sendPacksFlag_);
-    sendPacks_.clear();
-}
-
 uint32_t Transport::getNeighboursCount() {
     return nh_.size();
 }
@@ -751,6 +801,15 @@ bool Transport::isPingDone() {
 void Transport::resetNeighbours() {
     csdebug() << "Transport> Reset neighbours";
     return nh_.resetSyncNeighbours();
+}
+
+void Transport::onConfigChanged(const Config& updated, const Config& previous) {
+    if (updated.getSignalServerEndpoint() == previous.getSignalServerEndpoint()) {
+        return;
+    }
+
+    cs::Lock lock(oLock_);
+    config_ = updated;
 }
 
 /* Sending network tasks */
@@ -921,23 +980,26 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
         cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of Requested";
         return false;
     }
+    
+    if (ssStatus_ == SSBootstrapStatus::Requested) 
+    {
+        cslog() << "Connection to the Signal Server has been established";
+        nh_.addSignalServer(task->sender, ssEp_, rNode);
 
-    cslog() << "Connection to the Signal Server has been established";
-    nh_.addSignalServer(task->sender, ssEp_, rNode);
+        constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
+        size_t msg_size = task->pack.getMsgSize();
 
-    constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
-    size_t msg_size = task->pack.getMsgSize();
-
-    if (msg_size > MinRegistrationSize) {
-        if (!parseSSSignal(task)) {
-            cswarning() << "Bad Signal Server response";
+        if (msg_size > MinRegistrationSize) {
+            if (!parseSSSignal(task)) {
+                cswarning() << "Bad Signal Server response";
+            }
         }
-    }
-    else {
-        ssStatus_ = SSBootstrapStatus::RegisteredWait;
-    }
+        else {
+            ssStatus_ = SSBootstrapStatus::RegisteredWait;
+        }
 
-    return true;
+        return true;
+    }
 }
 
 bool Transport::gotSSReRegistration() {
@@ -1026,6 +1088,113 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
     return true;
 }
 
+bool Transport::gotSSNewFriends(const TaskPtr<IPacMan>& task)
+{
+    cslog() << "Receive new friedns nodes from SignalServer";
+    if (ssStatus_ != SSBootstrapStatus::Complete)
+    {
+        cs::Lock lock(oLock_);
+        formSSConnectPack(config_, oPackStream_, myPublicKey_, node_->getBlockChain().uuid());
+        net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
+        cswarning() << "Ignore new friends. Registration on Signal Server because ssStatus = " + std::to_string(static_cast<int>(ssStatus_));
+        return false;
+    }
+
+    cs::Signature sign;
+    iPackStream_ >> sign;
+    
+    if (!node_->gotSSMessageVerify(sign, iPackStream_.getCurrentPtr(), iPackStream_.remainsBytes()))
+    {
+        cswarning() << "New Friends message is incorrect: signature isn't valid";
+        return false;
+    }
+
+    uint32_t ctr = nh_.size();
+    uint8_t numCirc{ 0 };
+    iPackStream_ >> numCirc;
+
+    for (uint8_t i = 0; i < numCirc; ++i) {
+        EndpointData ep;
+        ep.ipSpecified = true;
+        cs::PublicKey key;
+
+        iPackStream_ >> ep.ip >> ep.port >> key;
+
+        if (!iPackStream_.good()) {
+            return false;
+        }
+
+        ++ctr;
+
+        if (!std::equal(key.cbegin(), key.cend(), config_.getMyPublicKey().cbegin())) {
+            if (ctr <= config_.getMaxNeighbours()) {
+                nh_.establishConnection(net_->resolve(ep));
+            }
+        }
+
+        if (!nh_.canHaveNewConnection()) {
+            break;
+        }
+    }
+
+    cslog() << "Save new friends nodes";
+    return true;
+
+}
+
+bool Transport::gotSSUpdateServer(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode)
+{
+    cslog() << "Update server from SignalServer";
+
+    cs::Signature sign;
+    iPackStream_ >> sign;
+
+    if (!node_->gotSSMessageVerify(sign, iPackStream_.getCurrentPtr(), iPackStream_.remainsBytes()))
+    {
+        cswarning() << "Update Server message is incorrect: signature isn't valid";
+        return false;
+    }
+
+    cs::RoundNumber round;
+    iPackStream_ >> round;
+
+    if (const auto currentRound = cs::Conveyer::instance().currentRoundNumber(); !(currentRound <= round + DELTA_ROUNDS_VERIFY_NEW_SERVER))
+    {
+        cswarning() << "Server update failed rounds verification. Receive round = " << round << " node round = " << currentRound;
+        return false;
+    }
+    
+    EndpointData ep;
+    iPackStream_ >> ep.ip >> ep.port;
+    
+    if (!nh_.updateSignalServer(net_->resolve(ep)))
+    {
+        cswarning() << "Don't update signal server. Error updating neighbours_";
+        return false;
+    }
+    
+    // update config.ini
+    if (!Config::replaceBlock("signal_server", "ip = " + ep.ip.to_string(), "port = " + std::to_string(ep.port)))
+    {
+        cswarning() << "Don't update signal server. Error updating config";
+        return false;
+    }
+
+    // update config variable
+    node_->updateConfigFromFile();
+    
+    ssEp_ = net_->resolve(ep);
+
+    cslog() << "Registration on new Signal Server";
+    {
+        cs::Lock lock(oLock_);
+        formSSConnectPack(config_, oPackStream_, myPublicKey_, node_->getBlockChain().uuid());
+        net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
+    }
+
+    return true;
+}
+
 void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
     if (!pack.isFragmented()) {
         return;
@@ -1034,17 +1203,24 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
     nh_.neighbourSentPacket(sender, pack.getHeaderHash());
 }
 
-void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
+void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender, bool resend) {
     sendPackInform(pack, sender);
+
+    if (!resend) {
+        return;
+    }
 
     if (pack.isNeighbors()) {
         return;  // Do not redirect packs
     }
 
-    if (pack.isFragmented() && pack.getFragmentsNum() > Packet::SmartRedirectTreshold) {
-        nh_.redirectByNeighbours(&pack);
-    }
-    else {
+    {
+        if (!sendLarge_.load(std::memory_order_acquire)) {
+            auto lock = getNeighboursLock();
+            nh_.chooseNeighbours();
+        }
+
+        auto lock = getNeighboursLock();
         nh_.neighbourHasPacket(sender, pack.getHash(), false);
         sendBroadcast(&pack);
     }
@@ -1075,6 +1251,7 @@ bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
         return false;
     }
 
+    auto lock = getNeighboursLock();
     nh_.neighbourHasPacket(sender, hHash, isDirect);
     return true;
 }
@@ -1125,17 +1302,17 @@ void Transport::askForMissingPackages() {
 
         {
             cs::Lock messageLock(msg->pLock_);
-            const auto end = msg->packets_ + msg->packetsTotal_;
 
             uint16_t start = 0;
             uint64_t mask = 0;
             uint64_t req = 0;
+            uint16_t end = msg->packets_.size();
 
-            for (auto s = msg->packets_; s != end; ++s) {
-                if (!*s) {
+            for (uint16_t j = 0; j < end; j++) {
+                if (!msg->packets_[j]) {
                     if (!mask) {
                         mask = 1;
-                        start = cs::numeric_cast<uint16_t>(s - msg->packets_);
+                        start = j;
                     }
                     req |= mask;
                 }
@@ -1143,7 +1320,7 @@ void Transport::askForMissingPackages() {
                 if (mask == maxMask) {
                     requestMissing(msg->headerHash_, start, req);
 
-                    if (s > (msg->packets_ + msg->maxFragment_) && (end - s) > 128) {
+                    if (j > msg->maxFragment_ && j >= 128) {
                         break;
                     }
 

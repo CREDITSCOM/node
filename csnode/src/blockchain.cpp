@@ -17,7 +17,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 
-#include <client/config.hpp>
+#include <config.hpp>
 
 using namespace cs;
 namespace fs = boost::filesystem;
@@ -109,6 +109,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
 , recreateIndex_(recreateIndex) {
+    cs::Connector::connect(&storage_.readingStartedEvent(), this, &BlockChain::onStartReadFromDB);
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
 
     createCachesPath();
@@ -165,6 +166,7 @@ bool BlockChain::init(const std::string& path) {
     }
 
     good_ = true;
+    blocksToBeRemoved_ = totalLoaded - 1; // any amount to remave after start
     return true;
 }
 
@@ -175,6 +177,12 @@ bool BlockChain::isGood() const {
 uint64_t BlockChain::uuid() const {
     cs::Lock lock(dbLock_);
     return uuid_;
+}
+
+void BlockChain::onStartReadFromDB(cs::Sequence lastWrittenPoolSeq) {
+    if (!recreateIndex_ && lastIndexedPool != lastWrittenPoolSeq) {
+        recreateIndex_ = true;
+    }
 }
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
@@ -251,13 +259,19 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
                 lapoo = getLastTransaction(key).pool_seq();
             }
             std::lock_guard<decltype(dbLock_)> l(dbLock_);
-            storage_.set_previous_transaction_block(key, pool.sequence(), lapoo);
+            if (!storage_.set_previous_transaction_block(key, pool.sequence(), lapoo)) {
+            // errors in database, or handler has been deleted
+                csdebug() << "Create trx index: can't set_previous_transaction_block"
+                          << " on pool sequence " << pool.sequence();
+                return false;
+            }
         }
+        return true;
     };
 
     for (auto& tr : pool.transactions()) {
-        lbd(tr.source());
-        lbd(tr.target());
+        if (!lbd(tr.source())) return;
+        if (!lbd(tr.target())) return;
     }
 
     lastIndexedPool = pool.sequence();
@@ -413,6 +427,11 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
 }
 
 void BlockChain::removeLastBlock() {
+    if (blocksToBeRemoved_ == 0) {
+        csmeta(csdebug) << "There are no blocks, allowed to be removed";
+        return;
+    }
+    --blocksToBeRemoved_;
     csmeta(csdebug) << "begin";
     csdb::Pool pool{};
 
@@ -442,12 +461,13 @@ void BlockChain::removeLastBlock() {
     if (!blockHashes_->remove(pool.sequence())) {
         blockHashes_->remove(pool.hash());
     }
-	--lastSequence_;
+    --lastSequence_;
     total_transactions_count_ -= pool.transactions().size();
+    walletsCacheUpdater_->loadNextBlock(pool, pool.confidants(), *this, true);
     removeWalletsInPoolFromCache(pool);
     removeLastBlockFromTrxIndex(pool);
 
-    emit removeBlockEvent(pool.sequence());
+    emit removeBlockEvent(pool);
 
     csmeta(csdebug) << "done";
 }
@@ -473,7 +493,6 @@ void BlockChain::removeLastBlockFromTrxIndex(const csdb::Pool& pool) {
 
         if (uniqueAddresses.insert(key).second) {
             auto it = cs::TransactionsIterator(*this, addr);
-            it.next();
             bool found = false;
 
             for (; it.isValid(); it.next()) {
@@ -1105,12 +1124,13 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
         // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
         deferredBlock_ = pool;
-		lastSequence_ = pool.sequence();
+        lastSequence_ = pool.sequence();
         if (finalizeBlock(deferredBlock_, isTrusted, lastConfidants)) {
             csdebug() << "The block is correct";
         }
         else {
             csdebug() << "the signatures of the block are incorrect";
+            setBlocksToBeRemoved(1U);
             return std::nullopt;
         }
         pool = deferredBlock_.clone();
@@ -1244,13 +1264,15 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
 
     if (poolSequence == lastSequence + 1) {
         if (pool.previous_hash() != getLastHash()) {
-            csdebug() << "BLOCKCHAIN> new pool\'s prev. hash does not equal to current last hash, remove own last block and cancel store operation";
+			csdebug() << "BLOCKCHAIN> new pool\'s prev. hash does not equal to current last hash";
             if (getLastHash().is_empty()) {
                 cserror() << "BLOCKCHAIN> own last hash is empty";
             }
             if (pool.previous_hash().is_empty()) {
-                cserror() << "BLOCKCHAIN> new pool\'s prev. hash is empty";
+                cserror() << "BLOCKCHAIN> new pool\'s prev. hash is empty, don\'t write it, do not any harm to our blockchain";
+				return false;
             }
+			csdebug() <<  "BLOCKCHAIN> remove own last block and cancel store operation";
             removeLastBlock();
             return false;
         }
@@ -1273,11 +1295,15 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             csdebug() << "BLOCKCHAIN> block #" << poolSequence << " has recorded to chain successfully";
             // unable to call because stack overflow in case of huge written blocks amount possible:
             // testCachedBlocks();
+			blocksToBeRemoved_ = 1;
             return true;
         }
 
         csdebug() << "BLOCKCHAIN> failed to store block #" << poolSequence << " to chain";
-        removeLastBlock();
+		if (poolSequence == lastSequence_) {
+			removeLastBlock();
+		}
+
         return false;
     }
 
@@ -1500,4 +1526,13 @@ std::pair<cs::Sequence, uint32_t> BlockChain::getPreviousNonEmptyBlock(cs::Seque
 
 cs::Sequence BlockChain::getLastSeq() const{
 	return lastSequence_;
+}
+
+void BlockChain::setBlocksToBeRemoved(cs::Sequence number) {
+	if (blocksToBeRemoved_ > 0) {
+		csdebug() << "BLOCKCHAIN> Can't change number of blocks to be removed, because the previous removal is still not finished";
+		return;
+	}
+	csdebug() << "BLOCKCHAIN> Allowed NUMBER blocks to remove is set to " << blocksToBeRemoved_;
+	blocksToBeRemoved_ = number;
 }

@@ -213,6 +213,38 @@ void Network::readerRoutine(const Config& config) {
     cswarning() << "readerRoutine STOPPED!!!\n";
 }
 
+void Network::sendPackDirect(Packet& pack, const ip::udp::endpoint& ep) {
+    boost::system::error_code lastError;
+    size_t size = 0;
+    size_t encodedSize = 0;
+
+    uint32_t count = 0;
+
+    // net code was built on this constant (Packet::MaxSize)
+    // and is used it implicitly in a lot of places(
+    char packetBuffer[Packet::MaxSize];
+    boost::asio::mutable_buffer encodedPacket = pack.encode(buffer(packetBuffer, sizeof(packetBuffer)));
+    encodedSize = encodedPacket.size();
+
+    do {
+        size = sendSock_->send_to(encodedPacket, ep, NO_FLAGS, lastError);
+
+        if (++count == 10) {
+            count = 0;
+            std::this_thread::yield();
+        }
+    } while (lastError == boost::asio::error::would_block);
+
+    if (lastError || size < encodedSize) {
+        cserror() << "Cannot send packet. Error " << lastError;
+    }
+#ifdef LOG_NET
+    else {
+        csdebug(logger::Net) << "--> " << size << " bytes to " << ep << " " << pack;
+    }
+#endif
+}
+
 [[maybe_unused]]
 static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const ip::udp::endpoint& ep) {
     boost::system::error_code lastError;
@@ -248,6 +280,7 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
 
 void Network::writerRoutine(const Config& config) {
     ip::udp::socket* sock = getSocketInThread(config.hasTwoSockets(), config.getOutputEndpoint(), writerStatus_, config.useIPv6());
+    sendSock_ = sock;
 
     if (!sock) {
         return;
@@ -271,61 +304,72 @@ void Network::writerRoutine(const Config& config) {
             csdetails() << "(informational) current task quantity more then normal: " << tasks;
         }
 
-        msg.resize(tasks);
-        std::fill(msg.begin(), msg.end(), mmsghdr{});
-        iovecs.resize(tasks);
-        std::fill(iovecs.begin(), iovecs.end(), iovec{});
-        packets_buffer.resize(tasks);
-        endpoints.resize(tasks);
-        encoded_packets.clear();
+        uint64_t all_tasks = tasks;
+        while (all_tasks != 0) {
+            if (all_tasks >= 1000) {
+                tasks = 1000;
+                all_tasks -= 1000;
+            } else {
+                tasks = all_tasks;
+                all_tasks = 0;
+            }
 
-        int j = 0;
-        for (uint64_t i = 0; i < tasks; i++) {
-            bool is_empty = false;
-            auto task = oPacMan_.getNextTask(is_empty);
-            if (is_empty) break;
-            std::atomic_thread_fence(std::memory_order_acquire);
-            if (!task->pack.region_.get()) {
-                cswarning() << "net: invalid packet for send!!!!!!!!! " << task->pack.region_.get();
+            msg.resize(tasks);
+            std::fill(msg.begin(), msg.end(), mmsghdr{});
+            iovecs.resize(tasks);
+            std::fill(iovecs.begin(), iovecs.end(), iovec{});
+            packets_buffer.resize(tasks);
+            endpoints.resize(tasks);
+            encoded_packets.clear();
+
+            int j = 0;
+            for (uint64_t i = 0; i < tasks; i++) {
+                bool is_empty = false;
+                auto task = oPacMan_.getNextTask(is_empty);
+                if (is_empty) break;
+                std::atomic_thread_fence(std::memory_order_acquire);
+                if (!task->pack.region_.get()) {
+                    cswarning() << "net: invalid packet for send!!!!!!!!! " << task->pack.region_.get();
+                    continue;
+                }
+
+                if (!(task->pack.isHeaderValid())) {
+                    static constexpr size_t limit = 100;
+                    auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
+                    cswarning() << "socket Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
+                    continue;
+                }
+
+                encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
+                endpoints[j] = task->endpoint;
+                iovecs[j].iov_base = encoded_packets[j].data();
+                iovecs[j].iov_len = encoded_packets[j].size();
+                msg[j].msg_hdr.msg_iov = &iovecs[j];
+                msg[j].msg_hdr.msg_iovlen = 1;
+                msg[j].msg_hdr.msg_name = endpoints[j].data();
+                msg[j].msg_hdr.msg_namelen = endpoints[j].size();
+                task.release();
+                ++j;
+            }
+            if (j == 0) {
                 continue;
             }
 
-            if (!(task->pack.isHeaderValid())) {
-                static constexpr size_t limit = 100;
-                auto size = (task->pack.size() <= limit) ? task->pack.size() : limit;
-                cswarning() << "socket Header is not valid: " << cs::Utils::byteStreamToHex(static_cast<const char*>(task->pack.data()), size);
-                continue;
-            }
+            tasks = j;
 
-            encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
-            endpoints[j] = task->endpoint;
-            iovecs[j].iov_base = encoded_packets[j].data();
-            iovecs[j].iov_len = encoded_packets[j].size();
-            msg[j].msg_hdr.msg_iov = &iovecs[j];
-            msg[j].msg_hdr.msg_iovlen = 1;
-            msg[j].msg_hdr.msg_name = endpoints[j].data();
-            msg[j].msg_hdr.msg_namelen = endpoints[j].size();
-            task.release();
-            ++j;
-        }
-        if (j == 0) {
-            continue;
-        }
-
-        tasks = j;
-
-        int sended = 0;
-        struct mmsghdr* messages = msg.data();
-        do {
-            sended = sendmmsg(sock->native_handle(), messages, tasks, 0);
-            if (sended < 0) {
-                cswarning() << "sendmmsg errno = " << errno;
-                if (errno != EAGAIN)
-                    break;
-            }
-            messages += sended;
-            tasks -= sended;
-        } while (tasks);
+            int sended = 0;
+            struct mmsghdr* messages = msg.data();
+            do {
+                sended = sendmmsg(sock->native_handle(), messages, tasks, 0);
+                if (sended < 0) {
+                    cswarning() << "sendmmsg errno = " << errno;
+                    if (errno != EAGAIN)
+                        break;
+                }
+                messages += sended;
+                tasks -= sended;
+            } while (tasks);
+        };
 #endif
 #if defined(WIN32) || defined(__APPLE__)
 #ifdef WIN32
@@ -339,9 +383,6 @@ void Network::writerRoutine(const Config& config) {
         int tasks = writerTaskCount_;
         writerTaskCount_ = 0;
         writerLock.clear(std::memory_order_release);  // release lock
-		//if (tasks > 100) {
-		//	csinfo() << __func__ << ": got package of " << tasks << " tasks";
-		//}
         for (int i = 0; i < tasks; i++) {
             bool is_empty = false;
             auto task = oPacMan_.getNextTask(is_empty);
@@ -467,23 +508,31 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         return;
     }
 
+    bool resend = true;
+
     // Non-network data
     uint32_t& recCounter = packetMap_.tryStore(task->pack.getHash());
     if (!recCounter && task->pack.addressedToMe(transport_->getMyPublicKey())) {
         if (task->pack.isFragmented() || task->pack.isCompressed()) {
             bool newFragmentedMsg = false;
             MessagePtr msg = collector_.getMessage(task->pack, newFragmentedMsg);
-            transport_->gotPacket(task->pack, remoteSender);
-
             if (newFragmentedMsg) {
                 transport_->registerMessage(msg);
+            }
+
+            if (msg && msg->getFirstPack()) {
+                if (msg->getFirstPack().getType() == MsgTypes::TransactionPacket) {
+                    resend = false;
+                }
             }
 
             if (msg && msg->isComplete()) {
                 if (cs::PacketValidator::instance().validate(**msg)) {
                     transport_->processNodeMessage(**msg);
+                    collector_.dropMessage(msg);
                 }
             }
+
         }
         else {
             if (cs::PacketValidator::instance().validate(task->pack)) {
@@ -492,7 +541,9 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         }
     }
 
-    transport_->redirectPacket(task->pack, remoteSender);
+    resend = !(task->pack.getAddressee() == transport_->getMyPublicKey()) && resend;
+    resend = !recCounter && resend;
+    transport_->redirectPacket(task->pack, remoteSender, resend);
     ++recCounter;
 }
 
@@ -630,7 +681,6 @@ Network::Network(const Config& config, Transport* transport)
 
 bool Network::resendFragment(const cs::Hash& hash, const uint16_t id, const ip::udp::endpoint& ep) {
     MessagePtr msg;
-
     {
         cs::Lock lock(collector_.mLock_);
         msg = collector_.map_.tryStore(hash);
@@ -642,8 +692,8 @@ bool Network::resendFragment(const cs::Hash& hash, const uint16_t id, const ip::
 
     {
         cs::Lock l(msg->pLock_);
-        if (id < msg->packetsTotal_ && *(msg->packets_ + id)) {
-            sendDirect(*(msg->packets_ + id), ep);
+        if (id < msg->packetsTotal_ && msg->packets_[id]) {
+            sendDirect(msg->packets_[id], ep);
             return true;
         }
     }
@@ -656,17 +706,15 @@ void Network::sendInit() {
 }
 
 void Network::registerMessage(Packet* pack, const uint32_t size) {
-	
-	if (size >= 1000) {
-		csinfo() << "Found large message, size = " << size;
-	}
+    if (size >= 1000) {
+        csinfo() << "Found large message, size = " << size;
+    }
+
     if (size >= Packet::MaxFragments) {
         cserror() << "Too much fragments in message to send (" << size << "), ignore";
-        return;
     }
 
     MessagePtr msg;
-
     {
         cs::Lock l(collector_.mLock_);
         msg = collector_.msgAllocator_.emplace();
@@ -674,12 +722,11 @@ void Network::registerMessage(Packet* pack, const uint32_t size) {
 
     msg->packetsLeft_ = 0;
     msg->packetsTotal_ = size;
+    msg->packets_.resize(size);
     msg->headerHash_ = pack->getHeaderHash();
 
-    auto packEnd = msg->packets_ + size;
-    auto rPtr = pack;
-    for (auto wPtr = msg->packets_; wPtr != packEnd; ++wPtr, ++rPtr) {
-        *wPtr = *rPtr;
+    for (auto it = msg->packets_.begin(), end = msg->packets_.end(); it != end; ++it) {
+        *it = *pack++;
     }
 
     {

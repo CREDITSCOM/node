@@ -38,6 +38,13 @@ public:  // Static interface
     static TransactionsPacketHash calcFromData(const cs::Bytes& data);
 
 public:  // Interface
+    TransactionsPacketHash() = default;
+    TransactionsPacketHash(const TransactionsPacketHash&) = default;
+    TransactionsPacketHash(TransactionsPacketHash&&) = default;
+
+    TransactionsPacketHash& operator=(const TransactionsPacketHash&) = default;
+    TransactionsPacketHash& operator=(TransactionsPacketHash&&) = default;
+
     ///
     /// @brief Сhecks hash size bytes on 0
     /// @return true if hash size == 0

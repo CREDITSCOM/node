@@ -131,7 +131,7 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
                 }
             }
             if (!ok) {
-                cslog() << kLogPrefix << __func__ << ": reject contract emitted transaction, new_state not found in block";
+                csdebug() << kLogPrefix << __func__ << ": reject contract emitted transaction, new_state not found in block";
                 return false;
             }
             newBalance = wallState.balance_ - trx.amount();

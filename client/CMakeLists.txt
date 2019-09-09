@@ -36,19 +36,18 @@ endif()
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/version.cpp" @ONLY)
 
 add_executable(client
-  include/client/config.hpp
   include/client/params.hpp
-  src/config.cpp
   src/main.cpp
   "${CMAKE_CURRENT_BINARY_DIR}/version.cpp" include/client/version.hpp
 )
 
-target_link_libraries (client csnode lib)
+target_link_libraries (client csnode lib config)
 
 target_include_directories(client PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/client
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../net/include
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/base58/include)
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/base58/include
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../client/config)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -73,3 +72,5 @@ if (NOT MSVC AND WITH_GPROF)
 add_definitions(-DBUILD_WITH_GPROF)
 target_link_libraries (client dl)
 endif()
+
+add_subdirectory(config)

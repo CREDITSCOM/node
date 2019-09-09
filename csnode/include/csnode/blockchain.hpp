@@ -42,6 +42,7 @@ using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 
 /** @brief   The write block or remove block signal emits when block is flushed to disk */
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
+using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
 }  // namespace cs
 
@@ -188,7 +189,7 @@ public signals:
     cs::ChangeBlockSignal cachedBlockEvent;
 
     /** @brief The remove block event. Raised when the next block is flushed to storage */
-    cs::ChangeBlockSignal removeBlockEvent;
+    cs::RemoveBlockSignal removeBlockEvent;
 
     const cs::ReadBlockSignal& readBlockEvent() const;
 
@@ -235,6 +236,8 @@ public:
     // wallet transactions: pools cache + db search
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
 
+	void setBlocksToBeRemoved(cs::Sequence number);
+
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);
     void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>); 
@@ -270,6 +273,7 @@ private:
     // Thread unsafe
     bool finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys lastConfidants);
 
+    void onStartReadFromDB(cs::Sequence lastWrittenPoolSeq);
     void onReadFromDB(csdb::Pool block, bool* shouldStop);
     bool postInitFromDB();
 
@@ -368,5 +372,6 @@ private:
     bool recreateIndex_;
     std::map<csdb::Address, cs::Sequence> lapoos;
 	std::atomic<cs::Sequence> lastSequence_;
+	cs::Sequence blocksToBeRemoved_ = 0;
 };
 #endif  //  BLOCKCHAIN_HPP

@@ -16,7 +16,7 @@
 #pragma warning(pop)
 #endif
 
-#include <client/config.hpp>
+#include <config.hpp>
 #include <client/params.hpp>
 #include <csdb/pool.hpp>
 #include <solvercore.hpp>

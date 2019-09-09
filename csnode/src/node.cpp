@@ -29,18 +29,22 @@
 #include <boost/optional.hpp>
 
 #include <lz4.h>
+
 #include <cscrypto/cscrypto.hpp>
+
+#include <observer.hpp>
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
 
-Node::Node(const Config& config)
+Node::Node(const Config& config, cs::config::Observer& observer)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(genesisAddress_, startAddress_, config.recreateIndex())
 , ostream_(&packStreamAllocator_, nodeIdKey_)
 , stat_()
-, blockValidator_(std::make_unique<cs::BlockValidator>(*this)) {
+, blockValidator_(std::make_unique<cs::BlockValidator>(*this))
+, observer_(observer) {
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
     std::cout << "Start transport... ";
     transport_ = new Transport(config, this);
@@ -48,7 +52,7 @@ Node::Node(const Config& config)
     poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
     executor::ExecutorSettings::set(cs::makeReference(blockChain_),
-                                    cs::makeReference(*solver_),
+                                    cs::makeReference(solver_),
                                     cs::makeReference(config));
 
     auto& executor = executor::Executor::getInstance();
@@ -61,12 +65,15 @@ Node::Node(const Config& config)
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
+    setupObserver();
+
     alwaysExecuteContracts_ = config.alwaysExecuteContracts();
     good_ = init(config);
 }
 
 Node::~Node() {
     std::cout << "Desturctor called\n";
+
     sendingTimer_.stop();
 
     delete solver_;
@@ -84,6 +91,7 @@ bool Node::init(const Config& config) {
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
+
 #endif  // NODE_API
 
     // must call prior to blockChain_.init():
@@ -93,6 +101,7 @@ bool Node::init(const Config& config) {
     if (!blockChain_.init(config.getPathToDB())) {
         return false;
     }
+
     cslog() << "Blockchain is ready, contains " << WithDelimiters(stat_.total_transactions()) << " transactions";
 
 #ifdef NODE_API
@@ -102,21 +111,33 @@ bool Node::init(const Config& config) {
     if (!transport_->isGood()) {
         return false;
     }
+
     std::cout << "Transport is init\n";
 
     if (!solver_) {
         return false;
     }
-    std::cout << "Solver is init\n";
 
+    std::cout << "Solver is init\n";
     std::cout << "Everything is init\n";
+
+    cs::Conveyer::instance().setData(config.conveyerData());
 
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
+
     initCurrentRP();
     maxNeighboursSequence_ = blockChain_.getLastSeq();
+
     return true;
+}
+
+void Node::setupObserver() {
+    // connect config observer to entities
+    cs::Connector::connect(&observer_.configChanged, &cs::Conveyer::instance(), &cs::Conveyer::onConfigChanged);
+    cs::Connector::connect(&observer_.configChanged, &executor::Executor::getInstance(), &executor::Executor::onConfigChanged);
+    cs::Connector::connect(&observer_.configChanged, transport_, &Transport::onConfigChanged);
 }
 
 void Node::run() {
@@ -141,13 +162,9 @@ void Node::stop() {
     }
 
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
-}
 
-/* Requests */
-void Node::flushCurrentTasks() {
-
-    transport_->addTask(ostream_.getPackets(), ostream_.getPacketsCount());
-    ostream_.clear();
+    observer_.stop();
+    cswarning() << "[CONFIG OBSERVER STOPPED]";
 }
 
 void Node::initCurrentRP() {
@@ -172,7 +189,6 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     cswarning() << "-----------------------------------------------------------";
     cswarning() << "NODE> BigBang #" << rNum << ": last written #" << blockChain_.getLastSeq() << ", current #" << conveyer.currentRoundNumber();
     cswarning() << "-----------------------------------------------------------";
-
     istream_.init(data, size);
     uint8_t tmp = 0;
     istream_ >> tmp;
@@ -209,6 +225,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         if (countRemoved == 0) {
             // the 1st time
             csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+			blockChain_.setBlocksToBeRemoved(lastSequence - rNum  + 1);
         }
 
         blockChain_.removeLastBlock();
@@ -262,6 +279,12 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
     if (!readRoundData(roundTable, false)) {
         cserror() << "NODE> read round data from SS failed, continue without round table";
     }
+
+	cs::Sequence lastSequence = blockChain_.getLastSeq();
+	if (lastSequence >= rNum) {
+		csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+		blockChain_.setBlocksToBeRemoved(lastSequence - rNum + 1);
+	}
 
     // update new round data from SS
     // TODO: fix sub round
@@ -1066,6 +1089,10 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
 
     // (rNum == round) => handle now
     return MessageActions::Process;
+}
+
+void Node::updateConfigFromFile() {
+    observer_.notify();
 }
 
 inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
@@ -2058,6 +2085,18 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage) {
     performRoundPackage(rPackage, solver_->getPublicKey());
 }
 
+bool Node::gotSSMessageVerify(const cs::Signature & sign, const cs::Byte* data, const size_t size)
+{
+    if (const auto & starter_key = cs::PacketValidator::instance().getStarterKey(); !cscrypto::verifySignature(sign, starter_key, data, size)) {
+        cswarning() << "SS message is incorrect: signature isn't valid";
+        csdebug() << "SSKey: " << cs::Utils::byteStreamToHex(starter_key.data(), starter_key.size());
+        csdebug() << "Message to Sign: " << cs::Utils::byteStreamToHex(data, size);
+        return false;
+    }
+
+    return true;
+}
+
 bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants) {
     csdebug() << "NODE> PoolSigs Amnt = " << rPackage.poolSignatures().size()
         << ", TrustedSigs Amnt = " << rPackage.trustedSignatures().size()
@@ -2091,6 +2130,57 @@ bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& curre
         return false;
     }
 
+    return true;
+}
+
+bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
+    cs::Conveyer& conveyer = cs::Conveyer::instance();
+    if (conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree && getBlockChain().getLastSeq() > 0) {
+        uint64_t lastTimeStamp;
+        uint64_t currentTimeStamp;
+        uint64_t rpTimeStamp;
+        try {
+            lastTimeStamp = std::stoll(getBlockChain().getLastTimeStamp());
+        }
+        catch (...) {
+            csdebug() << __func__ << ": last block Timestamp was announced as zero";
+            return false;
+        }
+
+        try {
+            currentTimeStamp = std::stoll(cs::Utils::currentTimestamp());
+        }
+        catch (...) {
+            csdebug() << __func__ << ": current Timestamp was announced as zero";
+            return false;
+        }
+
+        try {
+            rpTimeStamp = std::stoll(rPackage.poolMetaInfo().timestamp);
+        }
+        catch (...) {
+            csdebug() << __func__ << ": just received roundPackage Timestamp was announced as zero";
+            return false;
+        }
+
+        if (rPackage.roundTable().round > conveyer.currentRoundNumber() + 1) {
+            uint64_t delta;
+            if (lastTimeStamp > currentTimeStamp) {
+                delta = lastTimeStamp - currentTimeStamp;
+            }
+            else {
+                delta = currentTimeStamp - lastTimeStamp;
+            }
+            uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
+
+            const auto ave_duration = stat_.getAveTime();
+            if (speed < ave_duration / 10 && rPackage.roundTable().round - stat_.getNodeStartRound() > Consensus::SpeedCheckRound) {
+                stat_.onRoundStart(rPackage.roundTable().round, true /*skip_logs*/);
+                cserror() << "drop RoundPackage created in " << speed << " ms/block, average ms/round is " << ave_duration;
+                return false;
+            }
+        }
+    }
     return true;
 }
 
@@ -2133,50 +2223,11 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    if(conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree && getBlockChain().getLastSeq() > 0) {
-        uint64_t lastTimeStamp;
-        uint64_t currentTimeStamp;
-        uint64_t rpTimeStamp;
-        try {
-            lastTimeStamp = std::stoll(getBlockChain().getLastTimeStamp());
-        }
-        catch (...) {
-            csdebug() << __func__ << ": last block Timestamp was announced as zero";
-            return;
-        }
-
-        try {
-            currentTimeStamp = std::stoll(cs::Utils::currentTimestamp());
-        }
-        catch (...) {
-            csdebug() << __func__ << ": current Timestamp was announced as zero";
-            return;
-        }
-
-        try {
-            rpTimeStamp = std::stoll(rPackage.poolMetaInfo().timestamp);
-        }
-        catch (...) {
-            csdebug() << __func__ << ": just received roundPackage Timestamp was announced as zero";
-            return;
-        }
-    
-        if(rPackage.roundTable().round > conveyer.currentRoundNumber() + 1) {
-            uint64_t delta;
-            if (lastTimeStamp > currentTimeStamp) {
-                delta = lastTimeStamp - currentTimeStamp;
-            }
-            else {
-                delta = currentTimeStamp - lastTimeStamp;
-            }
-            uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
-        
-            if (speed < 50) {
-                cserror() << "just got RoundPackage can't be created in " << speed << " msec per block";
-                return;
-            }
-        }
+    if (!rpSpeedOk(rPackage)) {
+        return;
     }
+
+    
 
 
     csdebug() << "---------------------------------- RoundPackage #" << rPackage.roundTable().round << " --------------------------------------------- \n" 
@@ -2437,7 +2488,7 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
     }
     cs::RoundPackage rp = roundPackageCache_.back();
 
-    if (rp.roundTable().round == rNum) {
+    if (rp.roundTable().round >= rNum) {
         if(!rp.roundSignatures().empty()) {
             roundPackReply(sender);
         }
@@ -2672,7 +2723,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable) {
     }
 
     csdebug() << line2.str();
-    stat_.onRoundStart(cs::Conveyer::instance().currentRoundNumber());
+    stat_.onRoundStart(cs::Conveyer::instance().currentRoundNumber(), false /*skip_logs*/);
     csdebug() << line2.str();
 
     solver_->nextRound();
@@ -2792,6 +2843,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
     if (static_cast<size_t>(badHashReplySummary) > conveyer.confidantsCount() / 2) {
         csmeta(csdebug) << "This node really have not valid HASH!!! Removing last block from DB and trying to syncronize";
         // TODO: examine what will be done without this function
+		blockChain_.setBlocksToBeRemoved(1U);
         blockChain_.removeLastBlock();
     }
 }

@@ -275,6 +275,7 @@ private:
 
     friend typename MemRegion::Allocator;
     friend class Network;
+    friend class PacketCollector;
 };
 
 template <typename T>

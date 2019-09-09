@@ -10,11 +10,14 @@
 #endif
 
 #include <csnode/node.hpp>
+
 #include <lib/system/logger.hpp>
+
 #include <net/transport.hpp>
 
 #include <config.hpp>
 #include <params.hpp>
+#include <observer.hpp>
 #include <version.hpp>
 
 // diagnostic output
@@ -203,11 +206,23 @@ int main(int argc, char* argv[]) {
         panic();
     }
 
-    auto config = Config::read(vm, vm.count("seed"));
+    auto config = Config::read(vm);
 
     if (!config.isGood()) {
         panic();
     }
+
+    if (vm.count("seed") == 0) {
+        if (!config.readKeys(vm)) {
+            return false;
+        }
+    }
+    else {
+        if (!config.enterWithSeed()) {
+            return false;
+        }
+    }
+
 
     if (vm.count("dumpkeys")) {
         auto fName = vm["dumpkeys"].as<std::string>();
@@ -220,7 +235,8 @@ int main(int argc, char* argv[]) {
 
     logger::initialize(config.getLoggerSettings());
 
-    Node node(config);
+    cs::config::Observer observer(config, vm);
+    Node node(config, observer);
 
     if (!node.isGood()) {
         panic();

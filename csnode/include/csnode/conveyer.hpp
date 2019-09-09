@@ -10,6 +10,9 @@
 #include <memory>
 #include <optional>
 
+class Config;
+struct ConveyerData;
+
 namespace csdb {
 class Transaction;
 }
@@ -42,6 +45,11 @@ public:
         MaxPacketsPerRound = 10,
         MaxQueueSize = 1000000
     };
+
+    void setSendCacheValue(cs::RoundNumber value);
+    void setMaxResendsValue(size_t value);
+
+    void setData(const ConveyerData& data);
 
     ///
     /// @brief Sets cached conveyer round number for utility.
@@ -281,8 +289,21 @@ public:
     ///
     size_t packetQueueTransactionsCount() const;
 
+    ///
+    /// @brief Returns current send cache size
+    ///
+    size_t sendCacheCount() const;
+
     // sync, try do not use it :]
     std::unique_lock<cs::SharedMutex> lock() const;
+
+    ///
+    /// @brief Adds transactions packet hash to send cache, key will be current round.
+    /// @param hash, Rejected from consensus.
+    /// @return returns true, if hash does not exist at send cache and exists at hash table.
+    ///  returns false if hash exists at send cache or does not found at packets table.
+    ///
+    bool addRejectedHashToCache(const cs::TransactionsPacketHash& hash);
 
 public signals:
     cs::PacketFlushSignal packetFlushed;
@@ -293,12 +314,28 @@ public slots:
     /// try to send transactions packets to network
     void flushTransactions();
 
+    // chech config updation of conveyer values
+    void onConfigChanged(const Config& updated, const Config& previous);
+
 protected:
+    // searches transactions packet at all conveyer cache
+    std::optional<cs::TransactionsPacket> findPacketAtMeta(const cs::TransactionsPacketHash& hash) const;
+
     void removeHashesFromTable(const cs::PacketsHashes& hashes);
     cs::TransactionsPacketTable& poolTable(cs::RoundNumber round);
 
     // returns true if packet is found at cache, otherwise - false
     bool isPacketAtCache(const cs::TransactionsPacket& packet);
+
+    // returns true if hash is found at send cache, otherwise - false
+    bool isHashAtSendCache(cs::RoundNumber round, const cs::TransactionsPacketHash& hash);
+    bool isHashAtSendCache(const cs::TransactionsPacketHash& hash);
+
+    // checks send cache to resend hashes if they still exists
+    void checkSendCache();
+
+    // remove this hash from send cache
+    void removeHashFromSendCache(const cs::TransactionsPacketHash& hash);
 
 private:
     struct Impl;

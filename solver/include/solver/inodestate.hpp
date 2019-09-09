@@ -12,8 +12,6 @@ class Transaction;
 }  // namespace csdb
 namespace cs {
 class TransactionsPacket;
-struct HashVector;
-struct HashMatrix;
 struct StageOne;
 struct StageTwo;
 struct StageThree;

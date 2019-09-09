@@ -44,6 +44,11 @@ template <typename T>
 Reference<T> makeReference(T& value) noexcept {
     return Reference<T>::make(value);
 }
+
+template<typename T>
+Reference<T> makeReference(T* value) noexcept {
+    return makeReference(*value);
+}
 }
 
 #endif  //  REFERENCE_HPP

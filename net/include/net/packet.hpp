@@ -14,6 +14,7 @@
 
 #include <iostream>
 #include <memory>
+#include <vector>
 
 /*
     Static min memory usage (see types below):
@@ -86,7 +87,7 @@ enum MsgTypes : uint8_t {
 
 class Packet {
 public:
-    static const uint32_t MaxSize = 1400;
+    static const uint32_t MaxSize = 1024;
     static const uint32_t MaxFragments = 4096;
 
     static const uint32_t SmartRedirectTreshold = 10000;
@@ -192,7 +193,7 @@ public:
     uint32_t getHeadersLength() const;
     void recalculateHeadersLength();
 
-    explicit operator bool() {
+    explicit operator bool() const {
         return region_.get();
     }
 
@@ -288,7 +289,7 @@ public:
             const auto fragment = getFragmentId();
             const auto count = getFragmentsNum();
 
-            if (count == 0 || fragment >= MaxFragments || count >= MaxFragments || fragment >= count) {
+            if (count == 0 || fragment >= count) {
                 return false;
             }
         }
@@ -342,7 +343,7 @@ public:
     }
 
     const Packet& getFirstPack() const {
-        return *packets_;
+        return packets_[0];
     }
 
     const uint8_t* getFullData() const {
@@ -350,7 +351,7 @@ public:
             composeFullData();
         }
 
-        return static_cast<const uint8_t*>(fullData_->data()) + packets_->getHeadersLength();
+        return static_cast<const uint8_t*>(fullData_->data()) + packets_[0].getHeadersLength();
     }
 
     size_t getFullSize() const {
@@ -358,7 +359,7 @@ public:
             composeFullData();
         }
 
-        return fullData_->size() - packets_->getHeadersLength();
+        return fullData_->size() - packets_[0].getHeadersLength();
     }
 
     Packet extractData() const {
@@ -367,7 +368,7 @@ public:
         }
 
         Packet result(std::move(fullData_));
-        result.headersLength_ = packets_->getHeadersLength();
+        result.headersLength_ = packets_[0].getHeadersLength();
 
         return result;
     }
@@ -383,7 +384,7 @@ private:
     uint32_t packetsTotal_ = 0;
 
     uint16_t maxFragment_ = 0;
-    Packet packets_[Packet::MaxFragments];
+    std::vector<Packet> packets_;
 
     cs::Hash headerHash_;
 
@@ -405,6 +406,7 @@ public:
     }
 
     MessagePtr getMessage(const Packet&, bool&);
+    void dropMessage(MessagePtr);
 
 private:
     TypedAllocator<Message> msgAllocator_;

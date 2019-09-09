@@ -13,7 +13,7 @@ class RoundStat {
 public:
     RoundStat();
 
-    void onRoundStart(cs::RoundNumber round);
+    void onRoundStart(cs::RoundNumber round, bool skip_logs);
 
     // called when next block is read from database
     void onReadBlock(csdb::Pool block, bool* should_stop);
@@ -24,6 +24,10 @@ public:
     size_t total_transactions() const {
         return totalAcceptedTransactions_;
     }
+
+    size_t getAveTime();
+
+	size_t getNodeStartRound();
 
 private:
     // amount of transactions received (to verify or not or to ignore)
@@ -36,6 +40,7 @@ private:
     size_t deferredTransactionsCount_;
     std::chrono::steady_clock::time_point startPointMs_;
     size_t totalDurationMs_;
+    size_t ave_round_ms;
 
     // std::multiset<size_t> shortestRounds_;
     // std::multiset<size_t> longestRounds_;

@@ -74,6 +74,14 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
             return "NodeStopRequest";
         case RejectedContracts:
             return "RejectedContracts";
+        case RoundPackRequest:
+            return "RoundPackRequest";
+        case StateRequest:
+            return "StateRequest";
+        case StateReply:
+            return "StateReply";
+        case EmptyRoundPack:
+            return "EmptyRoundPack";
         default:
             return "Unknown";
     }
@@ -166,21 +174,24 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
         *msgPtr = msg = msgAllocator_.emplace();
         msg->packetsLeft_ = pack.getFragmentsNum();
         msg->packetsTotal_ = pack.getFragmentsNum();
+        msg->packets_.resize(msg->packetsTotal_);
         msg->headerHash_ = pack.getHeaderHash();
         newFragmentedMsg = true;
     }
     else {
         msg = *msgPtr;
+        if (msg->packets_.size() == 0) {
+            msg->packets_.resize(msg->packetsTotal_);
+        }
     }
 
     {
         cs::Lock lock(msg->pLock_);
-        auto goodPlace = msg->packets_ + pack.getFragmentId(); // valid fragmentation has already been tested
-
-        if (!*goodPlace) {
+        auto& goodPlace = msg->packets_[pack.getFragmentId()]; // valid fragmentation has already been tested
+        if (!goodPlace) {
             msg->maxFragment_ = std::max(pack.getFragmentsNum(), msg->maxFragment_);
             --msg->packetsLeft_;
-            *goodPlace = pack;
+            goodPlace = pack;
         }
 
         if (msg->packetsTotal_ >= 20) {
@@ -197,28 +208,28 @@ MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMs
             }
         }
     }
-
     return msg;
+}
+
+void PacketCollector::dropMessage(MessagePtr msg) {
+    (*msg)->packetsLeft_ = (*msg)->packetsTotal_;
+    (*msg)->packets_.clear();
 }
 
 /* WARN: All the cases except FRAG + COMPRESSED have bugs in them */
 void Message::composeFullData() const {
     if (getFirstPack().isFragmented()) {
-        const Packet* pack = packets_;
-        uint32_t headersLength = pack->getHeadersLength();
+        uint32_t headersLength = packets_[0].getHeadersLength();
         uint32_t totalSize = headersLength;
 
-        for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
-            totalSize += static_cast<uint32_t>((pack->size() - headersLength));
+        for (auto& pack: packets_) {
+            totalSize += static_cast<uint32_t>((pack.size() - headersLength));
         }
 
         fullData_ = allocator_.allocateNext(totalSize);
-
         uint8_t* data = static_cast<uint8_t*>(fullData_->data());
-        pack = packets_;
-
-        for (uint32_t i = 0; i < packetsTotal_; ++i, ++pack) {
-            uint32_t headerSize = static_cast<uint32_t>((i == 0) ? 0 : headersLength);
+        for (auto pack = packets_.begin(), end = packets_.end(); pack != end; ++pack) {
+            uint32_t headerSize = static_cast<uint32_t>((pack == packets_.begin()) ? 0 : headersLength);
 
             uint32_t cSize = cs::numeric_cast<uint32_t>(pack->size()) - headerSize;
             auto source = (reinterpret_cast<const char*>(pack->data())) + headerSize;

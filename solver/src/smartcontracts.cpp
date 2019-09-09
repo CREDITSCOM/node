@@ -156,9 +156,7 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
                 if (!invoke.usedContracts.empty()) {
                     for (const auto item : invoke.usedContracts) {
                         if (item.size() == cscrypto::kPublicKeySize) {
-                            cs::PublicKey key;
-                            std::copy(item.cbegin(), item.cend(), key.begin());
-                            const csdb::Address addr = csdb::Address::from_public_key(key); // BlockChain::getAddressFromKey(item);
+                            const csdb::Address addr = csdb::Address::from_public_key(item.c_str()); // BlockChain::getAddressFromKey(item);
                             if (addr.is_valid()) {
                                 execution.uses.push_back(addr);
                             }
@@ -188,6 +186,7 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
     // as event receiver:
     cs::Connector::connect(&bc.storeBlockEvent, this, &SmartContracts::on_store_block);
     cs::Connector::connect(&bc.readBlockEvent(), this, &SmartContracts::on_read_block);
+    cs::Connector::connect(&bc.removeBlockEvent, this, &SmartContracts::on_remove_block);
     cs::Connector::connect(&cs::Conveyer::instance().statesCreated, this, &SmartContracts::on_update);
     // as event source:
     cs::Connector::connect(&signal_payable_invoke, &bc, &BlockChain::onPayableContractReplenish);
@@ -1110,6 +1109,11 @@ void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
     on_next_block_impl(block, true, should_stop);
 }
 
+/*public*/
+void SmartContracts::on_remove_block(const csdb::Pool&) {
+    // @TODO provide implementation
+}
+
 /*private*/
 void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db, bool* should_stop) {
     if (!should_stop) {
@@ -1120,10 +1124,6 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
     test_contracts_locks();
 
     const auto seq = block.sequence();
-    if (seq == 4432461 || seq == 4500088) {
-        static int cnt = 0;
-        ++cnt;
-    }
     for (auto& item : exe_queue) {
         if (item.status != SmartContractStatus::Running && item.status != SmartContractStatus::Finished) {
             continue;

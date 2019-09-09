@@ -26,6 +26,9 @@ namespace cs {
 // table for fast transactions storage
 using TransactionsPacketTable = std::map<TransactionsPacketHash, TransactionsPacket>;  // TODO: check performance of map/unordered_map
 
+// send transactions packet cache for conveyer
+using TransactionPacketSendCache = std::multimap<cs::RoundNumber, TransactionsPacketHash>;
+
 // array of packets
 using TransactionsBlock = std::vector<cs::TransactionsPacket>;
 
@@ -84,20 +87,6 @@ struct PoolMetaInfo {
     cs::Sequence sequenceNumber;
     cs::Bytes realTrustedMask;
     std::vector <csdb::Pool::SmartSignature> smartSignatures;
-};
-
-struct HashVector {
-    cs::Byte sender;
-    cs::Hash hash;
-    cs::Signature signature;
-};
-
-constexpr std::size_t kHashVectorCount = 5;
-
-struct HashMatrix {
-    cs::Byte sender;
-    cs::HashVector hashVector[kHashVectorCount];
-    cs::Signature signature;
 };
 
 // metas

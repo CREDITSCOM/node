@@ -30,7 +30,7 @@
 #include <queue>
 
 #include <client/params.hpp>
-#include <client/config.hpp>
+#include <config.hpp>
 
 #include <lib/system/reference.hpp>
 #include <lib/system/concurrent.hpp>
@@ -156,11 +156,12 @@ public:  // wrappers
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 recreateOriginExecutor();
-                notifyError();
             }
 
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
         catch(const std::exception& x ) {
             _return.status.code = 1;
@@ -179,11 +180,12 @@ public:  // wrappers
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 recreateOriginExecutor();
-                notifyError();
             }
 
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
         catch(const std::exception& x ) {
             _return.status.code = 1;
@@ -202,11 +204,12 @@ public:  // wrappers
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 recreateOriginExecutor();
-                notifyError();
             }
 
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
         catch(const std::exception& x ) {
             _return.status.code = 1;
@@ -467,13 +470,27 @@ public slots:
     }
 
     void onExecutorFinished() {
-        if (!executorProcess_->isRunning() && !requestStop_) {
-            executorProcess_->launch(cs::Process::Options::None);
+        if (!requestStop_) {
+            cs::Concurrent::run([this] {
+                runProcess();
+            });
         }
     }
 
     void onExecutorProcessError(const cs::ProcessException& exception) {
         cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
+    }
+
+    void onConfigChanged(const Config& updated, const Config& previous) {
+        if (updated.getApiSettings().executorCmdLine == previous.getApiSettings().executorCmdLine) {
+            return;
+        }
+
+        if (updated.getApiSettings().executorCmdLine.empty()) {
+            return;
+        }
+
+        executorProcess_->setProgram(updated.getApiSettings().executorCmdLine);
     }
 
 private:
@@ -487,17 +504,15 @@ private:
     , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
     , origExecutor_(
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
-        std::string executorCmdline = config_.getApiSettings().executorCmdLine;
-
         socket_->setSendTimeout(config_.getApiSettings().executorSendTimeout);
         socket_->setRecvTimeout(config_.getApiSettings().executorReceiveTimeout);
 
-        if (executorCmdline.empty()) {
+        if (config_.getApiSettings().executorCmdLine.empty()) {
             cswarning() << "Executor command line args are empty, process would not be created";
             return;
         }
 
-        executorProcess_ = std::make_unique<cs::Process>(executorCmdline);
+        executorProcess_ = std::make_unique<cs::Process>(config_.getApiSettings().executorCmdLine);
 
         cs::Connector::connect(&executorProcess_->started, this, &Executor::onExecutorStarted);
         cs::Connector::connect(&executorProcess_->finished, this, &Executor::onExecutorFinished);
@@ -521,11 +536,17 @@ private:
                     break;
                 }
 
-                static const int kReconnectTime = 2;
-                std::this_thread::sleep_for(std::chrono::seconds(kReconnectTime));
+                if (executorProcess_->isRunning()) {
+                    if (!isConnected()) {
+                        connect();
+                    }
+                }
+                else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-                if (!isConnected()) {
-                    connect();
+                    if (!executorProcess_->isRunning()) {
+                        runProcess();
+                    }
                 }
             }
         });
@@ -535,6 +556,12 @@ private:
 
     ~Executor() {
         stop();
+    }
+
+    void runProcess() {
+        executorProcess_->terminate();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        executorProcess_->launch(cs::Process::Options::None);
     }
 
     struct OriginExecuteResult {
@@ -585,7 +612,11 @@ private:
         }
     }
 
-    void notifyError() const {
+    void notifyError() {
+        if (isConnected()) {
+            disconnect();
+        }
+
         cvErrorConnect_.notify_one();
     }
 
@@ -706,6 +737,16 @@ public:
 
     void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<::general::ByteCodeObject>& byteCodeObjects) override;
 
+    void addTokenResult(api::TokenTransfersResult& _return, const csdb::Address& token, const std::string& code, const csdb::Pool& pool, const csdb::Transaction& tr,
+        const api::SmartContractInvocation& smart, const std::pair<csdb::Address, csdb::Address>& addrPair);
+
+    void addTokenResult(api::TokenTransactionsResult& _return, const csdb::Address& token, const std::string&, const csdb::Pool& pool, const csdb::Transaction& tr,
+        const api::SmartContractInvocation& smart, const std::pair<csdb::Address, csdb::Address>&);
+
+    template <typename ResultType>
+    void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensMaster& tm, const general::Address& token, bool transfersOnly, bool filterByWallet, int64_t offset,
+        int64_t limit, const csdb::Address& wallet = csdb::Address());
+
     void ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) override;
     ////////new
     void iterateOverTokenTransactions(const csdb::Address&, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)>);
@@ -761,8 +802,8 @@ private:
     };
 
     struct HashState {
-        cs::Hash hash;
-        std::string retVal;
+        cs::Hash hash{};
+        std::string retVal{};
         bool isOld{false};
         bool condFlg{false};
     };

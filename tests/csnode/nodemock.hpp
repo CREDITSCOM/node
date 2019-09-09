@@ -46,8 +46,6 @@ public:
 
   MOCK_METHOD1(sendFirstTransaction, void(const csdb::Transaction&));
   MOCK_METHOD1(sendTransactionList, void(const csdb::Pool&));
-  MOCK_METHOD1(sendVector, void(const cs::HashVector&));
-  MOCK_METHOD1(sendMatrix, void(const cs::HashMatrix&));
   MOCK_METHOD1(sendBlock, void(const csdb::Pool&));
   MOCK_METHOD2(sendHash, void(const std::string&, const cs::PublicKey&));
 

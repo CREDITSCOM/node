@@ -20,7 +20,12 @@ class Transport;
 class BlockChain;
 
 const uint32_t MaxMessagesToKeep = 128;
-const uint32_t MaxResendTimes = 4;
+const uint32_t MaxResendTimes =
+#if defined(WEB_WALLET_NODE)
+8;
+#else
+4;
+#endif // !WEB_WALLET_NODE
 const cs::Sequence MaxSyncAttempts = 8;
 
 const cs::Sequence BlocksToSync = 16;
@@ -130,10 +135,11 @@ public:
     explicit Neighbourhood(Transport*);
 
     void chooseNeighbours();
-    void sendByNeighbours(const Packet*);
+    void sendByNeighbours(const Packet*, bool separate = false);
 
     void establishConnection(const ip::udp::endpoint&);
     void addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr);
+    bool updateSignalServer(const ip::udp::endpoint& in);
 
     void gotRegistration(Connection&&, RemoteNodePtr);
     void gotConfirmation(const Connection::Id& my, const Connection::Id& real, const ip::udp::endpoint&, const cs::PublicKey&, RemoteNodePtr);
@@ -153,7 +159,6 @@ public:
     void neighbourSentRenounce(RemoteNodePtr, const cs::Hash&);
 
     void redirectByNeighbours(const Packet*);
-    void pourByNeighbours(const Packet*, const uint32_t packNum);
 
     uint32_t size() const;
     uint32_t getNeighboursCountWithoutSS() const;
@@ -206,7 +211,7 @@ private:
     };
 
     bool isNewConnectionAvailable() const;
-    bool dispatch(BroadPackInfo&);
+    bool dispatch(BroadPackInfo&, bool separate = false);
     bool dispatch(DirectPackInfo&);
 
     ConnectionPtr getConnection(const ip::udp::endpoint&);
@@ -237,8 +242,8 @@ private:
     };
 
     FixedHashMap<cs::Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
-    FixedHashMap<cs::Hash, BroadPackInfo, uint16_t, 10000> msgBroads_;
-    FixedHashMap<cs::Hash, DirectPackInfo, uint16_t, 10000> msgDirects_;
+    FixedHashMap<cs::Hash, BroadPackInfo, uint32_t, 100000> msgBroads_;
+    FixedHashMap<cs::Hash, DirectPackInfo, uint32_t, 100000> msgDirects_;
 };
 
 #endif  // NEIGHBOURHOOD_HPP

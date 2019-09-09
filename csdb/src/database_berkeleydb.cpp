@@ -415,7 +415,21 @@ public:
     }
 
     void seek_to_last() final {
-        assert(false);
+        if (it_ == nullptr) {
+            return;
+        }
+
+        Dbt key;
+        Dbt_safe value;
+
+        int ret = it_->get(&key, &value, DB_LAST);
+        if (ret == 0) {
+            set_value(value);
+            valid_ = true;
+        }
+        else {
+            valid_ = false;
+        }
     }
 
     void seek(const cs::Bytes &) final {
@@ -536,11 +550,16 @@ bool DatabaseBerkeleyDB::getFromTransIndex(const cs::Bytes &key, cs::Bytes *valu
     return true;
 }
 
-void DatabaseBerkeleyDB::truncateTransIndex() {
+bool DatabaseBerkeleyDB::truncateTransIndex() {
     if (!db_trans_idx_) {
-        return;
+        return false;
     }
-    db_trans_idx_->truncate(nullptr, nullptr, 0);
+    int status = db_trans_idx_->truncate(nullptr, nullptr, 0);
+    if (status) {
+        set_last_error_from_berkeleydb(status);
+        return false;
+    }
+    return true;
 }
 
 bool DatabaseBerkeleyDB::updateContractData(const cs::Bytes& key, const cs::Bytes& data) {

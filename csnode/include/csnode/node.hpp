@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include <client/config.hpp>
+#include <config.hpp>
 #include <csconnector/csconnector.hpp>
 #include <csstats.hpp>
 
@@ -31,7 +31,11 @@ class BlockValidator;
 }  // namespace cs
 
 namespace cs {
-    class RoundPackage;
+class RoundPackage;
+}
+
+namespace cs::config {
+class Observer;
 }
 
 class Node {
@@ -51,7 +55,7 @@ public:
 
     using RefExecution = std::pair<cs::Sequence, uint32_t>;
 
-    explicit Node(const Config&);
+    explicit Node(const Config& config, cs::config::Observer& observer);
     ~Node();
 
     bool isGood() const {
@@ -133,6 +137,7 @@ public:
 
     void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3);
     bool receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants);
+    bool rpSpeedOk(cs::RoundPackage& rPackage);
     void addRoundSignature(const cs::StageThree& st3);
     // smart-contracts consensus stages sending and getting
 
@@ -147,6 +152,7 @@ public:
     // called by solver, review required:
     bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
     void sendRoundTable(cs::RoundPackage& rPackage);
+    bool gotSSMessageVerify(const cs::Signature& sign, const cs::Byte* data, const size_t size);
 
     // transaction's pack syncro
     void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
@@ -178,7 +184,6 @@ public:
     // syncro send functions
     void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
 
-    void flushCurrentTasks();
     void initCurrentRP();
     void becomeWriter();
 
@@ -188,6 +193,8 @@ public:
 
     // this function should filter the packages only using their roundNumber
     MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes, const cs::PublicKey);
+
+    void updateConfigFromFile();
 
     const cs::PublicKey& getNodeIdKey() const {
         return nodeIdKey_;
@@ -260,6 +267,8 @@ public slots:
 
 private:
     bool init(const Config& config);
+    void setupObserver();
+
     void sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);
 
@@ -421,6 +430,8 @@ private:
     std::map<cs::RoundNumber, uint8_t> recdBangs;
 
     bool alwaysExecuteContracts_ = false;
+
+    cs::config::Observer& observer_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

@@ -479,6 +479,9 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
         if (it.second > cr) {
             next_round_hashes.emplace_back(it.first);
         }
+        else {
+            cs::Conveyer::instance().addRejectedHashToCache(it.first);
+        }
     }
     size_t acceptedPacks = 0;
     for (const auto& hash : myHashes) {

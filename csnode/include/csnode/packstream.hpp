@@ -186,7 +186,7 @@ class OPackStream {
 public:
     OPackStream(RegionAllocator* allocator, const cs::PublicKey& nodeIdKey)
     : allocator_(allocator)
-    , packets_(new Packet[Packet::MaxFragments]())
+    , packets_(new Packet[200000/*Packet::MaxFragments*/]())
     , packetsEnd_(packets_)
     , senderKey_(nodeIdKey) {
     }
@@ -516,25 +516,6 @@ inline cs::IPackStream& cs::IPackStream::operator>>(cs::TransactionsPacket& pack
 }
 
 template <>
-inline cs::IPackStream& cs::IPackStream::operator>>(cs::HashVector& hashVector) {
-    (*this) >> hashVector.sender >> hashVector.hash >> hashVector.signature;
-    return *this;
-}
-
-template <>
-inline cs::IPackStream& cs::IPackStream::operator>>(cs::HashMatrix& hashMatrix) {
-    (*this) >> hashMatrix.sender;
-
-    for (std::size_t i = 0; i < kHashVectorCount; ++i) {
-        (*this) >> hashMatrix.hashVector[i];
-    }
-
-    (*this) >> hashMatrix.signature;
-
-    return *this;
-}
-
-template <>
 inline cs::IPackStream& cs::IPackStream::operator>>(csdb::PoolHash& hash) {
     cs::Bytes bytes;
     (*this) >> bytes;
@@ -638,24 +619,6 @@ inline cs::OPackStream& cs::OPackStream::operator<<(const cs::TransactionsPacket
 template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const cs::TransactionsPacket& packet) {
     (*this) << packet.toBinary();
-    return *this;
-}
-
-template <>
-inline cs::OPackStream& cs::OPackStream::operator<<(const cs::HashVector& hashVector) {
-    (*this) << hashVector.sender << hashVector.hash << hashVector.signature;
-    return *this;
-}
-
-template <>
-inline cs::OPackStream& cs::OPackStream::operator<<(const cs::HashMatrix& hashMatrix) {
-    (*this) << hashMatrix.sender;
-
-    for (std::size_t i = 0; i < kHashVectorCount; ++i) {
-        (*this) << hashMatrix.hashVector[i];
-    }
-
-    (*this) << hashMatrix.signature;
     return *this;
 }
 
