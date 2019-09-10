@@ -895,7 +895,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         conn.out.port(task->sender.port());
     }
 
-    if (vers != NODE_VERSION) {
+    if (vers < NODE_VERSION) {
         sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadClientVersion);
         return true;
     }
@@ -1000,6 +1000,8 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
 
         return true;
     }
+
+    return false;
 }
 
 bool Transport::gotSSReRegistration() {
@@ -1088,7 +1090,7 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
     return true;
 }
 
-bool Transport::gotSSNewFriends(const TaskPtr<IPacMan>& task)
+bool Transport::gotSSNewFriends(const TaskPtr<IPacMan>& /*task*/)
 {
     cslog() << "Receive new friedns nodes from SignalServer";
     if (ssStatus_ != SSBootstrapStatus::Complete)
@@ -1142,7 +1144,7 @@ bool Transport::gotSSNewFriends(const TaskPtr<IPacMan>& task)
 
 }
 
-bool Transport::gotSSUpdateServer(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode)
+bool Transport::gotSSUpdateServer(const TaskPtr<IPacMan>& /*task*/, RemoteNodePtr& /*rNode*/)
 {
     cslog() << "Update server from SignalServer";
 
