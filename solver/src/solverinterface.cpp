@@ -90,7 +90,7 @@ void SolverCore::addToGraylist(const cs::PublicKey & sender, uint32_t rounds) {
     }
 }
 
-void SolverCore::gotHash(const cs::StageHash&& sHash) {
+void SolverCore::gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize) {
     // GrayList check
     if (grayList_.count(sHash.sender) > 0) {
         csdebug() << "The sender " << cs::Utils::byteStreamToHex(sHash.sender.data(), sHash.sender.size()) << " is in gray list";
@@ -103,6 +103,10 @@ void SolverCore::gotHash(const cs::StageHash&& sHash) {
         return;
     }
     // DPOS check finish
+
+    if (sHash.realTrustedSize < currentTrustedSize) {
+        csdebug() << "Stake value is lower than that in this node, trow this hash";
+    }
     auto rNum = cs::Conveyer::instance().currentRoundNumber();
     auto it = std::find_if(recv_hash.cbegin(), recv_hash.cend(), [sHash, rNum](const cs::StageHash& sh)
     { return ((sHash.sender == sh.sender) && (sHash.realTrustedSize > sh.realTrustedSize) && (sHash.round == rNum)); });
@@ -134,13 +138,15 @@ void SolverCore::beforeNextRound() {
     pstate->onRoundEnd(*pcontext, false /*is_bigbang*/);
 }
 
-void SolverCore::nextRound() {
+void SolverCore::nextRound(bool updateRound) {
     // as store result of current round:
     if (Consensus::Log) {
         csdebug() << "SolverCore: clear all stored round data (block hashes, stages-1..3)";
     }
+    if (!updateRound) {
+        recv_hash.clear();
+    }
 
-    recv_hash.clear();
     stageOneStorage.clear();
     stageTwoStorage.clear();
     stageThreeStorage.clear();

@@ -73,7 +73,7 @@ public:
 
     void init(const cs::PublicKey& pub, const cs::PrivateKey& priv);
     void gotConveyerSync(cs::RoundNumber rNum);
-    void gotHash(const cs::StageHash&& sHash);
+    void gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize);
 
     const cs::PublicKey& getPublicKey() const {
         return public_key;
@@ -88,7 +88,7 @@ public:
 
 
     void beforeNextRound();
-    void nextRound();
+    void nextRound(bool updateRound);
     void gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round);
     void gotRoundInfoReply(bool next_round_started, const cs::PublicKey& respondent);
 
