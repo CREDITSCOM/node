@@ -165,7 +165,7 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
         }
     }
     else {
-        cslog() << name() << ": DOES NOT MATCH my value " << lastHash.to_string();
+        csdebug() << name() << ": DOES NOT MATCH my value " << lastHash.to_string();
         context.sendHashReply(std::move(pool_hash), sender);
     }
 
