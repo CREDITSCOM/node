@@ -36,9 +36,9 @@ const uint8_t DELTA_ROUNDS_VERIFY_NEW_SERVER = 100;
 using Port = short unsigned;
 
 struct EndpointData {
-    bool ipSpecified;
-    short unsigned port;
-    ip::address ip;
+    bool ipSpecified = false;
+    short unsigned port = 0;
+    ip::address ip{};
 
     static EndpointData fromString(const std::string&);
 };
@@ -206,7 +206,7 @@ private:
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
     void showKeys(const std::string& pk58);
-    
+
     void changePasswordOption(const std::string& pathToSk);
 
     template <typename T>
@@ -216,29 +216,31 @@ private:
 
     EndpointData inputEp_;
 
-    bool twoSockets_;
+    bool twoSockets_ = false;
+
     EndpointData outputEp_;
 
-    NodeType nType_;
+    NodeType nType_ = NodeType::Client;
 
-    bool ipv6_;
-    uint32_t maxNeighbours_;
-    uint64_t connectionBandwidth_;
+    bool ipv6_ = false;
 
-    bool symmetric_;
+    uint32_t maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS;
+    uint64_t connectionBandwidth_ = DEFAULT_CONNECTION_BANDWIDTH;
+
+    bool symmetric_ = false;
     EndpointData hostAddressEp_;
 
-    BootstrapType bType_;
+    BootstrapType bType_ = SignalServer;
     EndpointData signalServerEp_;
 
     std::vector<EndpointData> bList_;
 
     std::string pathToDb_;
 
-    cs::PublicKey publicKey_;
-    cs::PrivateKey privateKey_;
+    cs::PublicKey publicKey_{};
+    cs::PrivateKey privateKey_{};
 
-    boost::log::settings loggerSettings_;
+    boost::log::settings loggerSettings_{};
 
     PoolSyncData poolSyncData_;
     ApiData apiData_;
@@ -246,7 +248,7 @@ private:
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
 
-    uint64_t observerWaitTime_;
+    uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
 
     ConveyerData conveyerData_;
 

@@ -361,6 +361,7 @@ public:
         if (core.find_stage3(from) == nullptr) {
             cs::StageThree fake;
             fake.sender = from;
+            fake.iteration = core.getCurrentStage3Iteration();
             core.gotStageThree(fake, false);
         }
     }

@@ -466,8 +466,10 @@ public slots:
     }
 
     void onExecutorFinished() {
-        if (!executorProcess_->isRunning() && !requestStop_) {
-            executorProcess_->launch(cs::Process::Options::None);
+        if (!requestStop_) {
+            cs::Concurrent::run([this] {
+                runProcess();
+            });
         }
     }
 
@@ -521,7 +523,7 @@ private:
                     static std::mutex mutex;
                     std::unique_lock lock(mutex);
 
-                    cvErrorConnect_.wait(lock, [&] {
+                    cvErrorConnect_.wait_for(lock, std::chrono::seconds(5), [&] {
                         return !isConnected() || requestStop_;
                     });
                 }
@@ -530,8 +532,17 @@ private:
                     break;
                 }
 
-                if (!isConnected()) {
-                    connect();
+                if (executorProcess_->isRunning()) {
+                    if (!isConnected()) {
+                        connect();
+                    }
+                }
+                else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                    if (!executorProcess_->isRunning()) {
+                        runProcess();
+                    }
                 }
             }
         });
@@ -541,6 +552,12 @@ private:
 
     ~Executor() {
         stop();
+    }
+
+    void runProcess() {
+        executorProcess_->terminate();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        executorProcess_->launch(cs::Process::Options::None);
     }
 
     struct OriginExecuteResult {

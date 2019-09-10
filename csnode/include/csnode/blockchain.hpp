@@ -273,6 +273,7 @@ private:
     // Thread unsafe
     bool finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys lastConfidants);
 
+    void onStartReadFromDB(cs::Sequence lastWrittenPoolSeq);
     void onReadFromDB(csdb::Pool block, bool* shouldStop);
     bool postInitFromDB();
 

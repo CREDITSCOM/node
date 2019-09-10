@@ -184,6 +184,7 @@ private:
 
 private signals:
     ReadBlockSignal read_block_event;
+    BlockReadingStartedSingal start_reading_event;
 };
 
 void Storage::priv::set_last_error(Storage::Error error, const ::std::string& message) {
@@ -230,6 +231,21 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
 
     Database::IteratorPtr it = db->new_iterator();
     assert(it);
+
+    it->seek_to_last();
+    if (it->is_valid()) {
+        cs::Bytes v = it->value();
+        Pool p = Pool::from_binary(std::move(v));
+        if (p.is_valid()) {
+            emit start_reading_event(p.sequence());
+        }
+        else {
+            emit start_reading_event(0);
+        }
+    }
+    else {
+        emit start_reading_event(0);
+    }
 
     Storage::OpenProgress progress{0};
     for (it->seek_to_first(); it->is_valid(); it->next()) {
@@ -741,6 +757,10 @@ bool Storage::get_from_blockchain(const Address& addr, int64_t innerId,
 
 const ReadBlockSignal& Storage::readBlockEvent() const {
     return d->read_block_event;
+}
+
+const BlockReadingStartedSingal& Storage::readingStartedEvent() const {
+    return d->start_reading_event;
 }
 
 std::vector<Transaction> Storage::transactions(const Address& addr, size_t limit, const TransactionID& offset) const {
