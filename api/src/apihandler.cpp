@@ -2652,7 +2652,12 @@ namespace executor {
                 recreateOriginExecutor();
             }
 
-            originExecuteRes.resp.status.code = cs::error::ThriftException;
+            if (x.getType() == ::apache::thrift::transport::TTransportException::TIMED_OUT) {
+                originExecuteRes.resp.status.code = cs::error::TimeExpired;
+            }
+            else {
+                originExecuteRes.resp.status.code = cs::error::ThriftException;
+            }
             originExecuteRes.resp.status.message = x.what();
 
             notifyError();
