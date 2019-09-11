@@ -29,7 +29,7 @@ The node consists of the following elements:</p>
 
 <h2>Build dependencies</h2>
 <ul>
-<li><a href="https://www.boost.org/users/history/version_1_68_0.html">Boost 1.68</a> or newest static prebuild</li>
+<li><a href="https://www.boost.org/users/history/version_1_70_0.html">Boost 1.70</a> or newest static prebuild</li>
 <li>Compiler with C++17 support</li>
 <li><a href="https://cmake.org/download/">Cmake 3.11</a> or newest</li>
 <li> Requirements fo building <a href="https://thrift.apache.org/docs/install/">Apache Thrift</a></li>
