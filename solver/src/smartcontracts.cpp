@@ -665,7 +665,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_
                         }
                     }
                     if (!in_known_contracts(u)) {
-                        cslog() << kLogPrefix << "call to unknown contract " << to_base58(u) << " declared in " << new_item << ", cancel ";
+                        csdebug() << kLogPrefix << "call to unknown contract " << to_base58(u) << " declared in " << new_item << ", cancel ";
                         remove_from_queue(new_item, skip_log);
                         // also removes parent "it" from exe_queue if empty
                         return;
@@ -1054,7 +1054,12 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                                     // required contract address may differ from "primary" executed contract:
 
                                     if (head.states.count(req_abs_addr) == 0) {
-                                        cserror() << kLogPrefix << "cannot find contract new state in execution result";
+                                        if (exe_data.result.response.code == error::TimeExpired) {
+                                            cslog() << kLogPrefix << "timeout while executing contract, new state is not set";
+                                        }
+                                        else {
+                                            cslog() << kLogPrefix << "contract new state is not set in execution result";
+                                        }
                                     }
                                     else {
                                         const auto& state = head.states.at(req_abs_addr);
@@ -1440,6 +1445,9 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
                 executor_ready = false;
                 data.setError(error::ExecuteTransaction, "execution failed (check executor version), contract state is unchanged");
             }
+        }
+        else if (data.result.response.code == error::TimeExpired) {
+            data.setError(error::ExecutorUnreachable, "execution timeout");
         }
         else if (data.result.response.code == error::ThriftException) {
             test_executor_ready = true;
@@ -2463,7 +2471,7 @@ bool SmartContracts::wait_until_executor(unsigned int test_freq, unsigned int ma
         if (++counter >= max_periods) {
             return false;
         }
-        cswarning() << kLogPrefix << "wait for executor prior to continue read blockchain DB";
+        cswarning() << kLogPrefix << "executor disconnected, wait until connection is restored to continue with blockchain";
         std::this_thread::sleep_for(std::chrono::seconds(test_freq));
     }
     executor_ready = true;

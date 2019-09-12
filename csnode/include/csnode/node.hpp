@@ -82,7 +82,8 @@ public:
 
     // SOLVER3 methods
     void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
-    void performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& sender);
+    void setCurrentRP(const cs::RoundPackage& rp);
+    void performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& sender, bool updateRound);
     void clearRPCache(cs::RoundNumber rNum);
     void sendHash(cs::RoundNumber round);
     void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
@@ -132,7 +133,7 @@ public:
 
     cs::ConfidantsKeys retriveSmartConfidants(const cs::Sequence startSmartRoundNumber) const;
 
-    void onRoundStart(const cs::RoundTable& roundTable);
+    void onRoundStart(const cs::RoundTable& roundTable, bool updateRound);
     void startConsensus();
 
     void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3);
@@ -427,6 +428,8 @@ private:
     cs::Bytes lastTrustedMask_;
     std::unique_ptr<cs::BlockValidator> blockValidator_;
     std::vector<cs::RoundPackage> roundPackageCache_;
+    cs::RoundPackage currentRp_;
+    size_t roundPackRequests_ = 0;
     std::map<cs::RoundNumber, uint8_t> recdBangs;
 
     bool alwaysExecuteContracts_ = false;
