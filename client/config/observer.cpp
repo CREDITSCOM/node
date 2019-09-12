@@ -16,7 +16,7 @@ cs::config::Observer::~Observer() {
 
 void cs::config::Observer::stop() {
     if (isObserved_.load(std::memory_order_acquire)) {
-        isObserved_.store(true, std::memory_order_release);
+        isObserved_.store(false, std::memory_order_release);
         variable_.notify_one();
 
         thread_.join();

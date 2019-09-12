@@ -217,7 +217,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     }
 
     solver_->resetGrayList();
-
+    roundPackageCache_.clear();
     // this evil code sould be removed after examination
     cs::Sequence countRemoved = 0;
     cs::Sequence lastSequence = blockChain_.getLastSeq();
@@ -2254,8 +2254,11 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     bool updateRound = false;
     if (currentRp_.roundTable().round == 0) {//if normal or trusted  node that got RP has probably received a new RP with not full stake
-        if (rPackage.roundTable().round == roundPackageCache_.back().roundTable().round) {
-            if (!roundPackageCache_.empty()) {
+        if (roundPackageCache_.empty()) {
+            roundPackageCache_.push_back(rPackage);
+        }
+        else {
+            if (rPackage.roundTable().round == roundPackageCache_.back().roundTable().round) {
                 auto mask = roundPackageCache_.back().poolMetaInfo().realTrustedMask;
                 if (cs::TrustedMask::trustedSize(rPackage.poolMetaInfo().realTrustedMask) > cs::TrustedMask::trustedSize(mask)) {
                     csdebug() << "Current Roundpackage of " << rNum << " will be replaced by new one";
@@ -2271,16 +2274,13 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
                 }
             }
             else {
-                roundPackageCache_.push_back(rPackage);
-            }
-        }
-        else {
-            if (roundPackageCache_.empty() || rPackage.roundTable().round > roundPackageCache_.back().roundTable().round) {
-                roundPackageCache_.push_back(rPackage);
-            }
-            else {
-                csdebug() << "Current RoundPackage of " << rNum << " won't be added to cache";
-                return;
+                if (rPackage.roundTable().round > roundPackageCache_.back().roundTable().round) {
+                    roundPackageCache_.push_back(rPackage);
+                }
+                else {
+                    csdebug() << "Current RoundPackage of " << rNum << " won't be added to cache";
+                    return;
+                }
             }
         }
     }
