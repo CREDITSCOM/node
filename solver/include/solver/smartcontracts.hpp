@@ -403,9 +403,9 @@ public signals:
     SmartContractSignal rollback_contract_timeout;
 
     // emits when every contract emitted transaction is appeared in blockchain, args are (emitted_transaction, starter_transaction):
-    cs::Signal<void(const csdb::Transaction&, const csdb::Transaction&)> signal_emitted_accepted;
+    cs::Signal<void(const csdb::Transaction& emitted, const csdb::Transaction& starter)> signal_emitted_accepted;
     // emits on rollback the contract emitted transaction, args are (emitted_transaction, starter_transaction):
-    cs::Signal<void(const csdb::Transaction&, const csdb::Transaction&)> rollback_emitted_accepted;
+    cs::Signal<void(const csdb::Transaction& emitted, const csdb::Transaction& starter)> rollback_emitted_accepted;
 
     // emits on every update of contract state both during reading db and getting block in real time
     SmartContractSignal contract_state_updated;
