@@ -432,7 +432,7 @@ void BlockChain::removeLastBlock() {
         return;
     }
     --blocksToBeRemoved_;
-    csmeta(csdebug) << "begin";
+    csmeta(csdebug) << getLastSeq();
     csdb::Pool pool{};
 
     {
@@ -464,10 +464,12 @@ void BlockChain::removeLastBlock() {
     --lastSequence_;
     total_transactions_count_ -= pool.transactions().size();
     walletsCacheUpdater_->loadNextBlock(pool, pool.confidants(), *this, true);
+    // remove wallets exposed by the block
     removeWalletsInPoolFromCache(pool);
-    removeLastBlockFromTrxIndex(pool);
-
+    // signal all subscribers, transaction index is still consistent up to removed block!
     emit removeBlockEvent(pool);
+    // erase indexes from the block
+    removeLastBlockFromTrxIndex(pool);
 
     csmeta(csdebug) << "done";
 }

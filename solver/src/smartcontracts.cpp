@@ -1159,11 +1159,15 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                     while (prev_seq != kWrongSequence) {
                         all_contract_blocks.insert(all_contract_blocks.cbegin(), prev_seq);
                         prev_seq = bc.getPreviousPoolSeq(abs_addr, prev_seq);
+                        if (prev_seq == 0) {
+                            break;
+                        }
                     }
 
                     // go through all blocks and re-execute contract
                     std::string executed_state;
                     csdb::Transaction executed_transaction;
+                    SmartContractRef executed_ref;
                     if (!all_contract_blocks.empty()) {
                         for (const auto seq : all_contract_blocks) {
                             const csdb::Pool b = bc.loadBlock(seq);
@@ -1190,8 +1194,7 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                                         if (executed_hash == stored_hash) {
                                                             item.state = executed_state;
                                                             item.execute = executed_transaction;
-                                                            item.ref_execute.sequence = executed_transaction.id().pool_seq();
-                                                            item.ref_execute.transaction = executed_transaction.id().index();
+                                                            item.ref_execute = executed_ref;
                                                         }
                                                     }
                                                 }
@@ -1239,6 +1242,10 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                                 }
                                                 else {
                                                     executed_state = head.states.at(abs_addr);
+                                                    executed_transaction = tt;
+                                                    executed_ref.hash = b.hash();
+                                                    executed_ref.sequence = b.sequence();
+                                                    executed_ref.transaction = tt.id().index();
                                                 }
                                             }
                                         }
@@ -1253,9 +1260,13 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                         csdebug() << kLogPrefix << "unable to restore new state of " << to_base58(abs_addr) << ", make a network request";
                     }
                     else {
-                        item.ref_cache = item.ref_execute;
-                        dbcache_update(abs_addr, ref, item.state, true);
-                        csdebug() << kLogPrefix << "last state of " << to_base58(abs_addr) << " is restored";
+                        if (dbcache_update(abs_addr, item.ref_execute, item.state, true)) {
+                            item.ref_cache = item.ref_execute;
+                            csdebug() << kLogPrefix << "last state of " << to_base58(abs_addr) << " is restored to " << item.ref_execute;
+                        }
+                        else {
+                            cslog() << kLogPrefix << "failed to stora in cache state of " << to_base58(abs_addr) << " restored to " << item.ref_execute;
+                        }
                     }
                 }
             }
@@ -1265,7 +1276,26 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
             rollback_payable_invoke(t);
         }
         else if (is_executable(t)) {
-            // do nothing
+            // erase execution from exe queue
+            SmartContractRef ref;
+            ref.sequence = t.id().pool_seq();
+            ref.transaction = t.id().index();
+            auto it_queue = find_in_queue(ref);
+            if (it_queue != exe_queue.end()) {
+                auto it_exe = find_in_queue_item(it_queue, ref);
+                if (it_exe != it_queue->executions.end()) {
+                    it_queue->executions.erase(it_exe);
+                }
+                if (it_queue->executions.empty()) {
+                    exe_queue.erase(it_queue);
+                }
+            }
+            // erase deploy transaction, erase contract at all
+            if (is_deploy(t)) {
+                csdb::Address abs_addr = absolute_address(t.target());
+                csdebug() << kLogPrefix << "completely erase " << to_base58(abs_addr) << " as deploy " << ref << " in removed block";
+                known_contracts.erase(abs_addr);
+            }
         }
         else {
             csdb::Address abs_addr = absolute_address(t.source());
