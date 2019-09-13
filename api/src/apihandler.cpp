@@ -432,14 +432,16 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
 
     // 3) fill ExtraFee for extra transactions
     auto trxIt = std::find_if(transactions.begin(), transactions.end(), [&stateTrx](const csdb::Transaction& ptrx) { return ptrx.id() == stateTrx.id(); });
-    for (auto trx = ++trxIt; trx != transactions.end(); ++trx) {
-        if (s_blockchain.getAddressByType(trx->source(), BlockChain::AddressType::PublicKey) != 
-            s_blockchain.getAddressByType(stateTrx.source(), BlockChain::AddressType::PublicKey)) // end find extra transactions                   
+    if (trxIt != transactions.end()) {
+        for (auto trx = ++trxIt; trx != transactions.end(); ++trx) {
+            if (s_blockchain.getAddressByType(trx->source(), BlockChain::AddressType::PublicKey) !=
+                s_blockchain.getAddressByType(stateTrx.source(), BlockChain::AddressType::PublicKey)) // end find extra transactions                   
                 break;
-        extraFee.transactionId = convert_transaction_id(trx->id());
-        extraFee.sum = convertAmount(csdb::Amount(trx->counted_fee().to_double()));
-        extraFee.comment = "emitted trxs fee";
-        result.trxn.extraFee.push_back(extraFee);
+            extraFee.transactionId = convert_transaction_id(trx->id());
+            extraFee.sum = convertAmount(csdb::Amount(trx->counted_fee().to_double()));
+            extraFee.comment = "emitted trxs fee";
+            result.trxn.extraFee.push_back(extraFee);
+        }
     }
     result.trxn.__isset.extraFee = true;
     return result;
@@ -932,9 +934,9 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
 
 void APIHandler::store_block_slot(const csdb::Pool& pool) {
     updateSmartCachesPool(pool);
-#ifdef TOKENS_CACHE   
     if(!isBDLoaded_) {
         isBDLoaded_ = true;
+#ifdef TOKENS_CACHE   
         tm_.loadTokenInfo([&](const TokensMap& tokens, const HoldersMap&) {
             int count{}, i{};
             size_t tokenSize = tokens.size();
@@ -946,8 +948,9 @@ void APIHandler::store_block_slot(const csdb::Pool& pool) {
             }
             cslog() << "tokens loaded!";
         });
-    }
 #endif
+    }
+
 }
 
 void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
@@ -1098,18 +1101,18 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 // new_state value, not hash!
                 newStateStr = trxn.user_field(cs::trx_uf::new_state::Value).template value<std::string>();
             }
-            else { // signal to end waiting for a transaction
-                auto hashStateInst(lockedReference(this->hashStateSL));
-                (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
-                    auto newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();
-                    if (!newHashStr.empty())
-                        std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
-                    else
-                        res.hash = cs::Zero::hash;
-                    res.retVal = trxn.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();
-                    res.isOld = (res.hash == oldHash.hash);
-                    res.condFlg = true;
-                    return res;
+            else if (isBDLoaded_) { // signal to end waiting for a transaction
+                    auto hashStateInst(lockedReference(this->hashStateSL));
+                    (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
+                        auto newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();
+                        if (!newHashStr.empty())
+                            std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
+                        else
+                            res.hash = cs::Zero::hash;
+                        res.retVal = trxn.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();
+                        res.isOld = (res.hash == oldHash.hash);
+                        res.condFlg = true;
+                        return res;
                     });
             }
 
