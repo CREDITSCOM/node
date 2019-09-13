@@ -69,6 +69,11 @@ target_link_libraries (client
                        Boost::disable_autolinking
                        ${CMAKE_THREAD_LIBS_INIT}
                        )
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+target_link_libraries (client
+                       -static-libstdc++
+                       )
+endif()
 
 if (NOT MSVC AND WITH_GPROF)
 add_definitions(-DBUILD_WITH_GPROF)
