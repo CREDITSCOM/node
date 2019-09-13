@@ -44,6 +44,7 @@ using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
 using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
+using StartReadingBlocksSignal = csdb::BlockReadingStartedSingal;
 }  // namespace cs
 
 class BlockChain {
@@ -192,6 +193,7 @@ public signals:
     cs::RemoveBlockSignal removeBlockEvent;
 
     const cs::ReadBlockSignal& readBlockEvent() const;
+    const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;
 
 public slots:
 

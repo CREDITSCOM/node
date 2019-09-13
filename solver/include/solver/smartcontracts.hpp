@@ -429,6 +429,11 @@ public slots:
     // called when block should be removed from database
     void on_remove_block(const csdb::Pool& block);
 
+    void on_start_reading_blocks(cs::Sequence lastBlockNum) {
+        cs::Lock lock(public_access_lock);
+        max_read_sequence = lastBlockNum;
+    }
+
 private:
     using trx_innerid_t = int64_t;  // see csdb/transaction.hpp near #101
 
@@ -452,6 +457,9 @@ private:
 
     // flag to allow execution, currently depends on executor presence
     bool executor_ready;
+
+    // max block sequence read from DB
+    cs::Sequence max_read_sequence;
 
     CallsQueueScheduler::CallTag tag_cancel_running_contract;
 

@@ -182,11 +182,13 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
 , force_execution(false)
 , bc(blockchain)
 , executor_ready(true)
+, max_read_sequence(0)
 {
     // signals subscription (MUST occur AFTER the BlockChains has already subscribed to storage)
     // as event receiver:
-    cs::Connector::connect(&bc.storeBlockEvent, this, &SmartContracts::on_store_block);
+    cs::Connector::connect(&bc.startReadingBlocksEvent(), this, &SmartContracts::on_start_reading_blocks);
     cs::Connector::connect(&bc.readBlockEvent(), this, &SmartContracts::on_read_block);
+    cs::Connector::connect(&bc.storeBlockEvent, this, &SmartContracts::on_store_block);
     cs::Connector::connect(&bc.removeBlockEvent, this, &SmartContracts::on_remove_block);
     cs::Connector::connect(&cs::Conveyer::instance().statesCreated, this, &SmartContracts::on_update);
     // as event source:
@@ -213,22 +215,6 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
     }
     node_id = id;
     force_execution = pnode->alwaysExecuteContracts();
-
-    // currently, blockchain is read in such manner that does not require absolute/optimized consolidation post-factum
-    // anyway this tested code may become useful in future
-
-    // validate contract states
-    for (const auto& item : known_contracts) {
-        const StateItem& val = item.second;
-        if (val.state.empty()) {
-            csdetails() << kLogPrefix << "completely unsuccessful " << val.ref_deploy << " found, neither deployed, nor executed";
-        }
-        if (!val.ref_deploy.is_valid()) {
-            csdetails() << kLogPrefix << "unsuccessfully deployed contract found";
-        }
-    }
-
-    csdebug() << kLogPrefix << known_contracts.size() << " smart contract loaded";
 }
 
 /*static*/
@@ -1116,6 +1102,20 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
 void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
     cs::Lock lock(public_access_lock);
     on_next_block_impl(block, true, should_stop);
+
+    if (block.sequence() == max_read_sequence && max_read_sequence > 0) {
+        // validate contract states
+        for (const auto& item : known_contracts) {
+            const StateItem& val = item.second;
+            if (val.state.empty()) {
+                csdetails() << kLogPrefix << "completely unsuccessful " << val.ref_deploy << " found, neither deployed, nor executed";
+            }
+            if (!val.ref_deploy.is_valid()) {
+                csdetails() << kLogPrefix << "unsuccessfully deployed contract found";
+            }
+        }
+        csdebug() << kLogPrefix << "finish reading DB, " << WithDelimiters(known_contracts.size()) << " contracts were loaded";
+    }
 }
 
 /*public*/

@@ -1367,6 +1367,10 @@ const cs::ReadBlockSignal& BlockChain::readBlockEvent() const {
     return storage_.readBlockEvent();
 }
 
+const cs::StartReadingBlocksSignal& BlockChain::startReadingBlocksEvent() const {
+    return storage_.readingStartedEvent();
+}
+
 std::size_t BlockChain::getCachedBlocksSize() const {
     return cachedBlocks_.size();
 }
