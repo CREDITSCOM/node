@@ -99,6 +99,13 @@ bool Node::init(const Config& config) {
     solver_->init(nodeIdKey_, nodeIdPrivate_);
     solver_->startDefault();
 
+    if (config.newBlockchainTop()) {
+        if (!blockChain_.init(config.getPathToDB(), config.newBlockchainTopSeq())) {
+            return false;
+        }
+        return true;
+    }
+
     if (!blockChain_.init(config.getPathToDB())) {
         return false;
     }

@@ -124,7 +124,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 BlockChain::~BlockChain() {
 }
 
-bool BlockChain::init(const std::string& path) {
+bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
     cslog() << "Trying to open DB...";
 
     size_t totalLoaded = 0;
@@ -137,9 +137,13 @@ bool BlockChain::init(const std::string& path) {
         return false;
     };
 
-    if (!storage_.open(path, progress)) {
+    if (!storage_.open(path, progress, newBlockchainTop)) {
         cserror() << "Couldn't open database at " << path;
         return false;
+    }
+
+    if (newBlockchainTop != cs::kWrongSequence) {
+        return true;
     }
 
     cslog() << "\rDB is opened, loaded " << WithDelimiters(totalLoaded) << " blocks";
