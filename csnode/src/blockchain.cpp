@@ -252,7 +252,13 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
         if (indexedAddrs.insert(key).second) {
             cs::Sequence lapoo;
             if (recreateIndex_) {
-                lapoo = lapoos[key];
+                auto it = lapoos.find(key);
+                if (it == lapoos.end()) {
+                    lapoo = cs::kWrongSequence;
+                }
+                else {
+                    lapoo = it->second;
+                }
                 lapoos[key] = pool.sequence();
             }
             else {
