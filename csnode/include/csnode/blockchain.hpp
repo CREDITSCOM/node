@@ -44,6 +44,7 @@ using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
 using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
+using StartReadingBlocksSignal = csdb::BlockReadingStartedSingal;
 }  // namespace cs
 
 class BlockChain {
@@ -192,19 +193,28 @@ public signals:
     cs::RemoveBlockSignal removeBlockEvent;
 
     const cs::ReadBlockSignal& readBlockEvent() const;
+    const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;
 
 public slots:
 
-    // prototype is void (csdb::Transaction)
     // subscription is placed in SmartContracts constructor
     void onPayableContractReplenish(const csdb::Transaction& starter) {
-        this->walletsCacheUpdater_->invokeReplenishPayableContract(starter);
+        this->walletsCacheUpdater_->invokeReplenishPayableContract(starter, false /*inverse*/);
     }
     void onContractTimeout(const csdb::Transaction& starter) {
-        this->walletsCacheUpdater_->rollbackExceededTimeoutContract(starter, csdb::Amount(0));
+        this->walletsCacheUpdater_->rollbackExceededTimeoutContract(starter, csdb::Amount(0), false /*inverse*/);
     }
     void onContractEmittedAccepted(const csdb::Transaction& emitted, const csdb::Transaction& starter) {
-        this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter);
+        this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter, false /*inverse*/);
+    }
+    void rollbackPayableContractReplenish(const csdb::Transaction& starter) {
+        this->walletsCacheUpdater_->invokeReplenishPayableContract(starter, true /*inverse*/);
+    }
+    void rollbackContractTimeout(const csdb::Transaction& starter) {
+        this->walletsCacheUpdater_->rollbackExceededTimeoutContract(starter, csdb::Amount(0), true /*inverse*/);
+    }
+    void rollbackContractEmittedAccepted(const csdb::Transaction& emitted, const csdb::Transaction& starter) {
+        this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter, true /*inverse*/);
     }
 
 public:

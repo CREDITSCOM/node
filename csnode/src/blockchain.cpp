@@ -252,7 +252,13 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
         if (indexedAddrs.insert(key).second) {
             cs::Sequence lapoo;
             if (recreateIndex_) {
-                lapoo = lapoos[key];
+                auto it = lapoos.find(key);
+                if (it == lapoos.end()) {
+                    lapoo = cs::kWrongSequence;
+                }
+                else {
+                    lapoo = it->second;
+                }
                 lapoos[key] = pool.sequence();
             }
             else {
@@ -432,7 +438,7 @@ void BlockChain::removeLastBlock() {
         return;
     }
     --blocksToBeRemoved_;
-    csmeta(csdebug) << "begin";
+    csmeta(csdebug) << getLastSeq();
     csdb::Pool pool{};
 
     {
@@ -464,10 +470,12 @@ void BlockChain::removeLastBlock() {
     --lastSequence_;
     total_transactions_count_ -= pool.transactions().size();
     walletsCacheUpdater_->loadNextBlock(pool, pool.confidants(), *this, true);
+    // remove wallets exposed by the block
     removeWalletsInPoolFromCache(pool);
-    removeLastBlockFromTrxIndex(pool);
-
+    // signal all subscribers, transaction index is still consistent up to removed block!
     emit removeBlockEvent(pool);
+    // erase indexes from the block
+    removeLastBlockFromTrxIndex(pool);
 
     csmeta(csdebug) << "done";
 }
@@ -1363,6 +1371,10 @@ void BlockChain::testCachedBlocks() {
 
 const cs::ReadBlockSignal& BlockChain::readBlockEvent() const {
     return storage_.readBlockEvent();
+}
+
+const cs::StartReadingBlocksSignal& BlockChain::startReadingBlocksEvent() const {
+    return storage_.readingStartedEvent();
 }
 
 std::size_t BlockChain::getCachedBlocksSize() const {

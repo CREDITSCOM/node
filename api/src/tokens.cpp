@@ -132,6 +132,14 @@ template <typename T>
 T getVariantAs(const general::Variant&);
 template <>
 std::string getVariantAs(const general::Variant& var) {
+    if (var.__isset.v_big_decimal) {
+        try {
+            if (stof(var.v_big_decimal) == 0)
+                return "0";
+        }
+        catch (...) {}
+        return var.v_big_decimal;
+    }
     return var.v_string;
 }
 
