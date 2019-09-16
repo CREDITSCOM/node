@@ -193,13 +193,17 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
     auto blockSeq = block.sequence();
     lastSequence_ = blockSeq;
     if (blockSeq == 0 && recreateIndex_) {
-      cs::Lock lock(dbLock_);
-      storage_.truncate_trxs_index();
+        cs::Lock lock(dbLock_);
+        if (!storage_.truncate_trxs_index()) {
+            cserror() << "Can't truncate trxs index";
+            *shouldStop = true;
+            return;
+        }
     }
     if (blockSeq == 1) {
-      cs::Lock lock(dbLock_);
-      uuid_ = uuidFromBlock(block);
-      csdebug() << "Blockchain: UUID = " << uuid_;
+        cs::Lock lock(dbLock_);
+        uuid_ = uuidFromBlock(block);
+        csdebug() << "Blockchain: UUID = " << uuid_;
     }
 
     if (!updateWalletIds(block, *walletsCacheUpdater_.get())) {
