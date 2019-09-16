@@ -463,6 +463,8 @@ public slots:
         if (!isConnected()) {
             connect();
         }
+
+        csdebug() << csname() << "started";
     }
 
     void onExecutorFinished() {
@@ -471,6 +473,8 @@ public slots:
                 runProcess();
             });
         }
+
+        csdebug() << csname() << "finished";
     }
 
     void onExecutorProcessError(const cs::ProcessException& exception) {
