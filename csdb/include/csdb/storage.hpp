@@ -94,6 +94,7 @@ public:
     struct OpenOptions {
         /// Экземпляр драйвера базы данных
         ::std::shared_ptr<Database> db;
+        ::cs::Sequence newBlockchainTop = ::cs::kWrongSequence;
     };
 
     struct OpenProgress {
@@ -133,7 +134,8 @@ public:
      * В случае неудачи информацию об ошибке можно получить с помошью методов \ref last_error,
      * \ref last_error_message, \ref db_last_error() и \ref db_last_error_message()
      */
-    bool open(const ::std::string& path_to_base = ::std::string{}, OpenCallback callback = nullptr);
+    bool open(const ::std::string& path_to_base = ::std::string{}, OpenCallback callback = nullptr,
+              cs::Sequence newBlockchainTop = cs::kWrongSequence);
 
     /**
      * @brief Создание хранилища по набору параметров.

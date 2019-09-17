@@ -64,7 +64,8 @@ public:
                         bool recreateIndex = false);
     ~BlockChain();
 
-    bool init(const std::string& path);
+    bool init(const std::string& path,
+              cs::Sequence newBlockchainTop = cs::kWrongSequence);
     bool isGood() const;
 
     // return unique id of database if at least one unique block has written, otherwise (only genesis block) 0

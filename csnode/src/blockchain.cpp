@@ -124,7 +124,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 BlockChain::~BlockChain() {
 }
 
-bool BlockChain::init(const std::string& path) {
+bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
     cslog() << "Trying to open DB...";
 
     size_t totalLoaded = 0;
@@ -137,9 +137,13 @@ bool BlockChain::init(const std::string& path) {
         return false;
     };
 
-    if (!storage_.open(path, progress)) {
+    if (!storage_.open(path, progress, newBlockchainTop)) {
         cserror() << "Couldn't open database at " << path;
         return false;
+    }
+
+    if (newBlockchainTop != cs::kWrongSequence) {
+        return true;
     }
 
     cslog() << "\rDB is opened, loaded " << WithDelimiters(totalLoaded) << " blocks";
@@ -189,13 +193,17 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
     auto blockSeq = block.sequence();
     lastSequence_ = blockSeq;
     if (blockSeq == 0 && recreateIndex_) {
-      cs::Lock lock(dbLock_);
-      storage_.truncate_trxs_index();
+        cs::Lock lock(dbLock_);
+        if (!storage_.truncate_trxs_index()) {
+            cserror() << "Can't truncate trxs index";
+            *shouldStop = true;
+            return;
+        }
     }
     if (blockSeq == 1) {
-      cs::Lock lock(dbLock_);
-      uuid_ = uuidFromBlock(block);
-      csdebug() << "Blockchain: UUID = " << uuid_;
+        cs::Lock lock(dbLock_);
+        uuid_ = uuidFromBlock(block);
+        csdebug() << "Blockchain: UUID = " << uuid_;
     }
 
     if (!updateWalletIds(block, *walletsCacheUpdater_.get())) {
