@@ -658,7 +658,6 @@ private:
 
     const int16_t EXECUTOR_VERSION = 2;
 
-    // temporary solution?
     std::mutex callExecutorLock_;
 };
 }  // namespace executor

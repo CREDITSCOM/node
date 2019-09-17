@@ -2318,9 +2318,7 @@ namespace executor {
         }
     }
 
-    std::optional<Executor::ExecuteResult> Executor::executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {
-        std::lock_guard lock(callExecutorLock_);  // temporary solution
-
+    std::optional<Executor::ExecuteResult> Executor::executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {       
         if (smarts.empty()) {
             return std::nullopt;
         }
@@ -2480,8 +2478,6 @@ namespace executor {
     }
 
     std::optional<Executor::ExecuteResult> Executor::reexecuteContract(ExecuteTransactionInfo& contract, std::string forceContractState) {
-        std::lock_guard lock(callExecutorLock_);  // temporary solution
-
         if (!contract.transaction.is_valid() || !contract.deploy.is_valid()) {
             return std::nullopt;
         }
@@ -2491,16 +2487,6 @@ namespace executor {
         // get deploy transaction
         const csdb::Transaction& deployTrxn = contract.deploy;
         const auto isdeploy = (contract.deploy.id() == contract.transaction.id()); // isDeploy(contract.transaction);
-        //if (!isdeploy) {  // execute
-        //    const auto optDeployId = getDeployTrxn(smartTarget);
-        //    if (!optDeployId.has_value()) {
-        //        return std::nullopt;
-        //    }
-        //    deployTrxn = loadTransactionApi(optDeployId.value());
-        //}
-        //else {
-        //    deployTrxn = contract.transaction;
-        //}
 
         // fill smartContractBinary
         const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
@@ -2587,14 +2573,9 @@ namespace executor {
             return {};
         }
 
-        //const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
-
         // fill res
         ExecuteResult res;
         res.response = optOriginRes.value().resp.status;
-
-        //if (optInnerTransactions.has_value())
-        //    res.trxns = optInnerTransactions.value();
 
         deleteInnerSendTransactions(optOriginRes.value().acceessId);
         res.selfMeasuredCost = static_cast<long>(optOriginRes.value().timeExecute);
@@ -2640,13 +2621,13 @@ namespace executor {
             access_id = generateAccessId(explicit_sequence);
         }
 
-        //const auto access_id = generateAccessId();
         ++execCount_;
 
         const auto timeBeg = std::chrono::steady_clock::now();
 
         try {
             std::shared_lock lock(sharedErrorMutex_);
+            std::lock_guard lock(callExecutorLock_);
             origExecutor_->executeByteCode(originExecuteRes.resp, static_cast<general::AccessID>(access_id), address, smartContractBinary, methodHeader, EXECUTION_TIME, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::transport::TTransportException& x) {
