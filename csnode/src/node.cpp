@@ -190,13 +190,17 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     cswarning() << "-----------------------------------------------------------";
     cswarning() << "NODE> BigBang #" << rNum << ": last written #" << blockChain_.getLastSeq() << ", current #" << conveyer.currentRoundNumber();
     cswarning() << "-----------------------------------------------------------";
+
     istream_.init(data, size);
+
     uint8_t tmp = 0;
     istream_ >> tmp;
+
     if (tmp <= recdBangs[rNum] && !(tmp < Consensus::MaxSubroundDelta && recdBangs[rNum] > std::numeric_limits<uint8_t>::max() - Consensus::MaxSubroundDelta)) {
         cswarning() << "Old Big Bang received: " << rNum << "." << static_cast<int>(tmp) << " is <= " << rNum << "." << static_cast<int>(recdBangs[rNum]);
         return;
     }
+
     subRound_ = tmp;
 
     // cache
@@ -226,7 +230,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         if (countRemoved == 0) {
             // the 1st time
             csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
-			blockChain_.setBlocksToBeRemoved(lastSequence - rNum  + 1);
+            blockChain_.setBlocksToBeRemoved(lastSequence - rNum  + 1);
         }
 
         blockChain_.removeLastBlock();
@@ -269,10 +273,12 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
     istream_.init(data, size);
+
     if (cs::Conveyer::instance().currentRoundNumber() != 0) {
         csdebug() << "The RoundTable sent by SS doesn't correspond to the current RoundNumber";
         return;
     }
+
     cslog() << "NODE> get SS Round Table #" << rNum;
 
     cs::RoundTable roundTable;
@@ -281,11 +287,12 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
         cserror() << "NODE> read round data from SS failed, continue without round table";
     }
 
-	cs::Sequence lastSequence = blockChain_.getLastSeq();
-	if (lastSequence >= rNum) {
-		csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
-		blockChain_.setBlocksToBeRemoved(lastSequence - rNum + 1);
-	}
+    cs::Sequence lastSequence = blockChain_.getLastSeq();
+
+    if (lastSequence >= rNum) {
+        csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+        blockChain_.setBlocksToBeRemoved(lastSequence - rNum + 1);
+    }
 
     // update new round data from SS
     // TODO: fix sub round
