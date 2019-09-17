@@ -511,7 +511,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     csdebug() << "NODE> Time: " << rPackage.poolMetaInfo().timestamp;
 
     if (blockChain_.getLastSeq() > rPackage.poolMetaInfo().sequenceNumber) {
-        csmeta(cswarning) << "blockChain last seq: " << blockChain_.getLastSeq() 
+        csmeta(cswarning) << "blockChain last seq: " << blockChain_.getLastSeq()
             << " > pool meta info seq: " << rPackage.poolMetaInfo().sequenceNumber;
         return;
     }
@@ -524,11 +524,28 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         csmeta(cserror) << "Created pool is not valid";
         return;
     }
+
 //    solver_->uploadNewStates(conveyer.uploadNewStates());
+
     auto tmp = rPackage.poolSignatures();
     pool.value().set_signatures(tmp);
     pool.value().set_confidants(confidantsReference);
+    auto tmpPool = solver_->getDeferredBlock().clone();
+    if (tmpPool.is_valid() && tmpPool.sequence() == round) {
+        auto tmp = rPackage.poolSignatures();
+        tmpPool.set_signatures(tmp);
+        csdebug() << "Signatures " << tmp.size() << " were added to the pool: " << tmpPool.signatures().size();
+        auto resPool = getBlockChain().createBlock(tmpPool);
 
+        if (resPool.has_value()) {
+            csdebug() << "(From getCharacteristic): " << "The stored properly";
+            return;
+        }
+        else {
+            cserror() << "(From getCharacteristic): " << "Blockchain failed to write new block, it will do it later when get proper data";
+        }
+
+    }
     if (round != 0) {
         auto confirmation = confirmationList_.find(round);
         if (confirmation.has_value()) {
