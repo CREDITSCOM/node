@@ -152,13 +152,18 @@ int main(int argc, char* argv[]) {
 
     using namespace boost::program_options;
     options_description desc("Allowed options");
-    desc.add_options()("help", "produce this message")("recreate-index", "recreate index.db")("seed", "enter with seed instead of keys")(
-        "version", "show node version")("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")(
-        "config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")")(
-        "public-key-file", po::value<std::string>(), "path to public key file (default: \"NodePublic.txt\")")("private-key-file", po::value<std::string>(),
-                                                                                                              "path to private key file (default: \"NodePrivate.txt\")")(
-        "dumpkeys", po::value<std::string>(), "dump your public and private keys into a JSON file with the specified name (UNENCRYPTED!)")(
-        "encryptkey", "encrypts the private key with password upon startup (if not yet encrypted)");
+    desc.add_options()
+        ("help", "produce this message")
+        ("recreate-index", "recreate index.db")
+        ("seed", "enter with seed instead of keys")
+        ("set-bc-top", po::value<uint64_t>(), "all blocks in blockchain with higher sequence will be removed")
+        ("version", "show node version")
+        ("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")
+        ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")")
+        ("public-key-file", po::value<std::string>(), "path to public key file (default: \"NodePublic.txt\")")
+        ("private-key-file", po::value<std::string>(), "path to private key file (default: \"NodePrivate.txt\")")
+        ("dumpkeys", po::value<std::string>(), "dump your public and private keys into a JSON file with the specified name (UNENCRYPTED!)")
+        ("encryptkey", "encrypts the private key with password upon startup (if not yet encrypted)");
 
     variables_map vm;
     try {
@@ -240,6 +245,12 @@ int main(int argc, char* argv[]) {
 
     if (!node.isGood()) {
         panic();
+    }
+
+    if (vm.count("set-bc-top")) {
+        node.stop();
+        logger::cleanup();
+        std::_Exit(EXIT_SUCCESS);
     }
 
     std::cout << "Running Node\n";

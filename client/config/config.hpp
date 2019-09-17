@@ -183,6 +183,14 @@ public:
         return alwaysExecuteContracts_;
     }
 
+    bool newBlockchainTop() const {
+        return newBlockchainTop_;
+    }
+
+    uint64_t newBlockchainTopSeq() const {
+        return newBlockchainTopSeq_;
+    }
+
     uint64_t observerWaitTime() const {
         return observerWaitTime_;
     }
@@ -247,6 +255,9 @@ private:
 
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
+    bool newBlockchainTop_ = false;
+
+    uint64_t newBlockchainTopSeq_;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
 
