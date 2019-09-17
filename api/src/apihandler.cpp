@@ -2280,7 +2280,6 @@ namespace executor {
     }
 
     std::optional<Executor::ExecuteResult> Executor::executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {
-        std::lock_guard lock(callExecutorLock_);  // temporary solution
 
         if (smarts.empty()) {
             return std::nullopt;
@@ -2299,8 +2298,13 @@ namespace executor {
             }
         }
 
-        auto smartSource = blockchain_.getAddressByType(source, BlockChain::AddressType::PublicKey);
-        auto smartTarget = blockchain_.getAddressByType(target, BlockChain::AddressType::PublicKey);
+        csdb::Address smartSource;
+        csdb::Address smartTarget;
+        {
+            std::lock_guard lock(callExecutorLock_);  // temporary solution
+            smartSource = blockchain_.getAddressByType(source, BlockChain::AddressType::PublicKey);
+            smartTarget = blockchain_.getAddressByType(target, BlockChain::AddressType::PublicKey);
+        }
 
         // get deploy transaction
         const auto isdeploy = (head_transaction.id() == deployTrxn.id()); //isDeploy(head_transaction);
@@ -2384,6 +2388,7 @@ namespace executor {
             methodHeader.push_back(header);
         }
 
+        std::lock_guard lock(callExecutorLock_);  // temporary solution
         const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeader, false /*isGetter*/, smarts[0].sequence /*sequence*/);
 
         for (const auto& smart : smarts) {
@@ -2441,27 +2446,22 @@ namespace executor {
     }
 
     std::optional<Executor::ExecuteResult> Executor::reexecuteContract(ExecuteTransactionInfo& contract, std::string forceContractState) {
-        std::lock_guard lock(callExecutorLock_);  // temporary solution
 
         if (!contract.transaction.is_valid() || !contract.deploy.is_valid()) {
             return std::nullopt;
         }
-        auto smartSource = blockchain_.getAddressByType(contract.transaction.source(), BlockChain::AddressType::PublicKey);
-        auto smartTarget = blockchain_.getAddressByType(contract.transaction.target(), BlockChain::AddressType::PublicKey);
+
+        csdb::Address smartSource;
+        csdb::Address smartTarget;
+        {
+            std::lock_guard lock(callExecutorLock_);  // temporary solution
+            smartSource = blockchain_.getAddressByType(contract.transaction.source(), BlockChain::AddressType::PublicKey);
+            smartTarget = blockchain_.getAddressByType(contract.transaction.target(), BlockChain::AddressType::PublicKey);
+        }
 
         // get deploy transaction
         const csdb::Transaction& deployTrxn = contract.deploy;
-        const auto isdeploy = (contract.deploy.id() == contract.transaction.id()); // isDeploy(contract.transaction);
-        //if (!isdeploy) {  // execute
-        //    const auto optDeployId = getDeployTrxn(smartTarget);
-        //    if (!optDeployId.has_value()) {
-        //        return std::nullopt;
-        //    }
-        //    deployTrxn = loadTransactionApi(optDeployId.value());
-        //}
-        //else {
-        //    deployTrxn = contract.transaction;
-        //}
+        const auto isdeploy = (contract.deploy.id() == contract.transaction.id());
 
         // fill smartContractBinary
         const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
@@ -2530,6 +2530,7 @@ namespace executor {
         }
         methodHeader.push_back(header);
 
+        std::lock_guard lock(callExecutorLock_);  // temporary solution
         const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeader, false /*! isGetter*/, contract.sequence);
 
         if (!isdeploy) {
