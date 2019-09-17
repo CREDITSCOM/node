@@ -1426,15 +1426,16 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     iPackStream_ >> id >> lastSeq >> pk;
 
 #if defined(PING_WITH_BCHID)
-    uint64_t remote_bch_uuid = 0;
-        iPackStream_ >> remote_bch_uuid;
-        uint64_t local_bch_uuid = node_->getBlockChain().uuid();
-        if (local_bch_uuid != 0 && remote_bch_uuid != 0) {
-            if (local_bch_uuid != remote_bch_uuid) {
-                // remote is incompatible
-                return false;
-            }
+    uint64_t remoteUuid = 0;
+    iPackStream_ >> remoteUuid;
+
+    auto uuid = node_->getBlockChain().uuid();
+
+    if (uuid != 0 && remoteUuid != 0) {
+        if (uuid != remoteUuid) {
+            return false;   // remote is incompatible
         }
+    }
 #endif
 
     if (!iPackStream_.good() || !iPackStream_.end()) {
