@@ -220,8 +220,13 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         return;
     }
 
+    if (stat_.isLastRoundTooLong()) {
+        poolSynchronizer_->sync(globalTable.round, 1, true);
+    }
+
     solver_->resetGrayList();
     roundPackageCache_.clear();
+
     // this evil code sould be removed after examination
     cs::Sequence countRemoved = 0;
     cs::Sequence lastSequence = blockChain_.getLastSeq();
