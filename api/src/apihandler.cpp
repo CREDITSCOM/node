@@ -2626,8 +2626,8 @@ namespace executor {
         const auto timeBeg = std::chrono::steady_clock::now();
 
         try {
-            std::shared_lock lock(sharedErrorMutex_);
-            std::lock_guard lock2(callExecutorLock_);
+            std::shared_lock sharedLock(sharedErrorMutex_);
+            std::lock_guard lock(callExecutorLock_);
             origExecutor_->executeByteCode(originExecuteRes.resp, static_cast<general::AccessID>(access_id), address, smartContractBinary, methodHeader, EXECUTION_TIME, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::transport::TTransportException& x) {
