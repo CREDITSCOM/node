@@ -1029,6 +1029,21 @@ bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallDa
     return findWalletData_Unsafe(id, wallData);
 }
 
+bool BlockChain::getWalletData(const csdb::Address& address, WalletData& wallData) const {
+    if (address.is_wallet_id()) {
+        return findWalletData(address.wallet_id(), wallData);
+    }
+
+    std::lock_guard lock(cacheMutex_);
+
+    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(address.public_key());
+    if (wallDataPtr) {
+        wallData = *wallDataPtr;
+        return true;
+    }
+    return false;
+}
+
 bool BlockChain::findWalletData(WalletId id, WalletData& wallData) const {
     std::lock_guard lock(cacheMutex_);
     return findWalletData_Unsafe(id, wallData);
