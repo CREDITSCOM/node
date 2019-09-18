@@ -132,7 +132,7 @@ void APIHandler::WalletDataGet(WalletDataGetResult& _return, const general::Addr
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
     if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
-        if (!s_blockchain.getWalletData(addr, wallData)) { // **
+        if (!s_blockchain.findWalletData(addr, wallData)) { // **
             return;
         }
     }
@@ -161,7 +161,7 @@ void APIHandler::WalletIdGet(api::WalletIdGetResult& _return, const general::Add
 void APIHandler::WalletTransactionsCountGet(api::WalletTransactionsCountGetResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
-    if (!s_blockchain.getWalletData(addr, wallData)) {
+    if (!s_blockchain.findWalletData(addr, wallData)) {
         SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
         return;
     }
@@ -172,7 +172,7 @@ void APIHandler::WalletTransactionsCountGet(api::WalletTransactionsCountGetResul
 void APIHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
-    if (!s_blockchain.getWalletData(addr, wallData)) {
+    if (!s_blockchain.findWalletData(addr, wallData)) {
         return;
     }
     _return.balance.integral = wallData.balance_.integral();
@@ -611,7 +611,7 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
     BlockChain::WalletData dummy{};
 
     if (transaction.__isset.smartContract && !transaction.smartContract.forgetNewState &&  // not for getter
-            !s_blockchain.getWalletData(source, dummy)) {
+            !s_blockchain.findWalletData(source, dummy)) {
         return csdb::Transaction{};
     }
 
@@ -673,7 +673,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
     // check money
     const auto source_addr = s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
     BlockChain::WalletData wallData{};
-    if (!s_blockchain.getWalletData(source_addr, wallData))
+    if (!s_blockchain.findWalletData(source_addr, wallData))
         return "not enough money!";
 
     const auto max_fee = trxn.max_fee().to_double();
@@ -2147,7 +2147,7 @@ void apiexec::APIEXECHandler::SmartContractGet(SmartContractGetResult& _return, 
 void apiexec::APIEXECHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
-    if (!blockchain_.getWalletData(addr, wallData))
+    if (!blockchain_.findWalletData(addr, wallData))
         return;
     _return.balance.integral = wallData.balance_.integral();
     _return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());

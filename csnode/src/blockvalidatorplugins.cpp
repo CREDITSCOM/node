@@ -648,7 +648,7 @@ ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Poo
 
 double AccountBalanceChecker::get_wallet_balance() {
     BlockChain::WalletData data;
-    if (getBlockChain().getWalletData(abs_addr, data)) {
+    if (getBlockChain().findWalletData(abs_addr, data)) {
         return data.balance_.to_double();
     }
     return 0;

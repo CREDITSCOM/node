@@ -1029,7 +1029,7 @@ bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallDa
     return findWalletData_Unsafe(id, wallData);
 }
 
-bool BlockChain::getWalletData(const csdb::Address& address, WalletData& wallData) const {
+bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallData) const {
     if (address.is_wallet_id()) {
         return findWalletData(address.wallet_id(), wallData);
     }

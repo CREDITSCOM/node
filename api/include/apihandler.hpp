@@ -395,7 +395,7 @@ public:
         send_transaction.set_amount(csdb::Amount(transaction.amount.integral, uint64_t(transaction.amount.fraction), WALLET_DENOM));
 
         BlockChain::WalletData dummy{};
-        if (!blockchain_.getWalletData(source, dummy))
+        if (!blockchain_.findWalletData(source, dummy))
             return csdb::Transaction{}; // disable transaction from unknown source!
 
         send_transaction.set_currency(csdb::Currency(1));

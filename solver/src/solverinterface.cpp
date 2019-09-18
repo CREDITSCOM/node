@@ -70,7 +70,7 @@ bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
         return true;
     }
     BlockChain::WalletData wData;
-    pnode->getBlockChain().getWalletData(csdb::Address::from_public_key(sender), wData);
+    pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(sender), wData);
     if (wData.balance_ < Consensus::MinStakeValue) {
         return false;
     }
