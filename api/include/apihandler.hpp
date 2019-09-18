@@ -393,11 +393,10 @@ public:
         const auto source = BlockChain::getAddressFromKey(transaction.source);
         const uint64_t WALLET_DENOM = csdb::Amount::AMOUNT_MAX_FRACTION;  // 1'000'000'000'000'000'000ull;
         send_transaction.set_amount(csdb::Amount(transaction.amount.integral, uint64_t(transaction.amount.fraction), WALLET_DENOM));
-        BlockChain::WalletData wallData{};
-        BlockChain::WalletId id{};
 
-        if (!blockchain_.findWalletData(source, wallData, id))
-            return csdb::Transaction{};
+        BlockChain::WalletData dummy{};
+        if (!blockchain_.findWalletData(source, dummy))
+            return csdb::Transaction{}; // disable transaction from unknown source!
 
         send_transaction.set_currency(csdb::Currency(1));
         send_transaction.set_source(source);
@@ -463,6 +462,8 @@ public slots:
         if (!isConnected()) {
             connect();
         }
+
+        csdebug() << csname() << "started";
     }
 
     void onExecutorFinished() {
@@ -471,6 +472,8 @@ public slots:
                 runProcess();
             });
         }
+
+        csdebug() << csname() << "finished";
     }
 
     void onExecutorProcessError(const cs::ProcessException& exception) {
@@ -654,7 +657,6 @@ private:
 
     const int16_t EXECUTOR_VERSION = 2;
 
-    // temporary solution?
     std::mutex callExecutorLock_;
 };
 }  // namespace executor

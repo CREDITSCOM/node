@@ -554,11 +554,22 @@ bool DatabaseBerkeleyDB::truncateTransIndex() {
     if (!db_trans_idx_) {
         return false;
     }
-    int status = db_trans_idx_->truncate(nullptr, nullptr, 0);
+
+    db_trans_idx_.reset();
+    int status = env_.dbremove(nullptr, "index.db", nullptr, 0);
+
+    if (!status) {
+        auto db_trans_idx = new Db(&env_, 0);
+        status = db_trans_idx->open(nullptr, "index.db", nullptr, DB_BTREE, DB_CREATE, 0);
+        db_trans_idx_.reset(db_trans_idx);
+    }
+
     if (status) {
         set_last_error_from_berkeleydb(status);
         return false;
     }
+
+    set_last_error();
     return true;
 }
 

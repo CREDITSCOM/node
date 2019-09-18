@@ -99,6 +99,13 @@ bool Node::init(const Config& config) {
     solver_->init(nodeIdKey_, nodeIdPrivate_);
     solver_->startDefault();
 
+    if (config.newBlockchainTop()) {
+        if (!blockChain_.init(config.getPathToDB(), config.newBlockchainTopSeq())) {
+            return false;
+        }
+        return true;
+    }
+
     if (!blockChain_.init(config.getPathToDB())) {
         return false;
     }
@@ -190,13 +197,17 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     cswarning() << "-----------------------------------------------------------";
     cswarning() << "NODE> BigBang #" << rNum << ": last written #" << blockChain_.getLastSeq() << ", current #" << conveyer.currentRoundNumber();
     cswarning() << "-----------------------------------------------------------";
+
     istream_.init(data, size);
+
     uint8_t tmp = 0;
     istream_ >> tmp;
+
     if (tmp <= recdBangs[rNum] && !(tmp < Consensus::MaxSubroundDelta && recdBangs[rNum] > std::numeric_limits<uint8_t>::max() - Consensus::MaxSubroundDelta)) {
         cswarning() << "Old Big Bang received: " << rNum << "." << static_cast<int>(tmp) << " is <= " << rNum << "." << static_cast<int>(recdBangs[rNum]);
         return;
     }
+
     subRound_ = tmp;
 
     // cache
@@ -216,8 +227,13 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         return;
     }
 
+    if (stat_.isLastRoundTooLong()) {
+        poolSynchronizer_->sync(globalTable.round, 1, true);
+    }
+
     solver_->resetGrayList();
     roundPackageCache_.clear();
+
     // this evil code sould be removed after examination
     cs::Sequence countRemoved = 0;
     cs::Sequence lastSequence = blockChain_.getLastSeq();
@@ -226,7 +242,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         if (countRemoved == 0) {
             // the 1st time
             csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
-			blockChain_.setBlocksToBeRemoved(lastSequence - rNum  + 1);
+            blockChain_.setBlocksToBeRemoved(lastSequence - rNum  + 1);
         }
 
         blockChain_.removeLastBlock();
@@ -269,10 +285,12 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
     istream_.init(data, size);
+
     if (cs::Conveyer::instance().currentRoundNumber() != 0) {
         csdebug() << "The RoundTable sent by SS doesn't correspond to the current RoundNumber";
         return;
     }
+
     cslog() << "NODE> get SS Round Table #" << rNum;
 
     cs::RoundTable roundTable;
@@ -281,11 +299,12 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
         cserror() << "NODE> read round data from SS failed, continue without round table";
     }
 
-	cs::Sequence lastSequence = blockChain_.getLastSeq();
-	if (lastSequence >= rNum) {
-		csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
-		blockChain_.setBlocksToBeRemoved(lastSequence - rNum + 1);
-	}
+    cs::Sequence lastSequence = blockChain_.getLastSeq();
+
+    if (lastSequence >= rNum) {
+        csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+        blockChain_.setBlocksToBeRemoved(lastSequence - rNum + 1);
+    }
 
     // update new round data from SS
     // TODO: fix sub round
@@ -504,7 +523,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     csdebug() << "NODE> Time: " << rPackage.poolMetaInfo().timestamp;
 
     if (blockChain_.getLastSeq() > rPackage.poolMetaInfo().sequenceNumber) {
-        csmeta(cswarning) << "blockChain last seq: " << blockChain_.getLastSeq() 
+        csmeta(cswarning) << "blockChain last seq: " << blockChain_.getLastSeq()
             << " > pool meta info seq: " << rPackage.poolMetaInfo().sequenceNumber;
         return;
     }
@@ -517,11 +536,28 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         csmeta(cserror) << "Created pool is not valid";
         return;
     }
+
 //    solver_->uploadNewStates(conveyer.uploadNewStates());
+
     auto tmp = rPackage.poolSignatures();
     pool.value().set_signatures(tmp);
     pool.value().set_confidants(confidantsReference);
+    auto tmpPool = solver_->getDeferredBlock().clone();
+    if (tmpPool.is_valid() && tmpPool.sequence() == round) {
+        auto tmp = rPackage.poolSignatures();
+        tmpPool.set_signatures(tmp);
+        csdebug() << "Signatures " << tmp.size() << " were added to the pool: " << tmpPool.signatures().size();
+        auto resPool = getBlockChain().createBlock(tmpPool);
 
+        if (resPool.has_value()) {
+            csdebug() << "(From getCharacteristic): " << "The stored properly";
+            return;
+        }
+        else {
+            cserror() << "(From getCharacteristic): " << "Blockchain failed to write new block, it will do it later when get proper data";
+        }
+
+    }
     if (round != 0) {
         auto confirmation = confirmationList_.find(round);
         if (confirmation.has_value()) {
@@ -2972,7 +3008,7 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
     if (!blockValidator_->validateBlock(block,
         cs::BlockValidator::ValidationLevel::hashIntergrity
             /*| cs::BlockValidator::ValidationLevel::smartStates*/
-            /*| cs::BlockValidator::ValidationLevel::accountBalance */,
+            | cs::BlockValidator::ValidationLevel::accountBalance,
         cs::BlockValidator::SeverityLevel::onlyFatalErrors)) {
         *shouldStop = true;
         return;

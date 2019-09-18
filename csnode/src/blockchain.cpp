@@ -124,7 +124,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 BlockChain::~BlockChain() {
 }
 
-bool BlockChain::init(const std::string& path) {
+bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
     cslog() << "Trying to open DB...";
 
     size_t totalLoaded = 0;
@@ -137,9 +137,13 @@ bool BlockChain::init(const std::string& path) {
         return false;
     };
 
-    if (!storage_.open(path, progress)) {
+    if (!storage_.open(path, progress, newBlockchainTop)) {
         cserror() << "Couldn't open database at " << path;
         return false;
+    }
+
+    if (newBlockchainTop != cs::kWrongSequence) {
+        return true;
     }
 
     cslog() << "\rDB is opened, loaded " << WithDelimiters(totalLoaded) << " blocks";
@@ -189,13 +193,17 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
     auto blockSeq = block.sequence();
     lastSequence_ = blockSeq;
     if (blockSeq == 0 && recreateIndex_) {
-      cs::Lock lock(dbLock_);
-      storage_.truncate_trxs_index();
+        cs::Lock lock(dbLock_);
+        if (!storage_.truncate_trxs_index()) {
+            cserror() << "Can't truncate trxs index";
+            *shouldStop = true;
+            return;
+        }
     }
     if (blockSeq == 1) {
-      cs::Lock lock(dbLock_);
-      uuid_ = uuidFromBlock(block);
-      csdebug() << "Blockchain: UUID = " << uuid_;
+        cs::Lock lock(dbLock_);
+        uuid_ = uuidFromBlock(block);
+        csdebug() << "Blockchain: UUID = " << uuid_;
     }
 
     if (!updateWalletIds(block, *walletsCacheUpdater_.get())) {
@@ -1021,6 +1029,21 @@ bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallDa
     return findWalletData_Unsafe(id, wallData);
 }
 
+bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallData) const {
+    if (address.is_wallet_id()) {
+        return findWalletData(address.wallet_id(), wallData);
+    }
+
+    std::lock_guard lock(cacheMutex_);
+
+    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(address.public_key());
+    if (wallDataPtr) {
+        wallData = *wallDataPtr;
+        return true;
+    }
+    return false;
+}
+
 bool BlockChain::findWalletData(WalletId id, WalletData& wallData) const {
     std::lock_guard lock(cacheMutex_);
     return findWalletData_Unsafe(id, wallData);
@@ -1288,6 +1311,8 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         setTransactionsFees(pool);
 
         // update wallet ids
+        // it should be done before check pool's signature,
+        // because it can change pool's binary representation
         if (bySync) {
             // ready-to-record block does not require anything
             csdebug() << "BLOCKCHAIN> store block #" << poolSequence << " to chain, update wallets ids";
@@ -1308,9 +1333,14 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         }
 
         csdebug() << "BLOCKCHAIN> failed to store block #" << poolSequence << " to chain";
-		if (poolSequence == lastSequence_) {
-			removeLastBlock();
-		}
+
+        // no need to perform removeLastBlock() as we've updated only wallet ids
+        removeWalletsInPoolFromCache(pool);
+
+        if (lastSequence_ == poolSequence) {
+            --lastSequence_;
+            deferredBlock_ = csdb::Pool{};
+        }
 
         return false;
     }

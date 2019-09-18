@@ -103,6 +103,8 @@ public:
     void gotStageTwoRequest(uint8_t requester, uint8_t required);
     void gotStageThreeRequest(uint8_t requester, uint8_t required /*, uint8_t iteration*/);
 
+    csdb::Pool& getDeferredBlock();
+
     void removeDeferredBlock(cs::Sequence);
     bool realTrustedChanged() const;
     void adjustStageThreeStorage();

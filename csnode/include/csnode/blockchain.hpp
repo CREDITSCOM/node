@@ -11,8 +11,6 @@
 #include <iostream>
 #include <string>
 
-#include <boost/dynamic_bitset.hpp>
-
 #include <csdb/address.hpp>
 #include <csdb/amount.hpp>
 #include <csdb/amount_commission.hpp>
@@ -53,7 +51,6 @@ public:
     using WalletId = csdb::internal::WalletId;
     using WalletAddress = csdb::Address;
     using WalletData = cs::WalletsCache::WalletData;
-    using Mask = boost::dynamic_bitset<uint64_t>;
 
     enum class AddressType {
         PublicKey,
@@ -64,7 +61,8 @@ public:
                         bool recreateIndex = false);
     ~BlockChain();
 
-    bool init(const std::string& path);
+    bool init(const std::string& path,
+              cs::Sequence newBlockchainTop = cs::kWrongSequence);
     bool isGood() const;
 
     // return unique id of database if at least one unique block has written, otherwise (only genesis block) 0
@@ -242,6 +240,7 @@ public:
 
     bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
     bool findWalletData(WalletId id, WalletData& wallData) const;
+    bool findWalletData(const csdb::Address&, WalletData& wallData) const;
     bool findWalletId(const WalletAddress& address, WalletId& id) const;
     // wallet transactions: pools cache + db search
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);

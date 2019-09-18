@@ -514,6 +514,10 @@ bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) 
     return true;
 }
 
+csdb::Pool& SolverCore::getDeferredBlock() {
+    return deferredBlock_;
+}
+
 void SolverCore::updateLastPackageSignatures() {
 
     justCreatedRoundPackage.updatePoolSignatures(lastSentSignatures_.poolSignatures);

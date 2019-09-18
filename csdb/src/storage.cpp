@@ -412,6 +412,26 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
         return false;
     }
 
+    if (opt.newBlockchainTop != cs::kWrongSequence) {
+        auto seqToRemove = opt.newBlockchainTop + 1;
+
+        while (true) {
+            cs::Bytes poolBinary;
+            if (!d->db->get(seqToRemove++, &poolBinary)) {
+                break;
+            }
+            auto pool = csdb::Pool::from_binary(std::move(poolBinary));
+            if (!pool.is_valid()) {
+                break;
+            }
+            if (!d->db->remove(pool.hash().to_binary())) {
+                break;
+            }
+        }
+
+        return true;
+    }
+
     if (!d->rescan(callback)) {
         d->db.reset();
         return false;
@@ -421,7 +441,7 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
     return true;
 }
 
-bool Storage::open(const ::std::string& path_to_base, OpenCallback callback) {
+bool Storage::open(const ::std::string& path_to_base, OpenCallback callback, cs::Sequence newBlockchainTop) {
     ::std::string path{path_to_base};
     if (path.empty()) {
         path = ::csdb::internal::app_data_path() + "/CREDITS";
@@ -432,7 +452,7 @@ bool Storage::open(const ::std::string& path_to_base, OpenCallback callback) {
 
     d->write_thread = std::thread(&Storage::priv::write_routine, d.get());
 
-    return open(OpenOptions{db}, callback);
+    return open(OpenOptions{db, newBlockchainTop}, callback);
 }
 
 void Storage::close() {

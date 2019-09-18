@@ -70,8 +70,7 @@ bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
         return true;
     }
     BlockChain::WalletData wData;
-    BlockChain::WalletId wId;
-    pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(sender), wData, wId);
+    pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(sender), wData);
     if (wData.balance_ < Consensus::MinStakeValue) {
         return false;
     }
@@ -79,6 +78,7 @@ bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
 }
 
 void SolverCore::addToGraylist(const cs::PublicKey & sender, uint32_t rounds) {
+
     if (grayList_.find(sender) == grayList_.cend()) {
         grayList_.emplace(sender, rounds);
         csdebug() << "Node " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " is in gray list now";
@@ -170,9 +170,36 @@ void SolverCore::nextRound(bool updateRound) {
 
 void SolverCore::gotStageOne(const cs::StageOne& stage) {
     if (find_stage1(stage.sender) != nullptr) {
+        uint64_t lastTimeStamp, currentTimeStamp;
+        uint8_t sender = stage.sender;
+        try {
+            lastTimeStamp = std::stoll(find_stage1(stage.sender)->roundTimeStamp);
+        }
+        catch (...) {
+            csdebug() << __func__ << ": last stage-1 from " << static_cast<int>(stage.sender) << " Timestamp was announced as zero";
+            auto it = std::find_if(stageOneStorage.begin(), stageOneStorage.end(), [sender](cs::StageOne& st) { return st.sender == sender;});
+            stageOneStorage.erase(it);
+            //erase this stage
+        }
+
+        try {
+            currentTimeStamp = std::stoll(stage.roundTimeStamp);
+        }
+        catch (...) {
+            csdebug() << __func__ << ": current stage-1 from " << static_cast<int>(stage.sender) << " Timestamp was announced as zero";
+            return;
+        }
         // duplicated
-        return;
+        if (currentTimeStamp > lastTimeStamp) {
+            auto it = std::find_if(stageOneStorage.begin(), stageOneStorage.end(), [sender](cs::StageOne& st) { return st.sender == sender; });
+            stageOneStorage.erase(it);
+        }
+        else {
+            return;
+        }
     }
+
+
     stageOneStorage.push_back(stage);
     csdebug() << "SolverCore: <-- stage-1 [" << static_cast<int>(stage.sender) << "] = " << stageOneStorage.size();
 

@@ -595,7 +595,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
     if (characteristic.mask.size() != newPool.transactions_count()) {
         cslog() << "\tCharacteristic size: " << characteristic.mask.size() << ", new pool transactions count: " << newPool.transactions_count();
-        cswarning() << "\tSome of transactions is not valid";
+        cswarning() << "\tSome transactions are not valid";
     }
 
     csdebug() << "\tsequence = " << metaPoolInfo.sequenceNumber;
