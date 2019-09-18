@@ -1311,6 +1311,8 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         setTransactionsFees(pool);
 
         // update wallet ids
+        // it should be done before check pool's signature,
+        // because it can change pool's binary representation
         if (bySync) {
             // ready-to-record block does not require anything
             csdebug() << "BLOCKCHAIN> store block #" << poolSequence << " to chain, update wallets ids";
@@ -1331,9 +1333,14 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         }
 
         csdebug() << "BLOCKCHAIN> failed to store block #" << poolSequence << " to chain";
-		if (poolSequence == lastSequence_) {
-			removeLastBlock();
-		}
+
+        // no need to perform removeLastBlock() as we've updated only wallet ids
+        removeWalletsInPoolFromCache(pool);
+
+        if (lastSequence_ == poolSequence) {
+            --lastSequence_;
+            deferredBlock_ = csdb::Pool{};
+        }
 
         return false;
     }
