@@ -1194,11 +1194,21 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
 }
 
 template <typename Mapper>
-size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out) {
+size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out, int64_t offset, int64_t limit) {
     auto locked_deployed_by_creator = lockedReference(this->deployed_by_creator);
     auto& elt = (*locked_deployed_by_creator)[deployer];
-    for (const auto& trid : elt) {
-        auto tr = executor_.loadTransactionApi(trid);
+
+    if (offset >= elt.size()) { // Offset is more than number of smart!"
+        return 0;
+    }
+    if (offset + limit > elt.size())
+        limit = elt.size() - offset;
+    if (offset == limit == 0)
+        limit = elt.size();
+
+    auto begIt = elt.begin() + offset;
+    for (auto trid = begIt; trid != begIt + limit && trid != elt.end(); ++trid) {
+        auto tr = executor_.loadTransactionApi(*trid);
         if (cs::SmartContracts::get_contract_state(s_blockchain, tr.target()).empty())
             continue;
         auto smart = fetch_smart_body(tr);
@@ -1208,12 +1218,12 @@ size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper 
     return elt.size();
 }
 
-void APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer) {
+void APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer, const int64_t offset, const int64_t limit) {
     const csdb::Address addr = BlockChain::getAddressFromKey(deployer);
 
     _return.count = static_cast<decltype(_return.count)>(getMappedDeployerSmart(addr, [](const api::SmartContract& smart) {
         return smart;
-    }, _return.smartContractsList));
+    }, _return.smartContractsList, offset, limit));
 
     if(_return.smartContractsList.empty())
         SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
@@ -2243,7 +2253,7 @@ namespace executor {
             }
         }
     }
-
+        
     std::optional<Executor::ExecuteResult> Executor::executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {       
         if (smarts.empty()) {
             return std::nullopt;
