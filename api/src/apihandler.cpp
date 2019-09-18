@@ -131,9 +131,12 @@ void APIHandler::WalletDataGet(WalletDataGetResult& _return, const general::Addr
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(addr, wallData, wallId))
-        return;
-    _return.walletData.walletId = wallId;
+    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
+        if (!s_blockchain.getWalletData(addr, wallData)) { // **
+            return;
+        }
+    }
+    _return.walletData.walletId = wallId; // may be default value if **
     _return.walletData.balance.integral = wallData.balance_.integral();
     _return.walletData.balance.fraction = static_cast<decltype(_return.walletData.balance.fraction)>(wallData.balance_.fraction());
     const cs::TransactionsTail& tail = wallData.trxTail_;
@@ -158,8 +161,7 @@ void APIHandler::WalletIdGet(api::WalletIdGetResult& _return, const general::Add
 void APIHandler::WalletTransactionsCountGet(api::WalletTransactionsCountGetResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
+    if (!s_blockchain.getWalletData(addr, wallData)) {
         SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
         return;
     }
@@ -170,8 +172,7 @@ void APIHandler::WalletTransactionsCountGet(api::WalletTransactionsCountGetResul
 void APIHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
+    if (!s_blockchain.getWalletData(addr, wallData)) {
         return;
     }
     _return.balance.integral = wallData.balance_.integral();
@@ -607,11 +608,10 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
     const auto source = BlockChain::getAddressFromKey(transaction.source);
     const uint64_t WALLET_DENOM = csdb::Amount::AMOUNT_MAX_FRACTION;  // 1'000'000'000'000'000'000ull;
     send_transaction.set_amount(csdb::Amount(transaction.amount.integral, transaction.amount.fraction, WALLET_DENOM));
-    BlockChain::WalletData wallData{};
-    BlockChain::WalletId id{};
+    BlockChain::WalletData dummy{};
 
     if (transaction.__isset.smartContract && !transaction.smartContract.forgetNewState &&  // not for getter
-            !s_blockchain.findWalletData(source, wallData, id)) {
+            !s_blockchain.getWalletData(source, dummy)) {
         return csdb::Transaction{};
     }
 
@@ -673,8 +673,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
     // check money
     const auto source_addr = s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
     BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(source_addr, wallData, wallId))
+    if (!s_blockchain.getWalletData(source_addr, wallData))
         return "not enough money!";
 
     const auto max_fee = trxn.max_fee().to_double();
@@ -1342,60 +1341,6 @@ void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& /* obsolet
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const general::Address& address, const std::vector<int64_t>& v) {
     csunused(v);
     csunused(address);
-#if 0
-    const csdb::Address addr = BlockChain::getAddressFromKey(address);
-    for (auto inner_id : v) {
-        csdb::Transaction transactionTmp;
-        BlockChain::WalletData wallData{};
-        BlockChain::WalletId wallId{};
-        inner_id &= 0x3fffffffffff;
-        bool finish_for_idx = false;
-        if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
-            SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
-            return;
-        }
-        auto addr_id = csdb::Address::from_wallet_id(wallId);
-        if (s_blockchain.getTransaction(addr_id, inner_id, transactionTmp)) {// find in blockchain
-            _return.states[inner_id] = VALID;
-        }
-        else {
-            cs::Conveyer& conveyer = cs::Conveyer::instance();
-            auto lock = conveyer.lock();
-            for (decltype(auto) it : conveyer.packetQueue()) {
-                const auto& transactions = it.transactions();
-                for (decltype(auto) transaction : transactions) {
-                    if (transaction.innerID() == inner_id) {
-                        _return.states[inner_id] = INPROGRESS;
-                        finish_for_idx = true;
-                        break;
-                    }
-                }
-            }
-            if (!finish_for_idx) {
-                decltype(auto) m_hash_tb = conveyer.transactionsPacketTable();  // find in hash table
-                for (decltype(auto) it : m_hash_tb) {
-                    const auto& transactions = it.second.transactions();
-                    for (decltype(auto) transaction : transactions) {
-                        if (transaction.innerID() == inner_id) {
-                            _return.states[inner_id] = INPROGRESS;
-                            finish_for_idx = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            lock.unlock();
-            if (!finish_for_idx) {                                // if hash table doesn't contain trx return true if in last 5 rounds
-                if (conveyer.isMetaTransactionInvalid(inner_id)) {// trx is invalid (time between del from hash table and add to blockchain)
-                    _return.states[inner_id] = INVALID;
-                }
-                else {
-                    _return.states[inner_id] = VALID;
-                }
-            }
-        }
-    }
-#endif // 0
     _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
     SetResponseStatus(_return.status, APIRequestStatusType::NOT_IMPLEMENTED);
 }
@@ -1403,16 +1348,6 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
 void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, const general::Address& address, const int64_t id) {
     csunused(id);
     csunused(address);
-#if 0
-    csdb::Transaction trx;
-    const csdb::Address addr = BlockChain::getAddressFromKey(address);
-    if (!s_blockchain.getTransaction(addr, id, trx)) {
-        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-        return;
-    }
-    _return.method = convertTransaction(trx).trxn.smartContract.method;
-    _return.params = convertTransaction(trx).trxn.smartContract.params;
-#endif // 0
     SetResponseStatus(_return.status, APIRequestStatusType::NOT_IMPLEMENTED);
 }
 
@@ -2171,14 +2106,6 @@ void apiexec::APIEXECHandler::GetSeed(apiexec::GetSeedResult& _return, const gen
 void apiexec::APIEXECHandler::SendTransaction(apiexec::SendTransactionResult& _return, const general::AccessID accessId, const api::Transaction& transaction) {
     csunused(_return);
     csunused(accessId);
-    // const csdb::Address addr = BlockChain::getAddressFromKey(transaction.source);
-    // BlockChain::WalletData wallData{};
-    // BlockChain::WalletId wallId{};
-    // if (!blockchain_.findWalletData(addr, wallData, wallId)) {
-    //  SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
-    //  return;
-    //}
-    // const_cast<api::Transaction&>(transaction).id = wallData.trxTail_.empty() ? 0 : wallData.trxTail_.getLastTransactionId() + 1;
     executor_.addInnerSendTransaction(accessId, executor_.make_transaction(transaction));
 }
 
@@ -2220,8 +2147,7 @@ void apiexec::APIEXECHandler::SmartContractGet(SmartContractGetResult& _return, 
 void apiexec::APIEXECHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!blockchain_.findWalletData(addr, wallData, wallId))
+    if (!blockchain_.getWalletData(addr, wallData))
         return;
     _return.balance.integral = wallData.balance_.integral();
     _return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());

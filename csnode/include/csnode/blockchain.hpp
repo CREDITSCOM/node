@@ -243,8 +243,8 @@ public:
 
     bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
     bool findWalletData(WalletId id, WalletData& wallData) const;
-    bool findWalletId(const WalletAddress& address, WalletId& id) const;
     bool getWalletData(const csdb::Address&, WalletData& wallData) const;
+    bool findWalletId(const WalletAddress& address, WalletId& id) const;
     // wallet transactions: pools cache + db search
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
 
