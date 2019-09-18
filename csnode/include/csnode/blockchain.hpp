@@ -11,8 +11,6 @@
 #include <iostream>
 #include <string>
 
-#include <boost/dynamic_bitset.hpp>
-
 #include <csdb/address.hpp>
 #include <csdb/amount.hpp>
 #include <csdb/amount_commission.hpp>
@@ -53,7 +51,6 @@ public:
     using WalletId = csdb::internal::WalletId;
     using WalletAddress = csdb::Address;
     using WalletData = cs::WalletsCache::WalletData;
-    using Mask = boost::dynamic_bitset<uint64_t>;
 
     enum class AddressType {
         PublicKey,
