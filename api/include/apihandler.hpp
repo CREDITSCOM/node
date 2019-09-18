@@ -714,7 +714,7 @@ public:
 
     void SmartContractGet(api::SmartContractGetResult& _return, const general::Address& address) override;
 
-    void SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer) override;
+    void SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer, const int64_t offset, const int64_t limit) override;
 
     void SmartContractAddressesListGet(api::SmartContractAddressesListGetResult& _return, const general::Address& deployer) override;
 
@@ -887,7 +887,7 @@ private:
     // bool convertAddrToPublicKey(const csdb::Address& address);
 
     template <typename Mapper>
-    size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out);
+    size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out, int64_t offset = 0, int64_t limit = 0);
 
     bool updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequence sequence);
 
