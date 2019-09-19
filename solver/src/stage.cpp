@@ -87,10 +87,6 @@ namespace cs {
     }
 
 
-    StageOne StageOne::fromBytes(const Bytes bytes) {
-        return StageOne();
-    }
-
     std::string StageOne::toString(const StageOne stage) {
         return (", Hash: " + cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size()) + ", Sender: " + std::to_string(static_cast<int>(stage.sender))
             + ", Cand Amount: " + std::to_string(stage.trustedCandidates.size())
