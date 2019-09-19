@@ -180,6 +180,8 @@ private:
     const cs::Byte* ptr_ = nullptr;
     const cs::Byte* end_ = nullptr;
     bool good_ = false;
+
+    static inline RegionAllocator allocator_ = RegionAllocator{};
 };
 
 class OPackStream {
@@ -559,6 +561,29 @@ inline cs::IPackStream& cs::IPackStream::operator>>(RegionPtr& regionPtr) {
 }
 
 template <>
+inline cs::IPackStream& cs::IPackStream::operator>>(CompressedRegion& region) {
+    std::size_t binarySize = 0;
+    (*this) >> binarySize;
+
+    CompressedRegion::SizeType size = 0;
+    (*this) >> size;
+
+    if (!isBytesAvailable(size)) {
+        good_ = false;
+    }
+    else {
+        RegionPtr regionPtr = allocator_.allocateNext(size);
+
+        std::copy(ptr_, ptr_ + size, reinterpret_cast<char*>(regionPtr->data()));
+        ptr_ += size;
+
+        region = CompressedRegion { std::move(regionPtr), binarySize };
+    }
+
+    return *this;
+}
+
+template <>
 inline cs::OPackStream& cs::OPackStream::operator<<(const ip::address& ip) {
     (*this) << static_cast<cs::Byte>(ip.is_v6());
 
@@ -633,4 +658,14 @@ inline cs::OPackStream& cs::OPackStream::operator<<(const RegionPtr& regionPtr) 
     insertBytes(reinterpret_cast<const char*>(regionPtr->data()), static_cast<uint32_t>(regionPtr->size()));
     return *this;
 }
+
+template <>
+inline cs::OPackStream& cs::OPackStream::operator<<(const CompressedRegion& region) {
+    (*this) << region.binarySize();
+    (*this) << region.size();
+
+    insertBytes(region.data(), region.size());
+    return *this;
+}
+
 #endif  // PACKSTREAM_HPP
