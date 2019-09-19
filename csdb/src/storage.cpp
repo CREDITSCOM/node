@@ -450,7 +450,7 @@ bool Storage::open(const ::std::string& path_to_base, OpenCallback callback, cs:
     auto db{::std::make_shared<::csdb::DatabaseBerkeleyDB>()};
     db->open(path);
 
-    d->write_thread = std::thread(&Storage::priv::write_routine, d.get());
+    //d->write_thread = std::thread(&Storage::priv::write_routine, d.get());
 
     return open(OpenOptions{db, newBlockchainTop}, callback);
 }

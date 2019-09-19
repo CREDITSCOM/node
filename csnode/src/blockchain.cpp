@@ -1380,10 +1380,11 @@ void BlockChain::testCachedBlocks() {
         auto firstBlockInCache = cachedBlocks_.begin();
 
         if ((*firstBlockInCache).first == lastSeq) {
-            csdebug() << "BLOCKCHAIN> Retrieve required block #" << lastSeq << " from cache";
+            cslog() << "BLOCKCHAIN> store block #" << WithDelimiters(lastSeq) << " from cache";
             // retrieve and use block if it is exactly what we need:
 
-            const bool ok = storeBlock((*firstBlockInCache).second.pool, (*firstBlockInCache).second.by_sync);
+            auto data = (*firstBlockInCache).second;
+            const bool ok = storeBlock(data.pool, data.by_sync);
             cachedBlocks_.erase(firstBlockInCache);
             if (!ok) {
                 cserror() << "BLOCKCHAIN> Failed to record cached block to chain, drop it & wait to request again";
