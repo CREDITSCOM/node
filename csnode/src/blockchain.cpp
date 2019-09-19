@@ -1029,6 +1029,21 @@ bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallDa
     return findWalletData_Unsafe(id, wallData);
 }
 
+bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallData) const {
+    if (address.is_wallet_id()) {
+        return findWalletData(address.wallet_id(), wallData);
+    }
+
+    std::lock_guard lock(cacheMutex_);
+
+    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(address.public_key());
+    if (wallDataPtr) {
+        wallData = *wallDataPtr;
+        return true;
+    }
+    return false;
+}
+
 bool BlockChain::findWalletData(WalletId id, WalletData& wallData) const {
     std::lock_guard lock(cacheMutex_);
     return findWalletData_Unsafe(id, wallData);
@@ -1296,6 +1311,8 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         setTransactionsFees(pool);
 
         // update wallet ids
+        // it should be done before check pool's signature,
+        // because it can change pool's binary representation
         if (bySync) {
             // ready-to-record block does not require anything
             csdebug() << "BLOCKCHAIN> store block #" << poolSequence << " to chain, update wallets ids";
@@ -1316,9 +1333,14 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         }
 
         csdebug() << "BLOCKCHAIN> failed to store block #" << poolSequence << " to chain";
-		if (poolSequence == lastSequence_) {
-			removeLastBlock();
-		}
+
+        // no need to perform removeLastBlock() as we've updated only wallet ids
+        removeWalletsInPoolFromCache(pool);
+
+        if (lastSequence_ == poolSequence) {
+            --lastSequence_;
+            deferredBlock_ = csdb::Pool{};
+        }
 
         return false;
     }
@@ -1358,10 +1380,11 @@ void BlockChain::testCachedBlocks() {
         auto firstBlockInCache = cachedBlocks_.begin();
 
         if ((*firstBlockInCache).first == lastSeq) {
-            csdebug() << "BLOCKCHAIN> Retrieve required block #" << lastSeq << " from cache";
+            cslog() << "BLOCKCHAIN> store block #" << WithDelimiters(lastSeq) << " from cache";
             // retrieve and use block if it is exactly what we need:
 
-            const bool ok = storeBlock((*firstBlockInCache).second.pool, (*firstBlockInCache).second.by_sync);
+            auto data = (*firstBlockInCache).second;
+            const bool ok = storeBlock(data.pool, data.by_sync);
             cachedBlocks_.erase(firstBlockInCache);
             if (!ok) {
                 cserror() << "BLOCKCHAIN> Failed to record cached block to chain, drop it & wait to request again";

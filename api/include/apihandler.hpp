@@ -393,11 +393,10 @@ public:
         const auto source = BlockChain::getAddressFromKey(transaction.source);
         const uint64_t WALLET_DENOM = csdb::Amount::AMOUNT_MAX_FRACTION;  // 1'000'000'000'000'000'000ull;
         send_transaction.set_amount(csdb::Amount(transaction.amount.integral, uint64_t(transaction.amount.fraction), WALLET_DENOM));
-        BlockChain::WalletData wallData{};
-        BlockChain::WalletId id{};
 
-        if (!blockchain_.findWalletData(source, wallData, id))
-            return csdb::Transaction{};
+        BlockChain::WalletData dummy{};
+        if (!blockchain_.findWalletData(source, dummy))
+            return csdb::Transaction{}; // disable transaction from unknown source!
 
         send_transaction.set_currency(csdb::Currency(1));
         send_transaction.set_source(source);
@@ -717,7 +716,7 @@ public:
 
     void SmartContractGet(api::SmartContractGetResult& _return, const general::Address& address) override;
 
-    void SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer) override;
+    void SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer, const int64_t offset, const int64_t limit) override;
 
     void SmartContractAddressesListGet(api::SmartContractAddressesListGetResult& _return, const general::Address& deployer) override;
 
@@ -890,7 +889,7 @@ private:
     // bool convertAddrToPublicKey(const csdb::Address& address);
 
     template <typename Mapper>
-    size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out);
+    size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out, int64_t offset = 0, int64_t limit = 0);
 
     bool updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequence sequence);
 
