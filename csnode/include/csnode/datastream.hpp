@@ -568,10 +568,14 @@ inline DataStream& operator>>(DataStream& stream, csdb::Pool& pool) {
 
 template <typename T, typename U>
 inline DataStream& operator>>(DataStream& stream, std::vector<T, U>& entities) {
-    std::size_t size;
+    std::size_t size = 0;
     stream >> size;
 
     if (size == 0) {
+        return stream;
+    }
+
+    if (!stream.isAvailable(size)) {
         return stream;
     }
 
