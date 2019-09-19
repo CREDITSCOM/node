@@ -2,12 +2,14 @@
 #define DATASTREAM_HPP
 
 #include <algorithm>
-#include <csnode/nodecore.hpp>
 #include <exception>
 #include <string>
 #include <type_traits>
 
+#include <csnode/nodecore.hpp>
+
 #include <boost/asio/ip/udp.hpp>
+
 #include <csdb/pool.hpp>
 
 #include <lib/system/common.hpp>
