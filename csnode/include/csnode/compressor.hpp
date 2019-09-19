@@ -18,11 +18,11 @@ public:
     };
 
     static Compression checkCompression(const cs::Byte* data, size_t size) {
-        if (size < 2) {
-            return Compression::None;
-        }
+        return size < 2 ? Compression::None : Compression(*(data));
+    }
 
-        return Compression(*(data));
+    static Compression checkCompression(const CompressedRegion& region) {
+        return checkCompression(region.data(), region.size());
     }
 
     // returns compressed bytes
@@ -41,7 +41,8 @@ public:
         const auto maxSize = LZ4_compressBound(binSize);
 
         auto region = allocator_.allocateNext(static_cast<uint32_t>(byteSizeof_ + maxSize));
-        const int compressedSize = LZ4_compress_default(data, static_cast<char*>(region->data()) + byteSizeof_, binSize, cs::numeric_cast<int>(region->size()) - byteSizeof_);
+        const int compressedSize = LZ4_compress_default(data, static_cast<char*>(region->data()) + byteSizeof_, binSize,
+                                                        cs::numeric_cast<int>(region->size()) - byteSizeof_);
 
         if (!compressedSize) {
             std::copy(data, data + binSize, static_cast<char*>(region->data()) + byteSizeof_);
