@@ -1203,7 +1203,7 @@ size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper 
     }
     if (offset + limit > elt.size())
         limit = elt.size() - offset;
-    if (offset == limit == 0)
+    if (offset == 0 && limit == 0)
         limit = elt.size();
 
     auto begIt = elt.begin() + offset;
