@@ -136,7 +136,6 @@ bool Node::init(const Config& config) {
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
 
     initCurrentRP();
-    maxNeighboursSequence_ = blockChain_.getLastSeq();
 
     return true;
 }
@@ -267,8 +266,6 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     // do not pass further the hashes from unsuccessful round
     csmeta(csdebug) << "Get BigBang globalTable.hashes: " << globalTable.hashes.size();
 
-    maxNeighboursSequence_ = globalTable.round;
-
     conveyer.updateRoundTable(cachedRound, globalTable);
     onRoundStart(globalTable, false);
 
@@ -310,10 +307,6 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
     // TODO: fix sub round
     subRound_ = 0;
     roundTable.round = rNum;
-
-    if (maxNeighboursSequence_ < rNum) {
-        maxNeighboursSequence_ = rNum;
-    }
 
     cs::Conveyer::instance().setRound(rNum);
     cs::Conveyer::instance().setTable(roundTable);
@@ -544,7 +537,6 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     pool.value().set_confidants(confidantsReference);
     auto tmpPool = solver_->getDeferredBlock().clone();
     if (tmpPool.is_valid() && tmpPool.sequence() == round) {
-        auto tmp = rPackage.poolSignatures();
         tmpPool.set_signatures(tmp);
         csdebug() << "Signatures " << tmp.size() << " were added to the pool: " << tmpPool.signatures().size();
         auto resPool = getBlockChain().createBlock(tmpPool);
@@ -973,21 +965,18 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
 
 void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
-    static std::chrono::milliseconds delta{0};
+    static std::chrono::milliseconds delta{ 0 };
 
     auto now = std::chrono::steady_clock::now();
     delta += std::chrono::duration_cast<std::chrono::milliseconds>(now - point);
 
-    if (sequence <= maxNeighboursSequence_) {
-        delta = std::chrono::milliseconds(0);
-    }
-
     if (maxPingSynchroDelay_ <= delta.count()) {
-        delta = std::chrono::milliseconds(0);
         auto lastSequence = blockChain_.getLastSeq();
 
         if (lastSequence < sequence) {
-            cswarning() << "Last sequence is lower than network max sequence, trying to request round table";
+            delta = std::chrono::milliseconds(0);
+            cswarning() << "Local max block " << WithDelimiters(lastSequence) << " is lower than remote one "
+                << WithDelimiters(sequence) << ", trying to request round table";
 
             CallsQueue::instance().insert([=] {
                 roundPackRequest(sender, sequence);
@@ -2282,7 +2271,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
-    poolSynchronizer_->sync(conveyer.currentRoundNumber());
+    cs::RoundNumber delta = (stat_.lastRoundMs() > maxPingSynchroDelay_ ? 1 : cs::PoolSynchronizer::roundDifferentForSync);
+    poolSynchronizer_->sync(conveyer.currentRoundNumber(), delta);
 
     if (poolSynchronizer_->isSyncroStarted()) {
         getCharacteristic(rPackage);
@@ -2409,7 +2399,6 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     
     // update sub round and max heighbours sequence
     subRound_ = rPackage.subRound();
-    maxNeighboursSequence_ = rPackage.roundTable().round;
 
     auto it = recdBangs.begin();
     while (it != recdBangs.end()) {
@@ -2537,7 +2526,6 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     }
     uint64_t lastTimeStamp = std::atoll(getBlockChain().getLastTimeStamp().c_str());
     uint64_t currentTimeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
-    bool cacheAnyway;
     csdebug() << "Got Hash message (" << tmp.size() << "): " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
         << " : " << static_cast<int>(sHash.trustedSize) << " - " << static_cast<int>(sHash.realTrustedSize);
     if (!roundPackageCache_.empty()) {
@@ -2650,8 +2638,9 @@ void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNu
         csdebug() << "NODE> the RoundPackReply signature is not correct";
         return;
     }
-    cs::Conveyer::instance().setRound(rNum);
-    poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber());
+    cs::Conveyer::instance().setRound(rNum + 1); // There are no rounds at all on remote, "Round" = LastSequence(=rNum) + 1
+    cs::RoundNumber delta = (stat_.lastRoundMs() > maxPingSynchroDelay_ ? 1 : cs::PoolSynchronizer::roundDifferentForSync);
+    poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber(), delta);
 }
 
 
