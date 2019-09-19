@@ -68,7 +68,7 @@ public:
             cs::Bytes bytes;
             bytes.resize(region.binarySize());
 
-            const int uncompressedSize = LZ4_decompress_safe(reinterpret_cast<char*>(region.data()) + byteSizeof_, bytes.data(),
+            const int uncompressedSize = LZ4_decompress_safe(reinterpret_cast<char*>(region.data()) + byteSizeof_, reinterpret_cast<char*>(bytes.data()),
                                                              cs::numeric_cast<int>(region.size()) - byteSizeof_, cs::numeric_cast<int>(region.binarySize()));
             if (uncompressedSize < 0) {
                 cserror() << "Decompress error of " << NAMEOF_TYPE_EXPR(T{});
