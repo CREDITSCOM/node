@@ -61,17 +61,17 @@ public:
     T decompress(CompressedRegion region) {
         const auto compression = checkCompression(region.data(), region.size());
 
+        cs::Bytes bytes;
         cs::Byte* data = nullptr;
         size_t size = 0;
 
         if (compression == Compression::Compressed) {
-            cs::Bytes bytes;
             bytes.resize(region.binarySize());
 
             const int uncompressedSize = LZ4_decompress_safe(reinterpret_cast<char*>(region.data()) + byteSizeof_, reinterpret_cast<char*>(bytes.data()),
                                                              cs::numeric_cast<int>(region.size()) - byteSizeof_, cs::numeric_cast<int>(region.binarySize()));
             if (uncompressedSize < 0) {
-                cserror() << "Decompress error of " << NAMEOF_TYPE_EXPR(T{});
+                cserror() << "Decompress error of " << cstype(T);
                 return T{};
             }
 
@@ -93,9 +93,7 @@ public:
 
 private:
     RegionAllocator allocator_;
-
-    // align more than 1
-    static inline int byteSizeof_ = sizeof(cs::Byte) != 1 ? sizeof(cs::Byte) : 2;
+    static inline int byteSizeof_ = sizeof(cs::Byte);
 };
 }
 
