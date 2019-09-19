@@ -45,3 +45,13 @@ TEST(Compressor, TestCompressBase58) {
 
     ASSERT_EQ(key, entity);
 }
+
+TEST(Compressor, TestCompressByte) {
+    cs::Compressor compressor;
+    cs::Byte byte = { 0xFF };
+
+    auto ptr = compressor.compress(byte);
+    auto entity = compressor.decompress<cs::Byte>(ptr);
+
+    ASSERT_EQ(byte, entity);
+}
