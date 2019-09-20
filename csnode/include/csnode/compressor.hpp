@@ -44,14 +44,17 @@ public:
         const int compressedSize = LZ4_compress_default(data, static_cast<char*>(region->data()) + byteSizeof_, binSize,
                                                         cs::numeric_cast<int>(region->size()) - byteSizeof_);
 
+        CompressedRegion::SizeType size = 0;
+
         if (!compressedSize) {
             std::copy(data, data + binSize, static_cast<char*>(region->data()) + byteSizeof_);
-            region->setSize(static_cast<uint32_t>(binSize + byteSizeof_));
+            size = static_cast<uint32_t>(binSize + byteSizeof_);
         }
         else {
-            region->setSize(static_cast<uint32_t>(compressedSize + byteSizeof_));
+            size = static_cast<uint32_t>(compressedSize + byteSizeof_);
         }
 
+        region->setSize(size);
         *(static_cast<cs::Byte*>(region->data())) = compressedSize ? Compression::Compressed : Compression::None;
 
         return CompressedRegion { region, static_cast<size_t>(binSize) };
