@@ -187,6 +187,9 @@ void BlockChain::onStartReadFromDB(cs::Sequence lastWrittenPoolSeq) {
     if (!recreateIndex_ && lastIndexedPool != lastWrittenPoolSeq) {
         recreateIndex_ = true;
     }
+    if (lastWrittenPoolSeq > 0) {
+        cslog() << "Blockchain: start reading " << lastWrittenPoolSeq + 1 << " blocks from DB";
+    }
 }
 
 void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
