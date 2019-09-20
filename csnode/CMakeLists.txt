@@ -65,6 +65,7 @@ add_library(csnode
   include/csnode/blockvalidatorplugins.hpp
   include/csnode/packetqueue.hpp
   include/csnode/roundpackage.hpp
+  include/csnode/compressor.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp

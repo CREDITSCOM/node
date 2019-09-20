@@ -956,6 +956,16 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
 
 void BlockChain::close() {
     cs::Lock lock(dbLock_);
+    if (deferredBlock_.is_valid() && deferredBlock_.is_read_only()) {
+        deferredBlock_.set_storage(storage_);
+        if (deferredBlock_.save()) {
+            csdebug() << "Blockchain> block #" << deferredBlock_.sequence() << " is flushed to DB";
+            deferredBlock_ = csdb::Pool{};
+        }
+        else {
+            cserror() << "Failed to flush block #" << deferredBlock_.sequence() << " to DB";
+        }
+    }
     storage_.close();
     cs::Connector::disconnect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     blockHashes_->close();
