@@ -1251,10 +1251,10 @@ void APIHandler::GetLastHash(api::PoolHash& _return) {
 
 void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const int64_t sequence, const int64_t const_limit) {
     auto limit = limitPage(const_limit);
-    cs::Sequence seq = cs::Sequence(sequence);
-    if (seq < 0) {
+    if (sequence < 0) {
         return;
     }
+    cs::Sequence seq = cs::Sequence(sequence);
     csmeta(csdebug) << "sequence " << seq << ", limit " << limit;
     bool limSet = false;
 

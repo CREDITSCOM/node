@@ -282,6 +282,9 @@ void TokensMaster::updateTokenChaches(const csdb::Address& addr, const std::stri
             if (regDude.is_valid())
                 initiateHolder(tIt->second, tIt->first, regDude);
         }
+        else if (ps.method == "approve") {
+            initiateHolder(tIt->second, tIt->first, tryExtractPublicKey(ps.params[0].v_string));
+        }
     }
 
 #ifdef MANUAL_BALANCE
