@@ -1425,6 +1425,10 @@ std::size_t BlockChain::getCachedBlocksSize() const {
     return cachedBlocks_.size();
 }
 
+void BlockChain::clearBlockCache() {
+	cachedBlocks_.clear();
+}
+
 std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const {
 	cs::Sequence seq = getLastSeq();
     const auto firstSequence = seq + 1;
