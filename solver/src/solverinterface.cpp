@@ -70,8 +70,7 @@ bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
         return true;
     }
     BlockChain::WalletData wData;
-    BlockChain::WalletId wId;
-    pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(sender), wData, wId);
+    pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(sender), wData);
     if (wData.balance_ < Consensus::MinStakeValue) {
         return false;
     }
@@ -79,6 +78,7 @@ bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
 }
 
 void SolverCore::addToGraylist(const cs::PublicKey & sender, uint32_t rounds) {
+
     if (grayList_.find(sender) == grayList_.cend()) {
         grayList_.emplace(sender, rounds);
         csdebug() << "Node " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " is in gray list now";
@@ -89,7 +89,7 @@ void SolverCore::addToGraylist(const cs::PublicKey & sender, uint32_t rounds) {
     }
 }
 
-void SolverCore::gotHash(const cs::StageHash&& sHash) {
+void SolverCore::gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize) {
     // GrayList check
     if (grayList_.count(sHash.sender) > 0) {
         csdebug() << "The sender " << cs::Utils::byteStreamToHex(sHash.sender.data(), sHash.sender.size()) << " is in gray list";
@@ -102,6 +102,10 @@ void SolverCore::gotHash(const cs::StageHash&& sHash) {
         return;
     }
     // DPOS check finish
+
+    if (sHash.realTrustedSize < currentTrustedSize) {
+        csdebug() << "Stake value is lower than that in this node, trow this hash";
+    }
     auto rNum = cs::Conveyer::instance().currentRoundNumber();
     auto it = std::find_if(recv_hash.cbegin(), recv_hash.cend(), [sHash, rNum](const cs::StageHash& sh)
     { return ((sHash.sender == sh.sender) && (sHash.realTrustedSize > sh.realTrustedSize) && (sHash.round == rNum)); });
@@ -133,13 +137,15 @@ void SolverCore::beforeNextRound() {
     pstate->onRoundEnd(*pcontext, false /*is_bigbang*/);
 }
 
-void SolverCore::nextRound() {
+void SolverCore::nextRound(bool updateRound) {
     // as store result of current round:
     if (Consensus::Log) {
         csdebug() << "SolverCore: clear all stored round data (block hashes, stages-1..3)";
     }
+    if (!updateRound) {
+        recv_hash.clear();
+    }
 
-    recv_hash.clear();
     stageOneStorage.clear();
     stageTwoStorage.clear();
     stageThreeStorage.clear();
@@ -164,9 +170,36 @@ void SolverCore::nextRound() {
 
 void SolverCore::gotStageOne(const cs::StageOne& stage) {
     if (find_stage1(stage.sender) != nullptr) {
+        uint64_t lastTimeStamp, currentTimeStamp;
+        uint8_t sender = stage.sender;
+        try {
+            lastTimeStamp = std::stoll(find_stage1(stage.sender)->roundTimeStamp);
+        }
+        catch (...) {
+            csdebug() << __func__ << ": last stage-1 from " << static_cast<int>(stage.sender) << " Timestamp was announced as zero";
+            auto it = std::find_if(stageOneStorage.begin(), stageOneStorage.end(), [sender](cs::StageOne& st) { return st.sender == sender;});
+            stageOneStorage.erase(it);
+            //erase this stage
+        }
+
+        try {
+            currentTimeStamp = std::stoll(stage.roundTimeStamp);
+        }
+        catch (...) {
+            csdebug() << __func__ << ": current stage-1 from " << static_cast<int>(stage.sender) << " Timestamp was announced as zero";
+            return;
+        }
         // duplicated
-        return;
+        if (currentTimeStamp > lastTimeStamp) {
+            auto it = std::find_if(stageOneStorage.begin(), stageOneStorage.end(), [sender](cs::StageOne& st) { return st.sender == sender; });
+            stageOneStorage.erase(it);
+        }
+        else {
+            return;
+        }
     }
+
+
     stageOneStorage.push_back(stage);
     csdebug() << "SolverCore: <-- stage-1 [" << static_cast<int>(stage.sender) << "] = " << stageOneStorage.size();
 

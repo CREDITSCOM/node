@@ -11,7 +11,7 @@
 
 #include <net/neighbourhood.hpp>
 
-#include <client/config.hpp>
+#include <config.hpp>
 
 class Node;
 
@@ -48,7 +48,7 @@ private slots:
 
     void onWriteBlock(const csdb::Pool pool);
     void onWriteBlock(const cs::Sequence sequence);
-    void onRemoveBlock(const cs::Sequence sequence);
+    void onRemoveBlock(const csdb::Pool& pool);
 
 private:
     enum class CounterType;

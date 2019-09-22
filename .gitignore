@@ -9,3 +9,4 @@ js-client/js/*
 .idea/
 /CMakeLists.txt.user
 /vscbuild
+/CMakeLists.txt.user.4.10-pre1

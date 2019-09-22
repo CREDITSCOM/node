@@ -415,7 +415,21 @@ public:
     }
 
     void seek_to_last() final {
-        assert(false);
+        if (it_ == nullptr) {
+            return;
+        }
+
+        Dbt key;
+        Dbt_safe value;
+
+        int ret = it_->get(&key, &value, DB_LAST);
+        if (ret == 0) {
+            set_value(value);
+            valid_ = true;
+        }
+        else {
+            valid_ = false;
+        }
     }
 
     void seek(const cs::Bytes &) final {
@@ -540,11 +554,22 @@ bool DatabaseBerkeleyDB::truncateTransIndex() {
     if (!db_trans_idx_) {
         return false;
     }
-    int status = db_trans_idx_->truncate(nullptr, nullptr, 0);
+
+    db_trans_idx_.reset();
+    int status = env_.dbremove(nullptr, "index.db", nullptr, 0);
+
+    if (!status) {
+        auto db_trans_idx = new Db(&env_, 0);
+        status = db_trans_idx->open(nullptr, "index.db", nullptr, DB_BTREE, DB_CREATE, 0);
+        db_trans_idx_.reset(db_trans_idx);
+    }
+
     if (status) {
         set_last_error_from_berkeleydb(status);
         return false;
     }
+
+    set_last_error();
     return true;
 }
 

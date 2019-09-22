@@ -388,18 +388,27 @@ public:
 private:
     CallsQueueScheduler& scheduler;
 
-    public
-signals:
+public signals:
     // emits on contract execution
     SmartContractExecutedSignal signal_smart_executed;
+
     // emits on invocation of payable()
     SmartContractSignal signal_payable_invoke;
-    // emits on invocation of payable() is failed after timeout
+    // emits on rollback the invocation of payable()
+    SmartContractSignal rollback_payable_invoke;
+
+    // emits when invocation of contract is failed with timeout
     SmartContractSignal signal_contract_timeout;
-    // emits on every contract emitted transaction is appeared in blockchain, args are (emitted_transaction, starter_transaction):
-    cs::Signal<void(const csdb::Transaction&, const csdb::Transaction&)> signal_emitted_accepted;
+    // emits on rollback the invocation of contract is failed with timeout
+    SmartContractSignal rollback_contract_timeout;
+
+    // emits when every contract emitted transaction is appeared in blockchain, args are (emitted_transaction, starter_transaction):
+    cs::Signal<void(const csdb::Transaction& emitted, const csdb::Transaction& starter)> signal_emitted_accepted;
+    // emits on rollback the contract emitted transaction, args are (emitted_transaction, starter_transaction):
+    cs::Signal<void(const csdb::Transaction& emitted, const csdb::Transaction& starter)> rollback_emitted_accepted;
+
     // emits on every update of contract state both during reading db and getting block in real time
-    cs::Signal<void(const csdb::Transaction& new_state_value)> contract_state_updated;
+    SmartContractSignal contract_state_updated;
 
     // flag to always execute contracts even in normal state
     bool force_execution;
@@ -416,6 +425,14 @@ public slots:
 
     // called when next block is read from database
     void on_read_block(const csdb::Pool& block, bool* should_stop);
+
+    // called when block should be removed from database
+    void on_remove_block(const csdb::Pool& block);
+
+    void on_start_reading_blocks(cs::Sequence lastBlockNum) {
+        cs::Lock lock(public_access_lock);
+        max_read_sequence = lastBlockNum;
+    }
 
 private:
     using trx_innerid_t = int64_t;  // see csdb/transaction.hpp near #101
@@ -440,6 +457,9 @@ private:
 
     // flag to allow execution, currently depends on executor presence
     bool executor_ready;
+
+    // max block sequence read from DB
+    cs::Sequence max_read_sequence;
 
     CallsQueueScheduler::CallTag tag_cancel_running_contract;
 

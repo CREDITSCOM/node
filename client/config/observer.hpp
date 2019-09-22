@@ -21,6 +21,8 @@ public:
     void stop();
     bool isObserved() const;
 
+    void notify();
+
 public signals:
     // generates when new config updated
     // called from another thread

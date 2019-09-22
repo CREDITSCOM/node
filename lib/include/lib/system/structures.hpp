@@ -242,9 +242,8 @@ public:
     FixedHashMap() {
         static_assert(MaxSize >= 2, "Your member is too small");
 
-        const size_t bucketsSize = 1 << (sizeof(IndexType) * 8);
-        buckets_ = new ElementPtr[bucketsSize];
-        std::memset(buckets_, 0, bucketsSize * sizeof(ElementPtr));
+        buckets_ = new ElementPtr[MaxSize * 2];
+        std::memset(buckets_, 0, MaxSize * 2 * sizeof(ElementPtr));
     }
 
     FixedHashMap(const FixedHashMap&) = delete;
@@ -291,7 +290,7 @@ public:
 
 private:
     Element* getElt(const KeyType& key, Element*** bucket) {
-        const IndexType idx = getHashIndex<IndexType, KeyType>(key);
+        const IndexType idx = getHashIndex<IndexType, KeyType>(key) % (MaxSize * 2);
         *bucket = buckets_ + idx;
 
         Element* eltInBucket = **bucket;

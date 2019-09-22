@@ -67,7 +67,7 @@ void Neighbourhood::chooseNeighbours() {
     selection_ = sample(std::begin(neighbours_), std::end(neighbours_), redirectNumber);
 }
 
-bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
+bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp, bool separate) {
     bool result = false;
 
     if (bp.sentLastTime) {
@@ -92,7 +92,11 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp) {
 
         if (!found) {
             if (!nb->isSignal || (!bp.pack.isNetwork() && (bp.pack.getType() == MsgTypes::RoundTable || bp.pack.getType() == MsgTypes::BlockHash))) {
-                sent = transport_->sendDirect(&(bp.pack), **nb) || sent;
+                if (separate) {
+                    sent = transport_->sendDirectToSock(&(bp.pack), **nb) || sent;
+                } else {
+                    sent = transport_->sendDirect(&(bp.pack), **nb) || sent;
+                }
             }
 
             // Assume the SS got this
@@ -125,9 +129,8 @@ bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
     return true;
 }
 
-void Neighbourhood::sendByNeighbours(const Packet* pack) {
-    cs::Lock lock(nLockFlag_);
-
+// Not thread safe. Need lock nLockFlag_ above.
+void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
     if (pack->isNeighbors()) {
         for (auto& nb : neighbours_) {
             auto& bp = msgDirects_.tryStore(pack->getHash());
@@ -145,7 +148,7 @@ void Neighbourhood::sendByNeighbours(const Packet* pack) {
             bp.pack = *pack;
         }
 
-        dispatch(bp);
+        dispatch(bp, separate);
     }
 }
 
@@ -401,6 +404,20 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
     connectNode(node, conn);
 }
 
+
+bool Neighbourhood::updateSignalServer(const ip::udp::endpoint& in) {
+    cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_); // #!
+    
+    if (auto itServer = std::find_if(neighbours_.begin(), neighbours_.end(), [](auto const& node) { return node->isSignal; }); itServer != neighbours_.end()) {
+        itServer->get()->in = in;
+        itServer->get()->specialOut = false;
+        itServer->get()->out = {};
+        return true;
+    }
+    
+    return false;
+}
+
 /* Assuming both the mutexes have been locked */
 void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     Connection* connection = nullptr;
@@ -551,10 +568,10 @@ void Neighbourhood::gotRefusal(const Connection::Id& id) {
     }
 }
 
-void Neighbourhood::neighbourHasPacket(RemoteNodePtr node, const cs::Hash& hash, const bool isDirect) {
-    cs::Lock lock(nLockFlag_);
-    auto conn = node->connection.load(std::memory_order_relaxed);
 
+// Not thread safe. Need lock nLockFlag_ above.
+void Neighbourhood::neighbourHasPacket(RemoteNodePtr node, const cs::Hash& hash, const bool isDirect) {
+    auto conn = node->connection.load(std::memory_order_relaxed);
     if (!conn) {
         return;
     }
@@ -635,55 +652,6 @@ void Neighbourhood::redirectByNeighbours(const Packet* pack) {
         Connection::MsgRel& rel = nb->msgRels.tryStore(pack->getHeaderHash());
         if (rel.needSend) {
             transport_->sendDirect(pack, **nb);
-        }
-    }
-}
-
-void Neighbourhood::pourByNeighbours(const Packet* pack, const uint32_t packNum) {
-    if (packNum <= Packet::SmartRedirectTreshold) {
-        const auto end = pack + packNum;
-        for (auto ptr = pack; ptr != end; ++ptr) {
-            sendByNeighbours(ptr);
-        }
-        return;
-    }
-
-    {
-        cs::Lock lock(nLockFlag_);
-        for (auto& nb : neighbours_) {
-            transport_->sendPackRenounce(pack->getHeaderHash(), **nb);
-        }
-    }
-
-    ConnectionPtr* conn;
-    static uint32_t i = 0;
-    uint32_t tr = 0;
-    const Packet* packEnd = pack + packNum;
-
-    while (true) {
-        {
-            cs::Lock lock(nLockFlag_);
-
-            if (i >= neighbours_.size()) {
-                i = 0;
-            }
-
-            conn = &neighbours_[i];
-            ++i;
-        }
-
-        Connection::MsgRel& rel = (*conn)->msgRels.tryStore(pack->getHeaderHash());
-
-        if (!rel.needSend) {
-            continue;
-        }
-
-        for (auto p = pack; p != packEnd; ++p) {
-            transport_->sendDirect(p, ***conn);
-        }
-
-        if (++tr == 2) {
-            break;
         }
     }
 }

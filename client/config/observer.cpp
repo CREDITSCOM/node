@@ -2,7 +2,7 @@
 
 #include <utility>
 
-#include <client/config.hpp>
+#include <config.hpp>
 
 cs::config::Observer::Observer(Config& config, boost::program_options::variables_map& map)
 : config_(config)
@@ -16,7 +16,7 @@ cs::config::Observer::~Observer() {
 
 void cs::config::Observer::stop() {
     if (isObserved_.load(std::memory_order_acquire)) {
-        isObserved_.store(true, std::memory_order_release);
+        isObserved_.store(false, std::memory_order_release);
         variable_.notify_one();
 
         thread_.join();
@@ -25,6 +25,12 @@ void cs::config::Observer::stop() {
 
 bool cs::config::Observer::isObserved() const {
     return isObserved_.load(std::memory_order_acquire);
+}
+
+void cs::config::Observer::notify() {
+    if (isObserved()) {
+        variable_.notify_one();
+    }
 }
 
 void cs::config::Observer::eventLoop() {

@@ -30,7 +30,7 @@
 #include <queue>
 
 #include <client/params.hpp>
-#include <client/config.hpp>
+#include <config.hpp>
 
 #include <lib/system/reference.hpp>
 #include <lib/system/concurrent.hpp>
@@ -393,11 +393,10 @@ public:
         const auto source = BlockChain::getAddressFromKey(transaction.source);
         const uint64_t WALLET_DENOM = csdb::Amount::AMOUNT_MAX_FRACTION;  // 1'000'000'000'000'000'000ull;
         send_transaction.set_amount(csdb::Amount(transaction.amount.integral, uint64_t(transaction.amount.fraction), WALLET_DENOM));
-        BlockChain::WalletData wallData{};
-        BlockChain::WalletId id{};
 
-        if (!blockchain_.findWalletData(source, wallData, id))
-            return csdb::Transaction{};
+        BlockChain::WalletData dummy{};
+        if (!blockchain_.findWalletData(source, dummy))
+            return csdb::Transaction{}; // disable transaction from unknown source!
 
         send_transaction.set_currency(csdb::Currency(1));
         send_transaction.set_source(source);
@@ -463,12 +462,18 @@ public slots:
         if (!isConnected()) {
             connect();
         }
+
+        csdebug() << csname() << "started";
     }
 
     void onExecutorFinished() {
-        if (!executorProcess_->isRunning() && !requestStop_) {
-            executorProcess_->launch(cs::Process::Options::None);
+        if (!requestStop_) {
+            cs::Concurrent::run([this] {
+                runProcess();
+            });
         }
+
+        csdebug() << csname() << "finished";
     }
 
     void onExecutorProcessError(const cs::ProcessException& exception) {
@@ -521,7 +526,7 @@ private:
                     static std::mutex mutex;
                     std::unique_lock lock(mutex);
 
-                    cvErrorConnect_.wait(lock, [&] {
+                    cvErrorConnect_.wait_for(lock, std::chrono::seconds(5), [&] {
                         return !isConnected() || requestStop_;
                     });
                 }
@@ -530,8 +535,17 @@ private:
                     break;
                 }
 
-                if (!isConnected()) {
-                    connect();
+                if (executorProcess_->isRunning()) {
+                    if (!isConnected()) {
+                        connect();
+                    }
+                }
+                else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                    if (!executorProcess_->isRunning()) {
+                        runProcess();
+                    }
                 }
             }
         });
@@ -541,6 +555,12 @@ private:
 
     ~Executor() {
         stop();
+    }
+
+    void runProcess() {
+        executorProcess_->terminate();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        executorProcess_->launch(cs::Process::Options::None);
     }
 
     struct OriginExecuteResult {
@@ -632,12 +652,11 @@ private:
     std::shared_mutex mutex_;
     std::atomic_size_t execCount_{0};
 
-    std::condition_variable cvErrorConnect_;
+    mutable std::condition_variable cvErrorConnect_;
     std::atomic_bool requestStop_{ false };
 
     const int16_t EXECUTOR_VERSION = 2;
 
-    // temporary solution?
     std::mutex callExecutorLock_;
 };
 }  // namespace executor
@@ -697,7 +716,7 @@ public:
 
     void SmartContractGet(api::SmartContractGetResult& _return, const general::Address& address) override;
 
-    void SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer) override;
+    void SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer, const int64_t offset, const int64_t limit) override;
 
     void SmartContractAddressesListGet(api::SmartContractAddressesListGetResult& _return, const general::Address& deployer) override;
 
@@ -715,6 +734,16 @@ public:
     void TransactionsStateGet(TransactionsStateGetResult& _return, const general::Address& address, const std::vector<int64_t>& v) override;
 
     void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<::general::ByteCodeObject>& byteCodeObjects) override;
+
+    void addTokenResult(api::TokenTransfersResult& _return, const csdb::Address& token, const std::string& code, const csdb::Pool& pool, const csdb::Transaction& tr,
+        const api::SmartContractInvocation& smart, const std::pair<csdb::Address, csdb::Address>& addrPair);
+
+    void addTokenResult(api::TokenTransactionsResult& _return, const csdb::Address& token, const std::string&, const csdb::Pool& pool, const csdb::Transaction& tr,
+        const api::SmartContractInvocation& smart, const std::pair<csdb::Address, csdb::Address>&);
+
+    template <typename ResultType>
+    void tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensMaster& tm, const general::Address& token, bool transfersOnly, bool filterByWallet, int64_t offset,
+        int64_t limit, const csdb::Address& wallet = csdb::Address());
 
     void ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) override;
     ////////new
@@ -771,8 +800,8 @@ private:
     };
 
     struct HashState {
-        cs::Hash hash;
-        std::string retVal;
+        cs::Hash hash{};
+        std::string retVal{};
         bool isOld{false};
         bool condFlg{false};
     };
@@ -860,7 +889,7 @@ private:
     // bool convertAddrToPublicKey(const csdb::Address& address);
 
     template <typename Mapper>
-    size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out);
+    size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out, int64_t offset = 0, int64_t limit = 0);
 
     bool updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequence sequence);
 

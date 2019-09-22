@@ -8,6 +8,8 @@ project(config)
 add_library(${PROJECT_NAME}
     "observer.hpp"
     "observer.cpp"
+    "config.hpp"
+    "config.cpp"
 )
 
 target_link_libraries (${PROJECT_NAME} csnode lib)

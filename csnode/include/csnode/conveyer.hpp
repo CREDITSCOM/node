@@ -11,6 +11,7 @@
 #include <optional>
 
 class Config;
+struct ConveyerData;
 
 namespace csdb {
 class Transaction;
@@ -46,6 +47,9 @@ public:
     };
 
     void setSendCacheValue(cs::RoundNumber value);
+    void setMaxResendsValue(size_t value);
+
+    void setData(const ConveyerData& data);
 
     ///
     /// @brief Sets cached conveyer round number for utility.

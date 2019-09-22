@@ -57,14 +57,15 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
         --roundNum;
     }
 
-    const std::size_t cachedBlocksSize = blockChain_->getCachedBlocksSize();
-    const cs::Sequence totalBlocks = lastWrittenSequence + cachedBlocksSize;
+    std::size_t cachedBlocksSize = blockChain_->getCachedBlocksSize();
+    cs::Sequence totalBlocks = lastWrittenSequence + cachedBlocksSize;
 
     if (roundNum < totalBlocks) {
-        cswarning() << "Round number is lower than synchro total blocks, if same warning will occur again try to restart node";
+        cswarning() << "Round number is lower than synchro total blocks, do clear cache";
         csdebug() << "SYNC warning, round number " << roundNum << ", total blocks " << totalBlocks;
-        synchroFinished();
-        return;
+		blockChain_->clearBlockCache();
+		cachedBlocksSize = 0;
+		totalBlocks = lastWrittenSequence;
     }
 
     const cs::Sequence blocksRemaining = roundNum - totalBlocks;
@@ -267,9 +268,9 @@ void cs::PoolSynchronizer::onWriteBlock(const cs::Sequence sequence) {
     removeExistingSequence(sequence, SequenceRemovalAccuracy::EXACT);
 }
 
-void cs::PoolSynchronizer::onRemoveBlock(const cs::Sequence sequence) {
-    csmeta(csdetails) << sequence;
-    removeExistingSequence(sequence, SequenceRemovalAccuracy::UPPER_BOUND);
+void cs::PoolSynchronizer::onRemoveBlock(const csdb::Pool& pool) {
+    csmeta(csdetails) << pool.sequence();
+    removeExistingSequence(pool.sequence(), SequenceRemovalAccuracy::UPPER_BOUND);
 }
 
 //

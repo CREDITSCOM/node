@@ -11,8 +11,6 @@
 #include <iostream>
 #include <string>
 
-#include <boost/dynamic_bitset.hpp>
-
 #include <csdb/address.hpp>
 #include <csdb/amount.hpp>
 #include <csdb/amount_commission.hpp>
@@ -42,7 +40,9 @@ using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 
 /** @brief   The write block or remove block signal emits when block is flushed to disk */
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
+using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
+using StartReadingBlocksSignal = csdb::BlockReadingStartedSingal;
 }  // namespace cs
 
 class BlockChain {
@@ -51,7 +51,6 @@ public:
     using WalletId = csdb::internal::WalletId;
     using WalletAddress = csdb::Address;
     using WalletData = cs::WalletsCache::WalletData;
-    using Mask = boost::dynamic_bitset<uint64_t>;
 
     enum class AddressType {
         PublicKey,
@@ -62,7 +61,8 @@ public:
                         bool recreateIndex = false);
     ~BlockChain();
 
-    bool init(const std::string& path);
+    bool init(const std::string& path,
+              cs::Sequence newBlockchainTop = cs::kWrongSequence);
     bool isGood() const;
 
     // return unique id of database if at least one unique block has written, otherwise (only genesis block) 0
@@ -151,6 +151,8 @@ public:
 
     std::size_t getCachedBlocksSize() const;
 
+	void clearBlockCache();
+
     // continuous interval from ... to
     using SequenceInterval = std::pair<cs::Sequence, cs::Sequence>;
 
@@ -188,22 +190,31 @@ public signals:
     cs::ChangeBlockSignal cachedBlockEvent;
 
     /** @brief The remove block event. Raised when the next block is flushed to storage */
-    cs::ChangeBlockSignal removeBlockEvent;
+    cs::RemoveBlockSignal removeBlockEvent;
 
     const cs::ReadBlockSignal& readBlockEvent() const;
+    const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;
 
 public slots:
 
-    // prototype is void (csdb::Transaction)
     // subscription is placed in SmartContracts constructor
     void onPayableContractReplenish(const csdb::Transaction& starter) {
-        this->walletsCacheUpdater_->invokeReplenishPayableContract(starter);
+        this->walletsCacheUpdater_->invokeReplenishPayableContract(starter, false /*inverse*/);
     }
     void onContractTimeout(const csdb::Transaction& starter) {
-        this->walletsCacheUpdater_->rollbackExceededTimeoutContract(starter, csdb::Amount(0));
+        this->walletsCacheUpdater_->rollbackExceededTimeoutContract(starter, csdb::Amount(0), false /*inverse*/);
     }
     void onContractEmittedAccepted(const csdb::Transaction& emitted, const csdb::Transaction& starter) {
-        this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter);
+        this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter, false /*inverse*/);
+    }
+    void rollbackPayableContractReplenish(const csdb::Transaction& starter) {
+        this->walletsCacheUpdater_->invokeReplenishPayableContract(starter, true /*inverse*/);
+    }
+    void rollbackContractTimeout(const csdb::Transaction& starter) {
+        this->walletsCacheUpdater_->rollbackExceededTimeoutContract(starter, csdb::Amount(0), true /*inverse*/);
+    }
+    void rollbackContractEmittedAccepted(const csdb::Transaction& emitted, const csdb::Transaction& starter) {
+        this->walletsCacheUpdater_->smartSourceTransactionReleased(emitted, starter, true /*inverse*/);
     }
 
 public:
@@ -231,6 +242,7 @@ public:
 
     bool findWalletData(const csdb::Address&, WalletData& wallData, WalletId& id) const;
     bool findWalletData(WalletId id, WalletData& wallData) const;
+    bool findWalletData(const csdb::Address&, WalletData& wallData) const;
     bool findWalletId(const WalletAddress& address, WalletId& id) const;
     // wallet transactions: pools cache + db search
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
@@ -272,6 +284,7 @@ private:
     // Thread unsafe
     bool finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys lastConfidants);
 
+    void onStartReadFromDB(cs::Sequence lastWrittenPoolSeq);
     void onReadFromDB(csdb::Pool block, bool* shouldStop);
     bool postInitFromDB();
 

@@ -161,8 +161,8 @@ CallsQueueScheduler::CallTag CallsQueueScheduler::Insert(ClockType::duration wai
             }
             else {
                 // remove from queue, below we will add a new schedule
-                _queue.erase(it);
                 csdebug() << "Erasing existing calls: " << it->id;
+                _queue.erase(it);
             }
         }
         // add new item

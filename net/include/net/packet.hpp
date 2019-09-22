@@ -193,7 +193,7 @@ public:
     uint32_t getHeadersLength() const;
     void recalculateHeadersLength();
 
-    explicit operator bool() {
+    explicit operator bool() const {
         return region_.get();
     }
 
@@ -289,7 +289,7 @@ public:
             const auto fragment = getFragmentId();
             const auto count = getFragmentsNum();
 
-            if (count == 0 || fragment >= MaxFragments || count >= MaxFragments || fragment >= count) {
+            if (count == 0 || fragment >= count) {
                 return false;
             }
         }
@@ -406,6 +406,7 @@ public:
     }
 
     MessagePtr getMessage(const Packet&, bool&);
+    void dropMessage(MessagePtr);
 
 private:
     TypedAllocator<Message> msgAllocator_;

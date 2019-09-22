@@ -63,6 +63,9 @@ public:
     bool addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures);
 
     void updateLastPackageSignatures();
+    uint8_t getCurrentStage3Iteration() {
+        return currentStage3iteration_;
+    }
 
     uint8_t subRound();
     // Solver "public" interface,
@@ -70,7 +73,7 @@ public:
 
     void init(const cs::PublicKey& pub, const cs::PrivateKey& priv);
     void gotConveyerSync(cs::RoundNumber rNum);
-    void gotHash(const cs::StageHash&& sHash);
+    void gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize);
 
     const cs::PublicKey& getPublicKey() const {
         return public_key;
@@ -83,8 +86,9 @@ public:
     // TODO: requires revision
     const cs::PublicKey& getWriterPublicKey() const;
 
+
     void beforeNextRound();
-    void nextRound();
+    void nextRound(bool updateRound);
     void gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round);
     void gotRoundInfoReply(bool next_round_started, const cs::PublicKey& respondent);
 
@@ -98,6 +102,8 @@ public:
     void gotStageOneRequest(uint8_t requester, uint8_t required);
     void gotStageTwoRequest(uint8_t requester, uint8_t required);
     void gotStageThreeRequest(uint8_t requester, uint8_t required /*, uint8_t iteration*/);
+
+    csdb::Pool& getDeferredBlock();
 
     void removeDeferredBlock(cs::Sequence);
     bool realTrustedChanged() const;

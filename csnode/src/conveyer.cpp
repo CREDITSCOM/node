@@ -12,7 +12,7 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
-#include <client/config.hpp>
+#include <config.hpp>
 
 namespace {
 cs::ConveyerBase* conveyerView = nullptr;
@@ -43,7 +43,10 @@ struct cs::ConveyerBase::Impl {
 
     // cached active current round number
     std::atomic<cs::RoundNumber> currentRound = 0;
+
+    // settings
     std::atomic<cs::RoundNumber> sendCacheValue;
+    std::atomic<size_t> maxResendsSenCache;
 
     // helpers
     const cs::ConveyerMeta* validMeta() &;
@@ -73,6 +76,15 @@ cs::ConveyerBase::ConveyerBase() {
 
 void cs::ConveyerBase::setSendCacheValue(cs::RoundNumber value) {
     pimpl_->sendCacheValue.store(value, std::memory_order_release);
+}
+
+void cs::ConveyerBase::setMaxResendsValue(size_t value) {
+    pimpl_->maxResendsSenCache.store(value, std::memory_order_release);
+}
+
+void cs::ConveyerBase::setData(const ConveyerData& data) {
+    setSendCacheValue(data.sendCacheValue);
+    setMaxResendsValue(data.maxResendsSendCache);
 }
 
 void cs::ConveyerBase::setRound(cs::RoundNumber round) {
@@ -583,7 +595,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
 
     if (characteristic.mask.size() != newPool.transactions_count()) {
         cslog() << "\tCharacteristic size: " << characteristic.mask.size() << ", new pool transactions count: " << newPool.transactions_count();
-        cswarning() << "\tSome of transactions is not valid";
+        cswarning() << "\tSome transactions are not valid";
     }
 
     csdebug() << "\tsequence = " << metaPoolInfo.sequenceNumber;
@@ -733,11 +745,11 @@ void cs::ConveyerBase::flushTransactions() {
 }
 
 void cs::ConveyerBase::onConfigChanged(const Config& updated, const Config& previous) {
-    if (updated.conveyerSendCacheValue() == previous.conveyerSendCacheValue()) {
+    if (updated.conveyerData() == previous.conveyerData()) {
         return;
     }
 
-    pimpl_->sendCacheValue.store(updated.conveyerSendCacheValue(), std::memory_order_release);
+    setData(updated.conveyerData());
 }
 
 std::optional<cs::TransactionsPacket> cs::ConveyerBase::findPacketAtMeta(const cs::TransactionsPacketHash& hash) const {
