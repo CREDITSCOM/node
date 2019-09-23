@@ -418,8 +418,7 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     cs::PacketsHashes hashes;
     istream_ >> hashes;
 
-    csdebug() << "NODE> Get packet hashes request from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-    csdebug() << "NODE> Requested packet hashes: " << hashes.size();
+    csdebug() << "NODE> Get request for " << hashes.size() << " packet hashes from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
     if (hashes.empty()) {
         csmeta(cserror) << "Wrong hashes list requested";
@@ -445,8 +444,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
         return;
     }
 
-    csdebug() << "NODE> Get packet hashes reply: sender " << cs::Utils::byteStreamToHex(sender);
-    csdebug() << "NODE> Hashes reply got packets count: " << packets.size();
+    csdebug() << "NODE> Get reply with " << packets.size() <<  " packet hashes from sender " << cs::Utils::byteStreamToHex(sender);
 
     processPacketsReply(std::move(packets), round);
 }
@@ -512,8 +510,9 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         return;
     }
 
-    csdebug() << "NODE> Sequence " << rPackage.poolMetaInfo().sequenceNumber << ", mask size " << rPackage.poolMetaInfo().characteristic.mask.size();
-    csdebug() << "NODE> Time: " << rPackage.poolMetaInfo().timestamp;
+    csdebug() << "NODE> Sequence " << rPackage.poolMetaInfo().sequenceNumber
+        << ", mask size " << rPackage.poolMetaInfo().characteristic.mask.size()
+        << ", timestamp " << rPackage.poolMetaInfo().timestamp;
 
     if (blockChain_.getLastSeq() > rPackage.poolMetaInfo().sequenceNumber) {
         csmeta(cswarning) << "blockChain last seq: " << blockChain_.getLastSeq()
@@ -766,8 +765,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     istream_.init(data, size);
     istream_ >> sequences;
 
-    csdebug() << "NODE> Block request got sequences count: " << sequences.size();
-    csdebug() << "NODE> Get packet hashes request: sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    csdebug() << "NODE> got request for " << sequences.size() << " block(s) from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
     if (sequences.empty()) {
         csmeta(cserror) << "Sequences size is 0";
@@ -777,10 +775,8 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     std::size_t packetNum = 0;
     istream_ >> packetNum;
 
-    csdebug() << "NODE> Get block request> Getting the request for block: from: " << sequences.front() << ", to: " << sequences.back() << ", id: " << packetNum;
-
     if (sequences.front() > blockChain_.getLastSeq()) {
-        csdebug() << "NODE> Get block request> The requested block: " << sequences.front() << " is beyond last written sequence";
+        csdebug() << "NODE> Get block request> The requested block: " << sequences.front() << " is beyond my last block";
         return;
     }
 
@@ -806,7 +802,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
             }
         }
         else {
-            csmeta(cserror) << "Load block: " << sequence << " from blockchain is Invalid";
+            csmeta(cslog) << "unable to load block " << sequence << " from blockchain";
         }
     }
 
@@ -817,7 +813,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
     if (!poolSynchronizer_->isSyncroStarted()) {
-        csdebug() << "NODE> Get block reply> Pool synchronizer already syncro";
+        csdebug() << "NODE> Get block reply> Pool sync has already finished";
         return;
     }
 
@@ -826,7 +822,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     cs::PoolsBlock poolsBlock = decompressPoolsBlock(data, size);
 
     if (poolsBlock.empty()) {
-        cserror() << "NODE> Get block reply> Pools count is 0";
+        cserror() << "NODE> Get block reply> No pools found";
         return;
     }
 

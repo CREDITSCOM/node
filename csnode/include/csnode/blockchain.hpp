@@ -151,6 +151,8 @@ public:
 
     std::size_t getCachedBlocksSize() const;
 
+	void clearBlockCache();
+
     // continuous interval from ... to
     using SequenceInterval = std::pair<cs::Sequence, cs::Sequence>;
 
