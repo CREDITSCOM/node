@@ -1,6 +1,8 @@
 #ifndef COMPRESSOR_HPP
 #define COMPRESSOR_HPP
 
+#include <mutex>
+
 #include <lz4.h>
 
 #include <datastream.hpp>
@@ -98,6 +100,25 @@ public:
 private:
     RegionAllocator allocator_;
     static inline int byteSizeof_ = sizeof(cs::Byte);
+};
+
+// multi-threaded compressor
+class SynchronizedCompressor : public Compressor {
+public:
+    template<typename T>
+    CompressedRegion compress(const T& entity) {
+        cs::Lock lock(mutex_);
+        return Compressor::compress(entity);
+    }
+
+    template<typename T>
+    T decompress(CompressedRegion region) {
+        cs::Lock lock(mutex_);
+        return Compressor::decompress<T>(region);
+    }
+
+protected:
+    std::mutex mutex_;
 };
 }
 
