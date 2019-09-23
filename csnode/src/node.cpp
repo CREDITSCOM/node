@@ -1392,13 +1392,13 @@ void Node::sendStageOne(const cs::StageOne& stageOneInfo) {
         << cs::StageOne::toString(stageOneInfo);
 
     csdebug() << "Stage one Message R-" << cs::Conveyer::instance().currentRoundNumber() << "[" << static_cast<int>(stageOneInfo.sender)
-        << "]: " << cs::Utils::byteStreamToHex(stageOneInfo.messageBytes.data(), stageOneInfo.messageBytes.size());
+        << "]: " << cs::Utils::byteStreamToHex(stageOneInfo.message.data(), stageOneInfo.message.size());
     csdebug() << "Stage one Signature R-" << cs::Conveyer::instance().currentRoundNumber() << "[" << static_cast<int>(stageOneInfo.sender)
         << "]: " << cs::Utils::byteStreamToHex(stageOneInfo.signature.data(), stageOneInfo.signature.size());
 
-    sendToConfidants(MsgTypes::FirstStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageOneInfo.signature, stageOneInfo.messageBytes);
+    sendToConfidants(MsgTypes::FirstStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageOneInfo.signature, stageOneInfo.message);
 
-    csmeta(csdetails) << "Sent message size " << stageOneInfo.messageBytes.size();
+    csmeta(csdetails) << "Sent message size " << stageOneInfo.message.size();
 }
 
 void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1421,19 +1421,19 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
     cs::StageOne stage;
     istream_ >> stage.signature;
-    istream_ >> stage.messageBytes;
+    istream_ >> stage.message;
 
     if (!istream_.good() || !istream_.end()) {
         csmeta(cserror) << "Bad stage-1 packet format";
         return;
     }
-    csdetails() << "Stage1 message: " << cs::Utils::byteStreamToHex(stage.messageBytes);
+    csdetails() << "Stage1 message: " << cs::Utils::byteStreamToHex(stage.message);
     csdetails() << "Stage1 signature: " << cs::Utils::byteStreamToHex(stage.signature);
 
 
 
     // hash of part received message
-    stage.messageHash = cscrypto::calculateHash(stage.messageBytes.data(), stage.messageBytes.size());
+    stage.messageHash = cscrypto::calculateHash(stage.message.data(), stage.message.size());
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
     cs::Bytes signedMessage;
@@ -1443,7 +1443,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     signedStream << stage.messageHash;
 
     // stream for main message
-    cs::DataStream stream(stage.messageBytes.data(), stage.messageBytes.size());
+    cs::DataStream stream(stage.message.data(), stage.message.size());
     stream >> stage.sender;
     stream >> stage.hash;
     stream >> stage.trustedCandidates;
@@ -1455,7 +1455,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     }
 
     const cs::PublicKey& confidant = conveyer.confidantByIndex(stage.sender);
-    csdebug() << "StageMessage[" << static_cast<int>(stage.sender) <<"]: " << cs::Utils::byteStreamToHex(stage.messageBytes.data(), stage.messageBytes.size());
+    csdebug() << "StageMessage[" << static_cast<int>(stage.sender) <<"]: " << cs::Utils::byteStreamToHex(stage.message.data(), stage.message.size());
     if (!cscrypto::verifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
         cswarning() << "NODE> Stage-1 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
         return;
@@ -1481,10 +1481,10 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
         return;
     }
 
-    sendToConfidants(MsgTypes::SecondStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageTwoInfo.signature, stageTwoInfo.messageBytes);
+    sendToConfidants(MsgTypes::SecondStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageTwoInfo.signature, stageTwoInfo.message);
 
     // cash our stage two
-    csmeta(csdetails) << "Bytes size " << stageTwoInfo.messageBytes.size() << " ... done";
+    csmeta(csdetails) << "Bytes size " << stageTwoInfo.message.size() << " ... done";
 }
 
 void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1535,7 +1535,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     }
 
     csmeta(csdetails) << "Signature is OK";
-    stage.messageBytes = std::move(bytes);
+    stage.message = std::move(bytes);
 
     csdebug() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] is OK!";
     solver_->gotStageTwo(stage);
@@ -1550,10 +1550,10 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     }
 
     // TODO: think how to improve this code
-    sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, stageThreeInfo.messageBytes);
+    sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, stageThreeInfo.message);
 
     // cach stage three
-    csmeta(csdetails) << "bytes size " << stageThreeInfo.messageBytes.size();
+    csmeta(csdetails) << "bytes size " << stageThreeInfo.message.size();
     stageThreeSent_ = true;
     csmeta(csdetails) << "done";
 }
@@ -1619,7 +1619,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
         return;
     }
 
-    stage.messageBytes = std::move(bytes);
+    stage.message = std::move(bytes);
 
     csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] - preliminary check ... passed!";
 

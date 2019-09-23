@@ -60,8 +60,12 @@ namespace cs {
         return static_cast<uint8_t>(mask.size() - std::count(mask.cbegin(), mask.cend(), cs::ConfidantConsts::InvalidConfidantIndex));
     }
 
+    StageOne::StageOne() {
+        msgType = MsgTypes::FirstStage;
+    }
+
     void StageOne::toBytes() {
-        messageBytes.clear();
+        message.clear();
         size_t expectedMessageSize = sizeof(sender)
             + sizeof(hash)
             + sizeof(trustedCandidates.size())
@@ -73,9 +77,9 @@ namespace cs {
 
         //csmeta(csdebug) << "Stage one R - " << cs::Conveyer::instance().currentRoundNumber() << cs::StageOne::toString(this);
 
-        messageBytes.reserve(expectedMessageSize);
+        message.reserve(expectedMessageSize);
 
-        cs::DataStream stream(messageBytes);
+        cs::DataStream stream(message);
         stream << sender;
         stream << hash;
         stream << trustedCandidates;
@@ -83,7 +87,7 @@ namespace cs {
         stream << roundTimeStamp;
 
         csdebug() << "Stage one Message R-" << cs::Conveyer::instance().currentRoundNumber() << "[" << static_cast<int>(sender)
-            << "]: " << cs::Utils::byteStreamToHex(messageBytes.data(), messageBytes.size());
+            << "]: " << cs::Utils::byteStreamToHex(message.data(), message.size());
     }
 
 
@@ -94,17 +98,21 @@ namespace cs {
             + ", Time Stamp: " + stage.roundTimeStamp);
     }
 
+    StageTwo::StageTwo() {
+        msgType = MsgTypes::SecondStage;
+    }
+
     void StageTwo::toBytes() {
-        messageBytes.clear();
+        message.clear();
         const size_t confidantsCount = cs::Conveyer::instance().confidantsCount();
         const size_t stageBytesSize = sizeof(sender)
             + sizeof(size_t) // count of signatures
             + sizeof(size_t) // count of hashes
             + (sizeof(cs::Signature) + sizeof(cs::Hash)) * confidantsCount; // signature + hash items
 
-        messageBytes.reserve(stageBytesSize);
+        message.reserve(stageBytesSize);
 
-        cs::DataStream stream(messageBytes);
+        cs::DataStream stream(message);
         stream << sender;
         stream << signatures;
         stream << hashes;
@@ -123,12 +131,16 @@ namespace cs {
     }
 
 
+    StageThree::StageThree() {
+        msgType = MsgTypes::ThirdStage;
+    }
+
     void StageThree::toBytes() {
         const size_t stageSize = 2 * sizeof(uint8_t) + 3 * sizeof(cs::Signature) + realTrustedMask.size();
-        messageBytes.clear();
-        messageBytes.reserve(stageSize);
+        message.clear();
+        message.reserve(stageSize);
 
-        cs::DataStream stream(messageBytes);
+        cs::DataStream stream(message);
         stream << sender;
         stream << writer;
         stream << iteration;

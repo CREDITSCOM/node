@@ -69,7 +69,7 @@ void TrustedStage1State::finalizeStage(SolverContext& context) {
     stage.roundTimeStamp = std::to_string(currentTimeStamp);
         /*}*/
     stage.toBytes();
-    stage.messageHash = cscrypto::calculateHash(stage.messageBytes.data(), stage.messageBytes.size());
+    stage.messageHash = cscrypto::calculateHash(stage.message.data(), stage.message.size());
     cs::Bytes messageToSign;
     messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
     cs::DataStream signStream(messageToSign);

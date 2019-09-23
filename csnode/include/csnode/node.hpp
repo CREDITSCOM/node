@@ -406,7 +406,7 @@ private:
     std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
     std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
 
-    std::vector<cs::Stage> smartStageTemporary_;
+    //std::vector<cs::Stage> smartStageTemporary_;
     // smart consensus IDs:
     std::vector<uint64_t> activeSmartConsensuses_;
 
