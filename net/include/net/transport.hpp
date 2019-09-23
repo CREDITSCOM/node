@@ -194,8 +194,8 @@ private:
     bool gotSSDispatch(const TaskPtr<IPacMan>&);
     bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&);
     bool gotSSLastBlock(const TaskPtr<IPacMan>&, cs::Sequence, const csdb::PoolHash&, bool canBeTrusted);
-    bool gotSSNewFriends(const TaskPtr<IPacMan>&);
-    bool gotSSUpdateServer(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+    bool gotSSNewFriends();
+    bool gotSSUpdateServer();
 
     bool gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr&);
     bool gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr&);
