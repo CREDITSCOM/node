@@ -552,15 +552,30 @@ void cs::PoolSynchronizer::refreshNeighbours() {
 
     const uint8_t allNeighboursCount = static_cast<uint8_t>(transport_->getNeighboursCount());
 
+    // 1) sort neighbours by lastSeq descending
+    std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>> sort_by_seq_desc;
+    const size_t map_size = transport_->getNeighboursCount();
+    for (size_t i = 0; i < map_size; ++i) {
+        sort_by_seq_desc.insert(std::make_pair(transport_->getConnectionLastSequence(i), i));
+    }
+
     // Add new neighbours
     if (nSize < neededNeighboursCount) {
+        std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>>::const_iterator it = sort_by_seq_desc.cbegin();
         for (uint8_t i = nSize; i < allNeighboursCount; ++i) {
-            ConnectionPtr neighbour = transport_->getConnectionByNumber(i);
+            // get the i-th connection with max sequence
+            size_t conn_number = size_t(i);
+            if (it != sort_by_seq_desc.cend()) {
+                // normally, we always be here
+                conn_number = it->second;
+                ++it;
+            }
+            ConnectionPtr neighbour = transport_->getConnectionByNumber(conn_number);
             if (neighbour && !neighbour->isSignal && neighbour->lastSeq) {
-                auto isAlreadyHave = std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return el.index() == i; });
+                auto isAlreadyHave = std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return el.index() == conn_number; });
 
                 if (isAlreadyHave == neighbours_.end()) {
-                    neighbours_.emplace_back(NeighboursSetElemet(i, neighbour->key, syncData_.blockPoolsCount));
+                    neighbours_.emplace_back(NeighboursSetElemet(conn_number, neighbour->key, syncData_.blockPoolsCount));
                 }
             }
         }
@@ -568,12 +583,20 @@ void cs::PoolSynchronizer::refreshNeighbours() {
         return;
     }
 
-    // refresh neighbours index
+    // refresh neighbours' index
+    std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>>::const_iterator it = sort_by_seq_desc.cbegin();
     std::size_t currentNh = 0;
     for (uint8_t i = 0; i < allNeighboursCount; ++i) {
-        ConnectionPtr neighbour = transport_->getConnectionByNumber(i);
+        // get the i-th connection with max sequence
+        size_t conn_number = size_t(i);
+        if (it != sort_by_seq_desc.cend()) {
+            // normally, we always be here
+            conn_number = it->second;
+            ++it;
+        }
+        ConnectionPtr neighbour = transport_->getConnectionByNumber(conn_number);
         if (neighbour && !neighbour->isSignal) {
-            neighbours_[currentNh].setIndex(i);
+            neighbours_[currentNh].setIndex(uint8_t(conn_number));
             neighbours_[currentNh].setPublicKey(neighbour->key);
             ++currentNh;
         }
