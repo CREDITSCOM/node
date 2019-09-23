@@ -277,10 +277,8 @@ bool Config::replaceBlock(T&& blockName, Ts&& ... newLines) {
 
     if (const auto startPos = newConfig.find(fullBlockName); startPos != std::string::npos) {
         const auto tmpPos = newConfig.find("[", startPos + 1);
-        const auto endPos = tmpPos != std::string::npos ? tmpPos - 1 : newConfig.size();
-
-        newConfig.erase(startPos, endPos - startPos + 1);
-        newConfig.insert(startPos, fullReplaceString);
+        const auto endPos = (tmpPos != std::string::npos ? tmpPos - 1 : newConfig.size());
+        newConfig.replace(startPos, endPos, fullReplaceString);
     }
     else {
         newConfig += fullReplaceString;
