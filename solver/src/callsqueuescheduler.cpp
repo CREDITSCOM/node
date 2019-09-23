@@ -161,8 +161,8 @@ CallsQueueScheduler::CallTag CallsQueueScheduler::Insert(ClockType::duration wai
             }
             else {
                 // remove from queue, below we will add a new schedule
-                _queue.erase(it);
                 csdebug() << "Erasing existing calls: " << it->id;
+                _queue.erase(it);
             }
         }
         // add new item
@@ -183,14 +183,14 @@ CallsQueueScheduler::CallTag CallsQueueScheduler::Insert(ClockType::duration wai
 bool CallsQueueScheduler::Remove(CallsQueueScheduler::CallTag id) {
     {
         std::lock_guard<std::mutex> l(_mtx_queue);
+        // rollback last counter increment
+        auto it_sync = _exe_sync.find(id);
+        if (it_sync != _exe_sync.end()) {
+            it_sync->second.queued = it_sync->second.done;
+        }
         auto it = std::find(_queue.cbegin(), _queue.cend(), id);
         if (it == _queue.cend()) {
             return false;
-        }
-        // rollback last counter increment
-        auto it_sync = _exe_sync.find(it->id);
-        if (it_sync != _exe_sync.end()) {
-            it_sync->second.queued = it_sync->second.done;
         }
         _queue.erase(it);
     }

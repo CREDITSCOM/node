@@ -17,7 +17,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 
-#include <client/config.hpp>
+#include <config.hpp>
 
 using namespace cs;
 namespace fs = boost::filesystem;
@@ -109,6 +109,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , cacheMutex_()
 , recreateIndex_(recreateIndex) {
+    cs::Connector::connect(&storage_.readingStartedEvent(), this, &BlockChain::onStartReadFromDB);
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
 
     createCachesPath();
@@ -123,7 +124,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 BlockChain::~BlockChain() {
 }
 
-bool BlockChain::init(const std::string& path) {
+bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
     cslog() << "Trying to open DB...";
 
     size_t totalLoaded = 0;
@@ -136,9 +137,13 @@ bool BlockChain::init(const std::string& path) {
         return false;
     };
 
-    if (!storage_.open(path, progress)) {
+    if (!storage_.open(path, progress, newBlockchainTop)) {
         cserror() << "Couldn't open database at " << path;
         return false;
+    }
+
+    if (newBlockchainTop != cs::kWrongSequence) {
+        return true;
     }
 
     cslog() << "\rDB is opened, loaded " << WithDelimiters(totalLoaded) << " blocks";
@@ -165,6 +170,7 @@ bool BlockChain::init(const std::string& path) {
     }
 
     good_ = true;
+    blocksToBeRemoved_ = totalLoaded - 1; // any amount to remave after start
     return true;
 }
 
@@ -177,17 +183,30 @@ uint64_t BlockChain::uuid() const {
     return uuid_;
 }
 
+void BlockChain::onStartReadFromDB(cs::Sequence lastWrittenPoolSeq) {
+    if (!recreateIndex_ && lastIndexedPool != lastWrittenPoolSeq) {
+        recreateIndex_ = true;
+    }
+    if (lastWrittenPoolSeq > 0) {
+        cslog() << "Blockchain: start reading " << lastWrittenPoolSeq + 1 << " blocks from DB";
+    }
+}
+
 void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
     auto blockSeq = block.sequence();
     lastSequence_ = blockSeq;
     if (blockSeq == 0 && recreateIndex_) {
-      cs::Lock lock(dbLock_);
-      storage_.truncate_trxs_index();
+        cs::Lock lock(dbLock_);
+        if (!storage_.truncate_trxs_index()) {
+            cserror() << "Can't truncate trxs index";
+            *shouldStop = true;
+            return;
+        }
     }
     if (blockSeq == 1) {
-      cs::Lock lock(dbLock_);
-      uuid_ = uuidFromBlock(block);
-      csdebug() << "Blockchain: UUID = " << uuid_;
+        cs::Lock lock(dbLock_);
+        uuid_ = uuidFromBlock(block);
+        csdebug() << "Blockchain: UUID = " << uuid_;
     }
 
     if (!updateWalletIds(block, *walletsCacheUpdater_.get())) {
@@ -244,7 +263,13 @@ void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
         if (indexedAddrs.insert(key).second) {
             cs::Sequence lapoo;
             if (recreateIndex_) {
-                lapoo = lapoos[key];
+                auto it = lapoos.find(key);
+                if (it == lapoos.end()) {
+                    lapoo = cs::kWrongSequence;
+                }
+                else {
+                    lapoo = it->second;
+                }
                 lapoos[key] = pool.sequence();
             }
             else {
@@ -424,7 +449,7 @@ void BlockChain::removeLastBlock() {
         return;
     }
     --blocksToBeRemoved_;
-    csmeta(csdebug) << "begin";
+    csmeta(csdebug) << getLastSeq();
     csdb::Pool pool{};
 
     {
@@ -456,10 +481,12 @@ void BlockChain::removeLastBlock() {
     --lastSequence_;
     total_transactions_count_ -= pool.transactions().size();
     walletsCacheUpdater_->loadNextBlock(pool, pool.confidants(), *this, true);
+    // remove wallets exposed by the block
     removeWalletsInPoolFromCache(pool);
-    removeLastBlockFromTrxIndex(pool);
-
+    // signal all subscribers, transaction index is still consistent up to removed block!
     emit removeBlockEvent(pool);
+    // erase indexes from the block
+    removeLastBlockFromTrxIndex(pool);
 
     csmeta(csdebug) << "done";
 }
@@ -932,6 +959,16 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
 
 void BlockChain::close() {
     cs::Lock lock(dbLock_);
+    if (deferredBlock_.is_valid() && deferredBlock_.is_read_only()) {
+        deferredBlock_.set_storage(storage_);
+        if (deferredBlock_.save()) {
+            csdebug() << "Blockchain> block #" << deferredBlock_.sequence() << " is flushed to DB";
+            deferredBlock_ = csdb::Pool{};
+        }
+        else {
+            cserror() << "Failed to flush block #" << deferredBlock_.sequence() << " to DB";
+        }
+    }
     storage_.close();
     cs::Connector::disconnect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     blockHashes_->close();
@@ -1003,6 +1040,21 @@ bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallDa
     }
 
     return findWalletData_Unsafe(id, wallData);
+}
+
+bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallData) const {
+    if (address.is_wallet_id()) {
+        return findWalletData(address.wallet_id(), wallData);
+    }
+
+    std::lock_guard lock(cacheMutex_);
+
+    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(address.public_key());
+    if (wallDataPtr) {
+        wallData = *wallDataPtr;
+        return true;
+    }
+    return false;
 }
 
 bool BlockChain::findWalletData(WalletId id, WalletData& wallData) const {
@@ -1272,6 +1324,8 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         setTransactionsFees(pool);
 
         // update wallet ids
+        // it should be done before check pool's signature,
+        // because it can change pool's binary representation
         if (bySync) {
             // ready-to-record block does not require anything
             csdebug() << "BLOCKCHAIN> store block #" << poolSequence << " to chain, update wallets ids";
@@ -1287,14 +1341,19 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             csdebug() << "BLOCKCHAIN> block #" << poolSequence << " has recorded to chain successfully";
             // unable to call because stack overflow in case of huge written blocks amount possible:
             // testCachedBlocks();
-			blocksToBeRemoved_ = 0;
+			blocksToBeRemoved_ = 1;
             return true;
         }
 
         csdebug() << "BLOCKCHAIN> failed to store block #" << poolSequence << " to chain";
-		if (poolSequence == lastSequence_) {
-			removeLastBlock();
-		}
+
+        // no need to perform removeLastBlock() as we've updated only wallet ids
+        removeWalletsInPoolFromCache(pool);
+
+        if (lastSequence_ == poolSequence) {
+            --lastSequence_;
+            deferredBlock_ = csdb::Pool{};
+        }
 
         return false;
     }
@@ -1334,10 +1393,11 @@ void BlockChain::testCachedBlocks() {
         auto firstBlockInCache = cachedBlocks_.begin();
 
         if ((*firstBlockInCache).first == lastSeq) {
-            csdebug() << "BLOCKCHAIN> Retrieve required block #" << lastSeq << " from cache";
+            cslog() << "BLOCKCHAIN> store block #" << WithDelimiters(lastSeq) << " from cache";
             // retrieve and use block if it is exactly what we need:
 
-            const bool ok = storeBlock((*firstBlockInCache).second.pool, (*firstBlockInCache).second.by_sync);
+            auto data = (*firstBlockInCache).second;
+            const bool ok = storeBlock(data.pool, data.by_sync);
             cachedBlocks_.erase(firstBlockInCache);
             if (!ok) {
                 cserror() << "BLOCKCHAIN> Failed to record cached block to chain, drop it & wait to request again";
@@ -1357,8 +1417,16 @@ const cs::ReadBlockSignal& BlockChain::readBlockEvent() const {
     return storage_.readBlockEvent();
 }
 
+const cs::StartReadingBlocksSignal& BlockChain::startReadingBlocksEvent() const {
+    return storage_.readingStartedEvent();
+}
+
 std::size_t BlockChain::getCachedBlocksSize() const {
     return cachedBlocks_.size();
+}
+
+void BlockChain::clearBlockCache() {
+	cachedBlocks_.clear();
 }
 
 std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const {

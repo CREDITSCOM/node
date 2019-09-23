@@ -6,6 +6,7 @@
 #include <cscrypto/cryptoconstants.hpp>
 #include <csdb/currency.hpp>
 #include <csnode/datastream.hpp>
+#include <csnode/transactionsiterator.hpp>
 #include <lib/system/logger.hpp>
 #include <csnode/fee.hpp>
 #include <functional>
@@ -156,9 +157,7 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
                 if (!invoke.usedContracts.empty()) {
                     for (const auto item : invoke.usedContracts) {
                         if (item.size() == cscrypto::kPublicKeySize) {
-                            cs::PublicKey key;
-                            std::copy(item.cbegin(), item.cend(), key.begin());
-                            const csdb::Address addr = csdb::Address::from_public_key(key); // BlockChain::getAddressFromKey(item);
+                            const csdb::Address addr = csdb::Address::from_public_key(item.c_str()); // BlockChain::getAddressFromKey(item);
                             if (addr.is_valid()) {
                                 execution.uses.push_back(addr);
                             }
@@ -183,17 +182,22 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
 , force_execution(false)
 , bc(blockchain)
 , executor_ready(true)
+, max_read_sequence(0)
 {
     // signals subscription (MUST occur AFTER the BlockChains has already subscribed to storage)
     // as event receiver:
-    cs::Connector::connect(&bc.storeBlockEvent, this, &SmartContracts::on_store_block);
+    cs::Connector::connect(&bc.startReadingBlocksEvent(), this, &SmartContracts::on_start_reading_blocks);
     cs::Connector::connect(&bc.readBlockEvent(), this, &SmartContracts::on_read_block);
+    cs::Connector::connect(&bc.storeBlockEvent, this, &SmartContracts::on_store_block);
     cs::Connector::connect(&bc.removeBlockEvent, this, &SmartContracts::on_remove_block);
     cs::Connector::connect(&cs::Conveyer::instance().statesCreated, this, &SmartContracts::on_update);
     // as event source:
     cs::Connector::connect(&signal_payable_invoke, &bc, &BlockChain::onPayableContractReplenish);
     cs::Connector::connect(&signal_contract_timeout, &bc, &BlockChain::onContractTimeout);
     cs::Connector::connect(&signal_emitted_accepted, &bc, &BlockChain::onContractEmittedAccepted);
+    cs::Connector::connect(&rollback_payable_invoke, &bc, &BlockChain::rollbackPayableContractReplenish);
+    cs::Connector::connect(&rollback_contract_timeout, &bc, &BlockChain::rollbackContractTimeout);
+    cs::Connector::connect(&rollback_emitted_accepted, &bc, &BlockChain::rollbackContractEmittedAccepted);
 }
 
 SmartContracts::~SmartContracts() = default;
@@ -211,22 +215,6 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
     }
     node_id = id;
     force_execution = pnode->alwaysExecuteContracts();
-
-    // currently, blockchain is read in such manner that does not require absolute/optimized consolidation post-factum
-    // anyway this tested code may become useful in future
-
-    // validate contract states
-    for (const auto& item : known_contracts) {
-        const StateItem& val = item.second;
-        if (val.state.empty()) {
-            csdetails() << kLogPrefix << "completely unsuccessful " << val.ref_deploy << " found, neither deployed, nor executed";
-        }
-        if (!val.ref_deploy.is_valid()) {
-            csdetails() << kLogPrefix << "unsuccessfully deployed contract found";
-        }
-    }
-
-    csdebug() << kLogPrefix << known_contracts.size() << " smart contract loaded";
 }
 
 /*static*/
@@ -667,7 +655,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_
                         }
                     }
                     if (!in_known_contracts(u)) {
-                        cslog() << kLogPrefix << "call to unknown contract " << to_base58(u) << " declared in " << new_item << ", cancel ";
+                        csdebug() << kLogPrefix << "call to unknown contract " << to_base58(u) << " declared in " << new_item << ", cancel ";
                         remove_from_queue(new_item, skip_log);
                         // also removes parent "it" from exe_queue if empty
                         return;
@@ -1056,7 +1044,12 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                                     // required contract address may differ from "primary" executed contract:
 
                                     if (head.states.count(req_abs_addr) == 0) {
-                                        cserror() << kLogPrefix << "cannot find contract new state in execution result";
+                                        if (exe_data.result.response.code == error::TimeExpired) {
+                                            cslog() << kLogPrefix << "timeout while executing contract, new state is not set";
+                                        }
+                                        else {
+                                            cslog() << kLogPrefix << "contract new state is not set in execution result";
+                                        }
                                     }
                                     else {
                                         const auto& state = head.states.at(req_abs_addr);
@@ -1109,11 +1102,244 @@ void SmartContracts::on_store_block(const csdb::Pool& block) {
 void SmartContracts::on_read_block(const csdb::Pool& block, bool* should_stop) {
     cs::Lock lock(public_access_lock);
     on_next_block_impl(block, true, should_stop);
+
+    if (block.sequence() == max_read_sequence && max_read_sequence > 0) {
+        // validate contract states
+        for (const auto& item : known_contracts) {
+            const StateItem& val = item.second;
+            if (val.state.empty()) {
+                csdetails() << kLogPrefix << "completely unsuccessful " << val.ref_deploy << " found, neither deployed, nor executed";
+            }
+            if (!val.ref_deploy.is_valid()) {
+                csdetails() << kLogPrefix << "unsuccessfully deployed contract found";
+            }
+        }
+        csdebug() << kLogPrefix << "finish reading DB, " << WithDelimiters(known_contracts.size()) << " contracts were loaded";
+    }
 }
 
 /*public*/
-void SmartContracts::on_remove_block(const csdb::Pool&) {
-    // @TODO provide implementation
+void SmartContracts::on_remove_block(const csdb::Pool& block) {
+    if (!block.is_valid()) {
+        return;
+    }
+    if (block.transactions_count() == 0) {
+        return;
+    }
+
+    cs::Lock lock(public_access_lock);
+
+    csdebug() << kLogPrefix << "block " << WithDelimiters(block.sequence()) << " is removed, rollback contracts";
+    csdb::Transaction last_new_state_transaction;
+    for (const auto& t : block.transactions()) {
+        if (is_new_state(t)) {
+            last_new_state_transaction = t;
+            csdb::Address abs_addr = absolute_address(t.target());
+            csdb::UserField fld = t.user_field(trx_uf::new_state::RefStart);
+            if (fld.is_valid()) {
+                SmartContractRef ref(fld);
+                // put RUNNING item to exe_queue
+                auto it_queue = find_in_queue(ref);
+                if (it_queue == exe_queue.end()) {
+                    auto starter = get_transaction(ref, abs_addr);
+                    if (starter.is_valid()) {
+                        it_queue = exe_queue.emplace(exe_queue.cend(), QueueItem(ref, abs_addr, starter));
+                        update_status(*it_queue, ref.sequence, SmartContractStatus::Running, true /*skip_log*/);
+                    }
+                }
+                csdebug() << kLogPrefix << "last state of " << to_base58(abs_addr) << " is removed, restore previous";
+
+                // restore previous contract state
+                if (in_known_contracts(abs_addr)) {
+                    StateItem& item = known_contracts[abs_addr];
+                    item.state.clear();
+
+                    std::list<cs::Sequence> all_contract_blocks;
+                    auto prev_seq = bc.getPreviousPoolSeq(abs_addr, t.id().pool_seq());
+                    while (prev_seq != kWrongSequence) {
+                        all_contract_blocks.insert(all_contract_blocks.cbegin(), prev_seq);
+                        prev_seq = bc.getPreviousPoolSeq(abs_addr, prev_seq);
+                        if (prev_seq == 0) {
+                            break;
+                        }
+                    }
+
+                    // go through all blocks and re-execute contract
+                    std::string executed_state;
+                    csdb::Transaction executed_transaction;
+                    SmartContractRef executed_ref;
+                    if (!all_contract_blocks.empty()) {
+                        for (const auto seq : all_contract_blocks) {
+                            const csdb::Pool b = bc.loadBlock(seq);
+                            for (const auto& tt : b.transactions()) {
+                                if (absolute_address(tt.target()) == abs_addr) {
+                                    if (is_new_state(tt)) {
+                                        // store new state in cache
+                                        csdb::UserField fld_value = tt.user_field(trx_uf::new_state::Value);
+                                        if (fld_value.is_valid()) {
+                                            std::string tmp = fld_value.value<std::string>();
+                                            if (!tmp.empty()) {
+                                                item.state = tmp;
+                                            }
+                                        }
+                                        else {
+                                            if (!executed_state.empty()) {
+                                                csdb::UserField fld_hash = tt.user_field(trx_uf::new_state::Hash);
+                                                if (fld_hash.is_valid()) {
+                                                    std::string hash_string = fld_hash.value<std::string>();
+                                                    cs::Hash stored_hash;
+                                                    if (hash_string.size() == stored_hash.size()) {
+                                                        std::copy(hash_string.cbegin(), hash_string.cend(), stored_hash.begin());
+                                                        cs::Hash executed_hash = cscrypto::calculateHash((cs::Byte*)executed_state.data(), executed_state.size());
+                                                        if (executed_hash == stored_hash) {
+                                                            item.state = executed_state;
+                                                            item.execute = executed_transaction;
+                                                            item.ref_execute = executed_ref;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else {
+                                        // re-execute contract
+                                        SmartExecutionData exe_data;
+                                        exe_data.contract_ref.sequence = tt.id().pool_seq();
+                                        exe_data.contract_ref.transaction = tt.id().index();
+                                        exe_data.abs_addr = abs_addr;
+                                        exe_data.executor_fee = csdb::Amount(tt.max_fee().to_double());
+                                        exe_data.explicit_last_state = item.state;
+                                        while (!execute(exe_data, true /*validationMode*/)) {
+                                            // execution error, test if executor is still available
+                                            if (!executor_ready) {
+                                                // ask user to restart executor every 2 seconds
+                                                if (!wait_until_executor(2)) {
+                                                    cserror() << kLogPrefix << "cannot connect to executor, contract re-excution is impossible";
+                                                    if (pnode->isStopRequested()) {
+                                                        cslog() << kLogPrefix << "node is requested to stop, cancel wait to executor";
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                            else {
+                                                if (exe_data.error.empty()) {
+                                                    exe_data.error = "contract execution failed";
+                                                }
+                                                cserror() << kLogPrefix << "failed to get updated state of " << exe_data.contract_ref << ": " << exe_data.error;
+                                                break;
+                                            }
+                                        }
+                                        if (!exe_data.result.smartsRes.empty()) {
+                                            const auto& head = exe_data.result.smartsRes.front();
+                                            if (head.response.code == 0) {
+                                                if (head.states.count(abs_addr) == 0) {
+                                                    if (exe_data.result.response.code == error::TimeExpired) {
+                                                        cslog() << kLogPrefix << "timeout while executing contract, new state is not set";
+                                                    }
+                                                    else {
+                                                        cslog() << kLogPrefix << "contract new state is not set in execution result";
+                                                    }
+                                                }
+                                                else {
+                                                    executed_state = head.states.at(abs_addr);
+                                                    executed_transaction = tt;
+                                                    executed_ref.hash = b.hash();
+                                                    executed_ref.sequence = b.sequence();
+                                                    executed_ref.transaction = tt.id().index();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (item.state.empty()) {
+                        net_request_contract_state(abs_addr);
+                        csdebug() << kLogPrefix << "unable to restore new state of " << to_base58(abs_addr) << ", make a network request";
+                    }
+                    else {
+                        if (dbcache_update(abs_addr, item.ref_execute, item.state, true)) {
+                            item.ref_cache = item.ref_execute;
+                            csdebug() << kLogPrefix << "last state of " << to_base58(abs_addr) << " is restored to " << item.ref_execute;
+                        }
+                        else {
+                            cslog() << kLogPrefix << "failed to stora in cache state of " << to_base58(abs_addr) << " restored to " << item.ref_execute;
+                        }
+                    }
+                }
+            }
+        } // endif is_new_state(t)
+        else if (is_payable_target(t)) {
+            /*signal*/
+            rollback_payable_invoke(t);
+        }
+        else if (is_executable(t)) {
+            // erase execution from exe queue
+            SmartContractRef ref;
+            ref.sequence = t.id().pool_seq();
+            ref.transaction = t.id().index();
+            auto it_queue = find_in_queue(ref);
+            if (it_queue != exe_queue.end()) {
+                auto it_exe = find_in_queue_item(it_queue, ref);
+                if (it_exe != it_queue->executions.end()) {
+                    it_queue->executions.erase(it_exe);
+                }
+                if (it_queue->executions.empty()) {
+                    exe_queue.erase(it_queue);
+                }
+            }
+            // erase deploy transaction, erase contract at all
+            if (is_deploy(t)) {
+                csdb::Address abs_addr = absolute_address(t.target());
+                csdebug() << kLogPrefix << "completely erase " << to_base58(abs_addr) << " as deploy " << ref << " in removed block";
+                known_contracts.erase(abs_addr);
+            }
+        }
+        else {
+            csdb::Address abs_addr = absolute_address(t.source());
+            if (in_known_contracts(abs_addr)) {
+                if (last_new_state_transaction.is_valid()) {
+                    csdb::UserField fld = last_new_state_transaction.user_field(trx_uf::new_state::RefStart);
+                    if (fld.is_valid()) {
+                        SmartContractRef ref(fld);
+                        csdb::Transaction start_transaction = get_transaction(ref, abs_addr);
+                        if (start_transaction.is_valid()) {
+                            rollback_emitted_accepted(t, start_transaction);
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+    
+    // if 100 blocks ago execution is found:
+    csdb::Pool timeout_candidates_block = bc.loadBlock(block.sequence());
+    if (timeout_candidates_block.is_valid() && timeout_candidates_block.transactions_count() > 0) {
+        SmartContractRef ref;
+        ref.sequence = timeout_candidates_block.sequence();
+        for (const auto& t : timeout_candidates_block.transactions()) {
+            if (is_smart_contract(t) && !is_new_state(t)) {
+                // assume only last block in chain is subject to remove
+                
+                csdb::Address abs_addr = absolute_address(t.target());
+                if (in_known_contracts(abs_addr)) {
+                    auto& item = known_contracts[abs_addr];
+                    ref.transaction = t.id().index();
+                    // if it is completed with new_state before this block, ignore
+                    if (item.ref_execute < ref) {
+                        // such a call did not update a new state, ended with timeout
+                        rollback_contract_timeout(t);
+                        // put RUNNING item to exe_queue to fix timeout again when new block will arrive
+                        auto it_queue = exe_queue.emplace(exe_queue.cend(), QueueItem(ref, abs_addr, t));
+                        update_status(*it_queue, ref.sequence, SmartContractStatus::Running, true /*skip_log*/);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /*private*/
@@ -1442,6 +1668,9 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
                 executor_ready = false;
                 data.setError(error::ExecuteTransaction, "execution failed (check executor version), contract state is unchanged");
             }
+        }
+        else if (data.result.response.code == error::TimeExpired) {
+            data.setError(error::ExecutorUnreachable, "execution timeout");
         }
         else if (data.result.response.code == error::ThriftException) {
             test_executor_ready = true;
@@ -2002,13 +2231,8 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         // create or get contract state item
         StateItem& item = known_contracts[abs_addr];
         // update state value in cache if it is older then or equal to or unset
-#if defined(MONITOR_NODE) || defined(WEB_WALLET_NODE)
-        constexpr bool force_update_contracts_cache = true; // until TokenMaster to become more smart
-        if constexpr (force_update_contracts_cache || !item.ref_cache.is_valid() || item.ref_cache < ref_start || item.ref_cache == ref_start) {
-#else
-        constexpr bool force_update_contracts_cache = false; // until TokenMaster to become more smart
+        constexpr bool force_update_contracts_cache = false;
         if (force_update_contracts_cache || !item.ref_cache.is_valid() || item.ref_cache < ref_start || item.ref_cache == ref_start) {
-#endif
             if (!dbcache_update(abs_addr, ref_start, state_value, force_update_contracts_cache)) {
                 if (reading_db) {
                     // update state in memory cache
@@ -2465,7 +2689,7 @@ bool SmartContracts::wait_until_executor(unsigned int test_freq, unsigned int ma
         if (++counter >= max_periods) {
             return false;
         }
-        cswarning() << kLogPrefix << "wait for executor prior to continue read blockchain DB";
+        cswarning() << kLogPrefix << "executor disconnected, wait until connection is restored to continue with blockchain";
         std::this_thread::sleep_for(std::chrono::seconds(test_freq));
     }
     executor_ready = true;

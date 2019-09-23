@@ -7,12 +7,14 @@
 #endif
 #include <boost/asio.hpp>
 
-#include <client/config.hpp>
 #include <lib/system/cache.hpp>
 #include "pacmans.hpp"
 
 using io_context = boost::asio::io_context;
 
+struct EndpointData;
+
+class Config;
 class Transport;
 
 class Network {
@@ -28,6 +30,7 @@ public:
 
     void sendInit();
     void sendDirect(const Packet&, const ip::udp::endpoint&);
+    void sendPackDirect(Packet& pack, const ip::udp::endpoint& ep);
 
     bool resendFragment(const cs::Hash&, const uint16_t, const ip::udp::endpoint&);
     void registerMessage(Packet*, const uint32_t size);
@@ -97,6 +100,7 @@ private:
     std::atomic_flag readerLock = ATOMIC_FLAG_INIT;
     std::atomic_flag writerLock = ATOMIC_FLAG_INIT;
 #endif
+    ip::udp::socket* sendSock_;
 };
 
 #endif  // NETWORK_HPP

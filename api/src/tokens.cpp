@@ -132,6 +132,14 @@ template <typename T>
 T getVariantAs(const general::Variant&);
 template <>
 std::string getVariantAs(const general::Variant& var) {
+    if (var.__isset.v_big_decimal) {
+        try {
+            if (stof(var.v_big_decimal) == 0)
+                return "0";
+        }
+        catch (...) {}
+        return var.v_big_decimal;
+    }
     return var.v_string;
 }
 
@@ -210,20 +218,23 @@ void TokensMaster::refreshTokenState(const csdb::Address& token, const std::stri
             auto key = h.public_key();
             var.__set_v_string(EncodeBase58(cs::Bytes(key.begin(), key.end())));
             holderKeysParams.push_back(std::vector<general::Variant>(1, var));
-            /*if (var == "HtimoDtTYGSVotnQ5Eo4eud3FkDv5r2QYiKSZcdWP7Z8") {
-                int a = 1;
-            }*/
         }
 
         api_->getExecutor().executeByteCodeMultiple(result, dpAddr, smartContractBinary, "balanceOf", holderKeysParams, 100, executor::Executor::kUseLastSequence);
 
-        ++t.realHoldersCount = 0;
         if (!result.status.code && (result.results.size() == holders.size())) {
             for (uint32_t i = 0; i < holders.size(); ++i) {
                 const auto& res = result.results[i];
                 if (!res.status.code) {
+                    bool zeroBalanceFlg = true;
+                    if (!isZeroAmount(t.holders[holders[i]].balance))
+                        zeroBalanceFlg = false;
+
                     t.holders[holders[i]].balance = tryExtractAmount(getVariantAs<std::string>(res.ret_val));
-                    ++t.realHoldersCount;
+                    if (zeroBalanceFlg && !isZeroAmount(t.holders[holders[i]].balance))
+                        ++t.realHoldersCount;
+                    else if (!zeroBalanceFlg && isZeroAmount(t.holders[holders[i]].balance))
+                        --t.realHoldersCount;
                 }
             }
         }
@@ -271,8 +282,12 @@ void TokensMaster::updateTokenChaches(const csdb::Address& addr, const std::stri
             if (regDude.is_valid())
                 initiateHolder(tIt->second, tIt->first, regDude);
         }
+        else if (ps.method == "approve") {
+            initiateHolder(tIt->second, tIt->first, tryExtractPublicKey(ps.params[0].v_string));
+        }
     }
 
+#ifdef MANUAL_BALANCE
     // Balance update   
     auto refreshBalance = [&](const csdb::Address& addrFrom, const csdb::Address& addrTo = csdb::Address{}, const std::string& amount = "") {
         auto getCurrBalance = [&](const csdb::Address& addrOwner) -> std::string {
@@ -332,16 +347,18 @@ void TokensMaster::updateTokenChaches(const csdb::Address& addr, const std::stri
             ++t.realHoldersCount;
         currToBalance = newToBalance;
     };
+#endif
 
-    if(api_->isBDLoaded()){
+    if(api_->isBDLoaded()) {
+#ifdef MANUAL_BALANCE
         if (ps.method == "transfer" && ps.params.size() == 2)
             refreshBalance(ps.initiator, tryExtractPublicKey(ps.params[0].v_string), ps.params[1].v_string);
         else if (ps.method == "transferFrom" && ps.params.size() == 3)
             refreshBalance(tryExtractPublicKey(ps.params[0].v_string), tryExtractPublicKey(ps.params[1].v_string), ps.params[2].v_string);
         else if (ps.method.empty()) // deploy token
             refreshBalance(tokens_[addr].owner);
-
-        refreshTokenState(addr, cs::SmartContracts::get_contract_state(api_->get_s_blockchain(), addr));
+#endif
+        refreshTokenState(addr, cs::SmartContracts::get_contract_state(api_->get_s_blockchain(), addr), true);
     }
 }
 

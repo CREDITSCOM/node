@@ -14,7 +14,7 @@
 
 // compile time and rtti reflection in action, works only in methods.
 // if class/struct is not polimorphic - compile-time reflection, otherwise - run-time.
-#define className typeid(*this).name
+#define className() NAMEOF_FULL_TYPE_EXPR(*this)
 #define classNameString() std::string(className()) + std::literals::string_literals::operator""s(" ")
 
 #define funcName() __func__
@@ -25,6 +25,9 @@
 
 #define csreflection() className() << ", method " << csfunc()
 #define csmeta(...) __VA_ARGS__() << csreflection()
+
+#define csexpression(...) NAMEOF_FULL_TYPE_EXPR(__VA_ARGS__)
+#define cstype(...) NAMEOF_FULL_TYPE(__VA_ARGS__)
 
 namespace cs {
 

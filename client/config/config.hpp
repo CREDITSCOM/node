@@ -16,7 +16,7 @@ namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
 using NodeVersion = uint16_t;
-const NodeVersion NODE_VERSION = 421;
+const NodeVersion NODE_VERSION = 422;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
@@ -36,9 +36,9 @@ const uint8_t DELTA_ROUNDS_VERIFY_NEW_SERVER = 100;
 using Port = short unsigned;
 
 struct EndpointData {
-    bool ipSpecified;
-    short unsigned port;
-    ip::address ip;
+    bool ipSpecified = false;
+    short unsigned port = 0;
+    ip::address ip{};
 
     static EndpointData fromString(const std::string&);
 };
@@ -75,6 +75,11 @@ struct ApiData {
     int ajaxServerReceiveTimeout = 30000;
     std::string executorHost{ "localhost" };
     std::string executorCmdLine{};
+};
+
+struct ConveyerData {
+    size_t sendCacheValue = DEFAULT_CONVEYER_SEND_CACHE_VALUE;
+    size_t maxResendsSendCache = DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE;
 };
 
 class Config {
@@ -178,6 +183,14 @@ public:
         return alwaysExecuteContracts_;
     }
 
+    bool newBlockchainTop() const {
+        return newBlockchainTop_;
+    }
+
+    uint64_t newBlockchainTopSeq() const {
+        return newBlockchainTopSeq_;
+    }
+
     uint64_t observerWaitTime() const {
         return observerWaitTime_;
     }
@@ -185,21 +198,23 @@ public:
     bool readKeys(const po::variables_map& vm);
     bool enterWithSeed();
 
-    size_t conveyerSendCacheValue() const {
-        return conveyerSendCacheValue_;
+    const ConveyerData& conveyerData() const {
+        return conveyerData_;
     }
 
     void swap(Config& config);
 
 private:
     static Config readFromFile(const std::string& fileName);
+
     void setLoggerSettings(const boost::property_tree::ptree& config);
     void readPoolSynchronizerData(const boost::property_tree::ptree& config);
     void readApiData(const boost::property_tree::ptree& config);
+    void readConveyerData(const boost::property_tree::ptree& config);
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
     void showKeys(const std::string& pk58);
-    
+
     void changePasswordOption(const std::string& pathToSk);
 
     template <typename T>
@@ -209,40 +224,44 @@ private:
 
     EndpointData inputEp_;
 
-    bool twoSockets_;
+    bool twoSockets_ = false;
+
     EndpointData outputEp_;
 
-    NodeType nType_;
+    NodeType nType_ = NodeType::Client;
 
-    bool ipv6_;
-    uint32_t maxNeighbours_;
-    uint64_t connectionBandwidth_;
+    bool ipv6_ = false;
 
-    bool symmetric_;
+    uint32_t maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS;
+    uint64_t connectionBandwidth_ = DEFAULT_CONNECTION_BANDWIDTH;
+
+    bool symmetric_ = false;
     EndpointData hostAddressEp_;
 
-    BootstrapType bType_;
+    BootstrapType bType_ = SignalServer;
     EndpointData signalServerEp_;
 
     std::vector<EndpointData> bList_;
 
     std::string pathToDb_;
 
-    cs::PublicKey publicKey_;
-    cs::PrivateKey privateKey_;
+    cs::PublicKey publicKey_{};
+    cs::PrivateKey privateKey_{};
 
-    boost::log::settings loggerSettings_;
+    boost::log::settings loggerSettings_{};
 
     PoolSyncData poolSyncData_;
     ApiData apiData_;
 
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
+    bool newBlockchainTop_ = false;
 
-    uint64_t observerWaitTime_;
+    uint64_t newBlockchainTopSeq_;
 
-    size_t conveyerSendCacheValue_;
-    size_t conveyerMaxResendsSendCache_;
+    uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
+
+    ConveyerData conveyerData_;
 
     friend bool operator==(const Config&, const Config&);
 };
@@ -256,6 +275,9 @@ bool operator!=(const PoolSyncData& lhs, const PoolSyncData& rhs);
 
 bool operator==(const ApiData& lhs, const ApiData& rhs);
 bool operator!=(const ApiData& lhs, const ApiData& rhs);
+
+bool operator==(const ConveyerData& lhs, const ConveyerData& rhs);
+bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs);
 
 bool operator==(const Config& lhs, const Config& rhs);
 bool operator!=(const Config& lhs, const Config& rhs);

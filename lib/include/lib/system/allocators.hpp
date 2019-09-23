@@ -25,6 +25,7 @@ public:
     using Allocator = RegionAllocator;
     using Type = void;
     using RegionPtr = std::shared_ptr<Region>;
+    using SizeType = uint32_t;
 
     void* data() {
         return data_;
@@ -69,6 +70,35 @@ private:
 };
 
 using RegionPtr = Region::RegionPtr;
+
+class CompressedRegion {
+public:
+    using SizeType = Region::SizeType;
+    using BinarySizeType = size_t;
+
+    CompressedRegion() = default;
+
+    explicit CompressedRegion(RegionPtr ptr, size_t binary)
+    : binarySize_(binary)
+    , ptr_(std::move(ptr)) {
+    }
+
+    size_t binarySize() const {
+        return binarySize_;
+    }
+
+    cs::Byte* data() const {
+        return static_cast<cs::Byte*>(ptr_->data());
+    }
+
+    auto size() const {
+        return ptr_->size();
+    }
+
+private:
+    size_t binarySize_;
+    RegionPtr ptr_;
+};
 
 /* ActivePage points to a page with some free memory.
    - If its free memory isn't enough to complete an alloc request,
@@ -275,6 +305,7 @@ private:
 
     friend typename MemRegion::Allocator;
     friend class Network;
+    friend class PacketCollector;
 };
 
 template <typename T>

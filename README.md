@@ -15,7 +15,7 @@ The Node processes and stores transactions, executes and confirms smart contract
 Written on C++.
 
 ## Version
-Current node version 4.2.421
+Current node version 4.2.422
 
 <h2>What is Credits Node?</h2>
 <p>Credits Node is the main module that provide an opportunity to run a node and participate in CREDITS blockhain network. The node performs processing and storage of transactions, execution and confirmation of the terms of smart contracts, processing requests from third-party systems, and provides data upon request. Each node on the network has the same functionality.
@@ -29,7 +29,7 @@ The node consists of the following elements:</p>
 
 <h2>Build dependencies</h2>
 <ul>
-<li><a href="https://www.boost.org/users/history/version_1_68_0.html">Boost 1.68</a> or newest static prebuild</li>
+<li><a href="https://www.boost.org/users/history/version_1_70_0.html">Boost 1.70</a> or newest static prebuild</li>
 <li>Compiler with C++17 support</li>
 <li><a href="https://cmake.org/download/">Cmake 3.11</a> or newest</li>
 <li> Requirements fo building <a href="https://thrift.apache.org/docs/install/">Apache Thrift</a></li>

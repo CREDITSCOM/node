@@ -71,8 +71,13 @@ private:
 
     template <typename Func>
     static void run(Func&& function) {
-        std::thread thread(std::forward<Func>(function));
-        thread.detach();
+        try {
+            std::thread thread(std::forward<Func>(function));
+            thread.detach();
+        }
+        catch (...) {
+            execute(std::forward<Func>(function));
+        }
     }
 
     template <typename T>
@@ -416,6 +421,7 @@ public:
     bool waitTillFront(const T& t) {
         std::unique_lock lock(lock_);
         auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(kWaitSecondsTime), [&]() { return t(hash_); });
+        hash_.condFlg = false;
         tidMap_.erase(std::this_thread::get_id());
         conditionalVariable_.notify_all();
         return res;

@@ -11,7 +11,7 @@
 
 #include <net/neighbourhood.hpp>
 
-#include <client/config.hpp>
+#include <config.hpp>
 
 class Node;
 

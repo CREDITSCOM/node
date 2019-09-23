@@ -131,9 +131,12 @@ void APIHandler::WalletDataGet(WalletDataGetResult& _return, const general::Addr
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(addr, wallData, wallId))
-        return;
-    _return.walletData.walletId = wallId;
+    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
+        if (!s_blockchain.findWalletData(addr, wallData)) { // **
+            return;
+        }
+    }
+    _return.walletData.walletId = wallId; // may be default value if **
     _return.walletData.balance.integral = wallData.balance_.integral();
     _return.walletData.balance.fraction = static_cast<decltype(_return.walletData.balance.fraction)>(wallData.balance_.fraction());
     const cs::TransactionsTail& tail = wallData.trxTail_;
@@ -158,8 +161,7 @@ void APIHandler::WalletIdGet(api::WalletIdGetResult& _return, const general::Add
 void APIHandler::WalletTransactionsCountGet(api::WalletTransactionsCountGetResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
+    if (!s_blockchain.findWalletData(addr, wallData)) {
         SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
         return;
     }
@@ -170,8 +172,7 @@ void APIHandler::WalletTransactionsCountGet(api::WalletTransactionsCountGetResul
 void APIHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
+    if (!s_blockchain.findWalletData(addr, wallData)) {
         return;
     }
     _return.balance.integral = wallData.balance_.integral();
@@ -432,14 +433,16 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
 
     // 3) fill ExtraFee for extra transactions
     auto trxIt = std::find_if(transactions.begin(), transactions.end(), [&stateTrx](const csdb::Transaction& ptrx) { return ptrx.id() == stateTrx.id(); });
-    for (auto trx = ++trxIt; trx != transactions.end(); ++trx) {
-        if (s_blockchain.getAddressByType(trx->source(), BlockChain::AddressType::PublicKey) != 
-            s_blockchain.getAddressByType(stateTrx.source(), BlockChain::AddressType::PublicKey)) // end find extra transactions                   
+    if (trxIt != transactions.end()) {
+        for (auto trx = ++trxIt; trx != transactions.end(); ++trx) {
+            if (s_blockchain.getAddressByType(trx->source(), BlockChain::AddressType::PublicKey) !=
+                s_blockchain.getAddressByType(stateTrx.source(), BlockChain::AddressType::PublicKey)) // end find extra transactions                   
                 break;
-        extraFee.transactionId = convert_transaction_id(trx->id());
-        extraFee.sum = convertAmount(csdb::Amount(trx->counted_fee().to_double()));
-        extraFee.comment = "emitted trxs fee";
-        result.trxn.extraFee.push_back(extraFee);
+            extraFee.transactionId = convert_transaction_id(trx->id());
+            extraFee.sum = convertAmount(csdb::Amount(trx->counted_fee().to_double()));
+            extraFee.comment = "emitted trxs fee";
+            result.trxn.extraFee.push_back(extraFee);
+        }
     }
     result.trxn.__isset.extraFee = true;
     return result;
@@ -605,11 +608,10 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
     const auto source = BlockChain::getAddressFromKey(transaction.source);
     const uint64_t WALLET_DENOM = csdb::Amount::AMOUNT_MAX_FRACTION;  // 1'000'000'000'000'000'000ull;
     send_transaction.set_amount(csdb::Amount(transaction.amount.integral, transaction.amount.fraction, WALLET_DENOM));
-    BlockChain::WalletData wallData{};
-    BlockChain::WalletId id{};
+    BlockChain::WalletData dummy{};
 
     if (transaction.__isset.smartContract && !transaction.smartContract.forgetNewState &&  // not for getter
-            !s_blockchain.findWalletData(source, wallData, id)) {
+            !s_blockchain.findWalletData(source, dummy)) {
         return csdb::Transaction{};
     }
 
@@ -671,8 +673,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
     // check money
     const auto source_addr = s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
     BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(source_addr, wallData, wallId))
+    if (!s_blockchain.findWalletData(source_addr, wallData))
         return "not enough money!";
 
     const auto max_fee = trxn.max_fee().to_double();
@@ -932,9 +933,9 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
 
 void APIHandler::store_block_slot(const csdb::Pool& pool) {
     updateSmartCachesPool(pool);
-#ifdef TOKENS_CACHE   
     if(!isBDLoaded_) {
         isBDLoaded_ = true;
+#ifdef TOKENS_CACHE   
         tm_.loadTokenInfo([&](const TokensMap& tokens, const HoldersMap&) {
             int count{}, i{};
             size_t tokenSize = tokens.size();
@@ -946,8 +947,9 @@ void APIHandler::store_block_slot(const csdb::Pool& pool) {
             }
             cslog() << "tokens loaded!";
         });
-    }
 #endif
+    }
+
 }
 
 void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
@@ -1098,18 +1100,18 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 // new_state value, not hash!
                 newStateStr = trxn.user_field(cs::trx_uf::new_state::Value).template value<std::string>();
             }
-            else { // signal to end waiting for a transaction
-                auto hashStateInst(lockedReference(this->hashStateSL));
-                (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
-                    auto newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();
-                    if (!newHashStr.empty())
-                        std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
-                    else
-                        res.hash = cs::Zero::hash;
-                    res.retVal = trxn.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();
-                    res.isOld = (res.hash == oldHash.hash);
-                    res.condFlg = true;
-                    return res;
+            else if (isBDLoaded_) { // signal to end waiting for a transaction
+                    auto hashStateInst(lockedReference(this->hashStateSL));
+                    (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
+                        auto newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();
+                        if (!newHashStr.empty())
+                            std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
+                        else
+                            res.hash = cs::Zero::hash;
+                        res.retVal = trxn.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();
+                        res.isOld = (res.hash == oldHash.hash);
+                        res.condFlg = true;
+                        return res;
                     });
             }
 
@@ -1192,11 +1194,21 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
 }
 
 template <typename Mapper>
-size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out) {
+size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out, int64_t offset, int64_t limit) {
     auto locked_deployed_by_creator = lockedReference(this->deployed_by_creator);
     auto& elt = (*locked_deployed_by_creator)[deployer];
-    for (const auto& trid : elt) {
-        auto tr = executor_.loadTransactionApi(trid);
+
+    if (offset >= elt.size()) { // Offset is more than number of smart!"
+        return 0;
+    }
+    if (offset + limit > elt.size())
+        limit = elt.size() - offset;
+    if (offset == 0 && limit == 0)
+        limit = elt.size();
+
+    auto begIt = elt.begin() + offset;
+    for (auto trid = begIt; trid != begIt + limit && trid != elt.end(); ++trid) {
+        auto tr = executor_.loadTransactionApi(*trid);
         if (cs::SmartContracts::get_contract_state(s_blockchain, tr.target()).empty())
             continue;
         auto smart = fetch_smart_body(tr);
@@ -1206,12 +1218,12 @@ size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper 
     return elt.size();
 }
 
-void APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer) {
+void APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer, const int64_t offset, const int64_t limit) {
     const csdb::Address addr = BlockChain::getAddressFromKey(deployer);
 
     _return.count = static_cast<decltype(_return.count)>(getMappedDeployerSmart(addr, [](const api::SmartContract& smart) {
         return smart;
-    }, _return.smartContractsList));
+    }, _return.smartContractsList, offset, limit));
 
     if(_return.smartContractsList.empty())
         SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
@@ -1239,10 +1251,10 @@ void APIHandler::GetLastHash(api::PoolHash& _return) {
 
 void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const int64_t sequence, const int64_t const_limit) {
     auto limit = limitPage(const_limit);
-    cs::Sequence seq = cs::Sequence(sequence);
-    if (seq < 0) {
+    if (sequence < 0) {
         return;
     }
+    cs::Sequence seq = cs::Sequence(sequence);
     csmeta(csdebug) << "sequence " << seq << ", limit " << limit;
     bool limSet = false;
 
@@ -1339,60 +1351,6 @@ void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& /* obsolet
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const general::Address& address, const std::vector<int64_t>& v) {
     csunused(v);
     csunused(address);
-#if 0
-    const csdb::Address addr = BlockChain::getAddressFromKey(address);
-    for (auto inner_id : v) {
-        csdb::Transaction transactionTmp;
-        BlockChain::WalletData wallData{};
-        BlockChain::WalletId wallId{};
-        inner_id &= 0x3fffffffffff;
-        bool finish_for_idx = false;
-        if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
-            SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
-            return;
-        }
-        auto addr_id = csdb::Address::from_wallet_id(wallId);
-        if (s_blockchain.getTransaction(addr_id, inner_id, transactionTmp)) {// find in blockchain
-            _return.states[inner_id] = VALID;
-        }
-        else {
-            cs::Conveyer& conveyer = cs::Conveyer::instance();
-            auto lock = conveyer.lock();
-            for (decltype(auto) it : conveyer.packetQueue()) {
-                const auto& transactions = it.transactions();
-                for (decltype(auto) transaction : transactions) {
-                    if (transaction.innerID() == inner_id) {
-                        _return.states[inner_id] = INPROGRESS;
-                        finish_for_idx = true;
-                        break;
-                    }
-                }
-            }
-            if (!finish_for_idx) {
-                decltype(auto) m_hash_tb = conveyer.transactionsPacketTable();  // find in hash table
-                for (decltype(auto) it : m_hash_tb) {
-                    const auto& transactions = it.second.transactions();
-                    for (decltype(auto) transaction : transactions) {
-                        if (transaction.innerID() == inner_id) {
-                            _return.states[inner_id] = INPROGRESS;
-                            finish_for_idx = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            lock.unlock();
-            if (!finish_for_idx) {                                // if hash table doesn't contain trx return true if in last 5 rounds
-                if (conveyer.isMetaTransactionInvalid(inner_id)) {// trx is invalid (time between del from hash table and add to blockchain)
-                    _return.states[inner_id] = INVALID;
-                }
-                else {
-                    _return.states[inner_id] = VALID;
-                }
-            }
-        }
-    }
-#endif // 0
     _return.roundNum = (uint32_t) cs::Conveyer::instance().currentRoundTable().round;
     SetResponseStatus(_return.status, APIRequestStatusType::NOT_IMPLEMENTED);
 }
@@ -1400,16 +1358,6 @@ void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const
 void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, const general::Address& address, const int64_t id) {
     csunused(id);
     csunused(address);
-#if 0
-    csdb::Transaction trx;
-    const csdb::Address addr = BlockChain::getAddressFromKey(address);
-    if (!s_blockchain.getTransaction(addr, id, trx)) {
-        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-        return;
-    }
-    _return.method = convertTransaction(trx).trxn.smartContract.method;
-    _return.params = convertTransaction(trx).trxn.smartContract.params;
-#endif // 0
     SetResponseStatus(_return.status, APIRequestStatusType::NOT_IMPLEMENTED);
 }
 
@@ -2168,14 +2116,6 @@ void apiexec::APIEXECHandler::GetSeed(apiexec::GetSeedResult& _return, const gen
 void apiexec::APIEXECHandler::SendTransaction(apiexec::SendTransactionResult& _return, const general::AccessID accessId, const api::Transaction& transaction) {
     csunused(_return);
     csunused(accessId);
-    // const csdb::Address addr = BlockChain::getAddressFromKey(transaction.source);
-    // BlockChain::WalletData wallData{};
-    // BlockChain::WalletId wallId{};
-    // if (!blockchain_.findWalletData(addr, wallData, wallId)) {
-    //  SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
-    //  return;
-    //}
-    // const_cast<api::Transaction&>(transaction).id = wallData.trxTail_.empty() ? 0 : wallData.trxTail_.getLastTransactionId() + 1;
     executor_.addInnerSendTransaction(accessId, executor_.make_transaction(transaction));
 }
 
@@ -2217,8 +2157,7 @@ void apiexec::APIEXECHandler::SmartContractGet(SmartContractGetResult& _return, 
 void apiexec::APIEXECHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
-    BlockChain::WalletId wallId{};
-    if (!blockchain_.findWalletData(addr, wallData, wallId))
+    if (!blockchain_.findWalletData(addr, wallData))
         return;
     _return.balance.integral = wallData.balance_.integral();
     _return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());
@@ -2271,13 +2210,19 @@ namespace executor {
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 recreateOriginExecutor();
             }
+
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
         catch (std::exception& x) {
             _return.status.code = 1;
             _return.status.message = x.what();
+
+            notifyError();
         }
+
         --execCount_;
         deleteAccessId(static_cast<general::AccessID>(access_id));
     }
@@ -2308,10 +2253,8 @@ namespace executor {
             }
         }
     }
-
-    std::optional<Executor::ExecuteResult> Executor::executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {
-        std::lock_guard lock(callExecutorLock_);  // temporary solution
-
+        
+    std::optional<Executor::ExecuteResult> Executor::executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {       
         if (smarts.empty()) {
             return std::nullopt;
         }
@@ -2362,7 +2305,7 @@ namespace executor {
                 }
             }
         }
-        smartContractBinary.stateCanModify = solver_.isContractLocked(BlockChain::getAddressFromKey(smartTarget.to_api_addr()));
+        smartContractBinary.stateCanModify = solver_.isContractLocked(smartTarget);
 
         // fill methodHeader
         std::vector<executor::MethodHeader> methodHeader;
@@ -2471,8 +2414,6 @@ namespace executor {
     }
 
     std::optional<Executor::ExecuteResult> Executor::reexecuteContract(ExecuteTransactionInfo& contract, std::string forceContractState) {
-        std::lock_guard lock(callExecutorLock_);  // temporary solution
-
         if (!contract.transaction.is_valid() || !contract.deploy.is_valid()) {
             return std::nullopt;
         }
@@ -2482,16 +2423,6 @@ namespace executor {
         // get deploy transaction
         const csdb::Transaction& deployTrxn = contract.deploy;
         const auto isdeploy = (contract.deploy.id() == contract.transaction.id()); // isDeploy(contract.transaction);
-        //if (!isdeploy) {  // execute
-        //    const auto optDeployId = getDeployTrxn(smartTarget);
-        //    if (!optDeployId.has_value()) {
-        //        return std::nullopt;
-        //    }
-        //    deployTrxn = loadTransactionApi(optDeployId.value());
-        //}
-        //else {
-        //    deployTrxn = contract.transaction;
-        //}
 
         // fill smartContractBinary
         const auto sci_deploy = deserialize<api::SmartContractInvocation>(deployTrxn.user_field(0).value<std::string>());
@@ -2578,14 +2509,9 @@ namespace executor {
             return {};
         }
 
-        //const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
-
         // fill res
         ExecuteResult res;
         res.response = optOriginRes.value().resp.status;
-
-        //if (optInnerTransactions.has_value())
-        //    res.trxns = optInnerTransactions.value();
 
         deleteInnerSendTransactions(optOriginRes.value().acceessId);
         res.selfMeasuredCost = static_cast<long>(optOriginRes.value().timeExecute);
@@ -2631,28 +2557,36 @@ namespace executor {
             access_id = generateAccessId(explicit_sequence);
         }
 
-        //const auto access_id = generateAccessId();
         ++execCount_;
 
         const auto timeBeg = std::chrono::steady_clock::now();
 
         try {
-            std::shared_lock lock(sharedErrorMutex_);
+            std::shared_lock sharedLock(sharedErrorMutex_);
+            std::lock_guard lock(callExecutorLock_);
             origExecutor_->executeByteCode(originExecuteRes.resp, static_cast<general::AccessID>(access_id), address, smartContractBinary, methodHeader, EXECUTION_TIME, EXECUTOR_VERSION);
         }
         catch (::apache::thrift::transport::TTransportException& x) {
             // sets stop_ flag to true forever, replace with new instance
             if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
                 recreateOriginExecutor();
-                notifyError();
             }
 
-            originExecuteRes.resp.status.code = cs::error::ThriftException;
+            if (x.getType() == ::apache::thrift::transport::TTransportException::TIMED_OUT) {
+                originExecuteRes.resp.status.code = cs::error::TimeExpired;
+            }
+            else {
+                originExecuteRes.resp.status.code = cs::error::ThriftException;
+            }
             originExecuteRes.resp.status.message = x.what();
+
+            notifyError();
         }
         catch (std::exception& x) {
             originExecuteRes.resp.status.code = cs::error::StdException;
             originExecuteRes.resp.status.message = x.what();
+
+            notifyError();
         }
 
         originExecuteRes.timeExecute = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - timeBeg).count();

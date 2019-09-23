@@ -184,6 +184,7 @@ private:
 
 private signals:
     ReadBlockSignal read_block_event;
+    BlockReadingStartedSingal start_reading_event;
 };
 
 void Storage::priv::set_last_error(Storage::Error error, const ::std::string& message) {
@@ -230,6 +231,21 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
 
     Database::IteratorPtr it = db->new_iterator();
     assert(it);
+
+    it->seek_to_last();
+    if (it->is_valid()) {
+        cs::Bytes v = it->value();
+        Pool p = Pool::from_binary(std::move(v));
+        if (p.is_valid()) {
+            emit start_reading_event(p.sequence());
+        }
+        else {
+            emit start_reading_event(0);
+        }
+    }
+    else {
+        emit start_reading_event(0);
+    }
 
     Storage::OpenProgress progress{0};
     for (it->seek_to_first(); it->is_valid(); it->next()) {
@@ -396,6 +412,26 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
         return false;
     }
 
+    if (opt.newBlockchainTop != cs::kWrongSequence) {
+        auto seqToRemove = opt.newBlockchainTop + 1;
+
+        while (true) {
+            cs::Bytes poolBinary;
+            if (!d->db->get(seqToRemove++, &poolBinary)) {
+                break;
+            }
+            auto pool = csdb::Pool::from_binary(std::move(poolBinary));
+            if (!pool.is_valid()) {
+                break;
+            }
+            if (!d->db->remove(pool.hash().to_binary())) {
+                break;
+            }
+        }
+
+        return true;
+    }
+
     if (!d->rescan(callback)) {
         d->db.reset();
         return false;
@@ -405,7 +441,7 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
     return true;
 }
 
-bool Storage::open(const ::std::string& path_to_base, OpenCallback callback) {
+bool Storage::open(const ::std::string& path_to_base, OpenCallback callback, cs::Sequence newBlockchainTop) {
     ::std::string path{path_to_base};
     if (path.empty()) {
         path = ::csdb::internal::app_data_path() + "/CREDITS";
@@ -414,9 +450,9 @@ bool Storage::open(const ::std::string& path_to_base, OpenCallback callback) {
     auto db{::std::make_shared<::csdb::DatabaseBerkeleyDB>()};
     db->open(path);
 
-    d->write_thread = std::thread(&Storage::priv::write_routine, d.get());
+    //d->write_thread = std::thread(&Storage::priv::write_routine, d.get());
 
-    return open(OpenOptions{db}, callback);
+    return open(OpenOptions{db, newBlockchainTop}, callback);
 }
 
 void Storage::close() {
@@ -741,6 +777,10 @@ bool Storage::get_from_blockchain(const Address& addr, int64_t innerId,
 
 const ReadBlockSignal& Storage::readBlockEvent() const {
     return d->read_block_event;
+}
+
+const BlockReadingStartedSingal& Storage::readingStartedEvent() const {
+    return d->start_reading_event;
 }
 
 std::vector<Transaction> Storage::transactions(const Address& addr, size_t limit, const TransactionID& offset) const {

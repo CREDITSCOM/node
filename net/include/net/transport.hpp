@@ -4,8 +4,9 @@
 
 #include <boost/asio.hpp>
 #include <csignal>
+#include <atomic>
 
-#include <client/config.hpp>
+#include <config.hpp>
 
 #include <csnode/node.hpp>
 #include <csnode/packstream.hpp>
@@ -73,7 +74,7 @@ uint16_t getHashIndex(const ip::udp::endpoint&);
 
 class Transport {
 public:
-    Transport(Config& config, Node* node)
+    explicit Transport(const Config& config, Node* node)
     : config_(config)
     , sendPacksFlag_()
     , remoteNodes_(maxRemoteNodes_ + 1)
@@ -105,9 +106,6 @@ public:
     void processNodeMessage(const Message&);
     void processNodeMessage(const Packet&);
 
-    void addTask(Packet*, const uint32_t packNum, bool incrementWhenResend = false);
-    void clearTasks();
-
     const cs::PublicKey& getMyPublicKey() const {
         return myPublicKey_;
     }
@@ -121,11 +119,12 @@ public:
     }
 
     bool sendDirect(const Packet*, const Connection&);
+    bool sendDirectToSock(Packet*, const Connection&);
     void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
     void deliverBroadcast(const Packet*, const uint32_t);
 
     void gotPacket(const Packet&, RemoteNodePtr&);
-    void redirectPacket(const Packet&, RemoteNodePtr&);
+    void redirectPacket(const Packet&, RemoteNodePtr&, bool resend = true);
     bool shouldSendPacket(const Packet&);
 
     void refillNeighbourhood();
@@ -169,6 +168,9 @@ public:
 public signals:
     PingSignal pingReceived;
 
+public slots:
+    void onConfigChanged(const Config& updated, const Config& previous);
+
 private:
     void registerTask(Packet* pack, const uint32_t packNum, const bool);
     void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
@@ -205,7 +207,7 @@ private:
 
     /* Actions */
     bool good_;
-    Config& config_;
+    Config config_;
 
     static const uint32_t maxPacksQueue_ = 2048;
     static const uint32_t maxRemoteNodes_ = 4096;
@@ -275,6 +277,8 @@ private:
 
     static constexpr uint32_t fragmentsFixedMapSize_ = 10000;
     FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, fragmentsFixedMapSize_> fragOnRound_;
+
+    std::atomic_bool sendLarge_ = false;
 
 public:
     inline static size_t cntDirtyAllocs = 0;

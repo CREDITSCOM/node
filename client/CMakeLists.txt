@@ -36,9 +36,7 @@ endif()
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/version.cpp" @ONLY)
 
 add_executable(client
-  include/client/config.hpp
   include/client/params.hpp
-  src/config.cpp
   src/main.cpp
   "${CMAKE_CURRENT_BINARY_DIR}/version.cpp" include/client/version.hpp
 )
@@ -69,6 +67,11 @@ target_link_libraries (client
                        Boost::disable_autolinking
                        ${CMAKE_THREAD_LIBS_INIT}
                        )
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+target_link_libraries (client
+                       -static-libstdc++
+                       )
+endif()
 
 if (NOT MSVC AND WITH_GPROF)
 add_definitions(-DBUILD_WITH_GPROF)
