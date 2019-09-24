@@ -1052,10 +1052,15 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>&) {
 }
 
 bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
+    cs::Lock lock(oLock_);
+    oPackStream_.init(task->pack);
+    oPackStream_ << nh_.size();
+
     Connection conn;
     conn.in = task->sender;
     conn.specialOut = false;
-    sendDirect(&task->pack, conn);
+    
+    sendDirect(oPackStream_.getPackets(), conn);
     return true;
 }
 
