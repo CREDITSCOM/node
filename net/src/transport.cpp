@@ -812,7 +812,15 @@ void Transport::resetNeighbours() {
 }
 
 void Transport::onConfigChanged(const Config& updated, const Config& previous) {
-    if (updated.getSignalServerEndpoint() == previous.getSignalServerEndpoint()) {
+    bool is_interesting = false;
+    if (!(updated.getSignalServerEndpoint() == previous.getSignalServerEndpoint())) {
+        is_interesting = true;
+    }
+    else if (updated.getMinCompatibleVersion() != previous.getMinCompatibleVersion()) {
+        is_interesting = true;
+    }
+
+    if (!is_interesting) {
         return;
     }
 
@@ -903,7 +911,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         conn.out.port(task->sender.port());
     }
 
-    if (vers < NODE_VERSION) {
+    if (vers < config_.getMinCompatibleVersion()) {
         sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadClientVersion);
         return true;
     }
@@ -1078,7 +1086,7 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
 
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
-    oPackStream_ << NetworkCommand::SSLastBlock << NODE_VERSION;
+    oPackStream_ << NetworkCommand::SSLastBlock <<  NODE_VERSION;
 
     cs::Hash lastHash_;
     const auto hashBinary = lastHash.to_binary();

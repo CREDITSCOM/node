@@ -177,6 +177,10 @@ public:
         return NODE_VERSION;
     }
 
+    NodeVersion getMinCompatibleVersion() const {
+        return minCompatibleVersion_;
+    }
+
     void dumpJSONKeys(const std::string& fName) const;
 
     bool alwaysExecuteContracts() const {
@@ -229,6 +233,7 @@ private:
     EndpointData outputEp_;
 
     NodeType nType_ = NodeType::Client;
+    NodeVersion minCompatibleVersion_ = NODE_VERSION;
 
     bool ipv6_ = false;
 
