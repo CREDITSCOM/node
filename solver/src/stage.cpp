@@ -230,4 +230,7 @@ namespace cs {
     {
         return false;
     }
+    Stage::Stage() {
+        sender = cs::ConfidantConsts::InvalidConfidantIndex;
+    }
 }

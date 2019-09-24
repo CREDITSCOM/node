@@ -57,6 +57,7 @@ private:
 };
 
 struct Stage {
+    Stage();
     uint8_t msgType;
     uint8_t sender;
     cs::PublicKey senderKey;

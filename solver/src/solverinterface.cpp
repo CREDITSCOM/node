@@ -192,7 +192,9 @@ void SolverCore::gotStageOne(const cs::StageOne& stage) {
         // duplicated
         if (currentTimeStamp > lastTimeStamp) {
             auto it = std::find_if(stageOneStorage.begin(), stageOneStorage.end(), [sender](cs::StageOne& st) { return st.sender == sender; });
-            stageOneStorage.erase(it);
+			if (it != stageOneStorage.end()) {
+				stageOneStorage.erase(it);
+			}
         }
         else {
             return;
