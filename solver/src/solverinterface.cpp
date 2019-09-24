@@ -145,7 +145,7 @@ void SolverCore::nextRound(bool updateRound) {
     if (!updateRound) {
         recv_hash.clear();
     }
-
+    deferredBlock_ = csdb::Pool{};
     stageOneStorage.clear();
     stageTwoStorage.clear();
     stageThreeStorage.clear();
