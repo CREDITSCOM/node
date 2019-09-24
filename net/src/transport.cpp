@@ -1157,7 +1157,7 @@ bool Transport::gotSSUpdateServer(const TaskPtr<IPacMan>& /*task*/, RemoteNodePt
         return false;
     }
 
-    cs::RoundNumber round;
+    cs::RoundNumber round = 0;
     iPackStream_ >> round;
 
     if (const auto currentRound = cs::Conveyer::instance().currentRoundNumber(); !(currentRound <= round + DELTA_ROUNDS_VERIFY_NEW_SERVER))
@@ -1362,7 +1362,7 @@ void Transport::registerMessage(MessagePtr msg) {
     cs::Lock lock(uLock_);
     auto& ptr = uncollected_.emplace(msg);
     //DEBUG:
-    Message& message = *ptr.get();
+    [[maybe_unused]] Message& message = *ptr.get();
 }
 
 bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {

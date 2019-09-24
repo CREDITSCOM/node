@@ -480,7 +480,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     csdebug() << "NODE> StageThree prepared:" << std::endl << cs::StageThree::toString(stage3);
 }
 
-void SolverCore::uploadNewStates(std::vector<csdb::Transaction> newStates) {
+void SolverCore::uploadNewStates([[maybe_unused]] std::vector<csdb::Transaction> newStates) {
     //psmarts.
 }
 
