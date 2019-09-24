@@ -149,6 +149,7 @@ public:
     ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
     ConnectionPtr getConnectionByNumber(const std::size_t number);
     ConnectionPtr getRandomNeighbour();
+    cs::Sequence getConnectionLastSequence(const std::size_t number);
 
     std::unique_lock< std::mutex > getNeighboursLock() const;
 

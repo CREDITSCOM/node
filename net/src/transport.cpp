@@ -761,6 +761,14 @@ ConnectionPtr Transport::getConnectionByNumber(const std::size_t number) {
     return nh_.getNeighbour(number);
 }
 
+cs::Sequence Transport::getConnectionLastSequence(const std::size_t number) {
+    ConnectionPtr ptr = getConnectionByNumber(number);
+    if (ptr && !ptr->isSignal) {
+        return ptr->lastSeq;
+    }
+    return 0;
+}
+
 ConnectionPtr Transport::getRandomNeighbour() {
     csdebug() << "Transport> Get random neighbour for Sync";
     return nh_.getRandomSyncNeighbour();
