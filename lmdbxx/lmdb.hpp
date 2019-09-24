@@ -197,6 +197,8 @@ public:
     // name - table name at current path, nullptr if only one table exist
     bool remove(const char* data, size_t size, const char* name = nullptr,
                 const unsigned int flags = lmdb::dbi::default_flags) {
+        checkMapSize();
+
         try {
             auto transaction = lmdb::txn::begin(*env_, nullptr);
             auto dbi = lmdb::dbi::open(transaction, name, flags);
