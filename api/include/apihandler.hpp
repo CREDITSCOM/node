@@ -684,12 +684,6 @@ private:
 }  // namespace apiexec
 
 namespace api {
-class APIFaker : public APINull {
-public:
-    APIFaker(BlockChain&, cs::SolverCore&) {
-    }
-};
-
 class APIHandler : public APIHandlerInterface {
 public:
     explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
