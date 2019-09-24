@@ -16,7 +16,7 @@ namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
 using NodeVersion = uint16_t;
-const NodeVersion NODE_VERSION = 422;
+const NodeVersion NODE_VERSION = 426;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
@@ -177,6 +177,10 @@ public:
         return NODE_VERSION;
     }
 
+    NodeVersion getMinCompatibleVersion() const {
+        return minCompatibleVersion_;
+    }
+
     void dumpJSONKeys(const std::string& fName) const;
 
     bool alwaysExecuteContracts() const {
@@ -229,6 +233,7 @@ private:
     EndpointData outputEp_;
 
     NodeType nType_ = NodeType::Client;
+    NodeVersion minCompatibleVersion_ = NODE_VERSION;
 
     bool ipv6_ = false;
 

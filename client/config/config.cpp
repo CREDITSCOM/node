@@ -44,6 +44,8 @@ const std::string PARAM_NAME_USE_IPV6 = "ipv6";
 const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
+const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
+const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
 
 const std::string PARAM_NAME_CONVEYER_SEND_CACHE = "send_cache_value";
 const std::string PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE = "max_resends_send_cache";
@@ -78,8 +80,6 @@ const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
 const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
 const std::string ARG_NAME_RECREATE_INDEX = "recreate-index";
 const std::string ARG_NAME_NEW_BC_TOP = "set-bc-top";
-
-const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
 
 const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
@@ -738,6 +738,9 @@ Config Config::readFromFile(const std::string& fileName) {
 
         if (params.count(PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS) > 0) {
             result.alwaysExecuteContracts_ = params.get<bool>(PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS);
+        }
+        if (params.count(PARAM_NAME_MIN_COMPATIBLE_VERSION) > 0) {
+            result.minCompatibleVersion_ = params.get<NodeVersion>(PARAM_NAME_MIN_COMPATIBLE_VERSION);
         }
 
         result.setLoggerSettings(config);
