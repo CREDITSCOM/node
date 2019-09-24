@@ -2860,11 +2860,13 @@ void Node::startConsensus() {
 std::string Node::getSenderText(const cs::PublicKey& sender) {
     std::ostringstream os;
     unsigned idx = 0;
+
     for (const auto& key : cs::Conveyer::instance().confidants()) {
         if (std::equal(key.cbegin(), key.cend(), sender.cbegin())) {
             os << "T[" << idx << "]";
             return os.str();
         }
+
         ++idx;
     }
 

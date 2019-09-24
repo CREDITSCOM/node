@@ -77,6 +77,7 @@ public:
     void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
     void getTransactionsPacket(const uint8_t* data, const std::size_t size);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
+
     // critical is true if network near to be down, all capable trusted node required
     bool canBeTrusted(bool critical);
 
@@ -150,6 +151,7 @@ public:
     void getRoundTableRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
     void sendRoundTableReply(const cs::PublicKey& target, bool hasRequestedInfo);
     void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
+
     // called by solver, review required:
     bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
     void sendRoundTable(cs::RoundPackage& rPackage);
@@ -272,8 +274,6 @@ private:
 
     void sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);
-
-    //void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, cs::StageThree& st3);
 
     bool readRoundData(cs::RoundTable& roundTable, bool bang);
     void reviewConveyerHashes();
