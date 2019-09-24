@@ -112,8 +112,6 @@ struct Connection {
 
     FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
-    cs::Sequence syncSeqs[BlocksToSync] = {0};
-    cs::Sequence syncSeqsRetries[BlocksToSync] = {0};
     cs::Sequence lastSeq = 0;
 
     bool operator!=(const Connection& rhs) const {
@@ -181,13 +179,11 @@ public:
 
     ConnectionPtr getConnection(const RemoteNodePtr);
     ConnectionPtr getNextRequestee(const cs::Hash&);
-    ConnectionPtr getNextSyncRequestee(const cs::Sequence seq, bool& alreadyRequested);
     ConnectionPtr getNeighbour(const std::size_t number);
     ConnectionPtr getRandomSyncNeighbour();
     ConnectionPtr getNeighbourByKey(const cs::PublicKey&);
 
     void resetSyncNeighbours();
-    void releaseSyncRequestee(const cs::Sequence seq);
     void registerDirect(const Packet*, ConnectionPtr);
 
 private:

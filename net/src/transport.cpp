@@ -749,10 +749,6 @@ uint32_t Transport::getMaxNeighbours() const {
     return config_.getMaxNeighbours();
 }
 
-ConnectionPtr Transport::getSyncRequestee(const cs::Sequence seq, bool& alreadyRequested) {
-    return nh_.getNextSyncRequestee(seq, alreadyRequested);
-}
-
 ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
     return nh_.getNeighbourByKey(pk);
 }
@@ -788,10 +784,6 @@ const Connections Transport::getNeighbours() const {
 
 const Connections Transport::getNeighboursWithoutSS() const {
     return nh_.getNeighboursWithoutSS();
-}
-
-void Transport::syncReplied(const cs::Sequence seq) {
-    return nh_.releaseSyncRequestee(seq);
 }
 
 bool Transport::isPingDone() {

@@ -826,10 +826,6 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
         return;
     }
 
-    for (const auto& pool : poolsBlock) {
-        transport_->syncReplied(pool.sequence());
-    }
-
     std::size_t packetNum = 0;
     istream_ >> packetNum;
 
@@ -842,6 +838,7 @@ void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey&
     }
 
     csdebug() << "Node> Sending blocks with signatures:";
+
     for (const auto& it : poolsBlock) {
         csdebug() << "#" << it.sequence() << " signs = " << it.signatures().size();
     }
