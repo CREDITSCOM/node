@@ -539,7 +539,7 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const general::
     _return.transactions = convertTransactions(transactions);
 
 #ifdef MONITOR_NODE
-    _return.total_trxns_count = s_blockchain.getTransactionsCount(addr);
+    _return.total_trxns_count = blockchain_.getTransactionsCount(addr);
 #endif
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -583,7 +583,7 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
 #endif
 
 #ifdef MONITOR_NODE
-    s_blockchain.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) { res.createTime = wd.createTime_; });
+    blockchain_.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) { res.createTime = wd.createTime_; });
 #endif
 	if (tr.user_field(0).is_valid())
         res.transactionsCount = blockchain_.getTransactionsCount(tr.target());
@@ -2018,10 +2018,10 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
     }
 #ifdef MONITOR_NODE
     else if (_ordCol == 1) {  // TimeReg
-        iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.createTime_; }, num, _desc, lst, s_blockchain);
+        iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.createTime_; }, num, _desc, lst, blockchain_);
     }
     else {  // Tx count
-        iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.transNum_; }, num, _desc, lst, s_blockchain);
+        iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.transNum_; }, num, _desc, lst, blockchain_);
     }
 #endif
 
@@ -2059,7 +2059,7 @@ void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
     uint32_t limit = PER_PAGE;
     uint32_t total = 0;
 
-    s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::PublicKey& addr, const cs::WalletsCache::TrustedData& wd) {
+    blockchain_.iterateOverWriters([&_return, &offset, &limit, &total](const cs::PublicKey& addr, const cs::WalletsCache::TrustedData& wd) {
         if (addr.empty()) {
             return true;
         }
