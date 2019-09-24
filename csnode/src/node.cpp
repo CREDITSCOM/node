@@ -2156,7 +2156,7 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
     if (conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree && getBlockChain().getLastSeq() > 0) {
         uint64_t lastTimeStamp;
         uint64_t currentTimeStamp;
-        uint64_t rpTimeStamp;
+        [[maybe_unused]] uint64_t rpTimeStamp;
         try {
             lastTimeStamp = std::stoll(getBlockChain().getLastTimeStamp());
         }
