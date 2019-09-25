@@ -428,10 +428,10 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             break;
         }
         case NetworkCommand::SSNewFriends:
-            gotSSNewFriends(task);
+            gotSSNewFriends();
             break;
         case NetworkCommand::SSUpdateServer:
-            gotSSUpdateServer(task, sender);
+            gotSSUpdateServer();
             break;
         case NetworkCommand::PackInform:
             gotPackInform(task, sender);
@@ -761,6 +761,14 @@ ConnectionPtr Transport::getConnectionByNumber(const std::size_t number) {
     return nh_.getNeighbour(number);
 }
 
+cs::Sequence Transport::getConnectionLastSequence(const std::size_t number) {
+    ConnectionPtr ptr = getConnectionByNumber(number);
+    if (ptr && !ptr->isSignal) {
+        return ptr->lastSeq;
+    }
+    return 0;
+}
+
 ConnectionPtr Transport::getRandomNeighbour() {
     csdebug() << "Transport> Get random neighbour for Sync";
     return nh_.getRandomSyncNeighbour();
@@ -804,7 +812,15 @@ void Transport::resetNeighbours() {
 }
 
 void Transport::onConfigChanged(const Config& updated, const Config& previous) {
-    if (updated.getSignalServerEndpoint() == previous.getSignalServerEndpoint()) {
+    bool is_interesting = false;
+    if (!(updated.getSignalServerEndpoint() == previous.getSignalServerEndpoint())) {
+        is_interesting = true;
+    }
+    else if (updated.getMinCompatibleVersion() != previous.getMinCompatibleVersion()) {
+        is_interesting = true;
+    }
+
+    if (!is_interesting) {
         return;
     }
 
@@ -895,7 +911,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         conn.out.port(task->sender.port());
     }
 
-    if (vers < NODE_VERSION) {
+    if (vers < config_.getMinCompatibleVersion()) {
         sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadClientVersion);
         return true;
     }
@@ -976,32 +992,28 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 }
 
 bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode) {
-    if (ssStatus_ != SSBootstrapStatus::Requested) {
+    if (!(ssStatus_ == SSBootstrapStatus::Requested || ssStatus_ == SSBootstrapStatus::RegisteredWait)) {
         cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of Requested";
         return false;
     }
     
-    if (ssStatus_ == SSBootstrapStatus::Requested) 
-    {
-        cslog() << "Connection to the Signal Server has been established";
-        nh_.addSignalServer(task->sender, ssEp_, rNode);
+    cslog() << "Connection to the Signal Server has been established";
+    nh_.addSignalServer(task->sender, ssEp_, rNode);
 
-        constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
-        size_t msg_size = task->pack.getMsgSize();
+    constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
+    size_t msg_size = task->pack.getMsgSize();
 
-        if (msg_size > MinRegistrationSize) {
-            if (!parseSSSignal(task)) {
-                cswarning() << "Bad Signal Server response";
-            }
+    if (msg_size > MinRegistrationSize) {
+        if (!parseSSSignal(task)) {
+            cswarning() << "Bad Signal Server response";
+            return false;
         }
-        else {
-            ssStatus_ = SSBootstrapStatus::RegisteredWait;
-        }
-
-        return true;
+    }
+    else {
+        ssStatus_ = SSBootstrapStatus::RegisteredWait; // waiting for dispatch
     }
 
-    return false;
+    return true;
 }
 
 bool Transport::gotSSReRegistration() {
@@ -1019,10 +1031,12 @@ bool Transport::gotSSReRegistration() {
 bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
     if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
         cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of RegisteredWait";
+        return false;
     }
 
     if (!parseSSSignal(task)) {
         cswarning() << "Bad Signal Server response";
+        return false;
     }
 
     return true;
@@ -1054,10 +1068,15 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>&) {
 }
 
 bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
+    cs::Lock lock(oLock_);
+    oPackStream_.init(task->pack);
+    oPackStream_ << nh_.size();
+
     Connection conn;
     conn.in = task->sender;
     conn.specialOut = false;
-    sendDirect(&task->pack, conn);
+    
+    sendDirect(oPackStream_.getPackets(), conn);
     return true;
 }
 
@@ -1072,7 +1091,7 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
 
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
-    oPackStream_ << NetworkCommand::SSLastBlock << NODE_VERSION;
+    oPackStream_ << NetworkCommand::SSLastBlock <<  NODE_VERSION;
 
     cs::Hash lastHash_;
     const auto hashBinary = lastHash.to_binary();
@@ -1090,16 +1109,15 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
     return true;
 }
 
-bool Transport::gotSSNewFriends(const TaskPtr<IPacMan>& /*task*/)
+bool Transport::gotSSNewFriends()
 {
-    cslog() << "Receive new friedns nodes from SignalServer";
+    cslog() << "Get new friends from SignalServer";
     if (ssStatus_ != SSBootstrapStatus::Complete)
     {
         cs::Lock lock(oLock_);
         formSSConnectPack(config_, oPackStream_, myPublicKey_, node_->getBlockChain().uuid());
         net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
-        cswarning() << "Ignore new friends. Registration on Signal Server because ssStatus = " + std::to_string(static_cast<int>(ssStatus_));
-        return false;
+        cslog() << "Sending registration request to Signal Server because ssStatus = " + std::to_string(static_cast<int>(ssStatus_));
     }
 
     cs::Signature sign;
@@ -1144,9 +1162,9 @@ bool Transport::gotSSNewFriends(const TaskPtr<IPacMan>& /*task*/)
 
 }
 
-bool Transport::gotSSUpdateServer(const TaskPtr<IPacMan>& /*task*/, RemoteNodePtr& /*rNode*/)
+bool Transport::gotSSUpdateServer()
 {
-    cslog() << "Update server from SignalServer";
+    cslog() << "Get new friends from SignalServer";
 
     cs::Signature sign;
     iPackStream_ >> sign;
@@ -1157,7 +1175,7 @@ bool Transport::gotSSUpdateServer(const TaskPtr<IPacMan>& /*task*/, RemoteNodePt
         return false;
     }
 
-    cs::RoundNumber round;
+    cs::RoundNumber round = 0;
     iPackStream_ >> round;
 
     if (const auto currentRound = cs::Conveyer::instance().currentRoundNumber(); !(currentRound <= round + DELTA_ROUNDS_VERIFY_NEW_SERVER))
@@ -1362,7 +1380,7 @@ void Transport::registerMessage(MessagePtr msg) {
     cs::Lock lock(uLock_);
     auto& ptr = uncollected_.emplace(msg);
     //DEBUG:
-    Message& message = *ptr.get();
+    [[maybe_unused]] Message& message = *ptr.get();
 }
 
 bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {

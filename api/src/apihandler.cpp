@@ -28,8 +28,8 @@ apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& 
 
 APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config&)
 : executor_(executor)
-, s_blockchain(blockchain)
-, solver(_solver)
+, blockchain_(blockchain)
+, solver_(_solver)
 #ifdef MONITOR_NODE
 , stats(blockchain)
 #endif
@@ -51,7 +51,7 @@ APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor
 }
 
 void APIHandler::run() {
-    if (!s_blockchain.isGood())
+    if (!blockchain_.isGood())
         return;
 #ifdef MONITOR_NODE
     stats.run(stats_);
@@ -131,8 +131,8 @@ void APIHandler::WalletDataGet(WalletDataGetResult& _return, const general::Addr
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
-        if (!s_blockchain.findWalletData(addr, wallData)) { // **
+    if (!blockchain_.findWalletData(addr, wallData, wallId)) {
+        if (!blockchain_.findWalletData(addr, wallData)) { // **
             return;
         }
     }
@@ -149,7 +149,7 @@ void APIHandler::WalletIdGet(api::WalletIdGetResult& _return, const general::Add
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
     BlockChain::WalletId wallId{};
-    if (!s_blockchain.findWalletData(addr, wallData, wallId)) {
+    if (!blockchain_.findWalletData(addr, wallData, wallId)) {
         SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
         return;
     }
@@ -161,7 +161,7 @@ void APIHandler::WalletIdGet(api::WalletIdGetResult& _return, const general::Add
 void APIHandler::WalletTransactionsCountGet(api::WalletTransactionsCountGetResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
-    if (!s_blockchain.findWalletData(addr, wallData)) {
+    if (!blockchain_.findWalletData(addr, wallData)) {
         SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
         return;
     }
@@ -172,7 +172,7 @@ void APIHandler::WalletTransactionsCountGet(api::WalletTransactionsCountGetResul
 void APIHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) {
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     BlockChain::WalletData wallData{};
-    if (!s_blockchain.findWalletData(addr, wallData)) {
+    if (!blockchain_.findWalletData(addr, wallData)) {
         return;
     }
     _return.balance.integral = wallData.balance_.integral();
@@ -274,12 +274,12 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     csdb::Currency currency = transaction.currency();
     csdb::Address address = transaction.source();
     if (address.is_wallet_id()) {
-        address = s_blockchain.getAddressByType(transaction.source(), BlockChain::AddressType::PublicKey);
+        address = blockchain_.getAddressByType(transaction.source(), BlockChain::AddressType::PublicKey);
     }
 
     csdb::Address target = transaction.target();
     if (target.is_wallet_id()) {
-        target = s_blockchain.getAddressByType(transaction.target(), BlockChain::AddressType::PublicKey);
+        target = blockchain_.getAddressByType(transaction.target(), BlockChain::AddressType::PublicKey);
     }
 
     result.id = convert_transaction_id(transaction.id());
@@ -435,8 +435,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     auto trxIt = std::find_if(transactions.begin(), transactions.end(), [&stateTrx](const csdb::Transaction& ptrx) { return ptrx.id() == stateTrx.id(); });
     if (trxIt != transactions.end()) {
         for (auto trx = ++trxIt; trx != transactions.end(); ++trx) {
-            if (s_blockchain.getAddressByType(trx->source(), BlockChain::AddressType::PublicKey) !=
-                s_blockchain.getAddressByType(stateTrx.source(), BlockChain::AddressType::PublicKey)) // end find extra transactions                   
+            if (blockchain_.getAddressByType(trx->source(), BlockChain::AddressType::PublicKey) !=
+                blockchain_.getAddressByType(stateTrx.source(), BlockChain::AddressType::PublicKey)) // end find extra transactions
                 break;
             extraFee.transactionId = convert_transaction_id(trx->id());
             extraFee.sum = convertAmount(csdb::Amount(trx->counted_fee().to_double()));
@@ -534,12 +534,12 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const general::
     BlockChain::Transactions transactions;
     if (limit > 0) {
         const int64_t offset = (_offset < 0) ? 0 : _offset;
-        s_blockchain.getTransactions(transactions, addr, static_cast<uint64_t>(offset), static_cast<uint64_t>(limit));
+        blockchain_.getTransactions(transactions, addr, static_cast<uint64_t>(offset), static_cast<uint64_t>(limit));
     }
     _return.transactions = convertTransactions(transactions);
 
 #ifdef MONITOR_NODE
-    _return.total_trxns_count = s_blockchain.getTransactionsCount(addr);
+    _return.total_trxns_count = blockchain_.getTransactionsCount(addr);
 #endif
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -567,8 +567,8 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
     res.smartContractDeploy.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
     res.smartContractDeploy.sourceCode = sci.smartContractDeploy.sourceCode;
     res.smartContractDeploy.hashState = sci.smartContractDeploy.hashState;
-    res.deployer = fromByteArray(s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
-    res.address = fromByteArray(s_blockchain.getAddressByType(tr.target(), BlockChain::AddressType::PublicKey).public_key());
+    res.deployer = fromByteArray(blockchain_.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
+    res.address = fromByteArray(blockchain_.getAddressByType(tr.target(), BlockChain::AddressType::PublicKey).public_key());
 
 #ifdef TOKENS_CACHE
     tm_.loadTokenInfo([&tr, &res](const TokensMap& tokens, const HoldersMap&) {
@@ -583,10 +583,10 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
 #endif
 
 #ifdef MONITOR_NODE
-    s_blockchain.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) { res.createTime = wd.createTime_; });
+    blockchain_.applyToWallet(tr.target(), [&res](const cs::WalletsCache::WalletData& wd) { res.createTime = wd.createTime_; });
 #endif
 	if (tr.user_field(0).is_valid())
-		res.transactionsCount = s_blockchain.getTransactionsCount(tr.target());
+        res.transactionsCount = blockchain_.getTransactionsCount(tr.target());
 
     auto pool = executor_.loadBlockApi(tr.id().pool_seq());
     res.createTime = pool.get_time();
@@ -611,7 +611,7 @@ csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
     BlockChain::WalletData dummy{};
 
     if (transaction.__isset.smartContract && !transaction.smartContract.forgetNewState &&  // not for getter
-            !s_blockchain.findWalletData(source, dummy)) {
+            !blockchain_.findWalletData(source, dummy)) {
         return csdb::Transaction{};
     }
 
@@ -641,7 +641,7 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
     auto tr = make_transaction(transaction);
     if (!transaction.userFields.empty())
         tr.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
-    solver.send_wallet_transaction(tr);
+    solver_.send_wallet_transaction(tr);
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
 
@@ -671,9 +671,9 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
     }
 
     // check money
-    const auto source_addr = s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
+    const auto source_addr = blockchain_.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
     BlockChain::WalletData wallData{};
-    if (!s_blockchain.findWalletData(source_addr, wallData))
+    if (!blockchain_.findWalletData(source_addr, wallData))
         return "not enough money!";
 
     const auto max_fee = trxn.max_fee().to_double();
@@ -688,7 +688,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
 
     // check signature
     const auto byteStream = trxn.to_byte_stream_for_sig();
-    if (!cscrypto::verifySignature(trxn.signature(), s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey).public_key(),
+    if (!cscrypto::verifySignature(trxn.signature(), blockchain_.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey).public_key(),
         byteStream.data(), byteStream.size())) {
         cslog() << "API: reject transaction with wrong signature";
         return "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
@@ -699,7 +699,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
     auto input_smart        = transaction.__isset.smartContract ? transaction.smartContract : SmartContractInvocation{};
     auto send_transaction   = make_transaction(transaction);
-    const auto smart_addr   = s_blockchain.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
+    const auto smart_addr   = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
     bool deploy             = transaction.__isset.smartContract ? is_smart_deploy(input_smart) : false;
 
     if (transaction.__isset.smartContract) {
@@ -725,8 +725,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         }
     }
     else {
-        csdb::Address addr = s_blockchain.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
-        csdb::Address deployer = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
+        csdb::Address addr = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
+        csdb::Address deployer = blockchain_.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
         auto scKey = cs::SmartContracts::get_valid_smart_address(deployer, send_transaction.innerID(), input_smart.smartContractDeploy);
         if (scKey != addr) {
             _return.status.code = ERROR_CODE;
@@ -745,8 +745,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     hashStateEntry.getPosition();
 
     if (input_smart.forgetNewState) {
-        auto source_pk = s_blockchain.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).to_api_addr();
-        auto target_pk = s_blockchain.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey).to_api_addr();
+        auto source_pk = blockchain_.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).to_api_addr();
+        auto target_pk = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey).to_api_addr();
         executor::ExecuteByteCodeResult api_resp;
         const std::vector<general::ByteCodeObject>& bytecode = deploy ? input_smart.smartContractDeploy.byteCodeObjects : origin_bytecode;
         if (!deploy || !input_smart.smartContractDeploy.byteCodeObjects.empty()) {
@@ -757,8 +757,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
                 tmp.params      = input_smart.params;
                 methodHeader.push_back(tmp);
             }
-            auto smartAddr = s_blockchain.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
-            std::string contract_state = cs::SmartContracts::get_contract_state(s_blockchain, smartAddr);
+            auto smartAddr = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
+            std::string contract_state = cs::SmartContracts::get_contract_state(blockchain_, smartAddr);
 
             executor_.executeByteCode(api_resp, source_pk, target_pk, bytecode, contract_state, methodHeader, true, executor::Executor::kUseLastSequence);
             if (api_resp.status.code) {
@@ -777,7 +777,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         return;
     }
 
-    solver.send_wallet_transaction(send_transaction);
+    solver_.send_wallet_transaction(send_transaction);
 
     cs::Hash hashState;
     if (deploy) {        
@@ -833,7 +833,7 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
         return;
     }
 
-    if(!transaction.__isset.smartContract && !solver.smart_contracts().is_known_smart_contract(BlockChain::getAddressFromKey(transaction.target)))
+    if(!transaction.__isset.smartContract && !solver_.smart_contracts().is_known_smart_contract(BlockChain::getAddressFromKey(transaction.target)))
         dumb_transaction_flow(_return, transaction);
     else
         smart_transaction_flow(_return, transaction); 
@@ -842,7 +842,7 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
     cs::Sequence limit = limitPage(const_limit);
 
-    uint64_t sequence = s_blockchain.getLastSeq();
+    uint64_t sequence = blockchain_.getLastSeq();
     if ((uint64_t)offset > sequence) {
         return;
     }
@@ -915,16 +915,16 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
         return;
     }
     const csdb::Address adrs = BlockChain::getAddressFromKey(address);
-    auto transaction = solver.smart_contracts().get_contract_deploy(adrs);
+    auto transaction = solver_.smart_contracts().get_contract_deploy(adrs);
     if (!transaction.is_valid()) {
         transaction = executor_.loadTransactionApi(smartrid);
     }
     _return.smartContract = fetch_smart_body(transaction);
-    _return.smartContract.objectState = cs::SmartContracts::get_contract_state(s_blockchain, adrs);
+    _return.smartContract.objectState = cs::SmartContracts::get_contract_state(blockchain_, adrs);
 
     if (_return.smartContract.address.empty())
         SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
-    else if (cs::SmartContracts::get_contract_state(s_blockchain, transaction.target()).empty())
+    else if (cs::SmartContracts::get_contract_state(blockchain_, transaction.target()).empty())
         SetResponseStatus(_return.status, APIRequestStatusType::NOT_FOUND);
     else 
         SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -971,7 +971,7 @@ void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
         ++periodStats.poolsCount;
 
         size_t transactionsCount = pool.transactions_count();
-        periodStats.transactionsCount += (uint32_t)transactionsCount;
+        periodStats.transactionsCount += static_cast<uint32_t>(transactionsCount);
 
         for (size_t i = 0; i < transactionsCount; ++i) {
             const auto& transaction = pool.transaction(csdb::TransactionID(pool.sequence(), i));
@@ -1011,7 +1011,7 @@ void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
             for (size_t i = 0; i < transactionsCount; ++i) {
                 const auto& transaction = pool.transaction(csdb::TransactionID(pool.sequence(), i));
 
-                if (transaction.source() == s_blockchain.getGenesisAddress())
+                if (transaction.source() == blockchain_.getGenesisAddress())
                     continue;
 #ifdef MONITOR_NODE
                 if (is_smart(transaction) || is_smart_state(transaction)) {
@@ -1037,13 +1037,13 @@ void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
 //
 
 bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequence sequence) {
-    auto source_pk = s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
-    auto target_pk = s_blockchain.getAddressByType(trxn.target(), BlockChain::AddressType::PublicKey);
+    auto source_pk = blockchain_.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
+    auto target_pk = blockchain_.getAddressByType(trxn.target(), BlockChain::AddressType::PublicKey);
 
     if (is_smart_state(trxn)) {
         cs::SmartContractRef scr(trxn.user_field(cs::trx_uf::new_state::RefStart));
         csdb::TransactionID trId(scr.sequence, scr.transaction);
-        const auto execTrans = solver.smart_contracts().get_contract_call(trxn);
+        const auto execTrans = solver_.smart_contracts().get_contract_call(trxn);
 
         if ((execTrans.is_valid() && is_smart(execTrans)) ||
             execTrans.amount().to_double()) { // payable
@@ -1116,13 +1116,13 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
             }
 
             if (!newStateStr.empty() || res.hash != cs::Zero::hash) { // update tokens
-                auto caller_pk = s_blockchain.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
+                auto caller_pk = blockchain_.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
 
                 if (is_smart_deploy(smart))
                     tm_.checkNewDeploy(target_pk, caller_pk, smart);
 
                 if (newStateStr.empty()) {
-                    newStateStr = cs::SmartContracts::get_contract_state(s_blockchain, target_pk);
+                    newStateStr = cs::SmartContracts::get_contract_state(blockchain_, target_pk);
                 }
                 if (!newStateStr.empty()) {
                     tm_.checkNewState(target_pk, caller_pk, smart, newStateStr);
@@ -1157,7 +1157,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 (*locked_smart_origin)[target_pk] = trxn.id().clone();
                 executor_.updateDeployTrxns(target_pk, trxn.id().clone());
             }
-            auto locked_deployed_by_creator = lockedReference(this->deployed_by_creator);
+            auto locked_deployed_by_creator = lockedReference(this->deployedByCreator_);
             (*locked_deployed_by_creator)[source_pk].push_back(trxn.id().clone());
         }
         return true;
@@ -1195,27 +1195,34 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
 
 template <typename Mapper>
 size_t APIHandler::getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out, int64_t offset, int64_t limit) {
-    auto locked_deployed_by_creator = lockedReference(this->deployed_by_creator);
-    auto& elt = (*locked_deployed_by_creator)[deployer];
+    auto lockedDeployedByCreator = lockedReference(this->deployedByCreator_);
+    auto& element = (*lockedDeployedByCreator)[deployer];
 
-    if (offset >= elt.size()) { // Offset is more than number of smart!"
+    if (offset >= static_cast<int64_t>(element.size())) { // Offset is more than number of smart!"
         return 0;
     }
-    if (offset + limit > elt.size())
-        limit = elt.size() - offset;
-    if (offset == 0 && limit == 0)
-        limit = elt.size();
 
-    auto begIt = elt.begin() + offset;
-    for (auto trid = begIt; trid != begIt + limit && trid != elt.end(); ++trid) {
+    if (offset + limit > static_cast<int64_t>(element.size())) {
+        limit = static_cast<int64_t>(element.size()) - offset;
+    }
+
+    if (offset == 0 && limit == 0) {
+        limit = static_cast<int64_t>(element.size());
+    }
+
+    auto begIt = element.begin() + offset;
+    for (auto trid = begIt; trid != begIt + limit && trid != element.end(); ++trid) {
         auto tr = executor_.loadTransactionApi(*trid);
-        if (cs::SmartContracts::get_contract_state(s_blockchain, tr.target()).empty())
+
+        if (cs::SmartContracts::get_contract_state(blockchain_, tr.target()).empty()) {
             continue;
+        }
+
         auto smart = fetch_smart_body(tr);
         out.push_back(mapper(smart));
     }
 
-    return elt.size();
+    return element.size();
 }
 
 void APIHandler::SmartContractsListGet(api::SmartContractsListGetResult& _return, const general::Address& deployer, const int64_t offset, const int64_t limit) {
@@ -1245,7 +1252,7 @@ void APIHandler::SmartContractAddressesListGet(api::SmartContractAddressesListGe
 }
 
 void APIHandler::GetLastHash(api::PoolHash& _return) {
-    _return = fromByteArray(s_blockchain.getLastHash().to_binary());
+    _return = fromByteArray(blockchain_.getLastHash().to_binary());
     return;
 }
 
@@ -1326,7 +1333,7 @@ void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, 
             --offset;
         }
         else if (limit) {
-            auto tr = solver.smart_contracts().get_contract_deploy(p.first);
+            auto tr = solver_.smart_contracts().get_contract_deploy(p.first);
             if (!tr.is_valid()) {
                 auto trid = p.second;
                 tr = executor_.loadTransactionApi(trid);
@@ -1345,7 +1352,7 @@ void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, 
 void api::APIHandler::WaitForBlock(PoolHash& _return, const PoolHash& /* obsolete */) {
     std::unique_lock lock(dbLock_);
     newBlockCv_.wait(lock);
-    _return = fromByteArray(s_blockchain.getLastHash().to_binary());
+    _return = fromByteArray(blockchain_.getLastHash().to_binary());
 }
 
 void APIHandler::TransactionsStateGet(TransactionsStateGetResult& _return, const general::Address& address, const std::vector<int64_t>& v) {
@@ -1393,7 +1400,7 @@ void APIHandler::addTokenResult(api::TokenTransfersResult& _return, const csdb::
     transfer.sender     = fromByteArray(addrPair.first.public_key());
     transfer.receiver   = fromByteArray(addrPair.second.public_key());
     transfer.amount     = TokensMaster::getAmount(smart);
-    transfer.initiator  = fromByteArray(s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
+    transfer.initiator  = fromByteArray(blockchain_.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
     transfer.transaction.poolSeq = tr.id().pool_seq();
     transfer.transaction.index = (uint32_t) tr.id().index();
     transfer.time = atoll(pool.user_field(0).value<std::string>().c_str());
@@ -1412,7 +1419,7 @@ void APIHandler::addTokenResult(api::TokenTransactionsResult& _return, const csd
     trans.transaction.poolSeq = tr.id().pool_seq();
     trans.transaction.index = (uint32_t) tr.id().index();
     trans.time = atoll(pool.user_field(0).value<std::string>().c_str());
-    trans.initiator = fromByteArray(s_blockchain.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
+    trans.initiator = fromByteArray(blockchain_.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
     trans.method = smart.method;
     trans.params = smart.params;
 
@@ -1499,7 +1506,7 @@ void APIHandler::tokenTransactionsInternal(ResultType& _return, APIHandler& hand
 
 void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)> func) {
     std::list<csdb::TransactionID> l_id;
-    for (auto trIt = cs::TransactionsIterator(s_blockchain, addr); trIt.isValid(); trIt.next()) {
+    for (auto trIt = cs::TransactionsIterator(blockchain_, addr); trIt.isValid(); trIt.next()) {
         if (is_smart_state(*trIt)) {
             cs::SmartContractRef smart_ref;
             smart_ref.from_user_field(trIt->user_field(cs::trx_uf::new_state::RefStart));
@@ -1521,10 +1528,10 @@ void APIHandler::iterateOverTokenTransactions(const csdb::Address& addr, const s
 api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& addr, bool& present) {
     csdb::Address abs_addr = addr;
     if (addr.is_wallet_id()) {
-        abs_addr = s_blockchain.getAddressByType(addr, BlockChain::AddressType::PublicKey);
+        abs_addr = blockchain_.getAddressByType(addr, BlockChain::AddressType::PublicKey);
     }
 
-    const auto deploy = solver.smart_contracts().get_contract_deploy(addr);
+    const auto deploy = solver_.smart_contracts().get_contract_deploy(addr);
     if (deploy.is_valid()) {
         present = true;
         return fetch_smart(deploy);
@@ -1571,7 +1578,7 @@ void APIHandler::SmartContractDataGet(api::SmartContractDataResult& _return, con
 
     bool present = false;
     std::vector<general::ByteCodeObject> byteCode = getSmartByteCode(addr, present);
-    std::string state = cs::SmartContracts::get_contract_state(s_blockchain, addr);
+    std::string state = cs::SmartContracts::get_contract_state(blockchain_, addr);
 
     if (!present || state.empty()) {
         SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
@@ -1685,7 +1692,7 @@ void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const gene
 
     const auto pool = executor_.loadBlockApi(trxn.id().pool_seq());
     const auto smart = fetch_smart(trxn);
-    const auto addr_pk = s_blockchain.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
+    const auto addr_pk = blockchain_.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
     const auto addrPair = TokensMaster::getTransferData(addr_pk, smart.method, smart.params);
 
     _return.count = 1;
@@ -1699,9 +1706,9 @@ void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return, int64_
         return;
 
     _return.result = false;
-    _return.total_trxns_count = (uint32_t) s_blockchain.getTransactionsCount();
+    _return.total_trxns_count = (uint32_t) blockchain_.getTransactionsCount();
 
-    auto tPair = s_blockchain.getLastNonEmptyBlock();
+    auto tPair = blockchain_.getLastNonEmptyBlock();
     while (limit > 0 && tPair.second) {
         if (tPair.second <= offset)
             offset -= tPair.second;
@@ -1720,7 +1727,7 @@ void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return, int64_
         }
 
         if (limit) {
-            tPair = s_blockchain.getPreviousNonEmptyBlock(tPair.first);
+            tPair = blockchain_.getPreviousNonEmptyBlock(tPair.first);
         }
     }
 
@@ -1738,13 +1745,13 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
     tm_.loadTokenInfo([&totalTransfers, &tokenTransPools, this](const TokensMap& tm_, const HoldersMap&) {
         for (auto& t : tm_) {
             totalTransfers += t.second.transfersCount;
-            tokenTransPools.insert(std::make_pair(s_blockchain.getLastTransaction(t.first).pool_seq(), t.first));
+            tokenTransPools.insert(std::make_pair(blockchain_.getLastTransaction(t.first).pool_seq(), t.first));
         }
     });
 
     _return.count = uint32_t(totalTransfers);
 
-    cs::Sequence seq = s_blockchain.getLastNonEmptyBlock().first;
+    cs::Sequence seq = blockchain_.getLastNonEmptyBlock().first;
     while (limit && seq != cs::kWrongSequence && tokenTransPools.size()) {
         auto it = tokenTransPools.find(seq);
         if (it != tokenTransPools.end()) {
@@ -1761,7 +1768,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
                 if (--offset >= 0) {
                     continue;
                 }
-                csdb::Address target_pk = s_blockchain.getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
+                csdb::Address target_pk = blockchain_.getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
                 auto addrPair = TokensMaster::getTransferData(target_pk, smart.method, smart.params);
                 addTokenResult(_return, target_pk, "", pool, t, smart, addrPair);
                 if (--limit == 0) {
@@ -1770,7 +1777,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
             }
 
             do {
-                const auto lPs = s_blockchain.getPreviousPoolSeq(it->second, it->first);
+                const auto lPs = blockchain_.getPreviousPoolSeq(it->second, it->first);
                 const auto lAddr = it->second;
 
                 tokenTransPools.erase(it);
@@ -1782,7 +1789,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
             } while (it != tokenTransPools.end());
         }
 
-        seq = s_blockchain.getPreviousNonEmptyBlock(seq).first;
+        seq = blockchain_.getPreviousNonEmptyBlock(seq).first;
     }
 
     tm_.loadTokenInfo([&_return](const TokensMap& tm_, const HoldersMap&) {
@@ -2007,14 +2014,14 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
     const uint64_t num = _offset + _limit;
 
     if (_ordCol == 0) {  // Balance
-        iterateOverWallets<csdb::Amount>([](const cs::WalletsCache::WalletData& wd) -> const csdb::Amount& { return wd.balance_; }, num, _desc, lst, s_blockchain);
+        iterateOverWallets<csdb::Amount>([](const cs::WalletsCache::WalletData& wd) -> const csdb::Amount& { return wd.balance_; }, num, _desc, lst, blockchain_);
     }
 #ifdef MONITOR_NODE
     else if (_ordCol == 1) {  // TimeReg
-        iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.createTime_; }, num, _desc, lst, s_blockchain);
+        iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.createTime_; }, num, _desc, lst, blockchain_);
     }
     else {  // Tx count
-        iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.transNum_; }, num, _desc, lst, s_blockchain);
+        iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.transNum_; }, num, _desc, lst, blockchain_);
     }
 #endif
 
@@ -2039,7 +2046,7 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
         _return.wallets.push_back(wi);
     }
 
-    _return.count = (uint32_t) s_blockchain.getWalletsCountWithBalance();
+    _return.count = (uint32_t) blockchain_.getWalletsCountWithBalance();
 }
 
 void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
@@ -2052,7 +2059,7 @@ void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
     uint32_t limit = PER_PAGE;
     uint32_t total = 0;
 
-    s_blockchain.iterateOverWriters([&_return, &offset, &limit, &total](const cs::PublicKey& addr, const cs::WalletsCache::TrustedData& wd) {
+    blockchain_.iterateOverWriters([&_return, &offset, &limit, &total](const cs::PublicKey& addr, const cs::WalletsCache::TrustedData& wd) {
         if (addr.empty()) {
             return true;
         }
@@ -2089,7 +2096,7 @@ void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {
 ////////new
 
 void APIHandler::SyncStateGet(api::SyncStateResult& _return) {
-    _return.lastBlock = s_blockchain.getLastSeq();
+    _return.lastBlock = blockchain_.getLastSeq();
     _return.currRound = cs::Conveyer::instance().currentRoundNumber();
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }

@@ -507,19 +507,27 @@ template <typename T>
 struct SpinLockedRef {
 private:
     SpinLockable<T>* lockable_;
-
+    std::mutex mt;
 public:
     SpinLockedRef(SpinLockable<T>& lockable)
     : lockable_(&lockable) {
+#ifdef SPINLOCK
         while (this->lockable_->af.test_and_set(std::memory_order_acquire)) {
             std::this_thread::yield();
         }
+#else
+        mt.lock();
+#endif
     }
 
     ~SpinLockedRef() {
+#ifdef SPINLOCK
         if (lockable_) {
             lockable_->af.clear(std::memory_order_release);
         }
+#else
+        mt.unlock();
+#endif
     }
 
     SpinLockedRef(const SpinLockedRef&) = delete;

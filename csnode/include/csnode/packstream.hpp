@@ -220,6 +220,15 @@ public:
         *this << receiver;
     }
 
+    void init(const Packet& pack) {
+        clear();
+        ++id_;
+
+        newPack();
+
+        insertBytes(reinterpret_cast<const char*>(pack.data()), static_cast<uint32_t>(pack.size()));
+    }
+
     void clear() {
         for (auto ptr = packets_; ptr != packetsEnd_; ++ptr) {
             ptr->~Packet();

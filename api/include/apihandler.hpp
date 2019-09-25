@@ -684,12 +684,6 @@ private:
 }  // namespace apiexec
 
 namespace api {
-class APIFaker : public APINull {
-public:
-    APIFaker(BlockChain&, cs::SolverCore&) {
-    }
-};
-
 class APIHandler : public APIHandlerInterface {
 public:
     explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
@@ -771,7 +765,7 @@ public:
     void SyncStateGet(api::SyncStateResult& _return) override;
 
     BlockChain& get_s_blockchain() const noexcept {
-        return s_blockchain;
+        return blockchain_;
     }
 
     executor::Executor& getExecutor() {
@@ -809,8 +803,8 @@ private:
     using client_type           = executor::ContractExecutorConcurrentClient;
     using smartHashStateEntry   = cs::WorkerQueue<HashState>;
    
-    BlockChain& s_blockchain;
-    cs::SolverCore& solver;
+    BlockChain& blockchain_;
+    cs::SolverCore& solver_;
 #ifdef MONITOR_NODE
     csstats::csstats stats;
 #endif
@@ -863,8 +857,8 @@ private:
 
     cs::SpinLockable<std::map<csdb::Address, smartHashStateEntry>> hashStateSL;
 
-    cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployed_by_creator;
-    //cs::SpinLockable<PendingSmartTransactions> pending_smart_transactions;
+    cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployedByCreator_;
+
     cs::SpinLockable < std::map<cs::Sequence, api::Pool> > poolCache;
     std::atomic_flag state_updater_running = ATOMIC_FLAG_INIT;
     std::thread state_updater;

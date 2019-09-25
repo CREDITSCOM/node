@@ -145,7 +145,7 @@ void SolverCore::nextRound(bool updateRound) {
     if (!updateRound) {
         recv_hash.clear();
     }
-
+    deferredBlock_ = csdb::Pool{};
     stageOneStorage.clear();
     stageTwoStorage.clear();
     stageThreeStorage.clear();
@@ -170,7 +170,8 @@ void SolverCore::nextRound(bool updateRound) {
 
 void SolverCore::gotStageOne(const cs::StageOne& stage) {
     if (find_stage1(stage.sender) != nullptr) {
-        uint64_t lastTimeStamp, currentTimeStamp;
+        uint64_t lastTimeStamp = 0;
+        uint64_t currentTimeStamp = 0;
         uint8_t sender = stage.sender;
         try {
             lastTimeStamp = std::stoll(find_stage1(stage.sender)->roundTimeStamp);
@@ -192,9 +193,9 @@ void SolverCore::gotStageOne(const cs::StageOne& stage) {
         // duplicated
         if (currentTimeStamp > lastTimeStamp) {
             auto it = std::find_if(stageOneStorage.begin(), stageOneStorage.end(), [sender](cs::StageOne& st) { return st.sender == sender; });
-			if (it != stageOneStorage.end()) {
-				stageOneStorage.erase(it);
-			}
+            if (it != stageOneStorage.end()) {
+                stageOneStorage.erase(it);
+            }
         }
         else {
             return;
