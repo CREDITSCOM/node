@@ -226,9 +226,14 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         return;
     }
 
-    long long timeSS;
-    istream_ >> timeSS;
-    timePassedSinceBB(timeSS);
+    if (istream_.isBytesAvailable(sizeof(long long))) {
+        long long timeSS;
+        istream_ >> timeSS;
+        auto seconds = timePassedSinceBB(timeSS);
+        if (seconds > 180) {
+            return;
+        }
+    }
 
     if (stat_.isLastRoundTooLong()) {
         poolSynchronizer_->sync(globalTable.round, 1, true);
