@@ -2106,7 +2106,7 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
         uint64_t currentTimeStamp;
         [[maybe_unused]] uint64_t rpTimeStamp;
         try {
-            lastTimeStamp = std::stoll(getBlockChain().getLastTimeStamp());
+            lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
         }
         catch (...) {
             csdebug() << __func__ << ": last block Timestamp was announced as zero";
@@ -2114,7 +2114,7 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
         }
 
         try {
-            currentTimeStamp = std::stoll(cs::Utils::currentTimestamp());
+            currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
         }
         catch (...) {
             csdebug() << __func__ << ": current Timestamp was announced as zero";
@@ -2122,7 +2122,7 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
         }
 
         try {
-            rpTimeStamp = std::stoll(rPackage.poolMetaInfo().timestamp);
+            rpTimeStamp = std::stoull(rPackage.poolMetaInfo().timestamp);
         }
         catch (...) {
             csdebug() << __func__ << ": just received roundPackage Timestamp was announced as zero";
@@ -2405,11 +2405,13 @@ void Node::sendHash(cs::RoundNumber round) {
     cs::Byte myTrustedSize = 0;
     cs::Byte myRealTrustedSize = 0;
 
-    uint64_t lastTimeStamp = std::atoll(getBlockChain().getLastTimeStamp().c_str());
-    uint64_t currentTimeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
+    uint64_t lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+    uint64_t currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
+
     if (currentTimeStamp < lastTimeStamp) {
         currentTimeStamp = lastTimeStamp + 1;
     }
+
     csdebug() << "TimeStamp = " << std::to_string(currentTimeStamp);
 
     if (cs::Conveyer::instance().currentRoundNumber() > 1) {
@@ -2462,13 +2464,17 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     stream >> sHash.trustedSize;
     stream >> sHash.realTrustedSize;
     stream >> sHash.timeStamp;
+
     if (!stream.size() == 0 || !stream.isValid()) {
         csdebug() << "Stream is a bit uncertain ... ";
     }
-    uint64_t lastTimeStamp = std::atoll(getBlockChain().getLastTimeStamp().c_str());
-    uint64_t currentTimeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
+
+    uint64_t lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+    uint64_t currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
+
     csdebug() << "Got Hash message (" << tmp.size() << "): " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
         << " : " << static_cast<int>(sHash.trustedSize) << " - " << static_cast<int>(sHash.realTrustedSize);
+
     if (!roundPackageCache_.empty()) {
         auto mask = roundPackageCache_.back().poolMetaInfo().realTrustedMask;
         if (mask.size() > cs::TrustedMask::trustedSize(mask)) {
