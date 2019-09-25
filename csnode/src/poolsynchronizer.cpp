@@ -141,7 +141,8 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
     for (auto& pool : poolsBlock) {
         const auto sequence = pool.sequence();
 
-        removeExistingSequence(sequence, SequenceRemovalAccuracy::EXACT);
+        // sequence will be removed after block appears in chain
+        //removeExistingSequence(sequence, SequenceRemovalAccuracy::EXACT);
 
         if (lastWrittenSequence > sequence) {
             continue;
@@ -269,8 +270,15 @@ void cs::PoolSynchronizer::onWriteBlock(const cs::Sequence sequence) {
 }
 
 void cs::PoolSynchronizer::onRemoveBlock(const csdb::Pool& pool) {
-    csmeta(csdetails) << pool.sequence();
-    removeExistingSequence(pool.sequence(), SequenceRemovalAccuracy::UPPER_BOUND);
+    cs::Sequence removedSequence = pool.sequence();
+    csmeta(csdetails) << removedSequence;
+    cs::RoundNumber round = cs::Conveyer::instance().currentRoundNumber();
+    if (round > removedSequence && round - removedSequence > cs::PoolSynchronizer::roundDifferentForSync && !neighbours_.empty()) {
+        neighbours_.front().addSequences(removedSequence);
+    }
+    else {
+        removeExistingSequence(removedSequence, SequenceRemovalAccuracy::EXACT);
+    }
 }
 
 //
@@ -541,8 +549,8 @@ void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, c
 }
 
 void cs::PoolSynchronizer::refreshNeighbours() {
-    const uint8_t neededNeighboursCount = static_cast<uint8_t>(transport_->getNeighboursCountWithoutSS());
-    const uint8_t nSize = static_cast<uint8_t>(neighbours_.size());
+    const size_t neededNeighboursCount = transport_->getNeighboursCountWithoutSS();
+    const size_t nSize = neighbours_.size();
 
     if (nSize == neededNeighboursCount) {
         return;
@@ -550,7 +558,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
 
     csmeta(csdetails) << "Neighbours count without ss: " << static_cast<int>(neededNeighboursCount);
 
-    const uint8_t allNeighboursCount = static_cast<uint8_t>(transport_->getNeighboursCount());
+    const size_t allNeighboursCount = transport_->getNeighboursCount();
 
     // 1) sort neighbours by lastSeq descending
     std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>> sort_by_seq_desc;
@@ -561,10 +569,32 @@ void cs::PoolSynchronizer::refreshNeighbours() {
 
     // Add new neighbours
     if (nSize < neededNeighboursCount) {
-        std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>>::const_iterator it = sort_by_seq_desc.cbegin();
-        for (uint8_t i = nSize; i < allNeighboursCount; ++i) {
+        decltype(sort_by_seq_desc)::const_iterator it = sort_by_seq_desc.cbegin();
+        // update known neighbors
+        for (size_t i = 0; i < nSize; ++i) {
             // get the i-th connection with max sequence
-            size_t conn_number = size_t(i);
+            size_t conn_number = i;
+            if (it != sort_by_seq_desc.cend()) {
+                // normally, we always be here
+                conn_number = it->second;
+                ++it;
+            }
+            auto& item = *(neighbours_.begin() + i);
+            ConnectionPtr neighbour = transport_->getConnectionByNumber(conn_number);
+            if (neighbour->isSignal) {
+                ++conn_number;
+                if (conn_number >= neededNeighboursCount) {
+                    break;
+                }
+                neighbour = transport_->getConnectionByNumber(conn_number);
+            }
+            item.setIndex(uint8_t(conn_number));
+            item.setPublicKey(neighbour->key);
+        }
+        // add new neighbors
+        for (size_t i = nSize; i < allNeighboursCount; ++i) {
+            // get the i-th connection with max sequence
+            size_t conn_number = i;
             if (it != sort_by_seq_desc.cend()) {
                 // normally, we always be here
                 conn_number = it->second;
@@ -572,10 +602,10 @@ void cs::PoolSynchronizer::refreshNeighbours() {
             }
             ConnectionPtr neighbour = transport_->getConnectionByNumber(conn_number);
             if (neighbour && !neighbour->isSignal && neighbour->lastSeq) {
-                auto isAlreadyHave = std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return el.index() == conn_number; });
+                auto isAlreadyHave = std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return size_t(el.index()) == conn_number; });
 
                 if (isAlreadyHave == neighbours_.end()) {
-                    neighbours_.emplace_back(NeighboursSetElemet(conn_number, neighbour->key, syncData_.blockPoolsCount));
+                    neighbours_.emplace_back(NeighboursSetElemet(uint8_t(conn_number), neighbour->key, syncData_.blockPoolsCount));
                 }
             }
         }
@@ -586,9 +616,9 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     // refresh neighbours' index
     std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>>::const_iterator it = sort_by_seq_desc.cbegin();
     std::size_t currentNh = 0;
-    for (uint8_t i = 0; i < allNeighboursCount; ++i) {
+    for (size_t i = 0; i < allNeighboursCount; ++i) {
         // get the i-th connection with max sequence
-        size_t conn_number = size_t(i);
+        size_t conn_number = i;
         if (it != sort_by_seq_desc.cend()) {
             // normally, we always be here
             conn_number = it->second;
@@ -603,7 +633,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     }
 
     // remove extra neighbour
-    for (uint8_t i = neededNeighboursCount; i < nSize; ++i) {
+    for (size_t i = neededNeighboursCount; i < nSize; ++i) {
         const auto& seqs = neighbours_.back().sequences();
         for (const auto& seq : seqs) {
             bool isAvailable = true;
