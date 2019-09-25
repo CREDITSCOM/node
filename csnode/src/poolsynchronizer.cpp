@@ -296,6 +296,9 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const cs::Sequence lastWri
     const std::size_t cachedBlocksSize = blockChain_->getCachedBlocksSize();
     const float last = float(lastWrittenSequence + cachedBlocksSize);
     const float global = float(globalSequence - 1);
+    if (global < last) {
+        return false;
+    }
     const float maxValue = 100.0f;
     const uint32_t syncStatus = static_cast<uint32_t>(std::min(((last / global) * maxValue), maxValue));
     const uint32_t remaining = static_cast<uint32_t>(global - last);

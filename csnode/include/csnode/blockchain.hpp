@@ -273,6 +273,15 @@ public:
         return *(walletsCacheUpdater_.get());
     }
 
+    /**
+     * Try to flush deferred block to DB, intended to call on node exit
+     *
+     * @author  Alexander Avramenko
+     * @date    25.09.2019
+     */
+
+    void tryFlushDeferredBlock();
+
 private:
     void createCachesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
