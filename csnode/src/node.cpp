@@ -545,8 +545,9 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     pool.value().set_confidants(confidantsReference);
     auto tmpPool = solver_->getDeferredBlock().clone();
     if (tmpPool.is_valid() && tmpPool.sequence() == round) {
-        tmpPool.set_signatures(tmp);
-        csdebug() << "Signatures " << tmp.size() << " were added to the pool: " << tmpPool.signatures().size();
+        auto tmp2 = rPackage.poolSignatures();
+        tmpPool.set_signatures(tmp2);
+        csdebug() << "Signatures " << tmp2.size() << " were added to the pool: " << tmpPool.signatures().size();
         auto resPool = getBlockChain().createBlock(tmpPool);
 
         if (resPool.has_value()) {
