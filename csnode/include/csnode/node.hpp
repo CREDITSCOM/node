@@ -229,6 +229,20 @@ public:
         return solver_;
     }
 
+    void setDeltaTimeSS(long long timeSS) {
+        auto curTime = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        deltaTimeSS = curTime - timeSS;
+    }
+
+    long long getDeltaTimeSS() const {
+        return deltaTimeSS;
+    }
+
+    long long timePassedSinceBB(long long receiveTime) {
+        auto curTime = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        return curTime - (receiveTime + getDeltaTimeSS());
+    }
+
 #ifdef NODE_API
     csconnector::connector* getConnector() {
         return api_.get();
@@ -434,6 +448,7 @@ private:
     bool alwaysExecuteContracts_ = false;
 
     cs::config::Observer& observer_;
+    long long deltaTimeSS{};
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);
