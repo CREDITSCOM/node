@@ -55,3 +55,52 @@ TEST(Compressor, TestCompressByte) {
 
     ASSERT_EQ(byte, entity);
 }
+
+TEST(SynchronizedCompressor, BaseSynchronizedCompressorUsage) {
+    cs::SynchronizedCompressor compressor;
+
+    constexpr size_t count = 100;
+    const size_t threadsCount = std::thread::hardware_concurrency();
+    std::mutex mutex;
+
+    std::vector<std::size_t> data;
+    data.reserve(count);
+
+    std::map<std::thread::id, std::vector<size_t>> threadData;
+
+    for (size_t i = 0; i < count; ++i) {
+        data.push_back(i);
+    }
+
+    std::vector<std::thread> threads;
+
+    for (size_t i = 0; i < threadsCount; ++i) {
+        std::thread thread([&] {
+            CompressedRegion region;
+            std::vector<size_t> raw;
+
+            {
+                cs::Lock lock(mutex);
+                raw = data;
+            }
+
+            region = compressor.compress(raw);
+            raw = compressor.decompress<std::vector<size_t>>(region);
+
+            {
+                cs::Lock lock(mutex);
+                threadData[std::this_thread::get_id()] = raw;
+            }
+        });
+
+        threads.push_back(std::move(thread));
+    }
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    for (const auto& element : threadData) {
+        ASSERT_EQ(element.second, data);
+    }
+}
