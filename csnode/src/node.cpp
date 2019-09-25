@@ -230,7 +230,9 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         long long timeSS;
         istream_ >> timeSS;
         auto seconds = timePassedSinceBB(timeSS);
-        if (seconds > 180) {
+        constexpr long long MaxBigBangAge_sec = 180;
+        if (seconds > MaxBigBangAge_sec) {
+            cswarning() << "Elder Big Bang received of " << WithDelimiters(seconds) << " seconds age, ignore";
             return;
         }
     }
@@ -2986,9 +2988,9 @@ void Node::onStopRequested() {
     }
 
     stopRequested_ = true;
-
     if (myLevel_ == Level::Confidant) {
         cslog() << "Node: wait until complete trusted role before exit";
+        blockChain_.tryFlushDeferredBlock();
     }
     else {
         stop();

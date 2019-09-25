@@ -188,7 +188,8 @@ void BlockChain::onStartReadFromDB(cs::Sequence lastWrittenPoolSeq) {
         recreateIndex_ = true;
     }
     if (lastWrittenPoolSeq > 0) {
-        cslog() << "Blockchain: start reading " << lastWrittenPoolSeq + 1 << " blocks from DB";
+        cslog() << "Blockchain: start reading " << WithDelimiters(lastWrittenPoolSeq + 1)
+            << " blocks from DB, 0.." << WithDelimiters(lastWrittenPoolSeq);
     }
 }
 
@@ -957,7 +958,7 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
     }
 }
 
-void BlockChain::close() {
+void BlockChain::tryFlushDeferredBlock() {
     cs::Lock lock(dbLock_);
     if (deferredBlock_.is_valid() && deferredBlock_.is_read_only()) {
         Hash tempHash;
@@ -967,14 +968,19 @@ void BlockChain::close() {
         if (NodeUtils::checkGroupSignature(deferredBlock_.confidants(), mask, deferredBlock_.signatures(), tempHash)) {
             deferredBlock_.set_storage(storage_);
             if (deferredBlock_.save()) {
-                csdebug() << "Blockchain> block #" << deferredBlock_.sequence() << " is flushed to DB";
+                csdebug() << "Blockchain> block #" << WithDelimiters(deferredBlock_.sequence()) << " is flushed to DB";
                 deferredBlock_ = csdb::Pool{};
             }
             else {
-                cserror() << "Failed to flush block #" << deferredBlock_.sequence() << " to DB";
+                cserror() << "Failed to flush block #" << WithDelimiters(deferredBlock_.sequence()) << " to DB";
             }
         }
     }
+}
+
+void BlockChain::close() {
+    tryFlushDeferredBlock();
+    cs::Lock lock(dbLock_);
     storage_.close();
     cs::Connector::disconnect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     blockHashes_->close();
