@@ -931,27 +931,28 @@ bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs) {
 // logger settings not checked
 bool operator==(const Config& lhs, const Config& rhs) {
     return lhs.good_ == rhs.good_ &&
-           lhs.inputEp_ == rhs.inputEp_ &&
-           lhs.twoSockets_ == rhs.twoSockets_ &&
-           lhs.outputEp_ == rhs.outputEp_ &&
-           lhs.nType_ == rhs.nType_ &&
-           lhs.ipv6_ == rhs.ipv6_ &&
-           lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
-           lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
-           lhs.symmetric_ == rhs.symmetric_ &&
-           lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
-           lhs.bType_ == rhs.bType_ &&
-           lhs.signalServerEp_ == rhs.signalServerEp_ &&
-           lhs.bList_ == rhs.bList_ &&
-           lhs.pathToDb_ == rhs.pathToDb_ &&
-           lhs.publicKey_ == rhs.publicKey_ &&
-           lhs.privateKey_ == rhs.privateKey_ &&
-           lhs.poolSyncData_ == rhs.poolSyncData_ &&
-           lhs.apiData_ == rhs.apiData_ &&
-           lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
-           lhs.recreateIndex_ == rhs.recreateIndex_ &&
-           lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
-           lhs.conveyerData_ == rhs.conveyerData_;
+        lhs.inputEp_ == rhs.inputEp_ &&
+        lhs.twoSockets_ == rhs.twoSockets_ &&
+        lhs.outputEp_ == rhs.outputEp_ &&
+        lhs.nType_ == rhs.nType_ &&
+        lhs.ipv6_ == rhs.ipv6_ &&
+        lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
+        lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
+        lhs.symmetric_ == rhs.symmetric_ &&
+        lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
+        lhs.bType_ == rhs.bType_ &&
+        lhs.signalServerEp_ == rhs.signalServerEp_ &&
+        lhs.bList_ == rhs.bList_ &&
+        lhs.pathToDb_ == rhs.pathToDb_ &&
+        lhs.publicKey_ == rhs.publicKey_ &&
+        lhs.privateKey_ == rhs.privateKey_ &&
+        lhs.poolSyncData_ == rhs.poolSyncData_ &&
+        lhs.apiData_ == rhs.apiData_ &&
+        lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
+        lhs.recreateIndex_ == rhs.recreateIndex_ &&
+        lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
+        lhs.conveyerData_ == rhs.conveyerData_ &&
+        lhs.minCompatibleVersion_ == rhs.minCompatibleVersion_;
 }
 
 bool operator!=(const Config& lhs, const Config& rhs) {
