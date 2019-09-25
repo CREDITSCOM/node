@@ -507,7 +507,7 @@ template <typename T>
 struct SpinLockedRef {
 private:
     SpinLockable<T>* lockable_;
-    std::mutex mt;
+    std::mutex mutex_;
 public:
     SpinLockedRef(SpinLockable<T>& lockable)
     : lockable_(&lockable) {
@@ -516,7 +516,7 @@ public:
             std::this_thread::yield();
         }
 #else
-        mt.lock();
+        mutex_.lock();
 #endif
     }
 
@@ -526,7 +526,7 @@ public:
             lockable_->af.clear(std::memory_order_release);
         }
 #else
-        mt.unlock();
+        mutex_.unlock();
 #endif
     }
 
