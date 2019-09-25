@@ -448,7 +448,7 @@ void BlockChain::removeLastBlock() {
         csmeta(csdebug) << "There are no blocks, allowed to be removed";
         return;
     }
-    --blocksToBeRemoved_;
+    //--blocksToBeRemoved_;
     csmeta(csdebug) << getLastSeq();
     csdb::Pool pool{};
 
