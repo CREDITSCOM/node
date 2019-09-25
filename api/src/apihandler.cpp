@@ -2223,7 +2223,7 @@ namespace executor {
         }
     }
         
-    std::optional<Executor::ExecuteResult> Executor::executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {       
+    std::optional<Executor::ExecuteResult> Executor::executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {
         if (smarts.empty()) {
             return std::nullopt;
         }
