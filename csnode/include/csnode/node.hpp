@@ -6,10 +6,13 @@
 #include <string>
 
 #include <config.hpp>
-#include <csconnector/csconnector.hpp>
 #include <csstats.hpp>
 
+#include <csconnector/csconnector.hpp>
+
 #include <csnode/conveyer.hpp>
+#include <csnode/compressor.hpp>
+
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
@@ -327,9 +330,6 @@ private:
     template <typename... Args>
     void writeDefaultStream(Args&&... args);
 
-    RegionPtr compressPoolsBlock(const cs::PoolsBlock& poolsBlock, std::size_t& realBinSize);
-    cs::PoolsBlock decompressPoolsBlock(const uint8_t* data, const size_t size);
-
     // TODO: C++ 17 static inline?
     static const csdb::Address genesisAddress_;
     static const csdb::Address startAddress_;
@@ -407,8 +407,7 @@ private:
     std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
 
     std::vector<cs::Stage> smartStageTemporary_;
-    // smart consensus IDs:
-    std::vector<uint64_t> activeSmartConsensuses_;
+    std::vector<uint64_t> activeSmartConsensuses_;  // smart consensus IDs:
 
     SentRoundData lastSentRoundData_;
     SentSignatures lastSentSignatures_;
@@ -434,6 +433,7 @@ private:
     bool alwaysExecuteContracts_ = false;
 
     cs::config::Observer& observer_;
+    cs::Compressor compressor_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

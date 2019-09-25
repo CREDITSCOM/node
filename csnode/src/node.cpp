@@ -819,17 +819,22 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
     csdebug() << "NODE> Get Block Reply";
 
-    cs::PoolsBlock poolsBlock = decompressPoolsBlock(data, size);
+    istream_.init(data, size);
+
+    CompressedRegion region;
+    istream_ >> region;
+
+    size_t packetNumber = 0;
+    istream_ >> packetNumber;
+
+    cs::PoolsBlock poolsBlock = compressor_.decompress<cs::PoolsBlock>(region);
 
     if (poolsBlock.empty()) {
         cserror() << "NODE> Get block reply> No pools found";
         return;
     }
 
-    std::size_t packetNum = 0;
-    istream_ >> packetNum;
-
-    poolSynchronizer_->getBlockReply(std::move(poolsBlock), packetNum);
+    poolSynchronizer_->getBlockReply(std::move(poolsBlock), packetNumber);
 }
 
 void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packetNum) {
@@ -843,10 +848,8 @@ void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey&
         csdebug() << "#" << it.sequence() << " signs = " << it.signatures().size();
     }
 
-    std::size_t realBinSize = 0;
-    RegionPtr memPtr = compressPoolsBlock(poolsBlock, realBinSize);
-
-    tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), realBinSize, cs::numeric_cast<uint32_t>(memPtr->size()), memPtr, packetNum);
+    auto region = compressor_.compress(poolsBlock);
+    tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), region, packetNum);
 }
 
 void Node::becomeWriter() {
@@ -1319,64 +1322,9 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
 
     csdetails() << "NODE> Sending broadcast data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
                 << ", msgType: " << Packet::messageTypeToString(msgType);
-	//if (ostream_.getPacketsCount() > 100) {
-	//	csinfo() << __func__ << ": sending " << ostream_.getPacketsCount() << " packets";
-	//}
+
     transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
     ostream_.clear();
-}
-
-RegionPtr Node::compressPoolsBlock(const cs::PoolsBlock& poolsBlock, std::size_t& realBinSize) {
-    cs::Bytes bytes;
-    cs::DataStream stream(bytes);
-
-    stream << poolsBlock;
-
-    char* data = reinterpret_cast<char*>(bytes.data());
-    const int binSize = cs::numeric_cast<int>(bytes.size());
-
-    const auto maxSize = LZ4_compressBound(binSize);
-    auto memPtr = allocator_.allocateNext(static_cast<uint32_t>(maxSize));
-
-    const int compressedSize = LZ4_compress_default(data, static_cast<char*>(memPtr->data()), binSize, cs::numeric_cast<int>(memPtr->size()));
-
-    if (!compressedSize) {
-        csmeta(cserror) << "Compress poools block error";
-    }
-
-    memPtr->setSize(static_cast<uint32_t>(compressedSize));
-    realBinSize = cs::numeric_cast<std::size_t>(binSize);
-
-    return memPtr;
-}
-
-cs::PoolsBlock Node::decompressPoolsBlock(const uint8_t* data, const size_t size) {
-    istream_.init(data, size);
-    std::size_t realBinSize = 0;
-    istream_ >> realBinSize;
-
-    std::uint32_t compressSize = 0;
-    istream_ >> compressSize;
-
-    RegionPtr memPtr = allocator_.allocateNext(compressSize);
-    istream_ >> memPtr;
-
-    cs::Bytes bytes;
-    bytes.resize(realBinSize);
-    char* bytesData = reinterpret_cast<char*>(bytes.data());
-
-    const int uncompressedSize = LZ4_decompress_safe(static_cast<char*>(memPtr->data()), bytesData, cs::numeric_cast<int>(compressSize), cs::numeric_cast<int>(realBinSize));
-
-    if (uncompressedSize < 0) {
-        csmeta(cserror) << "Decompress poools block error";
-    }
-
-    cs::DataStream stream(bytes.data(), bytes.size());
-    cs::PoolsBlock poolsBlock;
-
-    stream >> poolsBlock;
-
-    return poolsBlock;
 }
 
 void Node::sendStageOne(const cs::StageOne& stageOneInfo) {
