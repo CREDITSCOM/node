@@ -217,7 +217,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
     cs::Hash lastBlockHash;
     istream_ >> lastBlockHash;
-
+       
     cs::RoundTable globalTable;
     globalTable.round = rNum;
 
@@ -225,6 +225,10 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         cserror() << className() << " read round data from SS failed";
         return;
     }
+
+    long long timeSS;
+    istream_ >> timeSS;
+    timePassedSinceBB(timeSS);
 
     if (stat_.isLastRoundTooLong()) {
         poolSynchronizer_->sync(globalTable.round, 1, true);
