@@ -1636,7 +1636,7 @@ void APIHandler::TokenTransfersGet(api::TokenTransfersResult& _return, const gen
 }
 
 void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const general::Address& token, const TransactionId& id) {
-    const csdb::TransactionID trxn_id = csdb::TransactionID(id.poolSeq, id.index);
+    const csdb::TransactionID trxn_id = csdb::TransactionID(cs::Sequence(id.poolSeq), cs::Sequence(id.index));
     const csdb::Transaction trxn = executor_.loadTransactionApi(trxn_id);
     const csdb::Address addr = BlockChain::getAddressFromKey(token);
 
@@ -1665,16 +1665,18 @@ void APIHandler::TokenTransferGet(api::TokenTransfersResult& _return, const gene
 }
 
 void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return, int64_t offset, int64_t limit) {
-    if (!validatePagination(_return, *this, offset, limit))
+    if (!validatePagination(_return, *this, offset, limit)) {
         return;
+    }
 
     _return.result = false;
-    _return.total_trxns_count = (uint32_t) blockchain_.getTransactionsCount();
+    _return.total_trxns_count = static_cast<int32_t>(blockchain_.getTransactionsCount());
 
     auto tPair = blockchain_.getLastNonEmptyBlock();
     while (limit > 0 && tPair.second) {
-        if (tPair.second <= offset)
+        if (tPair.second <= offset) {
             offset -= tPair.second;
+        }
         else {
             auto p = executor_.loadBlockApi(tPair.first);
             auto it = p.transactions().rbegin() + offset;
@@ -1712,7 +1714,7 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
         }
     });
 
-    _return.count = uint32_t(totalTransfers);
+    _return.count = int32_t(totalTransfers);
 
     cs::Sequence seq = blockchain_.getLastNonEmptyBlock().first;
     while (limit && seq != cs::kWrongSequence && tokenTransPools.size()) {
@@ -1757,8 +1759,9 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
 
     tm_.loadTokenInfo([&_return](const TokensMap& tm_, const HoldersMap&) {
         for (auto& transfer : _return.transfers) {
-            if(auto it = tm_.find(BlockChain::getAddressFromKey(transfer.token)); it != tm_.end())
+            if (auto it = tm_.find(BlockChain::getAddressFromKey(transfer.token)); it != tm_.end()) {
                 transfer.code = it->second.symbol;
+            }
         }
     });
 
@@ -1835,7 +1838,7 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
         auto tIt = tm_.find(addr);
         if (tIt != tm_.end()) {
             found = true;
-            _return.count = (uint32_t) tIt->second.realHoldersCount;
+            _return.count = static_cast<int32_t>(tIt->second.realHoldersCount);
 
             applyToSortedMap(tIt->second.holders, comparator, [&offset, &limit, &_return, &token](const HMap::value_type& t) {
                 if (TokensMaster::isZeroAmount(t.second.balance)) {
@@ -1850,7 +1853,7 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
                 th.holder = fromByteArray(t.first.public_key());
                 th.token = token;
                 th.balance = t.second.balance;
-                th.transfersCount = (uint32_t) t.second.transfersCount;
+                th.transfersCount = static_cast<int32_t>(t.second.transfersCount);
 
                 _return.holders.push_back(th);
 
@@ -1974,7 +1977,7 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 
     WCSortedList lst;
-    const uint64_t num = _offset + _limit;
+    const uint64_t num = static_cast<uint64_t>(_offset + _limit);
 
     if (_ordCol == 0) {  // Balance
         iterateOverWallets<csdb::Amount>([](const cs::WalletsCache::WalletData& wd) -> const csdb::Amount& { return wd.balance_; }, num, _desc, lst, blockchain_);
@@ -2335,8 +2338,6 @@ namespace executor {
         if (!optOriginRes.has_value()) {
             return {};
         }
-
-        //const auto optInnerTransactions = getInnerSendTransactions(optOriginRes.value().acceessId);
 
         // fill res
         ExecuteResult res;
