@@ -850,7 +850,7 @@ private:
     cs::SpinLockable<std::map<cs::Sequence, std::vector<csdb::TransactionID>>> smarts_pending;
 
     cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
-    cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smart_last_trxn;
+    cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smartLastTrxn_;
 
     cs::SpinLockable<std::map<csdb::Address, smartHashStateEntry>> hashStateSL;
 
