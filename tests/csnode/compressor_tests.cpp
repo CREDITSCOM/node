@@ -89,7 +89,7 @@ TEST(SynchronizedCompressor, BaseSynchronizedCompressorUsage) {
 
             {
                 cs::Lock lock(mutex);
-                threadData[std::this_thread::get_id()] = raw;
+                threadData[std::this_thread::get_id()] = std::move(raw);
             }
         });
 
