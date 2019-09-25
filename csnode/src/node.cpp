@@ -2400,13 +2400,22 @@ void Node::sendHash(cs::RoundNumber round) {
     }
 
     csdebug() << "NODE> Sending hash to ALL";
+
     cs::Bytes message;
     cs::DataStream stream(message);
     cs::Byte myTrustedSize = 0;
     cs::Byte myRealTrustedSize = 0;
 
-    uint64_t lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
-    uint64_t currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
+    uint64_t lastTimeStamp = 0;
+    uint64_t currentTimeStamp = 0;
+
+    try {
+        lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+        currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
+    }
+    catch (const std::exception& exception) {
+        cswarning() << exception.what();
+    }
 
     if (currentTimeStamp < lastTimeStamp) {
         currentTimeStamp = lastTimeStamp + 1;
@@ -2419,13 +2428,15 @@ void Node::sendHash(cs::RoundNumber round) {
         myTrustedSize = static_cast<uint8_t>(lastTrusted.size());
         myRealTrustedSize = cs::TrustedMask::trustedSize(lastTrusted);
     }
+
     csdb::PoolHash tmp = spoileHash(blockChain_.getLastHash(), solver_->getPublicKey());
     stream << tmp.to_binary() << myTrustedSize << myRealTrustedSize << currentTimeStamp << round << subRound_;
+
     cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
     cs::Bytes messageToSend(message.data(), message.data() + message.size() - sizeof(cs::RoundNumber) - sizeof(cs::Byte));
+
     sendToConfidants(MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
     csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_) << ", message: " << cs::Utils::byteStreamToHex(messageToSend);
-
 }
 
 void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -2465,12 +2476,20 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     stream >> sHash.realTrustedSize;
     stream >> sHash.timeStamp;
 
-    if (!stream.size() == 0 || !stream.isValid()) {
+    if (!stream.isEmpty() || !stream.isValid()) {
         csdebug() << "Stream is a bit uncertain ... ";
     }
 
-    uint64_t lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
-    uint64_t currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
+    uint64_t lastTimeStamp = 0;
+    uint64_t currentTimeStamp = 0;
+
+    try {
+        lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+        currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
+    }
+    catch (const std::exception& exception) {
+        cswarning() << exception.what();
+    }
 
     csdebug() << "Got Hash message (" << tmp.size() << "): " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
         << " : " << static_cast<int>(sHash.trustedSize) << " - " << static_cast<int>(sHash.realTrustedSize);
