@@ -855,8 +855,8 @@ template <typename T>
 bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value) {
     if (data.count(param)) {
         const int readValue = std::is_same_v<T, bool> ? data.get<bool>(param) : data.get<int>(param);
-        const auto max = cs::getMax(value);
-        const auto min = cs::getMin(value);
+        const auto max = static_cast<int>(cs::getMax(value));
+        const auto min = static_cast<int>(cs::getMin(value));
 
         if (readValue > max || readValue < min) {
             std::cout << "[warning] Config.ini> Please, check the block: [" << block << "], so that param: [" << param << "],  will be: [" << cs::numeric_cast<int>(min) << ", "
