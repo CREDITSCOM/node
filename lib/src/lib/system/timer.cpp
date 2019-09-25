@@ -23,10 +23,16 @@ void cs::Timer::start(int msec, Type type, RunPolicy policy) {
     ms_ = std::chrono::milliseconds(msec);
     ns_ = 0;
 
-    timerThread_ = (type_ == Type::Standard) ? std::thread(&Timer::loop, this) : std::thread(&Timer::preciseLoop, this);
-
     realMs_ = ms_;
     allowDifference_ = static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100;
+
+    try {
+        timerThread_ = (type_ == Type::Standard) ? std::thread(&Timer::loop, this) : std::thread(&Timer::preciseLoop, this);
+    }
+    catch (const std::exception& exception) {
+        cserror() << "Can not run Timer thread, " << exception.what();
+        stop();
+    }
 }
 
 void cs::Timer::stop() {
