@@ -62,10 +62,6 @@ void cs::Timer::singleShot(int msec, cs::RunPolicy policy, cs::TimerCallback cal
     cs::Concurrent::runAfter(std::chrono::milliseconds(msec), policy, std::move(callback));
 }
 
-cs::TimerPtr cs::Timer::create() {
-    return std::make_shared<Timer>();
-}
-
 void cs::Timer::loop() {
     while (!interruption_) {
         if (isRehabilitation_) {
