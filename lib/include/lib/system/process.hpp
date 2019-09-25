@@ -222,11 +222,17 @@ inline void Process::launch(Process::Options options) {
         emit errorOccured(cs::ProcessException(exception.what()));
     }
 
-    std::thread thread([this] {
-        io_->run();
-    });
+    try {
+        std::thread thread([this] {
+            io_->run();
+        });
 
-    thread.detach();
+        thread.detach();
+    }
+    catch (const std::exception& exception) {
+        terminate();
+        emit errorOccured(cs::ProcessException(exception.what()));
+    }
 }
 }
 
