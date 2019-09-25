@@ -124,14 +124,7 @@ void cs::Timer::rehabilitation() {
 }
 
 void cs::Timer::call() {
-    auto policy = policy_.load(std::memory_order_acquire);
-
-    if (policy == RunPolicy::ThreadPolicy) {
+    cs::Concurrent::execute(policy_.load(std::memory_order_acquire),[=] {
         emit timeOut();
-    }
-    else {
-        CallsQueue::instance().insert([=] {
-            emit timeOut();
-        });
-    }
+    });
 }
