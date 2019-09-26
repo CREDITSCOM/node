@@ -124,7 +124,7 @@ void cs::Timer::rehabilitation() {
 }
 
 void cs::Timer::call() {
-    cs::Concurrent::execute(policy_.load(std::memory_order_acquire),[=] {
+    cs::Concurrent::execute(policy_.load(std::memory_order_acquire),[this] {
         emit timeOut();
     });
 }
