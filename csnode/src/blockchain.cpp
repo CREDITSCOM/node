@@ -1373,6 +1373,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     if (cachedBlocks_.count(poolSequence) > 0) {
         csdebug() << "BLOCKCHAIN> ignore duplicated block #" << poolSequence << " in cache";
         // it is not error, so caller code nothing to do with it
+        cachedBlockEvent(poolSequence);
         return true;
     }
     // cache block for future recording
