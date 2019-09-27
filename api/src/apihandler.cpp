@@ -520,11 +520,7 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const general::
     }
 
     _return.transactions = convertTransactions(transactions);
-
-#ifdef MONITOR_NODE
     _return.total_trxns_count = blockchain_.getTransactionsCount(addr);
-#endif
-
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
