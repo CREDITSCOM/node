@@ -170,12 +170,12 @@ void Neighbourhood::checkPending(const uint32_t) {
 void Neighbourhood::refreshLimits() {
     cs::Lock lock(nLockFlag_);
     for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
-        for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
-            if (++((*conn)->syncSeqsRetries[i]) >= MaxSyncAttempts) {
-                (*conn)->syncSeqs[i] = 0;
-                (*conn)->syncSeqsRetries[i] = 0;
-            }
-        }
+//        for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
+//            if (++((*conn)->syncSeqsRetries[i]) >= MaxSyncAttempts) {
+//                (*conn)->syncSeqs[i] = 0;
+//                (*conn)->syncSeqsRetries[i] = 0;
+//            }
+//        }
 
         (*conn)->lastBytesCount.store(0, std::memory_order_relaxed);
     }
@@ -753,48 +753,6 @@ ConnectionPtr Neighbourhood::getNextRequestee(const cs::Hash& hash) {
     return si.prioritySender;
 }
 
-ConnectionPtr Neighbourhood::getNextSyncRequestee(const cs::Sequence seq, bool& alreadyRequested) {
-    cs::Lock lock(nLockFlag_);
-
-    alreadyRequested = false;
-    ConnectionPtr candidate;
-
-    for (auto& nb : neighbours_) {
-        if (nb->isSignal || nb->lastSeq < seq) {
-            continue;
-        }
-
-        for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
-            if (nb->syncSeqs[i] == seq) {
-                if (nb->syncSeqsRetries[i] < MaxSyncAttempts) {
-                    alreadyRequested = true;
-                    return nb;
-                }
-
-                nb->syncSeqs[i] = 0;
-                nb->syncSeqsRetries[i] = 0;
-                break;
-            }
-            else if (!candidate && !nb->syncSeqs[i]) {
-                candidate = nb;
-                break;
-            }
-        }
-    }
-
-    if (candidate) {
-        for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
-            if (!candidate->syncSeqs[i]) {
-                candidate->syncSeqs[i] = seq;
-                candidate->syncSeqsRetries[i] = cs::Random::generateValue<cs::Sequence>(1, MaxSyncAttempts / 2);
-                break;
-            }
-        }
-    }
-
-    return candidate;
-}
-
 ConnectionPtr Neighbourhood::getNeighbour(const std::size_t number) {
     cs::Lock lock(nLockFlag_);
 
@@ -864,20 +822,6 @@ void Neighbourhood::registerDirect(const Packet* packPtr, ConnectionPtr conn) {
 
 bool Neighbourhood::isNewConnectionAvailable() const {
     return neighbours_.size() < MaxNeighbours;
-}
-
-void Neighbourhood::releaseSyncRequestee(const cs::Sequence seq) {
-    cs::Lock lock(nLockFlag_);
-
-    for (auto& nb : neighbours_) {
-        for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
-            if (nb->syncSeqs[i] == seq) {
-                nb->syncSeqs[i] = 0;
-                nb->syncSeqsRetries[i] = 0;
-                break;
-            }
-        }
-    }
 }
 
 int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) {

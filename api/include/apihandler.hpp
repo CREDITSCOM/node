@@ -619,7 +619,6 @@ private:
         cvErrorConnect_.notify_one();
     }
 
-    //
     using OriginExecutor = executor::ContractExecutorConcurrentClient;
     using BinaryProtocol = apache::thrift::protocol::TBinaryProtocol;
     std::shared_mutex sharedErrorMutex_;
@@ -629,7 +628,6 @@ private:
         disconnect();
         origExecutor_.reset(new OriginExecutor(::apache::thrift::stdcxx::make_shared<BinaryProtocol>(executorTransport_)));
     }
-    //
 
 private:
     const BlockChain& blockchain_;
@@ -740,9 +738,9 @@ public:
         int64_t limit, const csdb::Address& wallet = csdb::Address());
 
     void ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) override;
-    ////////new
+
     void iterateOverTokenTransactions(const csdb::Address&, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)>);
-    ////////new
+
     api::SmartContractInvocation getSmartContract(const csdb::Address&, bool&);
     std::vector<general::ByteCodeObject> getSmartByteCode(const csdb::Address&, bool&);
     void SmartContractDataGet(api::SmartContractDataResult&, const general::Address&) override;
@@ -760,7 +758,6 @@ public:
     void TransactionsListGet(api::TransactionsGetResult&, int64_t offset, int64_t limit) override;
     void WalletsGet(api::WalletsGetResult& _return, int64_t offset, int64_t limit, int8_t ordCol, bool desc) override;
     void TrustedGet(api::TrustedGetResult& _return, int32_t page) override;
-    ////////new
 
     void SyncStateGet(api::SyncStateResult& _return) override;
 
@@ -853,7 +850,7 @@ private:
     cs::SpinLockable<std::map<cs::Sequence, std::vector<csdb::TransactionID>>> smarts_pending;
 
     cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
-    cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smart_last_trxn;
+    cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smartLastTrxn_;
 
     cs::SpinLockable<std::map<csdb::Address, smartHashStateEntry>> hashStateSL;
 
@@ -868,8 +865,6 @@ private:
     api::SmartContract fetch_smart_body(const csdb::Transaction&);
 
 private:
-    //void state_updater_work_function();
-
     std::vector<api::SealedTransaction> extractTransactions(const csdb::Pool& pool, int64_t limit, const int64_t offset);
 
     api::SealedTransaction convertTransaction(const csdb::Transaction& transaction);
@@ -879,8 +874,6 @@ private:
     api::Pool convertPool(const csdb::Pool& pool);
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
-
-    // bool convertAddrToPublicKey(const csdb::Address& address);
 
     template <typename Mapper>
     size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out, int64_t offset = 0, int64_t limit = 0);

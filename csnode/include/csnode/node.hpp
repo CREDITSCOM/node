@@ -6,10 +6,13 @@
 #include <string>
 
 #include <config.hpp>
-#include <csconnector/csconnector.hpp>
 #include <csstats.hpp>
 
+#include <csconnector/csconnector.hpp>
+
 #include <csnode/conveyer.hpp>
+#include <csnode/compressor.hpp>
+
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
@@ -77,6 +80,7 @@ public:
     void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
     void getTransactionsPacket(const uint8_t* data, const std::size_t size);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
+
     // critical is true if network near to be down, all capable trusted node required
     bool canBeTrusted(bool critical);
 
@@ -150,6 +154,7 @@ public:
     void getRoundTableRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
     void sendRoundTableReply(const cs::PublicKey& target, bool hasRequestedInfo);
     void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
+
     // called by solver, review required:
     bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
     void sendRoundTable(cs::RoundPackage& rPackage);
@@ -287,8 +292,6 @@ private:
     void sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);
 
-    //void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, cs::StageThree& st3);
-
     bool readRoundData(cs::RoundTable& roundTable, bool bang);
     void reviewConveyerHashes();
 
@@ -340,9 +343,6 @@ private:
     // write values to stream
     template <typename... Args>
     void writeDefaultStream(Args&&... args);
-
-    RegionPtr compressPoolsBlock(const cs::PoolsBlock& poolsBlock, std::size_t& realBinSize);
-    cs::PoolsBlock decompressPoolsBlock(const uint8_t* data, const size_t size);
 
     // TODO: C++ 17 static inline?
     static const csdb::Address genesisAddress_;
@@ -421,8 +421,7 @@ private:
     std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
 
     std::vector<cs::Stage> smartStageTemporary_;
-    // smart consensus IDs:
-    std::vector<uint64_t> activeSmartConsensuses_;
+    std::vector<uint64_t> activeSmartConsensuses_;  // smart consensus IDs:
 
     SentRoundData lastSentRoundData_;
     SentSignatures lastSentSignatures_;
@@ -448,6 +447,7 @@ private:
     bool alwaysExecuteContracts_ = false;
 
     cs::config::Observer& observer_;
+    cs::Compressor compressor_;
     long long deltaTimeSS{};
 };
 

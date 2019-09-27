@@ -145,7 +145,6 @@ public:
     uint32_t getNeighboursCount();
     uint32_t getNeighboursCountWithoutSS();
     uint32_t getMaxNeighbours() const;
-    ConnectionPtr getSyncRequestee(const cs::Sequence seq, bool& alreadyRequested);
     ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
     ConnectionPtr getConnectionByNumber(const std::size_t number);
     ConnectionPtr getRandomNeighbour();
@@ -162,7 +161,6 @@ public:
     const Connections getNeighbours() const;
     const Connections getNeighboursWithoutSS() const;
 
-    void syncReplied(const cs::Sequence seq);
     bool isPingDone();
     void resetNeighbours();
 

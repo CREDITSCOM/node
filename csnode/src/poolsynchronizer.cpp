@@ -63,9 +63,9 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
     if (roundNum < totalBlocks) {
         cswarning() << "Round number is lower than synchro total blocks, do clear cache";
         csdebug() << "SYNC warning, round number " << roundNum << ", total blocks " << totalBlocks;
-		blockChain_->clearBlockCache();
-		cachedBlocksSize = 0;
-		totalBlocks = lastWrittenSequence;
+        blockChain_->clearBlockCache();
+        cachedBlocksSize = 0;
+        totalBlocks = lastWrittenSequence;
     }
 
     const cs::Sequence blocksRemaining = roundNum - totalBlocks;
@@ -612,6 +612,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
                 }
             }
         }
+
         csmeta(csdetails) << "Neighbours saved count is: " << neighbours_.size();
         return;
     }
@@ -683,10 +684,13 @@ void cs::PoolSynchronizer::synchroFinished() {
     if (timer_.isRunning()) {
         timer_.stop();
     }
+
     if (roundSimulation_.isRunning()) {
         roundSimulation_.stop();
     }
+
     isSyncroStarted_ = false;
+
     requestedSequences_.clear();
     neighbours_.clear();
 

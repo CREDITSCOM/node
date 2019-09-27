@@ -284,22 +284,26 @@ void Transport::deliverDirect(const Packet* pack, const uint32_t size, Connectio
         for (auto& p : _packets) p = *pack++;
         std::thread thread([=, packets = std::move(_packets)]() mutable {
             uint32_t allSize = size, toSend, j = 0;
+
             while(allSize != 0) {
                 if (allSize > 100) {
                     toSend = 100;
                     allSize -= 100;
-                } else {
+                }
+                else {
                     toSend = allSize;
                     allSize = 0;
                 }
+
                 {
                     for (uint32_t i = 0; i < toSend; i++) {
                         nh_.registerDirect(&packets[j], conn);
                         sendDirectToSock(&packets[j++], **conn);
                     }
                 }
+
                 std::this_thread::yield();
-            };
+            }
         });
         thread.detach();
     } else {
@@ -328,26 +332,32 @@ void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
             }
 
             uint32_t allSize = size, toSend, j = 0;
+
             while(allSize != 0) {
                 if (allSize > 100) {
                     toSend = 100;
                     allSize -= 100;
-                } else {
+                }
+                else {
                     toSend = allSize;
                     allSize = 0;
                 }
+
                 {
                     auto lock = getNeighboursLock();
                     for (uint32_t i = 0; i < toSend; i++) {
                         nh_.sendByNeighbours(&packets[j++], true);
                     }
                 }
+
                 std::this_thread::yield();
-            };
+            }
+
             sendLarge_.store(false, std::memory_order_release);
         });
         thread.detach();
-    } else {
+    }
+    else {
         auto lock = getNeighboursLock();
         nh_.chooseNeighbours();
 
@@ -758,10 +768,6 @@ uint32_t Transport::getMaxNeighbours() const {
     return config_.getMaxNeighbours();
 }
 
-ConnectionPtr Transport::getSyncRequestee(const cs::Sequence seq, bool& alreadyRequested) {
-    return nh_.getNextSyncRequestee(seq, alreadyRequested);
-}
-
 ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
     return nh_.getNeighbourByKey(pk);
 }
@@ -775,7 +781,7 @@ cs::Sequence Transport::getConnectionLastSequence(const std::size_t number) {
     if (ptr && !ptr->isSignal) {
         return ptr->lastSeq;
     }
-    return 0;
+    return cs::Sequence{};
 }
 
 ConnectionPtr Transport::getRandomNeighbour() {
@@ -805,10 +811,6 @@ const Connections Transport::getNeighbours() const {
 
 const Connections Transport::getNeighboursWithoutSS() const {
     return nh_.getNeighboursWithoutSS();
-}
-
-void Transport::syncReplied(const cs::Sequence seq) {
-    return nh_.releaseSyncRequestee(seq);
 }
 
 bool Transport::isPingDone() {
@@ -1335,7 +1337,7 @@ void Transport::askForMissingPackages() {
             uint16_t start = 0;
             uint64_t mask = 0;
             uint64_t req = 0;
-            uint16_t end = msg->packets_.size();
+            uint16_t end = static_cast<uint16_t>(msg->packets_.size());
 
             for (uint16_t j = 0; j < end; j++) {
                 if (!msg->packets_[j]) {
