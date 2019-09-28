@@ -387,52 +387,52 @@ class Pool::priv : public ::csdb::internal::shared_data {
         }
 
         if (!getTransactions(is, cnt)) {
-            csmeta(cswarning) << "get transactions is failed";
+            csmeta(cswarning) << sequence_ << ": get transactions is failed";
             return false;
         }
 
         if (!getNewWallets(is)) {
-            csmeta(cswarning) << "get new wallets is failed";
+            csmeta(cswarning) << sequence_ << ": get new wallets is failed";
             return false;
         }
 
         if (!is.get(numberTrusted_)) {
-            csmeta(cswarning) << "get number trusted is failed";
+            csmeta(cswarning) << sequence_ << ": get number trusted is failed";
             return false;
         }
 
         if (!is.get(realTrusted_)) {
-            csmeta(cswarning) << "get real trusted is failed";
+            csmeta(cswarning) << sequence_ << ": get real trusted is failed";
             return false;
         }
 
         if (!getConfidants(is)) {
-            csmeta(cswarning) << "get confidants is failed";
+            csmeta(cswarning) << sequence_ << ": get confidants is failed";
             return false;
         }
 
         if (!getTrustedConfirmation(is)) {
-            csmeta(cswarning) << "get confirmations is failed";
+            csmeta(cswarning) << sequence_ << ": get confirmations is failed";
             return false;
         }
 
         if (!is.get(hashingLength_)) {
-            csmeta(cswarning) << "get hashing length is failed";
+            csmeta(cswarning) << sequence_ << ": get hashing length is failed";
             return false;
         }
 
         if (!getSignatures(is)) {
-            csmeta(cswarning) << "get signatures is failed";
+            csmeta(cswarning) << sequence_ << ": get signatures is failed";
             return false;
         }
 
         if (!getSmartSignatures(is)) {
-            csmeta(cswarning) << "get smart signatures is failed";
+            csmeta(cswarning) << sequence_ << ": get smart signatures is failed";
             return false;
         }
         is_valid_ = true;
         if (is.size() > 0) {
-            cserror() << "Pool::get(): inconsistent binary pool";
+            cserror() << sequence_ << ": Pool::get(): inconsistent binary pool";
         }
         return true;
     }
