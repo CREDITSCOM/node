@@ -170,7 +170,8 @@ void SolverCore::nextRound(bool updateRound) {
 
 void SolverCore::gotStageOne(const cs::StageOne& stage) {
     if (find_stage1(stage.sender) != nullptr) {
-        uint64_t lastTimeStamp, currentTimeStamp;
+		uint64_t lastTimeStamp = 0;
+		uint64_t currentTimeStamp = 0;
         uint8_t sender = stage.sender;
         try {
             lastTimeStamp = std::stoll(find_stage1(stage.sender)->roundTimeStamp);
