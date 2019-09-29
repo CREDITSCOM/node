@@ -397,19 +397,48 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
 
     if (opt.newBlockchainTop != cs::kWrongSequence) {
         auto seqToRemove = opt.newBlockchainTop + 1;
+		auto seqLast = seqToRemove;
+		Database::IteratorPtr it = d->db->new_iterator();
+		it->seek_to_last();
+		if (it->is_valid()) {
+			auto key = it->key();
+			if (key != std::numeric_limits<uint32_t>::max()) {
+				seqLast = key;
+			}
+		}
 
-        while (true) {
+		//cslog() << "start remove " << seqLast - seqToRemove + 1 << " blocks: " << seqToRemove << " .. " << seqLast;
+
+        while (seqToRemove <= seqLast) {
             cs::Bytes poolBinary;
-            if (!d->db->get(seqToRemove++, &poolBinary)) {
+            if (!d->db->get((uint32_t)seqToRemove++, &poolBinary)) {
+                continue;
+            }
+            auto hash = csdb::Pool::hash_from_binary(std::move(poolBinary));
+            if (hash.is_empty()) {
+				// try remove another way, using next block's previous hash
+				cs::Bytes next_block_bytes;
+				const uint32_t next_seq = uint32_t(seqToRemove);
+				if (!d->db->get(next_seq, &next_block_bytes)) {
+					// cannot, sorry
+					return false;
+				}
+				size_t dummy = 0;
+				auto next_pool = csdb::Pool::meta_from_binary(std::move(next_block_bytes), dummy);
+				if (!next_pool.is_valid()) {
+					// cannot, sorry
+					return false;
+				}
+				if (!d->db->remove(next_pool.previous_hash().to_binary())) {
+					// cannot repair, sorry
+					return false;
+				}
+                continue;
+            }
+            if (!d->db->remove(hash.to_binary())) {
                 break;
             }
-            auto pool = csdb::Pool::from_binary(std::move(poolBinary));
-            if (!pool.is_valid()) {
-                break;
-            }
-            if (!d->db->remove(pool.hash().to_binary())) {
-                break;
-            }
+			//cslog() << "block " << seqToRemove - 1 << " is removed";
         }
 
         return true;
@@ -714,20 +743,84 @@ Pool Storage::pool_remove_last() {
         return Pool{};
     }
 
-    res = Pool::from_binary(std::move(data));
+	size_t dummy = 0;
+	// need only previous_hash to discover:
+	res = Pool::meta_from_binary(std::move(data), dummy);
     if (!res.is_valid()) {
-        d->set_last_error(DataIntegrityError, "%s: Error decoding pool [hash: %s]", funcName(), last_hash().to_string().c_str());
+        d->set_last_error(DataIntegrityError, "%s: Error decoding pool meta [hash: %s]", funcName(), last_hash().to_string().c_str());
+		return Pool{};
     }
     else {
         d->set_last_error();
     }
 
-    d->db->remove(last_hash().to_binary());
+	// error nearly impossible
+	/*bool ok =*/ d->db->remove(last_hash().to_binary());
 
     --d->count_pool;
     d->last_hash = res.previous_hash();
 
     return res;
+}
+
+bool Storage::pool_remove_last_repair(cs::Sequence test_sequence, const csdb::PoolHash& test_hash) {
+	if (!isOpen()) {
+		d->set_last_error(NotOpen);
+		return false;
+	}
+	if (test_sequence == 0) {
+		d->set_last_error(InvalidParameter, "%s: Sequence 0 passed", funcName());
+		return false;
+	}
+	if (test_hash.is_empty()) {
+		// hash is required!
+		d->set_last_error(InvalidParameter, "%s: Empty hash passed", funcName());
+		return false;
+	}
+
+	// test sequence
+	if (test_sequence + 1 != d->count_pool) {
+		d->set_last_error(InvalidParameter, "%s: incorrect last sequence passed", funcName());
+		return false;
+	}
+
+	// clear write_queue if it is not empty
+	{
+		std::unique_lock<std::mutex> lock(d->write_lock);
+		d->write_queue.clear();
+	}
+
+	// test hash to conform last sequence or absent at all
+	uint32_t tmp;
+	if (d->db->seq_no(test_hash.to_binary(), &tmp)) {
+		if (tmp != test_sequence) {
+			// wrong pair (sequence, hash) passed!
+			d->set_last_error(InvalidParameter, "%s: incorrect last hash of %d passed", funcName(), tmp);
+			return false;
+		}
+	}
+	else {
+		// there is no test_hash in seq_no table, continue with remove operation
+	}
+
+	// now we have got correct last sequence and last hash
+	// TODO: remove operation fails if test_hash not found in (hash->sequence) table!
+	if (!d->db->remove(test_hash.to_binary())) {
+		// last error have already set
+		return false;
+	}
+
+	// setup new last sequence & last hash
+	--d->count_pool;
+	csdb::Pool last = pool_load(test_sequence - 1);
+	if (last.is_valid()) {
+		d->last_hash = last.hash();
+		return true;
+	}
+	// previous damaged block found, its hash is unknown
+	d->last_hash = csdb::PoolHash{};
+	d->set_last_error(DataIntegrityError, "%s: Error loading previous pool %d", funcName(), test_sequence - 1);
+	return false;
 }
 
 Wallet Storage::wallet(const Address& addr) const {
