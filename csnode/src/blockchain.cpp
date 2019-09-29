@@ -450,7 +450,9 @@ void BlockChain::removeLastBlock() {
         return;
     }
     //--blocksToBeRemoved_;
-    csmeta(csdebug) << getLastSeq();
+	cs::Sequence remove_seq = lastSequence_;
+	csdb::PoolHash remove_hash = blockHashes_->find(remove_seq);
+	csmeta(csdebug) << remove_seq;
     csdb::Pool pool{};
 
     {
@@ -467,27 +469,51 @@ void BlockChain::removeLastBlock() {
 
     if (!pool.is_valid()) {
         csmeta(cserror) << "Error! Removed pool is not valid";
-        return;
-    }
 
-    if (pool.sequence() == 0) {
-        csmeta(cswarning) << "Attempt to remove Genesis block !!!!!";
-        return;
+		if (remove_hash.is_empty()) {
+			cserror() << "Blockchain storage is corrupted, storage rescan is required";
+			return;
+		}
+
+		{
+			std::lock_guard lock(dbLock_);
+			if (!storage_.pool_remove_last_repair(remove_seq, remove_hash)) {
+				cserror() << "Blockchain storage is corrupted, storage rescan is required";
+				return;
+			}
+		}
+
+		cswarning() << "Wallets balances maybe invalidated, storage rescan required";
     }
+	else {
+		// just removed pool is valid
+		
+		if (!(remove_hash == pool.hash())) {
+			cswarning() << "Hashes cache is corrupted, storage rescan is required";
+			remove_hash = pool.hash();
+		}
+
+		if (pool.sequence() == 0) {
+			csmeta(cswarning) << "Attempt to remove Genesis block !!!!!";
+			return;
+		}
+
+		// such operations are only possible on valid pool:
+		total_transactions_count_ -= pool.transactions().size();
+		walletsCacheUpdater_->loadNextBlock(pool, pool.confidants(), *this, true);
+		// remove wallets exposed by the block
+		removeWalletsInPoolFromCache(pool);
+		// signal all subscribers, transaction index is still consistent up to removed block!
+		emit removeBlockEvent(pool);
+		// erase indexes from the block
+		removeLastBlockFromTrxIndex(pool);
+	}
 
     // to be sure, try to remove both sequence and hash
-    if (!blockHashes_->remove(pool.sequence())) {
-        blockHashes_->remove(pool.hash());
+    if (!blockHashes_->remove(remove_seq)) {
+        blockHashes_->remove(remove_hash);
     }
     --lastSequence_;
-    total_transactions_count_ -= pool.transactions().size();
-    walletsCacheUpdater_->loadNextBlock(pool, pool.confidants(), *this, true);
-    // remove wallets exposed by the block
-    removeWalletsInPoolFromCache(pool);
-    // signal all subscribers, transaction index is still consistent up to removed block!
-    emit removeBlockEvent(pool);
-    // erase indexes from the block
-    removeLastBlockFromTrxIndex(pool);
 
     csmeta(csdebug) << "done";
 }
