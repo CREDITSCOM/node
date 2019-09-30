@@ -570,7 +570,7 @@ public:
     }
 
 private:
-    __cacheline_aligned T data_ = T{};
+    alignas(sizeof(size_t) * 2) T data_ = T{};
 };
 
 TEST(LockFreeChanger, BaseUsage) {
@@ -578,49 +578,59 @@ TEST(LockFreeChanger, BaseUsage) {
 
     cs::LockFreeChanger<SizeStorage> changer;
 
-    const size_t maxCycles = 100;
-    const size_t changersCount = std::thread::hardware_concurrency();
+    const size_t maxCycles = 10000;
+    const size_t writersCount = std::thread::hardware_concurrency();
+    const size_t readersCount = std::thread::hardware_concurrency();
 
     std::atomic<bool> isExecute = { true };
 
     std::set<size_t> generatedValues { 0 };
     std::mutex mutex;
 
-    std::thread reader([&] {
-        while (isExecute.load(std::memory_order_acquire)) {
-            size_t current = changer.data();
-            bool result = false;
+    std::vector<std::thread> writers;
+    std::vector<std::thread> readers;
 
-            {
-                cs::Lock lock(mutex);
-                auto iter = generatedValues.find(current);
-                result = iter != generatedValues.end();
-            }
-
-
-            ASSERT_TRUE(result);
-            std::this_thread::yield();
-        }
-    });
-
-    cs::Console::writeLine("Reader started");
-
-    std::vector<std::thread> changers;
-
-    for (size_t i = 0; i < changersCount; ++i) {
-        changers.push_back(std::thread([&] {
-            size_t currentCycle = 0;
-
+    for (size_t i = 0; i < readersCount; ++i) {
+        readers.push_back(std::thread([&] {
             while (isExecute.load(std::memory_order_acquire)) {
-                if (currentCycle > maxCycles) {
-                    break;
-                }
-
-                auto randomValue = cs::Random::generateValue<size_t>(1, std::numeric_limits<int>::max());
+                size_t current = changer.data();
+                bool result = false;
 
                 {
                     cs::Lock lock(mutex);
-                    generatedValues.insert(randomValue);
+                    auto iter = generatedValues.find(current);
+                    result = iter != generatedValues.end();
+                }
+
+                ASSERT_TRUE(result);
+                std::this_thread::yield();
+            }
+        }));
+    }
+
+    for (size_t i = 0; i < writersCount; ++i) {
+        writers.push_back(std::thread([&] {
+            size_t currentCycle = 0;
+
+            while (isExecute.load(std::memory_order_acquire)) {
+                if (currentCycle >= maxCycles) {
+                    break;
+                }
+
+                size_t randomValue = 0;
+
+                while (true) {
+                    randomValue = cs::Random::generateValue<size_t>(1, std::numeric_limits<int>::max());
+
+                    {
+                        cs::Lock lock(mutex);
+                        auto iter = generatedValues.find(randomValue);
+
+                        if (iter == generatedValues.end()) {
+                            generatedValues.insert(randomValue);
+                            break;
+                        }
+                    }
                 }
 
                 changer.exchange(randomValue);
@@ -632,12 +642,30 @@ TEST(LockFreeChanger, BaseUsage) {
         }));
     }
 
-    for (auto& thread: changers) {
+    std::thread allocatorThread([&] {
+        while (isExecute.load(std::memory_order_acquire)) {
+            auto randomValue = cs::Random::generateValue<int>(std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
+            volatile Storage<int>* storage = new Storage<int>(randomValue);
+
+            std::this_thread::yield();
+            delete storage;
+        }
+    });
+
+    for (auto& thread : writers) {
         thread.join();
     }
 
     isExecute.store(false, std::memory_order_release);
-    reader.join();
+
+    for (auto& thread : readers) {
+        thread.join();
+    }
+
+    allocatorThread.join();
+
+    cs::Console::writeLine("Set value size ", generatedValues.size());
+    ASSERT_EQ(generatedValues.size(), (std::thread::hardware_concurrency() * maxCycles) + 1);
 }
 
 TEST(LockFreeChanger, BaseUsageSimple) {
