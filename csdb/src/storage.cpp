@@ -396,22 +396,24 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
     }
 
     if (opt.newBlockchainTop != cs::kWrongSequence) {
-        auto seqToRemove = opt.newBlockchainTop + 1;
+        auto seqToRemove = static_cast<uint32_t>(opt.newBlockchainTop + 1);
 		auto seqLast = seqToRemove;
-		Database::IteratorPtr it = d->db->new_iterator();
-		it->seek_to_last();
-		if (it->is_valid()) {
-			auto key = it->key();
-			if (key != std::numeric_limits<uint32_t>::max()) {
-				seqLast = key;
-			}
-		}
+        {
+		    Database::IteratorPtr it = d->db->new_iterator();
+		    it->seek_to_last();
+		    if (it->is_valid()) {
+			    auto key = it->key();
+			    if (key != std::numeric_limits<uint32_t>::max()) {
+				    seqLast = key;
+			    }
+		    }
+        }
 
 		//cslog() << "start remove " << seqLast - seqToRemove + 1 << " blocks: " << seqToRemove << " .. " << seqLast;
 
         while (seqToRemove <= seqLast) {
             cs::Bytes poolBinary;
-            if (!d->db->get((uint32_t)seqToRemove++, &poolBinary)) {
+            if (!d->db->get(seqToRemove++, &poolBinary)) {
                 continue;
             }
             auto hash = csdb::Pool::hash_from_binary(std::move(poolBinary));
