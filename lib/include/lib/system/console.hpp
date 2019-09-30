@@ -1,7 +1,9 @@
 #ifndef CONSOLE_HPP
 #define CONSOLE_HPP
 
+#include <sstream>
 #include <iostream>
+
 #include <lib/system/reflection.hpp>
 
 namespace cs {
@@ -38,6 +40,14 @@ public:
     template <typename T>
     static void print(const T& container) {
         cshelper::print(container, cs::IsPair<typename T::value_type>());
+    }
+
+    template<typename... Args>
+    static void writeLineSync(Args&&... args) {
+        std::stringstream ss;
+        (ss << ... << std::forward<Args>(args)) << std::endl;
+
+        std::cout << ss.str();
     }
 };
 } // namespace cs
