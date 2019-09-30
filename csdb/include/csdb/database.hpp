@@ -67,7 +67,7 @@ public:
         virtual void seek(const cs::Bytes& key) = 0;
         virtual void next() = 0;
         virtual void prev() = 0;
-        virtual cs::Bytes key() const = 0;
+        virtual uint32_t key() const = 0;
         virtual cs::Bytes value() const = 0;
     };
     using IteratorPtr = std::shared_ptr<Iterator>;

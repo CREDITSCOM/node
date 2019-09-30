@@ -1062,9 +1062,12 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>&) {
 }
 
 bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
+	// MUST NOT call nh_ under oLock_!!!
+	const auto nh_size = nh_.size();
+
     cs::Lock lock(oLock_);
     oPackStream_.init(task->pack);
-    oPackStream_ << nh_.size();
+    oPackStream_ << nh_size;
 
     Connection conn;
     conn.in = task->sender;
