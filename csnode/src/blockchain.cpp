@@ -1597,14 +1597,14 @@ std::pair<cs::Sequence, uint32_t> BlockChain::getPreviousNonEmptyBlock(cs::Seque
 }
 
 cs::Sequence BlockChain::getLastSeq() const{
-	return lastSequence_;
+    return lastSequence_;
 }
 
 void BlockChain::setBlocksToBeRemoved(cs::Sequence number) {
-	if (blocksToBeRemoved_ > 0) {
-		csdebug() << "BLOCKCHAIN> Can't change number of blocks to be removed, because the previous removal is still not finished";
-		return;
-	}
-	csdebug() << "BLOCKCHAIN> Allowed NUMBER blocks to remove is set to " << blocksToBeRemoved_;
-	blocksToBeRemoved_ = number;
+    if (blocksToBeRemoved_ > 0) {
+        csdebug() << "BLOCKCHAIN> Can't change number of blocks to be removed, because the previous removal is still not finished";
+        return;
+    }
+    csdebug() << "BLOCKCHAIN> Allowed NUMBER blocks to remove is set to " << blocksToBeRemoved_;
+    blocksToBeRemoved_ = number;
 }
