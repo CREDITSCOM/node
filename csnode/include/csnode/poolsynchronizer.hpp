@@ -2,12 +2,14 @@
 #define POOLSYNCHRONIZER_HPP
 
 #include <csdb/pool.hpp>
+
 #include <csnode/blockchain.hpp>
 #include <csnode/nodecore.hpp>
 #include <csnode/packstream.hpp>
 
-#include <lib/system/signals.hpp>
 #include <lib/system/timer.hpp>
+#include <lib/system/signals.hpp>
+#include <lib/system/lockfreechanger.hpp>
 
 #include <net/neighbourhood.hpp>
 
@@ -49,6 +51,9 @@ private slots:
     void onWriteBlock(const csdb::Pool pool);
     void onWriteBlock(const cs::Sequence sequence);
     void onRemoveBlock(const csdb::Pool& pool);
+
+public slots:
+    void onConfigChanged(const Config& updated);
 
 private:
     enum class CounterType;
@@ -212,13 +217,14 @@ private:
     };
 
 private:
-    const PoolSyncData syncData_;
+    cs::LockFreeChanger<PoolSyncData> syncData_;
 
     Transport* transport_;
     BlockChain* blockChain_;
 
     // flag starting  syncronization
     bool isSyncroStarted_ = false;
+
     // [key] = sequence,
     // [value] =  packet counter
     // value: increase each new round
