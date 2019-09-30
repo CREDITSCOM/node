@@ -652,6 +652,8 @@ TEST(LockFreeChanger, BaseUsageSimple) {
     std::atomic<bool> isRunning = { true };
 
     SizeStorage current;
+    SizeStorage previous;
+
     const size_t count = 1000;
 
     std::thread writer([&] {
@@ -663,9 +665,15 @@ TEST(LockFreeChanger, BaseUsageSimple) {
             }
 
             std::unique_lock lock(mutex);
-            auto randomValue = cs::Random::generateValue<size_t>(1, std::numeric_limits<int>::max());
+            size_t randomValue = 0;
+
+            do {
+                randomValue = cs::Random::generateValue<size_t>(1, std::numeric_limits<int>::max());
+            } while (randomValue != previous.data());
 
             changer.exchange(randomValue);
+
+            previous = current;
             current = SizeStorage(randomValue);
 
             readerVariable.notify_one();
@@ -681,7 +689,9 @@ TEST(LockFreeChanger, BaseUsageSimple) {
             readerVariable.wait_for(lock, std::chrono::milliseconds(250));
 
             auto desired = changer.data();
+
             ASSERT_EQ(desired.data(), current.data());
+            ASSERT_TRUE(desired.data() != previous.data());
 
             writerVariable.notify_one();
         }
