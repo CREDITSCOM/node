@@ -667,6 +667,11 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
     }
     // pool signatures check: end
 
+    // the block validator should be placed here
+
+    
+    // emit invalidBlockFromConsensus();
+    
     createTransactionsIndex(pool);
     updateNonEmptyBlocks(pool);
 

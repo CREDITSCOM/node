@@ -90,7 +90,7 @@ public:
     /// @brief Returns pair of transactions packet created in current round and smart contract packets.
     /// @warning Slow-performance method. Thread safe.
     ///
-    std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> createPacket() const;
+    std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> createPacket(cs::RoundNumber rNum) const;
 
     // round info
 

@@ -161,6 +161,10 @@ public:
 
     void getCharacteristic(cs::RoundPackage& rPackage);
 
+    void createTestTransaction();
+
+    void sendBlockAlarm(cs::Sequence seq);
+
     void cleanConfirmationList(cs::RoundNumber rNum);
 
     // state syncro functions

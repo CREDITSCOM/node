@@ -520,6 +520,56 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         return;
     }
 
+    auto myCharacteristic = conveyer.characteristic(rPackage.poolMetaInfo().sequenceNumber);
+    csdebug() << "NODE> Trying to get characteristic from conveyer";
+    std::vector<cscrypto::Byte> maskOnly;
+    std::vector<cscrypto::Byte>::const_iterator myIt;
+    if (myCharacteristic == nullptr || myCharacteristic->mask.size() < rPackage.poolMetaInfo().characteristic.mask.size()) {
+        csdebug() << "NODE> Characteristic from conveyer doesn't exist";
+        auto data = conveyer.createPacket(rPackage.poolMetaInfo().sequenceNumber);
+
+        if (!data.has_value()) {
+            cserror() << "NODE> error while prepare to calculate characteristic, maybe method called before sync completed?";
+            return;
+        }
+        // bindings
+        auto&&[packet, smartPackets] = std::move(data).value();
+        csdebug() << "NODE> Packet size: " << packet.transactionsCount() << ", smartPackets: " << smartPackets.size();
+        auto myMask = solver_->ownValidation(packet, smartPackets);
+        csdebug() << "NODE> Characteristic calculated from the very transactions";
+        if (myMask.has_value()) {
+            maskOnly = myMask.value().mask;
+        }
+        else {
+            maskOnly.clear();
+        }
+        myIt = maskOnly.cbegin();
+    }
+    else {
+        maskOnly = myCharacteristic->mask;
+        myIt = maskOnly.cbegin();
+    }
+    auto it = rPackage.poolMetaInfo().characteristic.mask.cbegin();
+    bool identic = true;
+    csdebug() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(maskOnly.data(), maskOnly.size())
+        << " and received: " << cs::Utils::byteStreamToHex(rPackage.poolMetaInfo().characteristic.mask.data(), rPackage.poolMetaInfo().characteristic.mask.size());
+    while (!(myIt == maskOnly.cend() || it == rPackage.poolMetaInfo().characteristic.mask.cend())) {
+        if (*myIt != *it) {
+            identic = false;
+            break;
+        }
+        ++myIt;
+        ++it;
+    }
+    if (maskOnly.size() != rPackage.poolMetaInfo().characteristic.mask.size()) {
+        identic = false;
+    }
+    if (!identic) {
+        cserror() << "NODE> We probably got the roundPackage with invalid characteristic, can't build block";
+        sendBlockAlarm(rPackage.poolMetaInfo().sequenceNumber);
+        return;
+    }
+    csdebug() << "NODE> Previous block mask validation finished successfully";
     // otherwise senseless, this block is already in chain
     conveyer.setCharacteristic(rPackage.poolMetaInfo().characteristic, rPackage.poolMetaInfo().sequenceNumber);
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(rPackage.poolMetaInfo());
@@ -569,6 +619,38 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     }
 
     csmeta(csdetails) << "done";
+}
+
+void Node::createTestTransaction() {
+    csdb::Transaction transaction;
+
+    std::string strAddr1 = "G2GeLfwjg6XuvoWnZ7ssx9EPkEBqbYL3mw3fusgpzoBk";
+    std::string strAddr2 = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
+
+    std::vector<uint8_t> pub_key1;
+    DecodeBase58(strAddr1, pub_key1);   
+    std::vector<uint8_t> pub_key2;
+    DecodeBase58(strAddr2, pub_ke2y);
+
+    csdb::Address test_address1 = csdb::Address::from_public_key(pub_key1);
+    csdb::Address test_address2 = csdb::Address::from_public_key(pub_key2);
+    transaction.set_target(test_address1);
+    transaction.set_source(genesisAddress_);
+    transaction.set_currency(csdb::Currency(1));
+    transaction.set_amount(csdb::Amount(1, 0));
+    transaction.set_max_fee(csdb::AmountCommission(0.0));
+    transaction.set_counted_fee(csdb::AmountCommission(0.0));
+    transaction.set_innerID(0);
+    cs::TransactionPacket transactionPack;
+    transactionPack.addTransaction(transaction);
+    transactionPack.makeHash();
+
+    auto conveyer = cs:Conveyer::instance();
+    conveyer.addSeparatePacket(transactionPack);
+}
+
+void Node::sendBlockAlarm(cs::Sequence seq) {
+    csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
 }
 
 void Node::cleanConfirmationList(cs::RoundNumber rNum) {

@@ -207,7 +207,7 @@ TEST(Conveyer, MainLogic) {
     ASSERT_TRUE(conveyer.currentNeededHashes().empty());
     ASSERT_TRUE(conveyer.isSyncCompleted());
 
-    auto created_packet{conveyer.createPacket()};
+    auto created_packet{conveyer.createPacket(1)};
     ASSERT_TRUE(created_packet.has_value());
     ASSERT_EQ(packet.transactionsCount(), created_packet.value().first.transactionsCount());
 
