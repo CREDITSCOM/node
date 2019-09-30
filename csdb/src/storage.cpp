@@ -252,11 +252,12 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
         cs::Bytes v = it->value();
 
         Pool p = Pool::from_binary(std::move(v));
-        pools_cache_insert(p.sequence(), p.hash(), p);
         if (!p.is_valid()) {
-            set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool for key'.");
+            set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool %d.", count_pool);
+            cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
             return false;
         }
+        pools_cache_insert(p.sequence(), p.hash(), p);
 
         bool test_failed = false;
         last_hash = p.hash();
@@ -426,7 +427,7 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
 		    }
         }
 
-		//cslog() << "start remove " << seqLast - seqToRemove + 1 << " blocks: " << seqToRemove << " .. " << seqLast;
+		cslog() << "start remove " << seqLast - seqToRemove + 1 << " blocks: " << seqToRemove << " .. " << seqLast;
 
         while (seqToRemove <= seqLast) {
             cs::Bytes poolBinary;
@@ -457,7 +458,7 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
             if (!d->db->remove(hash.to_binary())) {
                 break;
             }
-			//cslog() << "block " << seqToRemove - 1 << " is removed";
+			cslog() << "block " << seqToRemove - 1 << " is removed";
         }
 
         return true;
