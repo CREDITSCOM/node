@@ -7,11 +7,14 @@
 #include <mutex>
 #include <thread>
 #include <type_traits>
+#include <condition_variable>
 
+#include <lib/system/random.hpp>
 #include <lib/system/allocators.hpp>
 #include <lib/system/queues.hpp>
 #include <lib/system/structures.hpp>
-#include <lib/system/random.hpp>
+#include <lib/system/lockfreechanger.hpp>
+#include <lib/system/console.hpp>
 
 #include <boost/lockfree/spsc_queue.hpp>
 
@@ -543,4 +546,149 @@ TEST(FixedVector, base) {
         ASSERT_EQ(*it, (i < 7 ? i : i + 1));
         ++it;
     }
+}
+
+template<typename T>
+class Storage {
+public:
+    Storage() = default;
+
+    explicit Storage(const T& value)
+    : data_(value) {
+    }
+
+    T data() const {
+        return data_;
+    }
+
+    void setData(const T& value) {
+        data_ = value;
+    }
+
+    operator T() {
+        return data_;
+    }
+
+private:
+    __cacheline_aligned T data_ = T{};
+};
+
+TEST(LockFreeChanger, BaseUsage) {
+    using SizeStorage = Storage<size_t>;
+
+    cs::LockFreeChanger<SizeStorage> changer;
+
+    const size_t maxCycles = 100;
+    const size_t changersCount = std::thread::hardware_concurrency();
+
+    std::atomic<bool> isExecute = { true };
+
+    std::set<size_t> generatedValues { 0 };
+    std::mutex mutex;
+
+    std::thread reader([&] {
+        while (isExecute.load(std::memory_order_acquire)) {
+            size_t current = changer.data();
+            bool result = false;
+
+            {
+                cs::Lock lock(mutex);
+                auto iter = generatedValues.find(current);
+                result = iter != generatedValues.end();
+            }
+
+
+            ASSERT_TRUE(result);
+            std::this_thread::yield();
+        }
+    });
+
+    cs::Console::writeLine("Reader started");
+
+    std::vector<std::thread> changers;
+
+    for (size_t i = 0; i < changersCount; ++i) {
+        changers.push_back(std::thread([&] {
+            size_t currentCycle = 0;
+
+            while (isExecute.load(std::memory_order_acquire)) {
+                if (currentCycle > maxCycles) {
+                    break;
+                }
+
+                auto randomValue = cs::Random::generateValue<size_t>(1, std::numeric_limits<int>::max());
+
+                {
+                    cs::Lock lock(mutex);
+                    generatedValues.insert(randomValue);
+                }
+
+                changer.exchange(randomValue);
+                ++currentCycle;
+
+                cs::Console::writeLineSync("Thread id: ", std::this_thread::get_id());
+                std::this_thread::yield();
+            }
+        }));
+    }
+
+    for (auto& thread: changers) {
+        thread.join();
+    }
+
+    isExecute.store(false, std::memory_order_release);
+    reader.join();
+}
+
+TEST(LockFreeChanger, BaseUsageSimple) {
+    using SizeStorage = Storage<size_t>;
+
+    cs::LockFreeChanger<SizeStorage> changer;
+
+    std::mutex mutex;
+    std::condition_variable readerVariable;
+    std::condition_variable writerVariable;
+
+    std::atomic<bool> isRunning = { true };
+
+    SizeStorage current;
+    const size_t count = 1000;
+
+    std::thread writer([&] {
+        std::size_t currentCount = 0;
+
+        while(isRunning.load(std::memory_order_acquire)) {
+            if (currentCount > count) {
+                break;
+            }
+
+            std::unique_lock lock(mutex);
+            auto randomValue = cs::Random::generateValue<size_t>(1, std::numeric_limits<int>::max());
+
+            changer.exchange(randomValue);
+            current = SizeStorage(randomValue);
+
+            readerVariable.notify_one();
+            writerVariable.wait_for(lock, std::chrono::milliseconds(250));
+
+            ++currentCount;
+        }
+    });
+
+    std::thread reader([&] {
+        while (isRunning.load(std::memory_order_acquire)) {
+            std::unique_lock lock(mutex);
+            readerVariable.wait_for(lock, std::chrono::milliseconds(250));
+
+            auto desired = changer.data();
+            ASSERT_EQ(desired.data(), current.data());
+
+            writerVariable.notify_one();
+        }
+    });
+
+    isRunning.store(false, std::memory_order_release);
+
+    writer.join();
+    reader.join();
 }
