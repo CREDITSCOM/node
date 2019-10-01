@@ -76,6 +76,7 @@ struct ApiData {
     std::string executorHost{ "localhost" };
     std::string executorCmdLine{};
     int executorRunDelay = 10;
+    int executorBackgroundThreadDelay = 100;
 };
 
 struct ConveyerData {

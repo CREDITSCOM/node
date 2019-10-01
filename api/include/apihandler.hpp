@@ -538,7 +538,8 @@ private:
                     }
                 }
                 else {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    auto delay = std::chrono::milliseconds(config_->getApiSettings().executorBackgroundThreadDelay);
+                    std::this_thread::sleep_for(delay);
 
                     if (!executorProcess_->isRunning()) {
                         runProcess();
