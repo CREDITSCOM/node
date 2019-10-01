@@ -506,8 +506,10 @@ struct SpinLockable {
 
 private:
     std::mutex mutex_;
-    __cacheline_aligned std::atomic_flag atomicFlag_ = ATOMIC_FLAG_INIT;
     T type_;
+#ifdef API_SPINLOCK
+    __cacheline_aligned std::atomic_flag atomicFlag_ = ATOMIC_FLAG_INIT;
+#endif
 
     friend struct SpinLockedRef<T>;
 };
@@ -519,7 +521,7 @@ private:
 public:
     SpinLockedRef(SpinLockable<T>& lockable)
     : lockable_(&lockable) {
-#ifdef SPINLOCK
+#ifdef API_SPINLOCK
         while (this->lockable_->atomicFlag_.test_and_set(std::memory_order_acquire)) {
             std::this_thread::yield();
         }
@@ -529,7 +531,7 @@ public:
     }
 
     ~SpinLockedRef() {
-#ifdef SPINLOCK
+#ifdef API_SPINLOCK
         if (lockable_) {
             lockable_->atomicFlag_.clear(std::memory_order_release);
         }
