@@ -557,4 +557,14 @@ uint8_t SolverCore::subRound() {
     return (pnode->subRound());
 }
 
+bool SolverCore::isInGrayList(cs::PublicKey key) {
+    auto it = grayList_.find(key);
+    if (it == grayList_.end()) {
+        return false;
+    }
+    else {
+        return true;
+    }
+}
+
 }  // namespace cs
