@@ -228,7 +228,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     }
 
     if (istream_.isBytesAvailable(sizeof(long long))) {
-        long long timeSS;
+        long long timeSS = 0;
         istream_ >> timeSS;
         auto seconds = timePassedSinceBB(timeSS);
         constexpr long long MaxBigBangAge_sec = 180;
