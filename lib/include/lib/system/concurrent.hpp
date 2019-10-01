@@ -496,7 +496,16 @@ struct SpinLockable {
     : type_(std::forward<Args>(args)...) {
     }
 
+    void lock() {
+        mutex_.lock();
+    }
+
+    void unlock() {
+        mutex_.unlock();
+    }
+
 private:
+    std::mutex mutex_;
     __cacheline_aligned std::atomic_flag atomicFlag_ = ATOMIC_FLAG_INIT;
     T type_;
 
@@ -507,7 +516,6 @@ template <typename T>
 struct SpinLockedRef {
 private:
     SpinLockable<T>* lockable_;
-    std::mutex mutex_;
 public:
     SpinLockedRef(SpinLockable<T>& lockable)
     : lockable_(&lockable) {
@@ -516,7 +524,7 @@ public:
             std::this_thread::yield();
         }
 #else
-        mutex_.lock();
+        lockable_->lock();
 #endif
     }
 
@@ -526,7 +534,7 @@ public:
             lockable_->atomicFlag_.clear(std::memory_order_release);
         }
 #else
-        mutex_.unlock();
+        lockable_->unlock();
 #endif
     }
 

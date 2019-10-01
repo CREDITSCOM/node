@@ -772,7 +772,9 @@ public:
     bool isBDLoaded() { return isBDLoaded_; }
     
 private:
+#ifdef USE_DEPRECATED_STATS
     ::csstats::AllStats stats_;
+#endif // 0
     executor::Executor& executor_;
 
     bool isBDLoaded_{ false };
@@ -802,7 +804,7 @@ private:
    
     BlockChain& blockchain_;
     cs::SolverCore& solver_;
-#ifdef MONITOR_NODE
+#ifdef USE_DEPRECATED_STATS // MONITOR_NODE
     csstats::csstats stats;
 #endif
 
