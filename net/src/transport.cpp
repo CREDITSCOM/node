@@ -1187,7 +1187,7 @@ bool Transport::gotSSUpdateServer()
         return false;
     }
 
-    cs::RoundNumber round;
+    cs::RoundNumber round = 0;
     iPackStream_ >> round;
 
     if (const auto currentRound = cs::Conveyer::instance().currentRoundNumber(); !(currentRound <= round + DELTA_ROUNDS_VERIFY_NEW_SERVER))

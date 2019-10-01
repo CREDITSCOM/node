@@ -361,6 +361,7 @@ protected:
     T allocateResult(const char* data, size_t size) const {
         static_assert (std::is_integral_v<T> || std::is_floating_point_v<T>, "Allocate result supports only integral or floating-point types");
 
+        try {
         if constexpr (std::is_integral_v<T>) {
             if constexpr (std::is_signed_v<T>) {
                 return static_cast<T>(std::stoll(std::string(data, size)));
@@ -371,6 +372,11 @@ protected:
         }
         else {
             return static_cast<T>(std::stod(std::string(data, size)));
+        }
+    }
+        catch (const std::exception& exception) {
+            cswarning() << "Lmdb can not allocate result value, " << exception.what() << ", default value returned";
+            return T{};
         }
     }
 
