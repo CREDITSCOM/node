@@ -557,7 +557,7 @@ private:
     void runProcess() {
         executorProcess_->terminate();
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(config_->getApiSettings().executorRunDelay));
 
         executorProcess_->setProgram(config_->getApiSettings().executorCmdLine);
         executorProcess_->launch(cs::Process::Options::None);
