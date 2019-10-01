@@ -34,11 +34,11 @@ APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor
 : executor_(executor)
 , blockchain_(blockchain)
 , solver_(_solver)
-#ifdef MONITOR_NODE
+#ifdef USE_DEPRECATED_STATS //MONITOR_NODE
 , stats(blockchain)
 #endif
 , tm_(this) {
-#ifdef MONITOR_NODE
+#ifdef USE_DEPRECATED_STATS //MONITOR_NODE
     if (static bool firstTime = true; firstTime) {
         stats_.second.resize(::csstats::collectionPeriods.size());
         auto nowGlobal = std::chrono::system_clock::now();
@@ -57,7 +57,7 @@ APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor
 void APIHandler::run() {
     if (!blockchain_.isGood())
         return;
-#ifdef MONITOR_NODE
+#ifdef USE_DEPRECATED_STATS //MONITOR_NODE
     stats.run(stats_);
 #endif
     state_updater_running.test_and_set(std::memory_order_acquire);
@@ -879,7 +879,7 @@ void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const int64_t sequence,
 }
 
 void APIHandler::StatsGet(api::StatsGetResult& _return) {
-#ifdef MONITOR_NODE
+#ifdef USE_DEPRECATED_STATS //MONITOR_NODE
     csstats::StatsPerPeriod stats_inst = this->stats.getStats();
 
     for (auto& s : stats_inst) {
@@ -899,8 +899,10 @@ void APIHandler::StatsGet(api::StatsGetResult& _return) {
 
         _return.stats.push_back(ps);
     }
-#endif
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+#else
+    SetResponseStatus(_return.status, APIRequestStatusType::NOT_IMPLEMENTED);
+#endif
 }
 
 void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const general::Address& address) {
@@ -960,6 +962,7 @@ void APIHandler::store_block_slot(const csdb::Pool& pool) {
 }
 
 void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
+#ifdef USE_DEPRECATED_STATS
     const ::csstats::Periods periods = ::csstats::collectionPeriods;
 
     static unsigned int currentCutIndex = 0;
@@ -1041,6 +1044,9 @@ void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
             }
         }
     }
+#else
+    csunused(pool);
+#endif // USE_DEPRECATED_STATS
 }
 //
 
