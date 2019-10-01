@@ -1341,31 +1341,22 @@ void APIHandler::WaitForSmartTransaction(api::TransactionId& _return, const gene
 }
 
 void APIHandler::SmartContractsAllListGet(SmartContractsListGetResult& _return, const int64_t _offset, const int64_t _limit) {
-    int64_t offset = _offset;
-    int64_t limit = limitPage(_limit);
-
+    auto offset = _offset;
+    auto limit = limitPage(_limit);
     auto lockedSmartOrigin = lockedReference(this->smart_origin);
-
     _return.count = static_cast<int32_t>(lockedSmartOrigin->size());
 
-    for (auto p : *lockedSmartOrigin) {
-        if (offset) {
-            --offset;
-        }
+    for (const auto&[addr, id] : *lockedSmartOrigin) {
+        if (offset) --offset;
         else if (limit) {
-            auto tr = solver_.smart_contracts().get_contract_deploy(p.first);
-            if (!tr.is_valid()) {
-                auto trid = p.second;
-                tr = executor_.loadTransactionApi(trid);
-            }
+            auto tr = solver_.smart_contracts().get_contract_deploy(addr);
+            if (!tr.is_valid())
+                tr = executor_.loadTransactionApi(id);
             _return.smartContractsList.push_back(fetch_smart_body(tr));
             --limit;
         }
-        else {
-            break;
-        }
+        else break;
     }
-
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 

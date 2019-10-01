@@ -2412,7 +2412,10 @@ void Node::sendHash(cs::RoundNumber round) {
     }
 
     csdebug() << "NODE> Sending hash to ALL";
-
+    if (solver_->isInGrayList(solver_->getPublicKey())) {
+        csinfo() << "NODE> In current Consensus " << cs::Conveyer::instance().confidantsCount()
+            << " nodes will not propose this Node as Trusted Candidate. The probability to become Trusted is too low";
+    }
     cs::Bytes message;
     cs::DataStream stream(message);
     cs::Byte myTrustedSize = 0;

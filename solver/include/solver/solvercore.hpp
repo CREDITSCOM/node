@@ -114,6 +114,7 @@ public:
     bool checkNodeCache(const cs::PublicKey& sender);
     void addToGraylist(const cs::PublicKey& sender, uint32_t rounds);
     void updateGrayList(cs::RoundNumber round);
+    bool isInGrayList(cs::PublicKey key);
     void resetGrayList() {
         grayList_.clear();
     }
