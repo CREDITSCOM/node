@@ -28,6 +28,7 @@ add_library(lib
   include/lib/system/process.hpp
   include/lib/system/fileutils.hpp
   include/lib/system/shareable.hpp
+  include/lib/system/lockfreechanger.hpp
 )
 
 if (MSVC)

@@ -75,6 +75,8 @@ struct ApiData {
     int ajaxServerReceiveTimeout = 30000;
     std::string executorHost{ "localhost" };
     std::string executorCmdLine{};
+    int executorRunDelay = 10;
+    int executorBackgroundThreadDelay = 100;
 };
 
 struct ConveyerData {

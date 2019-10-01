@@ -145,6 +145,7 @@ void Node::setupObserver() {
     cs::Connector::connect(&observer_.configChanged, &cs::Conveyer::instance(), &cs::Conveyer::onConfigChanged);
     cs::Connector::connect(&observer_.configChanged, &executor::Executor::getInstance(), &executor::Executor::onConfigChanged);
     cs::Connector::connect(&observer_.configChanged, transport_, &Transport::onConfigChanged);
+    cs::Connector::connect(&observer_.configChanged, poolSynchronizer_, &cs::PoolSynchronizer::onConfigChanged);
 }
 
 void Node::run() {
@@ -227,7 +228,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     }
 
     if (istream_.isBytesAvailable(sizeof(long long))) {
-        long long timeSS;
+        long long timeSS = 0;
         istream_ >> timeSS;
         auto seconds = timePassedSinceBB(timeSS);
         constexpr long long MaxBigBangAge_sec = 180;

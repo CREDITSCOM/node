@@ -72,6 +72,8 @@ const std::string PARAM_NAME_AJAX_SERVER_SEND_TIMEOUT = "ajax_server_send_timeou
 const std::string PARAM_NAME_AJAX_SERVER_RECEIVE_TIMEOUT = "ajax_server_receive_timeout";
 const std::string PARAM_NAME_EXECUTOR_IP = "executor_ip";
 const std::string PARAM_NAME_EXECUTOR_CMDLINE = "executor_command";
+const std::string PARAM_NAME_EXECUTOR_RUN_DELAY = "executor_run_delay";
+const std::string PARAM_NAME_EXECUTOR_BACKGROUND_THREAD_DELAY = "executor_background_thread_delay";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
@@ -826,16 +828,19 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_PORT, apiData_.executorPort);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_SEND_TIMEOUT, apiData_.executorSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_RECEIVE_TIMEOUT, apiData_.executorReceiveTimeout);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_RUN_DELAY, apiData_.executorRunDelay);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_BACKGROUND_THREAD_DELAY, apiData_.executorBackgroundThreadDelay);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_SEND_TIMEOUT, apiData_.serverSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_RECEIVE_TIMEOUT, apiData_.serverReceiveTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_SEND_TIMEOUT, apiData_.ajaxServerSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_RECEIVE_TIMEOUT, apiData_.ajaxServerReceiveTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_APIEXEC_PORT, apiData_.apiexecPort);
 
-    if (data.count(PARAM_NAME_EXECUTOR_IP) > 0) {
+    if (data.count(PARAM_NAME_EXECUTOR_IP)) {
         apiData_.executorHost = data.get<std::string>(PARAM_NAME_EXECUTOR_IP);
     }
-    if (data.count(PARAM_NAME_EXECUTOR_CMDLINE) > 0) {
+
+    if (data.count(PARAM_NAME_EXECUTOR_CMDLINE)) {
         apiData_.executorCmdLine = data.get<std::string>(PARAM_NAME_EXECUTOR_CMDLINE);
     }
 }
@@ -912,7 +917,9 @@ bool operator==(const ApiData& lhs, const ApiData& rhs) {
            lhs.ajaxServerSendTimeout == rhs.ajaxServerSendTimeout &&
            lhs.ajaxServerReceiveTimeout == rhs.ajaxServerReceiveTimeout &&
            lhs.executorHost == rhs.executorHost &&
-           lhs.executorCmdLine == rhs.executorCmdLine;
+           lhs.executorCmdLine == rhs.executorCmdLine &&
+           lhs.executorRunDelay == rhs.executorRunDelay &&
+           lhs.executorBackgroundThreadDelay == rhs.executorBackgroundThreadDelay;
 }
 
 bool operator!=(const ApiData& lhs, const ApiData& rhs) {
