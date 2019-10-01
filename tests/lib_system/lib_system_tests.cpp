@@ -570,7 +570,7 @@ public:
     }
 
 private:
-    alignas(sizeof(size_t) * 2) T data_ = T{};
+    alignas(kCacheLineSize * 2) T data_ = T{};
 };
 
 TEST(LockFreeChanger, BaseUsage) {
@@ -613,7 +613,7 @@ TEST(LockFreeChanger, BaseUsage) {
             size_t currentCycle = 0;
 
             while (isExecute.load(std::memory_order_acquire)) {
-                if (currentCycle >= maxCycles) {
+                if (currentCycle++ >= maxCycles) {
                     break;
                 }
 
@@ -634,9 +634,6 @@ TEST(LockFreeChanger, BaseUsage) {
                 }
 
                 changer.exchange(randomValue);
-                ++currentCycle;
-
-                cs::Console::writeLineSync("Thread id: ", std::this_thread::get_id());
                 std::this_thread::yield();
             }
         }));
