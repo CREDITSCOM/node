@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.11)
 
+project(node)
+
 if (NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/berkeleydb/.git OR
     NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/googletest/.git OR
     NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/thrift/.git OR
