@@ -31,3 +31,5 @@ target_link_libraries(${TEST_NAME} ${LINKER_START_GROUP} csdb csconnector solver
 
 add_test(NAME ${TEST_NAME}
         COMMAND ${TEST_NAME})
+
+configure_msvc_flags()
