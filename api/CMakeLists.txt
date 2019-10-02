@@ -37,5 +37,7 @@ target_include_directories(csconnector
   PRIVATE src
 )
 
+configure_msvc_flags()
+
 set_property(TARGET csconnector PROPERTY CXX_STANDARD 17)
 set_property(TARGET csconnector PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)

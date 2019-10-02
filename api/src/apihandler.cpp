@@ -588,7 +588,7 @@ template <typename T>
 void set_max_fee(T&, const csdb::Amount&, long) {
 }
 
-csdb::Transaction APIHandler::make_transaction(const Transaction& transaction) {
+csdb::Transaction APIHandler::makeTransaction(const Transaction& transaction) {
     csdb::Transaction send_transaction;
     const auto source = BlockChain::getAddressFromKey(transaction.source);
     const uint64_t WALLET_DENOM = csdb::Amount::AMOUNT_MAX_FRACTION;  // 1'000'000'000'000'000'000ull;
@@ -623,7 +623,7 @@ std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
 }
 
 void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
-    auto tr = make_transaction(transaction);
+    auto tr = makeTransaction(transaction);
 
     if (!transaction.userFields.empty()) {
         tr.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
@@ -645,7 +645,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
         return {};
     }
 
-    auto trxn = make_transaction(transaction);
+    auto trxn = makeTransaction(transaction);
     if (transaction.__isset.smartContract) {
         trxn.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
     }
@@ -693,7 +693,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
 
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
     auto input_smart = transaction.__isset.smartContract ? transaction.smartContract : SmartContractInvocation{};
-    auto send_transaction = make_transaction(transaction);
+    auto send_transaction = makeTransaction(transaction);
     const auto smart_addr = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
     bool deploy = transaction.__isset.smartContract ? is_smart_deploy(input_smart) : false;
 
@@ -2134,7 +2134,7 @@ void apiexec::APIEXECHandler::GetSeed(apiexec::GetSeedResult& _return, const gen
 void apiexec::APIEXECHandler::SendTransaction(apiexec::SendTransactionResult& _return, const general::AccessID accessId, const api::Transaction& transaction) {
     csunused(_return);
     csunused(accessId);
-    executor_.addInnerSendTransaction(accessId, executor_.make_transaction(transaction));
+    executor_.addInnerSendTransaction(accessId, executor_.makeTransaction(transaction));
 }
 
 void apiexec::APIEXECHandler::WalletIdGet(api::WalletIdGetResult& _return, const general::AccessID accessId, const general::Address& address) {
@@ -2257,9 +2257,11 @@ namespace executor {
         return std::make_optional(std::move(state));
     }
 
-    void Executor::state_update(const csdb::Pool& pool) {
-        if (!pool.transactions().size())
+    void Executor::stateUpdate(const csdb::Pool& pool) {
+        if (!pool.transactions().size()) {
             return;
+        }
+
         for (const auto& trxn : pool.transactions()) {
             if (trxn.is_valid() && cs::SmartContracts::is_state_updated(trxn)) {
                 const auto address = blockchain_.getAddressByType(trxn.target(), BlockChain::AddressType::PublicKey);
