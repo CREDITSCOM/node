@@ -52,6 +52,7 @@ add_library(${PROJECT_NAME} STATIC
   include/csdb/user_field.hpp
   )
 
+suppress_boost_cmake_warnings()
 configure_msvc_flags()
 
 set (Boost_USE_MULTITHREADED ON)

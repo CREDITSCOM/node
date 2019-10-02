@@ -4,6 +4,7 @@ project(csnode)
 
 # it is useful not to optimize code in RelWithDebInfo config for debug ability
 configure_msvc_no_optimization()
+suppress_boost_cmake_warnings()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

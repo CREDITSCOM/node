@@ -134,11 +134,12 @@ macro(configure_msvc_runtime)
   endif()
 endmacro()
 
+macro(suppress_boost_cmake_warnings)
+    cmake_policy(SET CMP0074 NEW)
+endmacro()
+
 macro(configure_msvc_flags)
     if (MSVC)
-        #boost cmake warnings disable
-        cmake_policy(SET CMP0074 NEW)
-
         if ("${CMAKE_CXX_FLAGS}" MATCHES "([/-]W[0-3])")
             message("Other Flags /W detected, replace it to avoid compiler warning to /W4")
             string(REGEX REPLACE "([/-]W[0-3])" "/W4" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})

@@ -14,6 +14,8 @@ target_include_directories(${TEST_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../client/include/client
 )
 
+suppress_boost_cmake_warnings()
+
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
 
