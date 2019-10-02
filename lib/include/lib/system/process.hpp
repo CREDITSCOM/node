@@ -143,10 +143,7 @@ inline bool Process::isRunning() const {
 inline void Process::wait() {
     try {
         process_.wait();
-
-        if (io_) {
-            io_->stop();
-        }
+        io_->stop();
     }
     catch (const std::exception& exception) {
         emit errorOccured(cs::ProcessException(exception.what()));
@@ -155,10 +152,7 @@ inline void Process::wait() {
 
 inline void Process::terminate() {
     try {
-        if (io_) {
-            io_->stop();
-        }
-
+        io_->stop();
         process_.terminate();
     }
     catch (const std::exception& exception) {
@@ -168,10 +162,6 @@ inline void Process::terminate() {
 
 inline void Process::stop() {
     try {
-        if (!io_) {
-            return;
-        }
-
         if (!io_->stopped()) {
             io_->stop();
         }
