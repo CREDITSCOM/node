@@ -1092,6 +1092,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
             HashState res;
             res.hash = cs::Zero::hash;
             std::string newStateStr;
+            std::string newHashStr;
             if (trxn.user_field_ids().count(cs::trx_uf::new_state::RetVal) > 0) {
                 res.retVal = trxn.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();
             }
@@ -1106,10 +1107,11 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 // new_state value, not hash!
                 newStateStr = trxn.user_field(cs::trx_uf::new_state::Value).template value<std::string>();
             }
-            else if (isBDLoaded_) { // signal to end waiting for a transaction
+            else {
+                newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();              
+                if (isBDLoaded_) { // signal to end waiting for a transaction
                     auto hashStateInst(lockedReference(this->hashStateSL));
                     (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
-                        auto newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();
                         if (!newHashStr.empty())
                             std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
                         else
@@ -1118,11 +1120,12 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                         res.isOld = (res.hash == oldHash.hash);
                         res.condFlg = true;
                         return res;
-                    });
+                        });
+                }
             }
 
-            if (!newStateStr.empty() || res.hash != cs::Zero::hash) { // update tokens
-                auto caller_pk = s_blockchain.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
+            if (!newStateStr.empty() || !newHashStr.empty()) { // update tokens
+                auto caller_pk = blockchain_.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
 
                 if (is_smart_deploy(smart))
                     tm_.checkNewDeploy(target_pk, caller_pk, smart);
