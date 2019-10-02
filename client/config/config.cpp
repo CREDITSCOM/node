@@ -572,7 +572,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
                 privateKey_ = keys.second;
                 publicKey_ = keys.first;
 
-                std::cout << "\nSave this phrase to restore your keys in futute, and press any key to continue:" << std::endl;
+                std::cout << "\nSave this phrase to restore your keys in future, and press any key to continue:" << std::endl;
                 auto words = cscrypto::mnemonic::masterSeedToWords(ms);
                 for (auto w : words) {
                     std::cout << w << " ";
