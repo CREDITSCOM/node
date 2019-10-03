@@ -93,6 +93,8 @@ void cs::ConveyerBase::setRound(cs::RoundNumber round) {
     if (currentRoundNumber() < round) {
         pimpl_->currentRound = round;
         csdebug() << csname() << "cached round updated";
+
+        emit roundChanged(round);
     }
     else {
         cswarning() << csname() << "current round " << currentRoundNumber();
@@ -207,7 +209,7 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundNumber cachedRound, const cs::R
             --cachedRound;
         }
 
-        pimpl_->currentRound = table.round;
+        changeRound(table.round);
 
         if (pimpl_->metaStorage.contains(table.round)) {
             cserror() << csname() << "Round table updation failed";
@@ -241,8 +243,7 @@ void cs::ConveyerBase::setTable(const RoundTable& table) {
         csdetails() << csname() << "Need hash " << hash.toString();
     }
 
-    // atomic
-    pimpl_->currentRound = table.round;
+    changeRound(table.round);
 
     cs::ConveyerMetaStorage::Element element;
     element.round = table.round;
@@ -607,14 +608,6 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     newPool.add_real_trusted(cs::Utils::maskToBits(metaPoolInfo.realTrustedMask));
     newPool.set_previous_hash(metaPoolInfo.previousHash);
 
-    //TODO: be sure tthenext lines are included in Node::getCharacteristic()
-    //if (metaPoolInfo.sequenceNumber > 1) {
-    //    newPool.add_number_confirmations(static_cast<uint8_t>(metaPoolInfo.confirmationMask.size()));
-    //    newPool.add_confirmation_mask(cs::Utils::maskToBits(metaPoolInfo.confirmationMask));
-    //    newPool.add_round_confirmations(metaPoolInfo.confirmations);
-    //}
-
-    //csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey);
     csmeta(csdetails) << "done";
 
     if (!stateTransactions.empty()) {
@@ -750,6 +743,14 @@ void cs::ConveyerBase::onConfigChanged(const Config& updated, const Config& prev
     }
 
     setData(updated.conveyerData());
+}
+
+void cs::ConveyerBase::changeRound(cs::RoundNumber round) {
+    if (currentRoundNumber() != round) {
+        pimpl_->currentRound = round;
+
+        emit roundChanged(round);
+    }
 }
 
 std::optional<cs::TransactionsPacket> cs::ConveyerBase::findPacketAtMeta(const cs::TransactionsPacketHash& hash) const {

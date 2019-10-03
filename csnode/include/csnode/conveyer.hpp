@@ -20,6 +20,7 @@ class Transaction;
 namespace cs {
 using PacketFlushSignal = cs::Signal<void(const cs::TransactionsPacket&)>;
 using StatesSignal = cs::Signal<void(const std::vector<csdb::Transaction>&)>;
+using RoundChangeSignal = cs::Signal<void(cs::RoundNumber)>;
 
 ///
 /// @brief The Conveyer class, represents utils and mechanics
@@ -308,6 +309,7 @@ public:
 public signals:
     cs::PacketFlushSignal packetFlushed;
     cs::StatesSignal statesCreated;
+    cs::RoundChangeSignal roundChanged;
 
 public slots:
 
@@ -318,6 +320,8 @@ public slots:
     void onConfigChanged(const Config& updated, const Config& previous);
 
 protected:
+    void changeRound(cs::RoundNumber round);
+
     // searches transactions packet at all conveyer cache
     std::optional<cs::TransactionsPacket> findPacketAtMeta(const cs::TransactionsPacketHash& hash) const;
 
