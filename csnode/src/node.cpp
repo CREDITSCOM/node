@@ -2238,7 +2238,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
             roundPackageCache_.push_back(rPackage);
         }
         else {
-            if (rPackage.roundTable().round == roundPackageCache_.back().roundTable().round) {
+            if (rPackage.roundTable().round == roundPackageCache_.back().roundTable().round && !stageThreeSent_) {
                 auto mask = roundPackageCache_.back().poolMetaInfo().realTrustedMask;
                 if (cs::TrustedMask::trustedSize(rPackage.poolMetaInfo().realTrustedMask) > cs::TrustedMask::trustedSize(mask)) {
                     csdebug() << "Current Roundpackage of " << rNum << " will be replaced by new one";
