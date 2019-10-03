@@ -35,6 +35,7 @@
 #include <lib/system/reference.hpp>
 #include <lib/system/concurrent.hpp>
 #include <lib/system/process.hpp>
+#include <lib/system/lockfreechanger.hpp>
 
 #include "tokens.hpp"
 
@@ -388,15 +389,16 @@ public:
 
     std::optional<ExecuteResult> reexecuteContract(ExecuteTransactionInfo& contract, std::string forceContractState);
 
-    csdb::Transaction make_transaction(const api::Transaction& transaction) {
+    csdb::Transaction makeTransaction(const api::Transaction& transaction) {
         csdb::Transaction send_transaction;
         const auto source = BlockChain::getAddressFromKey(transaction.source);
         const uint64_t WALLET_DENOM = csdb::Amount::AMOUNT_MAX_FRACTION;  // 1'000'000'000'000'000'000ull;
         send_transaction.set_amount(csdb::Amount(transaction.amount.integral, uint64_t(transaction.amount.fraction), WALLET_DENOM));
 
         BlockChain::WalletData dummy{};
-        if (!blockchain_.findWalletData(source, dummy))
+        if (!blockchain_.findWalletData(source, dummy)) {
             return csdb::Transaction{}; // disable transaction from unknown source!
+        }
 
         send_transaction.set_currency(csdb::Currency(1));
         send_transaction.set_source(source);
@@ -406,15 +408,18 @@ public:
 
         // TODO Change Thrift to avoid copy
         cs::Signature signature;
-        if (transaction.signature.size() == signature.size())
+        if (transaction.signature.size() == signature.size()) {
             std::copy(transaction.signature.begin(), transaction.signature.end(), signature.begin());
-        else
+        }
+        else {
             signature.fill(0);
+        }
+
         send_transaction.set_signature(signature);
         return send_transaction;
     }
 
-    void state_update(const csdb::Pool& pool);
+    void stateUpdate(const csdb::Pool& pool);
 
     void addToLockSmart(const general::Address& address, const general::AccessID& accessId) {
         std::lock_guard lk(mutex_);
@@ -450,12 +455,12 @@ public:
 
 public slots:
     void onBlockStored(const csdb::Pool& pool) {
-        state_update(pool);
+        stateUpdate(pool);
     }
 
     void onReadBlock(const csdb::Pool& block, bool* test_failed) {
         csunused(test_failed);
-        state_update(block);
+        stateUpdate(block);
     }
 
     void onExecutorStarted() {
@@ -480,16 +485,8 @@ public slots:
         cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
     }
 
-    void onConfigChanged(const Config& updated, const Config& previous) {
-        if (updated.getApiSettings().executorCmdLine == previous.getApiSettings().executorCmdLine) {
-            return;
-        }
-
-        if (updated.getApiSettings().executorCmdLine.empty()) {
-            return;
-        }
-
-        executorProcess_->setProgram(updated.getApiSettings().executorCmdLine);
+    void onConfigChanged(const Config& updated) {
+        config_.exchange(updated);
     }
 
 private:
@@ -499,19 +496,19 @@ private:
     : blockchain_(std::get<cs::Reference<const BlockChain>>(types))
     , solver_(std::get<cs::Reference<const cs::SolverCore>>(types))
     , config_(std::get<cs::Reference<const Config>>(types))
-    , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(config_.getApiSettings().executorHost, config_.getApiSettings().executorPort))
+    , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(config_->getApiSettings().executorHost, config_->getApiSettings().executorPort))
     , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
     , origExecutor_(
           std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
-        socket_->setSendTimeout(config_.getApiSettings().executorSendTimeout);
-        socket_->setRecvTimeout(config_.getApiSettings().executorReceiveTimeout);
+        socket_->setSendTimeout(config_->getApiSettings().executorSendTimeout);
+        socket_->setRecvTimeout(config_->getApiSettings().executorReceiveTimeout);
 
-        if (config_.getApiSettings().executorCmdLine.empty()) {
+        if (config_->getApiSettings().executorCmdLine.empty()) {
             cswarning() << "Executor command line args are empty, process would not be created";
             return;
         }
 
-        executorProcess_ = std::make_unique<cs::Process>(config_.getApiSettings().executorCmdLine);
+        executorProcess_ = std::make_unique<cs::Process>(config_->getApiSettings().executorCmdLine);
 
         cs::Connector::connect(&executorProcess_->started, this, &Executor::onExecutorStarted);
         cs::Connector::connect(&executorProcess_->finished, this, &Executor::onExecutorFinished);
@@ -541,7 +538,8 @@ private:
                     }
                 }
                 else {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    auto delay = std::chrono::milliseconds(config_->getApiSettings().executorBackgroundThreadDelay);
+                    std::this_thread::sleep_for(delay);
 
                     if (!executorProcess_->isRunning()) {
                         runProcess();
@@ -559,7 +557,10 @@ private:
 
     void runProcess() {
         executorProcess_->terminate();
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(config_->getApiSettings().executorRunDelay));
+
+        executorProcess_->setProgram(config_->getApiSettings().executorCmdLine);
         executorProcess_->launch(cs::Process::Options::None);
     }
 
@@ -632,7 +633,7 @@ private:
 private:
     const BlockChain& blockchain_;
     const cs::SolverCore& solver_;
-    const Config& config_;
+    cs::LockFreeChanger<Config> config_;
 
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TSocket> socket_;
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executorTransport_;
@@ -772,7 +773,9 @@ public:
     bool isBDLoaded() { return isBDLoaded_; }
     
 private:
+#ifdef USE_DEPRECATED_STATS
     ::csstats::AllStats stats_;
+#endif // 0
     executor::Executor& executor_;
 
     bool isBDLoaded_{ false };
@@ -802,7 +805,7 @@ private:
    
     BlockChain& blockchain_;
     cs::SolverCore& solver_;
-#ifdef MONITOR_NODE
+#ifdef USE_DEPRECATED_STATS // MONITOR_NODE
     csstats::csstats stats;
 #endif
 
@@ -882,7 +885,7 @@ private:
 
     void run();
 
-    ::csdb::Transaction make_transaction(const ::api::Transaction&);
+    ::csdb::Transaction makeTransaction(const ::api::Transaction&);
     void dumb_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
     void smart_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
 

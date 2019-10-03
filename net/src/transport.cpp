@@ -45,89 +45,18 @@ enum Platform : uint8_t {
     Windows
 };
 
-namespace {
-// Packets formation
-
-void addMyOut(const Config& config, cs::OPackStream& stream, const uint8_t initFlagValue = 0) {
-    uint8_t regFlag = 0;
-    if (!config.isSymmetric()) {
-        if (config.getAddressEndpoint().ipSpecified) {
-            regFlag |= RegFlags::RedirectIP;
-            if (config.getAddressEndpoint().ip.is_v6()) {
-                regFlag |= RegFlags::UsingIPv6;
-            }
-        }
-
-        regFlag |= RegFlags::RedirectPort;
-    }
-    else if (config.hasTwoSockets()) {
-        regFlag |= RegFlags::RedirectPort;
-    }
-
-    uint8_t* flagChar = stream.getCurrentPtr();
-
-    if (!config.isSymmetric()) {
-        if (config.getAddressEndpoint().ipSpecified) {
-            stream << config.getAddressEndpoint().ip;
-        }
-        else {
-            uint8_t c = 0_b;
-            stream << c;
-        }
-
-        stream << config.getAddressEndpoint().port;
-    }
-    else if (config.hasTwoSockets()) {
-        stream << 0_b << config.getInputEndpoint().port;
-    }
-    else {
-        stream << 0_b;
-    }
-
-    *flagChar |= initFlagValue | regFlag;
-}
-
-void formRegPack(const Config& config, cs::OPackStream& stream, uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t uuid) {
-    stream.init(BaseFlags::NetworkMsg);
-    stream << NetworkCommand::Registration << NODE_VERSION << uuid;
-
-    addMyOut(config, stream);
-    *regPackConnId = reinterpret_cast<uint64_t*>(stream.getCurrentPtr());
-
-    stream << static_cast<ConnectionId>(0) << pk;
-}
-
-void formSSConnectPack(const Config& config, cs::OPackStream& stream, const cs::PublicKey& pk, uint64_t uuid) {
-    stream.init(BaseFlags::NetworkMsg);
-    stream << NetworkCommand::SSRegistration
-#ifdef _WIN32
-        << Platform::Windows
-#elif __APPLE__
-        << Platform::MacOS
-#else
-        << Platform::Linux
-#endif
-        << NODE_VERSION << uuid;
-
-    uint8_t flag = (config.getNodeType() == NodeType::Router) ? 8 : 0;
-    addMyOut(config, stream, flag);
-
-    stream << pk;
-}
-}  // namespace
-
 Transport::~Transport() {
     delete net_;
 }
 
 void Transport::run() {
     net_->sendInit();
-    acceptRegistrations_ = config_.getNodeType() == NodeType::Router;
+    acceptRegistrations_ = config_->getNodeType() == NodeType::Router;
 
     {
         cs::Lock lock(oLock_);
         oPackStream_.init(BaseFlags::NetworkMsg);
-        formRegPack(config_, oPackStream_, &regPackConnId_, myPublicKey_, node_->getBlockChain().uuid());
+        formRegPack(&regPackConnId_, myPublicKey_, node_->getBlockChain().uuid());
         regPack_ = *(oPackStream_.getPackets());
         oPackStream_.clear();
     }
@@ -154,7 +83,7 @@ void Transport::run() {
         }
 
         if (checkPending) {
-            nh_.checkPending(config_.getMaxNeighbours());
+            nh_.checkPending(config_->getMaxNeighbours());
         }
 
         if (checkSilent) {
@@ -473,8 +402,8 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
 
 void Transport::refillNeighbourhood() {
     // TODO: check this algorithm when all list nodes are dead
-    if (config_.getBootstrapType() == BootstrapType::IpList) {
-        for (auto& ep : config_.getIpList()) {
+    if (config_->getBootstrapType() == BootstrapType::IpList) {
+        for (auto& ep : config_->getIpList()) {
             if (!nh_.canHaveNewConnection()) {
                 cswarning() << "Connections limit reached";
                 break;
@@ -485,14 +414,14 @@ void Transport::refillNeighbourhood() {
         }
     }
 
-    if (config_.getBootstrapType() == BootstrapType::SignalServer || config_.getNodeType() == NodeType::Router) {
+    if (config_->getBootstrapType() == BootstrapType::SignalServer || config_->getNodeType() == NodeType::Router) {
         // Connect to SS logic
-        ssEp_ = net_->resolve(config_.getSignalServerEndpoint());
+        ssEp_ = net_->resolve(config_->getSignalServerEndpoint());
         cslog() << "Connecting to Signal Server on " << ssEp_;
 
         {
             cs::Lock lock(oLock_);
-            formSSConnectPack(config_, oPackStream_, myPublicKey_, node_->getBlockChain().uuid());
+            formSSConnectPack(myPublicKey_, node_->getBlockChain().uuid());
             ssStatus_ = SSBootstrapStatus::Requested;
             net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
         }
@@ -530,7 +459,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
     uint32_t ctr = nh_.size();
 
-    if (config_.getBootstrapType() == BootstrapType::SignalServer) {
+    if (config_->getBootstrapType() == BootstrapType::SignalServer) {
         for (uint8_t i = 0; i < numCirc; ++i) {
             EndpointData ep;
             ep.ipSpecified = true;
@@ -544,8 +473,8 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
             ++ctr;
 
-            if (!std::equal(key.cbegin(), key.cend(), config_.getMyPublicKey().cbegin())) {
-                if (ctr <= config_.getMaxNeighbours()) {
+            if (!std::equal(key.cbegin(), key.cend(), config_->getMyPublicKey().cbegin())) {
+                if (ctr <= config_->getMaxNeighbours()) {
                     nh_.establishConnection(net_->resolve(ep));
                 }
             }
@@ -765,7 +694,7 @@ uint32_t Transport::getNeighboursCountWithoutSS() {
 }
 
 uint32_t Transport::getMaxNeighbours() const {
-    return config_.getMaxNeighbours();
+    return config_->getMaxNeighbours();
 }
 
 ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
@@ -822,21 +751,75 @@ void Transport::resetNeighbours() {
     return nh_.resetSyncNeighbours();
 }
 
-void Transport::onConfigChanged(const Config& updated, const Config& previous) {
-    bool is_interesting = false;
-    if (!(updated.getSignalServerEndpoint() == previous.getSignalServerEndpoint())) {
-        is_interesting = true;
+void Transport::onConfigChanged(const Config& updated) {
+    config_.exchange(updated);
+}
+
+void Transport::addMyOut(const uint8_t initFlagValue) {
+    uint8_t regFlag = 0;
+    if (!config_->isSymmetric()) {
+        if (config_->getAddressEndpoint().ipSpecified) {
+            regFlag |= RegFlags::RedirectIP;
+            if (config_->getAddressEndpoint().ip.is_v6()) {
+                regFlag |= RegFlags::UsingIPv6;
+            }
+        }
+
+        regFlag |= RegFlags::RedirectPort;
     }
-    else if (updated.getMinCompatibleVersion() != previous.getMinCompatibleVersion()) {
-        is_interesting = true;
+    else if (config_->hasTwoSockets()) {
+        regFlag |= RegFlags::RedirectPort;
     }
 
-    if (!is_interesting) {
-        return;
+    uint8_t* flagChar = oPackStream_.getCurrentPtr();
+
+    if (!config_->isSymmetric()) {
+        if (config_->getAddressEndpoint().ipSpecified) {
+            oPackStream_ << config_->getAddressEndpoint().ip;
+        }
+        else {
+            uint8_t c = 0_b;
+            oPackStream_ << c;
+        }
+
+        oPackStream_ << config_->getAddressEndpoint().port;
+    }
+    else if (config_->hasTwoSockets()) {
+        oPackStream_ << 0_b << config_->getInputEndpoint().port;
+    }
+    else {
+        oPackStream_ << 0_b;
     }
 
-    cs::Lock lock(oLock_);
-    config_ = updated;
+    *flagChar |= initFlagValue | regFlag;
+}
+
+void Transport::formRegPack(uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t uuid) {
+    oPackStream_.init(BaseFlags::NetworkMsg);
+    oPackStream_ << NetworkCommand::Registration << NODE_VERSION << uuid;
+
+    addMyOut();
+    *regPackConnId = reinterpret_cast<uint64_t*>(oPackStream_.getCurrentPtr());
+
+    oPackStream_ << static_cast<ConnectionId>(0) << pk;
+}
+
+void Transport::formSSConnectPack(const cs::PublicKey& pk, uint64_t uuid) {
+    oPackStream_.init(BaseFlags::NetworkMsg);
+    oPackStream_ << NetworkCommand::SSRegistration
+#ifdef _WIN32
+        << Platform::Windows
+#elif __APPLE__
+        << Platform::MacOS
+#else
+        << Platform::Linux
+#endif
+        << NODE_VERSION << uuid;
+
+    uint8_t flag = (config_->getNodeType() == NodeType::Router) ? 8 : 0;
+    addMyOut(flag);
+
+    oPackStream_ << pk;
 }
 
 /* Sending network tasks */
@@ -922,7 +905,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         conn.out.port(task->sender.port());
     }
 
-    if (vers < config_.getMinCompatibleVersion()) {
+    if (vers < config_->getMinCompatibleVersion()) {
         sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadClientVersion);
         return true;
     }
@@ -1032,7 +1015,7 @@ bool Transport::gotSSReRegistration() {
 
     {
         cs::Lock lock(oLock_);
-        formSSConnectPack(config_, oPackStream_, myPublicKey_, node_->getBlockChain().uuid());
+        formSSConnectPack(myPublicKey_, node_->getBlockChain().uuid());
         net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
     }
 
@@ -1100,7 +1083,7 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
     csunused(task);
 
     Connection conn;
-    conn.in = net_->resolve(config_.getSignalServerEndpoint());
+    conn.in = net_->resolve(config_->getSignalServerEndpoint());
     conn.specialOut = false;
 
     cs::Lock lock(oLock_);
@@ -1129,7 +1112,7 @@ bool Transport::gotSSNewFriends()
     if (ssStatus_ != SSBootstrapStatus::Complete)
     {
         cs::Lock lock(oLock_);
-        formSSConnectPack(config_, oPackStream_, myPublicKey_, node_->getBlockChain().uuid());
+        formSSConnectPack(myPublicKey_, node_->getBlockChain().uuid());
         net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
         cslog() << "Sending registration request to Signal Server because ssStatus = " + std::to_string(static_cast<int>(ssStatus_));
     }
@@ -1160,8 +1143,8 @@ bool Transport::gotSSNewFriends()
 
         ++ctr;
 
-        if (!std::equal(key.cbegin(), key.cend(), config_.getMyPublicKey().cbegin())) {
-            if (ctr <= config_.getMaxNeighbours()) {
+        if (!std::equal(key.cbegin(), key.cend(), config_->getMyPublicKey().cbegin())) {
+            if (ctr <= config_->getMaxNeighbours()) {
                 nh_.establishConnection(net_->resolve(ep));
             }
         }
@@ -1222,7 +1205,7 @@ bool Transport::gotSSUpdateServer()
     cslog() << "Registration on new Signal Server";
     {
         cs::Lock lock(oLock_);
-        formSSConnectPack(config_, oPackStream_, myPublicKey_, node_->getBlockChain().uuid());
+        formSSConnectPack(myPublicKey_, node_->getBlockChain().uuid());
         net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
     }
 

@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.11)
 
+project(node)
+
 if (NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/berkeleydb/.git OR
     NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/googletest/.git OR
     NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/thrift/.git OR
@@ -26,7 +28,7 @@ if (MSVC)
   if(CMAKE_CONFIGURATION_TYPES)
     list(APPEND CMAKE_CONFIGURATION_TYPES RelMonitor RelWallet)
   endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
+  
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /MT")
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2 /MT")
@@ -132,6 +134,41 @@ macro(configure_msvc_runtime)
       endforeach()
     endif()
   endif()
+endmacro()
+
+macro(suppress_boost_cmake_warnings)
+    cmake_policy(SET CMP0074 NEW)
+endmacro()
+
+macro(configure_msvc_flags)
+    if (MSVC)
+        if ("${CMAKE_CXX_FLAGS}" MATCHES "([/-]W[0-3])")
+            message("Other Flags /W detected, replace it to avoid compiler warning to /W4")
+            string(REGEX REPLACE "([/-]W[0-3])" "/W4" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+        else()
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
+        endif()
+    endif()
+endmacro()
+
+macro(match_and_replace build_type from to)
+    if ("${${build_type}}" MATCHES ${from})
+        string(REGEX REPLACE ${from} ${to} ${build_type} ${${build_type}})
+    endif()
+endmacro()
+
+macro(configure_msvc_no_optimization)
+    if (MSVC)
+        match_and_replace(CMAKE_CXX_FLAGS_RELWITHDEBINFO "([/-]O[1-2])" "/Od")
+        match_and_replace(CMAKE_CXX_FLAGS_RELSPAM "([/-]O[1-2])" "/Od")
+        match_and_replace(CMAKE_CXX_FLAGS_RELMONITOR "([/-]O[1-2])" "/Od")
+        match_and_replace(CMAKE_CXX_FLAGS_RELWALLET "([/-]O[1-2])" "/Od")
+
+        match_and_replace(CMAKE_CXX_FLAGS_RELWITHDEBINFO "([/-]Ob1)" "/Ob0")
+        match_and_replace(CMAKE_CXX_FLAGS_RELSPAM "([/-]Ob1)" "/Ob0")
+        match_and_replace(CMAKE_CXX_FLAGS_RELMONITOR "([/-]Ob1)" "/Ob0")
+        match_and_replace(CMAKE_CXX_FLAGS_RELWALLET "([/-]Ob1)" "/Ob0")
+    endif()
 endmacro()
 
 configure_msvc_runtime()

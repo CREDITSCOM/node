@@ -18,6 +18,4 @@ target_include_directories(${PROJECT_NAME} PUBLIC "./"
 
 target_link_libraries(${PROJECT_NAME} lmdb lib)
 
-if (MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE "/W3")
-endif()
+configure_msvc_flags()
