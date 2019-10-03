@@ -1125,7 +1125,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
             }
 
             if (!newStateStr.empty() || !newHashStr.empty()) { // update tokens
-                auto caller_pk = blockchain_.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
+                auto caller_pk = s_blockchain.getAddressByType(execTrans.source(), BlockChain::AddressType::PublicKey);
 
                 if (is_smart_deploy(smart))
                     tm_.checkNewDeploy(target_pk, caller_pk, smart);
