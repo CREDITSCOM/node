@@ -44,7 +44,9 @@ target_link_libraries (net csnode lib cscrypto)
 
 set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)
-set (Boost_USE_STATIC_RUNTIME ON)
+if(NOT APPLE)
+  set (Boost_USE_STATIC_RUNTIME ON)
+endif()
 
 find_package (Boost REQUIRED COMPONENTS system filesystem)
 target_link_libraries (net Boost::system Boost::filesystem Boost::disable_autolinking)

@@ -17,7 +17,9 @@ target_include_directories(${TEST_NAME} PUBLIC
 suppress_boost_cmake_warnings()
 
 set(Boost_USE_STATIC_LIBS ON)
-set(Boost_USE_STATIC_RUNTIME ON)
+if(NOT APPLE)
+  set(Boost_USE_STATIC_RUNTIME ON)
+endif()
 
 find_package(Boost REQUIRED COMPONENTS program_options)
 
