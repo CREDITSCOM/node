@@ -37,6 +37,9 @@ if (MSVC)
   target_link_libraries(lib Psapi)
 endif(MSVC)
 
+suppress_boost_cmake_warnings()
+configure_msvc_flags()
+
 target_include_directories(lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
     )
 

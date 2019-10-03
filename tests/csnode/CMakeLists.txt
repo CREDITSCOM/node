@@ -14,6 +14,8 @@ target_include_directories(${TEST_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../client/include/client
 )
 
+suppress_boost_cmake_warnings()
+
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
 
@@ -31,3 +33,5 @@ target_link_libraries(${TEST_NAME} ${LINKER_START_GROUP} csdb csconnector solver
 
 add_test(NAME ${TEST_NAME}
         COMMAND ${TEST_NAME})
+
+configure_msvc_flags()
