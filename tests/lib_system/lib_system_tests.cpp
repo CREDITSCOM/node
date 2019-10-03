@@ -16,9 +16,17 @@
 #include <lib/system/lockfreechanger.hpp>
 #include <lib/system/console.hpp>
 
+#ifdef _MSC_VER
+#pragma warning(push, 0)
+#endif
+
 #include <boost/lockfree/spsc_queue.hpp>
 
 #include "gtest/gtest.h"
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 void CreateRegionAllocatorAndThenAllocateInIt([[maybe_unused]] const uint32_t pageSize, [[maybe_unused]] const uint32_t initialNumberOfPages,
                                               const uint32_t numberOfAdditionalAllocations, const uint32_t additionalAllocationSize, uint32_t& finalNumberOfPages) {

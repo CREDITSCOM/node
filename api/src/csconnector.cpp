@@ -1,13 +1,14 @@
 #include "stdafx.h"
 
 #include <csdb/currency.hpp>
+
 #if defined(_MSC_VER)
-#pragma warning(push)
-// 4245: 'return': conversion from 'int' to 'SOCKET', signed/unsigned mismatch
-#pragma warning(disable : 4245)
+#pragma warning(push, 0) // 4245: 'return': conversion from 'int' to 'SOCKET', signed/unsigned mismatch
 #endif
+
 #include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/transport/THttpServer.h>
+
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #endif  // _MSC_VER
