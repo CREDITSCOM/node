@@ -533,6 +533,10 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
                 csdebug() << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
             }
             const size_t toAdd = max_conf - next_round_trust.size();
+            std::random_device rd;
+            std::mt19937 g;
+            g.seed((unsigned int)Conveyer::instance().currentRoundNumber());
+            cs::Random::shuffle(belowThreshold.begin(), belowThreshold.end(), g);
             for (size_t i = 0; i < toAdd; i++) {
                 const auto& tmp = belowThreshold.at(i);
                 next_round_trust.emplace_back(tmp);
