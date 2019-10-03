@@ -47,9 +47,6 @@ public:
         MaxQueueSize = 1000000
     };
 
-    void setSendCacheValue(cs::RoundNumber value);
-    void setMaxResendsValue(size_t value);
-
     void setData(const ConveyerData& data);
 
     ///

@@ -11,6 +11,7 @@
 #include <lib/system/hash.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+#include <lib/system/lockfreechanger.hpp>
 
 #include <config.hpp>
 
@@ -45,8 +46,7 @@ struct cs::ConveyerBase::Impl {
     std::atomic<cs::RoundNumber> currentRound = 0;
 
     // settings
-    std::atomic<cs::RoundNumber> sendCacheValue;
-    std::atomic<size_t> maxResendsSenCache;
+    cs::LockFreeChanger<ConveyerData> settings;
 
     // helpers
     const cs::ConveyerMeta* validMeta() &;
@@ -74,17 +74,8 @@ cs::ConveyerBase::ConveyerBase() {
     std::call_once(::onceFlag, &::setup, this);
 }
 
-void cs::ConveyerBase::setSendCacheValue(cs::RoundNumber value) {
-    pimpl_->sendCacheValue.store(value, std::memory_order_release);
-}
-
-void cs::ConveyerBase::setMaxResendsValue(size_t value) {
-    pimpl_->maxResendsSenCache.store(value, std::memory_order_release);
-}
-
 void cs::ConveyerBase::setData(const ConveyerData& data) {
-    setSendCacheValue(data.sendCacheValue);
-    setMaxResendsValue(data.maxResendsSendCache);
+    pimpl_->settings.exchange(data);
 }
 
 void cs::ConveyerBase::setRound(cs::RoundNumber round) {
@@ -837,7 +828,7 @@ bool cs::ConveyerBase::isHashAtSendCache(const cs::TransactionsPacketHash& hash)
 
 void cs::ConveyerBase::checkSendCache() {
     auto round = currentRoundNumber();
-    auto sendCacheValue = pimpl_->sendCacheValue.load(std::memory_order_acquire);
+    auto sendCacheValue = pimpl_->settings->sendCacheValue;
 
     if (round < sendCacheValue) {
         return;
