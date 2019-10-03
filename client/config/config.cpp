@@ -46,6 +46,7 @@ const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
 const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
 const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
+const std::string PARAM_NAME_NEXT_ROUND_MESSAGE_TIME = "next_round_message_time";
 
 const std::string PARAM_NAME_CONVEYER_SEND_CACHE = "send_cache_value";
 const std::string PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE = "max_resends_send_cache";
@@ -700,6 +701,7 @@ Config Config::readFromFile(const std::string& fileName) {
 
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
         result.observerWaitTime_ = params.count(PARAM_NAME_OBSERVER_WAIT_TIME) ? params.get<uint64_t>(PARAM_NAME_OBSERVER_WAIT_TIME) : DEFAULT_OBSERVER_WAIT_TIME;
+        result.nextRoundMessageTime_ = params.count(PARAM_NAME_NEXT_ROUND_MESSAGE_TIME) ? params.get<uint64_t>(PARAM_NAME_NEXT_ROUND_MESSAGE_TIME) : DEFAULT_NEXT_ROUND_MESSAGE_TIME;
 
         result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE), NODE_TYPES_MAP);
 
@@ -938,28 +940,29 @@ bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs) {
 // logger settings not checked
 bool operator==(const Config& lhs, const Config& rhs) {
     return lhs.good_ == rhs.good_ &&
-        lhs.inputEp_ == rhs.inputEp_ &&
-        lhs.twoSockets_ == rhs.twoSockets_ &&
-        lhs.outputEp_ == rhs.outputEp_ &&
-        lhs.nType_ == rhs.nType_ &&
-        lhs.ipv6_ == rhs.ipv6_ &&
-        lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
-        lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
-        lhs.symmetric_ == rhs.symmetric_ &&
-        lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
-        lhs.bType_ == rhs.bType_ &&
-        lhs.signalServerEp_ == rhs.signalServerEp_ &&
-        lhs.bList_ == rhs.bList_ &&
-        lhs.pathToDb_ == rhs.pathToDb_ &&
-        lhs.publicKey_ == rhs.publicKey_ &&
-        lhs.privateKey_ == rhs.privateKey_ &&
-        lhs.poolSyncData_ == rhs.poolSyncData_ &&
-        lhs.apiData_ == rhs.apiData_ &&
-        lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
-        lhs.recreateIndex_ == rhs.recreateIndex_ &&
-        lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
-        lhs.conveyerData_ == rhs.conveyerData_ &&
-        lhs.minCompatibleVersion_ == rhs.minCompatibleVersion_;
+           lhs.inputEp_ == rhs.inputEp_ &&
+           lhs.twoSockets_ == rhs.twoSockets_ &&
+           lhs.outputEp_ == rhs.outputEp_ &&
+           lhs.nType_ == rhs.nType_ &&
+           lhs.ipv6_ == rhs.ipv6_ &&
+           lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
+           lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
+           lhs.symmetric_ == rhs.symmetric_ &&
+           lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
+           lhs.bType_ == rhs.bType_ &&
+           lhs.signalServerEp_ == rhs.signalServerEp_ &&
+           lhs.bList_ == rhs.bList_ &&
+           lhs.pathToDb_ == rhs.pathToDb_ &&
+           lhs.publicKey_ == rhs.publicKey_ &&
+           lhs.privateKey_ == rhs.privateKey_ &&
+           lhs.poolSyncData_ == rhs.poolSyncData_ &&
+           lhs.apiData_ == rhs.apiData_ &&
+           lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
+           lhs.recreateIndex_ == rhs.recreateIndex_ &&
+           lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
+           lhs.nextRoundMessageTime_ == rhs.nextRoundMessageTime_ &&
+           lhs.conveyerData_ == rhs.conveyerData_ &&
+           lhs.minCompatibleVersion_ == rhs.minCompatibleVersion_;
 }
 
 bool operator!=(const Config& lhs, const Config& rhs) {
