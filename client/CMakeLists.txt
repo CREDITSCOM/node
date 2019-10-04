@@ -3,6 +3,11 @@ cmake_minimum_required(VERSION 3.10)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if (MSVC)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /INCREMENTAL:NO /LTCG")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /INCREMENTAL:NO /LTCG")
+endif()
+
 project(client)
 
 find_package(Git)
@@ -57,7 +62,9 @@ configure_msvc_flags()
 
 set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)
-set (Boost_USE_STATIC_RUNTIME ON)
+if(NOT APPLE)
+  set (Boost_USE_STATIC_RUNTIME ON)
+endif()
 
 find_package (Threads)
 find_package (Boost REQUIRED COMPONENTS system filesystem program_options date_time regex)
