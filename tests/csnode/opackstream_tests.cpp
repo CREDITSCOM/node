@@ -79,7 +79,7 @@ TEST(OPackStream, InitializationWithFragmentedFlagOnly) {
                                               0xd3,  0xdf, 0x77, 0x29, 0xfd, 0xcf, 0xea, 0x4a, 0xcd, 0x0e, 0xcc, 0x14, 0xaa, 0x05, 0x0b,
                                               0x77,  0x11, 0x6d, 0x8f, 0xcd, 0x80, 0x4b, 0x45, 0x36, 0x6b, 0x5c, 0xae, 0x4a, 0x06, 0x82};
 
-    ASSERT_EQ(1, stream.getPacketsCount());
+    ASSERT_EQ(1u, stream.getPacketsCount());
     ASSERT_EQ(encoded.size(), sizeof encoded_expected);
     ASSERT_TRUE(0 == memcmp(encoded.data(), encoded_expected, encoded.size()));
 }
@@ -106,7 +106,7 @@ TEST(OPackStream, getPacketsCount) {
     cs::OPackStream oPackStream(&allocator, kPublicKey);
     oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
 
-    ASSERT_EQ(1, oPackStream.getPacketsCount());
+    ASSERT_EQ(1u, oPackStream.getPacketsCount());
 }
 
 TEST(OPackStream, getCurrentPtr) {
@@ -122,7 +122,7 @@ TEST(OPackStream, getCurrSize) {
     cs::OPackStream oPackStream(&allocator, kPublicKey);
     oPackStream.init(BaseFlags::Fragmented | BaseFlags::NetworkMsg);
 
-    ASSERT_EQ(5, oPackStream.getCurrentSize());
+    ASSERT_EQ(5u, oPackStream.getCurrentSize());
 }
 
 template<typename T>
@@ -138,7 +138,7 @@ void TestConcreteTypeWriteToOPackStream(const T& value, const unsigned char* dat
 
     displayStreamData(stream);
 
-    ASSERT_EQ(1, stream.getPacketsCount());
+    ASSERT_EQ(1u, stream.getPacketsCount());
     ASSERT_EQ(encoded.size(), size * sizeof(unsigned char));
     ASSERT_TRUE(0 == memcmp(encoded.data(), data, encoded.size()));
 }

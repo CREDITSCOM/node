@@ -1,6 +1,7 @@
 #include <csnode/roundstat.hpp>
 
 #include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
 
 #include <sstream>
 
