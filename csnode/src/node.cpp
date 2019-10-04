@@ -42,7 +42,7 @@ Node::Node(const Config& config, cs::config::Observer& observer)
 , nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(genesisAddress_, startAddress_, config.recreateIndex())
 , ostream_(&packStreamAllocator_, nodeIdKey_)
-, stat_()
+, stat_(config)
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this))
 , observer_(observer) {
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
@@ -67,6 +67,7 @@ Node::Node(const Config& config, cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     setupObserver();
+    setupNextMessageBehaviour();
 
     alwaysExecuteContracts_ = config.alwaysExecuteContracts();
     good_ = init(config);
@@ -146,6 +147,13 @@ void Node::setupObserver() {
     cs::Connector::connect(&observer_.configChanged, &executor::Executor::getInstance(), &executor::Executor::onConfigChanged);
     cs::Connector::connect(&observer_.configChanged, transport_, &Transport::onConfigChanged);
     cs::Connector::connect(&observer_.configChanged, poolSynchronizer_, &cs::PoolSynchronizer::onConfigChanged);
+    cs::Connector::connect(&observer_.configChanged, &stat_, &cs::RoundStat::onConfigChanged);
+}
+
+void Node::setupNextMessageBehaviour() {
+    cs::Connector::connect(&transport_->mainThreadIterated, &stat_, &cs::RoundStat::onMainThreadIterated);
+    cs::Connector::connect(&cs::Conveyer::instance().roundChanged, &stat_, &cs::RoundStat::onRoundChanged);
+    cs::Connector::connect(&stat_.roundTimeElapsed, this, &Node::onRoundTimeElapsed);
 }
 
 void Node::run() {
@@ -2986,4 +2994,8 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
         *shouldStop = true;
         return;
     }
+}
+
+void Node::onRoundTimeElapsed() {
+    cslog() << "Waiting for next round...";
 }

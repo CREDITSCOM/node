@@ -44,12 +44,12 @@ const std::string PARAM_NAME_USE_IPV6 = "ipv6";
 const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
+const std::string PARAM_NAME_ROUND_ELAPSE_TIME = "round_elapse_time";
 const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
 const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
 
 const std::string PARAM_NAME_CONVEYER_SEND_CACHE = "send_cache_value";
 const std::string PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE = "max_resends_send_cache";
-const std::string PARAM_NAME_CONVEYER_NEXT_ROUND_MESSAGE_TIME = "next_round_message_time";
 
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
@@ -701,6 +701,7 @@ Config Config::readFromFile(const std::string& fileName) {
 
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
         result.observerWaitTime_ = params.count(PARAM_NAME_OBSERVER_WAIT_TIME) ? params.get<uint64_t>(PARAM_NAME_OBSERVER_WAIT_TIME) : DEFAULT_OBSERVER_WAIT_TIME;
+        result.roundElapseTime_ = params.count(PARAM_NAME_ROUND_ELAPSE_TIME) ? params.get<uint64_t>(PARAM_NAME_ROUND_ELAPSE_TIME) : DEFAULT_ROUND_ELAPSE_TIME;
 
         result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE), NODE_TYPES_MAP);
 
@@ -855,7 +856,6 @@ void Config::readConveyerData(const boost::property_tree::ptree& config) {
 
     checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_SEND_CACHE, conveyerData_.sendCacheValue);
     checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE, conveyerData_.maxResendsSendCache);
-    checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_NEXT_ROUND_MESSAGE_TIME, conveyerData_.nextRoundMessageTime);
 }
 
 template <typename T>
@@ -930,8 +930,7 @@ bool operator!=(const ApiData& lhs, const ApiData& rhs) {
 
 bool operator==(const ConveyerData& lhs, const ConveyerData& rhs) {
     return lhs.sendCacheValue == rhs.sendCacheValue &&
-           lhs.maxResendsSendCache == rhs.maxResendsSendCache &&
-           lhs.nextRoundMessageTime == rhs.nextRoundMessageTime;
+           lhs.maxResendsSendCache == rhs.maxResendsSendCache;
 }
 
 bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs) {
@@ -961,6 +960,7 @@ bool operator==(const Config& lhs, const Config& rhs) {
            lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
            lhs.recreateIndex_ == rhs.recreateIndex_ &&
            lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
+           lhs.roundElapseTime_ == rhs.roundElapseTime_ &&
            lhs.conveyerData_ == rhs.conveyerData_ &&
            lhs.minCompatibleVersion_ == rhs.minCompatibleVersion_;
 }
