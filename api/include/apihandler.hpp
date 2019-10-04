@@ -359,6 +359,13 @@ public:
         Payable
     };
 
+    enum ExecutorErrorCode {
+        NoError = 0,
+        GeneralError = 1,
+        IncorrecJdkVersion,
+        ServerStartError
+    };
+
     enum ACCESS_ID_RESERVE { GETTER, START_INDEX };
 
     struct ExecuteTransactionInfo {
@@ -471,14 +478,26 @@ public slots:
         csdebug() << csname() << "started";
     }
 
-    void onExecutorFinished() {
-        if (!requestStop_) {
-            cs::Concurrent::run([this] {
-                runProcess();
-            });
+    void onExecutorFinished(int code, const std::error_code&) {
+        if (requestStop_) {
+            return;
         }
 
-        csdebug() << csname() << "finished";
+        if (!executorMessages_.count(code)) {
+            cswarning() << "Executor unknown error";
+        }
+        else {
+            cswarning() << executorMessages_[code];
+        }
+
+        if (code == ExecutorErrorCode::ServerStartError ||
+            code == ExecutorErrorCode::IncorrecJdkVersion) {
+            return;
+        }
+
+        cs::Concurrent::run([this] {
+            runProcess();
+        });
     }
 
     void onExecutorProcessError(const cs::ProcessException& exception) {
@@ -535,14 +554,6 @@ private:
                 if (executorProcess_->isRunning()) {
                     if (!isConnected()) {
                         connect();
-                    }
-                }
-                else {
-                    auto delay = std::chrono::milliseconds(config_->getApiSettings().executorBackgroundThreadDelay);
-                    std::this_thread::sleep_for(delay);
-
-                    if (!executorProcess_->isRunning()) {
-                        runProcess();
                     }
                 }
             }
@@ -657,6 +668,13 @@ private:
     const int16_t EXECUTOR_VERSION = 2;
 
     std::mutex callExecutorLock_;
+
+    std::map<int, const char*> executorMessages_ = {
+        { NoError, "Executor finished with no error code" },
+        { GeneralError, "Executor unexpected error, try to launch again" },
+        { IncorrecJdkVersion, "Executor can not be launched due to incorred JDK version" },
+        { ServerStartError, "Executor server start error" }
+    };
 };
 }  // namespace executor
 namespace apiexec {
