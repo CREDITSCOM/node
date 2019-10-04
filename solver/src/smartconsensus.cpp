@@ -375,7 +375,12 @@ void SmartConsensus::processStages() {
             if (st.signatures[i] != myStage2.signatures[i]) {
                 if (cscrypto::verifySignature(st.signatures[i], smartConfidants_[i], st.hashes[i].data(), sizeof(st.hashes[i]))) {
                     ++(smartUntrusted.at(i));
-                    cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted (wrong hash)";
+                    if (st.hashes[i] == Zero::hash) {
+                        cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted (zero hash) - possibly silent";
+                    }
+                    else {
+                        cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted (wrong hash)";
+                    }
                 }
                 else {
                     ++(smartUntrusted.at(st.sender));

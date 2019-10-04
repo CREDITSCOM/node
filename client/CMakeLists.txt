@@ -62,7 +62,9 @@ configure_msvc_flags()
 
 set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)
-set (Boost_USE_STATIC_RUNTIME ON)
+if(NOT APPLE)
+  set (Boost_USE_STATIC_RUNTIME ON)
+endif()
 
 find_package (Threads)
 find_package (Boost REQUIRED COMPONENTS system filesystem program_options date_time regex)
