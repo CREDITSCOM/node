@@ -28,6 +28,7 @@ inline volatile std::sig_atomic_t gSignalStatus = 0;
 
 using ConnectionId = uint64_t;
 using Tick = uint64_t;
+
 using PingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
 enum class NetworkCommand : uint8_t {
@@ -167,6 +168,7 @@ public:
 
 public signals:
     PingSignal pingReceived;
+    cs::Action mainThreadIterated;
 
 public slots:
     void onConfigChanged(const Config& updated);
