@@ -12,6 +12,10 @@
 #pragma warning(pop)
 #endif
 
+#include <fstream>
+
+#include <lib/system/common.hpp>
+
 namespace cs {
 class FileUtils {
 public:
@@ -41,6 +45,18 @@ public:
         }
 
         return createPath(path);
+    }
+
+    static cs::Bytes readAllFileData(const std::string& fileName) {
+        std::ifstream file(fileName);
+        return cs::Bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    }
+
+    static bool isFileExists(const std::string& fileName) {
+        namespace fs = boost::filesystem;
+
+        boost::system::error_code code;
+        return fs::exists(fileName, code);
     }
 };
 }
