@@ -16,6 +16,7 @@
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
+#include <lib/system/lockfreechanger.hpp>
 
 #include <net/network.hpp>
 
@@ -27,6 +28,7 @@ inline volatile std::sig_atomic_t gSignalStatus = 0;
 
 using ConnectionId = uint64_t;
 using Tick = uint64_t;
+
 using PingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
 enum class NetworkCommand : uint8_t {
@@ -166,11 +168,16 @@ public:
 
 public signals:
     PingSignal pingReceived;
+    cs::Action mainThreadIterated;
 
 public slots:
-    void onConfigChanged(const Config& updated, const Config& previous);
+    void onConfigChanged(const Config& updated);
 
 private:
+    void addMyOut(const uint8_t initFlagValue = 0);
+    void formRegPack(uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t uuid);
+    void formSSConnectPack(const cs::PublicKey& pk, uint64_t uuid);
+
     void registerTask(Packet* pack, const uint32_t packNum, const bool);
     void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
 
@@ -206,7 +213,7 @@ private:
 
     /* Actions */
     bool good_;
-    Config config_;
+    cs::LockFreeChanger<Config> config_;
 
     static const uint32_t maxPacksQueue_ = 2048;
     static const uint32_t maxRemoteNodes_ = 4096;

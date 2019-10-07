@@ -1,12 +1,17 @@
 #include <gtest/gtest.h>
+
 #include <csdb/amount_commission.hpp>
 #include <csdb/currency.hpp>
+
 #include <csnode/conveyer.hpp>
+
+#include <config.hpp>
 #include <iostream>
 
 #include <lib/system/hash.hpp>
 
 const cs::RoundNumber kRoundNumber = 12345;
+[[maybe_unused]]
 const cs::PublicKey kPublicKey = {0x53, 0x4B, 0xD3, 0xDF, 0x77, 0x29, 0xFD, 0xCF, 0xEA, 0x4A, 0xCD, 0x0E, 0xCC, 0x14, 0xAA, 0x05,
                                   0x0B, 0x77, 0x11, 0x6D, 0x8F, 0xCD, 0x80, 0x4B, 0x45, 0x36, 0x6B, 0x5C, 0xAE, 0x4A, 0x06, 0x82};
 
@@ -246,9 +251,11 @@ TEST(Conveyer, TestSendCache) {
 
     size_t counter = 0;
 
+    ConveyerData data;
     ConveyerTest conveyer{};
+
     conveyer.setRound(0);
-    conveyer.setSendCacheValue(10);
+    conveyer.setData(data);
 
     cs::Connector::connect(&conveyer.packetFlushed, [&](const auto& packet) {
         if (counter < 2) {
@@ -316,9 +323,11 @@ TEST(Conveyer, TestSendCache) {
 TEST(Conveyer, TestRejectedHashes) {
     bool called = false;
 
+    ConveyerData data;
     ConveyerTest conveyer{};
+
     conveyer.setRound(0);
-    conveyer.setSendCacheValue(10);
+    conveyer.setData(data);
 
     auto packet1 = CreateTestPacket(20);
     auto packet2 = CreateTestPacket(25);
@@ -342,5 +351,35 @@ TEST(Conveyer, TestRejectedHashes) {
     conveyer.setRound(100);
     conveyer.flushTransactions();
 
+    ASSERT_TRUE(called);
+}
+
+TEST(Conveyer, TestRoundChangeSignal) {
+    bool called = false;
+
+    ConveyerTest conveyer{};
+    conveyer.setRound(0);
+
+    cs::Connector::connect(&conveyer.roundChanged, [&](const cs::RoundNumber) {
+        called = true;
+    });
+
+    conveyer.setRound(0);
+    ASSERT_FALSE(called);
+
+    conveyer.setRound(100);
+    ASSERT_TRUE(called);
+
+    called = false;
+
+    cs::RoundTable table;
+    table.round = 100;
+
+    conveyer.setTable(table);
+    ASSERT_FALSE(called);
+
+    table.round = 100500;
+
+    conveyer.setTable(table);
     ASSERT_TRUE(called);
 }

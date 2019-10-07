@@ -1,8 +1,7 @@
 #include "lmdb.hpp"
 #include <iostream>
 
-#include <boost/filesystem.hpp>
-#include <boost/system/error_code.hpp>
+#include <lib/system/fileutils.hpp>
 
 namespace fs = boost::filesystem;
 
@@ -10,12 +9,8 @@ cs::Lmdb::Lmdb(const std::string& path, const unsigned int flags): path_(path), 
     try {
         env_ = environment(flags);
 
-        fs::path dbPath(path_);
-        boost::system::error_code code;
-        const auto res = fs::is_directory(dbPath, code);
-
-        if (!res) {
-            fs::create_directory(dbPath);
+        if (!cs::FileUtils::createPathIfNoExist(path_)) {
+            std::cout << "Could not create path for Lmdb: " << path_ << std::endl;
         }
     }
     catch (const lmdb::error& error) {

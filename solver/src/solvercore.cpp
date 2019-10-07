@@ -519,27 +519,11 @@ csdb::Pool& SolverCore::getDeferredBlock() {
 }
 
 void SolverCore::updateLastPackageSignatures() {
-
     justCreatedRoundPackage.updatePoolSignatures(lastSentSignatures_.poolSignatures);
     justCreatedRoundPackage.updateRoundSignatures(lastSentSignatures_.roundSignatures);
     justCreatedRoundPackage.updateTrustedSignatures(lastSentSignatures_.trustedConfirmation);
+
     pnode->setCurrentRP(justCreatedRoundPackage);
-    //auto ptr = pnode->getCurrentRoundPackage();
-    //if (ptr != nullptr) {
-    //    if (justCreatedRoundPackage.roundTable().round == ptr->roundTable().round) {
-    //        if (cs::TrustedMask::trustedSize(justCreatedRoundPackage.poolMetaInfo().realTrustedMask)
-    //            <= cs::TrustedMask::trustedSize(ptr->poolMetaInfo().realTrustedMask)) {
-    //            return;
-    //        }
-
-    //    }
-    //}
-
-    //pnode->addRoundPackageToList(justCreatedRoundPackage);
-
-    //if (!pnode->addRPackageToCache(justCreatedRoundPackage)) {
-    //    return;
-    //}
 }
 
 void SolverCore::removeDeferredBlock(cs::Sequence seq) {
@@ -555,6 +539,10 @@ void SolverCore::removeDeferredBlock(cs::Sequence seq) {
 
 uint8_t SolverCore::subRound() {
     return (pnode->subRound());
+}
+
+bool SolverCore::isInGrayList(cs::PublicKey key) {
+    return grayList_.find(key) != grayList_.end();
 }
 
 }  // namespace cs

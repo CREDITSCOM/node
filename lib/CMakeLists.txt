@@ -28,6 +28,7 @@ add_library(lib
   include/lib/system/process.hpp
   include/lib/system/fileutils.hpp
   include/lib/system/shareable.hpp
+  include/lib/system/lockfreechanger.hpp
 )
 
 if (MSVC)
@@ -36,6 +37,9 @@ if (MSVC)
   target_link_libraries(lib Psapi)
 endif(MSVC)
 
+suppress_boost_cmake_warnings()
+configure_msvc_flags()
+
 target_include_directories(lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
     )
 
@@ -43,15 +47,18 @@ target_link_libraries(lib rang cscrypto nameof)
 
 set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)
-set (Boost_USE_STATIC_RUNTIME ON)
+if(NOT APPLE)
+  set (Boost_USE_STATIC_RUNTIME ON)
+endif()
 set (BOOST_ALL_DYN_LINK OFF)
 
-find_package (Boost REQUIRED COMPONENTS log)
+find_package (Boost REQUIRED COMPONENTS log log_setup)
 # resolve cyclic dependency
 target_link_libraries (Boost::log INTERFACE Boost::log_setup)
 target_link_libraries (Boost::log_setup INTERFACE Boost::log)
 target_link_libraries (lib
                        Boost::log
+                       Boost::log_setup
                        Boost::disable_autolinking)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)

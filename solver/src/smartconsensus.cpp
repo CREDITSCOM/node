@@ -339,6 +339,7 @@ void SmartConsensus::processStages() {
     size_t currentSmartsNumber = smartStageOneStorage_.at(ownSmartsConfNum_).fees.size();
     for (auto& st : smartStageOneStorage_) {
         if (st.sender == ownSmartsConfNum_) {
+            csdebug() << kLogPrefix << "own stage-1 hash: " << cs::Utils::byteStreamToHex(st.hash.data(), st.hash.size());
             continue;
         }
         if (st.fees.size() != currentSmartsNumber) {
@@ -357,7 +358,8 @@ void SmartConsensus::processStages() {
 
             }
             else {
-                cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong hash)";
+                cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted, hash is wrong: "
+                    << cs::Utils::byteStreamToHex(st.hash.data(), st.hash.size());
             }
 
         }
@@ -365,7 +367,8 @@ void SmartConsensus::processStages() {
             ++hashFrequency;
         }
     }
-    csdebug() << kLogPrefix << "{" << smartRoundNumber_ << "} Hash " << cs::Utils::byteStreamToHex(hash_t.data(), hash_t.size()) << ", Frequency = " << hashFrequency;
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " hash "
+        << cs::Utils::byteStreamToHex(hash_t.data(), hash_t.size()) << ", count = " << hashFrequency;
     auto& myStage2 = smartStageTwoStorage_.at(ownSmartsConfNum_);
     for (auto& st : smartStageTwoStorage_) {
         if (st.sender == ownSmartsConfNum_) {
@@ -375,7 +378,13 @@ void SmartConsensus::processStages() {
             if (st.signatures[i] != myStage2.signatures[i]) {
                 if (cscrypto::verifySignature(st.signatures[i], smartConfidants_[i], st.hashes[i].data(), sizeof(st.hashes[i]))) {
                     ++(smartUntrusted.at(i));
-                    cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted (wrong hash)";
+                    if (st.hashes[i] == Zero::hash) {
+                        cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted (zero hash) - possibly silent";
+                    }
+                    else {
+                        cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted, hash is wrong: "
+                            << cs::Utils::byteStreamToHex(st.hashes[i].data(), st.hashes[i].size());
+                    }
                 }
                 else {
                     ++(smartUntrusted.at(st.sender));

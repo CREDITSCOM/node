@@ -12,7 +12,3 @@ add_library(${PROJECT_NAME} STATIC "../../third-party/lmdb/libraries/liblmdb/lmd
                                    "../../third-party/lmdb/libraries/liblmdb/midl.c")
 
 target_include_directories(${PROJECT_NAME} PUBLIC "../../third-party/lmdb/libraries/liblmdb/")
-
-if (MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE "/W3")
-endif()

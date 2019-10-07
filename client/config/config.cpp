@@ -44,6 +44,7 @@ const std::string PARAM_NAME_USE_IPV6 = "ipv6";
 const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
+const std::string PARAM_NAME_ROUND_ELAPSE_TIME = "round_elapse_time";
 const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
 const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
 
@@ -72,6 +73,8 @@ const std::string PARAM_NAME_AJAX_SERVER_SEND_TIMEOUT = "ajax_server_send_timeou
 const std::string PARAM_NAME_AJAX_SERVER_RECEIVE_TIMEOUT = "ajax_server_receive_timeout";
 const std::string PARAM_NAME_EXECUTOR_IP = "executor_ip";
 const std::string PARAM_NAME_EXECUTOR_CMDLINE = "executor_command";
+const std::string PARAM_NAME_EXECUTOR_RUN_DELAY = "executor_run_delay";
+const std::string PARAM_NAME_EXECUTOR_BACKGROUND_THREAD_DELAY = "executor_background_thread_delay";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
@@ -570,7 +573,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
                 privateKey_ = keys.second;
                 publicKey_ = keys.first;
 
-                std::cout << "\nSave this phrase to restore your keys in futute, and press any key to continue:" << std::endl;
+                std::cout << "\nSave this phrase to restore your keys in future, and press any key to continue:" << std::endl;
                 auto words = cscrypto::mnemonic::masterSeedToWords(ms);
                 for (auto w : words) {
                     std::cout << w << " ";
@@ -698,6 +701,7 @@ Config Config::readFromFile(const std::string& fileName) {
 
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
         result.observerWaitTime_ = params.count(PARAM_NAME_OBSERVER_WAIT_TIME) ? params.get<uint64_t>(PARAM_NAME_OBSERVER_WAIT_TIME) : DEFAULT_OBSERVER_WAIT_TIME;
+        result.roundElapseTime_ = params.count(PARAM_NAME_ROUND_ELAPSE_TIME) ? params.get<uint64_t>(PARAM_NAME_ROUND_ELAPSE_TIME) : DEFAULT_ROUND_ELAPSE_TIME;
 
         result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE), NODE_TYPES_MAP);
 
@@ -826,16 +830,19 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_PORT, apiData_.executorPort);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_SEND_TIMEOUT, apiData_.executorSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_RECEIVE_TIMEOUT, apiData_.executorReceiveTimeout);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_RUN_DELAY, apiData_.executorRunDelay);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_BACKGROUND_THREAD_DELAY, apiData_.executorBackgroundThreadDelay);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_SEND_TIMEOUT, apiData_.serverSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_RECEIVE_TIMEOUT, apiData_.serverReceiveTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_SEND_TIMEOUT, apiData_.ajaxServerSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_RECEIVE_TIMEOUT, apiData_.ajaxServerReceiveTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_APIEXEC_PORT, apiData_.apiexecPort);
 
-    if (data.count(PARAM_NAME_EXECUTOR_IP) > 0) {
+    if (data.count(PARAM_NAME_EXECUTOR_IP)) {
         apiData_.executorHost = data.get<std::string>(PARAM_NAME_EXECUTOR_IP);
     }
-    if (data.count(PARAM_NAME_EXECUTOR_CMDLINE) > 0) {
+
+    if (data.count(PARAM_NAME_EXECUTOR_CMDLINE)) {
         apiData_.executorCmdLine = data.get<std::string>(PARAM_NAME_EXECUTOR_CMDLINE);
     }
 }
@@ -912,7 +919,9 @@ bool operator==(const ApiData& lhs, const ApiData& rhs) {
            lhs.ajaxServerSendTimeout == rhs.ajaxServerSendTimeout &&
            lhs.ajaxServerReceiveTimeout == rhs.ajaxServerReceiveTimeout &&
            lhs.executorHost == rhs.executorHost &&
-           lhs.executorCmdLine == rhs.executorCmdLine;
+           lhs.executorCmdLine == rhs.executorCmdLine &&
+           lhs.executorRunDelay == rhs.executorRunDelay &&
+           lhs.executorBackgroundThreadDelay == rhs.executorBackgroundThreadDelay;
 }
 
 bool operator!=(const ApiData& lhs, const ApiData& rhs) {
@@ -931,28 +940,29 @@ bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs) {
 // logger settings not checked
 bool operator==(const Config& lhs, const Config& rhs) {
     return lhs.good_ == rhs.good_ &&
-        lhs.inputEp_ == rhs.inputEp_ &&
-        lhs.twoSockets_ == rhs.twoSockets_ &&
-        lhs.outputEp_ == rhs.outputEp_ &&
-        lhs.nType_ == rhs.nType_ &&
-        lhs.ipv6_ == rhs.ipv6_ &&
-        lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
-        lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
-        lhs.symmetric_ == rhs.symmetric_ &&
-        lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
-        lhs.bType_ == rhs.bType_ &&
-        lhs.signalServerEp_ == rhs.signalServerEp_ &&
-        lhs.bList_ == rhs.bList_ &&
-        lhs.pathToDb_ == rhs.pathToDb_ &&
-        lhs.publicKey_ == rhs.publicKey_ &&
-        lhs.privateKey_ == rhs.privateKey_ &&
-        lhs.poolSyncData_ == rhs.poolSyncData_ &&
-        lhs.apiData_ == rhs.apiData_ &&
-        lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
-        lhs.recreateIndex_ == rhs.recreateIndex_ &&
-        lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
-        lhs.conveyerData_ == rhs.conveyerData_ &&
-        lhs.minCompatibleVersion_ == rhs.minCompatibleVersion_;
+           lhs.inputEp_ == rhs.inputEp_ &&
+           lhs.twoSockets_ == rhs.twoSockets_ &&
+           lhs.outputEp_ == rhs.outputEp_ &&
+           lhs.nType_ == rhs.nType_ &&
+           lhs.ipv6_ == rhs.ipv6_ &&
+           lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
+           lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
+           lhs.symmetric_ == rhs.symmetric_ &&
+           lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
+           lhs.bType_ == rhs.bType_ &&
+           lhs.signalServerEp_ == rhs.signalServerEp_ &&
+           lhs.bList_ == rhs.bList_ &&
+           lhs.pathToDb_ == rhs.pathToDb_ &&
+           lhs.publicKey_ == rhs.publicKey_ &&
+           lhs.privateKey_ == rhs.privateKey_ &&
+           lhs.poolSyncData_ == rhs.poolSyncData_ &&
+           lhs.apiData_ == rhs.apiData_ &&
+           lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
+           lhs.recreateIndex_ == rhs.recreateIndex_ &&
+           lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
+           lhs.roundElapseTime_ == rhs.roundElapseTime_ &&
+           lhs.conveyerData_ == rhs.conveyerData_ &&
+           lhs.minCompatibleVersion_ == rhs.minCompatibleVersion_;
 }
 
 bool operator!=(const Config& lhs, const Config& rhs) {

@@ -15,6 +15,7 @@
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
+#include <lib/system/structures.hpp>
 
 #include <boost/asio/post.hpp>
 #include <boost/asio/thread_pool.hpp>
@@ -496,9 +497,20 @@ struct SpinLockable {
     : type_(std::forward<Args>(args)...) {
     }
 
+    void lock() {
+        mutex_.lock();
+    }
+
+    void unlock() {
+        mutex_.unlock();
+    }
+
 private:
-    __cacheline_aligned std::atomic_flag atomicFlag_ = ATOMIC_FLAG_INIT;
+    std::mutex mutex_;
     T type_;
+#ifdef API_SPINLOCK
+    __cacheline_aligned std::atomic_flag atomicFlag_ = ATOMIC_FLAG_INIT;
+#endif
 
     friend struct SpinLockedRef<T>;
 };
@@ -507,26 +519,25 @@ template <typename T>
 struct SpinLockedRef {
 private:
     SpinLockable<T>* lockable_;
-    std::mutex mutex_;
 public:
     SpinLockedRef(SpinLockable<T>& lockable)
     : lockable_(&lockable) {
-#ifdef SPINLOCK
+#ifdef API_SPINLOCK
         while (this->lockable_->atomicFlag_.test_and_set(std::memory_order_acquire)) {
             std::this_thread::yield();
         }
 #else
-        mutex_.lock();
+        lockable_->lock();
 #endif
     }
 
     ~SpinLockedRef() {
-#ifdef SPINLOCK
+#ifdef API_SPINLOCK
         if (lockable_) {
             lockable_->atomicFlag_.clear(std::memory_order_release);
         }
 #else
-        mutex_.unlock();
+        lockable_->unlock();
 #endif
     }
 

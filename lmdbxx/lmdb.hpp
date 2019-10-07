@@ -9,6 +9,7 @@
 #include <lmdbexception.hpp>
 
 #include <lib/system/signals.hpp>
+#include <lib/system/logger.hpp>
 #include <lib/system/reflection.hpp>
 
 #ifndef __APPLE__

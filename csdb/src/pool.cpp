@@ -17,6 +17,9 @@
 #include <csdb/csdb.hpp>
 #include <csdb/internal/utils.hpp>
 
+#include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
+
 #include "transaction_p.hpp"
 #include "priv_crypto.hpp"
 #include "binary_streams.hpp"

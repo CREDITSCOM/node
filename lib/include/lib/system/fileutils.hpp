@@ -1,7 +1,16 @@
 #ifndef FILEUTILS_HPP
 #define FILEUTILS_HPP
 
+#ifdef _MSC_VER
+#pragma warning(push, 0)
+#endif
+
 #include <boost/filesystem.hpp>
+#include <boost/system/error_code.hpp>
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 namespace cs {
 class FileUtils {
