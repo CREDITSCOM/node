@@ -326,9 +326,9 @@ public:
     }
 
     std::optional<std::vector<csdb::Transaction>> getInnerSendTransactions(const general::AccessID& accessId) {
-        std::shared_lock slk(mutex_);
+        std::shared_lock sharedLock(mutex_);
         if (const auto it = innerSendTransactions_.find(accessId); it != innerSendTransactions_.end()) {
-            return std::make_optional<std::vector<csdb::Transaction>>(it->second);
+            return std::make_optional(it->second);
         }
         return std::nullopt;
     }
