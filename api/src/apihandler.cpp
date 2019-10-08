@@ -2248,13 +2248,13 @@ namespace executor {
     std::optional<std::string> Executor::getState(const csdb::Address& p_address) {
         csdb::Address abs_addr = blockchain_.getAddressByType(p_address, BlockChain::AddressType::PublicKey);
         if (!abs_addr.is_valid()) {
-            return std::nullopt;
+            return {};
         }
         std::string state = cs::SmartContracts::get_contract_state(blockchain_, abs_addr);
         if (state.empty()) {
-            return std::nullopt;
+            return {};
         }
-        return std::make_optional(std::move(state));
+        return state;
     }
 
     void Executor::stateUpdate(const csdb::Pool& pool) {
@@ -2276,19 +2276,19 @@ namespace executor {
         
     std::optional<Executor::ExecuteResult> Executor::executeTransaction(const std::vector<ExecuteTransactionInfo>& smarts, std::string forceContractState) {
         if (smarts.empty()) {
-            return std::nullopt;
+            return {};
         }
         const auto& head_transaction = smarts[0].transaction;
         const auto& deployTrxn = smarts[0].deploy;
         if (!head_transaction.is_valid() || !deployTrxn.is_valid()) {
-            return std::nullopt;
+            return {};
         }
         // all smarts must have the same initiator and address
         const auto source = head_transaction.source();
         const auto target = head_transaction.target();
         for (const auto& smart : smarts) {
             if (source != smart.transaction.source() || target != smart.transaction.target()) {
-                return std::nullopt;
+                return {};
             }
         }
 
@@ -2352,7 +2352,7 @@ namespace executor {
                 api::SmartContractInvocation sci;
                 const auto fld = smart.user_field(0);
                 if (!fld.is_valid()) {
-                    return std::nullopt;
+                    return {};
                 }
                 else if (!isdeploy) {
                     sci = deserialize<api::SmartContractInvocation>(fld.value<std::string>());
@@ -2415,12 +2415,12 @@ namespace executor {
             }
         }
 
-        return std::make_optional(std::move(res));
+        return res;
     }
 
     std::optional<Executor::ExecuteResult> Executor::reexecuteContract(ExecuteTransactionInfo& contract, std::string forceContractState) {
         if (!contract.transaction.is_valid() || !contract.deploy.is_valid()) {
-            return std::nullopt;
+            return {};
         }
         auto smartSource = blockchain_.getAddressByType(contract.transaction.source(), BlockChain::AddressType::PublicKey);
         auto smartTarget = blockchain_.getAddressByType(contract.transaction.target(), BlockChain::AddressType::PublicKey);
@@ -2482,7 +2482,7 @@ namespace executor {
             api::SmartContractInvocation sci;
             const auto fld = contract.transaction.user_field(0);
             if (!fld.is_valid()) {
-                return std::nullopt;
+                return {};
             }
             else if (!isdeploy) {
                 sci = deserialize<api::SmartContractInvocation>(fld.value<std::string>());
@@ -2542,7 +2542,7 @@ namespace executor {
             }
         }
 
-        return std::make_optional(std::move(res));
+        return res;
     }
 
     // explicit_sequence set the proper context while executing transaction
@@ -2553,7 +2553,7 @@ namespace executor {
 
         if (!isConnected()) {
             notifyError();
-            return std::nullopt;
+            return {};
         }
 
         uint64_t access_id{};
@@ -2602,7 +2602,7 @@ namespace executor {
         }
 
         originExecuteRes.acceessId = static_cast<general::AccessID>(access_id);
-        return std::make_optional<OriginExecuteResult>(std::move(originExecuteRes));
+        return originExecuteRes;
     }
 
 } // Executor namespace

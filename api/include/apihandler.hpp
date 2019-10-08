@@ -247,17 +247,17 @@ public:
     std::optional<cs::Sequence> getSequence(const general::AccessID& accessId) {
         std::shared_lock lock(mutex_);
         if (auto it = accessSequence_.find(accessId); it != accessSequence_.end()) {
-            return std::make_optional(it->second);
+            return it->second;
         }
-        return std::nullopt;
+        return {};
     }
 
     std::optional<csdb::TransactionID> getDeployTrxn(const csdb::Address& p_address) {
         std::shared_lock lock(mutex_);
         if (const auto it = deployTrxns_.find(p_address); it != deployTrxns_.end()) {
-            return std::make_optional(it->second);
+            return it->second;
         }
-        return std::nullopt;
+        return {};
     }
 
     void updateDeployTrxns(const csdb::Address& p_address, const csdb::TransactionID& p_trxnsId) {
@@ -328,9 +328,9 @@ public:
     std::optional<std::vector<csdb::Transaction>> getInnerSendTransactions(const general::AccessID& accessId) {
         std::shared_lock slk(mutex_);
         if (const auto it = innerSendTransactions_.find(accessId); it != innerSendTransactions_.end()) {
-            return std::make_optional<std::vector<csdb::Transaction>>(it->second);
+            return it->second;
         }
-        return std::nullopt;
+        return {};
     }
 
     void deleteInnerSendTransactions(const general::AccessID& accessId) {
