@@ -642,7 +642,7 @@ std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type, std::ost
 
 std::optional<std::string> APIHandler::checkTransaction(const Transaction& transaction) {
     if (transaction.__isset.smartContract && transaction.smartContract.forgetNewState) {
-        return {};
+        return std::nullopt;
     }
 
     auto trxn = makeTransaction(transaction);
@@ -688,7 +688,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
         cslog() << "API: reject transaction with wrong signature";
         return "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
     }
-    return {};
+    return std::nullopt;
 }
 
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
@@ -2384,7 +2384,7 @@ namespace executor {
         }
 
         if (!optOriginRes.has_value()) {
-            return {};
+            return std::nullopt;
         }
 
         // fill res
@@ -2511,7 +2511,7 @@ namespace executor {
         }
 
         if (!optOriginRes.has_value()) {
-            return {};
+            return std::nullopt;
         }
 
         // fill res
@@ -2602,7 +2602,7 @@ namespace executor {
         }
 
         originExecuteRes.acceessId = static_cast<general::AccessID>(access_id);
-        return std::make_optional<OriginExecuteResult>(std::move(originExecuteRes));
+        return std::make_optional(std::move(originExecuteRes));
     }
 
 } // Executor namespace
