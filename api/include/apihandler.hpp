@@ -796,6 +796,14 @@ private:
 #endif // 0
     executor::Executor& executor_;
 
+    // for answer dumb transactions        
+    struct DUMBCV {
+        std::condition_variable cv;
+        std::atomic_bool condFlg{ false };
+    };
+    std::map<cs::Signature, DUMBCV> mDumbCv_;
+    //
+
     bool isBDLoaded_{ false };
 
     struct smart_trxns_queue {
