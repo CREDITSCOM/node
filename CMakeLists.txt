@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.12)
 
 project(node)
 
@@ -38,7 +38,9 @@ if (MSVC)
 
   set(CMAKE_C_FLAGS_RELMONITOR ${CMAKE_C_FLAGS_RELEASE})
   set(CMAKE_C_FLAGS_RELWALLET ${CMAKE_C_FLAGS_RELEASE})
-
+  
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /INCREMENTAL:NO /LTCG")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /INCREMENTAL:NO /LTCG")
   set(CMAKE_EXE_LINKER_FLAGS_RELMONITOR "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} /OUT:RelMonitor/client_monitor.exe /PDB:RelMonitor/client_monitor.pdb")
   set(CMAKE_EXE_LINKER_FLAGS_RELWALLET "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} /OUT:RelWallet/client_wallet.exe /PDB:RelWallet/client_wallet.pdb")
 else()

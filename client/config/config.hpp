@@ -28,10 +28,12 @@ const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::MaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
+const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
 
 const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;             // rounds
 const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
 
+[[maybe_unused]]
 const uint8_t DELTA_ROUNDS_VERIFY_NEW_SERVER = 100;
 using Port = short unsigned;
 
@@ -201,6 +203,10 @@ public:
         return observerWaitTime_;
     }
 
+    uint64_t roundElapseTime() const {
+        return roundElapseTime_;
+    }
+
     bool readKeys(const po::variables_map& vm);
     bool enterWithSeed();
 
@@ -267,6 +273,7 @@ private:
     uint64_t newBlockchainTopSeq_;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
+    uint64_t roundElapseTime_ = DEFAULT_ROUND_ELAPSE_TIME;
 
     ConveyerData conveyerData_;
 

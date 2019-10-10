@@ -7,14 +7,32 @@
 #include <vector>
 #include <iostream>
 
+#ifdef _MSC_VER
+#pragma warning(push, 0)
+#endif
+
 #include <boost/process.hpp>
 #include <boost/process/extend.hpp>
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #include <lib/system/signals.hpp>
 #include <lib/system/processexception.hpp>
 
 #ifdef BOOST_WINDOWS
+
+#ifdef _MSC_VER
+#pragma warning(push, 0)
+#endif
+
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 #endif
 
 namespace cs {

@@ -284,10 +284,12 @@ public slots:
     void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
     void validateBlock(csdb::Pool block, bool* shouldStop);
+    void onRoundTimeElapsed();
 
 private:
     bool init(const Config& config);
     void setupObserver();
+    void setupNextMessageBehaviour();
 
     void sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);

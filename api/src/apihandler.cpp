@@ -629,7 +629,21 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
         tr.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
     }
 
+    // create dumbCv
+    auto signature = tr.signature();
+    auto& [cv, condFlg] = mDumbCv_[signature];
+
     solver_.send_wallet_transaction(tr);
+
+    // wait for transaction in blockchain
+    std::mutex dumbMutex;
+    std::unique_lock lock(dumbMutex);
+    auto resWait = cv.wait_for(lock, std::chrono::seconds(30), [&]() -> bool { return condFlg; });
+    mDumbCv_.erase(signature);
+    if (!resWait) { // time is over
+        SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
+        return;
+    }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
@@ -642,7 +656,7 @@ std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type, std::ost
 
 std::optional<std::string> APIHandler::checkTransaction(const Transaction& transaction) {
     if (transaction.__isset.smartContract && transaction.smartContract.forgetNewState) {
-        return {};
+        return std::nullopt;
     }
 
     auto trxn = makeTransaction(transaction);
@@ -688,7 +702,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
         cslog() << "API: reject transaction with wrong signature";
         return "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
     }
-    return {};
+    return std::nullopt;
 }
 
 void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
@@ -1214,6 +1228,13 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
     for (auto& trx : pool.transactions()) {
         if (is_smart(trx) || is_smart_state(trx)) {
             updateSmartCachesTransaction(trx, pool.sequence());
+        }
+        else { // if dumb transaction
+            if (auto it = mDumbCv_.find(trx.signature()); it != mDumbCv_.end()) {
+                auto&[cv, condFlg] = it->second;
+                cv.notify_one();
+                condFlg = true;
+            }
         }
     }
 }
@@ -2384,7 +2405,7 @@ namespace executor {
         }
 
         if (!optOriginRes.has_value()) {
-            return {};
+            return std::nullopt;
         }
 
         // fill res
@@ -2511,7 +2532,7 @@ namespace executor {
         }
 
         if (!optOriginRes.has_value()) {
-            return {};
+            return std::nullopt;
         }
 
         // fill res
@@ -2602,7 +2623,7 @@ namespace executor {
         }
 
         originExecuteRes.acceessId = static_cast<general::AccessID>(access_id);
-        return std::make_optional<OriginExecuteResult>(std::move(originExecuteRes));
+        return std::make_optional(std::move(originExecuteRes));
     }
 
 } // Executor namespace

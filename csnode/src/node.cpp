@@ -42,7 +42,7 @@ Node::Node(const Config& config, cs::config::Observer& observer)
 , nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(genesisAddress_, startAddress_, config.recreateIndex())
 , ostream_(&packStreamAllocator_, nodeIdKey_)
-, stat_()
+, stat_(config)
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this))
 , observer_(observer) {
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
@@ -67,6 +67,7 @@ Node::Node(const Config& config, cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     setupObserver();
+    setupNextMessageBehaviour();
 
     alwaysExecuteContracts_ = config.alwaysExecuteContracts();
     good_ = init(config);
@@ -146,6 +147,13 @@ void Node::setupObserver() {
     cs::Connector::connect(&observer_.configChanged, &executor::Executor::getInstance(), &executor::Executor::onConfigChanged);
     cs::Connector::connect(&observer_.configChanged, transport_, &Transport::onConfigChanged);
     cs::Connector::connect(&observer_.configChanged, poolSynchronizer_, &cs::PoolSynchronizer::onConfigChanged);
+    cs::Connector::connect(&observer_.configChanged, &stat_, &cs::RoundStat::onConfigChanged);
+}
+
+void Node::setupNextMessageBehaviour() {
+    cs::Connector::connect(&transport_->mainThreadIterated, &stat_, &cs::RoundStat::onMainThreadIterated);
+    cs::Connector::connect(&cs::Conveyer::instance().roundChanged, &stat_, &cs::RoundStat::onRoundChanged);
+    cs::Connector::connect(&stat_.roundTimeElapsed, this, &Node::onRoundTimeElapsed);
 }
 
 void Node::run() {
@@ -208,13 +216,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         return;
     }
 
-    subRound_ = tmp;
-
     // cache
     auto cachedRound = conveyer.currentRoundNumber();
-
-    // update round data
-    recdBangs[rNum] = subRound_;
 
     cs::Hash lastBlockHash;
     istream_ >> lastBlockHash;
@@ -222,6 +225,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     cs::RoundTable globalTable;
     globalTable.round = rNum;
 
+    // not uses both subRound_ and recdBangs[], so can be called here:
     if (!readRoundData(globalTable, true)) {
         cserror() << className() << " read round data from SS failed";
         return;
@@ -233,10 +237,21 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
         auto seconds = timePassedSinceBB(timeSS);
         constexpr long long MaxBigBangAge_sec = 180;
         if (seconds > MaxBigBangAge_sec) {
-            cswarning() << "Elder Big Bang received of " << WithDelimiters(seconds) << " seconds age, ignore";
+            cslog() << "Elder Big Bang received of " << WithDelimiters(seconds) << " seconds age, ignore";
             return;
         }
+        else {
+            cslog() << "Big Bang received of " << WithDelimiters(seconds) << " seconds age, accept";
+        }
     }
+    else {
+        cswarning() << "Deprecated Big Bang received of unknown age, ignore";
+
+    }
+
+    // update round data
+    subRound_ = tmp;
+    recdBangs[rNum] = subRound_;
 
     if (stat_.isLastRoundTooLong()) {
         poolSynchronizer_->sync(globalTable.round, 1, true);
@@ -2359,14 +2374,14 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     // update sub round and max heighbours sequence
     subRound_ = rPackage.subRound();
 
-    auto it = recdBangs.begin();
-    while (it != recdBangs.end()) {
-        if (it->first < rPackage.roundTable().round) {
-            it = recdBangs.erase(it);
-            continue;
-        }
-        ++it;
-    }
+    //auto it = recdBangs.begin();
+    //while (it != recdBangs.end()) {
+    //    if (it->first < rPackage.roundTable().round) {
+    //        it = recdBangs.erase(it);
+    //        continue;
+    //    }
+    //    ++it;
+    //}
 
     cs::PacketsHashes hashes = rPackage.roundTable().hashes;
     cs::PublicKeys confidants = rPackage.roundTable().confidants;
@@ -2991,4 +3006,8 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
         *shouldStop = true;
         return;
     }
+}
+
+void Node::onRoundTimeElapsed() {
+    cslog() << "Waiting for next round...";
 }

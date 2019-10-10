@@ -39,6 +39,10 @@ public:
         return randomValueImpl<R, decltype(min)>(min, max);
     }
 
+    ///
+    /// Random shuffles range of [first, last).
+    /// Same sa msvc stl realization from https://github.com/microsoft/STL/blob/master/stl/inc/algorithm
+    ///
     template <typename RandomIterator, typename Generator>
     static void shuffle(RandomIterator first, RandomIterator last, Generator&& rng) {
         // shuffle [first, last) using random function rng

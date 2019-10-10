@@ -326,9 +326,9 @@ public:
     }
 
     std::optional<std::vector<csdb::Transaction>> getInnerSendTransactions(const general::AccessID& accessId) {
-        std::shared_lock slk(mutex_);
+        std::shared_lock sharedLock(mutex_);
         if (const auto it = innerSendTransactions_.find(accessId); it != innerSendTransactions_.end()) {
-            return std::make_optional<std::vector<csdb::Transaction>>(it->second);
+            return std::make_optional(it->second);
         }
         return std::nullopt;
     }
@@ -357,6 +357,13 @@ public:
         PayableLegacy,
         // Call to payable(string, byte[]) requested
         Payable
+    };
+
+    enum ExecutorErrorCode {
+        NoError = 0,
+        GeneralError = 1,
+        IncorrecJdkVersion,
+        ServerStartError
     };
 
     enum ACCESS_ID_RESERVE { GETTER, START_INDEX };
@@ -471,14 +478,26 @@ public slots:
         csdebug() << csname() << "started";
     }
 
-    void onExecutorFinished() {
-        if (!requestStop_) {
-            cs::Concurrent::run([this] {
-                runProcess();
-            });
+    void onExecutorFinished(int code, const std::error_code&) {
+        if (requestStop_) {
+            return;
         }
 
-        csdebug() << csname() << "finished";
+        if (!executorMessages_.count(code)) {
+            cswarning() << "Executor unknown error";
+        }
+        else {
+            cswarning() << executorMessages_[code];
+        }
+
+        if (code == ExecutorErrorCode::ServerStartError ||
+            code == ExecutorErrorCode::IncorrecJdkVersion) {
+            return;
+        }
+
+        cs::Concurrent::run([this] {
+            runProcess();
+        });
     }
 
     void onExecutorProcessError(const cs::ProcessException& exception) {
@@ -535,14 +554,6 @@ private:
                 if (executorProcess_->isRunning()) {
                     if (!isConnected()) {
                         connect();
-                    }
-                }
-                else {
-                    auto delay = std::chrono::milliseconds(config_->getApiSettings().executorBackgroundThreadDelay);
-                    std::this_thread::sleep_for(delay);
-
-                    if (!executorProcess_->isRunning()) {
-                        runProcess();
                     }
                 }
             }
@@ -657,6 +668,13 @@ private:
     const int16_t EXECUTOR_VERSION = 2;
 
     std::mutex callExecutorLock_;
+
+    std::map<int, const char*> executorMessages_ = {
+        { NoError, "Executor finished with no error code" },
+        { GeneralError, "Executor unexpected error, try to launch again" },
+        { IncorrecJdkVersion, "Executor can not be launched due to incorred JDK version" },
+        { ServerStartError, "Executor server start error" }
+    };
 };
 }  // namespace executor
 namespace apiexec {
@@ -777,6 +795,14 @@ private:
     ::csstats::AllStats stats_;
 #endif // 0
     executor::Executor& executor_;
+
+    // for answer dumb transactions        
+    struct DUMBCV {
+        std::condition_variable cv;
+        std::atomic_bool condFlg{ false };
+    };
+    std::map<cs::Signature, DUMBCV> mDumbCv_;
+    //
 
     bool isBDLoaded_{ false };
 
