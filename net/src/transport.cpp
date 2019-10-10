@@ -1483,3 +1483,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
 
     return true;
 }
+
+bool Transport::isOwnNodeTrusted() const {
+    return (node_->getNodeLevel() != Node::Level::Normal);
+}
