@@ -242,8 +242,8 @@ private:
     };
 
     FixedHashMap<cs::Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
-    FixedHashMap<cs::Hash, BroadPackInfo, uint32_t, 100000> msgBroads_;
-    FixedHashMap<cs::Hash, DirectPackInfo, uint32_t, 100000> msgDirects_;
+    FixedHashMap<cs::Hash, BroadPackInfo, uint32_t, MaxRememberPackets> msgBroads_;
+    FixedHashMap<cs::Hash, DirectPackInfo, uint32_t, MaxRememberPackets> msgDirects_;
 };
 
 #endif  // NEIGHBOURHOOD_HPP
