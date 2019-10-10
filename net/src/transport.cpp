@@ -1,4 +1,8 @@
 /* Send blaming letters to @yrtimd */
+#include "transport.hpp"
+#include "network.hpp"
+
+#include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/packstream.hpp>
 
@@ -6,9 +10,6 @@
 #include <lib/system/utils.hpp>
 
 #include <thread>
-
-#include "network.hpp"
-#include "transport.hpp"
 
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
@@ -44,6 +45,20 @@ enum Platform : uint8_t {
     MacOS,
     Windows
 };
+
+Transport::Transport(const Config& config, Node* node)
+: config_(config)
+, sendPacksFlag_()
+, remoteNodes_(maxRemoteNodes_ + 1)
+, myPublicKey_(node->getNodeIdKey())
+, oLock_()
+, oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
+, uLock_()
+, net_(new Network(config, this))
+, node_(node)
+, nh_(this) {
+    good_ = net_->isGood();
+}
 
 Transport::~Transport() {
     delete net_;
@@ -720,9 +735,6 @@ ConnectionPtr Transport::getRandomNeighbour() {
     return nh_.getRandomSyncNeighbour();
 }
 
-std::unique_lock< std::mutex > Transport::getNeighboursLock() const {
-    return nh_.getNeighboursLock();
-}
 
 void Transport::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
     nh_.forEachNeighbour(std::move(func));
