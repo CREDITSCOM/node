@@ -2215,6 +2215,11 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
+    if (rNum == conveyer.currentRoundNumber() + 1 && rPackage.poolMetaInfo().previousHash != blockChain_.getLastHash()) {
+        csdebug() << "NODE> RoundPackage prevous hash is not equal to one in this node. Abort RoundPackage";
+        return;
+    }
+
     if (!rpSpeedOk(rPackage)) {
         return;
     }
