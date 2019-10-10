@@ -8,7 +8,6 @@
 
 #include <config.hpp>
 
-#include <csnode/node.hpp>
 #include <csnode/packstream.hpp>
 
 #include <lib/system/allocators.hpp>
@@ -74,22 +73,11 @@ enum class SSBootstrapStatus : uint8_t {
 template <>
 uint16_t getHashIndex(const ip::udp::endpoint&);
 
+class Node;
+
 class Transport {
 public:
-    explicit Transport(const Config& config, Node* node)
-    : config_(config)
-    , sendPacksFlag_()
-    , remoteNodes_(maxRemoteNodes_ + 1)
-    , myPublicKey_(node->getNodeIdKey())
-    , oLock_()
-    , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
-    , uLock_()
-    , net_(new Network(config, this))
-    , node_(node)
-    , nh_(this) {
-        good_ = net_->isGood();
-    }
-
+    explicit Transport(const Config& config, Node* node);
     ~Transport();
 
     void run();
@@ -152,7 +140,9 @@ public:
     ConnectionPtr getRandomNeighbour();
     cs::Sequence getConnectionLastSequence(const std::size_t number);
 
-    std::unique_lock< std::mutex > getNeighboursLock() const;
+    auto getNeighboursLock() const {
+        return nh_.getNeighboursLock();
+    }
 
     // thread safe negihbours methods
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);
