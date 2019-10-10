@@ -2488,7 +2488,8 @@ void Node::sendHash(cs::RoundNumber round) {
     stream << tmp.to_binary() << myTrustedSize << myRealTrustedSize << currentTimeStamp << round << subRound_;
     cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
     cs::Bytes messageToSend(message.data(), message.data() + message.size() - sizeof(cs::RoundNumber) - sizeof(cs::Byte));
-    sendToConfidants(MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
+    sendBroadcast(MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
+
     csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_) << ", message: " << cs::Utils::byteStreamToHex(messageToSend);
 
 }
