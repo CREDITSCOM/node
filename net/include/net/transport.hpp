@@ -116,6 +116,10 @@ public:
         return good_;
     }
 
+    bool isOwnNodeTrusted() const {
+        return (node_->getNodeLevel() != Node::Level::Normal);
+    }
+
     void sendBroadcast(const Packet* pack) {
         nh_.sendByNeighbours(pack);
     }
