@@ -1284,6 +1284,7 @@ bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber r
 
 template <class... Args>
 void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+#if defined(DIRECT_SEND_AVAIL)
     const auto& confidants = cs::Conveyer::instance().confidants();
     const auto size = confidants.size();
 
@@ -1296,10 +1297,14 @@ void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round,
 
         sendBroadcast(confidant, msgType, round, std::forward<Args>(args)...);
     }
+#else
+    sendBroadcast(msgType, round, std::forward<Args>(args)...);
+#endif
 }
 
 template <class... Args>
 void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+#if defined(DIRECT_SEND_AVAIL)
     const auto size = listMembers.size();
 
     for (size_t i = 0; i < size; ++i) {
@@ -1311,6 +1316,9 @@ void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::B
 
         sendBroadcast(listMember, msgType, round, std::forward<Args>(args)...);
     }
+#else
+    sendBroadcast(msgType, round, std::forward<Args>(args)...);
+#endif
 }
 
 template <typename... Args>
@@ -2502,7 +2510,7 @@ void Node::sendHash(cs::RoundNumber round) {
     stream << tmp.to_binary() << myTrustedSize << myRealTrustedSize << currentTimeStamp << round << subRound_;
     cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
     cs::Bytes messageToSend(message.data(), message.data() + message.size() - sizeof(cs::RoundNumber) - sizeof(cs::Byte));
-    sendBroadcast(MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
+    sendToConfidants(MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
 
     csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_) << ", message: " << cs::Utils::byteStreamToHex(messageToSend);
 
