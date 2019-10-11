@@ -246,7 +246,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     }
     else {
         cswarning() << "Deprecated Big Bang received of unknown age, ignore";
-
+        return;
     }
 
     // update round data
