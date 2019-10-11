@@ -235,7 +235,18 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
             cswarning() << "Elder Big Bang received of " << WithDelimiters(seconds) << " seconds age, ignore";
             return;
         }
+        else {
+            cslog() << "Big Bang received of " << WithDelimiters(seconds) << " seconds age, accept";
+        }
     }
+    else {
+        cswarning() << "Deprecated Big Bang received of unknown age, ignore";
+        return;
+    }
+
+    // update round data
+    subRound_ = tmp;
+    recdBangs[rNum] = subRound_;
 
     if (stat_.isLastRoundTooLong()) {
         poolSynchronizer_->sync(globalTable.round, 1, true);
