@@ -13,7 +13,7 @@
 const csdb::Address genesisAddress = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address startAddress = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
 
-TEST(PoolSynchronizer, TestSyncLastPool) {
+TEST(PoolSynchronizer, DISABLED_TestSyncLastPool) {
     Config config;
     boost::program_options::variables_map map;
 
