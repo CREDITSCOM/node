@@ -797,11 +797,37 @@ private:
     executor::Executor& executor_;
 
     // for answer dumb transactions        
-    struct DUMBCV {
-        std::condition_variable cv;
-        std::atomic_bool condFlg{ false };
-    };
-    std::map<cs::Signature, DUMBCV> mDumbCv_;
+    class DUMBCV {
+    public:
+        void addCVInfo(const cs::Signature& signature) {
+            mCvInfo_[signature];
+        }
+
+        void sendCvSignal(const cs::Signature& signature) {
+            if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
+                auto&[cv, condFlg] = it->second;
+                cv.notify_one();
+                condFlg = true;
+            }
+        }
+
+        bool waitCvSignal(const cs::Signature& signature) {
+            if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
+                auto& [cv, condFlg] = it->second;
+                std::mutex dumbMutex;
+                std::unique_lock lock(dumbMutex);
+                auto isTimeOver = cv.wait_for(lock, std::chrono::seconds(30), [&]() -> bool { return condFlg; });
+                mCvInfo_.erase(signature);
+                return isTimeOver;
+            }
+        }
+    private:
+        struct CVInfo {
+            std::condition_variable cv_;
+            std::atomic_bool condFlg_{ false };
+        };
+        std::map<cs::Signature, CVInfo> mCvInfo_;
+    } dumbCv_;
     //
 
     bool isBDLoaded_{ false };
