@@ -126,6 +126,35 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
     }
 }
 
+void cs::PoolSynchronizer::syncLastPool() {
+    if (isSyncroStarted_) {
+        return;
+    }
+
+    auto lastWrittenSequence = blockChain_->getLastSeq();
+    ConnectionPtr connection;
+
+    {
+        auto lock = transport_->getNeighboursLock();
+        auto neighbours = transport_->getNeighboursWithoutSS();
+
+        auto iterator = std::find_if(std::begin(neighbours), std::end(neighbours), [lastWrittenSequence](const auto& neighobur) {
+            return neighobur->lastSeq > lastWrittenSequence;
+        });
+
+        if (iterator != std::end(neighbours)) {
+            connection = *iterator;
+        }
+    }
+
+    if (connection.isNull()) {
+        return;
+    }
+
+    isSyncroStarted_ = true;
+    emit sendRequest(connection, PoolsRequestedSequences { lastWrittenSequence + 1}, 0);
+}
+
 void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_t packetNum) {
     csmeta(csdebug) << "Get Block Reply <<<<<<< : count: " << poolsBlock.size() << ", seqs: [" << poolsBlock.front().sequence() << ", " << poolsBlock.back().sequence()
                     << "], id: " << packetNum;

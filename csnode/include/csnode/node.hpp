@@ -297,6 +297,8 @@ private:
     bool readRoundData(cs::RoundTable& roundTable, bool bang);
     void reviewConveyerHashes();
 
+    void processSync();
+
     // conveyer
     void processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
     void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
