@@ -180,11 +180,10 @@ void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transact
 
 #ifdef MONITOR_NODE
 bool WalletsCache::Updater::setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp) {
-    for (auto& it : data_.wallets_) {
-        if (it.first == address) {
-            it.second.createTime_ = p_timeStamp;
-            return true;
-        }
+    auto it = data_.wallets_.find(address);
+    if (it != data_.wallets_.end()) {
+        it->second.createTime_ = p_timeStamp;
+        return true;
     }
     return false;
 }

@@ -629,18 +629,13 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
         tr.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
     }
 
-    // create dumbCv
-    auto signature = tr.signature();
-    auto& [cv, condFlg] = mDumbCv_[signature];
+    // remember dumb transaction 
+    dumbCv_.addCVInfo(tr.signature());
 
     solver_.send_wallet_transaction(tr);
 
-    // wait for transaction in blockchain
-    std::mutex dumbMutex;
-    std::unique_lock lock(dumbMutex);
-    auto resWait = cv.wait_for(lock, std::chrono::seconds(30), [&]() -> bool { return condFlg; });
-    mDumbCv_.erase(signature);
-    if (!resWait) { // time is over
+    // wait for transaction in blockchain  
+    if (!dumbCv_.waitCvSignal(tr.signature())) {
         SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
         return;
     }
@@ -1230,11 +1225,7 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
             updateSmartCachesTransaction(trx, pool.sequence());
         }
         else { // if dumb transaction
-            if (auto it = mDumbCv_.find(trx.signature()); it != mDumbCv_.end()) {
-                auto&[cv, condFlg] = it->second;
-                cv.notify_one();
-                condFlg = true;
-            }
+            dumbCv_.sendCvSignal(trx.signature());
         }
     }
 }

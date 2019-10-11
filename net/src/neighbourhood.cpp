@@ -91,7 +91,21 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp, bool separate) {
         }
 
         if (!found) {
-            if (!nb->isSignal || (!bp.pack.isNetwork() && (bp.pack.getType() == MsgTypes::RoundTable || bp.pack.getType() == MsgTypes::BlockHash))) {
+            bool send_to_ss = false;
+            if (nb->isSignal) {
+                if (!bp.pack.isNetwork()) {
+                    const auto type = bp.pack.getType();
+                    if (type == MsgTypes::BlockHash) {
+                        send_to_ss = true;
+                    }
+                    else if(type == MsgTypes::RoundTable) {
+                        if (transport_->isOwnNodeTrusted()) {
+                            send_to_ss = bp.pack.isFragmented() ? bp.pack.getFragmentId() == 0 : true;
+                        }
+                    }
+                }
+            }
+            if (!nb->isSignal || send_to_ss) {
                 if (separate) {
                     sent = transport_->sendDirectToSock(&(bp.pack), **nb) || sent;
                 } else {

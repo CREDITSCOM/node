@@ -246,7 +246,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     }
     else {
         cswarning() << "Deprecated Big Bang received of unknown age, ignore";
-
+        return;
     }
 
     // update round data
@@ -564,6 +564,9 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     auto tmpPool = solver_->getDeferredBlock().clone();
     if (tmpPool.is_valid() && tmpPool.sequence() == round) {
         auto tmp2 = rPackage.poolSignatures();
+        tmpPool.add_user_field(0, rPackage.poolMetaInfo().timestamp);
+        tmpPool.add_number_trusted(static_cast<uint8_t>(rPackage.poolMetaInfo().realTrustedMask.size()));
+        tmpPool.add_real_trusted(cs::Utils::maskToBits(rPackage.poolMetaInfo().realTrustedMask));
         tmpPool.set_signatures(tmp2);
         csdebug() << "Signatures " << tmp2.size() << " were added to the pool: " << tmpPool.signatures().size();
         auto resPool = getBlockChain().createBlock(tmpPool);
@@ -2235,10 +2238,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    if (rNum == conveyer.currentRoundNumber() + 1 && rPackage.poolMetaInfo().previousHash != blockChain_.getLastHash()) {
-        csdebug() << "NODE> RoundPackage prevous hash is not equal to one in this node. Abort RoundPackage";
-        return;
-    }
+    //if (rNum == conveyer.currentRoundNumber() + 1 && rPackage.poolMetaInfo().previousHash != blockChain_.getLastHash()) {
+    //    csdebug() << "NODE> RoundPackage prevous hash is not equal to one in this node. Abort RoundPackage";
+    //    return;
+    //}
 
     if (!rpSpeedOk(rPackage)) {
         return;

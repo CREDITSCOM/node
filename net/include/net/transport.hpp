@@ -104,6 +104,8 @@ public:
         return good_;
     }
 
+    bool isOwnNodeTrusted() const;
+
     void sendBroadcast(const Packet* pack) {
         nh_.sendByNeighbours(pack);
     }
