@@ -2408,14 +2408,14 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     // update sub round and max heighbours sequence
     subRound_ = rPackage.subRound();
 
-    auto it = recdBangs.begin();
-    while (it != recdBangs.end()) {
-        if (it->first < rPackage.roundTable().round) {
-            it = recdBangs.erase(it);
-            continue;
-        }
-        ++it;
-    }
+    //auto it = recdBangs.begin();
+    //while (it != recdBangs.end()) {
+    //    if (it->first < rPackage.roundTable().round) {
+    //        it = recdBangs.erase(it);
+    //        continue;
+    //    }
+    //    ++it;
+    //}
 
     cs::PacketsHashes hashes = rPackage.roundTable().hashes;
     cs::PublicKeys confidants = rPackage.roundTable().confidants;
