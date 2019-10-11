@@ -812,14 +812,20 @@ private:
         }
 
         bool waitCvSignal(const cs::Signature& signature) {
+            bool isTimeOver = false;
+
             if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
-                auto& [cv, condFlg] = it->second;
                 std::mutex dumbMutex;
                 std::unique_lock lock(dumbMutex);
-                auto isTimeOver = cv.wait_for(lock, std::chrono::seconds(30), [&]() -> bool { return condFlg; });
+
+                isTimeOver = it->second.cv_.wait_for(lock, std::chrono::seconds(30), [it]() -> bool {
+                    return it->second.condFlg_;
+                });
+
                 mCvInfo_.erase(signature);
-                return isTimeOver;
             }
+
+            return isTimeOver;
         }
     private:
         struct CVInfo {
