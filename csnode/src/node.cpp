@@ -246,7 +246,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     }
     else {
         cswarning() << "Deprecated Big Bang received of unknown age, ignore";
-
+        return;
     }
 
     // update round data
@@ -254,7 +254,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     recdBangs[rNum] = subRound_;
 
     if (stat_.isLastRoundTooLong()) {
-        poolSynchronizer_->sync(globalTable.round, 1, true);
+        poolSynchronizer_->syncLastPool();
     }
 
     solver_->resetGrayList();
@@ -564,6 +564,9 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     auto tmpPool = solver_->getDeferredBlock().clone();
     if (tmpPool.is_valid() && tmpPool.sequence() == round) {
         auto tmp2 = rPackage.poolSignatures();
+        tmpPool.add_user_field(0, rPackage.poolMetaInfo().timestamp);
+        tmpPool.add_number_trusted(static_cast<uint8_t>(rPackage.poolMetaInfo().realTrustedMask.size()));
+        tmpPool.add_real_trusted(cs::Utils::maskToBits(rPackage.poolMetaInfo().realTrustedMask));
         tmpPool.set_signatures(tmp2);
         csdebug() << "Signatures " << tmp2.size() << " were added to the pool: " << tmpPool.signatures().size();
         auto resPool = getBlockChain().createBlock(tmpPool);
@@ -962,6 +965,15 @@ void Node::reviewConveyerHashes() {
     }
 
     startConsensus();
+}
+
+void Node::processSync() {
+    if (stat_.lastRoundMs() > maxPingSynchroDelay_) {
+        poolSynchronizer_->syncLastPool();
+    }
+    else {
+        poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber(), cs::PoolSynchronizer::roundDifferentForSync);
+    }
 }
 
 bool Node::isPoolsSyncroStarted() {
@@ -2196,10 +2208,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     // sync state check
     cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-    if (stat_.isLastRoundTooLong()) {
-        poolSynchronizer_->sync(rNum, 1);
-    }
-
     if (conveyer.currentRoundNumber() == rNum && subRound_ > subRound) {
         cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
         csmeta(csdetails) << "My subRound: " << static_cast<int>(subRound_) << ", Received subRound: " << static_cast<int>(subRound);
@@ -2230,10 +2238,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    if (rNum == conveyer.currentRoundNumber() + 1 && rPackage.poolMetaInfo().previousHash != blockChain_.getLastHash()) {
-        csdebug() << "NODE> RoundPackage prevous hash is not equal to one in this node. Abort RoundPackage";
-        return;
-    }
+    //if (rNum == conveyer.currentRoundNumber() + 1 && rPackage.poolMetaInfo().previousHash != blockChain_.getLastHash()) {
+    //    csdebug() << "NODE> RoundPackage prevous hash is not equal to one in this node. Abort RoundPackage";
+    //    return;
+    //}
 
     if (!rpSpeedOk(rPackage)) {
         return;
@@ -2245,8 +2253,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
-    cs::RoundNumber delta = (stat_.lastRoundMs() > maxPingSynchroDelay_ ? 1 : cs::PoolSynchronizer::roundDifferentForSync);
-    poolSynchronizer_->sync(conveyer.currentRoundNumber(), delta);
+
+    processSync();
 
     if (poolSynchronizer_->isSyncroStarted()) {
         getCharacteristic(rPackage);
@@ -2640,9 +2648,9 @@ void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNu
         csdebug() << "NODE> the RoundPackReply signature is not correct";
         return;
     }
+
     cs::Conveyer::instance().setRound(rNum + 1); // There are no rounds at all on remote, "Round" = LastSequence(=rNum) + 1
-    cs::RoundNumber delta = (stat_.lastRoundMs() > maxPingSynchroDelay_ ? 1 : cs::PoolSynchronizer::roundDifferentForSync);
-    poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber(), delta);
+    processSync();
 }
 
 
