@@ -126,6 +126,8 @@ public:
 
     void addNewWalletsToPool(csdb::Pool& pool);
 
+    bool checkForConsistency(csdb::Pool & pool);
+
     // storage adaptor
     void close();
     bool getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const;

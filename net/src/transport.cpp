@@ -434,7 +434,7 @@ void Transport::refillNeighbourhood() {
     if (config_->getBootstrapType() == BootstrapType::SignalServer || config_->getNodeType() == NodeType::Router) {
         // Connect to SS logic
         ssEp_ = net_->resolve(config_->getSignalServerEndpoint());
-        cslog() << "Connecting to Signal Server on " << ssEp_;
+        cslog() << "Connecting to start node on " << ssEp_;
 
         {
             cs::Lock lock(oLock_);
@@ -1001,11 +1001,11 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 
 bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode) {
     if (!(ssStatus_ == SSBootstrapStatus::Requested || ssStatus_ == SSBootstrapStatus::RegisteredWait)) {
-        cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of Requested";
+        cswarning() << "Unexpected start node response " << static_cast<int>(ssStatus_) << " instead of Requested";
         return false;
     }
     
-    cslog() << "Connection to the Signal Server has been established";
+    cslog() << "Connection to the start node has been established";
     nh_.addSignalServer(task->sender, ssEp_, rNode);
 
     constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
@@ -1013,7 +1013,7 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
 
     if (msg_size > MinRegistrationSize) {
         if (!parseSSSignal(task)) {
-            cswarning() << "Bad Signal Server response";
+            cswarning() << "Bad start node response";
             return false;
         }
     }
@@ -1025,7 +1025,7 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
 }
 
 bool Transport::gotSSReRegistration() {
-    cswarning() << "ReRegistration on Signal Server";
+    cswarning() << "ReRegistration on start node";
 
     {
         cs::Lock lock(oLock_);
@@ -1038,12 +1038,12 @@ bool Transport::gotSSReRegistration() {
 
 bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
     if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
-        cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of RegisteredWait";
+        cswarning() << "Unexpected start node response " << static_cast<int>(ssStatus_) << " instead of RegisteredWait";
         return false;
     }
 
     if (!parseSSSignal(task)) {
-        cswarning() << "Bad Signal Server response";
+        cswarning() << "Bad start node response";
         return false;
     }
 
@@ -1128,7 +1128,7 @@ bool Transport::gotSSNewFriends()
         cs::Lock lock(oLock_);
         formSSConnectPack(myPublicKey_, node_->getBlockChain().uuid());
         net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
-        cslog() << "Sending registration request to Signal Server because ssStatus = " + std::to_string(static_cast<int>(ssStatus_));
+        cslog() << "Sending registration request to start node because ssStatus = " + std::to_string(static_cast<int>(ssStatus_));
     }
 
     cs::Signature sign;
@@ -1200,14 +1200,14 @@ bool Transport::gotSSUpdateServer()
     
     if (!nh_.updateSignalServer(net_->resolve(ep)))
     {
-        cswarning() << "Don't update signal server. Error updating neighbours_";
+        cswarning() << "Don't update start node. Error updating neighbours_";
         return false;
     }
     
     // update config.ini
-    if (!Config::replaceBlock("signal_server", "ip = " + ep.ip.to_string(), "port = " + std::to_string(ep.port)))
+    if (!Config::replaceBlock("start_node", "ip = " + ep.ip.to_string(), "port = " + std::to_string(ep.port)))
     {
-        cswarning() << "Don't update signal server. Error updating config";
+        cswarning() << "Don't update start node Error updating config";
         return false;
     }
 
@@ -1216,7 +1216,7 @@ bool Transport::gotSSUpdateServer()
     
     ssEp_ = net_->resolve(ep);
 
-    cslog() << "Registration on new Signal Server";
+    cslog() << "Registration on new start node";
     {
         cs::Lock lock(oLock_);
         formSSConnectPack(myPublicKey_, node_->getBlockChain().uuid());
