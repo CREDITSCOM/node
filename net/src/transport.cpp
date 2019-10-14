@@ -314,6 +314,22 @@ void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     }
 }
 
+void Transport::deliverConfidants(const Packet* pack, const uint32_t size) {
+    if (!nh_.isConfidants()) {
+        deliverBroadcast(pack, size);
+        return;
+    }
+    if (size >= Packet::MaxFragments) {
+        ++Transport::cntExtraLargeNotSent;
+        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
+    }
+
+    const auto packEnd = pack + size;
+    for (auto ptr = pack; ptr != packEnd; ++ptr) {
+        nh_.sendByConfidants(ptr);
+    }
+}
+
 // Processing network packages
 
 void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
@@ -406,6 +422,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             break;
         case NetworkCommand::PackRequest:
             // gotPackRequest(task, sender);
+            break;
+        case NetworkCommand::IntroduceConsensusReply:
+            gotSSIntroduceConsensusReply();
             break;
         default:
             result = false;
@@ -1234,6 +1253,7 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
     nh_.neighbourSentPacket(sender, pack.getHeaderHash());
 }
 
+
 void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender, bool resend) {
     sendPackInform(pack, sender);
 
@@ -1486,4 +1506,65 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
 
 bool Transport::isOwnNodeTrusted() const {
     return (node_->getNodeLevel() != Node::Level::Normal);
+}
+
+bool Transport::gotSSIntroduceConsensusReply()
+{
+    cslog() << "Get confidants from SignalServer";
+    if (ssStatus_ != SSBootstrapStatus::Complete) {
+        return false;
+    }
+    nh_.removeConfidants();
+
+    uint8_t numCirc{ 0 };
+    iPackStream_ >> numCirc;
+
+    for (uint8_t i = 0; i < numCirc; ++i) {
+        EndpointData ep;
+        ep.ipSpecified = true;
+        cs::PublicKey key;
+
+        iPackStream_ >> key >> ep.ip >> ep.port;
+
+        if (!iPackStream_.good()) {
+            return false;
+        }
+
+        if (!std::equal(key.cbegin(), key.cend(), config_->getMyPublicKey().cbegin())) {
+            nh_.addConfidant(net_->resolve(ep));
+        }
+    }
+/*
+    cs::Signature sign;
+    iPackStream_ >> sign;
+
+    if (!node_->gotSSMessageVerify(sign, iPackStream_.getCurrentPtr(), iPackStream_.remainsBytes()))
+    {
+        cswarning() << "New Friends message is incorrect: signature isn't valid";
+        return false;
+    }
+*/
+    cslog() << "Save new confidance nodes";
+    return true;
+}
+
+void Transport::sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys) {
+    if (keys.size() == 0) return;
+    ssEp_ = net_->resolve(config_->getSignalServerEndpoint());
+    cslog() << "Send IntroduceConsensus to Signal Server on " << ssEp_;
+
+    cs::Lock lock(oLock_);
+    oPackStream_.init(BaseFlags::NetworkMsg);
+    oPackStream_ << NetworkCommand::IntroduceConsensus << node_->getBlockChain().uuid();
+    oPackStream_ << static_cast<uint8_t>(keys.size());
+    std::for_each(keys.cbegin(), keys.cend(), [this](const cs::PublicKey& key) { oPackStream_ << key; });
+    net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
+}
+
+bool Transport::isConfidants() {
+    return nh_.isConfidants();
+}
+
+void Transport::removeConfidants() {
+    return nh_.removeConfidants();
 }

@@ -1282,6 +1282,23 @@ void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Ar
 }
 
 template <class... Args>
+void Node::sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+    uint8_t flags = BaseFlags::Compressed;
+
+    if (!transport_->isConfidants()) {
+        flags |= BaseFlags::Broadcast;
+    } else {
+        flags |= BaseFlags::Neighbours;
+    }
+
+    ostream_.init(flags);
+    csdetails() << "NODE> Sending confidants";
+
+    sendConfidantsImpl(msgType, round, std::forward<Args>(args)...);
+}
+
+
+template <class... Args>
 void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
     const bool success = sendToNeighbour(target, msgType, round, std::forward<Args>(args)...);
     if (!success) {
@@ -1298,18 +1315,7 @@ bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber r
 
 template <class... Args>
 void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    const auto& confidants = cs::Conveyer::instance().confidants();
-    const auto size = confidants.size();
-
-    for (size_t i = 0; i < size; ++i) {
-        const auto& confidant = confidants.at(i);
-
-        if (myConfidantIndex_ == i && nodeIdKey_ == confidant) {
-            continue;
-        }
-
-        sendBroadcast(confidant, msgType, round, std::forward<Args>(args)...);
-    }
+    sendConfidants(msgType, round, std::forward<Args>(args)...);
 }
 
 template <class... Args>
@@ -1366,6 +1372,22 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
     transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
     ostream_.clear();
 }
+
+template <typename... Args>
+void Node::sendConfidantsImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+    ostream_ << msgType << round;
+
+    writeDefaultStream(std::forward<Args>(args)...);
+
+    csdetails() << "NODE> Sending confidants data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
+                << ", msgType: " << Packet::messageTypeToString(msgType);
+	//if (ostream_.getPacketsCount() > 100) {
+	//	csinfo() << __func__ << ": sending " << ostream_.getPacketsCount() << " packets";
+	//}
+    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount());
+    ostream_.clear();
+}
+
 
 void Node::sendStageOne(const cs::StageOne& stageOneInfo) {
     if (myLevel_ != Level::Confidant) {
@@ -1702,6 +1724,10 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
     sendDefault(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
 
     csmeta(csdetails) << "done";
+}
+
+void Node::sendConfidants(const std::vector<cs::PublicKey>& keys) {
+    transport_->sendSSIntroduceConsensus(keys);
 }
 
 void Node::sendSmartReject(const std::vector<RefExecution>& rejectList) {
@@ -2757,6 +2783,7 @@ void Node::getRoundTableReply(const uint8_t* data, const size_t size, const cs::
 void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     bool found = false;
     uint8_t confidantIndex = 0;
+    transport_->removeConfidants();
 
     for (auto& conf : roundTable.confidants) {
         if (conf == nodeIdKey_) {
