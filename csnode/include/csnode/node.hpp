@@ -158,6 +158,7 @@ public:
     // transaction's pack syncro
     void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
     void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
+    void getBlockAlarm(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
     void getCharacteristic(cs::RoundPackage& rPackage);
 

@@ -554,9 +554,14 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     csdebug() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(maskOnly.data(), maskOnly.size())
         << " and received: " << cs::Utils::byteStreamToHex(rPackage.poolMetaInfo().characteristic.mask.data(), rPackage.poolMetaInfo().characteristic.mask.size());
     while (!(myIt == maskOnly.cend() || it == rPackage.poolMetaInfo().characteristic.mask.cend())) {
+        csdebug() << "NODE> Comparing " << static_cast<int>(*myIt) << " versus " << static_cast<int>(*it);
         if (*myIt != *it) {
             identic = false;
+            csdebug() << "NODE> False";
             break;
+        }
+        else {
+            csdebug() << "NODE> Ok";
         }
         ++myIt;
         ++it;
@@ -622,6 +627,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
 }
 
 void Node::createTestTransaction() {
+    return;
     csdb::Transaction transaction;
 
     std::string strAddr1 = "G2GeLfwjg6XuvoWnZ7ssx9EPkEBqbYL3mw3fusgpzoBk";
@@ -630,27 +636,49 @@ void Node::createTestTransaction() {
     std::vector<uint8_t> pub_key1;
     DecodeBase58(strAddr1, pub_key1);   
     std::vector<uint8_t> pub_key2;
-    DecodeBase58(strAddr2, pub_ke2y);
+    DecodeBase58(strAddr2, pub_key2);
 
     csdb::Address test_address1 = csdb::Address::from_public_key(pub_key1);
     csdb::Address test_address2 = csdb::Address::from_public_key(pub_key2);
     transaction.set_target(test_address1);
-    transaction.set_source(genesisAddress_);
+    transaction.set_source(test_address2);
     transaction.set_currency(csdb::Currency(1));
     transaction.set_amount(csdb::Amount(1, 0));
     transaction.set_max_fee(csdb::AmountCommission(0.0));
     transaction.set_counted_fee(csdb::AmountCommission(0.0));
     transaction.set_innerID(0);
-    cs::TransactionPacket transactionPack;
+    cs::TransactionsPacket transactionPack;
     transactionPack.addTransaction(transaction);
     transactionPack.makeHash();
 
-    auto conveyer = cs:Conveyer::instance();
-    conveyer.addSeparatePacket(transactionPack);
+    cs::Conveyer::instance().addSeparatePacket(transactionPack);
+    csmeta(csdebug) << "NODE> Sending bad transaction's packet to all";
 }
 
 void Node::sendBlockAlarm(cs::Sequence seq) {
+    cs::Bytes message;
+    cs::DataStream stream(message);
+    stream << seq;
+    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+    sendBroadcast(MsgTypes::BlockAlarm, seq, sig);
     csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
+}
+
+void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+
+    istream_.init(data, size);
+    cs::Signature sig;
+    istream_ >> sig;
+    cs::Bytes message;
+    cs::DataStream stream(message);
+    stream << rNum;
+    if (!cscrypto::verifySignature(sig, sender, message.data(), message.size())) {
+        csdebug() << "NODE> BlockAlarm message from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " -  WRONG SIGNATURE!!!";
+        return;
+    }
+    else {
+        csdebug() << "NODE> Got BlockAlarm message from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    }
 }
 
 void Node::cleanConfirmationList(cs::RoundNumber rNum) {
@@ -1111,6 +1139,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         case MsgTypes::EmptyRoundPack:
         case MsgTypes::StateRequest:
         case MsgTypes::StateReply:
+        case MsgTypes::BlockAlarm:
             return MessageActions::Process;
 
         default:
@@ -2305,6 +2334,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     // sync state check
     cs::Conveyer& conveyer = cs::Conveyer::instance();
 
+    if (rNum == 30 && myConfidantIndex_ == 1) {
+        createTestTransaction();
+    }
     if (stat_.isLastRoundTooLong()) {
         poolSynchronizer_->sync(rNum, 1);
     }
@@ -2839,6 +2871,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     if (!found) {
         myLevel_ = Level::Normal;
+        myConfidantIndex_ = cs::ConfidantConsts::InvalidConfidantIndex;
         if (stopRequested_) {
             stop();
             return;
