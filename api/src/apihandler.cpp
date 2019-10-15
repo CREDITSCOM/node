@@ -1068,6 +1068,8 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
         csdb::TransactionID trId(scr.sequence, scr.transaction);
         const auto execTrans = solver_.smart_contracts().get_contract_call(trxn);
 
+        csdebug() << "[API]: transaction state writed in blockchain: " << sequence << "." << trxn.innerID();
+
         if ((execTrans.is_valid() && is_smart(execTrans)) ||
             execTrans.amount().to_double()) { // payable TODO: maybe > 0 ?
             const auto smart = fetch_smart(execTrans);
@@ -1089,6 +1091,8 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 auto& op = (*opers)[trId];
                 op.state = cs::SmartContracts::is_state_updated(trxn) ? SmartOperation::State::Success : SmartOperation::State::Failed;
                 op.stateTransaction = trxn.id();
+
+                csdebug() << "[API]: status of state transaction(" << sequence << "." << trxn.innerID() << ") is " << static_cast<int>(op.state);
 
                 auto sp = lockedReference(this->smarts_pending);// std::map<cs::Sequence, std::vector<csdb::TransactionID>>
                 auto seq = execTrans.id().pool_seq();
@@ -1142,6 +1146,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                         res.condFlg = true;
                         return res;
                         });
+                    csdebug() << "[API]: sended signal, state trx: " << sequence << "." << trxn.innerID() << ", hash: " << cs::Utils::byteStreamToHex(newHashStr.data(), newHashStr.size());
                 }
             }
 
@@ -1162,6 +1167,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
         }
     }
     else {
+        csdebug() << "[API]: transaction writed in blockchain: " << sequence << "." << trxn.innerID();
         {
             auto& e = [&]() -> decltype(auto) {
                 auto smartLastTrxn = lockedReference(this->smartLastTrxn_);
