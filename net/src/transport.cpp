@@ -1510,7 +1510,7 @@ bool Transport::isOwnNodeTrusted() const {
 
 bool Transport::gotSSIntroduceConsensusReply()
 {
-    cslog() << "Get confidants from SignalServer";
+    csdebug() << "Get confidants from SignalServer";
     if (ssStatus_ != SSBootstrapStatus::Complete) {
         return false;
     }
@@ -1544,7 +1544,6 @@ bool Transport::gotSSIntroduceConsensusReply()
         return false;
     }
 */
-    cslog() << "Save new confidance nodes";
     return true;
 }
 

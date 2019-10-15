@@ -431,7 +431,7 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
 }
 
 void Neighbourhood::addConfidant(const ip::udp::endpoint& ep) {
-    cswarning() << "Add confidant " << ep;
+    csdebug() << "Add confidant " << ep;
 
     cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
     auto conn = getConnection(ep);

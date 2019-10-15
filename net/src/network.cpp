@@ -509,9 +509,6 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
     }
 
     bool resend = task->pack.isBroadcast();
-    if (task->pack.isNeighbors()) {
-        cslog() << "Neghbours packet";
-    }
 
     // Non-network data
     uint32_t& recCounter = packetMap_.tryStore(task->pack.getHash());
