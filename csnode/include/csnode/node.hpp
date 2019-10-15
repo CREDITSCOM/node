@@ -112,6 +112,7 @@ public:
     void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required /*, uint8_t iteration*/);
     void getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
     void sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester, cs::Bytes& message);
+    void sendConfidants(const std::vector<cs::PublicKey>&);
 
     // smart-contracts consensus communicatioin
     void sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs::StageOneSmarts& stageOneInfo);
@@ -343,6 +344,12 @@ private:
 
     template <typename... Args>
     void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+
+    template <class... Args>
+    void sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+    template <typename... Args>
+    void sendConfidantsImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
     // write values to stream
     template <typename... Args>

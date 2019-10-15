@@ -49,7 +49,9 @@ enum class NetworkCommand : uint8_t {
     SSReRegistration = 36,
     SSSpecificBlock = 37,
     SSNewFriends = 38,
-    SSUpdateServer = 39
+    SSUpdateServer = 39,
+    IntroduceConsensus = 40,
+    IntroduceConsensusReply = 41
 };
 
 enum class RegistrationRefuseReasons : uint8_t {
@@ -114,6 +116,9 @@ public:
     bool sendDirectToSock(Packet*, const Connection&);
     void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
     void deliverBroadcast(const Packet*, const uint32_t);
+    void deliverConfidants(const Packet* pack, const uint32_t size);
+    bool isConfidants();
+    void removeConfidants();
 
     void gotPacket(const Packet&, RemoteNodePtr&);
     void redirectPacket(const Packet&, RemoteNodePtr&, bool resend = true);
@@ -128,6 +133,7 @@ public:
     void sendPackRenounce(const cs::Hash&, const Connection&);
     void sendPackInform(const Packet&, const Connection&);
     void sendPackInform(const Packet& pack, RemoteNodePtr&);
+    void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys);
 
     void sendPingPack(const Connection&);
 
@@ -199,6 +205,7 @@ private:
     bool gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
     bool gotPing(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+    bool gotSSIntroduceConsensusReply();
 
     void askForMissingPackages();
     void requestMissing(const cs::Hash&, const uint16_t, const uint64_t);

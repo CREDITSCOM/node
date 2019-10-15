@@ -120,6 +120,10 @@ void SolverContext::spawn_next_round(cs::StageThree& st3) {
         return;
     }
 
+    if (st3.writer == st3.sender) {
+        core.pnode->sendConfidants(core.trusted_candidates);
+    }
+
     std::string tStamp;
 
     if (st3.writer != InvalidConfidantIndex) {
@@ -235,6 +239,11 @@ void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2)
 void SolverContext::send_rejected_smarts(const std::vector<RefExecution>& reject_list) {
     csdebug() << kLogPrefix << "sending " << reject_list.size() << " rejected contract calls";
     core.pnode->sendSmartReject(reject_list);
+}
+
+void SolverContext::next_trusted_candidates(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes) {
+    core.trusted_candidates = nodes;
+    core.hashes_candidates = hashes;
 }
 
 }  // namespace cs

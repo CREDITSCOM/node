@@ -508,7 +508,7 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         return;
     }
 
-    bool resend = true;
+    bool resend = task->pack.isBroadcast();
 
     // Non-network data
     uint32_t& recCounter = packetMap_.tryStore(task->pack.getHash());
@@ -520,19 +520,12 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
                 transport_->registerMessage(msg);
             }
 
-            if (msg && msg->getFirstPack()) {
-                if (msg->getFirstPack().getType() == MsgTypes::TransactionPacket) {
-                    resend = false;
-                }
-            }
-
             if (msg && msg->isComplete()) {
                 if (cs::PacketValidator::instance().validate(**msg)) {
                     transport_->processNodeMessage(**msg);
                     collector_.dropMessage(msg);
                 }
             }
-
         }
         else {
             if (cs::PacketValidator::instance().validate(task->pack)) {
