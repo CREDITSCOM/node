@@ -345,12 +345,6 @@ private:
     template <typename... Args>
     void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
-    template <class... Args>
-    void sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    template <typename... Args>
-    void sendConfidantsImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
-
     // write values to stream
     template <typename... Args>
     void writeDefaultStream(Args&&... args);

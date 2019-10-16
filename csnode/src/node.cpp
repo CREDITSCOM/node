@@ -1282,23 +1282,6 @@ void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Ar
 }
 
 template <class... Args>
-void Node::sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    uint8_t flags = BaseFlags::Compressed;
-
-    if (!transport_->isConfidants()) {
-        flags |= BaseFlags::Broadcast;
-    } else {
-        flags |= BaseFlags::Neighbours;
-    }
-
-    ostream_.init(flags);
-    csdetails() << "NODE> Sending confidants";
-
-    sendConfidantsImpl(msgType, round, std::forward<Args>(args)...);
-}
-
-
-template <class... Args>
 void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
     const bool success = sendToNeighbour(target, msgType, round, std::forward<Args>(args)...);
     if (!success) {
@@ -1315,22 +1298,42 @@ bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber r
 
 template <class... Args>
 void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    sendConfidants(msgType, round, std::forward<Args>(args)...);
+    uint8_t flags = BaseFlags::Compressed;
+
+    if (!transport_->isConfidants()) {
+        flags |= BaseFlags::Broadcast;
+    } else {
+        flags |= BaseFlags::Neighbours;
+    }
+
+    ostream_.init(flags);
+    ostream_ << msgType << round;
+
+    writeDefaultStream(std::forward<Args>(args)...);
+
+    csdetails() << "NODE> Sending confidants data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
+                << ", msgType: " << Packet::messageTypeToString(msgType);
+
+    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount());
+    ostream_.clear();
 }
 
 template <class... Args>
 void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    const auto size = listMembers.size();
-
-    for (size_t i = 0; i < size; ++i) {
-        const auto& listMember = listMembers[i];
-
-        if (listExeption == i && nodeIdKey_ == listMember) {
-            continue;
-        }
-
-        sendBroadcast(listMember, msgType, round, std::forward<Args>(args)...);
+    if (!transport_->checkConfidants(listMembers, (int)listExeption)) {
+        sendBroadcast(msgType, round, std::forward<Args>(args)...);
     }
+
+    ostream_.init(BaseFlags::Compressed | BaseFlags::Neighbours);
+    ostream_ << msgType << round;
+
+    writeDefaultStream(std::forward<Args>(args)...);
+
+    csdetails() << "NODE> Sending confidants list data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
+                << ", msgType: " << Packet::messageTypeToString(msgType);
+
+    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount(), listMembers, (int)listExeption);
+    ostream_.clear();
 }
 
 template <typename... Args>
@@ -1354,7 +1357,7 @@ bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round,
 
 template <typename... Args>
 void Node::sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
-    ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, target);
+    ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed, target);
     csdetails() << "NODE> Sending broadcast to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
     sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
@@ -1372,22 +1375,6 @@ void Node::sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber roun
     transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
     ostream_.clear();
 }
-
-template <typename... Args>
-void Node::sendConfidantsImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
-    ostream_ << msgType << round;
-
-    writeDefaultStream(std::forward<Args>(args)...);
-
-    csdetails() << "NODE> Sending confidants data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
-                << ", msgType: " << Packet::messageTypeToString(msgType);
-	//if (ostream_.getPacketsCount() > 100) {
-	//	csinfo() << __func__ << ": sending " << ostream_.getPacketsCount() << " packets";
-	//}
-    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount());
-    ostream_.clear();
-}
-
 
 void Node::sendStageOne(const cs::StageOne& stageOneInfo) {
     if (myLevel_ != Level::Confidant) {

@@ -117,6 +117,8 @@ public:
     void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
     void deliverBroadcast(const Packet*, const uint32_t);
     void deliverConfidants(const Packet* pack, const uint32_t size);
+    void deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
+    bool checkConfidants(const std::vector<cs::PublicKey>& list, int except = -1);
     bool isConfidants();
     void removeConfidants();
 
@@ -284,6 +286,9 @@ private:
     FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, fragmentsFixedMapSize_> fragOnRound_;
 
     std::atomic_bool sendLarge_ = false;
+
+    cs::SpinLock aLock_{ATOMIC_FLAG_INIT};
+    std::map<cs::PublicKey, EndpointData> addresses_;
 
 public:
     inline static size_t cntDirtyAllocs = 0;
