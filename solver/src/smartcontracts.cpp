@@ -1053,11 +1053,11 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                                     }
                                     else {
                                         const auto& state = head.states.at(req_abs_addr);
-                                        tr_state.add_user_field(new_state::Value, state);
                                         // test actual hash
                                         cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)state.data(), state.size());
                                         if (actual_hash == hash) {
-											csdetails() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start
+                                            tr_state.add_user_field(new_state::Value, state);
+                                            csdetails() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start
 												<< " has updated, stored hash is OK, new size is " << state.size();
                                         }
                                         else {
@@ -1065,6 +1065,12 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
 												<< " has updated, stored hash is WRONG: " << cs::Utils::byteStreamToHex(hash.data(), hash.size())
 												<< " (expected " << cs::Utils::byteStreamToHex(actual_hash.data(), actual_hash.size())
 												<< "), new size is " << state.size();
+                                            if (!reading_db) {
+                                                net_request_contract_state(req_abs_addr);
+                                            }
+                                            else {
+                                                tr_state.add_user_field(new_state::Value, state);
+                                            }
 										}
                                     }
                                 }
