@@ -145,6 +145,7 @@ bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
 
 // Not thread safe. Need lock nLockFlag_ above.
 void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
+
     if (pack->isNeighbors()) {
         for (auto& nb : neighbours_) {
             auto& bp = msgDirects_.tryStore(pack->getHash());
@@ -163,6 +164,17 @@ void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
         }
 
         dispatch(bp, separate);
+    }
+}
+
+void Neighbourhood::sendByConfidants(const Packet* pack) {
+    for (auto& nb : confidants_) {
+        auto& bp = msgDirects_.tryStore(pack->getHash());
+
+        bp.pack = *pack;
+        bp.receiver = nb;
+
+        transport_->sendDirect(pack, **nb);
     }
 }
 
@@ -418,6 +430,24 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
     connectNode(node, conn);
 }
 
+void Neighbourhood::addConfidant(const ip::udp::endpoint& ep) {
+    csdebug() << "Add confidant " << ep;
+
+    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
+    auto conn = getConnection(ep);
+
+    if (!conn->id) {
+        conn->id = getSecureRandom<Connection::Id>();
+    }
+
+    conn->connected = true;
+    confidants_.push_back(conn);
+}
+
+void Neighbourhood::removeConfidants() {
+    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
+    confidants_.clear();
+}
 
 bool Neighbourhood::updateSignalServer(const ip::udp::endpoint& in) {
     cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_); // #!

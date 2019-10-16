@@ -67,7 +67,7 @@ private:
 
     Transport* transport_;
 
-    FixedHashMap<cs::Hash, uint32_t, uint16_t, MaxRememberPackets> packetMap_;  
+    FixedHashMap<cs::Hash, uint32_t, uint32_t, MaxRememberPackets> packetMap_;
 
     // Only needed in a one-socket configuration
     __cacheline_aligned std::atomic<bool> singleSockOpened_ = {false};

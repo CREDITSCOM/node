@@ -134,8 +134,12 @@ public:
 
     void chooseNeighbours();
     void sendByNeighbours(const Packet*, bool separate = false);
+    void sendByConfidants(const Packet* pack);
 
     void establishConnection(const ip::udp::endpoint&);
+    void addConfidant(const ip::udp::endpoint&);
+    bool isConfidants() { return confidants_.size() != 0; }
+    void removeConfidants();
     void addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr);
     bool updateSignalServer(const ip::udp::endpoint& in);
 
@@ -229,6 +233,7 @@ private:
 
     std::deque<ConnectionPtr> neighbours_;
     std::vector<ConnectionPtr> selection_;
+    std::vector<ConnectionPtr> confidants_;
     FixedHashMap<ip::udp::endpoint, ConnectionPtr, uint16_t, MaxConnections> connections_;
 
     struct SenderInfo {
