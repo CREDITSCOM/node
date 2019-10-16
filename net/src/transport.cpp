@@ -1141,7 +1141,7 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
 
 bool Transport::gotSSNewFriends()
 {
-    cslog() << "Get new friends from SignalServer";
+    cslog() << "Get new friends from start node";
     if (ssStatus_ != SSBootstrapStatus::Complete)
     {
         cs::Lock lock(oLock_);
@@ -1194,7 +1194,7 @@ bool Transport::gotSSNewFriends()
 
 bool Transport::gotSSUpdateServer()
 {
-    cslog() << "Get new friends from SignalServer";
+    cslog() << "Get new friends from start node";
 
     cs::Signature sign;
     iPackStream_ >> sign;
@@ -1510,7 +1510,7 @@ bool Transport::isOwnNodeTrusted() const {
 
 bool Transport::gotSSIntroduceConsensusReply()
 {
-    csdebug() << "Get confidants from SignalServer";
+    csdebug() << "Get confidants from start node";
     if (ssStatus_ != SSBootstrapStatus::Complete) {
         return false;
     }
@@ -1550,7 +1550,7 @@ bool Transport::gotSSIntroduceConsensusReply()
 void Transport::sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys) {
     if (keys.size() == 0) return;
     ssEp_ = net_->resolve(config_->getSignalServerEndpoint());
-    cslog() << "Send IntroduceConsensus to Signal Server on " << ssEp_;
+    cslog() << "Send IntroduceConsensus to start node on " << ssEp_;
 
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
