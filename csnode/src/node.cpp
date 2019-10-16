@@ -254,7 +254,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     recdBangs[rNum] = subRound_;
 
     if (stat_.isLastRoundTooLong()) {
-        poolSynchronizer_->sync(globalTable.round, 1, true);
+        poolSynchronizer_->syncLastPool();
     }
 
     solver_->resetGrayList();
@@ -967,6 +967,15 @@ void Node::reviewConveyerHashes() {
     startConsensus();
 }
 
+void Node::processSync() {
+    if (stat_.lastRoundMs() > maxPingSynchroDelay_) {
+        poolSynchronizer_->syncLastPool();
+    }
+    else {
+        poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber(), cs::PoolSynchronizer::roundDifferentForSync);
+    }
+}
+
 bool Node::isPoolsSyncroStarted() {
     return poolSynchronizer_->isSyncroStarted();
 }
@@ -1289,33 +1298,42 @@ bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber r
 
 template <class... Args>
 void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    const auto& confidants = cs::Conveyer::instance().confidants();
-    const auto size = confidants.size();
+    uint8_t flags = BaseFlags::Compressed;
 
-    for (size_t i = 0; i < size; ++i) {
-        const auto& confidant = confidants.at(i);
-
-        if (myConfidantIndex_ == i && nodeIdKey_ == confidant) {
-            continue;
-        }
-
-        sendBroadcast(confidant, msgType, round, std::forward<Args>(args)...);
+    if (!transport_->isConfidants()) {
+        flags |= BaseFlags::Broadcast;
+    } else {
+        flags |= BaseFlags::Neighbours;
     }
+
+    ostream_.init(flags);
+    ostream_ << msgType << round;
+
+    writeDefaultStream(std::forward<Args>(args)...);
+
+    csdetails() << "NODE> Sending confidants data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
+                << ", msgType: " << Packet::messageTypeToString(msgType);
+
+    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount());
+    ostream_.clear();
 }
 
 template <class... Args>
 void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    const auto size = listMembers.size();
-
-    for (size_t i = 0; i < size; ++i) {
-        const auto& listMember = listMembers[i];
-
-        if (listExeption == i && nodeIdKey_ == listMember) {
-            continue;
-        }
-
-        sendBroadcast(listMember, msgType, round, std::forward<Args>(args)...);
+    if (!transport_->checkConfidants(listMembers, (int)listExeption)) {
+        sendBroadcast(msgType, round, std::forward<Args>(args)...);
     }
+
+    ostream_.init(BaseFlags::Compressed | BaseFlags::Neighbours);
+    ostream_ << msgType << round;
+
+    writeDefaultStream(std::forward<Args>(args)...);
+
+    csdetails() << "NODE> Sending confidants list data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
+                << ", msgType: " << Packet::messageTypeToString(msgType);
+
+    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount(), listMembers, (int)listExeption);
+    ostream_.clear();
 }
 
 template <typename... Args>
@@ -1339,7 +1357,7 @@ bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round,
 
 template <typename... Args>
 void Node::sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
-    ostream_.init(BaseFlags::Fragmented | BaseFlags::Compressed, target);
+    ostream_.init(BaseFlags::Broadcast | BaseFlags::Fragmented | BaseFlags::Compressed, target);
     csdetails() << "NODE> Sending broadcast to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
 
     sendBroadcastImpl(msgType, round, std::forward<Args>(args)...);
@@ -1693,6 +1711,10 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
     sendDefault(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
 
     csmeta(csdetails) << "done";
+}
+
+void Node::sendConfidants(const std::vector<cs::PublicKey>& keys) {
+    transport_->sendSSIntroduceConsensus(keys);
 }
 
 void Node::sendSmartReject(const std::vector<RefExecution>& rejectList) {
@@ -2199,10 +2221,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     // sync state check
     cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-    if (stat_.isLastRoundTooLong()) {
-        poolSynchronizer_->sync(rNum, 1);
-    }
-
     if (conveyer.currentRoundNumber() == rNum && subRound_ > subRound) {
         cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
         csmeta(csdetails) << "My subRound: " << static_cast<int>(subRound_) << ", Received subRound: " << static_cast<int>(subRound);
@@ -2233,6 +2251,11 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
+    //if (rNum == conveyer.currentRoundNumber() + 1 && rPackage.poolMetaInfo().previousHash != blockChain_.getLastHash()) {
+    //    csdebug() << "NODE> RoundPackage prevous hash is not equal to one in this node. Abort RoundPackage";
+    //    return;
+    //}
+
     if (!rpSpeedOk(rPackage)) {
         return;
     }
@@ -2243,8 +2266,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
-    cs::RoundNumber delta = (stat_.lastRoundMs() > maxPingSynchroDelay_ ? 1 : cs::PoolSynchronizer::roundDifferentForSync);
-    poolSynchronizer_->sync(conveyer.currentRoundNumber(), delta);
+
+    processSync();
 
     if (poolSynchronizer_->isSyncroStarted()) {
         getCharacteristic(rPackage);
@@ -2638,9 +2661,9 @@ void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNu
         csdebug() << "NODE> the RoundPackReply signature is not correct";
         return;
     }
+
     cs::Conveyer::instance().setRound(rNum + 1); // There are no rounds at all on remote, "Round" = LastSequence(=rNum) + 1
-    cs::RoundNumber delta = (stat_.lastRoundMs() > maxPingSynchroDelay_ ? 1 : cs::PoolSynchronizer::roundDifferentForSync);
-    poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber(), delta);
+    processSync();
 }
 
 
@@ -2747,6 +2770,7 @@ void Node::getRoundTableReply(const uint8_t* data, const size_t size, const cs::
 void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     bool found = false;
     uint8_t confidantIndex = 0;
+    transport_->removeConfidants();
 
     for (auto& conf : roundTable.confidants) {
         if (conf == nodeIdKey_) {

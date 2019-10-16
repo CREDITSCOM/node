@@ -18,7 +18,6 @@
 class Node;
 
 namespace cs {
-
 using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, std::size_t packet)>;
 
 class PoolSynchronizer {
@@ -26,6 +25,7 @@ public:
     explicit PoolSynchronizer(const PoolSyncData& data, Transport* transport, BlockChain* blockChain);
 
     void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = roundDifferentForSync, bool isBigBand = false);
+    void syncLastPool();
 
     // syncro get functions
     void getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_t packetNum);

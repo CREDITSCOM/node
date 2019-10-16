@@ -134,8 +134,13 @@ public:
 
     void chooseNeighbours();
     void sendByNeighbours(const Packet*, bool separate = false);
+    void sendByConfidant(const Packet* pack, ConnectionPtr conn);
+    void sendByConfidants(const Packet* pack);
 
     void establishConnection(const ip::udp::endpoint&);
+    ConnectionPtr addConfidant(const ip::udp::endpoint&, bool insert = true);
+    bool isConfidants() { return confidants_.size() != 0; }
+    void removeConfidants();
     void addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr);
     bool updateSignalServer(const ip::udp::endpoint& in);
 
@@ -229,6 +234,7 @@ private:
 
     std::deque<ConnectionPtr> neighbours_;
     std::vector<ConnectionPtr> selection_;
+    std::vector<ConnectionPtr> confidants_;
     FixedHashMap<ip::udp::endpoint, ConnectionPtr, uint16_t, MaxConnections> connections_;
 
     struct SenderInfo {
@@ -238,8 +244,8 @@ private:
     };
 
     FixedHashMap<cs::Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
-    FixedHashMap<cs::Hash, BroadPackInfo, uint32_t, 100000> msgBroads_;
-    FixedHashMap<cs::Hash, DirectPackInfo, uint32_t, 100000> msgDirects_;
+    FixedHashMap<cs::Hash, BroadPackInfo, uint32_t, MaxRememberPackets> msgBroads_;
+    FixedHashMap<cs::Hash, DirectPackInfo, uint32_t, MaxRememberPackets> msgDirects_;
 };
 
 #endif  // NEIGHBOURHOOD_HPP

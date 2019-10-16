@@ -1053,11 +1053,11 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                                     }
                                     else {
                                         const auto& state = head.states.at(req_abs_addr);
-                                        tr_state.add_user_field(new_state::Value, state);
                                         // test actual hash
                                         cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)state.data(), state.size());
                                         if (actual_hash == hash) {
-											csdetails() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start
+                                            tr_state.add_user_field(new_state::Value, state);
+                                            csdetails() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start
 												<< " has updated, stored hash is OK, new size is " << state.size();
                                         }
                                         else {
@@ -1065,6 +1065,12 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
 												<< " has updated, stored hash is WRONG: " << cs::Utils::byteStreamToHex(hash.data(), hash.size())
 												<< " (expected " << cs::Utils::byteStreamToHex(actual_hash.data(), actual_hash.size())
 												<< "), new size is " << state.size();
+                                            if (!reading_db) {
+                                                net_request_contract_state(req_abs_addr);
+                                            }
+                                            else {
+                                                tr_state.add_user_field(new_state::Value, state);
+                                            }
 										}
                                     }
                                 }
@@ -1169,6 +1175,7 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                     csdb::Transaction executed_transaction;
                     SmartContractRef executed_ref;
                     if (!all_contract_blocks.empty()) {
+                        bool request_state_required = false;
                         for (const auto seq : all_contract_blocks) {
                             const csdb::Pool b = bc.loadBlock(seq);
                             for (const auto& tt : b.transactions()) {
@@ -1196,6 +1203,10 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                                             item.execute = executed_transaction;
                                                             item.ref_execute = executed_ref;
                                                         }
+                                                        else if (stored_hash != Zero::hash) {
+                                                            cslog() << kLogPrefix << "result state does not match stored non-zero hash, re-execution failed";
+                                                            request_state_required = true;
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1213,11 +1224,12 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                             // execution error, test if executor is still available
                                             if (!executor_ready) {
                                                 // ask user to restart executor every 2 seconds
-                                                if (!wait_until_executor(2)) {
+                                                if (!wait_until_executor(2, 15)) {
                                                     cserror() << kLogPrefix << "cannot connect to executor, contract re-excution is impossible";
                                                     if (pnode->isStopRequested()) {
                                                         cslog() << kLogPrefix << "node is requested to stop, cancel wait to executor";
                                                     }
+                                                    request_state_required = true;
                                                     break;
                                                 }
                                             }
@@ -1226,6 +1238,7 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                                     exe_data.error = "contract execution failed";
                                                 }
                                                 cserror() << kLogPrefix << "failed to get updated state of " << exe_data.contract_ref << ": " << exe_data.error;
+                                                request_state_required = true;
                                                 break;
                                             }
                                         }
@@ -1252,6 +1265,11 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                     }
                                 }
                             }
+                            if (request_state_required) {
+                                item.state.clear();
+                                // further re-execution is senseless
+                                break;
+                            }
                         }
                     }
 
@@ -1265,7 +1283,7 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                             csdebug() << kLogPrefix << "last state of " << to_base58(abs_addr) << " is restored to " << item.ref_execute;
                         }
                         else {
-                            cslog() << kLogPrefix << "failed to stora in cache state of " << to_base58(abs_addr) << " restored to " << item.ref_execute;
+                            cslog() << kLogPrefix << "failed to store in cache state of " << to_base58(abs_addr) << " restored to " << item.ref_execute;
                         }
                     }
                 }
@@ -2709,6 +2727,7 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
     cs::DataStream stream(contract_data.data(), contract_data.size());
     stream >> ref.sequence >> ref.transaction >> ref.hash >> state;
     if (stream.isValid() && !stream.isAvailable(1)) {
+        // TODO: test state hash before dbcache_update
         if (dbcache_update(contract_abs_addr, ref, state, false)) {
             if (in_known_contracts(contract_abs_addr)) {
                 auto& item = known_contracts[contract_abs_addr];

@@ -1148,6 +1148,30 @@ bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address& addr) cons
     return true;
 }
 
+bool BlockChain::checkForConsistency(csdb::Pool& pool) {
+    if (pool.sequence() == 0) {
+        return true;
+    }
+    if (pool.confidants().size() < pool.signatures().size()) {
+        return false;
+    }
+    if (cs::Utils::maskValue(pool.realTrusted()) != pool.signatures().size()) {
+        return false;
+    }
+    csdb::Pool tmp = pool.clone();
+    if (!tmp.compose()) {
+        return false;
+    }
+    cs::Bytes checking = tmp.to_binary();
+    csdb::Pool tmpCopy = csdb::Pool::from_binary(std::move(checking));
+    if (tmpCopy.sequence() == 0) {
+        csinfo() << "Failed to create correct binary representation of block #" << pool.sequence();
+        return false;
+    }
+    return true;
+
+}
+
 std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrusted) {
     const auto last_seq = getLastSeq();
     const auto pool_seq = pool.sequence();
@@ -1160,7 +1184,15 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     }
 
     pool.set_previous_hash(getLastHash());
+    if (!checkForConsistency(pool)) {
+        csdebug() << "BLOCKCHAIN> Pool #" << pool_seq << " failed the consistency check";
+        return std::nullopt;
+    }
 
+    if (!checkForConsistency(deferredBlock_)) {
+        csdebug() << "BLOCKCHAIN> Deferred Block #" << deferredBlock_.sequence() << " failed the consistency check";
+        return std::nullopt;
+    }
     constexpr cs::Sequence NoSequence = std::numeric_limits<cs::Sequence>::max();
     cs::Sequence flushed_block_seq = NoSequence;
 

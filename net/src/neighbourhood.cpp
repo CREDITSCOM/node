@@ -91,7 +91,21 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp, bool separate) {
         }
 
         if (!found) {
-            if (!nb->isSignal || (!bp.pack.isNetwork() && (bp.pack.getType() == MsgTypes::RoundTable || bp.pack.getType() == MsgTypes::BlockHash))) {
+            bool send_to_ss = false;
+            if (nb->isSignal) {
+                if (!bp.pack.isNetwork()) {
+                    const auto type = bp.pack.getType();
+                    if (type == MsgTypes::BlockHash) {
+                        send_to_ss = true;
+                    }
+                    else if(type == MsgTypes::RoundTable) {
+                        if (transport_->isOwnNodeTrusted()) {
+                            send_to_ss = bp.pack.isFragmented() ? bp.pack.getFragmentId() == 0 : true;
+                        }
+                    }
+                }
+            }
+            if (!nb->isSignal || send_to_ss) {
                 if (separate) {
                     sent = transport_->sendDirectToSock(&(bp.pack), **nb) || sent;
                 } else {
@@ -131,6 +145,7 @@ bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
 
 // Not thread safe. Need lock nLockFlag_ above.
 void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
+
     if (pack->isNeighbors()) {
         for (auto& nb : neighbours_) {
             auto& bp = msgDirects_.tryStore(pack->getHash());
@@ -149,6 +164,26 @@ void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
         }
 
         dispatch(bp, separate);
+    }
+}
+
+void Neighbourhood::sendByConfidant(const Packet* pack, ConnectionPtr conn) {
+    auto& bp = msgDirects_.tryStore(pack->getHash());
+
+    bp.pack = *pack;
+    bp.receiver = conn;
+
+    transport_->sendDirect(pack, **conn);
+}
+
+void Neighbourhood::sendByConfidants(const Packet* pack) {
+    for (auto& nb : confidants_) {
+        auto& bp = msgDirects_.tryStore(pack->getHash());
+
+        bp.pack = *pack;
+        bp.receiver = nb;
+
+        transport_->sendDirect(pack, **nb);
     }
 }
 
@@ -404,6 +439,27 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
     connectNode(node, conn);
 }
 
+ConnectionPtr Neighbourhood::addConfidant(const ip::udp::endpoint& ep, bool insert) {
+    csdebug() << "Add confidant " << ep;
+
+    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
+    auto conn = getConnection(ep);
+
+    if (!conn->id) {
+        conn->id = getSecureRandom<Connection::Id>();
+    }
+
+    conn->connected = true;
+    if (insert) {
+        confidants_.push_back(conn);
+    }
+    return conn;
+}
+
+void Neighbourhood::removeConfidants() {
+    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
+    confidants_.clear();
+}
 
 bool Neighbourhood::updateSignalServer(const ip::udp::endpoint& in) {
     cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_); // #!

@@ -1,4 +1,8 @@
 /* Send blaming letters to @yrtimd */
+#include "transport.hpp"
+#include "network.hpp"
+
+#include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/packstream.hpp>
 
@@ -6,9 +10,6 @@
 #include <lib/system/utils.hpp>
 
 #include <thread>
-
-#include "network.hpp"
-#include "transport.hpp"
 
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
@@ -44,6 +45,20 @@ enum Platform : uint8_t {
     MacOS,
     Windows
 };
+
+Transport::Transport(const Config& config, Node* node)
+: config_(config)
+, sendPacksFlag_()
+, remoteNodes_(maxRemoteNodes_ + 1)
+, myPublicKey_(node->getNodeIdKey())
+, oLock_()
+, oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
+, uLock_()
+, net_(new Network(config, this))
+, node_(node)
+, nh_(this) {
+    good_ = net_->isGood();
+}
 
 Transport::~Transport() {
     delete net_;
@@ -299,6 +314,70 @@ void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     }
 }
 
+void Transport::deliverConfidants(const Packet* pack, const uint32_t size) {
+    if (!nh_.isConfidants()) {
+        deliverBroadcast(pack, size);
+        return;
+    }
+    if (size >= Packet::MaxFragments) {
+        ++Transport::cntExtraLargeNotSent;
+        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
+    }
+
+    const auto packEnd = pack + size;
+    for (auto ptr = pack; ptr != packEnd; ++ptr) {
+        nh_.sendByConfidants(ptr);
+    }
+}
+
+bool Transport::checkConfidants(const std::vector<cs::PublicKey>& list, int except) {
+    cs::Lock lock(aLock_);
+
+    auto end = addresses_.end();
+    int i = 0;
+    for (const auto& pkey: list) {
+        if (i++ == except) continue;
+        if (addresses_.find(pkey) == end) return false;
+    }
+    return true;
+}
+
+void Transport::deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>& list, int except) {
+    std::vector<ConnectionPtr> conns;
+    conns.reserve(list.size());
+    bool finded = true;
+    int i = 0;
+    {
+        cs::Lock lock(aLock_);
+        for (const auto& pkey: list) {
+            if (i++ == except) continue;
+            auto res = addresses_.find(pkey);
+            if (res == addresses_.end()) {
+                finded = false;
+                break;
+            }
+            conns.emplace_back(nh_.addConfidant(net_->resolve(res->second), false));
+        }
+    }
+
+    if (!finded) {
+        deliverBroadcast(pack, size);
+        return;
+    }
+
+    if (size >= Packet::MaxFragments) {
+        ++Transport::cntExtraLargeNotSent;
+        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
+    }
+
+    for (auto& conn: conns) {
+        const auto packEnd = pack + size;
+        for (auto ptr = pack; ptr != packEnd; ++ptr) {
+            nh_.sendByConfidant(ptr, conn);
+        }
+    }
+}
+
 // Processing network packages
 
 void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
@@ -392,6 +471,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
         case NetworkCommand::PackRequest:
             // gotPackRequest(task, sender);
             break;
+        case NetworkCommand::IntroduceConsensusReply:
+            gotSSIntroduceConsensusReply();
+            break;
         default:
             result = false;
             cswarning() << "Unexpected network command";
@@ -419,7 +501,7 @@ void Transport::refillNeighbourhood() {
     if (config_->getBootstrapType() == BootstrapType::SignalServer || config_->getNodeType() == NodeType::Router) {
         // Connect to SS logic
         ssEp_ = net_->resolve(config_->getSignalServerEndpoint());
-        cslog() << "Connecting to Signal Server on " << ssEp_;
+        cslog() << "Connecting to start node on " << ssEp_;
 
         {
             cs::Lock lock(oLock_);
@@ -720,9 +802,6 @@ ConnectionPtr Transport::getRandomNeighbour() {
     return nh_.getRandomSyncNeighbour();
 }
 
-std::unique_lock< std::mutex > Transport::getNeighboursLock() const {
-    return nh_.getNeighboursLock();
-}
 
 void Transport::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
     nh_.forEachNeighbour(std::move(func));
@@ -989,11 +1068,11 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 
 bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& rNode) {
     if (!(ssStatus_ == SSBootstrapStatus::Requested || ssStatus_ == SSBootstrapStatus::RegisteredWait)) {
-        cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of Requested";
+        cswarning() << "Unexpected start node response " << static_cast<int>(ssStatus_) << " instead of Requested";
         return false;
     }
     
-    cslog() << "Connection to the Signal Server has been established";
+    cslog() << "Connection to the start node has been established";
     nh_.addSignalServer(task->sender, ssEp_, rNode);
 
     constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
@@ -1001,7 +1080,7 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
 
     if (msg_size > MinRegistrationSize) {
         if (!parseSSSignal(task)) {
-            cswarning() << "Bad Signal Server response";
+            cswarning() << "Bad start node response";
             return false;
         }
     }
@@ -1013,7 +1092,7 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
 }
 
 bool Transport::gotSSReRegistration() {
-    cswarning() << "ReRegistration on Signal Server";
+    cswarning() << "ReRegistration on start node";
 
     {
         cs::Lock lock(oLock_);
@@ -1026,12 +1105,12 @@ bool Transport::gotSSReRegistration() {
 
 bool Transport::gotSSDispatch(const TaskPtr<IPacMan>& task) {
     if (ssStatus_ != SSBootstrapStatus::RegisteredWait) {
-        cswarning() << "Unexpected Signal Server response " << static_cast<int>(ssStatus_) << " instead of RegisteredWait";
+        cswarning() << "Unexpected start node response " << static_cast<int>(ssStatus_) << " instead of RegisteredWait";
         return false;
     }
 
     if (!parseSSSignal(task)) {
-        cswarning() << "Bad Signal Server response";
+        cswarning() << "Bad start node response";
         return false;
     }
 
@@ -1110,13 +1189,13 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
 
 bool Transport::gotSSNewFriends()
 {
-    cslog() << "Get new friends from SignalServer";
+    cslog() << "Get new friends from start node";
     if (ssStatus_ != SSBootstrapStatus::Complete)
     {
         cs::Lock lock(oLock_);
         formSSConnectPack(myPublicKey_, node_->getBlockChain().uuid());
         net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
-        cslog() << "Sending registration request to Signal Server because ssStatus = " + std::to_string(static_cast<int>(ssStatus_));
+        cslog() << "Sending registration request to start node because ssStatus = " + std::to_string(static_cast<int>(ssStatus_));
     }
 
     cs::Signature sign;
@@ -1163,7 +1242,7 @@ bool Transport::gotSSNewFriends()
 
 bool Transport::gotSSUpdateServer()
 {
-    cslog() << "Get new friends from SignalServer";
+    cslog() << "Get new friends from start node";
 
     cs::Signature sign;
     iPackStream_ >> sign;
@@ -1188,14 +1267,14 @@ bool Transport::gotSSUpdateServer()
     
     if (!nh_.updateSignalServer(net_->resolve(ep)))
     {
-        cswarning() << "Don't update signal server. Error updating neighbours_";
+        cswarning() << "Don't update start node. Error updating neighbours_";
         return false;
     }
     
     // update config.ini
-    if (!Config::replaceBlock("signal_server", "ip = " + ep.ip.to_string(), "port = " + std::to_string(ep.port)))
+    if (!Config::replaceBlock("start_node", "ip = " + ep.ip.to_string(), "port = " + std::to_string(ep.port)))
     {
-        cswarning() << "Don't update signal server. Error updating config";
+        cswarning() << "Don't update start node Error updating config";
         return false;
     }
 
@@ -1204,7 +1283,7 @@ bool Transport::gotSSUpdateServer()
     
     ssEp_ = net_->resolve(ep);
 
-    cslog() << "Registration on new Signal Server";
+    cslog() << "Registration on new start node";
     {
         cs::Lock lock(oLock_);
         formSSConnectPack(myPublicKey_, node_->getBlockChain().uuid());
@@ -1221,6 +1300,7 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
 
     nh_.neighbourSentPacket(sender, pack.getHeaderHash());
 }
+
 
 void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender, bool resend) {
     sendPackInform(pack, sender);
@@ -1470,4 +1550,77 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     }
 
     return true;
+}
+
+bool Transport::isOwnNodeTrusted() const {
+    return (node_->getNodeLevel() != Node::Level::Normal);
+}
+
+bool Transport::gotSSIntroduceConsensusReply()
+{
+    csdebug() << "Get confidants from start node";
+    if (ssStatus_ != SSBootstrapStatus::Complete) {
+        return false;
+    }
+    nh_.removeConfidants();
+
+    uint8_t numCirc{ 0 };
+    iPackStream_ >> numCirc;
+
+    for (uint8_t i = 0; i < numCirc; ++i) {
+        EndpointData ep;
+        ep.ipSpecified = true;
+        cs::PublicKey key;
+
+        iPackStream_ >> key >> ep.ip >> ep.port;
+
+        if (!iPackStream_.good()) {
+            return false;
+        }
+
+        if (!std::equal(key.cbegin(), key.cend(), config_->getMyPublicKey().cbegin())) {
+            cs::Lock lock(aLock_);
+            auto value = std::make_pair(key, ep);
+            auto res = addresses_.insert(value);
+            if (!res.second) {
+                auto hint = res.first;
+                --hint;
+                addresses_.erase(res.first);
+                addresses_.insert(hint, value);
+            }
+            nh_.addConfidant(net_->resolve(ep));
+        }
+    }
+/*
+    cs::Signature sign;
+    iPackStream_ >> sign;
+
+    if (!node_->gotSSMessageVerify(sign, iPackStream_.getCurrentPtr(), iPackStream_.remainsBytes()))
+    {
+        cswarning() << "New Friends message is incorrect: signature isn't valid";
+        return false;
+    }
+*/
+    return true;
+}
+
+void Transport::sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys) {
+    if (keys.size() == 0) return;
+    ssEp_ = net_->resolve(config_->getSignalServerEndpoint());
+    cslog() << "Send IntroduceConsensus to start node on " << ssEp_;
+
+    cs::Lock lock(oLock_);
+    oPackStream_.init(BaseFlags::NetworkMsg);
+    oPackStream_ << NetworkCommand::IntroduceConsensus << node_->getBlockChain().uuid();
+    oPackStream_ << static_cast<uint8_t>(keys.size());
+    std::for_each(keys.cbegin(), keys.cend(), [this](const cs::PublicKey& key) { oPackStream_ << key; });
+    net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
+}
+
+bool Transport::isConfidants() {
+    return nh_.isConfidants();
+}
+
+void Transport::removeConfidants() {
+    return nh_.removeConfidants();
 }

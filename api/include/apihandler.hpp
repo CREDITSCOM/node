@@ -796,6 +796,46 @@ private:
 #endif // 0
     executor::Executor& executor_;
 
+    // for answer dumb transactions        
+    class DUMBCV {
+    public:
+        void addCVInfo(const cs::Signature& signature) {
+            mCvInfo_[signature];
+        }
+
+        void sendCvSignal(const cs::Signature& signature) {
+            if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
+                auto&[cv, condFlg] = it->second;
+                cv.notify_one();
+                condFlg = true;
+            }
+        }
+
+        bool waitCvSignal(const cs::Signature& signature) {
+            bool isTimeOver = false;
+
+            if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
+                std::mutex dumbMutex;
+                std::unique_lock lock(dumbMutex);
+
+                isTimeOver = it->second.cv_.wait_for(lock, std::chrono::seconds(30), [it]() -> bool {
+                    return it->second.condFlg_;
+                });
+
+                mCvInfo_.erase(signature);
+            }
+
+            return isTimeOver;
+        }
+    private:
+        struct CVInfo {
+            std::condition_variable cv_;
+            std::atomic_bool condFlg_{ false };
+        };
+        std::map<cs::Signature, CVInfo> mCvInfo_;
+    } dumbCv_;
+    //
+
     bool isBDLoaded_{ false };
 
     struct smart_trxns_queue {
