@@ -330,6 +330,54 @@ void Transport::deliverConfidants(const Packet* pack, const uint32_t size) {
     }
 }
 
+bool Transport::checkConfidants(const std::vector<cs::PublicKey>& list, int except) {
+    cs::Lock lock(aLock_);
+
+    auto end = addresses_.end();
+    int i = 0;
+    for (const auto& pkey: list) {
+        if (i++ == except) continue;
+        if (addresses_.find(pkey) == end) return false;
+    }
+    return true;
+}
+
+void Transport::deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>& list, int except) {
+    std::vector<ConnectionPtr> conns;
+    conns.reserve(list.size());
+    bool finded = true;
+    int i = 0;
+    {
+        cs::Lock lock(aLock_);
+        for (const auto& pkey: list) {
+            if (i++ == except) continue;
+            auto res = addresses_.find(pkey);
+            if (res == addresses_.end()) {
+                finded = false;
+                break;
+            }
+            conns.emplace_back(nh_.addConfidant(net_->resolve(res->second), false));
+        }
+    }
+
+    if (!finded) {
+        deliverBroadcast(pack, size);
+        return;
+    }
+
+    if (size >= Packet::MaxFragments) {
+        ++Transport::cntExtraLargeNotSent;
+        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
+    }
+
+    for (auto& conn: conns) {
+        const auto packEnd = pack + size;
+        for (auto ptr = pack; ptr != packEnd; ++ptr) {
+            nh_.sendByConfidant(ptr, conn);
+        }
+    }
+}
+
 // Processing network packages
 
 void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
@@ -1531,6 +1579,15 @@ bool Transport::gotSSIntroduceConsensusReply()
         }
 
         if (!std::equal(key.cbegin(), key.cend(), config_->getMyPublicKey().cbegin())) {
+            cs::Lock lock(aLock_);
+            auto value = std::make_pair(key, ep);
+            auto res = addresses_.insert(value);
+            if (!res.second) {
+                auto hint = res.first;
+                --hint;
+                addresses_.erase(res.first);
+                addresses_.insert(hint, value);
+            }
             nh_.addConfidant(net_->resolve(ep));
         }
     }

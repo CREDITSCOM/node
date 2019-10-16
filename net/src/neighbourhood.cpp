@@ -167,6 +167,15 @@ void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
     }
 }
 
+void Neighbourhood::sendByConfidant(const Packet* pack, ConnectionPtr conn) {
+    auto& bp = msgDirects_.tryStore(pack->getHash());
+
+    bp.pack = *pack;
+    bp.receiver = conn;
+
+    transport_->sendDirect(pack, **conn);
+}
+
 void Neighbourhood::sendByConfidants(const Packet* pack) {
     for (auto& nb : confidants_) {
         auto& bp = msgDirects_.tryStore(pack->getHash());
@@ -430,7 +439,7 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
     connectNode(node, conn);
 }
 
-void Neighbourhood::addConfidant(const ip::udp::endpoint& ep) {
+ConnectionPtr Neighbourhood::addConfidant(const ip::udp::endpoint& ep, bool insert) {
     csdebug() << "Add confidant " << ep;
 
     cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
@@ -441,7 +450,10 @@ void Neighbourhood::addConfidant(const ip::udp::endpoint& ep) {
     }
 
     conn->connected = true;
-    confidants_.push_back(conn);
+    if (insert) {
+        confidants_.push_back(conn);
+    }
+    return conn;
 }
 
 void Neighbourhood::removeConfidants() {
