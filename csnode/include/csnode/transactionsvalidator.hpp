@@ -37,6 +37,7 @@ public:
     void addRejectedNewState(const csdb::Address& newState);
 
     size_t getCntRemovedTrxsByGraph() const;
+    bool duplicatedNewState(SolverContext&, const csdb::Address&) const;
 
 private:
     using TrxList = std::vector<TransactionIndex>;
@@ -65,6 +66,7 @@ private:
     TrxList trxList_;
     std::map<csdb::Address, csdb::Amount> payableMaxFees_;
     std::vector<csdb::Address> rejectedNewStates_;
+    std::vector<csdb::Address> duplicatedNewStates_;
     Stack negativeNodes_;
     size_t cntRemovedTrxs_;
 };
@@ -72,6 +74,7 @@ private:
 inline void TransactionsValidator::clearCaches() {
     payableMaxFees_.clear();
     rejectedNewStates_.clear();
+    duplicatedNewStates_.clear();
 }
 
 inline void TransactionsValidator::addRejectedNewState(const csdb::Address& newState) {
