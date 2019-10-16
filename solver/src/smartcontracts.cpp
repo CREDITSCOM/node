@@ -1204,7 +1204,7 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                                             item.ref_execute = executed_ref;
                                                         }
                                                         else if (stored_hash != Zero::hash) {
-                                                            // executed hash does not match stored non-zero hash, re-execution has compromized
+                                                            cslog() << kLogPrefix << "result state does not match stored non-zero hash, re-execution failed";
                                                             request_state_required = true;
                                                         }
                                                     }
@@ -1224,11 +1224,12 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                             // execution error, test if executor is still available
                                             if (!executor_ready) {
                                                 // ask user to restart executor every 2 seconds
-                                                if (!wait_until_executor(2)) {
+                                                if (!wait_until_executor(2, 15)) {
                                                     cserror() << kLogPrefix << "cannot connect to executor, contract re-excution is impossible";
                                                     if (pnode->isStopRequested()) {
                                                         cslog() << kLogPrefix << "node is requested to stop, cancel wait to executor";
                                                     }
+                                                    request_state_required = true;
                                                     break;
                                                 }
                                             }
