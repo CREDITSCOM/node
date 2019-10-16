@@ -2709,6 +2709,7 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
     cs::DataStream stream(contract_data.data(), contract_data.size());
     stream >> ref.sequence >> ref.transaction >> ref.hash >> state;
     if (stream.isValid() && !stream.isAvailable(1)) {
+        // TODO: test state hash before dbcache_update
         if (dbcache_update(contract_abs_addr, ref, state, false)) {
             if (in_known_contracts(contract_abs_addr)) {
                 auto& item = known_contracts[contract_abs_addr];
