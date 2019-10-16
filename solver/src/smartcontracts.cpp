@@ -1175,6 +1175,7 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                     csdb::Transaction executed_transaction;
                     SmartContractRef executed_ref;
                     if (!all_contract_blocks.empty()) {
+                        bool request_state_required = false;
                         for (const auto seq : all_contract_blocks) {
                             const csdb::Pool b = bc.loadBlock(seq);
                             for (const auto& tt : b.transactions()) {
@@ -1201,6 +1202,10 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                                             item.state = executed_state;
                                                             item.execute = executed_transaction;
                                                             item.ref_execute = executed_ref;
+                                                        }
+                                                        else if (stored_hash != Zero::hash) {
+                                                            // executed hash does not match stored non-zero hash, re-execution has compromized
+                                                            request_state_required = true;
                                                         }
                                                     }
                                                 }
@@ -1232,6 +1237,7 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                                     exe_data.error = "contract execution failed";
                                                 }
                                                 cserror() << kLogPrefix << "failed to get updated state of " << exe_data.contract_ref << ": " << exe_data.error;
+                                                request_state_required = true;
                                                 break;
                                             }
                                         }
@@ -1258,6 +1264,11 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                     }
                                 }
                             }
+                            if (request_state_required) {
+                                item.state.clear();
+                                // further re-execution is senseless
+                                break;
+                            }
                         }
                     }
 
@@ -1271,7 +1282,7 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                             csdebug() << kLogPrefix << "last state of " << to_base58(abs_addr) << " is restored to " << item.ref_execute;
                         }
                         else {
-                            cslog() << kLogPrefix << "failed to stora in cache state of " << to_base58(abs_addr) << " restored to " << item.ref_execute;
+                            cslog() << kLogPrefix << "failed to store in cache state of " << to_base58(abs_addr) << " restored to " << item.ref_execute;
                         }
                     }
                 }
