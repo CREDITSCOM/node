@@ -1298,24 +1298,22 @@ bool Node::sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber r
 
 template <class... Args>
 void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    uint8_t flags = BaseFlags::Compressed;
+    const auto& confidants = cs::Conveyer::instance().confidants();
+    const auto size = confidants.size();
 
-    if (!transport_->isConfidants()) {
-        flags |= BaseFlags::Broadcast;
-    } else {
-        flags |= BaseFlags::Neighbours;
+    size_t i = 0;
+    for (; i < size; ++i) {
+        const auto& confidant = confidants.at(i);
+        if (nodeIdKey_ == confidant) {
+            break;
+        }
     }
 
-    ostream_.init(flags);
-    ostream_ << msgType << round;
+    if (i == size) {
+        i = cs::ConfidantConsts::InvalidConfidantIndex;
+    }
 
-    writeDefaultStream(std::forward<Args>(args)...);
-
-    csdetails() << "NODE> Sending confidants data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
-                << ", msgType: " << Packet::messageTypeToString(msgType);
-
-    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount());
-    ostream_.clear();
+    sendToList(confidants, (cs::Byte)i, msgType, round, std::forward<Args>(args)...);
 }
 
 template <class... Args>
@@ -2770,7 +2768,6 @@ void Node::getRoundTableReply(const uint8_t* data, const size_t size, const cs::
 void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     bool found = false;
     uint8_t confidantIndex = 0;
-    transport_->removeConfidants();
 
     for (auto& conf : roundTable.confidants) {
         if (conf == nodeIdKey_) {

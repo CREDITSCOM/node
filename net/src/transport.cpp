@@ -314,22 +314,6 @@ void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     }
 }
 
-void Transport::deliverConfidants(const Packet* pack, const uint32_t size) {
-    if (!nh_.isConfidants()) {
-        deliverBroadcast(pack, size);
-        return;
-    }
-    if (size >= Packet::MaxFragments) {
-        ++Transport::cntExtraLargeNotSent;
-        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
-    }
-
-    const auto packEnd = pack + size;
-    for (auto ptr = pack; ptr != packEnd; ++ptr) {
-        nh_.sendByConfidants(ptr);
-    }
-}
-
 bool Transport::checkConfidants(const std::vector<cs::PublicKey>& list, int except) {
     cs::Lock lock(aLock_);
 
@@ -356,7 +340,7 @@ void Transport::deliverConfidants(const Packet* pack, const uint32_t size, const
                 finded = false;
                 break;
             }
-            conns.emplace_back(nh_.addConfidant(net_->resolve(res->second), false));
+            conns.emplace_back(nh_.addConfidant(net_->resolve(res->second)));
         }
     }
 
@@ -1562,7 +1546,6 @@ bool Transport::gotSSIntroduceConsensusReply()
     if (ssStatus_ != SSBootstrapStatus::Complete) {
         return false;
     }
-    nh_.removeConfidants();
 
     uint8_t numCirc{ 0 };
     iPackStream_ >> numCirc;
@@ -1582,13 +1565,12 @@ bool Transport::gotSSIntroduceConsensusReply()
             cs::Lock lock(aLock_);
             auto value = std::make_pair(key, ep);
             auto res = addresses_.insert(value);
-            if (!res.second) {
+            if (!res.second && res.first->second != ep) {
                 auto hint = res.first;
                 --hint;
                 addresses_.erase(res.first);
                 addresses_.insert(hint, value);
             }
-            nh_.addConfidant(net_->resolve(ep));
         }
     }
 /*
@@ -1615,12 +1597,4 @@ void Transport::sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys)
     oPackStream_ << static_cast<uint8_t>(keys.size());
     std::for_each(keys.cbegin(), keys.cend(), [this](const cs::PublicKey& key) { oPackStream_ << key; });
     net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
-}
-
-bool Transport::isConfidants() {
-    return nh_.isConfidants();
-}
-
-void Transport::removeConfidants() {
-    return nh_.removeConfidants();
 }

@@ -176,15 +176,18 @@ void Neighbourhood::sendByConfidant(const Packet* pack, ConnectionPtr conn) {
     transport_->sendDirect(pack, **conn);
 }
 
-void Neighbourhood::sendByConfidants(const Packet* pack) {
-    for (auto& nb : confidants_) {
-        auto& bp = msgDirects_.tryStore(pack->getHash());
+ConnectionPtr Neighbourhood::addConfidant(const ip::udp::endpoint& ep) {
+    csdebug() << "Add confidant " << ep;
 
-        bp.pack = *pack;
-        bp.receiver = nb;
+    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
+    auto conn = getConnection(ep);
 
-        transport_->sendDirect(pack, **nb);
+    if (!conn->id) {
+        conn->id = getSecureRandom<Connection::Id>();
     }
+
+    conn->connected = true;
+    return conn;
 }
 
 bool Neighbourhood::canHaveNewConnection() {
@@ -320,7 +323,7 @@ static ip::udp::endpoint getIndexingEndpoint(const ip::udp::endpoint& ep) {
 }
 
 ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
-    cswarning() << "Getting connection";
+    csdebug() << "Getting connection to " << ep;
     auto& conn = connections_.tryStore(getIndexingEndpoint(ep));
 
     if (!conn) {
@@ -437,28 +440,6 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
 
     conn->isSignal = true;
     connectNode(node, conn);
-}
-
-ConnectionPtr Neighbourhood::addConfidant(const ip::udp::endpoint& ep, bool insert) {
-    csdebug() << "Add confidant " << ep;
-
-    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
-    auto conn = getConnection(ep);
-
-    if (!conn->id) {
-        conn->id = getSecureRandom<Connection::Id>();
-    }
-
-    conn->connected = true;
-    if (insert) {
-        confidants_.push_back(conn);
-    }
-    return conn;
-}
-
-void Neighbourhood::removeConfidants() {
-    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
-    confidants_.clear();
 }
 
 bool Neighbourhood::updateSignalServer(const ip::udp::endpoint& in) {
