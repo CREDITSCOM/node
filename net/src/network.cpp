@@ -508,7 +508,6 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         return;
     }
 
-    bool resend = task->pack.isBroadcast();
 
     // Non-network data
     uint32_t& recCounter = packetMap_.tryStore(task->pack.getHash());
@@ -534,8 +533,15 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         }
     }
 
-    resend = !(task->pack.getAddressee() == transport_->getMyPublicKey()) && resend;
-    resend = !recCounter && resend;
+    bool resend = false;
+    if (recCounter == 0) {
+        if (!task->pack.isBroadcast() && !task->pack.isDirect()) {
+            resend = task->pack.getAddressee() != transport_->getMyPublicKey();
+        } else {
+            resend = task->pack.isBroadcast();
+        }
+    }
+
     transport_->redirectPacket(task->pack, remoteSender, resend);
     ++recCounter;
 }

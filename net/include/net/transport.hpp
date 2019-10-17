@@ -154,7 +154,6 @@ public:
     // thread safe negihbours methods
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);
     void forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> func);
-    bool forRandomNeighbour(std::function<void(ConnectionPtr)> func);
 
     // no thread safe
     const Connections getNeighbours() const;

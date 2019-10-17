@@ -146,7 +146,7 @@ bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
 // Not thread safe. Need lock nLockFlag_ above.
 void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
 
-    if (pack->isNeighbors()) {
+    if (pack->isDirect()) {
         for (auto& nb : neighbours_) {
             auto& bp = msgDirects_.tryStore(pack->getHash());
 
@@ -404,18 +404,6 @@ void Neighbourhood::forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)>
             func(connection);
         }
     }
-}
-
-bool Neighbourhood::forRandomNeighbour(std::function<void(ConnectionPtr)> func) {
-    cs::Lock lock(nLockFlag_);
-    ConnectionPtr connection = getRandomNeighbour();
-
-    if (connection.isNull()) {
-        return false;
-    }
-
-    func(connection);
-    return !connection.isNull();
 }
 
 void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr node) {
@@ -894,15 +882,4 @@ int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) 
     }
 
     return randomNumber;
-}
-
-ConnectionPtr Neighbourhood::getRandomNeighbour() {
-    if (neighbours_.size() == 0) {
-        return ConnectionPtr();
-    }
-
-    const size_t neighbourCount = static_cast<size_t>(neighbours_.size() - 1U);
-    const int randomNumber = cs::Random::generateValue<int>(0, static_cast<int>(neighbourCount));
-
-    return *(neighbours_.begin() + randomNumber);
 }

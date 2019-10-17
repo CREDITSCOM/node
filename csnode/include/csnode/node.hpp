@@ -309,7 +309,7 @@ private:
 
     // default methods without flags
     template <typename... Args>
-    void sendDefault(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    void sendToTargetBroadcast(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     // to neighbour
     template <typename... Args>
@@ -337,13 +337,10 @@ private:
 
     // broadcast
     template <class... Args>
-    void sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    void sendToBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     template <typename... Args>
-    void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
-
-    template <typename... Args>
-    void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+    void sendToBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
     // write values to stream
     template <typename... Args>

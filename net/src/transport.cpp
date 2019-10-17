@@ -795,10 +795,6 @@ void Transport::forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> fun
     nh_.forEachNeighbourWithoutSS(std::move(func));
 }
 
-bool Transport::forRandomNeighbour(std::function<void(ConnectionPtr)> func) {
-    return nh_.forRandomNeighbour(std::move(func));
-}
-
 const Connections Transport::getNeighbours() const {
     return nh_.getNeigbours();
 }
@@ -1293,7 +1289,7 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender, bool r
         return;
     }
 
-    if (pack.isNeighbors()) {
+    if (pack.isDirect()) {
         return;  // Do not redirect packs
     }
 
@@ -1320,7 +1316,7 @@ void Transport::sendPackInform(const Packet& pack, RemoteNodePtr& sender) {
 void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
-    oPackStream_ << NetworkCommand::PackInform << static_cast<cs::Byte>(pack.isNeighbors()) << pack.getHash();
+    oPackStream_ << NetworkCommand::PackInform << static_cast<cs::Byte>(pack.isDirect()) << pack.getHash();
     sendDirect(oPackStream_.getPackets(), addr);
     oPackStream_.clear();
 }
