@@ -154,6 +154,8 @@ public:
         return nh_.getNeighboursLock();
     }
 
+    bool isShouldUpdateNeighbours() const;
+
     // thread safe negihbours methods
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);
     void forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> func);

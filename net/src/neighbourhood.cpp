@@ -279,14 +279,7 @@ void Neighbourhood::checkSilent() {
 }
 
 void Neighbourhood::checkNeighbours() {
-    uint32_t size = 0;
-
-    {
-        cs::Lock lock(nLockFlag_);
-        size = uint32_t(neighbours_.size());
-    }
-
-    if (size < MinNeighbours) {
+    if (transport_->isShouldUpdateNeighbours()) {
         transport_->refillNeighbourhood();
     }
 }
