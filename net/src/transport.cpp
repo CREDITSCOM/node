@@ -357,6 +357,7 @@ void Transport::deliverConfidants(const Packet* pack, const uint32_t size, const
     for (auto& conn: conns) {
         const auto packEnd = pack + size;
         for (auto ptr = pack; ptr != packEnd; ++ptr) {
+            csdebug() << "Transport: sending to " << (conn->specialOut ? conn->out : conn->in);
             nh_.sendByConfidant(ptr, conn);
         }
     }

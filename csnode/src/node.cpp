@@ -373,13 +373,20 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
     istream_.init(data, size);
 
     uint16_t version = 0;
-    istream_ >> version;
-
-    if (!istream_.good() || istream_.remainsBytes() != cscrypto::kSignatureSize) {
+    cs::Signature sig;
+    istream_ >> version >> sig;
+    if (!istream_.good() || !istream_.end()) {
         cswarning() << "NODE> Get stop request parsing failed";
         return;
     }
-
+    cs::Bytes message;
+    cs::DataStream stream(message);
+    stream << round << version;
+    const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
+    if (!cscrypto::verifySignature(sig, starter_key, message.data(), message.size())) {
+        cswarning() << "NODE> Get incorrect stoprequest signature, possible attack";
+        return;
+    }
     cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
 
     if (NODE_VERSION > version) {
@@ -1276,7 +1283,7 @@ void Node::sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, c
 template <class... Args>
 void Node::sendToBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
     ostream_.init(BaseFlags::Broadcast /*| BaseFlags::Fragmented*/ | BaseFlags::Compressed);
-    csdetails() << "NODE> Sending broadcast";
+    csdebug() << "NODE> Sending broadcast";
 
     sendToBroadcastImpl(msgType, round, std::forward<Args>(args)...);
 }
@@ -1321,11 +1328,16 @@ void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::B
 
     writeDefaultStream(std::forward<Args>(args)...);
 
-    csdetails() << "NODE> Sending confidants list data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
+    csdebug() << "NODE> Sending confidants list data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
                 << ", msgType: " << Packet::messageTypeToString(msgType);
 
     transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount(), listMembers, (int)listExeption);
     ostream_.clear();
+}
+
+template <class... Args>
+void Node::sendToSingle(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+    sendToList(std::vector<cs::PublicKey>{target}, cs::ConfidantConsts::InvalidConfidantIndex, msgType, round, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
@@ -1621,7 +1633,7 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required /
         return;
     }
 
-    sendToTargetBroadcast(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required /*, iteration*/);
+    sendToSingle(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required /*, iteration*/);
     csmeta(csdetails) << "done";
 }
 
@@ -1692,7 +1704,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
     if (!conveyer.isConfidantExists(requester) || !conveyer.isConfidantExists(sender)) {
         return;
     }
-    sendToTargetBroadcast(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
+    sendToSingle(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
 
     csmeta(csdetails) << "done";
 }
@@ -1940,7 +1952,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
 }
 
 void Node::smartStageRequest(MsgTypes msgType, uint64_t smartID, cs::PublicKey confidant, uint8_t respondent, uint8_t required) {
-    sendToTargetBroadcast(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartID, respondent, required);
+    sendToSingle(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartID, respondent, required);
     csmeta(csdetails) << "done";
 }
 
@@ -1969,7 +1981,7 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
 void Node::sendSmartStageReply(const cs::Bytes& message, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey& requester) {
     csmeta(csdetails) << "started";
 
-    sendToTargetBroadcast(requester, msgType, cs::Conveyer::instance().currentRoundNumber(), message, signature);
+    sendToSingle(requester, msgType, cs::Conveyer::instance().currentRoundNumber(), message, signature);
     csmeta(csdetails) << "done";
 }
 

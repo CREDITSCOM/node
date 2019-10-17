@@ -331,6 +331,9 @@ private:
     template <class... Args>
     void sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
+    template <class... Args>
+    void sendToSingle(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
     // to neighbours
     template <typename... Args>
     bool sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
