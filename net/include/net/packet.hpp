@@ -16,7 +16,7 @@
 #include <memory>
 #include <vector>
 
-const uint32_t MaxRememberPackets = 400000;
+const uint32_t MaxRememberPackets = 100000;
 
 /*
     Static min memory usage (see types below):
