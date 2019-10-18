@@ -1596,7 +1596,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     }
 
     if (stage.iteration < solver_->currentStage3iteration()) {
-        stageRequest(MsgTypes::ThirdStage, myConfidantIndex_, stage.sender);
+        stageRequest(MsgTypes::ThirdStage, myConfidantIndex_, stage.sender, solver_->currentStage3iteration());
         return;
     }
     else if (stage.iteration > solver_->currentStage3iteration()) {
@@ -1620,7 +1620,7 @@ void Node::adjustStageThreeStorage() {
     stageThreeSent_ = false;
 }
 
-void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required /*, uint8_t iteration*/) {
+void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, uint8_t iteration) {
     csdebug() << __func__;
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
         cswarning() << "NODE> Only confidant nodes can request consensus stages";
@@ -1633,7 +1633,7 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required /
         return;
     }
 
-    sendToSingle(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required /*, iteration*/);
+    sendToSingle(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required, iteration);
     csmeta(csdetails) << "done";
 }
 
@@ -1660,6 +1660,11 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
     uint8_t requiredNumber = 0;
     istream_ >> requiredNumber;
 
+    uint8_t iteration = solver_->currentStage3iteration(); // default value
+    if (istream_.isBytesAvailable(1)) {
+        istream_ >> iteration;
+    }
+
     if (!istream_.good() || !istream_.end()) {
         cserror() << "Bad StageThree packet format";
         return;
@@ -1683,7 +1688,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
             solver_->gotStageTwoRequest(requesterNumber, requiredNumber);
             break;
         case MsgTypes::ThirdStageRequest:
-            solver_->gotStageThreeRequest(requesterNumber, requiredNumber /*, iteration*/);
+            solver_->gotStageThreeRequest(requesterNumber, requiredNumber, iteration);
             break;
         default:
             break;
