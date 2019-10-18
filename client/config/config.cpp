@@ -84,6 +84,7 @@ const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
 const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
 const std::string ARG_NAME_RECREATE_INDEX = "recreate-index";
 const std::string ARG_NAME_NEW_BC_TOP = "set-bc-top";
+const std::string ARG_NAME_DISABLE_AUTO_SHUTDOWN = "disable-auto-shutdown";
 
 const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
@@ -178,6 +179,7 @@ Config Config::read(po::variables_map& vm) {
     Config result = readFromFile(getArgFromCmdLine(vm, ARG_NAME_CONFIG_FILE, DEFAULT_PATH_TO_CONFIG));
 
     result.recreateIndex_ = vm.count(ARG_NAME_RECREATE_INDEX);
+    result.autoShutdownEnabled_ = !vm.count(ARG_NAME_DISABLE_AUTO_SHUTDOWN);
     result.pathToDb_ = getArgFromCmdLine(vm, ARG_NAME_DB_PATH, DEFAULT_PATH_TO_DB);
 
     if (vm.count(ARG_NAME_NEW_BC_TOP)) {

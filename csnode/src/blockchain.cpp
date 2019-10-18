@@ -11,6 +11,7 @@
 #include <csnode/datastream.hpp>
 #include <csnode/fee.hpp>
 #include <csnode/nodeutils.hpp>
+#include <csnode/node.hpp>
 #include <csnode/transactionsiterator.hpp>
 #include <solver/smartcontracts.hpp>
 
@@ -88,6 +89,9 @@ inline void checkLastIndFile(bool& recreateIndex) {
         return;
     }
     lastIndexedPool = *(f.data<const cs::Sequence>());
+    if (lastIndexedPool == kWrongSequence) {
+      recreateIndex = true;
+    }
 }
 
 inline void updateLastIndFile() {
@@ -1636,7 +1640,20 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) co
 
 cs::Sequence BlockChain::getPreviousPoolSeq(const csdb::Address& addr, cs::Sequence ps) const {
     std::lock_guard lock(dbLock_);
-    return storage_.get_previous_transaction_block(getAddressByType(addr, AddressType::PublicKey), ps);
+    auto prev_seq = storage_.get_previous_transaction_block(
+            getAddressByType(addr, AddressType::PublicKey), ps);
+
+    if (prev_seq == ps) {
+        if (Node::autoShutdownEnabled()) {
+            cserror() << "Inconsistent transaction index. Node will be stopped. Please restart it.";
+            lastIndexedPool = kWrongSequence;
+            updateLastIndFile();
+            Node::requestStop();
+        }
+        return kWrongSequence;
+    }
+
+    return prev_seq;
 }
 
 std::pair<cs::Sequence, uint32_t> BlockChain::getLastNonEmptyBlock() {
