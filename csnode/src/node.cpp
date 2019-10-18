@@ -1409,7 +1409,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     istream_ >> subRound;
 
     if (subRound != subRound_) {
-        cswarning() << "NODE> ignore stage-1 with subround #" << subRound << ", required #" << subRound_;
+        cswarning() << "NODE> ignore stage-1 with subround #" << static_cast<int>(subRound) << ", required #" << static_cast<int>(subRound_);
         return;
     }
 
@@ -1497,7 +1497,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     istream_ >> subRound;
 
     if (subRound != subRound_) {
-        cswarning() << "NODE> We got Stage-2 for the Node with SUBROUND, we don't have";
+        cswarning() << "NODE> ignore stage-2 with subround #" << static_cast<int>(subRound) << ", required #" << static_cast<int>(subRound_);
         return;
     }
 
@@ -1565,7 +1565,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     istream_ >> subRound;
 
     if (subRound != subRound_) {
-        cswarning() << "NODE> We got Stage-2 for the Node with SUBROUND, we don't have";
+        cswarning() << "NODE> ignore stage-3 with subround #" << static_cast<int>(subRound) << ", required #" << static_cast<int>(subRound_);
         return;
     }
 
@@ -2502,7 +2502,6 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
         return;
     }
 
-    // TODO: here shoud be placed the DPOS check
     csdetails() << "NODE> get hash of round " << rNum << ", data size " << size;
 
     istream_.init(data, size);
@@ -2510,8 +2509,8 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     istream_ >> subRound;
 
     if (subRound > subRound_) {
-        cswarning() << "NODE> We got hash for the Node with SUBROUND: " << static_cast<int>(subRound) << ", we don't have";
-        // TODO : Maybe return
+        cswarning() << "NODE> We got hash for the Node with SUBROUND: " << static_cast<int>(subRound) << " required #" << static_cast<int>(subRound_);
+        // We don't have to return, the has of previous is the same 
     }
 
     cs::Bytes message;

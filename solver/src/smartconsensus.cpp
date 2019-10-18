@@ -360,7 +360,7 @@ void SmartConsensus::processStages() {
 
             }
             else {
-                cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "], hash is different: "
+                csdebug() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "], hash is different: "
                     << cs::Utils::byteStreamToHex(st.hash.data(), st.hash.size()) << " - is marked as untrusted";
             }
 
@@ -402,7 +402,7 @@ void SmartConsensus::processStages() {
                         cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted (zero hash) - possibly silent";
                     }
                     else {
-                        cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted, hash is wrong: "
+                        csdebug() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted, hash is wrong: "
                             << cs::Utils::byteStreamToHex(st.hashes[i].data(), st.hashes[i].size());
                     }
                 }
