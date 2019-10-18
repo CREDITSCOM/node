@@ -337,6 +337,9 @@ void SmartConsensus::processStages() {
     const size_t cnt = smartConfidants_.size();
     std::map<cs::Hash, size_t> hashCount;
     // perform the evaluation og stages 1 & 2 to find out who is traitor
+    if (ownSmartsConfNum_ >= smartStageOneStorage_.size()) {
+        return;
+    }
     const auto& hash_t = smartStageOneStorage_.at(ownSmartsConfNum_).hash;
     size_t currentSmartsNumber = smartStageOneStorage_.at(ownSmartsConfNum_).fees.size();
     for (auto& st : smartStageOneStorage_) {

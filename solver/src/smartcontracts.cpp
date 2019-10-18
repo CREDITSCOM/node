@@ -1984,8 +1984,12 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
     }
     csdebug() << kLogPrefix << "starting " << os.str() << "consensus";
     if (!it->is_executor || !start_consensus(*it)) {
-        cserror() << kLogPrefix << os.str() << "consensus is not started, remove item from queue";
-        remove_from_queue(it, false/*skip_log*/);
+        if (!it->is_executor) {
+            csdebug() << kLogPrefix << os.str() << "consensus need not to start";
+        }
+        else {
+            cswarning() << kLogPrefix << os.str() << "consensus is not started, probably this node is not a confidant";
+        }
     }
 }
 
@@ -2012,7 +2016,11 @@ bool SmartContracts::start_consensus(QueueItem& item) {
     // inform slots if any, packet does not contain smart consensus' data!
     emit signal_smart_executed(integral_packet);
 
-    return item.pconsensus->initSmartRound(integral_packet, run_counter, this->pnode, this);
+    const auto res = item.pconsensus->initSmartRound(integral_packet, run_counter, this->pnode, this);
+    if (!res) {
+        item.pconsensus.reset();
+    }
+    return res;
 }
 
 uint64_t SmartContracts::next_inner_id(const csdb::Address& addr) const {
@@ -2153,8 +2161,10 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                     }
     
                     // finally, restart consensus on the queue item
-                    if (!start_consensus(*it_queue)) {
-                        cserror() << kLogPrefix << "failed to restart consensus on " << FormatRef(sequence);
+                    if (it_queue->is_executor) {
+                        if (!start_consensus(*it_queue)) {
+                            cserror() << kLogPrefix << "failed to restart consensus on " << FormatRef(sequence);
+                        }
                     }
                 }
 
