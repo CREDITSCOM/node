@@ -25,6 +25,7 @@ const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
 const std::string DEFAULT_PATH_TO_PUBLIC_KEY = "NodePublic.txt";
 const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 
+const uint32_t DEFAULT_MIN_NEIGHBOURS = 5;
 const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::MaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
@@ -140,6 +141,10 @@ public:
         return twoSockets_;
     }
 
+    uint32_t getMinNeighbours() const {
+        return minNeighbours_;
+    }
+
     uint32_t getMaxNeighbours() const {
         return maxNeighbours_;
     }
@@ -245,6 +250,7 @@ private:
 
     bool ipv6_ = false;
 
+    uint32_t minNeighbours_ = DEFAULT_MIN_NEIGHBOURS;
     uint32_t maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS;
     uint64_t connectionBandwidth_ = DEFAULT_CONNECTION_BANDWIDTH;
 

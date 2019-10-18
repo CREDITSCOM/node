@@ -797,11 +797,14 @@ cs::Sequence Transport::getConnectionLastSequence(const std::size_t number) {
     return cs::Sequence{};
 }
 
+bool Transport::isShouldUpdateNeighbours() const {
+    return nh_.getNeighboursCountWithoutSS() < config_->getMinNeighbours();
+}
+
 ConnectionPtr Transport::getRandomNeighbour() {
     csdebug() << "Transport> Get random neighbour for Sync";
     return nh_.getRandomSyncNeighbour();
 }
-
 
 void Transport::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
     nh_.forEachNeighbour(std::move(func));

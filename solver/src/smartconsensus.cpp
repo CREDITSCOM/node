@@ -376,7 +376,7 @@ void SmartConsensus::processStages() {
             ++hashCount.at(st.hash);
         }
     }
-    auto& it = hashCount.cbegin();
+    auto it = hashCount.cbegin();
     size_t maxFreq = 0;
     cs::Hash finHash = Zero::hash;
     while (it != hashCount.cend()) {
