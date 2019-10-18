@@ -88,6 +88,9 @@ inline void checkLastIndFile(bool& recreateIndex) {
         return;
     }
     lastIndexedPool = *(f.data<const cs::Sequence>());
+    if (lastIndexedPool == kWrongSequence) {
+      recreateIndex = true;
+    }
 }
 
 inline void updateLastIndFile() {
