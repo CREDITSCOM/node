@@ -175,6 +175,10 @@ public:
         return recreateIndex_;
     }
 
+    bool autoShutdownEnabled() const {
+        return autoShutdownEnabled_;
+    }
+
     const cs::PublicKey& getMyPublicKey() const {
         return publicKey_;
     }
@@ -275,6 +279,7 @@ private:
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
     bool newBlockchainTop_ = false;
+    bool autoShutdownEnabled_ = true;
 
     uint64_t newBlockchainTopSeq_;
 
