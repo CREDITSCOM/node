@@ -1176,6 +1176,7 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                     csdb::Transaction executed_transaction;
                     SmartContractRef executed_ref;
                     if (!all_contract_blocks.empty()) {
+                        bool request_state_required = false;
                         for (const auto seq : all_contract_blocks) {
                             const csdb::Pool b = bc.loadBlock(seq);
                             for (const auto& tt : b.transactions()) {

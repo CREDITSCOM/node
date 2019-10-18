@@ -1303,20 +1303,22 @@ void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round,
 }
 
 template <class... Args>
-void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listException, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
 #if defined(DIRECT_SEND_AVAIL)
     const auto size = listMembers.size();
 
     for (size_t i = 0; i < size; ++i) {
         const auto& listMember = listMembers[i];
 
-        if (listExeption == i && nodeIdKey_ == listMember) {
+        if (listException == i && nodeIdKey_ == listMember) {
             continue;
         }
 
         sendBroadcast(listMember, msgType, round, std::forward<Args>(args)...);
     }
 #else
+    csunused(listMembers);
+    csunused(listException);
     sendBroadcast(msgType, round, std::forward<Args>(args)...);
 #endif
 }
