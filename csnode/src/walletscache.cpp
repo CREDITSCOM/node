@@ -511,8 +511,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
 
 void WalletsCache::Updater::updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>& updates) {
     for (const auto& u : updates) {
-        auto it = std::find_if(data_.wallets_.begin(), data_.wallets_.end(), [&u](auto& wall) {
-                               return wall.first == u.first; });
+        auto it = data_.wallets_.find(u.first);
         if (it != data_.wallets_.end()) {
             it->second.lastTransaction_ = u.second;
         }

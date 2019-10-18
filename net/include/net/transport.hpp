@@ -116,11 +116,8 @@ public:
     bool sendDirectToSock(Packet*, const Connection&);
     void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
     void deliverBroadcast(const Packet*, const uint32_t);
-    void deliverConfidants(const Packet* pack, const uint32_t size);
     void deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
     bool checkConfidants(const std::vector<cs::PublicKey>& list, int except = -1);
-    bool isConfidants();
-    void removeConfidants();
 
     void gotPacket(const Packet&, RemoteNodePtr&);
     void redirectPacket(const Packet&, RemoteNodePtr&, bool resend = true);
@@ -154,10 +151,11 @@ public:
         return nh_.getNeighboursLock();
     }
 
+    bool isShouldUpdateNeighbours() const;
+
     // thread safe negihbours methods
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);
     void forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> func);
-    bool forRandomNeighbour(std::function<void(ConnectionPtr)> func);
 
     // no thread safe
     const Connections getNeighbours() const;

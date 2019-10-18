@@ -1,3 +1,4 @@
+#include <map>
 #include <smartconsensus.hpp>
 #include <smartcontracts.hpp>
 
@@ -137,6 +138,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     smartConfidants_ = pnode_->retriveSmartConfidants(smartRoundNumber_);
     ownSmartsConfNum_ = calculateSmartsConfNum();
     refreshSmartStagesStorage();
+
     if (ownSmartsConfNum_ == cs::InvalidConfidantIndex) {
         cserror() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " cannot determine own number in confidant list";
@@ -333,8 +335,11 @@ void SmartConsensus::addSmartStageTwo(cs::StageTwoSmarts& stage, bool send) {
 void SmartConsensus::processStages() {
     csmeta(csdetails) << "start";
     const size_t cnt = smartConfidants_.size();
+    std::map<cs::Hash, size_t> hashCount;
     // perform the evaluation og stages 1 & 2 to find out who is traitor
-    int hashFrequency = 1;
+    if (ownSmartsConfNum_ >= smartStageOneStorage_.size()) {
+        return;
+    }
     const auto& hash_t = smartStageOneStorage_.at(ownSmartsConfNum_).hash;
     size_t currentSmartsNumber = smartStageOneStorage_.at(ownSmartsConfNum_).fees.size();
     for (auto& st : smartStageOneStorage_) {
@@ -358,17 +363,35 @@ void SmartConsensus::processStages() {
 
             }
             else {
-                cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted, hash is wrong: "
-                    << cs::Utils::byteStreamToHex(st.hash.data(), st.hash.size());
+                csdebug() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "], hash is different: "
+                    << cs::Utils::byteStreamToHex(st.hash.data(), st.hash.size()) << " - is marked as untrusted";
             }
 
         }
         else {
-            ++hashFrequency;
+            csdebug() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "], hash  like  mine : "
+                << cs::Utils::byteStreamToHex(st.hash.data(), st.hash.size());
+        }
+        if (hashCount.find(st.hash) == hashCount.end()) {
+            hashCount.emplace(st.hash, 1ULL);
+        }
+        else {
+            ++hashCount.at(st.hash);
         }
     }
+    auto it = hashCount.cbegin();
+    size_t maxFreq = 0;
+    cs::Hash finHash = Zero::hash;
+    while (it != hashCount.cend()) {
+        if (maxFreq < it->second) {
+            maxFreq = it->second;
+            std::copy(it->first.cbegin(), it->first.cend(), finHash.begin());
+        }
+        ++it;
+    }
+
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " hash "
-        << cs::Utils::byteStreamToHex(hash_t.data(), hash_t.size()) << ", count = " << hashFrequency;
+        << cs::Utils::byteStreamToHex(finHash.data(), finHash.size()) << ", count = " << maxFreq;
     auto& myStage2 = smartStageTwoStorage_.at(ownSmartsConfNum_);
     for (auto& st : smartStageTwoStorage_) {
         if (st.sender == ownSmartsConfNum_) {
@@ -382,7 +405,7 @@ void SmartConsensus::processStages() {
                         cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted (zero hash) - possibly silent";
                     }
                     else {
-                        cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted, hash is wrong: "
+                        csdebug() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted, hash is wrong: "
                             << cs::Utils::byteStreamToHex(st.hashes[i].data(), st.hashes[i].size());
                     }
                 }
@@ -410,12 +433,19 @@ void SmartConsensus::processStages() {
     }
     const size_t lowerTrustedLimit = static_cast<size_t>(smartConfidants_.size() / 2. + 1.);
     if (cnt_active < lowerTrustedLimit) {
-        cslog() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
-        << " smart consensus is NOT achieved, the state transaction won't send to the conveyer";
+        if (maxFreq >= lowerTrustedLimit) {
+            cslog() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
+            << " smart consensus is achieved, but not by fraction of this node";
+        }
+        else {
+            cslog() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
+            << " smart consensus CAN'T be achieved, to low confidants in each fraction";
+        }
+
         return;
     }
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
-        << " smart consensus achieved";
+        << " smart consensus is achieved by this node fraction";
 
     if (hash_t.empty()) {
         return;  // TODO: decide what to return
