@@ -1164,10 +1164,11 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                     auto prev_seq = bc.getPreviousPoolSeq(abs_addr, t.id().pool_seq());
                     while (prev_seq != kWrongSequence) {
                         all_contract_blocks.insert(all_contract_blocks.cbegin(), prev_seq);
-                        prev_seq = bc.getPreviousPoolSeq(abs_addr, prev_seq);
-                        if (prev_seq == 0) {
+                        const auto tmp = bc.getPreviousPoolSeq(abs_addr, prev_seq);
+                        if (tmp == 0 || tmp == prev_seq) {
                             break;
                         }
+                        prev_seq = tmp;
                     }
 
                     // go through all blocks and re-execute contract
