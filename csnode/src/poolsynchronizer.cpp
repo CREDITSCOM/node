@@ -111,19 +111,31 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 
         roundSimulation_.start(60000, cs::Timer::Type::HighPrecise, RunPolicy::CallQueuePolicy);  // 1 Min
     }
-    else if (syncData_->requestRepeatRoundCount > 0) {
-        roundSimulation_.restart();
-        const bool isNeedRequest = checkActivity(CounterType::ROUND);
-        bool isAvailable = false;
+	else if (syncData_->requestRepeatRoundCount > 0) {
+		roundSimulation_.restart();
+		const bool isNeedRequest = checkActivity(CounterType::ROUND);
+		bool isAvailable = false;
 
-        if (syncData_->sequencesVerificationFrequency == 1) {
-            isAvailable = checkActivity(CounterType::TIMER);
-        }
+		if (syncData_->sequencesVerificationFrequency == 1) {
+			isAvailable = checkActivity(CounterType::TIMER);
+		}
 
-        if (isNeedRequest || isAvailable) {
-            sendBlockRequest();
-        }
-    }
+		if (isNeedRequest || isAvailable) {
+			sendBlockRequest();
+		}
+
+		bool nothing_to_request = true;
+		for (const auto& neighbour : neighbours_) {
+			if (!neighbour.sequences().empty()) {
+				nothing_to_request = false;
+				break;
+			}
+		}
+		if (nothing_to_request) {
+			cslog() << "PoolSyncronizer> No sequence is waited from any neighbour, finish sync";
+			synchroFinished();
+		}
+	}
 }
 
 void cs::PoolSynchronizer::syncLastPool() {
