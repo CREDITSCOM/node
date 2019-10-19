@@ -120,10 +120,22 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
             isAvailable = checkActivity(CounterType::TIMER);
         }
 
-        if (isNeedRequest || isAvailable) {
-            sendBlockRequest();
-        }
-    }
+		if (isNeedRequest || isAvailable) {
+			sendBlockRequest();
+		}
+
+		bool nothing_to_request = true;
+		for (const auto& neighbour : neighbours_) {
+			if (!neighbour.sequences().empty()) {
+				nothing_to_request = false;
+				break;
+			}
+		}
+		if (nothing_to_request) {
+			cslog() << "PoolSyncronizer> No sequence is waited from any neighbour, finish sync";
+			synchroFinished();
+		}
+	}
 }
 
 void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_t packetNum) {
