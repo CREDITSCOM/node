@@ -159,7 +159,9 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
     if (!wallState.trxTail_.isAllowed(trx.innerID())) {
         csdebug() << kLogPrefix << "reject transaction, duplicated or incorrect innerID " << trx.innerID() << ", allowed " << wallState.trxTail_.printRange();
         if (SmartContracts::is_new_state(trx)) {
-            rejectedNewStates_.push_back(context.smart_contracts().absolute_address(trx.source()));
+            auto addr = context.smart_contracts().absolute_address(trx.source());
+            rejectedNewStates_.push_back(addr);
+            duplicatedNewStates_.push_back(addr);
         }
         return false;
     }
@@ -467,5 +469,10 @@ bool TransactionsValidator::removeTransactions_NegativeAll(SolverContext& contex
     }
 
     return false;
+}
+
+bool TransactionsValidator::duplicatedNewState(SolverContext& context, const csdb::Address& addr) const {
+    auto abs_addr = context.smart_contracts().absolute_address(addr);
+    return std::find(duplicatedNewStates_.begin(), duplicatedNewStates_.end(), abs_addr) != duplicatedNewStates_.end();
 }
 }  // namespace cs

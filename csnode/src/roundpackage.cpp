@@ -150,9 +150,6 @@ namespace cs {
     trustedSignatures_ = signatures;
   }
 
-  void RoundPackage::updateSmartSignatures(const std::vector<csdb::Pool::SmartSignature> smartSigs) {
-  }
-
   const cs::PoolMetaInfo RoundPackage::poolMetaInfo() {
     return poolMetaInfo_;
   }
@@ -189,7 +186,7 @@ namespace cs {
     binaryRepresentation_.clear();
     binaryRepresentation_.reserve(expectedMessageSize);
     cs::DataStream stream(binaryRepresentation_);
-    //uint8_t subRound = 0;
+
     uint8_t iteration = 0;
     stream << roundTable_.confidants;
     stream << poolMetaInfo_.realTrustedMask;
@@ -199,11 +196,7 @@ namespace cs {
     stream << poolMetaInfo_.characteristic.mask;
     stream << poolMetaInfo_.sequenceNumber;
     stream << poolMetaInfo_.previousHash;
-    //stream << lastSentRoundData_.poolMetaInfo.writerKey; -- we don't need to send this
-    //cs::Bytes trustedList;
-    //cs::DataStream tStream(trustedList);
-    //tStream << newRoundTable.round;
-    //tStream << newRoundTable.confidants;
+
     messageSize_ = binaryRepresentation_.size();
   }
 

@@ -50,7 +50,7 @@ void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& chara
     size_t i = 0;
     for (const auto& tr : transactions) {
         if (i < maskSize && *(characteristicMask.cbegin() + static_cast<std::ptrdiff_t>(i)) == kInvalidMarker) {
-            if (SmartContracts::is_new_state(tr)) {
+            if (SmartContracts::is_new_state(tr) && !pTransval_->duplicatedNewState(context, tr.source())) {
                 csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
                 if (fld.is_valid()) {
                     SmartContractRef ref(fld);

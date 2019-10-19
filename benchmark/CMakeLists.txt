@@ -6,9 +6,12 @@ project(benchmark)
 add_subdirectory(testbench)
 add_subdirectory(lmdbbench)
 add_subdirectory(allocatorbench)
+add_subdirectory(signalsbench)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+configure_msvc_flags()
 
 add_library(${PROJECT_NAME} STATIC "./include/timeoutexception.hpp"
                                    "./include/benchmark.hpp"

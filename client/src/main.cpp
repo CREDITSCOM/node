@@ -157,6 +157,7 @@ int main(int argc, char* argv[]) {
         ("recreate-index", "recreate index.db")
         ("seed", "enter with seed instead of keys")
         ("set-bc-top", po::value<uint64_t>(), "all blocks in blockchain with higher sequence will be removed")
+        ("disable-auto-shutdown", "node will be prohibited to shutdown in case of fatal errors")
         ("version", "show node version")
         ("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")
         ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")")

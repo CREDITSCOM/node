@@ -19,7 +19,6 @@ namespace cs {
       void updateRoundSignatures(const cs::Signatures signatures);
       void updatePoolSignatures(const cs::Signatures signatures);
       void updateTrustedSignatures(const cs::Signatures signatures);
-      void updateSmartSignatures(std::vector<csdb::Pool::SmartSignature> smartSignatures);
       cs::Signatures roundSignatures();
       cs::Signatures poolSignatures();
       cs::Signatures trustedSignatures();

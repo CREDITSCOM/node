@@ -16,6 +16,8 @@
 #include <memory>
 #include <vector>
 
+const uint32_t MaxRememberPackets = 100000;
+
 /*
     Static min memory usage (see types below):
 
@@ -33,7 +35,7 @@ enum BaseFlags : uint8_t {
     Compressed = 1 << 3,
     Encrypted = 1 << 4,
     Signed = 1 << 5,
-    Neighbours = 1 << 6,  // send packet to Neighbours only, Neighbours _cant_ resend it
+    Direct = 1 << 6,  // send packet to Direct only, Node _cant_ resend it
 };
 
 enum Offsets : uint32_t {
@@ -118,8 +120,8 @@ public:
         return checkFlag(BaseFlags::Compressed);
     }
 
-    bool isNeighbors() const {
-        return checkFlag(BaseFlags::Neighbours);
+    bool isDirect() const {
+        return checkFlag(BaseFlags::Direct);
     }
 
     const cs::Hash& getHash() const {
@@ -132,7 +134,7 @@ public:
     }
 
     bool addressedToMe(const cs::PublicKey& myKey) const {
-        return isNetwork() || isNeighbors() || (isBroadcast() && !(getSender() == myKey)) || getAddressee() == myKey;
+        return isNetwork() || isDirect() || (isBroadcast() && !(getSender() == myKey)) || getAddressee() == myKey;
     }
 
     const cs::PublicKey& getSender() const {

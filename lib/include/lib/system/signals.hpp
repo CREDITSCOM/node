@@ -1,10 +1,11 @@
 #ifndef SIGNALS_HPP
 #define SIGNALS_HPP
 
-#include <lib/system/utils.hpp>
-
 #include <functional>
-#include <vector>
+#include <algorithm>
+
+#include <lib/system/common.hpp>
+#include <lib/system/reflection.hpp>
 
 #define signals
 #define slots
@@ -538,6 +539,10 @@ template <typename Object>
 inline void cshelper::ConnectorForwarder::disconnect(const ISignal* signal, const Object& object) {
     cs::Connector::disconnect(signal, object);
 }
+
+// primitive signals types
+// to not use many defined same types
+using Action = cs::Signal<void()>;
 
 }  // namespace cs
 

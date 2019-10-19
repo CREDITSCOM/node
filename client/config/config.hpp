@@ -16,7 +16,7 @@ namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
 using NodeVersion = uint16_t;
-const NodeVersion NODE_VERSION = 421;
+const NodeVersion NODE_VERSION = 430;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
@@ -25,13 +25,16 @@ const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
 const std::string DEFAULT_PATH_TO_PUBLIC_KEY = "NodePublic.txt";
 const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 
+const uint32_t DEFAULT_MIN_NEIGHBOURS = 5;
 const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::MaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
+const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
 
 const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;             // rounds
 const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
 
+[[maybe_unused]]
 const uint8_t DELTA_ROUNDS_VERIFY_NEW_SERVER = 100;
 using Port = short unsigned;
 
@@ -75,6 +78,8 @@ struct ApiData {
     int ajaxServerReceiveTimeout = 30000;
     std::string executorHost{ "localhost" };
     std::string executorCmdLine{};
+    int executorRunDelay = 10;
+    int executorBackgroundThreadDelay = 100;
 };
 
 struct ConveyerData {
@@ -136,6 +141,10 @@ public:
         return twoSockets_;
     }
 
+    uint32_t getMinNeighbours() const {
+        return minNeighbours_;
+    }
+
     uint32_t getMaxNeighbours() const {
         return maxNeighbours_;
     }
@@ -166,6 +175,10 @@ public:
         return recreateIndex_;
     }
 
+    bool autoShutdownEnabled() const {
+        return autoShutdownEnabled_;
+    }
+
     const cs::PublicKey& getMyPublicKey() const {
         return publicKey_;
     }
@@ -175,6 +188,10 @@ public:
 
     static NodeVersion getNodeVersion() {
         return NODE_VERSION;
+    }
+
+    NodeVersion getMinCompatibleVersion() const {
+        return minCompatibleVersion_;
     }
 
     void dumpJSONKeys(const std::string& fName) const;
@@ -193,6 +210,10 @@ public:
 
     uint64_t observerWaitTime() const {
         return observerWaitTime_;
+    }
+
+    uint64_t roundElapseTime() const {
+        return roundElapseTime_;
     }
 
     bool readKeys(const po::variables_map& vm);
@@ -229,9 +250,11 @@ private:
     EndpointData outputEp_;
 
     NodeType nType_ = NodeType::Client;
+    NodeVersion minCompatibleVersion_ = NODE_VERSION;
 
     bool ipv6_ = false;
 
+    uint32_t minNeighbours_ = DEFAULT_MIN_NEIGHBOURS;
     uint32_t maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS;
     uint64_t connectionBandwidth_ = DEFAULT_CONNECTION_BANDWIDTH;
 
@@ -256,10 +279,12 @@ private:
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
     bool newBlockchainTop_ = false;
+    bool autoShutdownEnabled_ = true;
 
     uint64_t newBlockchainTopSeq_;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
+    uint64_t roundElapseTime_ = DEFAULT_ROUND_ELAPSE_TIME;
 
     ConveyerData conveyerData_;
 
@@ -299,10 +324,8 @@ bool Config::replaceBlock(T&& blockName, Ts&& ... newLines) {
 
     if (const auto startPos = newConfig.find(fullBlockName); startPos != std::string::npos) {
         const auto tmpPos = newConfig.find("[", startPos + 1);
-        const auto endPos = tmpPos != std::string::npos ? tmpPos - 1 : newConfig.size();
-
-        newConfig.erase(startPos, endPos - startPos + 1);
-        newConfig.insert(startPos, fullReplaceString);
+        const auto endPos = (tmpPos != std::string::npos ? tmpPos - 1 : newConfig.size());
+        newConfig.replace(startPos, endPos, fullReplaceString);
     }
     else {
         newConfig += fullReplaceString;

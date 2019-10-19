@@ -11,6 +11,7 @@
 #include <csnode/datastream.hpp>
 #include <csnode/fee.hpp>
 #include <csnode/nodeutils.hpp>
+#include <csnode/node.hpp>
 #include <csnode/transactionsiterator.hpp>
 #include <solver/smartcontracts.hpp>
 
@@ -88,6 +89,9 @@ inline void checkLastIndFile(bool& recreateIndex) {
         return;
     }
     lastIndexedPool = *(f.data<const cs::Sequence>());
+    if (lastIndexedPool == kWrongSequence) {
+      recreateIndex = true;
+    }
 }
 
 inline void updateLastIndFile() {
@@ -188,7 +192,8 @@ void BlockChain::onStartReadFromDB(cs::Sequence lastWrittenPoolSeq) {
         recreateIndex_ = true;
     }
     if (lastWrittenPoolSeq > 0) {
-        cslog() << "Blockchain: start reading " << lastWrittenPoolSeq + 1 << " blocks from DB";
+        cslog() << "Blockchain: start reading " << WithDelimiters(lastWrittenPoolSeq + 1)
+            << " blocks from DB, 0.." << WithDelimiters(lastWrittenPoolSeq);
     }
 }
 
@@ -448,8 +453,10 @@ void BlockChain::removeLastBlock() {
         csmeta(csdebug) << "There are no blocks, allowed to be removed";
         return;
     }
-    --blocksToBeRemoved_;
-    csmeta(csdebug) << getLastSeq();
+    //--blocksToBeRemoved_;
+	cs::Sequence remove_seq = lastSequence_;
+	csdb::PoolHash remove_hash = blockHashes_->find(remove_seq);
+	csmeta(csdebug) << remove_seq;
     csdb::Pool pool{};
 
     {
@@ -466,27 +473,51 @@ void BlockChain::removeLastBlock() {
 
     if (!pool.is_valid()) {
         csmeta(cserror) << "Error! Removed pool is not valid";
-        return;
-    }
 
-    if (pool.sequence() == 0) {
-        csmeta(cswarning) << "Attempt to remove Genesis block !!!!!";
-        return;
+		if (remove_hash.is_empty()) {
+			cserror() << "Blockchain storage is corrupted, storage rescan is required";
+			return;
+		}
+
+		{
+			std::lock_guard lock(dbLock_);
+			if (!storage_.pool_remove_last_repair(remove_seq, remove_hash)) {
+				cserror() << "Blockchain storage is corrupted, storage rescan is required";
+				return;
+			}
+		}
+
+		cswarning() << "Wallets balances maybe invalidated, storage rescan required";
     }
+	else {
+		// just removed pool is valid
+		
+		if (!(remove_hash == pool.hash())) {
+			cswarning() << "Hashes cache is corrupted, storage rescan is required";
+			remove_hash = pool.hash();
+		}
+
+		if (pool.sequence() == 0) {
+			csmeta(cswarning) << "Attempt to remove Genesis block !!!!!";
+			return;
+		}
+
+		// such operations are only possible on valid pool:
+		total_transactions_count_ -= pool.transactions().size();
+		walletsCacheUpdater_->loadNextBlock(pool, pool.confidants(), *this, true);
+		// remove wallets exposed by the block
+		removeWalletsInPoolFromCache(pool);
+		// signal all subscribers, transaction index is still consistent up to removed block!
+		emit removeBlockEvent(pool);
+		// erase indexes from the block
+		removeLastBlockFromTrxIndex(pool);
+	}
 
     // to be sure, try to remove both sequence and hash
-    if (!blockHashes_->remove(pool.sequence())) {
-        blockHashes_->remove(pool.hash());
+    if (!blockHashes_->remove(remove_seq)) {
+        blockHashes_->remove(remove_hash);
     }
     --lastSequence_;
-    total_transactions_count_ -= pool.transactions().size();
-    walletsCacheUpdater_->loadNextBlock(pool, pool.confidants(), *this, true);
-    // remove wallets exposed by the block
-    removeWalletsInPoolFromCache(pool);
-    // signal all subscribers, transaction index is still consistent up to removed block!
-    emit removeBlockEvent(pool);
-    // erase indexes from the block
-    removeLastBlockFromTrxIndex(pool);
 
     csmeta(csdebug) << "done";
 }
@@ -957,18 +988,29 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
     }
 }
 
-void BlockChain::close() {
+void BlockChain::tryFlushDeferredBlock() {
     cs::Lock lock(dbLock_);
     if (deferredBlock_.is_valid() && deferredBlock_.is_read_only()) {
-        deferredBlock_.set_storage(storage_);
-        if (deferredBlock_.save()) {
-            csdebug() << "Blockchain> block #" << deferredBlock_.sequence() << " is flushed to DB";
-            deferredBlock_ = csdb::Pool{};
-        }
-        else {
-            cserror() << "Failed to flush block #" << deferredBlock_.sequence() << " to DB";
+        Hash tempHash;
+        auto hash = deferredBlock_.hash().to_binary();
+        std::copy(hash.cbegin(), hash.cend(), tempHash.data());
+        auto mask = cs::Utils::bitsToMask(deferredBlock_.numberTrusted(), deferredBlock_.realTrusted());
+        if (NodeUtils::checkGroupSignature(deferredBlock_.confidants(), mask, deferredBlock_.signatures(), tempHash)) {
+            deferredBlock_.set_storage(storage_);
+            if (deferredBlock_.save()) {
+                csdebug() << "Blockchain> block #" << WithDelimiters(deferredBlock_.sequence()) << " is flushed to DB";
+                deferredBlock_ = csdb::Pool{};
+            }
+            else {
+                cserror() << "Failed to flush block #" << WithDelimiters(deferredBlock_.sequence()) << " to DB";
+            }
         }
     }
+}
+
+void BlockChain::close() {
+    tryFlushDeferredBlock();
+    cs::Lock lock(dbLock_);
     storage_.close();
     cs::Connector::disconnect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     blockHashes_->close();
@@ -1110,6 +1152,30 @@ bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address& addr) cons
     return true;
 }
 
+bool BlockChain::checkForConsistency(csdb::Pool& pool) {
+    if (pool.sequence() == 0) {
+        return true;
+    }
+    if (pool.confidants().size() < pool.signatures().size()) {
+        return false;
+    }
+    if (cs::Utils::maskValue(pool.realTrusted()) != pool.signatures().size()) {
+        return false;
+    }
+    csdb::Pool tmp = pool.clone();
+    if (!tmp.compose()) {
+        return false;
+    }
+    cs::Bytes checking = tmp.to_binary();
+    csdb::Pool tmpCopy = csdb::Pool::from_binary(std::move(checking));
+    if (tmpCopy.sequence() == 0) {
+        csinfo() << "Failed to create correct binary representation of block #" << pool.sequence();
+        return false;
+    }
+    return true;
+
+}
+
 std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrusted) {
     const auto last_seq = getLastSeq();
     const auto pool_seq = pool.sequence();
@@ -1122,7 +1188,15 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     }
 
     pool.set_previous_hash(getLastHash());
+    if (!checkForConsistency(pool)) {
+        csdebug() << "BLOCKCHAIN> Pool #" << pool_seq << " failed the consistency check";
+        return std::nullopt;
+    }
 
+    if (!checkForConsistency(deferredBlock_)) {
+        csdebug() << "BLOCKCHAIN> Deferred Block #" << deferredBlock_.sequence() << " failed the consistency check";
+        return std::nullopt;
+    }
     constexpr cs::Sequence NoSequence = std::numeric_limits<cs::Sequence>::max();
     cs::Sequence flushed_block_seq = NoSequence;
 
@@ -1361,6 +1435,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     if (cachedBlocks_.count(poolSequence) > 0) {
         csdebug() << "BLOCKCHAIN> ignore duplicated block #" << poolSequence << " in cache";
         // it is not error, so caller code nothing to do with it
+        cachedBlockEvent(poolSequence);
         return true;
     }
     // cache block for future recording
@@ -1565,7 +1640,20 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) co
 
 cs::Sequence BlockChain::getPreviousPoolSeq(const csdb::Address& addr, cs::Sequence ps) const {
     std::lock_guard lock(dbLock_);
-    return storage_.get_previous_transaction_block(getAddressByType(addr, AddressType::PublicKey), ps);
+    auto prev_seq = storage_.get_previous_transaction_block(
+            getAddressByType(addr, AddressType::PublicKey), ps);
+
+    if (prev_seq == ps) {
+        if (Node::autoShutdownEnabled()) {
+            cserror() << "Inconsistent transaction index. Node will be stopped. Please restart it.";
+            lastIndexedPool = kWrongSequence;
+            updateLastIndFile();
+            Node::requestStop();
+        }
+        return kWrongSequence;
+    }
+
+    return prev_seq;
 }
 
 std::pair<cs::Sequence, uint32_t> BlockChain::getLastNonEmptyBlock() {
@@ -1585,14 +1673,14 @@ std::pair<cs::Sequence, uint32_t> BlockChain::getPreviousNonEmptyBlock(cs::Seque
 }
 
 cs::Sequence BlockChain::getLastSeq() const{
-	return lastSequence_;
+    return lastSequence_;
 }
 
 void BlockChain::setBlocksToBeRemoved(cs::Sequence number) {
-	if (blocksToBeRemoved_ > 0) {
-		csdebug() << "BLOCKCHAIN> Can't change number of blocks to be removed, because the previous removal is still not finished";
-		return;
-	}
-	csdebug() << "BLOCKCHAIN> Allowed NUMBER blocks to remove is set to " << blocksToBeRemoved_;
-	blocksToBeRemoved_ = number;
+    if (blocksToBeRemoved_ > 0) {
+        csdebug() << "BLOCKCHAIN> Can't change number of blocks to be removed, because the previous removal is still not finished";
+        return;
+    }
+    csdebug() << "BLOCKCHAIN> Allowed NUMBER blocks to remove is set to " << blocksToBeRemoved_;
+    blocksToBeRemoved_ = number;
 }

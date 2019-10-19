@@ -112,8 +112,6 @@ struct Connection {
 
     FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
 
-    cs::Sequence syncSeqs[BlocksToSync] = {0};
-    cs::Sequence syncSeqsRetries[BlocksToSync] = {0};
     cs::Sequence lastSeq = 0;
 
     bool operator!=(const Connection& rhs) const {
@@ -136,8 +134,10 @@ public:
 
     void chooseNeighbours();
     void sendByNeighbours(const Packet*, bool separate = false);
+    void sendByConfidant(const Packet* pack, ConnectionPtr conn);
 
     void establishConnection(const ip::udp::endpoint&);
+    ConnectionPtr addConfidant(const ip::udp::endpoint&);
     void addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr);
     bool updateSignalServer(const ip::udp::endpoint& in);
 
@@ -173,7 +173,6 @@ public:
     // thread safe
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);
     void forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)> func);
-    bool forRandomNeighbour(std::function<void(ConnectionPtr)> func);
 
     void pingNeighbours();
     bool isPingDone();
@@ -181,13 +180,11 @@ public:
 
     ConnectionPtr getConnection(const RemoteNodePtr);
     ConnectionPtr getNextRequestee(const cs::Hash&);
-    ConnectionPtr getNextSyncRequestee(const cs::Sequence seq, bool& alreadyRequested);
     ConnectionPtr getNeighbour(const std::size_t number);
     ConnectionPtr getRandomSyncNeighbour();
     ConnectionPtr getNeighbourByKey(const cs::PublicKey&);
 
     void resetSyncNeighbours();
-    void releaseSyncRequestee(const cs::Sequence seq);
     void registerDirect(const Packet*, ConnectionPtr);
 
 private:
@@ -220,7 +217,6 @@ private:
     void disconnectNode(ConnectionPtr*);
 
     int getRandomSyncNeighbourNumber(const std::size_t attemptCount = 0);
-    ConnectionPtr getRandomNeighbour();
 
     Transport* transport_;
 
@@ -233,6 +229,7 @@ private:
 
     std::deque<ConnectionPtr> neighbours_;
     std::vector<ConnectionPtr> selection_;
+    std::vector<ConnectionPtr> confidants_;
     FixedHashMap<ip::udp::endpoint, ConnectionPtr, uint16_t, MaxConnections> connections_;
 
     struct SenderInfo {
@@ -242,8 +239,8 @@ private:
     };
 
     FixedHashMap<cs::Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
-    FixedHashMap<cs::Hash, BroadPackInfo, uint32_t, 100000> msgBroads_;
-    FixedHashMap<cs::Hash, DirectPackInfo, uint32_t, 100000> msgDirects_;
+    FixedHashMap<cs::Hash, BroadPackInfo, uint32_t, MaxRememberPackets> msgBroads_;
+    FixedHashMap<cs::Hash, DirectPackInfo, uint32_t, MaxRememberPackets> msgDirects_;
 };
 
 #endif  // NEIGHBOURHOOD_HPP

@@ -508,7 +508,6 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         return;
     }
 
-    bool resend = true;
 
     // Non-network data
     uint32_t& recCounter = packetMap_.tryStore(task->pack.getHash());
@@ -520,19 +519,12 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
                 transport_->registerMessage(msg);
             }
 
-            if (msg && msg->getFirstPack()) {
-                if (msg->getFirstPack().getType() == MsgTypes::TransactionPacket) {
-                    resend = false;
-                }
-            }
-
             if (msg && msg->isComplete()) {
                 if (cs::PacketValidator::instance().validate(**msg)) {
                     transport_->processNodeMessage(**msg);
                     collector_.dropMessage(msg);
                 }
             }
-
         }
         else {
             if (cs::PacketValidator::instance().validate(task->pack)) {
@@ -541,8 +533,15 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         }
     }
 
-    resend = !(task->pack.getAddressee() == transport_->getMyPublicKey()) && resend;
-    resend = !recCounter && resend;
+    bool resend = false;
+    if (recCounter == 0) {
+        if (!task->pack.isBroadcast() && !task->pack.isDirect()) {
+            resend = task->pack.getAddressee() != transport_->getMyPublicKey();
+        } else {
+            resend = task->pack.isBroadcast();
+        }
+    }
+
     transport_->redirectPacket(task->pack, remoteSender, resend);
     ++recCounter;
 }

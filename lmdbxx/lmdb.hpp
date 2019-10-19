@@ -9,6 +9,7 @@
 #include <lmdbexception.hpp>
 
 #include <lib/system/signals.hpp>
+#include <lib/system/logger.hpp>
 #include <lib/system/reflection.hpp>
 
 #ifndef __APPLE__
@@ -197,6 +198,8 @@ public:
     // name - table name at current path, nullptr if only one table exist
     bool remove(const char* data, size_t size, const char* name = nullptr,
                 const unsigned int flags = lmdb::dbi::default_flags) {
+        checkMapSize();
+
         try {
             auto transaction = lmdb::txn::begin(*env_, nullptr);
             auto dbi = lmdb::dbi::open(transaction, name, flags);
@@ -359,16 +362,22 @@ protected:
     T allocateResult(const char* data, size_t size) const {
         static_assert (std::is_integral_v<T> || std::is_floating_point_v<T>, "Allocate result supports only integral or floating-point types");
 
-        if constexpr (std::is_integral_v<T>) {
-            if constexpr (std::is_signed_v<T>) {
-                return static_cast<T>(std::stoll(std::string(data, size)));
+        try {
+            if constexpr (std::is_integral_v<T>) {
+                if constexpr (std::is_signed_v<T>) {
+                    return static_cast<T>(std::stoll(std::string(data, size)));
+                }
+                else {
+                    return static_cast<T>(std::stoull(std::string(data, size)));
+                }
             }
             else {
-                return static_cast<T>(std::stoull(std::string(data, size)));
+                return static_cast<T>(std::stod(std::string(data, size)));
             }
         }
-        else {
-            return static_cast<T>(std::stod(std::string(data, size)));
+        catch (const std::exception& exception) {
+            cswarning() << "Lmdb can not allocate result value, " << exception.what() << ", default value returned";
+            return T{};
         }
     }
 

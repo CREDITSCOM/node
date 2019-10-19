@@ -101,7 +101,7 @@ public:
 
     void gotStageOneRequest(uint8_t requester, uint8_t required);
     void gotStageTwoRequest(uint8_t requester, uint8_t required);
-    void gotStageThreeRequest(uint8_t requester, uint8_t required /*, uint8_t iteration*/);
+    void gotStageThreeRequest(uint8_t requester, uint8_t required, uint8_t iteration);
 
     csdb::Pool& getDeferredBlock();
 
@@ -114,6 +114,7 @@ public:
     bool checkNodeCache(const cs::PublicKey& sender);
     void addToGraylist(const cs::PublicKey& sender, uint32_t rounds);
     void updateGrayList(cs::RoundNumber round);
+    bool isInGrayList(cs::PublicKey key);
     void resetGrayList() {
         grayList_.clear();
     }

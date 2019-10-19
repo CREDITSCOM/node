@@ -455,11 +455,11 @@ ValidationPlugin::ErrorType AccountBalanceChecker::validateBlock(const csdb::Poo
     csdb::Address emitted_src_opt_addr{};
 
     //bool possible_error = false;
-    constexpr size_t StopOn = 99;
+    [[maybe_unused]] constexpr size_t StopOn = 99;
 
     for (const auto& t : block.transactions()) {
 
-        size_t cnt_all_transactions = all_transactions.size();
+        [[maybe_unused]] size_t cnt_all_transactions = all_transactions.size();
 
         // get opt_addr if it has not got yet
         if (!opt_addr.is_wallet_id()) {

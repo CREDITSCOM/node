@@ -2,9 +2,7 @@
 #define CSCONNCETOR_HPP
 
 #if defined(_MSC_VER)
-#pragma warning(push)
-// 4245: 'return': conversion from 'int' to 'SOCKET', signed/unsigned mismatch
-#pragma warning(disable : 4245)
+#pragma warning(push, 0) // 4245: 'return': conversion from 'int' to 'SOCKET', signed/unsigned mismatch
 #endif
 
 #include <apihandler.hpp>
