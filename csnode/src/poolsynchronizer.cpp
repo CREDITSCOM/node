@@ -221,6 +221,9 @@ void cs::PoolSynchronizer::sendBlockRequest() {
         csmeta(csdetails) << "Requested sequence size: 0";
     }
 
+    // remove unnecessary sequences
+    removeExistingSequence(blockChain_->getLastSeq(), SequenceRemovalAccuracy::LOWER_BOUND);
+
     bool success = false;
 
     for (auto& neighbour : neighbours_) {
@@ -452,9 +455,6 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     }
 
     const cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
-
-    // remove unnecessary sequnces
-    removeExistingSequence(lastWrittenSequence, SequenceRemovalAccuracy::LOWER_BOUND);
 
     cs::Sequence sequence = lastWrittenSequence;
 
