@@ -1321,6 +1321,7 @@ template <class... Args>
 void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
     if (!transport_->checkConfidants(listMembers, (int)listExeption)) {
         sendToBroadcast(msgType, round, std::forward<Args>(args)...);
+        cslog() << "NODE> cannot send to the recipients directly";
         return;
     }
 
@@ -2790,7 +2791,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
             return;
         }
     }
-
+    
     // TODO: think how to improve this code.
     stageOneMessage_.clear();
     stageOneMessage_.resize(roundTable.confidants.size());
