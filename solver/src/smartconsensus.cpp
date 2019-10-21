@@ -337,6 +337,9 @@ void SmartConsensus::processStages() {
     const size_t cnt = smartConfidants_.size();
     std::map<cs::Hash, size_t> hashCount;
     // perform the evaluation og stages 1 & 2 to find out who is traitor
+    if (ownSmartsConfNum_ >= smartStageOneStorage_.size()) {
+        return;
+    }
     const auto& hash_t = smartStageOneStorage_.at(ownSmartsConfNum_).hash;
     size_t currentSmartsNumber = smartStageOneStorage_.at(ownSmartsConfNum_).fees.size();
     for (auto& st : smartStageOneStorage_) {
@@ -360,7 +363,7 @@ void SmartConsensus::processStages() {
 
             }
             else {
-                cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "], hash is different: "
+                csdebug() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "], hash is different: "
                     << cs::Utils::byteStreamToHex(st.hash.data(), st.hash.size()) << " - is marked as untrusted";
             }
 
@@ -402,7 +405,7 @@ void SmartConsensus::processStages() {
                         cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted (zero hash) - possibly silent";
                     }
                     else {
-                        cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted, hash is wrong: "
+                        csdebug() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted, hash is wrong: "
                             << cs::Utils::byteStreamToHex(st.hashes[i].data(), st.hashes[i].size());
                     }
                 }

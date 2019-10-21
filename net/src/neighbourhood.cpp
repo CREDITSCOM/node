@@ -146,7 +146,7 @@ bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
 // Not thread safe. Need lock nLockFlag_ above.
 void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
 
-    if (pack->isNeighbors()) {
+    if (pack->isDirect()) {
         for (auto& nb : neighbours_) {
             auto& bp = msgDirects_.tryStore(pack->getHash());
 
@@ -176,15 +176,18 @@ void Neighbourhood::sendByConfidant(const Packet* pack, ConnectionPtr conn) {
     transport_->sendDirect(pack, **conn);
 }
 
-void Neighbourhood::sendByConfidants(const Packet* pack) {
-    for (auto& nb : confidants_) {
-        auto& bp = msgDirects_.tryStore(pack->getHash());
+ConnectionPtr Neighbourhood::addConfidant(const ip::udp::endpoint& ep) {
+    csdebug() << "Add confidant " << ep;
 
-        bp.pack = *pack;
-        bp.receiver = nb;
+    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
+    auto conn = getConnection(ep);
 
-        transport_->sendDirect(pack, **nb);
+    if (!conn->id) {
+        conn->id = getSecureRandom<Connection::Id>();
     }
+
+    conn->connected = true;
+    return conn;
 }
 
 bool Neighbourhood::canHaveNewConnection() {
@@ -279,14 +282,7 @@ void Neighbourhood::checkSilent() {
 }
 
 void Neighbourhood::checkNeighbours() {
-    uint32_t size = 0;
-
-    {
-        cs::Lock lock(nLockFlag_);
-        size = uint32_t(neighbours_.size());
-    }
-
-    if (size < MinNeighbours) {
+    if (transport_->isShouldUpdateNeighbours()) {
         transport_->refillNeighbourhood();
     }
 }
@@ -320,7 +316,7 @@ static ip::udp::endpoint getIndexingEndpoint(const ip::udp::endpoint& ep) {
 }
 
 ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
-    cswarning() << "Getting connection";
+    csdebug() << "Getting connection to " << ep;
     auto& conn = connections_.tryStore(getIndexingEndpoint(ep));
 
     if (!conn) {
@@ -403,18 +399,6 @@ void Neighbourhood::forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)>
     }
 }
 
-bool Neighbourhood::forRandomNeighbour(std::function<void(ConnectionPtr)> func) {
-    cs::Lock lock(nLockFlag_);
-    ConnectionPtr connection = getRandomNeighbour();
-
-    if (connection.isNull()) {
-        return false;
-    }
-
-    func(connection);
-    return !connection.isNull();
-}
-
 void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr node) {
     cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_);
 
@@ -437,28 +421,6 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
 
     conn->isSignal = true;
     connectNode(node, conn);
-}
-
-ConnectionPtr Neighbourhood::addConfidant(const ip::udp::endpoint& ep, bool insert) {
-    csdebug() << "Add confidant " << ep;
-
-    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
-    auto conn = getConnection(ep);
-
-    if (!conn->id) {
-        conn->id = getSecureRandom<Connection::Id>();
-    }
-
-    conn->connected = true;
-    if (insert) {
-        confidants_.push_back(conn);
-    }
-    return conn;
-}
-
-void Neighbourhood::removeConfidants() {
-    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
-    confidants_.clear();
 }
 
 bool Neighbourhood::updateSignalServer(const ip::udp::endpoint& in) {
@@ -913,15 +875,4 @@ int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) 
     }
 
     return randomNumber;
-}
-
-ConnectionPtr Neighbourhood::getRandomNeighbour() {
-    if (neighbours_.size() == 0) {
-        return ConnectionPtr();
-    }
-
-    const size_t neighbourCount = static_cast<size_t>(neighbours_.size() - 1U);
-    const int randomNumber = cs::Random::generateValue<int>(0, static_cast<int>(neighbourCount));
-
-    return *(neighbours_.begin() + randomNumber);
 }
