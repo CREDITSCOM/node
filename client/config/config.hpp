@@ -79,6 +79,8 @@ struct ApiData {
     std::string executorCmdLine{};
     int executorRunDelay = 10;
     int executorBackgroundThreadDelay = 100;
+    int executorCommitMin = 1506;   // first commit with support of checking
+    int executorCommitMax{-1};      // unlimited range on the right
 };
 
 struct ConveyerData {
