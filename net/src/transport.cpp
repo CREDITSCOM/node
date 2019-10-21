@@ -483,7 +483,7 @@ void Transport::refillNeighbourhood() {
         }
     }
 
-    if (config_->getBootstrapType() == BootstrapType::SignalServer || config_->getNodeType() == NodeType::Router) {
+    if (requireStartNode()) {
         // Connect to SS logic
         ssEp_ = net_->resolve(config_->getSignalServerEndpoint());
         cslog() << "Connecting to start node on " << ssEp_;
@@ -784,6 +784,10 @@ cs::Sequence Transport::getConnectionLastSequence(const std::size_t number) {
 
 bool Transport::isShouldUpdateNeighbours() const {
     return nh_.getNeighboursCountWithoutSS() < config_->getMinNeighbours();
+}
+
+bool Transport::requireStartNode() const {
+    return (config_->getBootstrapType() == BootstrapType::SignalServer || config_->getNodeType() == NodeType::Router);
 }
 
 ConnectionPtr Transport::getRandomNeighbour() {
