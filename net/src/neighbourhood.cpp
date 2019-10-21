@@ -282,7 +282,31 @@ void Neighbourhood::checkSilent() {
 }
 
 void Neighbourhood::checkNeighbours() {
+    bool refill_required = false;
+
+    if (transport_->requireStartNode()) {
+        bool starter_found = false;
+
+        cs::Lock lock(nLockFlag_);
+        for (const auto& nb : neighbours_) {
+            if (nb->isSignal) {
+                starter_found = true;
+                if (!nb->connected) {
+                    refill_required = true;
+                    break;
+                }
+            }
+        }
+        if (!starter_found) {
+            refill_required = true;
+        }
+    }
+
     if (transport_->isShouldUpdateNeighbours()) {
+        refill_required = true;
+    }
+
+    if (refill_required) {
         transport_->refillNeighbourhood();
     }
 }

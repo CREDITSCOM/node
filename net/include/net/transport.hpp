@@ -164,6 +164,8 @@ public:
     bool isPingDone();
     void resetNeighbours();
 
+    bool requireStartNode() const;
+
 public signals:
     PingSignal pingReceived;
     cs::Action mainThreadIterated;
