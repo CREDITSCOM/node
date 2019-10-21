@@ -924,7 +924,6 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
 
     if (conveyer.isSyncCompleted(round)) {
         csdebug() << "NODE> Packets sync completed, #" << round;
-        transport_->resetNeighbours();
 
         if (roundPackageCache_.size() > 0) {
             auto rPackage = roundPackageCache_.back();

@@ -155,6 +155,7 @@ public:
     }
 
     bool isShouldUpdateNeighbours() const;
+    bool isShouldPending(Connection* connection) const;
 
     // thread safe negihbours methods
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);
@@ -166,7 +167,6 @@ public:
     const Connections getNeighboursWithoutSS() const;
 
     bool isPingDone();
-    void resetNeighbours();
 
 public signals:
     PingSignal pingReceived;

@@ -50,17 +50,23 @@ void Neighbourhood::chooseNeighbours() {
 
     if (!redirectLimit) {
         auto now_time = std::chrono::high_resolution_clock::now();
-        auto spended_time = std::chrono::duration_cast<std::chrono::seconds>(now_time - startTime);
-        if (spended_time.count() > 10) redirectLimit = true; // 10 seconst dry run
+        auto spendedTime = std::chrono::duration_cast<std::chrono::seconds>(now_time - startTime);
+
+        if (spendedTime.count() > 10) {    // 10 seconst dry run
+            redirectLimit = true;
+        }
     }
 
-    size_t redirectNumber;
+    size_t redirectNumber = 0;
+
     if (redirectLimit) {
         redirectNumber = std::max(kNeighborsRedirectMin, neighbours_.size() / 3 + 1);
+
         if (redirectNumber > neighbours_.size()) {
             redirectNumber = neighbours_.size();
         }
-    } else {
+    }
+    else {
         redirectNumber = neighbours_.size();
     }
 
@@ -78,7 +84,9 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp, bool separate) {
         return result;
     }
 
-    if (neighbours_.size() == 0) return false;
+    if (neighbours_.size() == 0) {
+        return false;
+    }
 
     bool sent = false;
     for (auto& nb : selection_) {
@@ -189,7 +197,7 @@ void Neighbourhood::sendByConfidants(const Packet* pack) {
 
 bool Neighbourhood::canHaveNewConnection() {
     cs::Lock lock(nLockFlag_);
-    return neighbours_.size() < MaxNeighbours;
+    return isNewConnectionAvailable();
 }
 
 void Neighbourhood::checkPending(const uint32_t) {
@@ -197,7 +205,9 @@ void Neighbourhood::checkPending(const uint32_t) {
     for (auto conn = connections_.begin(); conn != connections_.end(); ++conn) {
         // Attempt to reconnect if the connection hasn't been established yet
         if (!(**conn)->connected && (**conn)->attempts < MaxConnectAttempts) {
-            transport_->sendRegistrationRequest(****conn);
+            if (transport_->isShouldPending(***conn)) {
+                transport_->sendRegistrationRequest(****conn);
+            }
         }
     }
 }
@@ -205,13 +215,6 @@ void Neighbourhood::checkPending(const uint32_t) {
 void Neighbourhood::refreshLimits() {
     cs::Lock lock(nLockFlag_);
     for (auto conn = neighbours_.begin(); conn != neighbours_.end(); ++conn) {
-//        for (cs::Sequence i = 0; i < BlocksToSync; ++i) {
-//            if (++((*conn)->syncSeqsRetries[i]) >= MaxSyncAttempts) {
-//                (*conn)->syncSeqs[i] = 0;
-//                (*conn)->syncSeqsRetries[i] = 0;
-//            }
-//        }
-
         (*conn)->lastBytesCount.store(0, std::memory_order_relaxed);
     }
 }
@@ -325,16 +328,15 @@ ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
 }
 
 void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
-    cswarning() << "Establishing connection to " << ep;
-
-    cs::Lock lp(mLockFlag_);
+    cs::Lock lock(mLockFlag_);
     auto conn = getConnection(ep);
 
     if (!conn->id) {
         conn->id = getSecureRandom<Connection::Id>();
     }
 
-    if (!conn->connected) {
+    if (!conn->connected && transport_->isShouldPending(*conn)) {
+        cswarning() << "Establishing connection to " << ep;
         transport_->sendRegistrationRequest(**conn);
     }
 }
@@ -397,7 +399,6 @@ void Neighbourhood::forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)>
 }
 
 bool Neighbourhood::forRandomNeighbour(std::function<void(ConnectionPtr)> func) {
-    cs::Lock lock(nLockFlag_);
     ConnectionPtr connection = getRandomNeighbour();
 
     if (connection.isNull()) {
@@ -417,6 +418,7 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
     }
 
     ConnectionPtr conn = getConnection(out);
+
     if (!conn->id) {
         conn->id = getSecureRandom<Connection::Id>();
     }
@@ -443,9 +445,11 @@ ConnectionPtr Neighbourhood::addConfidant(const ip::udp::endpoint& ep, bool inse
     }
 
     conn->connected = true;
+
     if (insert) {
         confidants_.push_back(conn);
     }
+
     return conn;
 }
 
@@ -457,7 +461,7 @@ void Neighbourhood::removeConfidants() {
 bool Neighbourhood::updateSignalServer(const ip::udp::endpoint& in) {
     cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_); // #!
     
-    if (auto itServer = std::find_if(neighbours_.begin(), neighbours_.end(), [](auto const& node) { return node->isSignal; }); itServer != neighbours_.end()) {
+    if (auto itServer = std::find_if(neighbours_.begin(), neighbours_.end(), [](auto const& node) {return node->isSignal; }); itServer != neighbours_.end()) {
         itServer->get()->in = in;
         itServer->get()->specialOut = false;
         itServer->get()->out = {};
@@ -474,6 +478,7 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
 
     if (connection) {
         auto connPtr = findInVec(connection->id, neighbours_);
+
         if (connPtr) {
             disconnectNode(connPtr);
         }
@@ -500,7 +505,9 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
 void Neighbourhood::disconnectNode(ConnectionPtr* connPtr) {
     (*connPtr)->connected = false;
     (*connPtr)->node = RemoteNodePtr();
+
     auto res = std::find(neighbours_.begin(), neighbours_.end(), *connPtr);
+
     if (res != neighbours_.end()) {
         neighbours_.erase(res);
         chooseNeighbours();
@@ -520,6 +527,7 @@ void Neighbourhood::gotRegistration(Connection&& conn, RemoteNodePtr node) {
         }
 
         connPtr->key = conn.key;
+        connPtr->version = conn.version;
 
         connPtr->in = conn.in;
         connPtr->specialOut = conn.specialOut;
@@ -617,6 +625,28 @@ void Neighbourhood::gotRefusal(const Connection::Id& id) {
     }
 }
 
+void Neighbourhood::gotBadPing(Connection::Id id) {
+    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
+    auto realPtr = findInMap(id, connections_);
+
+    if (realPtr) {
+        transport_->sendRegistrationRefusal(***realPtr, RegistrationRefuseReasons::BadClientVersion);
+        disconnectNode(realPtr);
+    }
+}
+
+bool Neighbourhood::dropConnection(Connection::Id id) {
+    cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
+
+    auto realPtr = findInMap(id, connections_);
+    auto result = realPtr != nullptr;
+
+    if (realPtr) {
+        disconnectNode(realPtr);
+    }
+
+    return result;
+}
 
 // Not thread safe. Need lock nLockFlag_ above.
 void Neighbourhood::neighbourHasPacket(RemoteNodePtr node, const cs::Hash& hash, const bool isDirect) {
@@ -818,30 +848,6 @@ ConnectionPtr Neighbourhood::getNeighbour(const std::size_t number) {
     return candidate;
 }
 
-ConnectionPtr Neighbourhood::getRandomSyncNeighbour() {
-    cs::Lock lock(nLockFlag_);
-
-    const int candidateNumber = getRandomSyncNeighbourNumber();
-
-    if (candidateNumber < 0) {
-        return ConnectionPtr();
-    }
-
-    ConnectionPtr candidate = *(neighbours_.begin() + candidateNumber);
-
-    if (!candidate->syncNeighbourRetries) {
-        candidate->syncNeighbourRetries = cs::Random::generateValue<uint32_t>(1, MaxSyncAttempts * 3);
-    }
-
-    --(candidate->syncNeighbourRetries);
-
-    if (candidate->syncNeighbourRetries == 0) {
-        candidate->isRequested = true;
-    }
-
-    return candidate;
-}
-
 ConnectionPtr Neighbourhood::getNeighbourByKey(const cs::PublicKey& pk) {
     cs::Lock lock(nLockFlag_);
 
@@ -852,13 +858,6 @@ ConnectionPtr Neighbourhood::getNeighbourByKey(const cs::PublicKey& pk) {
     }
 
     return ConnectionPtr();
-}
-
-void Neighbourhood::resetSyncNeighbours() {
-    for (auto& nb : neighbours_) {
-        nb->isRequested = false;
-        nb->syncNeighbourRetries = 0;
-    }
 }
 
 void Neighbourhood::registerDirect(const Packet* packPtr, ConnectionPtr conn) {
@@ -873,42 +872,9 @@ bool Neighbourhood::isNewConnectionAvailable() const {
     return neighbours_.size() < MaxNeighbours;
 }
 
-int Neighbourhood::getRandomSyncNeighbourNumber(const std::size_t attemptCount) {
-    if (neighbours_.size() == 0) {
-        cslog() << "Neighbourhood, no neighbours";
-        return -1;
-    }
-
-    const size_t neighbourCount = static_cast<size_t>(neighbours_.size() - 1U);
-
-    if (attemptCount > (neighbourCount * 3)) {
-        int index = 0;
-        for (const auto& nb : neighbours_) {
-            if (nb->isSignal || nb->isRequested) {
-                ++index;
-            }
-            else {
-                return index;
-            }
-        }
-        return -1;
-    }
-
-    const int randomNumber = cs::Random::generateValue<int>(0, static_cast<int>(neighbourCount));
-    const ConnectionPtr nb = *(neighbours_.begin() + randomNumber);
-
-    if (!nb) {
-        return -1;
-    }
-
-    if (nb->isSignal || nb->isRequested) {
-        return getRandomSyncNeighbourNumber(attemptCount + 1);
-    }
-
-    return randomNumber;
-}
-
 ConnectionPtr Neighbourhood::getRandomNeighbour() {
+    cs::Lock lock(nLockFlag_);
+
     if (neighbours_.size() == 0) {
         return ConnectionPtr();
     }

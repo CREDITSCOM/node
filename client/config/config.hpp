@@ -15,8 +15,8 @@
 namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
-using NodeVersion = uint16_t;
-const NodeVersion NODE_VERSION = 430;
+using NodeVersion = cs::Version;
+extern const NodeVersion NODE_VERSION;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
@@ -200,6 +200,10 @@ public:
         return newBlockchainTop_;
     }
 
+    bool isCompatibleVersion() const {
+        return compatibleVersion_;
+    }
+
     uint64_t newBlockchainTopSeq() const {
         return newBlockchainTopSeq_;
     }
@@ -275,6 +279,7 @@ private:
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
     bool newBlockchainTop_ = false;
+    bool compatibleVersion_ = true;
 
     uint64_t newBlockchainTopSeq_;
 

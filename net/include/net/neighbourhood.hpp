@@ -26,9 +26,6 @@ const uint32_t MaxResendTimes =
 #else
 4;
 #endif // !WEB_WALLET_NODE
-const cs::Sequence MaxSyncAttempts = 8;
-
-const cs::Sequence BlocksToSync = 16;
 const uint32_t WarnsBeforeRefill = 8;
 
 struct Connection;
@@ -62,6 +59,7 @@ struct Connection {
 
     Connection(Connection&& rhs)
     : id(rhs.id)
+    , version(rhs.version)
     , lastBytesCount(rhs.lastBytesCount.load(std::memory_order_relaxed))
     , lastPacketsCount(rhs.lastPacketsCount)
     , attempts(rhs.attempts)
@@ -84,6 +82,7 @@ struct Connection {
     }
 
     Id id = 0;
+    cs::Version version = 0;
 
     static const uint32_t BytesLimit = 1 << 20;
     mutable std::atomic<uint32_t> lastBytesCount = {0};
@@ -102,9 +101,6 @@ struct Connection {
     bool isSignal = false;
     bool connected = false;
 
-    bool isRequested = false;
-    uint32_t syncNeighbourRetries = 0;
-
     struct MsgRel {
         uint32_t acceptOrder = 0;
         bool needSend = true;
@@ -115,7 +111,8 @@ struct Connection {
     cs::Sequence lastSeq = 0;
 
     bool operator!=(const Connection& rhs) const {
-        return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out);
+        return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out) ||
+               version != rhs.version;
     }
 };
 
@@ -147,6 +144,9 @@ public:
     void gotRegistration(Connection&&, RemoteNodePtr);
     void gotConfirmation(const Connection::Id& my, const Connection::Id& real, const ip::udp::endpoint&, const cs::PublicKey&, RemoteNodePtr);
     void gotRefusal(const Connection::Id&);
+    void gotBadPing(Connection::Id);
+
+    bool dropConnection(Connection::Id id);
 
     void resendPackets();
     void checkPending(const uint32_t maxNeighbours);
@@ -169,6 +169,7 @@ public:
     // no thread safe
     Connections getNeigbours() const;
     Connections getNeighboursWithoutSS() const;
+    ConnectionPtr getRandomNeighbour();
 
     // uses to iterate connections
     std::unique_lock< std::mutex > getNeighboursLock() const;
@@ -185,10 +186,8 @@ public:
     ConnectionPtr getConnection(const RemoteNodePtr);
     ConnectionPtr getNextRequestee(const cs::Hash&);
     ConnectionPtr getNeighbour(const std::size_t number);
-    ConnectionPtr getRandomSyncNeighbour();
     ConnectionPtr getNeighbourByKey(const cs::PublicKey&);
 
-    void resetSyncNeighbours();
     void registerDirect(const Packet*, ConnectionPtr);
 
 private:
@@ -220,16 +219,11 @@ private:
     void connectNode(RemoteNodePtr, ConnectionPtr);
     void disconnectNode(ConnectionPtr*);
 
-    int getRandomSyncNeighbourNumber(const std::size_t attemptCount = 0);
-    ConnectionPtr getRandomNeighbour();
-
     Transport* transport_;
 
     TypedAllocator<Connection> connectionsAllocator_;
 
-    //mutable cs::SpinLock nLockFlag_{ATOMIC_FLAG_INIT};
     mutable std::mutex nLockFlag_;
-    //mutable cs::SpinLock mLockFlag_{ATOMIC_FLAG_INIT};
     mutable std::mutex mLockFlag_;
 
     std::deque<ConnectionPtr> neighbours_;
