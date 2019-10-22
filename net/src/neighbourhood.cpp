@@ -342,7 +342,7 @@ static ip::udp::endpoint getIndexingEndpoint(const ip::udp::endpoint& ep) {
 }
 
 ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
-    cswarning() << "Getting connection";
+    //csdebug() << "Getting connection with " << ep;
     auto& conn = connections_.tryStore(getIndexingEndpoint(ep));
 
     if (!conn) {
