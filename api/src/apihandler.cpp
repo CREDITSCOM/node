@@ -2682,4 +2682,39 @@ namespace executor {
         return std::make_optional(std::move(originExecuteRes));
     }
 
+    void Executor::onExecutorStarted() {
+        if (!isConnected()) {
+            connect();
+        }
+
+        // executor version checking        
+        ExecutorBuildVersionResult _return;
+        bool isOutOfRange{ false };
+        do {
+            do {
+                if (solver_.stopNodeRequested()) {
+                    return;
+                }
+                getExecutorBuildVersion(_return);
+                if (!_return.status.code)
+                    break;
+                cserror() << "start contract executor error code " << int(_return.status.code) << ": " << _return.status.message;
+                connect();
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+            } while (_return.status.code);
+
+            isOutOfRange = _return.commitNumber < commitMin_ || (_return.commitNumber > commitMax_ && commitMax_ != -1);
+            csdebug() << "[executorInfo]: commitNumber: " << _return.commitNumber << ", commitHash: " << _return.commitHash;
+            if (isOutOfRange) {
+                if (commitMax_ != -1)
+                    cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. " << commitMax_ << ")";
+                else
+                    cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. any)";
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+            }
+        } while (isOutOfRange);
+
+        csdebug() << csname() << "started";
+    }
+
 } // Executor namespace
