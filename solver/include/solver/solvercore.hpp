@@ -105,6 +105,8 @@ public:
 
     csdb::Pool& getDeferredBlock();
 
+    void checkZeroSmartSignatures(csdb::Pool& pool);
+
     void removeDeferredBlock(cs::Sequence);
     bool realTrustedChanged() const;
     void adjustStageThreeStorage();

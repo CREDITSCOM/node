@@ -898,7 +898,7 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
 bool SmartContracts::test_executor_availability() {
     if (!executor_ready) {
         // ask user to restart executor every 2 seconds
-        if (!wait_until_executor(2)) {
+        if (!wait_until_executor(2, 15)) { //15 times by 2 seconds
             cserror() << kLogPrefix << "cannot connect to executor, further blockchain reading is impossible, interrupt reading";
             if (pnode->isStopRequested()) {
                 cslog() << kLogPrefix << "node is requested to stop, cancel wait to executor";

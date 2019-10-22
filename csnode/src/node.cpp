@@ -604,6 +604,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     }
     else {
         blockChain_.testCachedBlocks();
+        solver_->checkZeroSmartSignatures(pool.value());
         //confirmationList_.remove(round);
     }
 
