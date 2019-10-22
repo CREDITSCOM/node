@@ -164,6 +164,8 @@ public:
 
     bool isPingDone();
 
+    bool requireStartNode() const;
+
 public signals:
     PingSignal pingReceived;
     cs::Action mainThreadIterated;
