@@ -52,11 +52,18 @@ Node::Node(const Config& config, cs::config::Observer& observer)
     std::cout << "Done\n";
     poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
+    cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
+
     executor::ExecutorSettings::set(cs::makeReference(blockChain_),
                                     cs::makeReference(solver_),
                                     cs::makeReference(config));
 
     auto& executor = executor::Executor::getInstance();
+
+    if (isStopRequested()) {
+        stop();
+        return;
+    }
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
@@ -64,7 +71,6 @@ Node::Node(const Config& config, cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &executor::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
-    cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     setupObserver();
