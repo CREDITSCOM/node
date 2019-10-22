@@ -220,6 +220,30 @@ public:  // wrappers
         }
     }
 
+    void getExecutorBuildVersion(ExecutorBuildVersionResult& _return) {
+        try {
+            std::shared_lock slk(sharedErrorMutex_);
+            origExecutor_->getExecutorBuildVersion(_return, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException& x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                recreateOriginExecutor();
+            }
+
+            _return.status.code = 1;
+            _return.status.message = x.what();
+
+            notifyError();
+        }
+        catch (const std::exception& x) {
+            _return.status.code = 1;
+            _return.status.message = x.what();
+
+            notifyError();
+        }
+    }
+
 public:
     static Executor& getInstance() {  // singlton
         static Executor executor(executor::ExecutorSettings::get());
@@ -475,6 +499,29 @@ public slots:
             connect();
         }
 
+        // executor version checking        
+        ExecutorBuildVersionResult _return;
+        bool isOutOfRange{ false };
+        do {
+            do {
+                getExecutorBuildVersion(_return);
+                if (!_return.status.code)
+                    break;
+                connect();
+                std::this_thread::sleep_for(std::chrono::seconds(5));                             
+            } while (_return.status.code);
+
+            isOutOfRange = _return.commitNumber < commitMin_ || (_return.commitNumber > commitMax_ && commitMax_ != -1);
+            csdebug() << "[executorInfo]: commitNumber: " << _return.commitNumber << ", commitHash: " << _return.commitHash;
+            if (isOutOfRange) {
+                if(commitMax_ != -1)
+                    cslog() << "Error: executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << ", " << commitMax_ << ")";
+                else
+                    cslog() << "Error: executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << ", infinitely)";
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+            }
+        } while (isOutOfRange);
+
         csdebug() << csname() << "started";
     }
 
@@ -509,6 +556,9 @@ public slots:
     }
 
 private:
+    int commitMin_{};
+    int commitMax_{};
+
     std::map<general::Address, general::AccessID> lockSmarts;
 
     explicit Executor(const ExecutorSettings::Types& types)
@@ -517,10 +567,12 @@ private:
     , config_(std::get<cs::Reference<const Config>>(types))
     , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(config_->getApiSettings().executorHost, config_->getApiSettings().executorPort))
     , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
-    , origExecutor_(
-          std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
+    , origExecutor_(std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
         socket_->setSendTimeout(config_->getApiSettings().executorSendTimeout);
         socket_->setRecvTimeout(config_->getApiSettings().executorReceiveTimeout);
+
+        commitMin_ = config_->getApiSettings().executorCommitMin;
+        commitMax_ = config_->getApiSettings().executorCommitMax;
 
         if (config_->getApiSettings().executorCmdLine.empty()) {
             cswarning() << "Executor command line args are empty, process would not be created";
@@ -665,7 +717,7 @@ private:
     mutable std::condition_variable cvErrorConnect_;
     std::atomic_bool requestStop_{ false };
 
-    const int16_t EXECUTOR_VERSION = 2;
+    const int16_t EXECUTOR_VERSION = 3;
 
     std::mutex callExecutorLock_;
 
