@@ -507,6 +507,7 @@ public slots:
                 getExecutorBuildVersion(_return);
                 if (!_return.status.code)
                     break;
+                cserror() << "start contract executor error code " << int(_return.status.code) << ": " << _return.status.message;
                 connect();
                 std::this_thread::sleep_for(std::chrono::seconds(5));                             
             } while (_return.status.code);
@@ -515,9 +516,9 @@ public slots:
             csdebug() << "[executorInfo]: commitNumber: " << _return.commitNumber << ", commitHash: " << _return.commitHash;
             if (isOutOfRange) {
                 if(commitMax_ != -1)
-                    cslog() << "Error: executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << ", " << commitMax_ << ")";
+                    cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << ", " << commitMax_ << ")";
                 else
-                    cslog() << "Error: executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << ", infinitely)";
+                    cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << ", infinitely)";
                 std::this_thread::sleep_for(std::chrono::seconds(5));
             }
         } while (isOutOfRange);
@@ -561,58 +562,7 @@ private:
 
     std::map<general::Address, general::AccessID> lockSmarts;
 
-    explicit Executor(const ExecutorSettings::Types& types)
-    : blockchain_(std::get<cs::Reference<const BlockChain>>(types))
-    , solver_(std::get<cs::Reference<const cs::SolverCore>>(types))
-    , config_(std::get<cs::Reference<const Config>>(types))
-    , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(config_->getApiSettings().executorHost, config_->getApiSettings().executorPort))
-    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
-    , origExecutor_(std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
-        socket_->setSendTimeout(config_->getApiSettings().executorSendTimeout);
-        socket_->setRecvTimeout(config_->getApiSettings().executorReceiveTimeout);
-
-        commitMin_ = config_->getApiSettings().executorCommitMin;
-        commitMax_ = config_->getApiSettings().executorCommitMax;
-
-        if (config_->getApiSettings().executorCmdLine.empty()) {
-            cswarning() << "Executor command line args are empty, process would not be created";
-            return;
-        }
-
-        executorProcess_ = std::make_unique<cs::Process>(config_->getApiSettings().executorCmdLine);
-
-        cs::Connector::connect(&executorProcess_->started, this, &Executor::onExecutorStarted);
-        cs::Connector::connect(&executorProcess_->finished, this, &Executor::onExecutorFinished);
-        cs::Connector::connect(&executorProcess_->errorOccured, this, &Executor::onExecutorProcessError);
-
-        executorProcess_->launch(cs::Process::Options::None);
-        while (!executorProcess_->isRunning());
-
-        std::thread thread([this]() {
-            while(!requestStop_) {
-                if (isConnected()) {
-                    static std::mutex mutex;
-                    std::unique_lock lock(mutex);
-
-                    cvErrorConnect_.wait_for(lock, std::chrono::seconds(5), [&] {
-                        return !isConnected() || requestStop_;
-                    });
-                }
-
-                if (requestStop_) {
-                    break;
-                }
-
-                if (executorProcess_->isRunning()) {
-                    if (!isConnected()) {
-                        connect();
-                    }
-                }
-            }
-        });
-
-        thread.detach();
-    }
+    explicit Executor(const ExecutorSettings::Types& types);
 
     ~Executor() {
         stop();

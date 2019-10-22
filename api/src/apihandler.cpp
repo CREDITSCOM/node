@@ -2210,6 +2210,65 @@ void apiexec::APIEXECHandler::PoolGet(PoolGetResult& _return, const int64_t sequ
 // Executor implementation
 
 namespace executor {
+    /*explicit*/
+    Executor::Executor(const ExecutorSettings::Types& types)
+        : blockchain_(std::get<cs::Reference<const BlockChain>>(types))
+        , solver_(std::get<cs::Reference<const cs::SolverCore>>(types))
+        , config_(std::get<cs::Reference<const Config>>(types))
+        , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(config_->getApiSettings().executorHost, config_->getApiSettings().executorPort))
+        , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
+        , origExecutor_(std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
+        socket_->setSendTimeout(config_->getApiSettings().executorSendTimeout);
+        socket_->setRecvTimeout(config_->getApiSettings().executorReceiveTimeout);
+
+        commitMin_ = config_->getApiSettings().executorCommitMin;
+        commitMax_ = config_->getApiSettings().executorCommitMax;
+
+        if (config_->getApiSettings().executorCmdLine.empty()) {
+            cswarning() << "Executor command line args are empty, process would not be created";
+            return;
+        }
+
+        executorProcess_ = std::make_unique<cs::Process>(config_->getApiSettings().executorCmdLine);
+
+        cs::Connector::connect(&executorProcess_->started, this, &Executor::onExecutorStarted);
+        cs::Connector::connect(&executorProcess_->finished, this, &Executor::onExecutorFinished);
+        cs::Connector::connect(&executorProcess_->errorOccured, this, &Executor::onExecutorProcessError);
+
+        executorProcess_->launch(cs::Process::Options::None);
+        while (!executorProcess_->isRunning()) {
+            if (solver_.stopNodeRequested()) {
+                requestStop_ = true;
+                return;
+            }
+        }
+
+        std::thread thread([this]() {
+            while (!requestStop_) {
+                if (isConnected()) {
+                    static std::mutex mutex;
+                    std::unique_lock lock(mutex);
+
+                    cvErrorConnect_.wait_for(lock, std::chrono::seconds(5), [&] {
+                        return !isConnected() || requestStop_;
+                        });
+                }
+
+                if (requestStop_) {
+                    break;
+                }
+
+                if (executorProcess_->isRunning()) {
+                    if (!isConnected()) {
+                        connect();
+                    }
+                }
+            }
+            });
+
+        thread.detach();
+    }
+
     void Executor::executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject>& code,
         const std::string& state, std::vector<MethodHeader>& methodHeader, bool isGetter, cs::Sequence sequence) {
         static std::mutex mutex;

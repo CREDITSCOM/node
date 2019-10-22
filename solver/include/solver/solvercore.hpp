@@ -141,6 +141,8 @@ public:
 
     bool isContractLocked(const csdb::Address&) const;
 
+    bool stopNodeRequested() const;
+
 private:
     // to use private data while serve for states as SolverCore context:
     friend class SolverContext;
