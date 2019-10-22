@@ -28,6 +28,8 @@
 #include <unistd.h>
 #endif
 
+const NodeVersion NODE_VERSION = 431;
+
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
@@ -48,6 +50,7 @@ const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
 const std::string PARAM_NAME_ROUND_ELAPSE_TIME = "round_elapse_time";
 const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
 const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
+const std::string PARAM_NAME_COMPATIBLE_VERSION = "compatible_version";
 
 const std::string PARAM_NAME_CONVEYER_SEND_CACHE = "send_cache_value";
 const std::string PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE = "max_resends_send_cache";
@@ -706,6 +709,10 @@ Config Config::readFromFile(const std::string& fileName) {
             result.maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS; // see neighbourhood.hpp, some containers are of static size
         }
 
+        if (params.count(PARAM_NAME_COMPATIBLE_VERSION)) {
+            result.compatibleVersion_ = params.get<bool>(PARAM_NAME_COMPATIBLE_VERSION);
+        }
+
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
         result.observerWaitTime_ = params.count(PARAM_NAME_OBSERVER_WAIT_TIME) ? params.get<uint64_t>(PARAM_NAME_OBSERVER_WAIT_TIME) : DEFAULT_OBSERVER_WAIT_TIME;
         result.roundElapseTime_ = params.count(PARAM_NAME_ROUND_ELAPSE_TIME) ? params.get<uint64_t>(PARAM_NAME_ROUND_ELAPSE_TIME) : DEFAULT_ROUND_ELAPSE_TIME;
@@ -970,6 +977,7 @@ bool operator==(const Config& lhs, const Config& rhs) {
            lhs.poolSyncData_ == rhs.poolSyncData_ &&
            lhs.apiData_ == rhs.apiData_ &&
            lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
+           lhs.compatibleVersion_ == rhs.compatibleVersion_ &&
            lhs.recreateIndex_ == rhs.recreateIndex_ &&
            lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
            lhs.roundElapseTime_ == rhs.roundElapseTime_ &&
