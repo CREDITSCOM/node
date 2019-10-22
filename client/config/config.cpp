@@ -79,6 +79,8 @@ const std::string PARAM_NAME_EXECUTOR_IP = "executor_ip";
 const std::string PARAM_NAME_EXECUTOR_CMDLINE = "executor_command";
 const std::string PARAM_NAME_EXECUTOR_RUN_DELAY = "executor_run_delay";
 const std::string PARAM_NAME_EXECUTOR_BACKGROUND_THREAD_DELAY = "executor_background_thread_delay";
+const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MIN = "executor_commit_min";
+const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MAX = "executor_commit_max";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
@@ -87,6 +89,7 @@ const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
 const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
 const std::string ARG_NAME_RECREATE_INDEX = "recreate-index";
 const std::string ARG_NAME_NEW_BC_TOP = "set-bc-top";
+const std::string ARG_NAME_DISABLE_AUTO_SHUTDOWN = "disable-auto-shutdown";
 
 const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
@@ -181,6 +184,7 @@ Config Config::read(po::variables_map& vm) {
     Config result = readFromFile(getArgFromCmdLine(vm, ARG_NAME_CONFIG_FILE, DEFAULT_PATH_TO_CONFIG));
 
     result.recreateIndex_ = vm.count(ARG_NAME_RECREATE_INDEX);
+    result.autoShutdownEnabled_ = !vm.count(ARG_NAME_DISABLE_AUTO_SHUTDOWN);
     result.pathToDb_ = getArgFromCmdLine(vm, ARG_NAME_DB_PATH, DEFAULT_PATH_TO_DB);
 
     if (vm.count(ARG_NAME_NEW_BC_TOP)) {
@@ -847,6 +851,8 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_SEND_TIMEOUT, apiData_.ajaxServerSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_RECEIVE_TIMEOUT, apiData_.ajaxServerReceiveTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_APIEXEC_PORT, apiData_.apiexecPort);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_VERSION_COMMIT_MIN, apiData_.executorCommitMin);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_VERSION_COMMIT_MAX, apiData_.executorCommitMax);
 
     if (data.count(PARAM_NAME_EXECUTOR_IP)) {
         apiData_.executorHost = data.get<std::string>(PARAM_NAME_EXECUTOR_IP);
@@ -931,7 +937,9 @@ bool operator==(const ApiData& lhs, const ApiData& rhs) {
            lhs.executorHost == rhs.executorHost &&
            lhs.executorCmdLine == rhs.executorCmdLine &&
            lhs.executorRunDelay == rhs.executorRunDelay &&
-           lhs.executorBackgroundThreadDelay == rhs.executorBackgroundThreadDelay;
+           lhs.executorBackgroundThreadDelay == rhs.executorBackgroundThreadDelay &&
+           lhs.executorCommitMin == rhs.executorCommitMin &&
+           lhs.executorCommitMax == rhs.executorCommitMax;
 }
 
 bool operator!=(const ApiData& lhs, const ApiData& rhs) {

@@ -139,7 +139,7 @@ uint32_t Packet::calculateHeadersLength() const {
     if (!isNetwork()) {
         length += kPublicKeyLength + sizeof(getId());  // Sender key + ID
 
-        if (!isBroadcast() && !isNeighbors()) {
+        if (!isBroadcast() && !isDirect()) {
             length += kPublicKeyLength;  // Receiver key
         }
     }
@@ -264,7 +264,7 @@ public:
             ++n;
         }
 
-        if (packet_.isNeighbors()) {
+        if (packet_.isDirect()) {
             os << (n ? ", " : "") << "neighbors";
             ++n;
         }

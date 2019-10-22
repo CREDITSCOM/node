@@ -153,8 +153,7 @@ bool Neighbourhood::dispatch(Neighbourhood::DirectPackInfo& dp) {
 
 // Not thread safe. Need lock nLockFlag_ above.
 void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
-
-    if (pack->isNeighbors()) {
+    if (pack->isDirect()) {
         for (auto& nb : neighbours_) {
             auto& bp = msgDirects_.tryStore(pack->getHash());
 
@@ -253,13 +252,16 @@ void Neighbourhood::checkSilent() {
         for (auto it = toDisconnect.rbegin(), end = toDisconnect.rend(); it != end; ++it) {
             auto connPtrIt = neighbours_.begin() + *it;
             ConnectionPtr tc = *connPtrIt;
+
             if (tc->node) {
                 cswarning() << "Node " << tc->in << " stopped responding";
                 Connection* c = *tc;
                 tc->node->connection.compare_exchange_strong(c, nullptr, std::memory_order_release, std::memory_order_relaxed);
             }
+
             (*connPtrIt)->connected = false;
             (*connPtrIt)->node = RemoteNodePtr();
+
             neighbours_.erase(connPtrIt);
             chooseNeighbours();
         }

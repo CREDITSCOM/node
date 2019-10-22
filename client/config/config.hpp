@@ -80,6 +80,8 @@ struct ApiData {
     std::string executorCmdLine{};
     int executorRunDelay = 10;
     int executorBackgroundThreadDelay = 100;
+    int executorCommitMin = 1506;   // first commit with support of checking
+    int executorCommitMax{-1};      // unlimited range on the right
 };
 
 struct ConveyerData {
@@ -173,6 +175,10 @@ public:
 
     bool recreateIndex() const {
         return recreateIndex_;
+    }
+
+    bool autoShutdownEnabled() const {
+        return autoShutdownEnabled_;
     }
 
     const cs::PublicKey& getMyPublicKey() const {
@@ -279,8 +285,8 @@ private:
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
     bool newBlockchainTop_ = false;
+    bool autoShutdownEnabled_ = true;
     bool compatibleVersion_ = true;
-
     uint64_t newBlockchainTopSeq_;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;

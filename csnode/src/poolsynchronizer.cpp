@@ -120,10 +120,22 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
             isAvailable = checkActivity(CounterType::TIMER);
         }
 
-        if (isNeedRequest || isAvailable) {
-            sendBlockRequest();
-        }
-    }
+		if (isNeedRequest || isAvailable) {
+			sendBlockRequest();
+		}
+
+		bool nothing_to_request = true;
+		for (const auto& neighbour : neighbours_) {
+			if (!neighbour.sequences().empty()) {
+				nothing_to_request = false;
+				break;
+			}
+		}
+		if (nothing_to_request) {
+			cslog() << "PoolSyncronizer> No sequence is waited from any neighbour, finish sync";
+			synchroFinished();
+		}
+	}
 }
 
 void cs::PoolSynchronizer::syncLastPool() {
@@ -208,6 +220,9 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     if (requestedSequences_.empty()) {
         csmeta(csdetails) << "Requested sequence size: 0";
     }
+
+    // remove unnecessary sequences
+    removeExistingSequence(blockChain_->getLastSeq(), SequenceRemovalAccuracy::LOWER_BOUND);
 
     bool success = false;
 
@@ -440,9 +455,6 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
     }
 
     const cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
-
-    // remove unnecessary sequnces
-    removeExistingSequence(lastWrittenSequence, SequenceRemovalAccuracy::LOWER_BOUND);
 
     cs::Sequence sequence = lastWrittenSequence;
 

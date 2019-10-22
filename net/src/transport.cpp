@@ -339,22 +339,6 @@ void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     }
 }
 
-void Transport::deliverConfidants(const Packet* pack, const uint32_t size) {
-    if (!nh_.isConfidants()) {
-        deliverBroadcast(pack, size);
-        return;
-    }
-    if (size >= Packet::MaxFragments) {
-        ++Transport::cntExtraLargeNotSent;
-        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
-    }
-
-    const auto packEnd = pack + size;
-    for (auto ptr = pack; ptr != packEnd; ++ptr) {
-        nh_.sendByConfidants(ptr);
-    }
-}
-
 bool Transport::checkConfidants(const std::vector<cs::PublicKey>& list, int except) {
     cs::Lock lock(aLock_);
 
@@ -381,7 +365,7 @@ void Transport::deliverConfidants(const Packet* pack, const uint32_t size, const
                 finded = false;
                 break;
             }
-            conns.emplace_back(nh_.addConfidant(net_->resolve(res->second), false));
+            conns.emplace_back(nh_.addConfidant(net_->resolve(res->second)));
         }
     }
 
@@ -398,6 +382,7 @@ void Transport::deliverConfidants(const Packet* pack, const uint32_t size, const
     for (auto& conn: conns) {
         const auto packEnd = pack + size;
         for (auto ptr = pack; ptr != packEnd; ++ptr) {
+            csdebug() << "Transport: sending to " << (conn->specialOut ? conn->out : conn->in);
             nh_.sendByConfidant(ptr, conn);
         }
     }
@@ -840,10 +825,6 @@ void Transport::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
 
 void Transport::forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> func) {
     nh_.forEachNeighbourWithoutSS(std::move(func));
-}
-
-bool Transport::forRandomNeighbour(std::function<void(ConnectionPtr)> func) {
-    return nh_.forRandomNeighbour(std::move(func));
 }
 
 const Connections Transport::getNeighbours() const {
@@ -1328,7 +1309,7 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender, bool r
         return;
     }
 
-    if (pack.isNeighbors()) {
+    if (pack.isDirect()) {
         return;  // Do not redirect packs
     }
 
@@ -1355,7 +1336,7 @@ void Transport::sendPackInform(const Packet& pack, RemoteNodePtr& sender) {
 void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
-    oPackStream_ << NetworkCommand::PackInform << static_cast<cs::Byte>(pack.isNeighbors()) << pack.getHash();
+    oPackStream_ << NetworkCommand::PackInform << static_cast<cs::Byte>(pack.isDirect()) << pack.getHash();
     sendDirect(oPackStream_.getPackets(), addr);
     oPackStream_.clear();
 }
@@ -1594,7 +1575,6 @@ bool Transport::gotSSIntroduceConsensusReply()
     if (ssStatus_ != SSBootstrapStatus::Complete) {
         return false;
     }
-    nh_.removeConfidants();
 
     uint8_t numCirc{ 0 };
     iPackStream_ >> numCirc;
@@ -1614,13 +1594,12 @@ bool Transport::gotSSIntroduceConsensusReply()
             cs::Lock lock(aLock_);
             auto value = std::make_pair(key, ep);
             auto res = addresses_.insert(value);
-            if (!res.second) {
+            if (!res.second && res.first->second != ep) {
                 auto hint = res.first;
                 --hint;
                 addresses_.erase(res.first);
                 addresses_.insert(hint, value);
             }
-            nh_.addConfidant(net_->resolve(ep));
         }
     }
 /*
@@ -1647,12 +1626,4 @@ void Transport::sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys)
     oPackStream_ << static_cast<uint8_t>(keys.size());
     std::for_each(keys.cbegin(), keys.cend(), [this](const cs::PublicKey& key) { oPackStream_ << key; });
     net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
-}
-
-bool Transport::isConfidants() {
-    return nh_.isConfidants();
-}
-
-void Transport::removeConfidants() {
-    return nh_.removeConfidants();
 }
