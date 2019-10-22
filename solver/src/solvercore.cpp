@@ -275,7 +275,7 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
                     continue;
                 }
                 ++N0;
-                sx0 += tStamp;
+                sx0 += static_cast<int>(tStamp);
             }
 
             if (N0 > 0) {

@@ -120,22 +120,15 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
             isAvailable = checkActivity(CounterType::TIMER);
         }
 
-		if (isNeedRequest || isAvailable) {
-			sendBlockRequest();
-		}
+        if (isNeedRequest || isAvailable) {
+            sendBlockRequest();
+        }
 
-		bool nothing_to_request = true;
-		for (const auto& neighbour : neighbours_) {
-			if (!neighbour.sequences().empty()) {
-				nothing_to_request = false;
-				break;
-			}
-		}
-		if (nothing_to_request) {
-			cslog() << "PoolSyncronizer> No sequence is waited from any neighbour, finish sync";
-			synchroFinished();
-		}
-	}
+        if (std::all_of(std::begin(neighbours_), std::end(neighbours_), [](const auto& neighbour) { return neighbour.sequences().empty(); })) {
+            cslog() << "PoolSyncronizer> No sequence is waited from any neighbour, finish sync";
+            synchroFinished();
+        }
+    }
 }
 
 void cs::PoolSynchronizer::syncLastPool() {
@@ -608,51 +601,61 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     const size_t allNeighboursCount = transport_->getNeighboursCount();
 
     // 1) sort neighbours by lastSeq descending
-    std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>> sort_by_seq_desc;
-    const size_t map_size = transport_->getNeighboursCount();
-    for (size_t i = 0; i < map_size; ++i) {
-        sort_by_seq_desc.insert(std::make_pair(transport_->getConnectionLastSequence(i), i));
+    std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>> sortBySeqDesc;
+    const size_t mapSize = transport_->getNeighboursCount();
+    for (size_t i = 0; i < mapSize; ++i) {
+        sortBySeqDesc.insert(std::make_pair(transport_->getConnectionLastSequence(i), i));
     }
 
     // Add new neighbours
     if (nSize < neededNeighboursCount) {
-        decltype(sort_by_seq_desc)::const_iterator it = sort_by_seq_desc.cbegin();
+        decltype(sortBySeqDesc)::const_iterator it = sortBySeqDesc.cbegin();
         // update known neighbors
         for (size_t i = 0; i < nSize; ++i) {
             // get the i-th connection with max sequence
-            size_t conn_number = i;
-            if (it != sort_by_seq_desc.cend()) {
+            size_t connectionNumber = i;
+
+            if (it != sortBySeqDesc.cend()) {
                 // normally, we always be here
-                conn_number = it->second;
+                connectionNumber = it->second;
                 ++it;
             }
-            auto& item = *(neighbours_.begin() + i);
-            ConnectionPtr neighbour = transport_->getConnectionByNumber(conn_number);
+
+            auto& item = *(neighbours_.begin() + static_cast<std::ptrdiff_t>(i));
+            ConnectionPtr neighbour = transport_->getConnectionByNumber(connectionNumber);
+
             if (neighbour->isSignal) {
-                ++conn_number;
-                if (conn_number >= neededNeighboursCount) {
+                ++connectionNumber;
+
+                if (connectionNumber >= neededNeighboursCount) {
                     break;
                 }
-                neighbour = transport_->getConnectionByNumber(conn_number);
+
+                neighbour = transport_->getConnectionByNumber(connectionNumber);
             }
-            item.setIndex(uint8_t(conn_number));
+
+            item.setIndex(uint8_t(connectionNumber));
             item.setPublicKey(neighbour->key);
         }
+
         // add new neighbors
         for (size_t i = nSize; i < allNeighboursCount; ++i) {
             // get the i-th connection with max sequence
-            size_t conn_number = i;
-            if (it != sort_by_seq_desc.cend()) {
+            size_t connectionNumber = i;
+
+            if (it != sortBySeqDesc.cend()) {
                 // normally, we always be here
-                conn_number = it->second;
+                connectionNumber = it->second;
                 ++it;
             }
-            ConnectionPtr neighbour = transport_->getConnectionByNumber(conn_number);
+
+            ConnectionPtr neighbour = transport_->getConnectionByNumber(connectionNumber);
+
             if (neighbour && !neighbour->isSignal && neighbour->lastSeq) {
-                auto isAlreadyHave = std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return size_t(el.index()) == conn_number; });
+                auto isAlreadyHave = std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return size_t(el.index()) == connectionNumber; });
 
                 if (isAlreadyHave == neighbours_.end()) {
-                    neighbours_.emplace_back(NeighboursSetElemet(uint8_t(conn_number), neighbour->key, syncData_->blockPoolsCount));
+                    neighbours_.emplace_back(NeighboursSetElemet(uint8_t(connectionNumber), neighbour->key, syncData_->blockPoolsCount));
                 }
             }
         }
@@ -662,19 +665,23 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     }
 
     // refresh neighbours' index
-    std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>>::const_iterator it = sort_by_seq_desc.cbegin();
+    std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>>::const_iterator it = sortBySeqDesc.cbegin();
     std::size_t currentNh = 0;
+
     for (size_t i = 0; i < allNeighboursCount; ++i) {
         // get the i-th connection with max sequence
-        size_t conn_number = i;
-        if (it != sort_by_seq_desc.cend()) {
+        size_t connectionNumber = i;
+
+        if (it != sortBySeqDesc.cend()) {
             // normally, we always be here
-            conn_number = it->second;
+            connectionNumber = it->second;
             ++it;
         }
-        ConnectionPtr neighbour = transport_->getConnectionByNumber(conn_number);
+
+        ConnectionPtr neighbour = transport_->getConnectionByNumber(connectionNumber);
+
         if (neighbour && !neighbour->isSignal) {
-            neighbours_[currentNh].setIndex(uint8_t(conn_number));
+            neighbours_[currentNh].setIndex(uint8_t(connectionNumber));
             neighbours_[currentNh].setPublicKey(neighbour->key);
             ++currentNh;
         }
