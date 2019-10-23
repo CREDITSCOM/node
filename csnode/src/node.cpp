@@ -554,14 +554,13 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     csdebug() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(maskOnly.data(), maskOnly.size())
         << " and received: " << cs::Utils::byteStreamToHex(rPackage.poolMetaInfo().characteristic.mask.data(), rPackage.poolMetaInfo().characteristic.mask.size());
     while (!(myIt == maskOnly.cend() || it == rPackage.poolMetaInfo().characteristic.mask.cend())) {
-        csdebug() << "NODE> Comparing " << static_cast<int>(*myIt) << " versus " << static_cast<int>(*it);
         if (*myIt != *it) {
             identic = false;
-            csdebug() << "NODE> False";
+            csdebug() << "NODE> Comparing " << static_cast<int>(*myIt) << " versus " << static_cast<int>(*it) << " ... False";
             break;
         }
         else {
-            csdebug() << "NODE> Ok";
+            csdebug() << "NODE> Comparing " << static_cast<int>(*myIt) << " versus " << static_cast<int>(*it) << " ... Ok";
         }
         ++myIt;
         ++it;
@@ -627,7 +626,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
 }
 
 void Node::createTestTransaction() {
-    return;
+    //return;
     csdb::Transaction transaction;
 
     std::string strAddr1 = "G2GeLfwjg6XuvoWnZ7ssx9EPkEBqbYL3mw3fusgpzoBk";
@@ -2334,9 +2333,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     // sync state check
     cs::Conveyer& conveyer = cs::Conveyer::instance();
 
-    if (rNum == 30 && myConfidantIndex_ == 1) {
-        createTestTransaction();
-    }
     if (stat_.isLastRoundTooLong()) {
         poolSynchronizer_->sync(rNum, 1);
     }
@@ -2538,6 +2534,11 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
 	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
     currentRp_ = cs::RoundPackage();
+
+    if (rPackage.roundTable().round == 30 && myConfidantIndex_ == 1) {
+        createTestTransaction();
+    }
+
     reviewConveyerHashes();
 
     csmeta(csdetails) << "done\n";
