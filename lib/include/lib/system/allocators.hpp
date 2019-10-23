@@ -96,7 +96,7 @@ public:
     }
 
 private:
-    size_t binarySize_;
+    size_t binarySize_{};
     RegionPtr ptr_;
 };
 

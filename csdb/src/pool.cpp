@@ -17,6 +17,9 @@
 #include <csdb/csdb.hpp>
 #include <csdb/internal/utils.hpp>
 
+#include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
+
 #include "transaction_p.hpp"
 #include "priv_crypto.hpp"
 #include "binary_streams.hpp"
@@ -378,61 +381,68 @@ class Pool::priv : public ::csdb::internal::shared_data {
         return true;
     }
 
+	bool get_hashed_data(::csdb::priv::ibstream& is) {
+		size_t cnt;
+
+		if (!get_meta(is, cnt)) {
+			csmeta(cswarning) << "get meta is failed";
+			return false;
+		}
+
+		if (!getTransactions(is, cnt)) {
+			csmeta(cswarning) << sequence_ << ": get transactions is failed";
+			return false;
+		}
+
+		if (!getNewWallets(is)) {
+			csmeta(cswarning) << sequence_ << ": get new wallets is failed";
+			return false;
+		}
+
+		if (!is.get(numberTrusted_)) {
+			csmeta(cswarning) << sequence_ << ": get number trusted is failed";
+			return false;
+		}
+
+		if (!is.get(realTrusted_)) {
+			csmeta(cswarning) << sequence_ << ": get real trusted is failed";
+			return false;
+		}
+
+		if (!getConfidants(is)) {
+			csmeta(cswarning) << sequence_ << ": get confidants is failed";
+			return false;
+		}
+
+		if (!getTrustedConfirmation(is)) {
+			csmeta(cswarning) << sequence_ << ": get confirmations is failed";
+			return false;
+		}
+
+		if (!is.get(hashingLength_)) {
+			csmeta(cswarning) << sequence_ << ": get hashing length is failed";
+			return false;
+		}
+		return true;
+	}
+
     bool get(::csdb::priv::ibstream& is) {
-        size_t cnt;
-
-        if (!get_meta(is, cnt)) {
-            csmeta(cswarning) << "get meta is failed";
-            return false;
-        }
-
-        if (!getTransactions(is, cnt)) {
-            csmeta(cswarning) << "get transactions is failed";
-            return false;
-        }
-
-        if (!getNewWallets(is)) {
-            csmeta(cswarning) << "get new wallets is failed";
-            return false;
-        }
-
-        if (!is.get(numberTrusted_)) {
-            csmeta(cswarning) << "get number trusted is failed";
-            return false;
-        }
-
-        if (!is.get(realTrusted_)) {
-            csmeta(cswarning) << "get real trusted is failed";
-            return false;
-        }
-
-        if (!getConfidants(is)) {
-            csmeta(cswarning) << "get confidants is failed";
-            return false;
-        }
-
-        if (!getTrustedConfirmation(is)) {
-            csmeta(cswarning) << "get confirmations is failed";
-            return false;
-        }
-
-        if (!is.get(hashingLength_)) {
-            csmeta(cswarning) << "get hashing length is failed";
-            return false;
-        }
-
+		if (!get_hashed_data(is)) {
+			return false;
+		}
         if (!getSignatures(is)) {
-            csmeta(cswarning) << "get signatures is failed";
+            csmeta(cswarning) << sequence_ << ": get signatures is failed";
             return false;
         }
 
         if (!getSmartSignatures(is)) {
-            csmeta(cswarning) << "get smart signatures is failed";
+            csmeta(cswarning) << sequence_ << ": get smart signatures is failed";
             return false;
         }
-        is_valid_ = true;
+
+		is_valid_ = true;
         if (is.size() > 0) {
-            cserror() << "Pool::get(): inconsistent binary pool";
+            cserror() << sequence_ << ": Pool::get(): inconsistent binary pool";
         }
         return true;
     }
@@ -902,6 +912,19 @@ uint64_t Pool::get_time() const noexcept {
     return atoll(user_field(0).value<std::string>().c_str());
 }
 
+/*static*/
+PoolHash Pool::hash_from_binary(cs::Bytes&& data) {
+	std::unique_ptr<priv> p{ new priv() };
+	::csdb::priv::ibstream is(data.data(), data.size());
+	if (!p->get_hashed_data(is)) {
+		return PoolHash();
+	}
+	p->update_binary_representation(std::move(data));
+	p->updateHash();
+	return p->hash_;
+}
+
+/*static*/
 Pool Pool::from_binary(cs::Bytes&& data) {
     std::unique_ptr<priv> p{new priv()};
     ::csdb::priv::ibstream is(data.data(), data.size());

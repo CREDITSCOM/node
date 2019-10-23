@@ -10,3 +10,5 @@ set_property(TARGET ${TEST_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_test(NAME ${TEST_NAME}
         COMMAND ${TEST_NAME})
+
+configure_msvc_flags()

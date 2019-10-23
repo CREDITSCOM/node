@@ -120,6 +120,10 @@ void SolverContext::spawn_next_round(cs::StageThree& st3) {
         return;
     }
 
+    if (st3.writer == st3.sender) {
+        core.pnode->sendConfidants(core.trusted_candidates);
+    }
+
     std::string tStamp;
 
     if (st3.writer != InvalidConfidantIndex) {
@@ -188,7 +192,7 @@ void SolverContext::request_stage1(uint8_t from, uint8_t required) {
         return;
     }
     csdebug() << kLogPrefix << "ask [" << static_cast<int>(from) << "] for stage-1 of [" << static_cast<int>(required) << "]";
-    core.pnode->stageRequest(MsgTypes::FirstStageRequest, from, required /*, 0U*/);
+    core.pnode->stageRequest(MsgTypes::FirstStageRequest, from, required , 0U);
 }
 
 void SolverContext::request_stage2(uint8_t from, uint8_t required) {
@@ -197,7 +201,7 @@ void SolverContext::request_stage2(uint8_t from, uint8_t required) {
         return;
     }
     csdebug() << kLogPrefix << "ask [" << static_cast<int>(from) << "] for stage-2 of [" << static_cast<int>(required) << "]";
-    core.pnode->stageRequest(MsgTypes::SecondStageRequest, from, required /*, 0U*/);
+    core.pnode->stageRequest(MsgTypes::SecondStageRequest, from, required , 0U);
 }
 
 void SolverContext::request_stage3(uint8_t from, uint8_t required) {
@@ -206,7 +210,7 @@ void SolverContext::request_stage3(uint8_t from, uint8_t required) {
         return;
     }
     csdebug() << kLogPrefix << "ask [" << static_cast<int>(from) << "] for stage-3 of [" << static_cast<int>(required) << "]";
-    core.pnode->stageRequest(MsgTypes::ThirdStageRequest, from, required /*, core.currentStage3iteration()*/);
+    core.pnode->stageRequest(MsgTypes::ThirdStageRequest, from, required , core.currentStage3iteration());
 }
 
 bool SolverContext::transaction_still_in_pool(int64_t inner_id) const {
@@ -235,6 +239,11 @@ void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2)
 void SolverContext::send_rejected_smarts(const std::vector<RefExecution>& reject_list) {
     csdebug() << kLogPrefix << "sending " << reject_list.size() << " rejected contract calls";
     core.pnode->sendSmartReject(reject_list);
+}
+
+void SolverContext::next_trusted_candidates(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes) {
+    core.trusted_candidates = nodes;
+    core.hashes_candidates = hashes;
 }
 
 }  // namespace cs

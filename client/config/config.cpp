@@ -28,6 +28,8 @@
 #include <unistd.h>
 #endif
 
+const NodeVersion NODE_VERSION = 431;
+
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
@@ -41,11 +43,14 @@ const std::string PARAM_NAME_NODE_TYPE = "node_type";
 const std::string PARAM_NAME_BOOTSTRAP_TYPE = "bootstrap_type";
 const std::string PARAM_NAME_HOSTS_FILENAME = "hosts_filename";
 const std::string PARAM_NAME_USE_IPV6 = "ipv6";
+const std::string PARAM_NAME_MIN_NEIGHBOURS = "min_neighbours";
 const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
+const std::string PARAM_NAME_ROUND_ELAPSE_TIME = "round_elapse_time";
 const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
 const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
+const std::string PARAM_NAME_COMPATIBLE_VERSION = "compatible_version";
 
 const std::string PARAM_NAME_CONVEYER_SEND_CACHE = "send_cache_value";
 const std::string PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE = "max_resends_send_cache";
@@ -72,6 +77,10 @@ const std::string PARAM_NAME_AJAX_SERVER_SEND_TIMEOUT = "ajax_server_send_timeou
 const std::string PARAM_NAME_AJAX_SERVER_RECEIVE_TIMEOUT = "ajax_server_receive_timeout";
 const std::string PARAM_NAME_EXECUTOR_IP = "executor_ip";
 const std::string PARAM_NAME_EXECUTOR_CMDLINE = "executor_command";
+const std::string PARAM_NAME_EXECUTOR_RUN_DELAY = "executor_run_delay";
+const std::string PARAM_NAME_EXECUTOR_BACKGROUND_THREAD_DELAY = "executor_background_thread_delay";
+const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MIN = "executor_commit_min";
+const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MAX = "executor_commit_max";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
@@ -80,6 +89,7 @@ const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
 const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
 const std::string ARG_NAME_RECREATE_INDEX = "recreate-index";
 const std::string ARG_NAME_NEW_BC_TOP = "set-bc-top";
+const std::string ARG_NAME_DISABLE_AUTO_SHUTDOWN = "disable-auto-shutdown";
 
 const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
@@ -174,6 +184,7 @@ Config Config::read(po::variables_map& vm) {
     Config result = readFromFile(getArgFromCmdLine(vm, ARG_NAME_CONFIG_FILE, DEFAULT_PATH_TO_CONFIG));
 
     result.recreateIndex_ = vm.count(ARG_NAME_RECREATE_INDEX);
+    result.autoShutdownEnabled_ = !vm.count(ARG_NAME_DISABLE_AUTO_SHUTDOWN);
     result.pathToDb_ = getArgFromCmdLine(vm, ARG_NAME_DB_PATH, DEFAULT_PATH_TO_DB);
 
     if (vm.count(ARG_NAME_NEW_BC_TOP)) {
@@ -570,7 +581,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
                 privateKey_ = keys.second;
                 publicKey_ = keys.first;
 
-                std::cout << "\nSave this phrase to restore your keys in futute, and press any key to continue:" << std::endl;
+                std::cout << "\nSave this phrase to restore your keys in future, and press any key to continue:" << std::endl;
                 auto words = cscrypto::mnemonic::masterSeedToWords(ms);
                 for (auto w : words) {
                     std::cout << w << " ";
@@ -691,13 +702,20 @@ Config Config::readFromFile(const std::string& fileName) {
 
         result.ipv6_ = !(params.count(PARAM_NAME_USE_IPV6) && params.get<std::string>(PARAM_NAME_USE_IPV6) == "false");
 
+        result.minNeighbours_ = params.count(PARAM_NAME_MIN_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MIN_NEIGHBOURS) : DEFAULT_MIN_NEIGHBOURS;
         result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) : DEFAULT_MAX_NEIGHBOURS;
+
         if (result.maxNeighbours_ > DEFAULT_MAX_NEIGHBOURS) {
             result.maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS; // see neighbourhood.hpp, some containers are of static size
         }
 
+        if (params.count(PARAM_NAME_COMPATIBLE_VERSION)) {
+            result.compatibleVersion_ = params.get<bool>(PARAM_NAME_COMPATIBLE_VERSION);
+        }
+
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
         result.observerWaitTime_ = params.count(PARAM_NAME_OBSERVER_WAIT_TIME) ? params.get<uint64_t>(PARAM_NAME_OBSERVER_WAIT_TIME) : DEFAULT_OBSERVER_WAIT_TIME;
+        result.roundElapseTime_ = params.count(PARAM_NAME_ROUND_ELAPSE_TIME) ? params.get<uint64_t>(PARAM_NAME_ROUND_ELAPSE_TIME) : DEFAULT_ROUND_ELAPSE_TIME;
 
         result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE), NODE_TYPES_MAP);
 
@@ -826,16 +844,21 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_PORT, apiData_.executorPort);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_SEND_TIMEOUT, apiData_.executorSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_RECEIVE_TIMEOUT, apiData_.executorReceiveTimeout);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_RUN_DELAY, apiData_.executorRunDelay);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_BACKGROUND_THREAD_DELAY, apiData_.executorBackgroundThreadDelay);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_SEND_TIMEOUT, apiData_.serverSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_RECEIVE_TIMEOUT, apiData_.serverReceiveTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_SEND_TIMEOUT, apiData_.ajaxServerSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_RECEIVE_TIMEOUT, apiData_.ajaxServerReceiveTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_APIEXEC_PORT, apiData_.apiexecPort);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_VERSION_COMMIT_MIN, apiData_.executorCommitMin);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_VERSION_COMMIT_MAX, apiData_.executorCommitMax);
 
-    if (data.count(PARAM_NAME_EXECUTOR_IP) > 0) {
+    if (data.count(PARAM_NAME_EXECUTOR_IP)) {
         apiData_.executorHost = data.get<std::string>(PARAM_NAME_EXECUTOR_IP);
     }
-    if (data.count(PARAM_NAME_EXECUTOR_CMDLINE) > 0) {
+
+    if (data.count(PARAM_NAME_EXECUTOR_CMDLINE)) {
         apiData_.executorCmdLine = data.get<std::string>(PARAM_NAME_EXECUTOR_CMDLINE);
     }
 }
@@ -855,8 +878,8 @@ template <typename T>
 bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value) {
     if (data.count(param)) {
         const int readValue = std::is_same_v<T, bool> ? data.get<bool>(param) : data.get<int>(param);
-        const auto max = cs::getMax(value);
-        const auto min = cs::getMin(value);
+        const auto max = static_cast<int>(cs::getMax(value));
+        const auto min = static_cast<int>(cs::getMin(value));
 
         if (readValue > max || readValue < min) {
             std::cout << "[warning] Config.ini> Please, check the block: [" << block << "], so that param: [" << param << "],  will be: [" << cs::numeric_cast<int>(min) << ", "
@@ -912,7 +935,11 @@ bool operator==(const ApiData& lhs, const ApiData& rhs) {
            lhs.ajaxServerSendTimeout == rhs.ajaxServerSendTimeout &&
            lhs.ajaxServerReceiveTimeout == rhs.ajaxServerReceiveTimeout &&
            lhs.executorHost == rhs.executorHost &&
-           lhs.executorCmdLine == rhs.executorCmdLine;
+           lhs.executorCmdLine == rhs.executorCmdLine &&
+           lhs.executorRunDelay == rhs.executorRunDelay &&
+           lhs.executorBackgroundThreadDelay == rhs.executorBackgroundThreadDelay &&
+           lhs.executorCommitMin == rhs.executorCommitMin &&
+           lhs.executorCommitMax == rhs.executorCommitMax;
 }
 
 bool operator!=(const ApiData& lhs, const ApiData& rhs) {
@@ -936,6 +963,7 @@ bool operator==(const Config& lhs, const Config& rhs) {
            lhs.outputEp_ == rhs.outputEp_ &&
            lhs.nType_ == rhs.nType_ &&
            lhs.ipv6_ == rhs.ipv6_ &&
+           lhs.minNeighbours_ == rhs.minNeighbours_ &&
            lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
            lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
            lhs.symmetric_ == rhs.symmetric_ &&
@@ -949,9 +977,12 @@ bool operator==(const Config& lhs, const Config& rhs) {
            lhs.poolSyncData_ == rhs.poolSyncData_ &&
            lhs.apiData_ == rhs.apiData_ &&
            lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
+           lhs.compatibleVersion_ == rhs.compatibleVersion_ &&
            lhs.recreateIndex_ == rhs.recreateIndex_ &&
            lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
-           lhs.conveyerData_ == rhs.conveyerData_;
+           lhs.roundElapseTime_ == rhs.roundElapseTime_ &&
+           lhs.conveyerData_ == rhs.conveyerData_ &&
+           lhs.minCompatibleVersion_ == rhs.minCompatibleVersion_;
 }
 
 bool operator!=(const Config& lhs, const Config& rhs) {

@@ -1,6 +1,9 @@
 #include <csnode/roundstat.hpp>
 
 #include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
+
+#include <configholder.hpp>
 
 #include <sstream>
 
@@ -12,7 +15,9 @@ RoundStat::RoundStat()
 , totalDurationMs_(0)
 , nodeStartRound_(0)
 , startSkipRounds_(2)
-, lastRoundMs_(0) {
+, lastRoundMs_(0)
+, roundElapseSetting_(cs::ConfigHolder::instance().config()->roundElapseTime())
+, roundElapseTimePoint_(std::chrono::steady_clock::now()) {
 }
 
 void RoundStat::onRoundStart(RoundNumber round, bool skipLogs) {
@@ -109,6 +114,37 @@ void RoundStat::onPingReceived(cs::Sequence, const cs::PublicKey&) {
 
     lastRoundMs_.fetch_add(static_cast<size_t>(result.count()), std::memory_order_acq_rel);
     point = now;
+}
+
+void RoundStat::onRoundChanged() {
+    cs::Lock lock(roundElapseMutex_);
+    roundElapseTimePoint_ = std::chrono::steady_clock::now();
+}
+
+void RoundStat::onMainThreadIterated() {
+    std::chrono::steady_clock::time_point point;
+    uint64_t limit = 0;
+
+    {
+        cs::Lock lock(roundElapseMutex_);
+        point = roundElapseTimePoint_;
+        limit = roundElapseSetting_;
+    }
+
+    auto duration = std::chrono::steady_clock::now() - point;
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+
+    if (limit > static_cast<uint64_t>(ms)) {
+        return;
+    }
+
+    emit roundTimeElapsed();
+
+    {
+        // reset time point to tick next time after limit
+        cs::Lock lock(roundElapseMutex_);
+        roundElapseTimePoint_ = std::chrono::steady_clock::now();
+    }
 }
 
 }  // namespace cs

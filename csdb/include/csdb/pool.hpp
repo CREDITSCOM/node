@@ -145,6 +145,7 @@ public:
 public:
     Pool(PoolHash previous_hash, cs::Sequence sequence, const Storage& storage = Storage());
 
+	static PoolHash hash_from_binary(cs::Bytes&& data);
     static Pool from_binary(cs::Bytes&& data);
     static Pool meta_from_binary(cs::Bytes&& data, size_t& cnt);
     static Pool load(const PoolHash& hash, Storage storage = Storage());

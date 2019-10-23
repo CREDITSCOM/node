@@ -105,9 +105,11 @@ public:
 
     void gotStageOneRequest(uint8_t requester, uint8_t required);
     void gotStageTwoRequest(uint8_t requester, uint8_t required);
-    void gotStageThreeRequest(uint8_t requester, uint8_t required /*, uint8_t iteration*/);
+    void gotStageThreeRequest(uint8_t requester, uint8_t required, uint8_t iteration);
 
     csdb::Pool& getDeferredBlock();
+
+    void checkZeroSmartSignatures(csdb::Pool& pool);
 
     void removeDeferredBlock(cs::Sequence);
     bool realTrustedChanged() const;
@@ -118,6 +120,7 @@ public:
     bool checkNodeCache(const cs::PublicKey& sender);
     void addToGraylist(const cs::PublicKey& sender, uint32_t rounds);
     void updateGrayList(cs::RoundNumber round);
+    bool isInGrayList(cs::PublicKey key);
     void resetGrayList() {
         grayList_.clear();
     }
@@ -145,6 +148,8 @@ public:
     }
 
     bool isContractLocked(const csdb::Address&) const;
+
+    bool stopNodeRequested() const;
 
 private:
     // to use private data while serve for states as SolverCore context:

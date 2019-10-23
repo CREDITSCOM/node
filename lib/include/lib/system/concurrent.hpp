@@ -15,6 +15,7 @@
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
+#include <lib/system/structures.hpp>
 
 #include <boost/asio/post.hpp>
 #include <boost/asio/thread_pool.hpp>
@@ -418,9 +419,9 @@ public:
     }
 
     template <typename T>
-    bool waitTillFront(const T& t) {
+    bool waitTillFront(const T& type) {
         std::unique_lock lock(lock_);
-        auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(kWaitSecondsTime), [&]() { return t(hash_); });
+        auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(kWaitSecondsTime), [&]() { return type(hash_); });
         hash_.condFlg = false;
         tidMap_.erase(std::this_thread::get_id());
         conditionalVariable_.notify_all();
@@ -493,12 +494,23 @@ struct SpinLockable {
 
     template <typename... Args>
     SpinLockable(Args&&... args)
-    : t(std::forward<Args>(args)...) {
+    : type_(std::forward<Args>(args)...) {
+    }
+
+    void lock() {
+        mutex_.lock();
+    }
+
+    void unlock() {
+        mutex_.unlock();
     }
 
 private:
-    __cacheline_aligned std::atomic_flag af = ATOMIC_FLAG_INIT;
-    T t;
+    std::mutex mutex_;
+    T type_;
+#ifdef API_SPINLOCK
+    __cacheline_aligned std::atomic_flag atomicFlag_ = ATOMIC_FLAG_INIT;
+#endif
 
     friend struct SpinLockedRef<T>;
 };
@@ -507,26 +519,25 @@ template <typename T>
 struct SpinLockedRef {
 private:
     SpinLockable<T>* lockable_;
-    std::mutex mt;
 public:
     SpinLockedRef(SpinLockable<T>& lockable)
     : lockable_(&lockable) {
-#ifdef SPINLOCK
-        while (this->lockable_->af.test_and_set(std::memory_order_acquire)) {
+#ifdef API_SPINLOCK
+        while (this->lockable_->atomicFlag_.test_and_set(std::memory_order_acquire)) {
             std::this_thread::yield();
         }
 #else
-        mt.lock();
+        lockable_->lock();
 #endif
     }
 
     ~SpinLockedRef() {
-#ifdef SPINLOCK
+#ifdef API_SPINLOCK
         if (lockable_) {
-            lockable_->af.clear(std::memory_order_release);
+            lockable_->atomicFlag_.clear(std::memory_order_release);
         }
 #else
-        mt.unlock();
+        lockable_->unlock();
 #endif
     }
 
@@ -537,7 +548,7 @@ public:
     }
 
     explicit operator T*() {
-        return &(lockable_->t);
+        return &(lockable_->type_);
     }
 
     T* operator->() {
@@ -545,7 +556,7 @@ public:
     }
 
     T& operator*() {
-        return lockable_->t;
+        return lockable_->type_;
     }
 };
 

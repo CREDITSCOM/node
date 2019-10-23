@@ -10,12 +10,12 @@
 #endif
 
 #include <csnode/node.hpp>
+#include <csnode/configholder.hpp>
 
 #include <lib/system/logger.hpp>
 
 #include <net/transport.hpp>
 
-#include <config.hpp>
 #include <params.hpp>
 #include <observer.hpp>
 #include <version.hpp>
@@ -157,6 +157,7 @@ int main(int argc, char* argv[]) {
         ("recreate-index", "recreate index.db")
         ("seed", "enter with seed instead of keys")
         ("set-bc-top", po::value<uint64_t>(), "all blocks in blockchain with higher sequence will be removed")
+        ("disable-auto-shutdown", "node will be prohibited to shutdown in case of fatal errors")
         ("version", "show node version")
         ("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")
         ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")")
@@ -241,7 +242,10 @@ int main(int argc, char* argv[]) {
     logger::initialize(config.getLoggerSettings());
 
     cs::config::Observer observer(config, vm);
-    Node node(config, observer);
+    cs::ConfigHolder::instance().setConfig(config);
+    cs::Connector::connect(&observer.configChanged, &cs::ConfigHolder::instance(), &cs::ConfigHolder::onConfigChanged);
+
+    Node node(observer);
 
     if (!node.isGood()) {
         panic();

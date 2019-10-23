@@ -114,19 +114,10 @@ struct FormatRef {
     cs::Sequence seq;
     uint32_t idx;
 
-    FormatRef(cs::Sequence s, uint32_t i)
+    template<typename T, class = typename std::enable_if<std::is_integral_v<T>>>
+    FormatRef(cs::Sequence s, T i)
         : seq(s)
-        , idx(i)
-    {}
-
-    FormatRef(cs::Sequence s, size_t i)
-        : seq(s)
-        , idx(uint32_t(i))
-    {}
-
-    FormatRef(cs::Sequence s, uint16_t i)
-        : seq(s)
-        , idx(i)
+        , idx((uint32_t)(i))
     {}
 
     FormatRef(cs::Sequence s)

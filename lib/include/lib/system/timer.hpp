@@ -3,11 +3,8 @@
 
 #include <atomic>
 #include <chrono>
-#include <functional>
-#include <memory>
-#include <thread>
-#include <vector>
 
+#include <lib/system/shareable.hpp>
 #include <lib/system/concurrent.hpp>
 
 namespace cs {
@@ -16,13 +13,12 @@ using TimerCallback = std::function<TimerCallbackSignature>;
 using TimeOutSignal = cs::Signal<TimerCallbackSignature>;
 
 class Timer;
-using TimerPtr = std::shared_ptr<Timer>;
 
 ///
 /// Represents standard timer that calls callbacks every msec with time correction.
 /// @brief Timer emits time out signal by run policy.
 ///
-class Timer {
+class Timer : public Shareable<Timer> {
 public:
     enum : unsigned int {
         RangeDeltaInPercents = 10,
@@ -45,7 +41,6 @@ public:
     Type type() const;
 
     static void singleShot(int msec, cs::RunPolicy policy, TimerCallback callback);
-    static TimerPtr create();
 
 public signals:
 

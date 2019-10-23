@@ -269,6 +269,13 @@ public:
     }
 
     ///
+    /// Returns stream empty status
+    ///
+    bool isEmpty() const {
+        return size() == 0;
+    }
+
+    ///
     /// @brief Returns Read/Write status of stream.
     ///
     Status status() const {

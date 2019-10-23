@@ -24,13 +24,13 @@
 #endif
 
 #include <csnode/blockchain.hpp>
+#include <csnode/configholder.hpp>
 
 #include <csstats.hpp>
 #include <deque>
 #include <queue>
 
 #include <client/params.hpp>
-#include <config.hpp>
 
 #include <lib/system/reference.hpp>
 #include <lib/system/concurrent.hpp>
@@ -104,33 +104,27 @@ class Executor;
 
 struct ExecutorSettings {
     using Types = std::tuple<cs::Reference<const BlockChain>,
-                             cs::Reference<const cs::SolverCore>,
-                             cs::Reference<const Config>>;
+                             cs::Reference<const cs::SolverCore>>;
 
     static void set(cs::Reference<const BlockChain> blockchain,
-                    cs::Reference<const cs::SolverCore> solver,
-                    cs::Reference<const Config> config) {
+                    cs::Reference<const cs::SolverCore> solver) {
         blockchain_ = blockchain;
         solver_ = solver;
-        config_ = config;
     }
 
 private:
     static Types get() {
         auto tuple = std::make_tuple(std::any_cast<cs::Reference<const BlockChain>>(blockchain_),
-                                     std::any_cast<cs::Reference<const cs::SolverCore>>(solver_),
-                                     std::any_cast<cs::Reference<const Config>>(config_));
+                                     std::any_cast<cs::Reference<const cs::SolverCore>>(solver_));
 
         blockchain_.reset();
         solver_.reset();
-        config_.reset();
 
         return tuple;
     }
 
     inline static std::any blockchain_;
     inline static std::any solver_;
-    inline static std::any config_;
 
     friend class Executor;
 };
@@ -212,6 +206,30 @@ public:  // wrappers
             notifyError();
         }
         catch(const std::exception& x ) {
+            _return.status.code = 1;
+            _return.status.message = x.what();
+
+            notifyError();
+        }
+    }
+
+    void getExecutorBuildVersion(ExecutorBuildVersionResult& _return) {
+        try {
+            std::shared_lock slk(sharedErrorMutex_);
+            origExecutor_->getExecutorBuildVersion(_return, EXECUTOR_VERSION);
+        }
+        catch (::apache::thrift::transport::TTransportException& x) {
+            // sets stop_ flag to true forever, replace with new instance
+            if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
+                recreateOriginExecutor();
+            }
+
+            _return.status.code = 1;
+            _return.status.message = x.what();
+
+            notifyError();
+        }
+        catch (const std::exception& x) {
             _return.status.code = 1;
             _return.status.message = x.what();
 
@@ -325,9 +343,9 @@ public:
     }
 
     std::optional<std::vector<csdb::Transaction>> getInnerSendTransactions(const general::AccessID& accessId) {
-        std::shared_lock slk(mutex_);
+        std::shared_lock sharedLock(mutex_);
         if (const auto it = innerSendTransactions_.find(accessId); it != innerSendTransactions_.end()) {
-            return std::make_optional<std::vector<csdb::Transaction>>(it->second);
+            return std::make_optional(it->second);
         }
         return std::nullopt;
     }
@@ -356,6 +374,13 @@ public:
         PayableLegacy,
         // Call to payable(string, byte[]) requested
         Payable
+    };
+
+    enum ExecutorErrorCode {
+        NoError = 0,
+        GeneralError = 1,
+        IncorrecJdkVersion,
+        ServerStartError
     };
 
     enum ACCESS_ID_RESERVE { GETTER, START_INDEX };
@@ -388,15 +413,16 @@ public:
 
     std::optional<ExecuteResult> reexecuteContract(ExecuteTransactionInfo& contract, std::string forceContractState);
 
-    csdb::Transaction make_transaction(const api::Transaction& transaction) {
+    csdb::Transaction makeTransaction(const api::Transaction& transaction) {
         csdb::Transaction send_transaction;
         const auto source = BlockChain::getAddressFromKey(transaction.source);
         const uint64_t WALLET_DENOM = csdb::Amount::AMOUNT_MAX_FRACTION;  // 1'000'000'000'000'000'000ull;
         send_transaction.set_amount(csdb::Amount(transaction.amount.integral, uint64_t(transaction.amount.fraction), WALLET_DENOM));
 
         BlockChain::WalletData dummy{};
-        if (!blockchain_.findWalletData(source, dummy))
+        if (!blockchain_.findWalletData(source, dummy)) {
             return csdb::Transaction{}; // disable transaction from unknown source!
+        }
 
         send_transaction.set_currency(csdb::Currency(1));
         send_transaction.set_source(source);
@@ -406,15 +432,18 @@ public:
 
         // TODO Change Thrift to avoid copy
         cs::Signature signature;
-        if (transaction.signature.size() == signature.size())
+        if (transaction.signature.size() == signature.size()) {
             std::copy(transaction.signature.begin(), transaction.signature.end(), signature.begin());
-        else
+        }
+        else {
             signature.fill(0);
+        }
+
         send_transaction.set_signature(signature);
         return send_transaction;
     }
 
-    void state_update(const csdb::Pool& pool);
+    void stateUpdate(const csdb::Pool& pool);
 
     void addToLockSmart(const general::Address& address, const general::AccessID& accessId) {
         std::lock_guard lk(mutex_);
@@ -450,108 +479,48 @@ public:
 
 public slots:
     void onBlockStored(const csdb::Pool& pool) {
-        state_update(pool);
+        stateUpdate(pool);
     }
 
-    void onReadBlock(const csdb::Pool& block, bool* test_failed) {
-        csunused(test_failed);
-        state_update(block);
+    void onReadBlock(const csdb::Pool& block) {
+        stateUpdate(block);
     }
 
-    void onExecutorStarted() {
-        if (!isConnected()) {
-            connect();
+    void onExecutorStarted();
+
+    void onExecutorFinished(int code, const std::error_code&) {
+        if (requestStop_) {
+            return;
         }
 
-        csdebug() << csname() << "started";
-    }
-
-    void onExecutorFinished() {
-        if (!requestStop_) {
-            cs::Concurrent::run([this] {
-                runProcess();
-            });
+        if (!executorMessages_.count(code)) {
+            cswarning() << "Executor unknown error";
+        }
+        else {
+            cswarning() << executorMessages_[code];
         }
 
-        csdebug() << csname() << "finished";
+        if (code == ExecutorErrorCode::ServerStartError ||
+            code == ExecutorErrorCode::IncorrecJdkVersion) {
+            return;
+        }
+
+        cs::Concurrent::run([this] {
+            runProcess();
+        });
     }
 
     void onExecutorProcessError(const cs::ProcessException& exception) {
         cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
     }
 
-    void onConfigChanged(const Config& updated, const Config& previous) {
-        if (updated.getApiSettings().executorCmdLine == previous.getApiSettings().executorCmdLine) {
-            return;
-        }
-
-        if (updated.getApiSettings().executorCmdLine.empty()) {
-            return;
-        }
-
-        executorProcess_->setProgram(updated.getApiSettings().executorCmdLine);
-    }
-
 private:
+    int commitMin_{};
+    int commitMax_{};
+
     std::map<general::Address, general::AccessID> lockSmarts;
 
-    explicit Executor(const ExecutorSettings::Types& types)
-    : blockchain_(std::get<cs::Reference<const BlockChain>>(types))
-    , solver_(std::get<cs::Reference<const cs::SolverCore>>(types))
-    , config_(std::get<cs::Reference<const Config>>(types))
-    , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(config_.getApiSettings().executorHost, config_.getApiSettings().executorPort))
-    , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
-    , origExecutor_(
-          std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
-        socket_->setSendTimeout(config_.getApiSettings().executorSendTimeout);
-        socket_->setRecvTimeout(config_.getApiSettings().executorReceiveTimeout);
-
-        if (config_.getApiSettings().executorCmdLine.empty()) {
-            cswarning() << "Executor command line args are empty, process would not be created";
-            return;
-        }
-
-        executorProcess_ = std::make_unique<cs::Process>(config_.getApiSettings().executorCmdLine);
-
-        cs::Connector::connect(&executorProcess_->started, this, &Executor::onExecutorStarted);
-        cs::Connector::connect(&executorProcess_->finished, this, &Executor::onExecutorFinished);
-        cs::Connector::connect(&executorProcess_->errorOccured, this, &Executor::onExecutorProcessError);
-
-        executorProcess_->launch(cs::Process::Options::None);
-        while (!executorProcess_->isRunning());
-
-        std::thread thread([this]() {
-            while(!requestStop_) {
-                if (isConnected()) {
-                    static std::mutex mutex;
-                    std::unique_lock lock(mutex);
-
-                    cvErrorConnect_.wait_for(lock, std::chrono::seconds(5), [&] {
-                        return !isConnected() || requestStop_;
-                    });
-                }
-
-                if (requestStop_) {
-                    break;
-                }
-
-                if (executorProcess_->isRunning()) {
-                    if (!isConnected()) {
-                        connect();
-                    }
-                }
-                else {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-                    if (!executorProcess_->isRunning()) {
-                        runProcess();
-                    }
-                }
-            }
-        });
-
-        thread.detach();
-    }
+    explicit Executor(const ExecutorSettings::Types& types);
 
     ~Executor() {
         stop();
@@ -559,7 +528,10 @@ private:
 
     void runProcess() {
         executorProcess_->terminate();
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(cs::ConfigHolder::instance().config()->getApiSettings().executorRunDelay));
+
+        executorProcess_->setProgram(cs::ConfigHolder::instance().config()->getApiSettings().executorCmdLine);
         executorProcess_->launch(cs::Process::Options::None);
     }
 
@@ -619,7 +591,6 @@ private:
         cvErrorConnect_.notify_one();
     }
 
-    //
     using OriginExecutor = executor::ContractExecutorConcurrentClient;
     using BinaryProtocol = apache::thrift::protocol::TBinaryProtocol;
     std::shared_mutex sharedErrorMutex_;
@@ -629,12 +600,10 @@ private:
         disconnect();
         origExecutor_.reset(new OriginExecutor(::apache::thrift::stdcxx::make_shared<BinaryProtocol>(executorTransport_)));
     }
-    //
 
 private:
     const BlockChain& blockchain_;
     const cs::SolverCore& solver_;
-    const Config& config_;
 
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TSocket> socket_;
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executorTransport_;
@@ -655,15 +624,22 @@ private:
     mutable std::condition_variable cvErrorConnect_;
     std::atomic_bool requestStop_{ false };
 
-    const int16_t EXECUTOR_VERSION = 2;
+    const int16_t EXECUTOR_VERSION = 3;
 
     std::mutex callExecutorLock_;
+
+    std::map<int, const char*> executorMessages_ = {
+        { NoError, "Executor finished with no error code" },
+        { GeneralError, "Executor unexpected error, try to launch again" },
+        { IncorrecJdkVersion, "Executor can not be launched due to incorred JDK version" },
+        { ServerStartError, "Executor server start error" }
+    };
 };
 }  // namespace executor
 namespace apiexec {
 class APIEXECHandler : public APIEXECNull, public APIHandlerBase {
 public:
-    explicit APIEXECHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
+    explicit APIEXECHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor);
     APIEXECHandler(const APIEXECHandler&) = delete;
     void GetSeed(apiexec::GetSeedResult& _return, const general::AccessID accessId) override;
     void SendTransaction(apiexec::SendTransactionResult& _return, const general::AccessID accessId, const api::Transaction& transaction) override;
@@ -686,7 +662,7 @@ private:
 namespace api {
 class APIHandler : public APIHandlerInterface {
 public:
-    explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
+    explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor);
     ~APIHandler() override;
 
     APIHandler(const APIHandler&) = delete;
@@ -740,9 +716,9 @@ public:
         int64_t limit, const csdb::Address& wallet = csdb::Address());
 
     void ExecuteCountGet(ExecuteCountGetResult& _return, const std::string& executeMethod) override;
-    ////////new
+
     void iterateOverTokenTransactions(const csdb::Address&, const std::function<bool(const csdb::Pool&, const csdb::Transaction&)>);
-    ////////new
+
     api::SmartContractInvocation getSmartContract(const csdb::Address&, bool&);
     std::vector<general::ByteCodeObject> getSmartByteCode(const csdb::Address&, bool&);
     void SmartContractDataGet(api::SmartContractDataResult&, const general::Address&) override;
@@ -760,7 +736,6 @@ public:
     void TransactionsListGet(api::TransactionsGetResult&, int64_t offset, int64_t limit) override;
     void WalletsGet(api::WalletsGetResult& _return, int64_t offset, int64_t limit, int8_t ordCol, bool desc) override;
     void TrustedGet(api::TrustedGetResult& _return, int32_t page) override;
-    ////////new
 
     void SyncStateGet(api::SyncStateResult& _return) override;
 
@@ -775,8 +750,50 @@ public:
     bool isBDLoaded() { return isBDLoaded_; }
     
 private:
+#ifdef USE_DEPRECATED_STATS
     ::csstats::AllStats stats_;
+#endif // 0
     executor::Executor& executor_;
+
+    // for answer dumb transactions        
+    class DUMBCV {
+    public:
+        void addCVInfo(const cs::Signature& signature) {
+            mCvInfo_[signature];
+        }
+
+        void sendCvSignal(const cs::Signature& signature) {
+            if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
+                auto&[cv, condFlg] = it->second;
+                cv.notify_one();
+                condFlg = true;
+            }
+        }
+
+        bool waitCvSignal(const cs::Signature& signature) {
+            bool isTimeOver = false;
+
+            if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
+                std::mutex dumbMutex;
+                std::unique_lock lock(dumbMutex);
+
+                isTimeOver = it->second.cv_.wait_for(lock, std::chrono::seconds(30), [it]() -> bool {
+                    return it->second.condFlg_;
+                });
+
+                mCvInfo_.erase(signature);
+            }
+
+            return isTimeOver;
+        }
+    private:
+        struct CVInfo {
+            std::condition_variable cv_;
+            std::atomic_bool condFlg_{ false };
+        };
+        std::map<cs::Signature, CVInfo> mCvInfo_;
+    } dumbCv_;
+    //
 
     bool isBDLoaded_{ false };
 
@@ -805,7 +822,7 @@ private:
    
     BlockChain& blockchain_;
     cs::SolverCore& solver_;
-#ifdef MONITOR_NODE
+#ifdef USE_DEPRECATED_STATS // MONITOR_NODE
     csstats::csstats stats;
 #endif
 
@@ -853,7 +870,7 @@ private:
     cs::SpinLockable<std::map<cs::Sequence, std::vector<csdb::TransactionID>>> smarts_pending;
 
     cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
-    cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smart_last_trxn;
+    cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smartLastTrxn_;
 
     cs::SpinLockable<std::map<csdb::Address, smartHashStateEntry>> hashStateSL;
 
@@ -868,8 +885,6 @@ private:
     api::SmartContract fetch_smart_body(const csdb::Transaction&);
 
 private:
-    //void state_updater_work_function();
-
     std::vector<api::SealedTransaction> extractTransactions(const csdb::Pool& pool, int64_t limit, const int64_t offset);
 
     api::SealedTransaction convertTransaction(const csdb::Transaction& transaction);
@@ -880,8 +895,6 @@ private:
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
 
-    // bool convertAddrToPublicKey(const csdb::Address& address);
-
     template <typename Mapper>
     size_t getMappedDeployerSmart(const csdb::Address& deployer, Mapper mapper, std::vector<decltype(mapper(api::SmartContract()))>& out, int64_t offset = 0, int64_t limit = 0);
 
@@ -889,7 +902,7 @@ private:
 
     void run();
 
-    ::csdb::Transaction make_transaction(const ::api::Transaction&);
+    ::csdb::Transaction makeTransaction(const ::api::Transaction&);
     void dumb_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
     void smart_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
 

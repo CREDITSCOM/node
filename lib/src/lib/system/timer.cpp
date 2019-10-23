@@ -23,10 +23,16 @@ void cs::Timer::start(int msec, Type type, RunPolicy policy) {
     ms_ = std::chrono::milliseconds(msec);
     ns_ = 0;
 
-    timerThread_ = (type_ == Type::Standard) ? std::thread(&Timer::loop, this) : std::thread(&Timer::preciseLoop, this);
-
     realMs_ = ms_;
     allowDifference_ = static_cast<unsigned int>(msec) * RangeDeltaInPercents / 100;
+
+    try {
+        timerThread_ = (type_ == Type::Standard) ? std::thread(&Timer::loop, this) : std::thread(&Timer::preciseLoop, this);
+    }
+    catch (const std::exception& exception) {
+        cserror() << "Can not run Timer thread, " << exception.what();
+        stop();
+    }
 }
 
 void cs::Timer::stop() {
@@ -60,10 +66,6 @@ cs::Timer::Type cs::Timer::type() const {
 
 void cs::Timer::singleShot(int msec, cs::RunPolicy policy, cs::TimerCallback callback) {
     cs::Concurrent::runAfter(std::chrono::milliseconds(msec), policy, std::move(callback));
-}
-
-cs::TimerPtr cs::Timer::create() {
-    return std::make_shared<Timer>();
 }
 
 void cs::Timer::loop() {
@@ -122,14 +124,7 @@ void cs::Timer::rehabilitation() {
 }
 
 void cs::Timer::call() {
-    auto policy = policy_.load(std::memory_order_acquire);
-
-    if (policy == RunPolicy::ThreadPolicy) {
+    cs::Concurrent::execute(policy_.load(std::memory_order_acquire),[this] {
         emit timeOut();
-    }
-    else {
-        CallsQueue::instance().insert([=] {
-            emit timeOut();
-        });
-    }
+    });
 }

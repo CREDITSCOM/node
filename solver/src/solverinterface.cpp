@@ -236,13 +236,13 @@ uint8_t SolverCore::currentStage3iteration() {
     return currentStage3iteration_;
 }
 
-void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required /*, uint8_t iteration*/) {
-    csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-3 of [" << static_cast<int>(required) << "]";  // - i" << static_cast<int>(iteration);
+void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required, uint8_t iteration) {
+    csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-3 of [" << static_cast<int>(required) << "] - iteration = " << static_cast<int>(iteration);
 
     // const auto ptr = find_stage3(required);
 
     for (auto& it : stageThreeStorage) {
-        if (it.iteration == currentStage3iteration_ && it.sender == requester) {
+        if (it.iteration == iteration && it.sender == requester) {
             pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester, it.message);
             return;
         }
@@ -545,5 +545,13 @@ void SolverCore::gotRoundInfoReply(bool next_round_started, const cs::PublicKey&
 bool SolverCore::isContractLocked(const csdb::Address& address) const {
     return psmarts->is_contract_locked(address);
 }
+
+bool SolverCore::stopNodeRequested() const {
+    if (pnode) {
+        return pnode->isStopRequested();
+    }
+    return false;
+}
+
 
 }  // namespace cs

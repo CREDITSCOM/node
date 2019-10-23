@@ -134,10 +134,7 @@ public:
 
     void sendRoundTable();
 
-    void next_trusted_candidates(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes = std::vector<cs::TransactionsPacketHash>()) {
-        core.trusted_candidates = nodes;
-        core.hashes_candidates = hashes;
-    }
+    void next_trusted_candidates(const std::vector<cs::PublicKey>& nodes, const std::vector<cs::TransactionsPacketHash>& hashes = std::vector<cs::TransactionsPacketHash>());
 
     // Fast access methods, may be removed at the end
 

@@ -1,6 +1,8 @@
 #ifndef COMPRESSOR_HPP
 #define COMPRESSOR_HPP
 
+#include <mutex>
+
 #include <lz4.h>
 
 #include <datastream.hpp>
@@ -44,14 +46,17 @@ public:
         const int compressedSize = LZ4_compress_default(data, static_cast<char*>(region->data()) + byteSizeof_, binSize,
                                                         cs::numeric_cast<int>(region->size()) - byteSizeof_);
 
+        CompressedRegion::SizeType size = 0;
+
         if (!compressedSize) {
             std::copy(data, data + binSize, static_cast<char*>(region->data()) + byteSizeof_);
-            region->setSize(static_cast<uint32_t>(binSize + byteSizeof_));
+            size = static_cast<uint32_t>(binSize + byteSizeof_);
         }
         else {
-            region->setSize(static_cast<uint32_t>(compressedSize + byteSizeof_));
+            size = static_cast<uint32_t>(compressedSize + byteSizeof_);
         }
 
+        region->setSize(size);
         *(static_cast<cs::Byte*>(region->data())) = compressedSize ? Compression::Compressed : Compression::None;
 
         return CompressedRegion { region, static_cast<size_t>(binSize) };
@@ -95,6 +100,25 @@ public:
 private:
     RegionAllocator allocator_;
     static inline int byteSizeof_ = sizeof(cs::Byte);
+};
+
+// multi-threaded compressor
+class SynchronizedCompressor : public Compressor {
+public:
+    template<typename T>
+    CompressedRegion compress(const T& entity) {
+        cs::Lock lock(mutex_);
+        return Compressor::compress(entity);
+    }
+
+    template<typename T>
+    T decompress(CompressedRegion region) {
+        cs::Lock lock(mutex_);
+        return Compressor::decompress<T>(region);
+    }
+
+protected:
+    std::mutex mutex_;
 };
 }
 

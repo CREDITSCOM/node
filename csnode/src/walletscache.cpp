@@ -180,11 +180,10 @@ void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transact
 
 #ifdef MONITOR_NODE
 bool WalletsCache::Updater::setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp) {
-    for (auto& it : data_.wallets_) {
-        if (it.first == address) {
-            it.second.createTime_ = p_timeStamp;
-            return true;
-        }
+    auto it = data_.wallets_.find(address);
+    if (it != data_.wallets_.end()) {
+        it->second.createTime_ = p_timeStamp;
+        return true;
     }
     return false;
 }
@@ -512,8 +511,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
 
 void WalletsCache::Updater::updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>& updates) {
     for (const auto& u : updates) {
-        auto it = std::find_if(data_.wallets_.begin(), data_.wallets_.end(), [&u](auto& wall) {
-                               return wall.first == u.first; });
+        auto it = data_.wallets_.find(u.first);
         if (it != data_.wallets_.end()) {
             it->second.lastTransaction_ = u.second;
         }
