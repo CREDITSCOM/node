@@ -18,8 +18,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 
-#include <config.hpp>
-
 using namespace cs;
 namespace fs = boost::filesystem;
 

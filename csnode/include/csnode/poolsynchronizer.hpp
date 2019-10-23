@@ -9,11 +9,8 @@
 
 #include <lib/system/timer.hpp>
 #include <lib/system/signals.hpp>
-#include <lib/system/lockfreechanger.hpp>
 
 #include <net/neighbourhood.hpp>
-
-#include <config.hpp>
 
 class Node;
 
@@ -22,7 +19,7 @@ using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr target
 
 class PoolSynchronizer {
 public:
-    explicit PoolSynchronizer(const PoolSyncData& data, Transport* transport, BlockChain* blockChain);
+    explicit PoolSynchronizer(Transport* transport, BlockChain* blockChain);
 
     void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = roundDifferentForSync, bool isBigBand = false);
     void syncLastPool();
@@ -51,9 +48,6 @@ private slots:
     void onWriteBlock(const csdb::Pool pool);
     void onWriteBlock(const cs::Sequence sequence);
     void onRemoveBlock(const csdb::Pool& pool);
-
-public slots:
-    void onConfigChanged(const Config& updated);
 
 private:
     enum class CounterType;
@@ -217,8 +211,6 @@ private:
     };
 
 private:
-    cs::LockFreeChanger<PoolSyncData> syncData_;
-
     Transport* transport_;
     BlockChain* blockChain_;
 

@@ -11,9 +11,8 @@
 #include <lib/system/hash.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
-#include <lib/system/lockfreechanger.hpp>
 
-#include <config.hpp>
+#include <csnode/configholder.hpp>
 
 namespace {
 cs::ConveyerBase* conveyerView = nullptr;
@@ -45,9 +44,6 @@ struct cs::ConveyerBase::Impl {
     // cached active current round number
     std::atomic<cs::RoundNumber> currentRound = 0;
 
-    // settings
-    cs::LockFreeChanger<ConveyerData> settings;
-
     // helpers
     const cs::ConveyerMeta* validMeta() &;
 };
@@ -72,10 +68,6 @@ cs::ConveyerBase::ConveyerBase() {
     pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
 
     std::call_once(::onceFlag, &::setup, this);
-}
-
-void cs::ConveyerBase::setData(const ConveyerData& data) {
-    pimpl_->settings.exchange(data);
 }
 
 void cs::ConveyerBase::setRound(cs::RoundNumber round) {
@@ -729,14 +721,6 @@ void cs::ConveyerBase::flushTransactions() {
     checkSendCache();
 }
 
-void cs::ConveyerBase::onConfigChanged(const Config& updated, const Config& previous) {
-    if (updated.conveyerData() == previous.conveyerData()) {
-        return;
-    }
-
-    setData(updated.conveyerData());
-}
-
 void cs::ConveyerBase::changeRound(cs::RoundNumber round) {
     if (currentRoundNumber() != round) {
         pimpl_->currentRound = round;
@@ -829,7 +813,7 @@ bool cs::ConveyerBase::isHashAtSendCache(const cs::TransactionsPacketHash& hash)
 
 void cs::ConveyerBase::checkSendCache() {
     auto round = currentRoundNumber();
-    auto sendCacheValue = pimpl_->settings->sendCacheValue;
+    auto sendCacheValue = cs::ConfigHolder::instance().config()->conveyerData().sendCacheValue;
 
     if (round < sendCacheValue) {
         return;

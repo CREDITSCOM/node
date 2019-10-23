@@ -24,13 +24,13 @@
 #endif
 
 #include <csnode/blockchain.hpp>
+#include <csnode/configholder.hpp>
 
 #include <csstats.hpp>
 #include <deque>
 #include <queue>
 
 #include <client/params.hpp>
-#include <config.hpp>
 
 #include <lib/system/reference.hpp>
 #include <lib/system/concurrent.hpp>
@@ -105,33 +105,27 @@ class Executor;
 
 struct ExecutorSettings {
     using Types = std::tuple<cs::Reference<const BlockChain>,
-                             cs::Reference<const cs::SolverCore>,
-                             cs::Reference<const Config>>;
+                             cs::Reference<const cs::SolverCore>>;
 
     static void set(cs::Reference<const BlockChain> blockchain,
-                    cs::Reference<const cs::SolverCore> solver,
-                    cs::Reference<const Config> config) {
+                    cs::Reference<const cs::SolverCore> solver) {
         blockchain_ = blockchain;
         solver_ = solver;
-        config_ = config;
     }
 
 private:
     static Types get() {
         auto tuple = std::make_tuple(std::any_cast<cs::Reference<const BlockChain>>(blockchain_),
-                                     std::any_cast<cs::Reference<const cs::SolverCore>>(solver_),
-                                     std::any_cast<cs::Reference<const Config>>(config_));
+                                     std::any_cast<cs::Reference<const cs::SolverCore>>(solver_));
 
         blockchain_.reset();
         solver_.reset();
-        config_.reset();
 
         return tuple;
     }
 
     inline static std::any blockchain_;
     inline static std::any solver_;
-    inline static std::any config_;
 
     friend class Executor;
 };
@@ -551,10 +545,6 @@ public slots:
         cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
     }
 
-    void onConfigChanged(const Config& updated) {
-        config_.exchange(updated);
-    }
-
 private:
     int commitMin_{};
     int commitMax_{};
@@ -564,22 +554,22 @@ private:
     explicit Executor(const ExecutorSettings::Types& types)
     : blockchain_(std::get<cs::Reference<const BlockChain>>(types))
     , solver_(std::get<cs::Reference<const cs::SolverCore>>(types))
-    , config_(std::get<cs::Reference<const Config>>(types))
-    , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(config_->getApiSettings().executorHost, config_->getApiSettings().executorPort))
+    , socket_(::apache::thrift::stdcxx::make_shared<::apache::thrift::transport::TSocket>(cs::ConfigHolder::instance().config()->getApiSettings().executorHost,
+                                                                                          cs::ConfigHolder::instance().config()->getApiSettings().executorPort))
     , executorTransport_(new ::apache::thrift::transport::TBufferedTransport(socket_))
     , origExecutor_(std::make_unique<executor::ContractExecutorConcurrentClient>(::apache::thrift::stdcxx::make_shared<apache::thrift::protocol::TBinaryProtocol>(executorTransport_))) {
-        socket_->setSendTimeout(config_->getApiSettings().executorSendTimeout);
-        socket_->setRecvTimeout(config_->getApiSettings().executorReceiveTimeout);
+        socket_->setSendTimeout(cs::ConfigHolder::instance().config()->getApiSettings().executorSendTimeout);
+        socket_->setRecvTimeout(cs::ConfigHolder::instance().config()->getApiSettings().executorReceiveTimeout);
 
-        commitMin_ = config_->getApiSettings().executorCommitMin;
-        commitMax_ = config_->getApiSettings().executorCommitMax;
+        commitMin_ = cs::ConfigHolder::instance().config()->getApiSettings().executorCommitMin;
+        commitMax_ = cs::ConfigHolder::instance().config()->getApiSettings().executorCommitMax;
 
-        if (config_->getApiSettings().executorCmdLine.empty()) {
+        if (cs::ConfigHolder::instance().config()->getApiSettings().executorCmdLine.empty()) {
             cswarning() << "Executor command line args are empty, process would not be created";
             return;
         }
 
-        executorProcess_ = std::make_unique<cs::Process>(config_->getApiSettings().executorCmdLine);
+        executorProcess_ = std::make_unique<cs::Process>(cs::ConfigHolder::instance().config()->getApiSettings().executorCmdLine);
 
         cs::Connector::connect(&executorProcess_->started, this, &Executor::onExecutorStarted);
         cs::Connector::connect(&executorProcess_->finished, this, &Executor::onExecutorFinished);
@@ -621,9 +611,9 @@ private:
     void runProcess() {
         executorProcess_->terminate();
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(config_->getApiSettings().executorRunDelay));
+        std::this_thread::sleep_for(std::chrono::milliseconds(cs::ConfigHolder::instance().config()->getApiSettings().executorRunDelay));
 
-        executorProcess_->setProgram(config_->getApiSettings().executorCmdLine);
+        executorProcess_->setProgram(cs::ConfigHolder::instance().config()->getApiSettings().executorCmdLine);
         executorProcess_->launch(cs::Process::Options::None);
     }
 
@@ -696,7 +686,6 @@ private:
 private:
     const BlockChain& blockchain_;
     const cs::SolverCore& solver_;
-    cs::LockFreeChanger<Config> config_;
 
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TSocket> socket_;
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executorTransport_;
@@ -732,7 +721,7 @@ private:
 namespace apiexec {
 class APIEXECHandler : public APIEXECNull, public APIHandlerBase {
 public:
-    explicit APIEXECHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
+    explicit APIEXECHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor);
     APIEXECHandler(const APIEXECHandler&) = delete;
     void GetSeed(apiexec::GetSeedResult& _return, const general::AccessID accessId) override;
     void SendTransaction(apiexec::SendTransactionResult& _return, const general::AccessID accessId, const api::Transaction& transaction) override;
@@ -755,7 +744,7 @@ private:
 namespace api {
 class APIHandler : public APIHandlerInterface {
 public:
-    explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
+    explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor);
     ~APIHandler() override;
 
     APIHandler(const APIHandler&) = delete;

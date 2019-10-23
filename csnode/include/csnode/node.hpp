@@ -5,7 +5,6 @@
 #include <memory>
 #include <string>
 
-#include <config.hpp>
 #include <csstats.hpp>
 
 #include <csconnector/csconnector.hpp>
@@ -33,12 +32,12 @@ class PoolSynchronizer;
 class BlockValidator;
 }  // namespace cs
 
-namespace cs {
-class RoundPackage;
-}
-
 namespace cs::config {
 class Observer;
+}
+
+namespace cs {
+class RoundPackage;
 }
 
 class Node {
@@ -58,7 +57,7 @@ public:
 
     using RefExecution = std::pair<cs::Sequence, uint32_t>;
 
-    explicit Node(const Config& config, cs::config::Observer& observer);
+    explicit Node(cs::config::Observer& observer);
     ~Node();
 
     bool isGood() const {
@@ -292,8 +291,7 @@ public slots:
     void onRoundTimeElapsed();
 
 private:
-    bool init(const Config& config);
-    void setupObserver();
+    bool init();
     void setupNextMessageBehaviour();
 
     void sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
@@ -458,6 +456,7 @@ private:
 
     cs::config::Observer& observer_;
     cs::Compressor compressor_;
+
     long long deltaTimeSS{};
 };
 

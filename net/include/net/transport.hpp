@@ -6,8 +6,6 @@
 #include <csignal>
 #include <atomic>
 
-#include <config.hpp>
-
 #include <csnode/packstream.hpp>
 
 #include <lib/system/allocators.hpp>
@@ -15,7 +13,6 @@
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
-#include <lib/system/lockfreechanger.hpp>
 
 #include <net/network.hpp>
 
@@ -79,7 +76,7 @@ class Node;
 
 class Transport {
 public:
-    explicit Transport(const Config& config, Node* node);
+    explicit Transport(Node* node);
     ~Transport();
 
     void run();
@@ -170,9 +167,6 @@ public signals:
     PingSignal pingReceived;
     cs::Action mainThreadIterated;
 
-public slots:
-    void onConfigChanged(const Config& updated);
-
 private:
     void addMyOut(const uint8_t initFlagValue = 0);
     void formRegPack(uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t uuid);
@@ -214,7 +208,6 @@ private:
 
     /* Actions */
     bool good_;
-    cs::LockFreeChanger<Config> config_;
 
     static const uint32_t maxPacksQueue_ = 2048;
     static const uint32_t maxRemoteNodes_ = 4096;

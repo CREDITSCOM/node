@@ -23,14 +23,13 @@ inline int64_t limitPage(int64_t value) {
     return std::clamp(value, int64_t(0), int64_t(100));
 }
 
-apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& solver, executor::Executor& executor, const Config& config)
+apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& solver, executor::Executor& executor)
 : executor_(executor)
 , blockchain_(blockchain)
 , solver_(solver) {
-    csunused(config);
 }
 
-APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config&)
+APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor)
 : executor_(executor)
 , blockchain_(blockchain)
 , solver_(_solver)

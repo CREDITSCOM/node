@@ -23,6 +23,8 @@
 
 #include <set>
 
+#include <configholder.hpp>
+
 // disables 10052, 10054 win socket errors
 #if defined(WIN32)
 #define DISABLE_WIN_SOCKET_ERRORS
@@ -98,8 +100,9 @@ ip::udp::socket* Network::getSocketInThread(const bool openOwn, const EndpointDa
     return result;
 }  // resolve
 
-void Network::readerRoutine(const Config& config) {
-    ip::udp::socket* sock = getSocketInThread(config.hasTwoSockets(), config.getInputEndpoint(), readerStatus_, config.useIPv6());
+void Network::readerRoutine() {
+    ip::udp::socket* sock = getSocketInThread(cs::ConfigHolder::instance().config()->hasTwoSockets(),
+                                              cs::ConfigHolder::instance().config()->getInputEndpoint(), readerStatus_, cs::ConfigHolder::instance().config()->useIPv6());
 
     if (!sock) {
         return;
@@ -278,8 +281,9 @@ static inline void sendPack(ip::udp::socket& sock, TaskPtr<OPacMan>& task, const
 #endif
 }
 
-void Network::writerRoutine(const Config& config) {
-    ip::udp::socket* sock = getSocketInThread(config.hasTwoSockets(), config.getOutputEndpoint(), writerStatus_, config.useIPv6());
+void Network::writerRoutine() {
+    ip::udp::socket* sock = getSocketInThread(cs::ConfigHolder::instance().config()->hasTwoSockets(),
+                                              cs::ConfigHolder::instance().config()->getOutputEndpoint(), writerStatus_, cs::ConfigHolder::instance().config()->useIPv6());
     sendSock_ = sock;
 
     if (!sock) {
@@ -466,9 +470,7 @@ void Network::processorRoutine() {
         int tasks = readerTaskCount_;
         readerTaskCount_ = 0;
         readerLock.clear(std::memory_order_release);  // release lock
-		//if (tasks > 100) {
-		//	csinfo() << __func__ << ": got package of " << tasks << " tasks";
-		//}
+
         for (int i = 0; i < tasks; i++) {
             bool is_empty = false;
             auto task = iPacMan_.getNextTask(is_empty);
@@ -580,7 +582,7 @@ void Network::sendDirect(const Packet& p, const ip::udp::endpoint& ep) {
 #endif
 }
 
-Network::Network(const Config& config, Transport* transport)
+Network::Network(Transport* transport)
 : resolver_(context_)
 , transport_(transport) {
 #ifdef __linux__
@@ -650,8 +652,9 @@ Network::Network(const Config& config, Transport* transport)
 
     EV_SET(&writerEvent_, 0, EVFILT_USER, EV_DISPATCH | EV_ENABLE, NOTE_FFCOPY | NOTE_TRIGGER, 0, NULL);
 #endif
-    if (!config.hasTwoSockets()) {
-        auto sockPtr = new ip::udp::socket(bindSocket(context_, this, config.getInputEndpoint(), config.useIPv6()));
+    if (!cs::ConfigHolder::instance().config()->hasTwoSockets()) {
+        auto sockPtr = new ip::udp::socket(bindSocket(context_, this, cs::ConfigHolder::instance().config()->getInputEndpoint(),
+                                                      cs::ConfigHolder::instance().config()->useIPv6()));
 
         if (!sockPtr->is_open()) {
             good_ = false;
@@ -662,8 +665,8 @@ Network::Network(const Config& config, Transport* transport)
         singleSockOpened_.store(true);
     }
 
-    readerThread_ = std::thread(&Network::readerRoutine, this, config);
-    writerThread_ = std::thread(&Network::writerRoutine, this, config);
+    readerThread_ = std::thread(&Network::readerRoutine, this);
+    writerThread_ = std::thread(&Network::writerRoutine, this);
     processorThread_ = std::thread(&Network::processorRoutine, this);
 
     while (readerStatus_.load() == ThreadStatus::NonInit)
@@ -729,7 +732,7 @@ void Network::registerMessage(Packet* pack, const uint32_t size) {
     }
 
     {
-        cs::Lock l(collector_.mLock_);
+        cs::Lock lock(collector_.mLock_);
         collector_.map_.tryStore(pack->getHeaderHash()) = msg;
     }
 }

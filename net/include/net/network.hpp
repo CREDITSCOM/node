@@ -14,12 +14,11 @@ using io_context = boost::asio::io_context;
 
 struct EndpointData;
 
-class Config;
 class Transport;
 
 class Network {
 public:
-    explicit Network(const Config&, Transport*);
+    explicit Network(Transport*);
     ~Network();
 
     bool isGood() const {
@@ -47,8 +46,8 @@ public:
     };
 
 private:
-    void readerRoutine(const Config&);
-    void writerRoutine(const Config&);
+    void readerRoutine();
+    void writerRoutine();
     void processorRoutine();
     inline void processTask(TaskPtr<IPacMan>&);
 

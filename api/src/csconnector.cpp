@@ -15,6 +15,8 @@
 
 #include "csconnector/csconnector.hpp"
 
+#include <csnode/configholder.hpp>
+
 namespace csconnector {
 
 using ::apache::thrift::TProcessorFactory;
@@ -24,22 +26,26 @@ using namespace ::apache::thrift::server;
 using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
-connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config)
+connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
 : executor_(executor::Executor::getInstance())
-, api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, executor_, config))
-, apiexec_handler(make_shared<apiexec::APIEXECHandler>(m_blockchain, *solver, executor_, config))
+, api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, executor_))
+, apiexec_handler(make_shared<apiexec::APIEXECHandler>(m_blockchain, *solver, executor_))
 , p_api_processor(make_shared<connector::ApiProcessor>(api_handler))
 , p_apiexec_processor(make_shared<apiexec::APIEXECProcessor>(apiexec_handler))
 #ifdef BINARY_TCP_API
-, server(p_api_processor, make_shared<TServerSocket>(config.getApiSettings().port, config.getApiSettings().serverSendTimeout, config.getApiSettings().serverReceiveTimeout),
+, server(p_api_processor, make_shared<TServerSocket>(cs::ConfigHolder::instance().config()->getApiSettings().port,
+                                                     cs::ConfigHolder::instance().config()->getApiSettings().serverSendTimeout,
+                                                     cs::ConfigHolder::instance().config()->getApiSettings().serverReceiveTimeout),
     make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 #ifdef AJAX_IFACE
-, ajax_server(p_api_processor, make_shared<TServerSocket>(config.getApiSettings().ajaxPort, config.getApiSettings().ajaxServerSendTimeout, config.getApiSettings().ajaxServerReceiveTimeout),
+, ajax_server(p_api_processor, make_shared<TServerSocket>(cs::ConfigHolder::instance().config()->getApiSettings().ajaxPort,
+                                                          cs::ConfigHolder::instance().config()->getApiSettings().ajaxServerSendTimeout,
+                                                          cs::ConfigHolder::instance().config()->getApiSettings().ajaxServerReceiveTimeout),
     make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
 #ifdef BINARY_TCP_EXECAPI
-, exec_server(p_apiexec_processor, make_shared<TServerSocket>(config.getApiSettings().apiexecPort),
+, exec_server(p_apiexec_processor, make_shared<TServerSocket>(cs::ConfigHolder::instance().config()->getApiSettings().apiexecPort),
     make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
 #endif
 {
@@ -49,8 +55,8 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 #endif
 
 #ifdef BINARY_TCP_EXECAPI
-    exec_server_port = uint16_t(config.getApiSettings().apiexecPort);
-    cslog() << "Starting executor API on port " << config.getApiSettings().apiexecPort;
+    exec_server_port = uint16_t(cs::ConfigHolder::instance().config()->getApiSettings().apiexecPort);
+    cslog() << "Starting executor API on port " << cs::ConfigHolder::instance().config()->getApiSettings().apiexecPort;
     exec_thread = std::thread([this]() {
         try {
             exec_server.run();
@@ -62,11 +68,11 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Con
 #endif
 
 #ifdef BINARY_TCP_API
-    server_port = uint16_t(config.getApiSettings().port);
+    server_port = uint16_t(cs::ConfigHolder::instance().config()->getApiSettings().port);
 #endif
 
 #ifdef AJAX_IFACE
-    ajax_server_port = uint16_t(config.getApiSettings().ajaxPort);
+    ajax_server_port = uint16_t(cs::ConfigHolder::instance().config()->getApiSettings().ajaxPort);
 #endif
 }
 
