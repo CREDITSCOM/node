@@ -546,4 +546,12 @@ bool SolverCore::isContractLocked(const csdb::Address& address) const {
     return psmarts->is_contract_locked(address);
 }
 
+bool SolverCore::stopNodeRequested() const {
+    if (pnode) {
+        return pnode->isStopRequested();
+    }
+    return false;
+}
+
+
 }  // namespace cs

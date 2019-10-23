@@ -3,12 +3,12 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
-#include <config.hpp>
+#include <configholder.hpp>
 
 #include <sstream>
 
 namespace cs {
-RoundStat::RoundStat(const Config& config)
+RoundStat::RoundStat()
 : totalReceivedTransactions_(0)
 , totalAcceptedTransactions_(0)
 , deferredTransactionsCount_(0)
@@ -16,7 +16,7 @@ RoundStat::RoundStat(const Config& config)
 , nodeStartRound_(0)
 , startSkipRounds_(2)
 , lastRoundMs_(0)
-, roundElapseSetting_(config.roundElapseTime())
+, roundElapseSetting_(cs::ConfigHolder::instance().config()->roundElapseTime())
 , roundElapseTimePoint_(std::chrono::steady_clock::now()) {
 }
 
@@ -114,15 +114,6 @@ void RoundStat::onPingReceived(cs::Sequence, const cs::PublicKey&) {
 
     lastRoundMs_.fetch_add(static_cast<size_t>(result.count()), std::memory_order_acq_rel);
     point = now;
-}
-
-void RoundStat::onConfigChanged(const Config& updated, const Config& previous) {
-    if (updated.roundElapseTime() == previous.roundElapseTime()) {
-        return;
-    }
-
-    cs::Lock lock(roundElapseMutex_);
-    roundElapseSetting_ = updated.roundElapseTime();
 }
 
 void RoundStat::onRoundChanged() {

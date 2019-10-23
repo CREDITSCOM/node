@@ -47,8 +47,6 @@ public:
         MaxQueueSize = 1000000
     };
 
-    void setData(const ConveyerData& data);
-
     ///
     /// @brief Sets cached conveyer round number for utility.
     /// @warning Call this method before setTable method.
@@ -312,9 +310,6 @@ public slots:
 
     /// try to send transactions packets to network
     void flushTransactions();
-
-    // chech config updation of conveyer values
-    void onConfigChanged(const Config& updated, const Config& previous);
 
 protected:
     void changeRound(cs::RoundNumber round);

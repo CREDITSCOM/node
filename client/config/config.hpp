@@ -15,8 +15,8 @@
 namespace po = boost::program_options;
 namespace ip = boost::asio::ip;
 
-using NodeVersion = uint16_t;
-const NodeVersion NODE_VERSION = 430;
+using NodeVersion = cs::Version;
+extern const NodeVersion NODE_VERSION;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "test_db";
@@ -80,6 +80,8 @@ struct ApiData {
     std::string executorCmdLine{};
     int executorRunDelay = 10;
     int executorBackgroundThreadDelay = 100;
+    int executorCommitMin = 1506;   // first commit with support of checking
+    int executorCommitMax{-1};      // unlimited range on the right
 };
 
 struct ConveyerData {
@@ -204,6 +206,10 @@ public:
         return newBlockchainTop_;
     }
 
+    bool isCompatibleVersion() const {
+        return compatibleVersion_;
+    }
+
     uint64_t newBlockchainTopSeq() const {
         return newBlockchainTopSeq_;
     }
@@ -280,7 +286,7 @@ private:
     bool recreateIndex_ = false;
     bool newBlockchainTop_ = false;
     bool autoShutdownEnabled_ = true;
-
+    bool compatibleVersion_ = true;
     uint64_t newBlockchainTopSeq_;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;

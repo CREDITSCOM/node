@@ -5,6 +5,7 @@
 #include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/packstream.hpp>
+#include <csnode/configholder.hpp>
 
 #include <lib/system/allocators.hpp>
 #include <lib/system/utils.hpp>
@@ -46,15 +47,39 @@ enum Platform : uint8_t {
     Windows
 };
 
-Transport::Transport(const Config& config, Node* node)
-: config_(config)
-, sendPacksFlag_()
+static std::string parseRefusalReason(RegistrationRefuseReasons reason) {
+    std::string reasonInfo;
+
+    switch (reason) {
+    case RegistrationRefuseReasons::BadClientVersion:
+        reasonInfo = "incompatible node version";
+        break;
+    case RegistrationRefuseReasons::IncompatibleBlockchain:
+        reasonInfo = "incompatible blockchain version";
+        break;
+    case RegistrationRefuseReasons::LimitReached:
+        reasonInfo = "maximum connections limit on remote node is reached";
+        break;
+    default:
+        {
+            std::ostringstream os;
+            os << "reason code " << static_cast<int>(reason);
+            reasonInfo = os.str();
+        }
+        break;
+    }
+
+    return reasonInfo;
+}
+
+Transport::Transport(Node* node)
+: sendPacksFlag_()
 , remoteNodes_(maxRemoteNodes_ + 1)
 , myPublicKey_(node->getNodeIdKey())
 , oLock_()
 , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
 , uLock_()
-, net_(new Network(config, this))
+, net_(new Network(this))
 , node_(node)
 , nh_(this) {
     good_ = net_->isGood();
@@ -66,7 +91,7 @@ Transport::~Transport() {
 
 void Transport::run() {
     net_->sendInit();
-    acceptRegistrations_ = config_->getNodeType() == NodeType::Router;
+    acceptRegistrations_ = cs::ConfigHolder::instance().config()->getNodeType() == NodeType::Router;
 
     {
         cs::Lock lock(oLock_);
@@ -98,7 +123,7 @@ void Transport::run() {
         }
 
         if (checkPending) {
-            nh_.checkPending(config_->getMaxNeighbours());
+            nh_.checkPending(cs::ConfigHolder::instance().config()->getMaxNeighbours());
         }
 
         if (checkSilent) {
@@ -471,8 +496,8 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
 
 void Transport::refillNeighbourhood() {
     // TODO: check this algorithm when all list nodes are dead
-    if (config_->getBootstrapType() == BootstrapType::IpList) {
-        for (auto& ep : config_->getIpList()) {
+    if (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::IpList) {
+        for (auto& ep : cs::ConfigHolder::instance().config()->getIpList()) {
             if (!nh_.canHaveNewConnection()) {
                 cswarning() << "Connections limit reached";
                 break;
@@ -485,7 +510,7 @@ void Transport::refillNeighbourhood() {
 
     if (requireStartNode()) {
         // Connect to SS logic
-        ssEp_ = net_->resolve(config_->getSignalServerEndpoint());
+        ssEp_ = net_->resolve(cs::ConfigHolder::instance().config()->getSignalServerEndpoint());
         cslog() << "Connecting to start node on " << ssEp_;
 
         {
@@ -526,9 +551,9 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
         return false;
     }
 
-    uint32_t ctr = nh_.size();
+    uint32_t count = nh_.size();
 
-    if (config_->getBootstrapType() == BootstrapType::SignalServer) {
+    if (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::SignalServer) {
         for (uint8_t i = 0; i < numCirc; ++i) {
             EndpointData ep;
             ep.ipSpecified = true;
@@ -540,10 +565,10 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
                 return false;
             }
 
-            ++ctr;
+            ++count;
 
-            if (!std::equal(key.cbegin(), key.cend(), config_->getMyPublicKey().cbegin())) {
-                if (ctr <= config_->getMaxNeighbours()) {
+            if (key != cs::ConfigHolder::instance().config()->getMyPublicKey()) {
+                if (count <= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
                     nh_.establishConnection(net_->resolve(ep));
                 }
             }
@@ -763,7 +788,7 @@ uint32_t Transport::getNeighboursCountWithoutSS() {
 }
 
 uint32_t Transport::getMaxNeighbours() const {
-    return config_->getMaxNeighbours();
+    return cs::ConfigHolder::instance().config()->getMaxNeighbours();
 }
 
 ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
@@ -783,7 +808,17 @@ cs::Sequence Transport::getConnectionLastSequence(const std::size_t number) {
 }
 
 bool Transport::isShouldUpdateNeighbours() const {
-    return nh_.getNeighboursCountWithoutSS() < config_->getMinNeighbours();
+    return nh_.getNeighboursCountWithoutSS() < cs::ConfigHolder::instance().config()->getMinNeighbours();
+}
+
+bool Transport::requireStartNode() const {
+    return (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::SignalServer ||
+            cs::ConfigHolder::instance().config()->getNodeType() == NodeType::Router);
+}
+
+bool Transport::isShouldPending(Connection* connection) const {
+    return connection->isSignal ||
+           (cs::ConfigHolder::instance().config()->getMinCompatibleVersion() <= connection->version) || (connection->version == 0);
 }
 
 bool Transport::requireStartNode() const {
@@ -791,8 +826,7 @@ bool Transport::requireStartNode() const {
 }
 
 ConnectionPtr Transport::getRandomNeighbour() {
-    csdebug() << "Transport> Get random neighbour for Sync";
-    return nh_.getRandomSyncNeighbour();
+    return nh_.getRandomNeighbour();
 }
 
 void Transport::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
@@ -815,46 +849,37 @@ bool Transport::isPingDone() {
     return nh_.isPingDone();
 }
 
-void Transport::resetNeighbours() {
-    csdebug() << "Transport> Reset neighbours";
-    return nh_.resetSyncNeighbours();
-}
-
-void Transport::onConfigChanged(const Config& updated) {
-    config_.exchange(updated);
-}
-
 void Transport::addMyOut(const uint8_t initFlagValue) {
     uint8_t regFlag = 0;
-    if (!config_->isSymmetric()) {
-        if (config_->getAddressEndpoint().ipSpecified) {
+    if (!cs::ConfigHolder::instance().config()->isSymmetric()) {
+        if (cs::ConfigHolder::instance().config()->getAddressEndpoint().ipSpecified) {
             regFlag |= RegFlags::RedirectIP;
-            if (config_->getAddressEndpoint().ip.is_v6()) {
+            if (cs::ConfigHolder::instance().config()->getAddressEndpoint().ip.is_v6()) {
                 regFlag |= RegFlags::UsingIPv6;
             }
         }
 
         regFlag |= RegFlags::RedirectPort;
     }
-    else if (config_->hasTwoSockets()) {
+    else if (cs::ConfigHolder::instance().config()->hasTwoSockets()) {
         regFlag |= RegFlags::RedirectPort;
     }
 
     uint8_t* flagChar = oPackStream_.getCurrentPtr();
 
-    if (!config_->isSymmetric()) {
-        if (config_->getAddressEndpoint().ipSpecified) {
-            oPackStream_ << config_->getAddressEndpoint().ip;
+    if (!cs::ConfigHolder::instance().config()->isSymmetric()) {
+        if (cs::ConfigHolder::instance().config()->getAddressEndpoint().ipSpecified) {
+            oPackStream_ << cs::ConfigHolder::instance().config()->getAddressEndpoint().ip;
         }
         else {
             uint8_t c = 0_b;
             oPackStream_ << c;
         }
 
-        oPackStream_ << config_->getAddressEndpoint().port;
+        oPackStream_ << cs::ConfigHolder::instance().config()->getAddressEndpoint().port;
     }
-    else if (config_->hasTwoSockets()) {
-        oPackStream_ << 0_b << config_->getInputEndpoint().port;
+    else if (cs::ConfigHolder::instance().config()->hasTwoSockets()) {
+        oPackStream_ << 0_b << cs::ConfigHolder::instance().config()->getInputEndpoint().port;
     }
     else {
         oPackStream_ << 0_b;
@@ -885,7 +910,7 @@ void Transport::formSSConnectPack(const cs::PublicKey& pk, uint64_t uuid) {
 #endif
         << NODE_VERSION << uuid;
 
-    uint8_t flag = (config_->getNodeType() == NodeType::Router) ? 8 : 0;
+    uint8_t flag = (cs::ConfigHolder::instance().config()->getNodeType() == NodeType::Router) ? 8 : 0;
     addMyOut(flag);
 
     oPackStream_ << pk;
@@ -904,7 +929,7 @@ void Transport::sendRegistrationRequest(Connection& conn) {
     cs::Lock lock(oLock_);
     Packet req(netPacksAllocator_.allocateNext(cs::numeric_cast<uint32_t>(regPack_.size())));
     *regPackConnId_ = conn.id;
-    memcpy(req.data(), regPack_.data(), regPack_.size());
+    std::memcpy(req.data(), regPack_.data(), regPack_.size());
 
     ++(conn.attempts);
     sendDirect(&req, conn);
@@ -922,7 +947,7 @@ void Transport::sendRegistrationConfirmation(const Connection& conn, const Conne
 }
 
 void Transport::sendRegistrationRefusal(const Connection& conn, const RegistrationRefuseReasons reason) {
-    cslog() << "Refusing registration with " << conn.in;
+    cslog() << "Refusing registration with " << conn.in << " reason: " << parseRefusalReason(reason);
 
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
@@ -936,9 +961,9 @@ void Transport::sendRegistrationRefusal(const Connection& conn, const Registrati
 bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     cslog() << "Got registration request from " << task->sender;
 
-    NodeVersion vers;
-    uint64_t remote_uuid = 0;
-    iPackStream_ >> vers >> remote_uuid;
+    NodeVersion version;
+    uint64_t remoteUuid = 0;
+    iPackStream_ >> version >> remoteUuid;
 
     if (!iPackStream_.good()) {
         return false;
@@ -946,6 +971,8 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
 
     Connection conn;
     conn.in = task->sender;
+    conn.version = version;
+
     auto& flags = iPackStream_.peek<uint8_t>();
 
     if (flags & RegFlags::RedirectIP) {
@@ -974,14 +1001,15 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         conn.out.port(task->sender.port());
     }
 
-    if (vers < config_->getMinCompatibleVersion()) {
+    if (version < cs::ConfigHolder::instance().config()->getMinCompatibleVersion()) {
         sendRegistrationRefusal(conn, RegistrationRefuseReasons::BadClientVersion);
         return true;
     }
 
     RemoteNodePtr ptr = getPackSenderEntry(conn.getOut());
-    uint64_t local_uuid = node_->getBlockChain().uuid();
-    if (local_uuid != 0 && remote_uuid != 0 && local_uuid != remote_uuid) {
+    uint64_t uuid = node_->getBlockChain().uuid();
+
+    if (uuid != 0 && remoteUuid != 0 && uuid != remoteUuid) {
        sendRegistrationRefusal(conn, RegistrationRefuseReasons::IncompatibleBlockchain);
        ptr->setBlackListed(true);
        return true;
@@ -1028,28 +1056,18 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
         return false;
     }
 
-    nh_.gotRefusal(id);
+    std::string reasonInfo = parseRefusalReason(reason);
+    cslog() << "Registration to " << task->sender << " refused: " << reasonInfo;
 
-    std::string reason_info;
     switch (reason) {
     case RegistrationRefuseReasons::BadClientVersion:
-        reason_info = "incompatible node version";
+        nh_.dropConnection(id);
         break;
-    case RegistrationRefuseReasons::IncompatibleBlockchain:
-        reason_info = "incompatible blockchain version";
-        break;
-    case RegistrationRefuseReasons::LimitReached:
-        reason_info = "maximum connections limit on remote node is reached";
-        break;
+
     default:
-        {
-            std::ostringstream os;
-            os << "reason code " << static_cast<int>(reason);
-            reason_info = os.str();
-        }
+        nh_.gotRefusal(id);
         break;
     }
-    cslog() << "Registration to " << task->sender << " refused: " << reason_info;
 
     return true;
 }
@@ -1064,9 +1082,9 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
     nh_.addSignalServer(task->sender, ssEp_, rNode);
 
     constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
-    size_t msg_size = task->pack.getMsgSize();
+    size_t msgSize = task->pack.getMsgSize();
 
-    if (msg_size > MinRegistrationSize) {
+    if (msgSize > MinRegistrationSize) {
         if (!parseSSSignal(task)) {
             cswarning() << "Bad start node response";
             return false;
@@ -1152,7 +1170,7 @@ bool Transport::gotSSLastBlock(const TaskPtr<IPacMan>& task, cs::Sequence lastBl
     csunused(task);
 
     Connection conn;
-    conn.in = net_->resolve(config_->getSignalServerEndpoint());
+    conn.in = net_->resolve(cs::ConfigHolder::instance().config()->getSignalServerEndpoint());
     conn.specialOut = false;
 
     cs::Lock lock(oLock_);
@@ -1212,8 +1230,8 @@ bool Transport::gotSSNewFriends()
 
         ++ctr;
 
-        if (!std::equal(key.cbegin(), key.cend(), config_->getMyPublicKey().cbegin())) {
-            if (ctr <= config_->getMaxNeighbours()) {
+        if (key != cs::ConfigHolder::instance().config()->getMyPublicKey()) {
+            if (ctr <= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
                 nh_.establishConnection(net_->resolve(ep));
             }
         }
@@ -1496,8 +1514,12 @@ void Transport::sendPingPack(const Connection& conn) {
     oPackStream_ << NetworkCommand::Ping << conn.id << seq << myPublicKey_;
 
 #if defined(PING_WITH_BCHID)
-        oPackStream_ << node_->getBlockChain().uuid();
+    oPackStream_ << node_->getBlockChain().uuid();
 #endif
+
+    if (!cs::ConfigHolder::instance().config()->isCompatibleVersion()) {
+        oPackStream_ << NODE_VERSION;
+    }
 
     sendDirect(oPackStream_.getPackets(), conn);
     oPackStream_.clear();
@@ -1507,8 +1529,8 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     Connection::Id id = 0u;
     cs::Sequence lastSeq = 0u;
 
-    cs::PublicKey pk;
-    iPackStream_ >> id >> lastSeq >> pk;
+    cs::PublicKey publicKey;
+    iPackStream_ >> id >> lastSeq >> publicKey;
 
 #if defined(PING_WITH_BCHID)
     uint64_t remoteUuid = 0;
@@ -1522,19 +1544,28 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
         }
     }
 #endif
+    if (!cs::ConfigHolder::instance().config()->isCompatibleVersion() && iPackStream_.end()) {
+        nh_.gotBadPing(id);
+        return false;
+    }
+
+    uint16_t nodeVersion = 0;
+
+    if (!iPackStream_.end()) {
+        iPackStream_ >> nodeVersion;
+    }
 
     if (!iPackStream_.good() || !iPackStream_.end()) {
         return false;
     }
-
 
     if (lastSeq > maxBlock_) {
         maxBlock_ = lastSeq;
         maxBlockCount_ = 1;
     }
 
-    if (nh_.validateConnectionId(sender, id, task->sender, pk, lastSeq)) {
-        emit pingReceived(lastSeq, pk);
+    if (nh_.validateConnectionId(sender, id, task->sender, publicKey, lastSeq)) {
+        emit pingReceived(lastSeq, publicKey);
     }
 
     return true;
@@ -1565,7 +1596,7 @@ bool Transport::gotSSIntroduceConsensusReply()
             return false;
         }
 
-        if (!std::equal(key.cbegin(), key.cend(), config_->getMyPublicKey().cbegin())) {
+        if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
             cs::Lock lock(aLock_);
             auto value = std::make_pair(key, ep);
             auto res = addresses_.insert(value);
@@ -1577,28 +1608,25 @@ bool Transport::gotSSIntroduceConsensusReply()
             }
         }
     }
-/*
-    cs::Signature sign;
-    iPackStream_ >> sign;
 
-    if (!node_->gotSSMessageVerify(sign, iPackStream_.getCurrentPtr(), iPackStream_.remainsBytes()))
-    {
-        cswarning() << "New Friends message is incorrect: signature isn't valid";
-        return false;
-    }
-*/
     return true;
 }
 
 void Transport::sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys) {
-    if (keys.size() == 0) return;
-    ssEp_ = net_->resolve(config_->getSignalServerEndpoint());
+    if (keys.size() == 0) {
+        return;
+    }
+
+    ssEp_ = net_->resolve(cs::ConfigHolder::instance().config()->getSignalServerEndpoint());
+
     cslog() << "Send IntroduceConsensus to start node on " << ssEp_;
 
     cs::Lock lock(oLock_);
+
     oPackStream_.init(BaseFlags::NetworkMsg);
     oPackStream_ << NetworkCommand::IntroduceConsensus << node_->getBlockChain().uuid();
     oPackStream_ << static_cast<uint8_t>(keys.size());
+
     std::for_each(keys.cbegin(), keys.cend(), [this](const cs::PublicKey& key) { oPackStream_ << key; });
     net_->sendDirect(*(oPackStream_.getPackets()), ssEp_);
 }

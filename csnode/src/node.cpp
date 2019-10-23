@@ -15,6 +15,7 @@
 #include <csnode/poolsynchronizer.hpp>
 #include <csnode/blockvalidator.hpp>
 #include <csnode/roundpackage.hpp>
+#include <csnode/configholder.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/progressbar.hpp>
@@ -37,26 +38,32 @@
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
 
-Node::Node(const Config& config, cs::config::Observer& observer)
-: nodeIdKey_(config.getMyPublicKey())
-, nodeIdPrivate_(config.getMyPrivateKey())
-, blockChain_(genesisAddress_, startAddress_, config.recreateIndex())
+Node::Node(cs::config::Observer& observer)
+: nodeIdKey_(cs::ConfigHolder::instance().config()->getMyPublicKey())
+, nodeIdPrivate_(cs::ConfigHolder::instance().config()->getMyPrivateKey())
+, blockChain_(genesisAddress_, startAddress_, cs::ConfigHolder::instance().config()->recreateIndex())
 , ostream_(&packStreamAllocator_, nodeIdKey_)
-, stat_(config)
+, stat_()
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this))
 , observer_(observer) {
-    autoShutdownEnabled_ = config.autoShutdownEnabled();
+    autoShutdownEnabled_ = cs::ConfigHolder::instance().config()->autoShutdownEnabled();
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
+
     std::cout << "Start transport... ";
-    transport_ = new Transport(config, this);
+    transport_ = new Transport(this);
     std::cout << "Done\n";
-    poolSynchronizer_ = new cs::PoolSynchronizer(config.getPoolSyncSettings(), transport_, &blockChain_);
 
-    executor::ExecutorSettings::set(cs::makeReference(blockChain_),
-                                    cs::makeReference(solver_),
-                                    cs::makeReference(config));
+    poolSynchronizer_ = new cs::PoolSynchronizer(transport_, &blockChain_);
 
+    executor::ExecutorSettings::set(cs::makeReference(blockChain_), cs::makeReference(solver_));
     auto& executor = executor::Executor::getInstance();
+
+    cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
+
+    if (isStopRequested()) {
+        stop();
+        return;
+    }
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
@@ -64,14 +71,12 @@ Node::Node(const Config& config, cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &executor::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
-    cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
-    setupObserver();
     setupNextMessageBehaviour();
 
-    alwaysExecuteContracts_ = config.alwaysExecuteContracts();
-    good_ = init(config);
+    alwaysExecuteContracts_ = cs::ConfigHolder::instance().config()->alwaysExecuteContracts();
+    good_ = init();
 }
 
 Node::~Node() {
@@ -84,11 +89,11 @@ Node::~Node() {
     delete poolSynchronizer_;
 }
 
-bool Node::init(const Config& config) {
+bool Node::init() {
 #ifdef NODE_API
     std::cout << "Init API... ";
 
-    api_ = std::make_unique<csconnector::connector>(blockChain_, solver_, config);
+    api_ = std::make_unique<csconnector::connector>(blockChain_, solver_);
 
     std::cout << "Done\n";
 
@@ -101,14 +106,14 @@ bool Node::init(const Config& config) {
     solver_->init(nodeIdKey_, nodeIdPrivate_);
     solver_->startDefault();
 
-    if (config.newBlockchainTop()) {
-        if (!blockChain_.init(config.getPathToDB(), config.newBlockchainTopSeq())) {
+    if (cs::ConfigHolder::instance().config()->newBlockchainTop()) {
+        if (!blockChain_.init(cs::ConfigHolder::instance().config()->getPathToDB(), cs::ConfigHolder::instance().config()->newBlockchainTopSeq())) {
             return false;
         }
         return true;
     }
 
-    if (!blockChain_.init(config.getPathToDB())) {
+    if (!blockChain_.init(cs::ConfigHolder::instance().config()->getPathToDB())) {
         return false;
     }
 
@@ -131,8 +136,6 @@ bool Node::init(const Config& config) {
     std::cout << "Solver is init\n";
     std::cout << "Everything is init\n";
 
-    cs::Conveyer::instance().setData(config.conveyerData());
-
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
@@ -140,15 +143,6 @@ bool Node::init(const Config& config) {
     initCurrentRP();
 
     return true;
-}
-
-void Node::setupObserver() {
-    // connect config observer to entities
-    cs::Connector::connect(&observer_.configChanged, &cs::Conveyer::instance(), &cs::Conveyer::onConfigChanged);
-    cs::Connector::connect(&observer_.configChanged, &executor::Executor::getInstance(), &executor::Executor::onConfigChanged);
-    cs::Connector::connect(&observer_.configChanged, transport_, &Transport::onConfigChanged);
-    cs::Connector::connect(&observer_.configChanged, poolSynchronizer_, &cs::PoolSynchronizer::onConfigChanged);
-    cs::Connector::connect(&observer_.configChanged, &stat_, &cs::RoundStat::onConfigChanged);
 }
 
 void Node::setupNextMessageBehaviour() {
@@ -604,6 +598,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     }
     else {
         blockChain_.testCachedBlocks();
+        solver_->checkZeroSmartSignatures(pool.value());
         //confirmationList_.remove(round);
     }
 
@@ -932,7 +927,6 @@ void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber roun
 
     if (conveyer.isSyncCompleted(round)) {
         csdebug() << "NODE> Packets sync completed, #" << round;
-        transport_->resetNeighbours();
 
         if (roundPackageCache_.size() > 0) {
             auto rPackage = roundPackageCache_.back();
@@ -1635,7 +1629,12 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, 
         return;
     }
 
-    sendToSingle(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required, iteration);
+    if (cs::ConfigHolder::instance().config()->isCompatibleVersion()) {
+        sendToSingle(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required);
+    }
+    else {
+        sendToSingle(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required, iteration);
+    }
     csmeta(csdetails) << "done";
 }
 

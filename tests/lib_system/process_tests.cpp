@@ -51,6 +51,31 @@ TEST(Process, BaseUsage) {
     ASSERT_TRUE(isTerminated);
 }
 
+TEST(Process, DISABLED_Termination) {
+    PROCESS_TEST_START()
+
+    size_t maxTermination = 30000;
+    cs::Process process(programPath + std::to_string(maxTermination));
+    std::atomic<bool> isTerminated = false;
+
+    cs::Connector::connect(&process.finished, [&](int, const std::system_error&) {
+        cs::Console::writeLine(programName, " finished");
+        isTerminated = true;
+    });
+
+    cs::Connector::connect(&process.errorOccured, [&](const cs::ProcessException&) {
+        isTerminated = true;
+    });
+
+    process.launch();
+    while(!process.isRunning());
+
+    process.terminate();
+    std::this_thread::sleep_for(std::chrono::milliseconds(maxTermination/2));
+
+    ASSERT_TRUE(isTerminated);
+}
+
 TEST(Process, HighLoadUsage) {
     PROCESS_TEST_START()
 

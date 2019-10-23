@@ -5,7 +5,6 @@
 
 #include <csnode/conveyer.hpp>
 
-#include <config.hpp>
 #include <iostream>
 
 #include <lib/system/hash.hpp>
@@ -250,12 +249,9 @@ TEST(Conveyer, TestSendCache) {
     cs::PacketsHashes hashes;
 
     size_t counter = 0;
-
-    ConveyerData data;
     ConveyerTest conveyer{};
 
     conveyer.setRound(0);
-    conveyer.setData(data);
 
     cs::Connector::connect(&conveyer.packetFlushed, [&](const auto& packet) {
         if (counter < 2) {
@@ -323,11 +319,8 @@ TEST(Conveyer, TestSendCache) {
 TEST(Conveyer, TestRejectedHashes) {
     bool called = false;
 
-    ConveyerData data;
     ConveyerTest conveyer{};
-
     conveyer.setRound(0);
-    conveyer.setData(data);
 
     auto packet1 = CreateTestPacket(20);
     auto packet2 = CreateTestPacket(25);

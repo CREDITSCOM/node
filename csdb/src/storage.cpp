@@ -1018,6 +1018,9 @@ bool Storage::truncate_trxs_index() {
 }
 
 bool Storage::get_contract_data(const Address& abs_addr /*input*/, cs::Bytes& data /*output*/) const {
+    if (!d->db) {
+        return false;
+    }
     const auto& pk = abs_addr.public_key();
     cs::Bytes bytes(pk.size());
     bytes.assign(pk.cbegin(), pk.cend());
@@ -1025,6 +1028,9 @@ bool Storage::get_contract_data(const Address& abs_addr /*input*/, cs::Bytes& da
 }
 
 bool Storage::update_contract_data(const Address& abs_addr /*input*/, const cs::Bytes& data /*input*/) const {
+    if (!d->db) {
+        return false;
+    }
     const auto& pk = abs_addr.public_key();
     cs::Bytes bytes(pk.size());
     bytes.assign(pk.cbegin(), pk.cend());

@@ -10,12 +10,12 @@
 #endif
 
 #include <csnode/node.hpp>
+#include <csnode/configholder.hpp>
 
 #include <lib/system/logger.hpp>
 
 #include <net/transport.hpp>
 
-#include <config.hpp>
 #include <params.hpp>
 #include <observer.hpp>
 #include <version.hpp>
@@ -242,7 +242,10 @@ int main(int argc, char* argv[]) {
     logger::initialize(config.getLoggerSettings());
 
     cs::config::Observer observer(config, vm);
-    Node node(config, observer);
+    cs::ConfigHolder::instance().setConfig(config);
+    cs::Connector::connect(&observer.configChanged, &cs::ConfigHolder::instance(), &cs::ConfigHolder::onConfigChanged);
+
+    Node node(observer);
 
     if (!node.isGood()) {
         panic();

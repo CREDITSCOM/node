@@ -105,6 +105,8 @@ public:
 
     csdb::Pool& getDeferredBlock();
 
+    void checkZeroSmartSignatures(csdb::Pool& pool);
+
     void removeDeferredBlock(cs::Sequence);
     bool realTrustedChanged() const;
     void adjustStageThreeStorage();
@@ -140,6 +142,8 @@ public:
     }
 
     bool isContractLocked(const csdb::Address&) const;
+
+    bool stopNodeRequested() const;
 
 private:
     // to use private data while serve for states as SolverCore context:

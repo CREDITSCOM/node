@@ -64,6 +64,7 @@ add_library(csnode
   include/csnode/packetqueue.hpp
   include/csnode/roundpackage.hpp
   include/csnode/compressor.hpp
+  include/csnode/configholder.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -87,6 +88,7 @@ add_library(csnode
   src/blockvalidatorplugins.cpp
   src/packetqueue.cpp
   src/roundpackage.cpp
+  src/configholder.cpp
 )
 
 configure_msvc_flags()

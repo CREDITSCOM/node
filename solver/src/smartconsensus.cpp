@@ -55,6 +55,9 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     std::vector<csdb::Transaction> newStates;
     /*bool primary_new_state_found = false;*/
     csdb::Transaction lastEmptyNewState;
+    /* //uncomment this to test smartconsensus with bad node #1
+    csdb::Transaction trr;
+    */
     for (const auto& tr : pack.transactions()) {
         // only the 1st new_state is specifically handled
         if (SmartContracts::is_new_state(tr)/* && !primary_new_state_found*/) {
@@ -109,6 +112,9 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             tmpNewStates_.push_back(tmpNewState);
             tmpPacket.addTransaction(tmpNewStates_.back());
             newStates.push_back(tr);
+            /* //uncomment this to test smartconsensus with bad node #1
+            trr = tr;
+            */
         }
         else {
             tmpPacket.addTransaction(tr);
@@ -144,7 +150,11 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
         << " cannot determine own number in confidant list";
         return false;
     }
-
+    /* //uncomment this to test smartconsensus with bad node #1
+    if (ownSmartsConfNum_ == 1) {
+        tmpPacket.addTransaction(trr);
+    }
+    */
     cslog() << "======================  SMART-ROUND: " << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " [" << static_cast<int>(ownSmartsConfNum_) << "] =========================";
     std::string strFees;
@@ -336,10 +346,14 @@ void SmartConsensus::processStages() {
     csmeta(csdetails) << "start";
     const size_t cnt = smartConfidants_.size();
     std::map<cs::Hash, size_t> hashCount;
+
+    //cs::StageThreeSmarts stage;
+    st3.realTrustedMask.resize(cnt);
     // perform the evaluation og stages 1 & 2 to find out who is traitor
     if (ownSmartsConfNum_ >= smartStageOneStorage_.size()) {
         return;
     }
+
     const auto& hash_t = smartStageOneStorage_.at(ownSmartsConfNum_).hash;
     size_t currentSmartsNumber = smartStageOneStorage_.at(ownSmartsConfNum_).fees.size();
     for (auto& st : smartStageOneStorage_) {
@@ -349,6 +363,7 @@ void SmartConsensus::processStages() {
         }
         if (st.fees.size() != currentSmartsNumber) {
             ++(smartUntrusted.at(st.sender));
+            st3.realTrustedMask.at(st.sender) = cs::ConfidantConsts::LiarIndex;
             cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (different fee-vector size)";
         }
         if (st.hash != hash_t) {
@@ -365,8 +380,8 @@ void SmartConsensus::processStages() {
             else {
                 csdebug() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "], hash is different: "
                     << cs::Utils::byteStreamToHex(st.hash.data(), st.hash.size()) << " - is marked as untrusted";
+                st3.realTrustedMask.at(st.sender) = cs::ConfidantConsts::LiarIndex;
             }
-
         }
         else {
             csdebug() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "], hash  like  mine : "
@@ -422,12 +437,15 @@ void SmartConsensus::processStages() {
             }
         }
     }
+
     size_t cnt_active = 0;
-    cs::StageThreeSmarts stage;
-    stage.realTrustedMask.resize(cnt);
     for (size_t i = 0; i < cnt; ++i) {
-        stage.realTrustedMask[i] = (smartUntrusted[i] > 0 ? cs::ConfidantConsts::InvalidConfidantIndex : cs::ConfidantConsts::FirstWriterIndex);
-        if (stage.realTrustedMask[i] == cs::ConfidantConsts::FirstWriterIndex) {
+        if (st3.realTrustedMask[i] == cs::ConfidantConsts::LiarIndex) {
+            csdebug() << kLogPrefix << "Node " << i << " was marked as liar";
+            continue;
+        }
+        st3.realTrustedMask[i] = (smartUntrusted[i] > 0 ? cs::ConfidantConsts::InvalidConfidantIndex : cs::ConfidantConsts::FirstWriterIndex);
+        if (st3.realTrustedMask[i] == cs::ConfidantConsts::FirstWriterIndex) {
             ++cnt_active;
         }
     }
@@ -455,7 +473,7 @@ void SmartConsensus::processStages() {
         k = -k;
     }
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
-        << " smart consensus result 1 from 3";
+        << " smart consensus result 1 from 3: cnt_active = " << cnt_active;
     size_t idx_writer = static_cast<size_t>(k % cnt_active);
     size_t idx = 0;
 
@@ -467,7 +485,7 @@ void SmartConsensus::processStages() {
     }
     // here will the fee be calculated too
     for (size_t i = 0; i < cnt; ++i) {
-        if (st3.realTrustedMask.at(i) != InvalidConfidantIndex) {
+        if (st3.realTrustedMask.at(i) != InvalidConfidantIndex && st3.realTrustedMask.at(i) != LiarIndex) {
             for (size_t j = 0; j < feesNumber; ++j) {
                 if (smartStageOneStorage_.at(i).fees.size() > j) {
                    sumFees[j] += smartStageOneStorage_.at(i).fees[j];
@@ -480,17 +498,20 @@ void SmartConsensus::processStages() {
             ++idx;
         }
     }
+    csdebug() << kLogPrefix << "Local trusted mask(4): " << TrustedMask::toString(st3.realTrustedMask);
     std::vector <csdb::Amount> finalFees = calculateFinalFee(sumFees, idx);
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " smart consensus result 2 from 3";
     idx = 0;
     for (size_t i = st3.writer; i < cnt + st3.writer; ++i) {
         size_t c = i % cnt;
-        if (st3.realTrustedMask.at(c) != InvalidConfidantIndex) {
+        if (st3.realTrustedMask.at(c) != InvalidConfidantIndex && st3.realTrustedMask.at(c) != LiarIndex) {
             st3.realTrustedMask.at(c) = static_cast<uint8_t>(idx);
+
             ++idx;
         }
     }
+
     csdebug() << kLogPrefix << "{" << smartRoundNumber_ << "} smart consensus result 3 from 3";
     startTimer(3);
     createFinalTransactionSet(finalFees);
@@ -579,7 +600,7 @@ void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) 
         killTimer();
         cs::Connector::disconnect(&pnode_->gotSmartStageThree, this, &cs::SmartConsensus::addSmartStageThree);
         if (finalSmartTransactionPack_.isHashEmpty()) {
-            cserror() << kLogPrefix << "Trying to send FinalTransactionSet that doesn't exest";
+            cserror() << kLogPrefix << "Trying to send FinalTransactionSet that doesn't exist";
             return;
         }
         sendFinalTransactionSet();
@@ -631,19 +652,35 @@ void SmartConsensus::sendFinalTransactionSet() {
                       << ", writer = " << static_cast<int>(smartStageThreeStorage_.at(ownSmartsConfNum_).writer);
     // if (ownSmartsConfNum_ == smartStageThreeStorage_.at(ownSmartsConfNum_).writer) {
     auto& conv = cs::Conveyer::instance();
-
+    cs::Bytes tMask = smartStageThreeStorage_[ownSmartsConfNum_].realTrustedMask;
     for (auto& st : smartStageThreeStorage_) {
-        if (st.sender != cs::ConfidantConsts::InvalidConfidantIndex) {
+        if (st.sender == cs::ConfidantConsts::InvalidConfidantIndex) {
+        }
+        else {
             if (finalSmartTransactionPack_.addSignature(st.sender, st.packageSignature)) {
                 csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
-                    << " signature of T[" << static_cast<int>(st.sender) << "] added to the Transactions Packet";
+                << " signature of T[" << static_cast<int>(st.sender) << "] added to the Transactions Packet";
             }
             else {
                 csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
-                << " signature of T[" << static_cast<int>(st.sender) << "] isn't added";
+                << " signature of T[" << static_cast<int>(st.sender) << "] wasn't added";
             }
         }
     }
+    for (size_t i = 0; i < tMask.size(); ++i) {
+        if (tMask[i] == cs::ConfidantConsts::LiarIndex) {
+            if (finalSmartTransactionPack_.addSignature(static_cast<uint8_t>(i), Zero::signature)) {
+                csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
+                << " ZERO signature of T[" << i << "] added to the Transactions Packet";
+            }
+            else {
+                csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
+                << " ZERO signature of T[" << i << "] wasn't added";
+            }
+        }
+    }
+
+
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " adding separate package with "
         << finalSmartTransactionPack_.signatures().size() << " signatures";
     conv.addSeparatePacket(finalSmartTransactionPack_);
