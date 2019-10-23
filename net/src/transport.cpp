@@ -821,10 +821,6 @@ bool Transport::isShouldPending(Connection* connection) const {
            (cs::ConfigHolder::instance().config()->getMinCompatibleVersion() <= connection->version) || (connection->version == 0);
 }
 
-bool Transport::requireStartNode() const {
-    return (config_->getBootstrapType() == BootstrapType::SignalServer || config_->getNodeType() == NodeType::Router);
-}
-
 ConnectionPtr Transport::getRandomNeighbour() {
     return nh_.getRandomNeighbour();
 }

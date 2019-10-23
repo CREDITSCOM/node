@@ -163,8 +163,6 @@ public:
 
     bool requireStartNode() const;
 
-    bool requireStartNode() const;
-
 public signals:
     PingSignal pingReceived;
     cs::Action mainThreadIterated;
