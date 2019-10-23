@@ -354,7 +354,8 @@ public:
 
     bool is_closed_smart_contract(const csdb::Address& addr) const {
         cs::Lock lock(public_access_lock);
-        return get_smart_contract_status(addr) == SmartContractStatus::Canceled;
+        const auto status = get_smart_contract_status(addr);
+        return (status == SmartContractStatus::Canceled || status == SmartContractStatus::Idle);
     }
 
     bool is_known_smart_contract(const csdb::Address& addr) const {
