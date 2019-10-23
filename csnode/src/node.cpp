@@ -56,8 +56,14 @@ Node::Node(cs::config::Observer& observer)
     poolSynchronizer_ = new cs::PoolSynchronizer(transport_, &blockChain_);
 
     executor::ExecutorSettings::set(cs::makeReference(blockChain_), cs::makeReference(solver_));
-
     auto& executor = executor::Executor::getInstance();
+
+    cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
+
+    if (isStopRequested()) {
+        stop();
+        return;
+    }
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
@@ -65,7 +71,6 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &executor::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
-    cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     setupNextMessageBehaviour();

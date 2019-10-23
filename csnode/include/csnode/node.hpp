@@ -359,7 +359,7 @@ private:
     const cs::PrivateKey nodeIdPrivate_;
     bool good_ = true;
 
-    bool stopRequested_ = false;
+    std::atomic_bool stopRequested_{ false };
     static inline bool autoShutdownEnabled_;
 
     // file names for crypto public/private keys

@@ -2743,8 +2743,62 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
     std::string state;
     cs::DataStream stream(contract_data.data(), contract_data.size());
     stream >> ref.sequence >> ref.transaction >> ref.hash >> state;
+
     if (stream.isValid() && !stream.isAvailable(1)) {
-        // TODO: test state hash before dbcache_update
+
+        if (in_known_contracts(contract_abs_addr)) {
+            auto& item = known_contracts[contract_abs_addr];
+            if (item.ref_execute > ref) {
+                cswarning() << kLogPrefix << "ignore outdated " << cs::SmartContracts::to_base58(contract_abs_addr) << " state";
+                return;
+            }
+            // test state hash before dbcache_update
+            csdebug() << kLogPrefix << "test " << cs::SmartContracts::to_base58(contract_abs_addr) << " state received";
+            bool state_found = false;
+            bool state_test_passed = false;
+            SmartContractRef ref_state;
+            for (cs::Sequence i = ref.sequence; i < ref.sequence + Consensus::MaxRoundsCancelContract; ++i) {
+                csdb::Pool b = bc.loadBlock(i);
+                if (b.is_valid() && b.transactions_count() > 0) {
+                    for (const auto& t : b.transactions()) {
+                        if (is_new_state(t)) {
+                            csdb::UserField fld = t.user_field(trx_uf::new_state::RefStart);
+                            if (fld.is_valid()) {
+                                if (SmartContractRef(fld) == ref) {
+                                    // corresponding new state found, test it
+                                    state_found = true;
+                                    ref_state.sequence = t.id().pool_seq();
+                                    ref_state.transaction = t.id().index();
+                                    fld = t.user_field(trx_uf::new_state::Hash);
+                                    if (fld.is_valid()) {
+                                        std::string hash_bytes = fld.value<std::string>();
+                                        cs::Hash hash;
+                                        if (hash.size() == hash_bytes.size()) {
+                                            std::copy(hash_bytes.cbegin(), hash_bytes.cend(), hash.begin());
+                                            if (state.empty()) {
+                                                state_test_passed = (hash == cs::Zero::hash);
+                                            }
+                                            else {
+                                                state_test_passed = (hash == cscrypto::calculateHash((cs::Byte*)state.data(), state.size()));
+                                            }
+                                        }
+                                    }
+                                    break; // transactions cycle
+                                }
+                            }
+                        }
+                    }
+                }
+                if (state_found) {
+                    break;
+                }
+            }
+            if (state_found && !state_test_passed) {
+                cswarning() << kLogPrefix << to_base58(contract_abs_addr) << " state received does not match hash value in " << ref_state;
+                return;
+            }
+        }
+        
         if (dbcache_update(contract_abs_addr, ref, state, false)) {
             if (in_known_contracts(contract_abs_addr)) {
                 auto& item = known_contracts[contract_abs_addr];
