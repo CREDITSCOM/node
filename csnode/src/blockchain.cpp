@@ -120,6 +120,10 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
     }
 
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
+    cs::Connector::connect(
+            &storage_.readingStoppedEvent(), walletsCacheUpdater_.get(),
+            &WalletsCache::Updater::onStopReadingFromDB);
+
     blockHashes_ = std::make_unique<cs::BlockHashes>(cachesPath);
 }
 
