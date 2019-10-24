@@ -110,7 +110,13 @@ void WalletsCache::Updater::invokeReplenishPayableContract(const csdb::Transacti
             sourceWallData.balance_ -= csdb::Amount(transaction.counted_fee().to_double());
             sourceWallData.balance_ += csdb::Amount(transaction.max_fee().to_double());
         }
+#ifdef MONITOR_NODE
+        emit walletUpdateEvent(toPublicKey(transaction.source()), sourceWallData);
+#endif
     }
+#ifdef MONITOR_NODE
+    emit walletUpdateEvent(toPublicKey(transaction.target()), wallData);
+#endif
 }
 
 void WalletsCache::Updater::smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx,
@@ -129,6 +135,10 @@ void WalletsCache::Updater::smartSourceTransactionReleased(const csdb::Transacti
         smartWallData.balance_ -= countedFee;
         initWallData.balance_ += countedFee;
     }
+#ifdef MONITOR_NODE
+    emit walletUpdateEvent(toPublicKey(smartSourceTrx.source()), smartWallData);
+    emit walletUpdateEvent(toPublicKey(initTrx.source()), initWallData);
+#endif
 }
 
 void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transaction& transaction,
@@ -176,6 +186,9 @@ void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transact
             }
         }
     }
+#ifdef MONITOR_NODE
+    emit walletUpdateEvent(toPublicKey(transaction.source()), wallData);
+#endif
 }
 
 #ifdef MONITOR_NODE
@@ -183,6 +196,7 @@ bool WalletsCache::Updater::setWalletTime(const PublicKey& address, const uint64
     auto it = data_.wallets_.find(address);
     if (it != data_.wallets_.end()) {
         it->second.createTime_ = p_timeStamp;
+        emit walletUpdateEvent(it->first, it->second);
         return true;
     }
     return false;
@@ -228,6 +242,9 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
             if (numPayedTrusted == (realTrustedNumber - 1)) {
                 feeToEachConfidant = totalFee - payedFee;
             }
+#ifdef MONITOR_NODE
+            emit walletUpdateEvent(confidants[i], walletData);
+#endif
         }
     }
 }
@@ -269,6 +286,9 @@ void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transac
             if (numPayedTrusted == (realTrustedNumber - 1)) {
                 feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>() - payedFee;
             }
+#ifdef MONITOR_NODE
+            emit walletUpdateEvent(confidants[i], walletData);
+#endif
         }
     }
 }
@@ -364,6 +384,9 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         else {
 		    --wallData_s.transNum_;
         }
+#ifdef MONITOR_NODE
+        emit walletUpdateEvent(toPublicKey(tr.source()), wallData_s);
+#endif
     }
     else {
         if (!inverse) {
@@ -396,6 +419,9 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         }
     }
 
+#ifdef MONITOR_NODE
+    emit walletUpdateEvent(toPublicKey(wallAddress), wallData);
+#endif
     return tr.counted_fee().to_double();
 }
 
@@ -475,6 +501,10 @@ void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& i
 
             auto& wallData = getWalletData(initTransaction.target());
             wallData.balance_ -= initTransaction.amount();
+#ifdef MONITOR_NODE
+            emit walletUpdateEvent(toPublicKey(initTransaction.source()), wallDataIniter);
+            emit walletUpdateEvent(toPublicKey(initTransaction.target()), wallData);
+#endif
         }
     }
 
@@ -487,6 +517,10 @@ void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& i
 
         auto& wallData = getWalletData(initTransaction.target());
         wallData.balance_ += initTransaction.amount();
+#ifdef MONITOR_NODE
+        emit walletUpdateEvent(toPublicKey(initTransaction.source()), wallDataIniter);
+        emit walletUpdateEvent(toPublicKey(initTransaction.target()), wallData);
+#endif
     }
 }
 
@@ -507,6 +541,9 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
         if (!inverse) ++wallData.transNum_;
         else --wallData.transNum_;
     }
+#ifdef MONITOR_NODE
+    emit walletUpdateEvent(toPublicKey(tr.target()), wallData);
+#endif
 }
 
 void WalletsCache::Updater::updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>& updates) {
@@ -514,6 +551,9 @@ void WalletsCache::Updater::updateLastTransactions(const std::vector<std::pair<P
         auto it = data_.wallets_.find(u.first);
         if (it != data_.wallets_.end()) {
             it->second.lastTransaction_ = u.second;
+#ifdef MONITOR_NODE
+            emit walletUpdateEvent(it->first, it->second);
+#endif
         }
     }
 }
