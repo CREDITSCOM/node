@@ -31,6 +31,7 @@ class TransactionID;
 using ReadBlockSignal = cs::Signal<void(const csdb::Pool& block, bool* test_failed)>;
 
 using BlockReadingStartedSingal = cs::Signal<void(cs::Sequence lastBlockNum)>;
+using BlockReadingStoppedSignal = cs::Signal<void()>;
 
 /**
  * @brief Объект хранилища.
@@ -330,6 +331,7 @@ public:
 public signals:
     const ReadBlockSignal& readBlockEvent() const;
     const BlockReadingStartedSingal& readingStartedEvent() const;
+    const BlockReadingStoppedSignal& readingStoppedEvent() const;
 
 private:
   static cs::Bytes get_trans_index_key(const Address&, cs::Sequence);

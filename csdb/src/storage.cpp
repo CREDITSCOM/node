@@ -185,6 +185,7 @@ private:
 private signals:
     ReadBlockSignal read_block_event;
     BlockReadingStartedSingal start_reading_event;
+    BlockReadingStoppedSignal stop_reading_event;
 };
 
 void Storage::priv::set_last_error(Storage::Error error, const ::std::string& message) {
@@ -279,6 +280,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
             }
         }
     }
+    emit stop_reading_event();
 
     return true;
 
@@ -860,6 +862,10 @@ const ReadBlockSignal& Storage::readBlockEvent() const {
 
 const BlockReadingStartedSingal& Storage::readingStartedEvent() const {
     return d->start_reading_event;
+}
+
+const BlockReadingStoppedSignal& Storage::readingStoppedEvent() const {
+    return d->stop_reading_event;
 }
 
 std::vector<Transaction> Storage::transactions(const Address& addr, size_t limit, const TransactionID& offset) const {

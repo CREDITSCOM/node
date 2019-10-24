@@ -15,6 +15,7 @@
 #include <csnode/transactionstail.hpp>
 
 #include <lib/system/common.hpp>
+#include <lib/system/signals.hpp>
 
 namespace std {
 template<>
@@ -90,6 +91,10 @@ private:
 #endif
 };
 
+using WalletUpdateSignal = cs::Signal<void(const PublicKey&, const WalletsCache::WalletData&)>;
+using FinishedUpdateFromDB =
+    cs::Signal<void(const std::unordered_map<PublicKey, WalletsCache::WalletData>&)>;
+
 class WalletsCache::Updater {
 public:
     Updater(WalletsCache& data);
@@ -115,6 +120,14 @@ public:
     void updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>&);
 
     PublicKey toPublicKey(const csdb::Address&) const;
+
+    void onStopReadingFromDB() const {
+      emit updateFromDBFinishedEvent(data_.wallets_);
+    }
+
+public signals:
+    WalletUpdateSignal walletUpdateEvent;
+    FinishedUpdateFromDB updateFromDBFinishedEvent;
 
 private:
     WalletData& getWalletData(const PublicKey&);
