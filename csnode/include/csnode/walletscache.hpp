@@ -55,7 +55,7 @@ public:
     struct WalletData {
         csdb::Amount balance_;
         TransactionsTail trxTail_;
-		uint64_t transNum_ = 0;
+        uint64_t transNum_ = 0;
         csdb::TransactionID lastTransaction_;
 #ifdef MONITOR_NODE
         uint64_t createTime_ = 0;        
