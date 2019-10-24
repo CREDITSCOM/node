@@ -5,11 +5,13 @@
 #include <memory>
 #include <string>
 
-#include <config.hpp>
-#include <csconnector/csconnector.hpp>
 #include <csstats.hpp>
 
+#include <csconnector/csconnector.hpp>
+
 #include <csnode/conveyer.hpp>
+#include <csnode/compressor.hpp>
+
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
@@ -30,12 +32,12 @@ class PoolSynchronizer;
 class BlockValidator;
 }  // namespace cs
 
-namespace cs {
-class RoundPackage;
-}
-
 namespace cs::config {
 class Observer;
+}
+
+namespace cs {
+class RoundPackage;
 }
 
 class Node {
@@ -55,7 +57,7 @@ public:
 
     using RefExecution = std::pair<cs::Sequence, uint32_t>;
 
-    explicit Node(const Config& config, cs::config::Observer& observer);
+    explicit Node(cs::config::Observer& observer);
     ~Node();
 
     bool isGood() const {
@@ -66,6 +68,10 @@ public:
     void stop();
 
     static void requestStop();
+    static bool autoShutdownEnabled() {
+        return autoShutdownEnabled_;
+    }
+
     bool isStopRequested() const {
         return stopRequested_;
     }
@@ -77,6 +83,7 @@ public:
     void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
     void getTransactionsPacket(const uint8_t* data, const std::size_t size);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
+
     // critical is true if network near to be down, all capable trusted node required
     bool canBeTrusted(bool critical);
 
@@ -105,9 +112,10 @@ public:
     void getStageThree(const uint8_t* data, const size_t size);
 
     void adjustStageThreeStorage();
-    void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required /*, uint8_t iteration*/);
+    void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, uint8_t iteration);
     void getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
     void sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester, cs::Bytes& message);
+    void sendConfidants(const std::vector<cs::PublicKey>&);
 
     // smart-contracts consensus communicatioin
     void sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs::StageOneSmarts& stageOneInfo);
@@ -150,6 +158,7 @@ public:
     void getRoundTableRequest(const uint8_t*, const size_t, const cs::RoundNumber, const cs::PublicKey&);
     void sendRoundTableReply(const cs::PublicKey& target, bool hasRequestedInfo);
     void getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent);
+
     // called by solver, review required:
     bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
     void sendRoundTable(cs::RoundPackage& rPackage);
@@ -279,18 +288,19 @@ public slots:
     void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
     void validateBlock(csdb::Pool block, bool* shouldStop);
+    void onRoundTimeElapsed();
 
 private:
-    bool init(const Config& config);
-    void setupObserver();
+    bool init();
+    void setupNextMessageBehaviour();
 
     void sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);
 
-    //void storeRoundPackageData(const cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, const cs::Characteristic& characteristic, cs::StageThree& st3);
-
     bool readRoundData(cs::RoundTable& roundTable, bool bang);
     void reviewConveyerHashes();
+
+    void processSync();
 
     // conveyer
     void processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
@@ -301,7 +311,7 @@ private:
 
     // default methods without flags
     template <typename... Args>
-    void sendDefault(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    void sendToTargetBroadcast(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     // to neighbour
     template <typename... Args>
@@ -323,26 +333,23 @@ private:
     template <class... Args>
     void sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
+    template <class... Args>
+    void sendToSingle(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
     // to neighbours
     template <typename... Args>
     bool sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     // broadcast
     template <class... Args>
-    void sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    void sendToBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     template <typename... Args>
-    void sendBroadcast(const cs::PublicKey& target, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
-
-    template <typename... Args>
-    void sendBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+    void sendToBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
     // write values to stream
     template <typename... Args>
     void writeDefaultStream(Args&&... args);
-
-    RegionPtr compressPoolsBlock(const cs::PoolsBlock& poolsBlock, std::size_t& realBinSize);
-    cs::PoolsBlock decompressPoolsBlock(const uint8_t* data, const size_t size);
 
     // TODO: C++ 17 static inline?
     static const csdb::Address genesisAddress_;
@@ -352,7 +359,8 @@ private:
     const cs::PrivateKey nodeIdPrivate_;
     bool good_ = true;
 
-    bool stopRequested_ = false;
+    std::atomic_bool stopRequested_{ false };
+    static inline bool autoShutdownEnabled_;
 
     // file names for crypto public/private keys
     inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
@@ -421,8 +429,7 @@ private:
     std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
 
     std::vector<cs::Stage> smartStageTemporary_;
-    // smart consensus IDs:
-    std::vector<uint64_t> activeSmartConsensuses_;
+    std::vector<uint64_t> activeSmartConsensuses_;  // smart consensus IDs:
 
     SentRoundData lastSentRoundData_;
     SentSignatures lastSentSignatures_;
@@ -448,6 +455,8 @@ private:
     bool alwaysExecuteContracts_ = false;
 
     cs::config::Observer& observer_;
+    cs::Compressor compressor_;
+
     long long deltaTimeSS{};
 };
 

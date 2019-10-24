@@ -1,11 +1,12 @@
 #ifndef CONFIRMATIONLIST_HPP
 #define CONFIRMATIONLIST_HPP
 
-#include <csnode/nodecore.hpp>
-#include <lib/system/common.hpp>
-
 #include <map>
 #include <optional>
+
+#include <csnode/nodecore.hpp>
+
+#include <lib/system/common.hpp>
 
 namespace cs {
 struct TrustedConfirmation {

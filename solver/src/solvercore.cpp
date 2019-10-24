@@ -275,7 +275,7 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
                     continue;
                 }
                 ++N0;
-                sx0 += tStamp;
+                sx0 += static_cast<int>(tStamp);
             }
 
             if (N0 > 0) {
@@ -480,12 +480,42 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     csdebug() << "NODE> StageThree prepared:" << std::endl << cs::StageThree::toString(stage3);
 }
 
-void SolverCore::uploadNewStates(std::vector<csdb::Transaction> newStates) {
+void SolverCore::uploadNewStates([[maybe_unused]] std::vector<csdb::Transaction> newStates) {
     //psmarts.
 }
 
 void SolverCore::sendRoundTable() {
     pnode->sendRoundTable(justCreatedRoundPackage);
+}
+
+void SolverCore::checkZeroSmartSignatures(csdb::Pool& pool) {
+    auto smartSignatures = pool.smartSignatures();
+    for (auto it : smartSignatures) {
+        bool metZeroSignature = false;
+        bool blockLoaded = false;
+        csdb::Pool smartPool;
+        cs::PublicKeys smartConfidants;
+        for (auto itt : it.signatures) {
+            csdebug() << "NODE> Signature: " << cs::Utils::byteStreamToHex(itt.second.data(), itt.second.size());
+            if (!metZeroSignature && std::memcmp(cs::Zero::signature.data(), itt.second.data(), itt.second.size()) == 0) {
+                csdebug() << "NODE> Found Zero-signature";
+                metZeroSignature = true;
+            }
+            if (metZeroSignature && !blockLoaded) {
+                smartPool = pnode->getBlockChain().loadBlock(it.smartConsensusPool);
+                if (smartPool.sequence() != 0) {
+                    smartConfidants = smartPool.confidants();
+                }
+                blockLoaded = true;
+            }
+            if (metZeroSignature && std::memcmp(cs::Zero::signature.data(), itt.second.data(), itt.second.size()) == 0) {
+                if (itt.first < smartConfidants.size()) {
+                    csdebug() << "NODE> Sending PublicKey to grayList";
+                    addToGraylist(smartConfidants[itt.first], Consensus::GrayListPunishment);
+                }
+            }
+        }
+    }
 }
 
 bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) {
@@ -506,6 +536,9 @@ bool SolverCore::addSignaturesToDeferredBlock(cs::Signatures&& blockSignatures) 
         cserror() << log_prefix << "Blockchain failed to write new block, it will do it later when get proper data";
         return false;
     }
+    else {
+        checkZeroSmartSignatures(resPool.value());
+    }
     //pnode->cleanConfirmationList(deferredBlock_.sequence());
     deferredBlock_ = csdb::Pool();
 
@@ -519,27 +552,11 @@ csdb::Pool& SolverCore::getDeferredBlock() {
 }
 
 void SolverCore::updateLastPackageSignatures() {
-
     justCreatedRoundPackage.updatePoolSignatures(lastSentSignatures_.poolSignatures);
     justCreatedRoundPackage.updateRoundSignatures(lastSentSignatures_.roundSignatures);
     justCreatedRoundPackage.updateTrustedSignatures(lastSentSignatures_.trustedConfirmation);
+
     pnode->setCurrentRP(justCreatedRoundPackage);
-    //auto ptr = pnode->getCurrentRoundPackage();
-    //if (ptr != nullptr) {
-    //    if (justCreatedRoundPackage.roundTable().round == ptr->roundTable().round) {
-    //        if (cs::TrustedMask::trustedSize(justCreatedRoundPackage.poolMetaInfo().realTrustedMask)
-    //            <= cs::TrustedMask::trustedSize(ptr->poolMetaInfo().realTrustedMask)) {
-    //            return;
-    //        }
-
-    //    }
-    //}
-
-    //pnode->addRoundPackageToList(justCreatedRoundPackage);
-
-    //if (!pnode->addRPackageToCache(justCreatedRoundPackage)) {
-    //    return;
-    //}
 }
 
 void SolverCore::removeDeferredBlock(cs::Sequence seq) {
@@ -555,6 +572,10 @@ void SolverCore::removeDeferredBlock(cs::Sequence seq) {
 
 uint8_t SolverCore::subRound() {
     return (pnode->subRound());
+}
+
+bool SolverCore::isInGrayList(cs::PublicKey key) {
+    return grayList_.find(key) != grayList_.end();
 }
 
 }  // namespace cs

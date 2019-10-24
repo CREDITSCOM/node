@@ -3,19 +3,17 @@ cmake_minimum_required(VERSION 3.10)
 project(csnode)
 
 # it is useful not to optimize code in RelWithDebInfo config for debug ability
-if (MSVC)
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Od /Ob0")
-    set(CMAKE_CXX_FLAGS_RELSPAM "${CMAKE_CXX_FLAGS_RELSPAM} /Od /Ob0")
-    set(CMAKE_CXX_FLAGS_RELMONITOR "${CMAKE_CXX_FLAGS_RELMONITOR} /Od /Ob0")
-    set(CMAKE_CXX_FLAGS_RELWALLET "${CMAKE_CXX_FLAGS_RELWALLET} /Od /Ob0")
-endif()
+configure_msvc_no_optimization()
+suppress_boost_cmake_warnings()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set (Boost_USE_MULTITHREADED ON)
 set (Boost_USE_STATIC_LIBS ON)
-set (Boost_USE_STATIC_RUNTIME ON)
+if(NOT APPLE)
+  set (Boost_USE_STATIC_RUNTIME ON)
+endif()
 set (BOOST_ALL_DYN_LINK OFF)
 
 find_package (Boost 1.66.0 REQUIRED COMPONENTS iostreams thread system filesystem)
@@ -66,6 +64,7 @@ add_library(csnode
   include/csnode/packetqueue.hpp
   include/csnode/roundpackage.hpp
   include/csnode/compressor.hpp
+  include/csnode/configholder.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -89,7 +88,10 @@ add_library(csnode
   src/blockvalidatorplugins.cpp
   src/packetqueue.cpp
   src/roundpackage.cpp
+  src/configholder.cpp
 )
+
+configure_msvc_flags()
 
 target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 lmdbxx config ${Boost_LIBRARIES})
 
@@ -105,4 +107,4 @@ target_include_directories(${PROJECT_NAME} PUBLIC
                                          ${CMAKE_BINARY_DIR}/api/api_gen
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lmdbxx
-										 ${CMAKE_CURRENT_SOURCE_DIR}/../client/config)
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../client/config)

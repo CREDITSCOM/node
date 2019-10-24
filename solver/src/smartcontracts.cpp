@@ -898,7 +898,7 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
 bool SmartContracts::test_executor_availability() {
     if (!executor_ready) {
         // ask user to restart executor every 2 seconds
-        if (!wait_until_executor(2)) {
+        if (!wait_until_executor(2, 15)) { //15 times by 2 seconds
             cserror() << kLogPrefix << "cannot connect to executor, further blockchain reading is impossible, interrupt reading";
             if (pnode->isStopRequested()) {
                 cslog() << kLogPrefix << "node is requested to stop, cancel wait to executor";
@@ -1991,8 +1991,12 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
     }
     csdebug() << kLogPrefix << "starting " << os.str() << "consensus";
     if (!it->is_executor || !start_consensus(*it)) {
-        cserror() << kLogPrefix << os.str() << "consensus is not started, remove item from queue";
-        remove_from_queue(it, false/*skip_log*/);
+        if (!it->is_executor) {
+            csdebug() << kLogPrefix << os.str() << "consensus need not to start";
+        }
+        else {
+            cswarning() << kLogPrefix << os.str() << "consensus is not started, probably this node is not a confidant";
+        }
     }
 }
 
@@ -2019,7 +2023,11 @@ bool SmartContracts::start_consensus(QueueItem& item) {
     // inform slots if any, packet does not contain smart consensus' data!
     emit signal_smart_executed(integral_packet);
 
-    return item.pconsensus->initSmartRound(integral_packet, run_counter, this->pnode, this);
+    const auto res = item.pconsensus->initSmartRound(integral_packet, run_counter, this->pnode, this);
+    if (!res) {
+        item.pconsensus.reset();
+    }
+    return res;
 }
 
 uint64_t SmartContracts::next_inner_id(const csdb::Address& addr) const {
@@ -2160,8 +2168,10 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                     }
     
                     // finally, restart consensus on the queue item
-                    if (!start_consensus(*it_queue)) {
-                        cserror() << kLogPrefix << "failed to restart consensus on " << FormatRef(sequence);
+                    if (it_queue->is_executor) {
+                        if (!start_consensus(*it_queue)) {
+                            cserror() << kLogPrefix << "failed to restart consensus on " << FormatRef(sequence);
+                        }
                     }
                 }
 
@@ -2733,8 +2743,62 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
     std::string state;
     cs::DataStream stream(contract_data.data(), contract_data.size());
     stream >> ref.sequence >> ref.transaction >> ref.hash >> state;
+
     if (stream.isValid() && !stream.isAvailable(1)) {
-        // TODO: test state hash before dbcache_update
+
+        if (in_known_contracts(contract_abs_addr)) {
+            auto& item = known_contracts[contract_abs_addr];
+            if (item.ref_execute > ref) {
+                cswarning() << kLogPrefix << "ignore outdated " << cs::SmartContracts::to_base58(contract_abs_addr) << " state";
+                return;
+            }
+            // test state hash before dbcache_update
+            csdebug() << kLogPrefix << "test " << cs::SmartContracts::to_base58(contract_abs_addr) << " state received";
+            bool state_found = false;
+            bool state_test_passed = false;
+            SmartContractRef ref_state;
+            for (cs::Sequence i = ref.sequence; i < ref.sequence + Consensus::MaxRoundsCancelContract; ++i) {
+                csdb::Pool b = bc.loadBlock(i);
+                if (b.is_valid() && b.transactions_count() > 0) {
+                    for (const auto& t : b.transactions()) {
+                        if (is_new_state(t)) {
+                            csdb::UserField fld = t.user_field(trx_uf::new_state::RefStart);
+                            if (fld.is_valid()) {
+                                if (SmartContractRef(fld) == ref) {
+                                    // corresponding new state found, test it
+                                    state_found = true;
+                                    ref_state.sequence = t.id().pool_seq();
+                                    ref_state.transaction = t.id().index();
+                                    fld = t.user_field(trx_uf::new_state::Hash);
+                                    if (fld.is_valid()) {
+                                        std::string hash_bytes = fld.value<std::string>();
+                                        cs::Hash hash;
+                                        if (hash.size() == hash_bytes.size()) {
+                                            std::copy(hash_bytes.cbegin(), hash_bytes.cend(), hash.begin());
+                                            if (state.empty()) {
+                                                state_test_passed = (hash == cs::Zero::hash);
+                                            }
+                                            else {
+                                                state_test_passed = (hash == cscrypto::calculateHash((cs::Byte*)state.data(), state.size()));
+                                            }
+                                        }
+                                    }
+                                    break; // transactions cycle
+                                }
+                            }
+                        }
+                    }
+                }
+                if (state_found) {
+                    break;
+                }
+            }
+            if (state_found && !state_test_passed) {
+                cswarning() << kLogPrefix << to_base58(contract_abs_addr) << " state received does not match hash value in " << ref_state;
+                return;
+            }
+        }
+        
         if (dbcache_update(contract_abs_addr, ref, state, false)) {
             if (in_known_contracts(contract_abs_addr)) {
                 auto& item = known_contracts[contract_abs_addr];

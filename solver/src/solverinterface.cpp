@@ -170,8 +170,8 @@ void SolverCore::nextRound(bool updateRound) {
 
 void SolverCore::gotStageOne(const cs::StageOne& stage) {
     if (find_stage1(stage.sender) != nullptr) {
-		uint64_t lastTimeStamp = 0;
-		uint64_t currentTimeStamp = 0;
+        uint64_t lastTimeStamp = 0;
+        uint64_t currentTimeStamp = 0;
         uint8_t sender = stage.sender;
         try {
             lastTimeStamp = std::stoll(find_stage1(stage.sender)->roundTimeStamp);
@@ -193,9 +193,9 @@ void SolverCore::gotStageOne(const cs::StageOne& stage) {
         // duplicated
         if (currentTimeStamp > lastTimeStamp) {
             auto it = std::find_if(stageOneStorage.begin(), stageOneStorage.end(), [sender](cs::StageOne& st) { return st.sender == sender; });
-			if (it != stageOneStorage.end()) {
-				stageOneStorage.erase(it);
-			}
+            if (it != stageOneStorage.end()) {
+                stageOneStorage.erase(it);
+            }
         }
         else {
             return;
@@ -236,13 +236,13 @@ uint8_t SolverCore::currentStage3iteration() {
     return currentStage3iteration_;
 }
 
-void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required /*, uint8_t iteration*/) {
-    csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-3 of [" << static_cast<int>(required) << "]";  // - i" << static_cast<int>(iteration);
+void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required, uint8_t iteration) {
+    csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-3 of [" << static_cast<int>(required) << "] - iteration = " << static_cast<int>(iteration);
 
     // const auto ptr = find_stage3(required);
 
     for (auto& it : stageThreeStorage) {
-        if (it.iteration == currentStage3iteration_ && it.sender == requester) {
+        if (it.iteration == iteration && it.sender == requester) {
             pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester, it.messageBytes);
             return;
         }
@@ -545,5 +545,13 @@ void SolverCore::gotRoundInfoReply(bool next_round_started, const cs::PublicKey&
 bool SolverCore::isContractLocked(const csdb::Address& address) const {
     return psmarts->is_contract_locked(address);
 }
+
+bool SolverCore::stopNodeRequested() const {
+    if (pnode) {
+        return pnode->isStopRequested();
+    }
+    return false;
+}
+
 
 }  // namespace cs

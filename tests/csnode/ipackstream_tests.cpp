@@ -141,7 +141,7 @@ TEST(IPackStream, SuccessfulReadOfIntegralType) {
     uint32_t value;
     stream >> value;
     EXPECT_TRUE(stream.good());
-    ASSERT_EQ(value, 0x78563412);
+    ASSERT_EQ(value, 0x78563412u);
 }
 
 TEST(IPackStream, IsNotGoodAfterRequestForReadingTooMany) {
@@ -160,7 +160,7 @@ TEST(IPackStream, PeekIntegerValue) {
     stream.init(data, sizeof data);
     uint32_t value;
     value = stream.peek<decltype(value)>();
-    ASSERT_EQ(value, 0x78563412);
+    ASSERT_EQ(value, 0x78563412u);
 }
 
 void displayStreamData(cs::IPackStream& stream, const size_t& size) {

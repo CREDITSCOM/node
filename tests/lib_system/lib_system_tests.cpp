@@ -7,15 +7,26 @@
 #include <mutex>
 #include <thread>
 #include <type_traits>
+#include <condition_variable>
 
+#include <lib/system/random.hpp>
 #include <lib/system/allocators.hpp>
 #include <lib/system/queues.hpp>
 #include <lib/system/structures.hpp>
-#include <lib/system/random.hpp>
+#include <lib/system/lockfreechanger.hpp>
+#include <lib/system/console.hpp>
+
+#ifdef _MSC_VER
+#pragma warning(push, 0)
+#endif
 
 #include <boost/lockfree/spsc_queue.hpp>
 
 #include "gtest/gtest.h"
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 void CreateRegionAllocatorAndThenAllocateInIt([[maybe_unused]] const uint32_t pageSize, [[maybe_unused]] const uint32_t initialNumberOfPages,
                                               const uint32_t numberOfAdditionalAllocations, const uint32_t additionalAllocationSize, uint32_t& finalNumberOfPages) {
@@ -543,4 +554,184 @@ TEST(FixedVector, base) {
         ASSERT_EQ(*it, (i < 7 ? i : i + 1));
         ++it;
     }
+}
+
+template<typename T>
+class Storage {
+public:
+    Storage() = default;
+
+    explicit Storage(const T& value)
+    : data_(value) {
+    }
+
+    T data() const {
+        return data_;
+    }
+
+    void setData(const T& value) {
+        data_ = value;
+    }
+
+    operator T() {
+        return data_;
+    }
+
+private:
+    alignas(kCacheLineSize * 2) T data_ = T{};
+};
+
+TEST(LockFreeChanger, BaseUsage) {
+    using SizeStorage = Storage<size_t>;
+
+    cs::LockFreeChanger<SizeStorage> changer;
+
+    const size_t maxCycles = 10000;
+    const size_t writersCount = std::thread::hardware_concurrency();
+    const size_t readersCount = std::thread::hardware_concurrency();
+
+    std::atomic<bool> isExecute = { true };
+
+    std::set<size_t> generatedValues { 0 };
+    std::mutex mutex;
+
+    std::vector<std::thread> writers;
+    std::vector<std::thread> readers;
+
+    for (size_t i = 0; i < readersCount; ++i) {
+        readers.push_back(std::thread([&] {
+            while (isExecute.load(std::memory_order_acquire)) {
+                size_t current = changer.data();
+                bool result = false;
+
+                {
+                    cs::Lock lock(mutex);
+                    auto iter = generatedValues.find(current);
+                    result = iter != generatedValues.end();
+                }
+
+                ASSERT_TRUE(result);
+                std::this_thread::yield();
+            }
+        }));
+    }
+
+    for (size_t i = 0; i < writersCount; ++i) {
+        writers.push_back(std::thread([&] {
+            size_t currentCycle = 0;
+
+            while (isExecute.load(std::memory_order_acquire)) {
+                if (currentCycle++ >= maxCycles) {
+                    break;
+                }
+
+                size_t randomValue = 0;
+
+                while (true) {
+                    randomValue = cs::Random::generateValue<size_t>(1, std::numeric_limits<int>::max());
+
+                    {
+                        cs::Lock lock(mutex);
+                        auto iter = generatedValues.find(randomValue);
+
+                        if (iter == generatedValues.end()) {
+                            generatedValues.insert(randomValue);
+                            break;
+                        }
+                    }
+                }
+
+                changer.exchange(randomValue);
+                std::this_thread::yield();
+            }
+        }));
+    }
+
+    std::thread allocatorThread([&] {
+        while (isExecute.load(std::memory_order_acquire)) {
+            auto randomValue = cs::Random::generateValue<int>(std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
+            volatile Storage<int>* storage = new Storage<int>(randomValue);
+
+            std::this_thread::yield();
+            delete storage;
+        }
+    });
+
+    for (auto& thread : writers) {
+        thread.join();
+    }
+
+    isExecute.store(false, std::memory_order_release);
+
+    for (auto& thread : readers) {
+        thread.join();
+    }
+
+    allocatorThread.join();
+
+    cs::Console::writeLine("Set value size ", generatedValues.size());
+    ASSERT_EQ(generatedValues.size(), (std::thread::hardware_concurrency() * maxCycles) + 1);
+}
+
+TEST(LockFreeChanger, BaseUsageSimple) {
+    using SizeStorage = Storage<size_t>;
+
+    cs::LockFreeChanger<SizeStorage> changer;
+
+    std::mutex mutex;
+    std::condition_variable readerVariable;
+    std::condition_variable writerVariable;
+
+    std::atomic<bool> isRunning = { true };
+
+    SizeStorage current;
+    SizeStorage previous;
+
+    const size_t count = 1000;
+
+    std::thread writer([&] {
+        std::size_t currentCount = 0;
+
+        while(isRunning.load(std::memory_order_acquire)) {
+            if (currentCount > count) {
+                break;
+            }
+
+            std::unique_lock lock(mutex);
+            size_t randomValue = 0;
+
+            do {
+                randomValue = cs::Random::generateValue<size_t>(1, std::numeric_limits<int>::max());
+            } while (randomValue != previous.data());
+
+            changer.exchange(randomValue);
+
+            previous = current;
+            current = SizeStorage(randomValue);
+
+            readerVariable.notify_one();
+            writerVariable.wait_for(lock, std::chrono::milliseconds(250));
+
+            ++currentCount;
+        }
+    });
+
+    std::thread reader([&] {
+        while (isRunning.load(std::memory_order_acquire)) {
+            std::unique_lock lock(mutex);
+            readerVariable.wait_for(lock, std::chrono::milliseconds(250));
+
+            auto desired = changer.data();
+
+            ASSERT_EQ(desired.data(), current.data());
+            ASSERT_TRUE(desired.data() != previous.data());
+
+            writerVariable.notify_one();
+        }
+    });
+
+    isRunning.store(false, std::memory_order_release);
+
+    writer.join();
+    reader.join();
 }

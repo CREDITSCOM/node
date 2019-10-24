@@ -12,7 +12,7 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
-#include <config.hpp>
+#include <csnode/configholder.hpp>
 
 namespace {
 cs::ConveyerBase* conveyerView = nullptr;
@@ -44,10 +44,6 @@ struct cs::ConveyerBase::Impl {
     // cached active current round number
     std::atomic<cs::RoundNumber> currentRound = 0;
 
-    // settings
-    std::atomic<cs::RoundNumber> sendCacheValue;
-    std::atomic<size_t> maxResendsSenCache;
-
     // helpers
     const cs::ConveyerMeta* validMeta() &;
 };
@@ -74,25 +70,14 @@ cs::ConveyerBase::ConveyerBase() {
     std::call_once(::onceFlag, &::setup, this);
 }
 
-void cs::ConveyerBase::setSendCacheValue(cs::RoundNumber value) {
-    pimpl_->sendCacheValue.store(value, std::memory_order_release);
-}
-
-void cs::ConveyerBase::setMaxResendsValue(size_t value) {
-    pimpl_->maxResendsSenCache.store(value, std::memory_order_release);
-}
-
-void cs::ConveyerBase::setData(const ConveyerData& data) {
-    setSendCacheValue(data.sendCacheValue);
-    setMaxResendsValue(data.maxResendsSendCache);
-}
-
 void cs::ConveyerBase::setRound(cs::RoundNumber round) {
     csmeta(csdebug) << "trying to change round to " << round;
 
     if (currentRoundNumber() < round) {
         pimpl_->currentRound = round;
         csdebug() << csname() << "cached round updated";
+
+        emit roundChanged(round);
     }
     else {
         cswarning() << csname() << "current round " << currentRoundNumber();
@@ -207,7 +192,7 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundNumber cachedRound, const cs::R
             --cachedRound;
         }
 
-        pimpl_->currentRound = table.round;
+        changeRound(table.round);
 
         if (pimpl_->metaStorage.contains(table.round)) {
             cserror() << csname() << "Round table updation failed";
@@ -241,8 +226,7 @@ void cs::ConveyerBase::setTable(const RoundTable& table) {
         csdetails() << csname() << "Need hash " << hash.toString();
     }
 
-    // atomic
-    pimpl_->currentRound = table.round;
+    changeRound(table.round);
 
     cs::ConveyerMetaStorage::Element element;
     element.round = table.round;
@@ -594,8 +578,9 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     meta->invalidTransactions = std::move(invalidTransactions);
 
     if (characteristic.mask.size() != newPool.transactions_count()) {
-        cslog() << "\tCharacteristic size: " << characteristic.mask.size() << ", new pool transactions count: " << newPool.transactions_count();
-        cswarning() << "\tSome transactions are not valid";
+        auto cnt_total = characteristic.mask.size();
+        auto cnt_valid = newPool.transactions_count();
+        cslog() << "Viewed transactions: " << cnt_total << ", valid : " << cnt_valid << ", invalid: " << cnt_total - cnt_valid;
     }
 
     csdebug() << "\tsequence = " << metaPoolInfo.sequenceNumber;
@@ -607,14 +592,6 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     newPool.add_real_trusted(cs::Utils::maskToBits(metaPoolInfo.realTrustedMask));
     newPool.set_previous_hash(metaPoolInfo.previousHash);
 
-    //TODO: be sure tthenext lines are included in Node::getCharacteristic()
-    //if (metaPoolInfo.sequenceNumber > 1) {
-    //    newPool.add_number_confirmations(static_cast<uint8_t>(metaPoolInfo.confirmationMask.size()));
-    //    newPool.add_confirmation_mask(cs::Utils::maskToBits(metaPoolInfo.confirmationMask));
-    //    newPool.add_round_confirmations(metaPoolInfo.confirmations);
-    //}
-
-    //csdebug() << "\twriter key is set to " << cs::Utils::byteStreamToHex(metaPoolInfo.writerKey);
     csmeta(csdetails) << "done";
 
     if (!stateTransactions.empty()) {
@@ -744,12 +721,12 @@ void cs::ConveyerBase::flushTransactions() {
     checkSendCache();
 }
 
-void cs::ConveyerBase::onConfigChanged(const Config& updated, const Config& previous) {
-    if (updated.conveyerData() == previous.conveyerData()) {
-        return;
-    }
+void cs::ConveyerBase::changeRound(cs::RoundNumber round) {
+    if (currentRoundNumber() != round) {
+        pimpl_->currentRound = round;
 
-    setData(updated.conveyerData());
+        emit roundChanged(round);
+    }
 }
 
 std::optional<cs::TransactionsPacket> cs::ConveyerBase::findPacketAtMeta(const cs::TransactionsPacketHash& hash) const {
@@ -836,7 +813,7 @@ bool cs::ConveyerBase::isHashAtSendCache(const cs::TransactionsPacketHash& hash)
 
 void cs::ConveyerBase::checkSendCache() {
     auto round = currentRoundNumber();
-    auto sendCacheValue = pimpl_->sendCacheValue.load(std::memory_order_acquire);
+    auto sendCacheValue = cs::ConfigHolder::instance().config()->conveyerData().sendCacheValue;
 
     if (round < sendCacheValue) {
         return;

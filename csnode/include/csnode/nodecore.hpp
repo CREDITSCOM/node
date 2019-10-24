@@ -60,6 +60,7 @@ enum ConveyerConsts : uint32_t {
 
 enum ConfidantConsts : Byte {
     FirstWriterIndex = std::numeric_limits<uint8_t>::min(),
+    LiarIndex = 254,
     InvalidConfidantIndex = std::numeric_limits<uint8_t>::max(),
 };
 

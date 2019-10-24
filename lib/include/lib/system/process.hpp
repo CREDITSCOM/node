@@ -7,14 +7,32 @@
 #include <vector>
 #include <iostream>
 
+#ifdef _MSC_VER
+#pragma warning(push, 0)
+#endif
+
 #include <boost/process.hpp>
 #include <boost/process/extend.hpp>
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #include <lib/system/signals.hpp>
 #include <lib/system/processexception.hpp>
 
 #ifdef BOOST_WINDOWS
+
+#ifdef _MSC_VER
+#pragma warning(push, 0)
+#endif
+
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 #endif
 
 namespace cs {
@@ -78,7 +96,7 @@ private:
 
     std::string program_;
     std::vector<std::string> args_;
-    std::unique_ptr<boost::asio::io_context> io_;
+    boost::asio::io_context io_;
 
     std::string file_;
 };
@@ -143,10 +161,7 @@ inline bool Process::isRunning() const {
 inline void Process::wait() {
     try {
         process_.wait();
-
-        if (io_) {
-            io_->stop();
-        }
+        io_.stop();
     }
     catch (const std::exception& exception) {
         emit errorOccured(cs::ProcessException(exception.what()));
@@ -155,10 +170,7 @@ inline void Process::wait() {
 
 inline void Process::terminate() {
     try {
-        if (io_) {
-            io_->stop();
-        }
-
+        io_.stop();
         process_.terminate();
     }
     catch (const std::exception& exception) {
@@ -168,12 +180,8 @@ inline void Process::terminate() {
 
 inline void Process::stop() {
     try {
-        if (!io_) {
-            return;
-        }
-
-        if (!io_->stopped()) {
-            io_->stop();
+        if (!io_.stopped()) {
+            io_.stop();
         }
     }
     catch (const std::exception& exception) {
@@ -206,15 +214,15 @@ inline void Process::launch(Process::Options options) {
         emit finished(code, errorCode);
     };
 
-    io_ = std::make_unique<boost::asio::io_context>();
+    io_.restart();
 
     try {
         if ((options & Options::OutToFile) && !file_.empty()) {
-            process_ = boost::process::child(program_, args_, *io_.get(), boost::process::std_out > file_, boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
+            process_ = boost::process::child(program_, args_, io_, boost::process::std_out > file_, boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
                                              boost::process::extend::on_success = success, boost::process::extend::on_error = error);
         }
         else {
-            process_ = boost::process::child(program_, args_, *io_.get(), boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
+            process_ = boost::process::child(program_, args_, io_, boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
                                              boost::process::extend::on_success = success, boost::process::extend::on_error = error);
         }
     }
@@ -223,11 +231,11 @@ inline void Process::launch(Process::Options options) {
     }
 
     try {
-    std::thread thread([this] {
-        io_->run();
-    });
+        std::thread thread([this] {
+            io_.run();
+        });
 
-    thread.detach();
+        thread.detach();
     }
     catch (const std::exception& exception) {
         terminate();

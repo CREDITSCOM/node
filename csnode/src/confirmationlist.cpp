@@ -1,5 +1,7 @@
 #include <csnode/confirmationlist.hpp>
 
+#include <lib/system/logger.hpp>
+
 namespace cs {
 void ConfirmationList::add(cs::RoundNumber rNum, bool bang, const cs::ConfidantsKeys& confidants, const cs::Bytes& confirmationsMask, const cs::Signatures& confirmation) {
     if (confirmationList_.find(rNum) != confirmationList_.cend()) {

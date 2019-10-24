@@ -5,12 +5,12 @@
 #include <lib/system/utils.hpp>
 
 #include <csnode/conveyer.hpp>
+#include <csnode/configholder.hpp>
 
 #include <net/transport.hpp>
 
-cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* transport, BlockChain* blockChain)
-: syncData_(data)
-, transport_(transport)
+cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockChain)
+: transport_(transport)
 , blockChain_(blockChain) {
     neighbours_.reserve(transport_->getMaxNeighbours());
 
@@ -23,17 +23,18 @@ cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData& data, Transport* tran
     const uint8_t hl = 25;
     const uint8_t vl = 6;
     csmeta(csdebug) << "Pool sync data : \n"
-                    << std::setw(hl) << "Fast mode:        " << std::setw(vl) << syncData_.isFastMode << "\n"
-                    << std::setw(hl) << "One reply block:  " << std::setw(vl) << syncData_.oneReplyBlock << "\n"
-                    << std::setw(hl) << "Block pools:      " << std::setw(vl) << static_cast<int>(syncData_.blockPoolsCount) << "\n"
-                    << std::setw(hl) << "Request round:    " << std::setw(vl) << static_cast<int>(syncData_.requestRepeatRoundCount) << "\n"
-                    << std::setw(hl) << "Neighbour packets:" << std::setw(vl) << static_cast<int>(syncData_.neighbourPacketsCount) << "\n"
-                    << std::setw(hl) << "Polling frequency:" << std::setw(vl) << syncData_.sequencesVerificationFrequency;
+                    << std::setw(hl) << "Fast mode:        " << std::setw(vl) << cs::ConfigHolder::instance().config()->getPoolSyncSettings().isFastMode << "\n"
+                    << std::setw(hl) << "One reply block:  " << std::setw(vl) << cs::ConfigHolder::instance().config()->getPoolSyncSettings().oneReplyBlock << "\n"
+                    << std::setw(hl) << "Block pools:      " << std::setw(vl) << static_cast<int>(cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount) << "\n"
+                    << std::setw(hl) << "Request round:    " << std::setw(vl) << static_cast<int>(cs::ConfigHolder::instance().config()->getPoolSyncSettings().requestRepeatRoundCount) << "\n"
+                    << std::setw(hl) << "Neighbour packets:" << std::setw(vl) << static_cast<int>(cs::ConfigHolder::instance().config()->getPoolSyncSettings().neighbourPacketsCount) << "\n"
+                    << std::setw(hl) << "Polling frequency:" << std::setw(vl) << cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency;
 }
 
 void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber difference, bool isBigBand) {
     if (transport_->getNeighboursCount() == 0) {
-        csmeta(csdebug) << "Cannot start sync (no neighbours). Needed sequence: " << roundNum << ",   Requested pools block size:" << syncData_.blockPoolsCount;
+        csmeta(csdebug) << "Cannot start sync (no neighbours). Needed sequence: " << roundNum
+                        << ",   Requested pools block size:" << cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
         return;
     }
 
@@ -63,9 +64,9 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
     if (roundNum < totalBlocks) {
         cswarning() << "Round number is lower than synchro total blocks, do clear cache";
         csdebug() << "SYNC warning, round number " << roundNum << ", total blocks " << totalBlocks;
-		blockChain_->clearBlockCache();
-		cachedBlocksSize = 0;
-		totalBlocks = lastWrittenSequence;
+        blockChain_->clearBlockCache();
+        cachedBlocksSize = 0;
+        totalBlocks = lastWrittenSequence;
     }
 
     const cs::Sequence blocksRemaining = roundNum - totalBlocks;
@@ -80,8 +81,8 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
         return;
     }
 
-    const bool useTimer = syncData_.sequencesVerificationFrequency > 1;
-    const int delay = useTimer ? static_cast<int>(syncData_.sequencesVerificationFrequency) : static_cast<int>(cs::NeighboursRequestDelay);
+    const bool useTimer = cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency > 1;
+    const int delay = useTimer ? static_cast<int>(cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency) : static_cast<int>(cs::NeighboursRequestDelay);
 
     // already synchro start
     if (isSyncroStarted_ && !useTimer) {
@@ -111,26 +112,59 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 
         roundSimulation_.start(60000, cs::Timer::Type::HighPrecise, RunPolicy::CallQueuePolicy);  // 1 Min
     }
-    else if (syncData_.requestRepeatRoundCount > 0) {
+    else if (cs::ConfigHolder::instance().config()->getPoolSyncSettings().requestRepeatRoundCount > 0) {
         roundSimulation_.restart();
         const bool isNeedRequest = checkActivity(CounterType::ROUND);
         bool isAvailable = false;
 
-        if (syncData_.sequencesVerificationFrequency == 1) {
+        if (cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency == 1) {
             isAvailable = checkActivity(CounterType::TIMER);
         }
 
         if (isNeedRequest || isAvailable) {
             sendBlockRequest();
         }
+
+        if (std::all_of(std::begin(neighbours_), std::end(neighbours_), [](const auto& neighbour) { return neighbour.sequences().empty(); })) {
+            cslog() << "PoolSyncronizer> No sequence is waited from any neighbour, finish sync";
+            synchroFinished();
+        }
     }
+}
+
+void cs::PoolSynchronizer::syncLastPool() {
+    if (isSyncroStarted_) {
+        return;
+    }
+
+    auto lastWrittenSequence = blockChain_->getLastSeq();
+    ConnectionPtr connection;
+
+    {
+        auto lock = transport_->getNeighboursLock();
+        auto neighbours = transport_->getNeighboursWithoutSS();
+
+        auto iterator = std::find_if(std::begin(neighbours), std::end(neighbours), [lastWrittenSequence](const auto& neighobur) {
+            return neighobur->lastSeq > lastWrittenSequence;
+        });
+
+        if (iterator != std::end(neighbours)) {
+            connection = *iterator;
+        }
+    }
+
+    if (connection.isNull()) {
+        return;
+    }
+
+    isSyncroStarted_ = true;
+    emit sendRequest(connection, PoolsRequestedSequences { lastWrittenSequence + 1}, 0);
 }
 
 void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_t packetNum) {
     csmeta(csdebug) << "Get Block Reply <<<<<<< : count: " << poolsBlock.size() << ", seqs: [" << poolsBlock.front().sequence() << ", " << poolsBlock.back().sequence()
                     << "], id: " << packetNum;
 
-    /// TODO Fix numeric cast from RoundNum to cs::Sequence
     cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
     const cs::Sequence oldLastWrittenSequence = lastWrittenSequence;
     const std::size_t oldCachedBlocksSize = blockChain_->getCachedBlocksSize();
@@ -181,6 +215,9 @@ void cs::PoolSynchronizer::sendBlockRequest() {
         csmeta(csdetails) << "Requested sequence size: 0";
     }
 
+    // remove unnecessary sequences
+    removeExistingSequence(blockChain_->getLastSeq(), SequenceRemovalAccuracy::LOWER_BOUND);
+
     bool success = false;
 
     for (auto& neighbour : neighbours_) {
@@ -208,16 +245,16 @@ bool cs::PoolSynchronizer::isSyncroStarted() const {
 }
 
 bool cs::PoolSynchronizer::isOneBlockReply() const {
-    return syncData_.oneReplyBlock;
+    return cs::ConfigHolder::instance().config()->getPoolSyncSettings().oneReplyBlock;
 }
 
 bool cs::PoolSynchronizer::isFastMode() const {
-    if (!isSyncroStarted_ || !syncData_.isFastMode) {
+    if (!isSyncroStarted_ || !cs::ConfigHolder::instance().config()->getPoolSyncSettings().isFastMode) {
         return false;
     }
 
     const cs::Sequence sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSeq() - blockChain_->getCachedBlocksSize();
-    return sum > static_cast<cs::Sequence>(syncData_.blockPoolsCount * 3);  // roundDifferentForSync_
+    return sum > static_cast<cs::Sequence>(cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount * 3);  // roundDifferentForSync_
 }
 
 //
@@ -236,13 +273,13 @@ void cs::PoolSynchronizer::onTimeOut() {
         ++fastCounter;
         if (fastCounter > 20) {
             fastCounter = 0;
-            csmeta(csdetails) << "OnTimeOut Fast: " << syncData_.sequencesVerificationFrequency * 20;
+            csmeta(csdetails) << "OnTimeOut Fast: " << cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency * 20;
             isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
         }
     }
 
     if (!isAvailable) {
-        csmeta(csdetails) << "OnTimeOut: " << syncData_.sequencesVerificationFrequency;
+        csmeta(csdetails) << "OnTimeOut: " << cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency;
         isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::TIMER);
     }
 
@@ -409,14 +446,13 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
 
     const cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
 
-    // remove unnecessary sequnces
-    removeExistingSequence(lastWrittenSequence, SequenceRemovalAccuracy::LOWER_BOUND);
-
     cs::Sequence sequence = lastWrittenSequence;
 
     auto isNeededHelpIt = requestedSequences_.end();
-    if (syncData_.neighbourPacketsCount > 0 && !isLastPacket) {
-        isNeededHelpIt = std::find_if(requestedSequences_.begin(), requestedSequences_.end(), [this](const auto& pair) { return pair.second >= syncData_.neighbourPacketsCount; });
+    if (cs::ConfigHolder::instance().config()->getPoolSyncSettings().neighbourPacketsCount > 0 && !isLastPacket) {
+        isNeededHelpIt = std::find_if(requestedSequences_.begin(), requestedSequences_.end(), [](const auto& pair) {
+            return pair.second >= cs::ConfigHolder::instance().config()->getPoolSyncSettings().neighbourPacketsCount;
+        });
     }
 
     // if storage requested sequences is impty
@@ -472,7 +508,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
 
     neighbour.resetSequences();
 
-    for (std::size_t i = 0; i < syncData_.blockPoolsCount; ++i) {
+    for (std::size_t i = 0; i < cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount; ++i) {
         ++sequence;
 
         // max sequence
@@ -564,72 +600,87 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     const size_t allNeighboursCount = transport_->getNeighboursCount();
 
     // 1) sort neighbours by lastSeq descending
-    std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>> sort_by_seq_desc;
-    const size_t map_size = transport_->getNeighboursCount();
-    for (size_t i = 0; i < map_size; ++i) {
-        sort_by_seq_desc.insert(std::make_pair(transport_->getConnectionLastSequence(i), i));
+    std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>> sortBySeqDesc;
+    const size_t mapSize = transport_->getNeighboursCount();
+    for (size_t i = 0; i < mapSize; ++i) {
+        sortBySeqDesc.insert(std::make_pair(transport_->getConnectionLastSequence(i), i));
     }
 
     // Add new neighbours
     if (nSize < neededNeighboursCount) {
-        decltype(sort_by_seq_desc)::const_iterator it = sort_by_seq_desc.cbegin();
+        decltype(sortBySeqDesc)::const_iterator it = sortBySeqDesc.cbegin();
         // update known neighbors
         for (size_t i = 0; i < nSize; ++i) {
             // get the i-th connection with max sequence
-            size_t conn_number = i;
-            if (it != sort_by_seq_desc.cend()) {
+            size_t connectionNumber = i;
+
+            if (it != sortBySeqDesc.cend()) {
                 // normally, we always be here
-                conn_number = it->second;
+                connectionNumber = it->second;
                 ++it;
             }
-            auto& item = *(neighbours_.begin() + i);
-            ConnectionPtr neighbour = transport_->getConnectionByNumber(conn_number);
+
+            auto& item = *(neighbours_.begin() + static_cast<std::ptrdiff_t>(i));
+            ConnectionPtr neighbour = transport_->getConnectionByNumber(connectionNumber);
+
             if (neighbour->isSignal) {
-                ++conn_number;
-                if (conn_number >= neededNeighboursCount) {
+                ++connectionNumber;
+
+                if (connectionNumber >= neededNeighboursCount) {
                     break;
                 }
-                neighbour = transport_->getConnectionByNumber(conn_number);
+
+                neighbour = transport_->getConnectionByNumber(connectionNumber);
             }
-            item.setIndex(uint8_t(conn_number));
+
+            item.setIndex(uint8_t(connectionNumber));
             item.setPublicKey(neighbour->key);
         }
+
         // add new neighbors
         for (size_t i = nSize; i < allNeighboursCount; ++i) {
             // get the i-th connection with max sequence
-            size_t conn_number = i;
-            if (it != sort_by_seq_desc.cend()) {
+            size_t connectionNumber = i;
+
+            if (it != sortBySeqDesc.cend()) {
                 // normally, we always be here
-                conn_number = it->second;
+                connectionNumber = it->second;
                 ++it;
             }
-            ConnectionPtr neighbour = transport_->getConnectionByNumber(conn_number);
+
+            ConnectionPtr neighbour = transport_->getConnectionByNumber(connectionNumber);
+
             if (neighbour && !neighbour->isSignal && neighbour->lastSeq) {
-                auto isAlreadyHave = std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return size_t(el.index()) == conn_number; });
+                auto isAlreadyHave = std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return size_t(el.index()) == connectionNumber; });
 
                 if (isAlreadyHave == neighbours_.end()) {
-                    neighbours_.emplace_back(NeighboursSetElemet(uint8_t(conn_number), neighbour->key, syncData_.blockPoolsCount));
+                    neighbours_.emplace_back(NeighboursSetElemet(uint8_t(connectionNumber), neighbour->key, cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount));
                 }
             }
         }
+
         csmeta(csdetails) << "Neighbours saved count is: " << neighbours_.size();
         return;
     }
 
     // refresh neighbours' index
-    std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>>::const_iterator it = sort_by_seq_desc.cbegin();
+    std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>>::const_iterator it = sortBySeqDesc.cbegin();
     std::size_t currentNh = 0;
+
     for (size_t i = 0; i < allNeighboursCount; ++i) {
         // get the i-th connection with max sequence
-        size_t conn_number = i;
-        if (it != sort_by_seq_desc.cend()) {
+        size_t connectionNumber = i;
+
+        if (it != sortBySeqDesc.cend()) {
             // normally, we always be here
-            conn_number = it->second;
+            connectionNumber = it->second;
             ++it;
         }
-        ConnectionPtr neighbour = transport_->getConnectionByNumber(conn_number);
+
+        ConnectionPtr neighbour = transport_->getConnectionByNumber(connectionNumber);
+
         if (neighbour && !neighbour->isSignal) {
-            neighbours_[currentNh].setIndex(uint8_t(conn_number));
+            neighbours_[currentNh].setIndex(uint8_t(connectionNumber));
             neighbours_[currentNh].setPublicKey(neighbour->key);
             ++currentNh;
         }
@@ -662,14 +713,14 @@ void cs::PoolSynchronizer::refreshNeighbours() {
 
 bool cs::PoolSynchronizer::isLastRequest() const {
     const auto sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSeq() - blockChain_->getCachedBlocksSize();
-    return sum <= syncData_.blockPoolsCount;
+    return sum <= cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
 }
 
 bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::NeighboursSetElemet& nh) const {
     const auto value = nh.roundCounter();
 
     if (value != 0) {
-        return ((value % syncData_.requestRepeatRoundCount) == 0);
+        return ((value % cs::ConfigHolder::instance().config()->getPoolSyncSettings().requestRepeatRoundCount) == 0);
     }
 
     return false;
@@ -683,10 +734,13 @@ void cs::PoolSynchronizer::synchroFinished() {
     if (timer_.isRunning()) {
         timer_.stop();
     }
+
     if (roundSimulation_.isRunning()) {
         roundSimulation_.stop();
     }
+
     isSyncroStarted_ = false;
+
     requestedSequences_.clear();
     neighbours_.clear();
 

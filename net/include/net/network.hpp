@@ -14,12 +14,11 @@ using io_context = boost::asio::io_context;
 
 struct EndpointData;
 
-class Config;
 class Transport;
 
 class Network {
 public:
-    explicit Network(const Config&, Transport*);
+    explicit Network(Transport*);
     ~Network();
 
     bool isGood() const {
@@ -47,8 +46,8 @@ public:
     };
 
 private:
-    void readerRoutine(const Config&);
-    void writerRoutine(const Config&);
+    void readerRoutine();
+    void writerRoutine();
     void processorRoutine();
     inline void processTask(TaskPtr<IPacMan>&);
 
@@ -67,7 +66,7 @@ private:
 
     Transport* transport_;
 
-    FixedHashMap<cs::Hash, uint32_t, uint16_t, MaxRememberPackets> packetMap_;  
+    FixedHashMap<cs::Hash, uint32_t, uint32_t, MaxRememberPackets> packetMap_;
 
     // Only needed in a one-socket configuration
     __cacheline_aligned std::atomic<bool> singleSockOpened_ = {false};

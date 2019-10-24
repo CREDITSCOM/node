@@ -54,7 +54,7 @@ struct head_info_t {
 using heads_t = std::map<PoolHash, head_info_t>;
 using tails_t = std::map<PoolHash, PoolHash>;
 
-void update_heads_and_tails(heads_t& heads, tails_t& tails, const PoolHash& cur_hash, const PoolHash& prev_hash) {
+[[maybe_unused]] void update_heads_and_tails(heads_t& heads, tails_t& tails, const PoolHash& cur_hash, const PoolHash& prev_hash) {
     auto ith = heads.find(prev_hash);
     auto itt = tails.find(cur_hash);
     bool eith = (heads.end() != ith);
@@ -279,23 +279,6 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
             }
         }
     }
-
-    // Посмотрим, сколько у нас завершённых цепочек.
-    //if ([this, &heads]() -> bool {
-    //        for (const auto it : heads) {
-    //            if (!it.second.next_.is_empty())
-    //                continue;
-
-    //            if (!last_hash.is_empty())
-    //                return false;
-
-    //            last_hash = it.first;
-    //        }
-    //        return true;
-    //    }()) {
-    //    set_last_error();
-    //    return true;
-    //}
 
     return true;
 
@@ -1035,6 +1018,9 @@ bool Storage::truncate_trxs_index() {
 }
 
 bool Storage::get_contract_data(const Address& abs_addr /*input*/, cs::Bytes& data /*output*/) const {
+    if (!d->db) {
+        return false;
+    }
     const auto& pk = abs_addr.public_key();
     cs::Bytes bytes(pk.size());
     bytes.assign(pk.cbegin(), pk.cend());
@@ -1042,6 +1028,9 @@ bool Storage::get_contract_data(const Address& abs_addr /*input*/, cs::Bytes& da
 }
 
 bool Storage::update_contract_data(const Address& abs_addr /*input*/, const cs::Bytes& data /*input*/) const {
+    if (!d->db) {
+        return false;
+    }
     const auto& pk = abs_addr.public_key();
     cs::Bytes bytes(pk.size());
     bytes.assign(pk.cbegin(), pk.cend());

@@ -15,7 +15,7 @@ The Node processes and stores transactions, executes and confirms smart contract
 Written on C++.
 
 ## Version
-Current node version 4.2.426
+Current node version 4.2.432
 
 <h2>What is Credits Node?</h2>
 <p>Credits Node is the main module that provide an opportunity to run a node and participate in CREDITS blockhain network. The node performs processing and storage of transactions, execution and confirmation of the terms of smart contracts, processing requests from third-party systems, and provides data upon request. Each node on the network has the same functionality.

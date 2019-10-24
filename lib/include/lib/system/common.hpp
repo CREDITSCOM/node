@@ -20,6 +20,7 @@ namespace cs {
 // key node type
 using RoundNumber = uint64_t;
 using Sequence = RoundNumber;
+using Version = uint16_t;
 
 constexpr const Sequence kWrongSequence = std::numeric_limits<Sequence>::max();
 constexpr const RoundNumber kWrongRoundNumber = std::numeric_limits<RoundNumber>::max();

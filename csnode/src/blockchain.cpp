@@ -11,13 +11,12 @@
 #include <csnode/datastream.hpp>
 #include <csnode/fee.hpp>
 #include <csnode/nodeutils.hpp>
+#include <csnode/node.hpp>
 #include <csnode/transactionsiterator.hpp>
 #include <solver/smartcontracts.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
-
-#include <config.hpp>
 
 using namespace cs;
 namespace fs = boost::filesystem;
@@ -88,6 +87,9 @@ inline void checkLastIndFile(bool& recreateIndex) {
         return;
     }
     lastIndexedPool = *(f.data<const cs::Sequence>());
+    if (lastIndexedPool == kWrongSequence) {
+      recreateIndex = true;
+    }
 }
 
 inline void updateLastIndFile() {
@@ -1148,6 +1150,30 @@ bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address& addr) cons
     return true;
 }
 
+bool BlockChain::checkForConsistency(csdb::Pool& pool) {
+    if (pool.sequence() == 0) {
+        return true;
+    }
+    if (pool.confidants().size() < pool.signatures().size()) {
+        return false;
+    }
+    if (cs::Utils::maskValue(pool.realTrusted()) != pool.signatures().size()) {
+        return false;
+    }
+    csdb::Pool tmp = pool.clone();
+    if (!tmp.compose()) {
+        return false;
+    }
+    cs::Bytes checking = tmp.to_binary();
+    csdb::Pool tmpCopy = csdb::Pool::from_binary(std::move(checking));
+    if (tmpCopy.sequence() == 0) {
+        csinfo() << "Failed to create correct binary representation of block #" << pool.sequence();
+        return false;
+    }
+    return true;
+
+}
+
 std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrusted) {
     const auto last_seq = getLastSeq();
     const auto pool_seq = pool.sequence();
@@ -1160,7 +1186,15 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     }
 
     pool.set_previous_hash(getLastHash());
+    if (!checkForConsistency(pool)) {
+        csdebug() << "BLOCKCHAIN> Pool #" << pool_seq << " failed the consistency check";
+        return std::nullopt;
+    }
 
+    if (!checkForConsistency(deferredBlock_)) {
+        csdebug() << "BLOCKCHAIN> Deferred Block #" << deferredBlock_.sequence() << " failed the consistency check";
+        return std::nullopt;
+    }
     constexpr cs::Sequence NoSequence = std::numeric_limits<cs::Sequence>::max();
     cs::Sequence flushed_block_seq = NoSequence;
 
@@ -1604,7 +1638,20 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) co
 
 cs::Sequence BlockChain::getPreviousPoolSeq(const csdb::Address& addr, cs::Sequence ps) const {
     std::lock_guard lock(dbLock_);
-    return storage_.get_previous_transaction_block(getAddressByType(addr, AddressType::PublicKey), ps);
+    auto prev_seq = storage_.get_previous_transaction_block(
+            getAddressByType(addr, AddressType::PublicKey), ps);
+
+    if (prev_seq == ps) {
+        if (Node::autoShutdownEnabled()) {
+            cserror() << "Inconsistent transaction index. Node will be stopped. Please restart it.";
+            lastIndexedPool = kWrongSequence;
+            updateLastIndFile();
+            Node::requestStop();
+        }
+        return kWrongSequence;
+    }
+
+    return prev_seq;
 }
 
 std::pair<cs::Sequence, uint32_t> BlockChain::getLastNonEmptyBlock() {
@@ -1624,14 +1671,14 @@ std::pair<cs::Sequence, uint32_t> BlockChain::getPreviousNonEmptyBlock(cs::Seque
 }
 
 cs::Sequence BlockChain::getLastSeq() const{
-	return lastSequence_;
+    return lastSequence_;
 }
 
 void BlockChain::setBlocksToBeRemoved(cs::Sequence number) {
-	if (blocksToBeRemoved_ > 0) {
-		csdebug() << "BLOCKCHAIN> Can't change number of blocks to be removed, because the previous removal is still not finished";
-		return;
-	}
-	csdebug() << "BLOCKCHAIN> Allowed NUMBER blocks to remove is set to " << blocksToBeRemoved_;
-	blocksToBeRemoved_ = number;
+    if (blocksToBeRemoved_ > 0) {
+        csdebug() << "BLOCKCHAIN> Can't change number of blocks to be removed, because the previous removal is still not finished";
+        return;
+    }
+    csdebug() << "BLOCKCHAIN> Allowed NUMBER blocks to remove is set to " << blocksToBeRemoved_;
+    blocksToBeRemoved_ = number;
 }

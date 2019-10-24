@@ -9,6 +9,9 @@
 #include <set>
 #include <atomic>
 #include <chrono>
+#include <mutex>
+
+class Config;
 
 namespace cs {
 constexpr size_t kMaxStoredDurations = 1000;
@@ -42,6 +45,11 @@ public:
 
 public slots:
     void onPingReceived(cs::Sequence, const cs::PublicKey&);
+    void onRoundChanged();
+    void onMainThreadIterated();
+
+public signals:
+    cs::Action roundTimeElapsed;
 
 private:
     // amount of transactions received (to verify or not or to ignore)
@@ -61,6 +69,11 @@ private:
     size_t startSkipRounds_;
 
     std::atomic<size_t> lastRoundMs_;
+
+    // round time elapsing calcualtion and sync
+    std::mutex roundElapseMutex_;
+    uint64_t roundElapseSetting_;
+    std::chrono::steady_clock::time_point roundElapseTimePoint_;
 };
 
 }  // namespace cs

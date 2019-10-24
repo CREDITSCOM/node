@@ -6,9 +6,6 @@
 #include <csignal>
 #include <atomic>
 
-#include <config.hpp>
-
-#include <csnode/node.hpp>
 #include <csnode/packstream.hpp>
 
 #include <lib/system/allocators.hpp>
@@ -27,6 +24,7 @@ inline volatile std::sig_atomic_t gSignalStatus = 0;
 
 using ConnectionId = uint64_t;
 using Tick = uint64_t;
+
 using PingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
 enum class NetworkCommand : uint8_t {
@@ -48,7 +46,9 @@ enum class NetworkCommand : uint8_t {
     SSReRegistration = 36,
     SSSpecificBlock = 37,
     SSNewFriends = 38,
-    SSUpdateServer = 39
+    SSUpdateServer = 39,
+    IntroduceConsensus = 40,
+    IntroduceConsensusReply = 41
 };
 
 enum class RegistrationRefuseReasons : uint8_t {
@@ -72,22 +72,11 @@ enum class SSBootstrapStatus : uint8_t {
 template <>
 uint16_t getHashIndex(const ip::udp::endpoint&);
 
+class Node;
+
 class Transport {
 public:
-    explicit Transport(const Config& config, Node* node)
-    : config_(config)
-    , sendPacksFlag_()
-    , remoteNodes_(maxRemoteNodes_ + 1)
-    , myPublicKey_(node->getNodeIdKey())
-    , oLock_()
-    , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
-    , uLock_()
-    , net_(new Network(config, this))
-    , node_(node)
-    , nh_(this) {
-        good_ = net_->isGood();
-    }
-
+    explicit Transport(Node* node);
     ~Transport();
 
     void run();
@@ -114,9 +103,7 @@ public:
         return good_;
     }
 
-    bool isOwnNodeTrusted() const {
-        return (node_->getNodeLevel() != Node::Level::Normal);
-    }
+    bool isOwnNodeTrusted() const;
 
     void sendBroadcast(const Packet* pack) {
         nh_.sendByNeighbours(pack);
@@ -126,6 +113,8 @@ public:
     bool sendDirectToSock(Packet*, const Connection&);
     void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
     void deliverBroadcast(const Packet*, const uint32_t);
+    void deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
+    bool checkConfidants(const std::vector<cs::PublicKey>& list, int except = -1);
 
     void gotPacket(const Packet&, RemoteNodePtr&);
     void redirectPacket(const Packet&, RemoteNodePtr&, bool resend = true);
@@ -140,6 +129,7 @@ public:
     void sendPackRenounce(const cs::Hash&, const Connection&);
     void sendPackInform(const Packet&, const Connection&);
     void sendPackInform(const Packet& pack, RemoteNodePtr&);
+    void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys);
 
     void sendPingPack(const Connection&);
 
@@ -149,34 +139,39 @@ public:
     uint32_t getNeighboursCount();
     uint32_t getNeighboursCountWithoutSS();
     uint32_t getMaxNeighbours() const;
-    ConnectionPtr getSyncRequestee(const cs::Sequence seq, bool& alreadyRequested);
     ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
     ConnectionPtr getConnectionByNumber(const std::size_t number);
     ConnectionPtr getRandomNeighbour();
     cs::Sequence getConnectionLastSequence(const std::size_t number);
 
-    std::unique_lock< std::mutex > getNeighboursLock() const;
+    auto getNeighboursLock() const {
+        return nh_.getNeighboursLock();
+    }
+
+    bool isShouldUpdateNeighbours() const;
+    bool isShouldPending(Connection* connection) const;
 
     // thread safe negihbours methods
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);
     void forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> func);
-    bool forRandomNeighbour(std::function<void(ConnectionPtr)> func);
 
     // no thread safe
     const Connections getNeighbours() const;
     const Connections getNeighboursWithoutSS() const;
 
-    void syncReplied(const cs::Sequence seq);
     bool isPingDone();
-    void resetNeighbours();
+
+    bool requireStartNode() const;
 
 public signals:
     PingSignal pingReceived;
-
-public slots:
-    void onConfigChanged(const Config& updated, const Config& previous);
+    cs::Action mainThreadIterated;
 
 private:
+    void addMyOut(const uint8_t initFlagValue = 0);
+    void formRegPack(uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t uuid);
+    void formSSConnectPack(const cs::PublicKey& pk, uint64_t uuid);
+
     void registerTask(Packet* pack, const uint32_t packNum, const bool);
     void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
 
@@ -206,13 +201,13 @@ private:
     bool gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
     bool gotPing(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+    bool gotSSIntroduceConsensusReply();
 
     void askForMissingPackages();
     void requestMissing(const cs::Hash&, const uint16_t, const uint64_t);
 
     /* Actions */
     bool good_;
-    Config config_;
 
     static const uint32_t maxPacksQueue_ = 2048;
     static const uint32_t maxRemoteNodes_ = 4096;
@@ -284,6 +279,9 @@ private:
     FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, fragmentsFixedMapSize_> fragOnRound_;
 
     std::atomic_bool sendLarge_ = false;
+
+    cs::SpinLock aLock_{ATOMIC_FLAG_INIT};
+    std::map<cs::PublicKey, EndpointData> addresses_;
 
 public:
     inline static size_t cntDirtyAllocs = 0;

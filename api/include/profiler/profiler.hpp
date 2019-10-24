@@ -11,8 +11,16 @@
 #include <mutex>
 #include <condition_variable>
 
+#ifdef _MSC_VER
+#pragma warning(push, 0)
+#endif
+
 #include <boost/lockfree/spsc_queue.hpp>
 #include <boost/circular_buffer.hpp>
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 namespace cs {
 // you can use user defined formatter, args are:
