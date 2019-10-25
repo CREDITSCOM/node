@@ -59,7 +59,7 @@ public:
         uint64_t transNum_ = 0;
         csdb::TransactionID lastTransaction_;
 #ifdef MONITOR_NODE
-        uint64_t createTime_ = 0;        
+        uint64_t createTime_ = 0;
 #endif
     };
 
@@ -92,8 +92,7 @@ private:
 };
 
 using WalletUpdateSignal = cs::Signal<void(const PublicKey&, const WalletsCache::WalletData&)>;
-using FinishedUpdateFromDB =
-    cs::Signal<void(const std::unordered_map<PublicKey, WalletsCache::WalletData>&)>;
+using FinishedUpdateFromDB = cs::Signal<void(const std::unordered_map<PublicKey, WalletsCache::WalletData>&)>;
 
 class WalletsCache::Updater {
 public:

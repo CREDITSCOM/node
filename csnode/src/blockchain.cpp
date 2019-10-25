@@ -109,6 +109,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , walletIds_(new WalletsIds)
 , walletsCacheStorage_(new WalletsCache(*walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
+, multiWallets_(new MultiWallets())
 , cacheMutex_()
 , recreateIndex_(recreateIndex) {
     cs::Connector::connect(&storage_.readingStartedEvent(), this, &BlockChain::onStartReadFromDB);
@@ -120,9 +121,15 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
     }
 
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
-    cs::Connector::connect(
-            &storage_.readingStoppedEvent(), walletsCacheUpdater_.get(),
-            &WalletsCache::Updater::onStopReadingFromDB);
+
+    cs::Connector::connect(&storage_.readingStoppedEvent(), walletsCacheUpdater_.get(), &WalletsCache::Updater::onStopReadingFromDB);
+
+#ifdef MONITOR_NODE
+    cs::Connector::connect(&walletsCacheUpdater_->updateFromDBFinishedEvent, multiWallets_.get(), &MultiWallets::onDbReadFinished);
+    cs::Connector::connect(&walletsCacheUpdater_->updateFromDBFinishedEvent, [this] (const auto&) {
+        cs::Connector::connect(&walletsCacheUpdater_->walletUpdateEvent, multiWallets_.get(), &MultiWallets::onWalletCacheUpdated);
+    });
+#endif
 
     blockHashes_ = std::make_unique<cs::BlockHashes>(cachesPath);
 }
@@ -1674,8 +1681,12 @@ std::pair<cs::Sequence, uint32_t> BlockChain::getPreviousNonEmptyBlock(cs::Seque
     return std::pair<cs::Sequence, uint32_t>(cs::kWrongSequence, 0);
 }
 
-cs::Sequence BlockChain::getLastSeq() const{
+cs::Sequence BlockChain::getLastSeq() const {
     return lastSequence_;
+}
+
+const MultiWallets& BlockChain::multiWallets() const {
+    return *(multiWallets_.get());
 }
 
 void BlockChain::setBlocksToBeRemoved(cs::Sequence number) {

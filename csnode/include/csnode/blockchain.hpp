@@ -19,7 +19,7 @@
 
 #include <csdb/internal/types.hpp>
 #include <csnode/nodecore.hpp>
-#include <csnode/walletscache.hpp>
+#include <csnode/multiwallets.hpp>
 #include <csnode/walletsids.hpp>
 #include <csnode/walletspools.hpp>
 #include <roundpackage.hpp>
@@ -139,6 +139,8 @@ public:
     bool updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom);
     bool deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool);
     cs::Sequence getLastSeq() const;
+
+    const cs::MultiWallets& multiWallets() const;
 
     /**
      * @fn    std::size_t BlockChain::getCachedBlocksSize() const;
@@ -332,6 +334,8 @@ private:
     std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
     std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
     std::unique_ptr<cs::WalletsPools> walletsPools_;
+    std::unique_ptr<cs::MultiWallets> multiWallets_;
+
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
     uint64_t total_transactions_count_ = 0;
