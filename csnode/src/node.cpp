@@ -765,18 +765,18 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
 
 void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& hashes, const cs::RoundNumber round) {
     const auto msgType = MsgTypes::TransactionsPacketRequest;
-    const auto neighboursCount = transport_->getNeighboursCount();
 
     bool successRequest = false;
 
-    for (std::size_t i = 0; i < neighboursCount; ++i) {
-        ConnectionPtr connection = transport_->getConnectionByNumber(i);
-
-        if (connection) {
-            successRequest = true;
-            sendToNeighbour(connection, msgType, round, hashes);
+    auto f = [this, &successRequest, msgType, round, &hashes](const ConnectionPtr neighbour) -> bool {
+        if (neighbour) {
+          successRequest = true;
+          sendToNeighbour(neighbour, msgType, round, hashes);
         }
-    }
+        return !successRequest;
+    };
+
+    transport_->forEachNeighbour(f);
 
     if (!successRequest) {
         csdebug() << "NODE> Send broadcast hashes request, no neigbours";
