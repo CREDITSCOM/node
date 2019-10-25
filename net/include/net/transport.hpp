@@ -181,10 +181,6 @@ private:
     cs::SpinLock oLock_{ATOMIC_FLAG_INIT};
     cs::OPackStream oPackStream_;
 
-    // SS Data
-    SSBootstrapStatus ssStatus_ = SSBootstrapStatus::Empty;
-    ip::udp::endpoint ssEp_;
-
     // Registration data
     Packet regPack_;
     uint64_t* regPackConnId_;

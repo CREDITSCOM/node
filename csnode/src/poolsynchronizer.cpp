@@ -408,7 +408,7 @@ void cs::PoolSynchronizer::sendBlock(const NeighboursSetElemet& neighbour) {
     }
 
     cslog() << "SYNC: requesting for " << sequences.size() << " blocks [" << sequences.front() << ", " << sequences.back()
-        << "] from " << target->getOut() << ", repeat " << packet;
+        << ", repeat " << packet;
 
     emit sendRequest(target, sequences, packet);
 }
@@ -623,16 +623,6 @@ void cs::PoolSynchronizer::refreshNeighbours() {
             auto& item = *(neighbours_.begin() + static_cast<std::ptrdiff_t>(i));
             ConnectionPtr neighbour = transport_->getConnectionByNumber(connectionNumber);
 
-            if (neighbour->isSignal) {
-                ++connectionNumber;
-
-                if (connectionNumber >= neededNeighboursCount) {
-                    break;
-                }
-
-                neighbour = transport_->getConnectionByNumber(connectionNumber);
-            }
-
             item.setIndex(uint8_t(connectionNumber));
             item.setPublicKey(neighbour->key);
         }
@@ -650,7 +640,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
 
             ConnectionPtr neighbour = transport_->getConnectionByNumber(connectionNumber);
 
-            if (neighbour && !neighbour->isSignal && neighbour->lastSeq) {
+            if (neighbour && neighbour->lastSeq) {
                 auto isAlreadyHave = std::find_if(neighbours_.begin(), neighbours_.end(), [=](const auto& el) { return size_t(el.index()) == connectionNumber; });
 
                 if (isAlreadyHave == neighbours_.end()) {
@@ -679,7 +669,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
 
         ConnectionPtr neighbour = transport_->getConnectionByNumber(connectionNumber);
 
-        if (neighbour && !neighbour->isSignal) {
+        if (neighbour) {
             neighbours_[currentNh].setIndex(uint8_t(connectionNumber));
             neighbours_[currentNh].setPublicKey(neighbour->key);
             ++currentNh;
@@ -762,7 +752,7 @@ void cs::PoolSynchronizer::printNeighbours(const std::string& funcName) const {
         ConnectionPtr target = getConnection(neighbour);
 
         if (target) {
-            csmeta(csdebug) << funcName << " Neighbour: " << target->getOut() << ", " << neighbour;
+            csmeta(csdebug) << funcName << " Neighbour: " << neighbour;
         }
         else {
             csmeta(csdebug) << funcName << " Neighbour index: " << neighbour.index() << ", does not contained in transport. Neighbours сount: " << transport_->getNeighboursCount()

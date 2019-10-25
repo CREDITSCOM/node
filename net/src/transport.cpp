@@ -590,7 +590,7 @@ void Transport::sendRegistrationRequest(Connection& conn) {
 }
 
 void Transport::sendRegistrationConfirmation(const Connection& conn, const Connection::Id requestedId) {
-    cslog() << "Confirming registration with " << conn.getOut();
+//    cslog() << "Confirming registration with " << conn.getOut();
 
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
@@ -601,7 +601,7 @@ void Transport::sendRegistrationConfirmation(const Connection& conn, const Conne
 }
 
 void Transport::sendRegistrationRefusal(const Connection& conn, const RegistrationRefuseReasons reason) {
-    cslog() << "Refusing registration with " << conn.in << " reason: " << parseRefusalReason(reason);
+//    cslog() << "Refusing registration with " << conn.in << " reason: " << parseRefusalReason(reason);
 
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
@@ -624,7 +624,6 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
     }
 
     Connection conn;
-    conn.in = task->sender;
     conn.version = version;
 
     auto& flags = iPackStream_.peek<uint8_t>();
@@ -632,27 +631,14 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
     if (flags & RegFlags::RedirectIP) {
         boost::asio::ip::address addr;
         iPackStream_ >> addr;
-
-        conn.out.address(addr);
-        conn.specialOut = true;
     }
     else {
-        conn.specialOut = false;
         iPackStream_.skip<uint8_t>();
     }
 
     if (flags & RegFlags::RedirectPort) {
         Port port = Port();
         iPackStream_ >> port;
-
-        if (!conn.specialOut) {
-            conn.specialOut = true;
-            conn.out.address(task->sender.address());
-        }
-        conn.out.port(port);
-    }
-    else if (conn.specialOut) {
-        conn.out.port(task->sender.port());
     }
 
     if (version < config_->getMinCompatibleVersion()) {

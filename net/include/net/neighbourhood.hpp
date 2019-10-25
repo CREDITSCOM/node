@@ -2,22 +2,11 @@
 #ifndef NEIGHBOURHOOD_HPP
 #define NEIGHBOURHOOD_HPP
 
-#include <deque>
-
-#include <boost/asio.hpp>
-
 #include <lib/system/allocators.hpp>
 #include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
 
 #include "packet.hpp"
-
-namespace ip = boost::asio::ip;
-
-class Network;
-class Transport;
-
-class BlockChain;
 
 const uint32_t MaxMessagesToKeep = 128;
 const uint32_t MaxResendTimes =
@@ -64,22 +53,12 @@ struct Connection {
     , lastPacketsCount(rhs.lastPacketsCount)
     , attempts(rhs.attempts)
     , key(rhs.key)
-    , in(std::move(rhs.in))
-    , specialOut(rhs.specialOut)
-    , out(std::move(rhs.out))
     , node(std::move(rhs.node))
-    , isSignal(rhs.isSignal)
     , connected(rhs.connected)
-    , msgRels(std::move(rhs.msgRels)) {
-    }
+    , msgRels(std::move(rhs.msgRels)) {}
 
     Connection(const Connection&) = delete;
-    ~Connection() {
-    }
-
-    const ip::udp::endpoint& getOut() const {
-        return specialOut ? out : in;
-    }
+    ~Connection() {}
 
     Id id = 0;
     cs::Version version = 0;
@@ -91,14 +70,8 @@ struct Connection {
     uint32_t attempts = 0;
 
     cs::PublicKey key;
-    ip::udp::endpoint in;
-
-    bool specialOut = false;
-    ip::udp::endpoint out;
-
     RemoteNodePtr node;
 
-    bool isSignal = false;
     bool connected = false;
 
     struct MsgRel {
@@ -111,8 +84,7 @@ struct Connection {
     cs::Sequence lastSeq = 0;
 
     bool operator!=(const Connection& rhs) const {
-        return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out) ||
-               version != rhs.version;
+        return id != rhs.id || key != rhs.key || version != rhs.version;
     }
 };
 
@@ -126,7 +98,5 @@ public:
     const static uint32_t MaxNeighbours = 256;
     const static uint32_t MinNeighbours = 3;
     const static uint32_t MaxConnectAttempts = 64;
-
 };
-
 #endif  // NEIGHBOURHOOD_HPP

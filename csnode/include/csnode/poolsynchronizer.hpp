@@ -16,6 +16,7 @@
 #include <config.hpp>
 
 class Node;
+class Transport;
 
 namespace cs {
 using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, std::size_t packet)>;
