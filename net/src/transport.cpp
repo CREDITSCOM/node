@@ -72,7 +72,6 @@ static std::string parseRefusalReason(RegistrationRefuseReasons reason) {
 
 Transport::Transport(const Config& config, Node* node)
 : config_(config)
-, remoteNodes_(maxRemoteNodes_ + 1)
 , myPublicKey_(node->getNodeIdKey())
 , oLock_()
 , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())

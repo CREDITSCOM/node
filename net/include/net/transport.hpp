@@ -2,7 +2,6 @@
 #ifndef TRANSPORT_HPP
 #define TRANSPORT_HPP
 
-#include <boost/asio.hpp>
 #include <csignal>
 #include <atomic>
 
@@ -163,13 +162,6 @@ private:
     bool good_;
     cs::LockFreeChanger<Config> config_;
 
-    static const uint32_t maxPacksQueue_ = 2048;
-    static const uint32_t maxRemoteNodes_ = 4096;
-
-    TypedAllocator<RemoteNode> remoteNodes_;
-
-    FixedHashMap<ip::udp::endpoint, RemoteNodePtr, uint16_t, maxRemoteNodes_> remoteNodesMap_;
-
     RegionAllocator netPacksAllocator_;
     cs::PublicKey myPublicKey_;
 
@@ -206,6 +198,7 @@ private:
 
     cs::Sequence maxBlock_ = 0;
     cs::Sequence maxBlockCount_;
+    std::deque<ConnectionPtr> neighbours_;
 
     Node* node_;
 };
