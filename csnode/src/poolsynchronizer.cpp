@@ -140,7 +140,6 @@ void cs::PoolSynchronizer::syncLastPool() {
     ConnectionPtr connection;
 
     {
-        auto lock = transport_->getNeighboursLock();
         auto neighbours = transport_->getNeighboursWithoutSS();
 
         auto iterator = std::find_if(std::begin(neighbours), std::end(neighbours), [lastWrittenSequence](const auto& neighobur) {

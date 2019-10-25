@@ -17,8 +17,6 @@
 #include <lib/system/signals.hpp>
 #include <lib/system/lockfreechanger.hpp>
 
-#include <net/network.hpp>
-
 #include "neighbourhood.hpp"
 #include "packet.hpp"
 #include "pacmans.hpp"
@@ -80,7 +78,7 @@ class Node;
 class Transport {
 public:
     explicit Transport(const Config& config, Node* node);
-    ~Transport();
+    ~Transport() {}
 
     void run();
 
@@ -91,8 +89,6 @@ public:
     }
 
     static const char* networkCommandToString(NetworkCommand command);
-
-    RemoteNodePtr getPackSenderEntry(const ip::udp::endpoint&);
 
     void processNetworkTask(const TaskPtr<IPacMan>&, RemoteNodePtr&);
     void processNodeMessage(const Message&);
@@ -106,37 +102,12 @@ public:
         return good_;
     }
 
-    bool isOwnNodeTrusted() const;
-
-    void sendBroadcast(const Packet* pack) {
-        nh_.sendByNeighbours(pack);
-    }
-
-    bool sendDirect(const Packet*, const Connection&);
-    bool sendDirectToSock(Packet*, const Connection&);
     void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
     void deliverBroadcast(const Packet*, const uint32_t);
     void deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
     bool checkConfidants(const std::vector<cs::PublicKey>& list, int except = -1);
 
-    void gotPacket(const Packet&, RemoteNodePtr&);
-    void redirectPacket(const Packet&, RemoteNodePtr&, bool resend = true);
-    bool shouldSendPacket(const Packet&);
-
-    void refillNeighbourhood();
     void processPostponed(const cs::RoundNumber);
-
-    void sendRegistrationRequest(Connection&);
-    void sendRegistrationConfirmation(const Connection&, const Connection::Id);
-    void sendRegistrationRefusal(const Connection&, const RegistrationRefuseReasons);
-    void sendPackRenounce(const cs::Hash&, const Connection&);
-    void sendPackInform(const Packet&, const Connection&);
-    void sendPackInform(const Packet& pack, RemoteNodePtr&);
-    void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys);
-
-    void sendPingPack(const Connection&);
-
-    void registerMessage(MessagePtr);
 
     // neighbours interface
     uint32_t getNeighboursCount();
@@ -144,27 +115,13 @@ public:
     uint32_t getMaxNeighbours() const;
     ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
     ConnectionPtr getConnectionByNumber(const std::size_t number);
-    ConnectionPtr getRandomNeighbour();
     cs::Sequence getConnectionLastSequence(const std::size_t number);
-
-    auto getNeighboursLock() const {
-        return nh_.getNeighboursLock();
-    }
-
-    bool isShouldUpdateNeighbours() const;
-    bool isShouldPending(Connection* connection) const;
-
-    // thread safe negihbours methods
-    void forEachNeighbour(std::function<void(ConnectionPtr)> func);
-    void forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> func);
 
     // no thread safe
     const Connections getNeighbours() const;
     const Connections getNeighboursWithoutSS() const;
 
-    bool isPingDone();
-
-    bool requireStartNode() const;
+    void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}
 
 public signals:
     PingSignal pingReceived;
@@ -174,6 +131,11 @@ public slots:
     void onConfigChanged(const Config& updated);
 
 private:
+    bool shouldSendPacket(const Packet& pack);
+    void sendRegistrationRequest(Connection& conn);
+    void sendRegistrationConfirmation(const Connection& conn, const Connection::Id requestedId);
+    void sendRegistrationRefusal(const Connection& conn, const RegistrationRefuseReasons reason);
+    void sendPingPack(const Connection& conn);
     void addMyOut(const uint8_t initFlagValue = 0);
     void formRegPack(uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t uuid);
     void formSSConnectPack(const cs::PublicKey& pk, uint64_t uuid);
@@ -193,15 +155,6 @@ private:
 
     bool gotRegistrationRefusal(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
-    bool gotSSRegistration(const TaskPtr<IPacMan>&, RemoteNodePtr&);
-    bool gotSSReRegistration();
-    bool gotSSRefusal(const TaskPtr<IPacMan>&);
-    bool gotSSDispatch(const TaskPtr<IPacMan>&);
-    bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&);
-    bool gotSSLastBlock(const TaskPtr<IPacMan>&, cs::Sequence, const csdb::PoolHash&, bool canBeTrusted);
-    bool gotSSNewFriends();
-    bool gotSSUpdateServer();
-
     bool gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr&);
     bool gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr&);
     bool gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr&);
@@ -209,25 +162,12 @@ private:
     bool gotPing(const TaskPtr<IPacMan>&, RemoteNodePtr&);
     bool gotSSIntroduceConsensusReply();
 
-    void askForMissingPackages();
-    void requestMissing(const cs::Hash&, const uint16_t, const uint64_t);
-
     /* Actions */
     bool good_;
     cs::LockFreeChanger<Config> config_;
 
     static const uint32_t maxPacksQueue_ = 2048;
     static const uint32_t maxRemoteNodes_ = 4096;
-
-    cs::SpinLock sendPacksFlag_{ATOMIC_FLAG_INIT};
-
-    struct PackSendTask {
-        Packet pack;
-        uint32_t resendTimes = 0;
-        bool incrementId;
-    };
-
-    FixedCircularBuffer<PackSendTask, maxPacksQueue_> sendPacks_;
 
     TypedAllocator<RemoteNode> remoteNodes_;
 
@@ -271,29 +211,9 @@ private:
     static constexpr uint32_t posponedPointerBufferSize_ = 2;
     PPBuf* postponed_[posponedPointerBufferSize_] = {&postponedPacketsFirst_, &postponedPacketsSecond_};
 
-    cs::SpinLock uLock_{ATOMIC_FLAG_INIT};
-    FixedCircularBuffer<MessagePtr, PacketCollector::MaxParallelCollections> uncollected_;
-
     cs::Sequence maxBlock_ = 0;
     cs::Sequence maxBlockCount_;
 
-    Network* net_;
     Node* node_;
-
-    Neighbourhood nh_;
-
-    static constexpr uint32_t fragmentsFixedMapSize_ = 10000;
-    FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, fragmentsFixedMapSize_> fragOnRound_;
-
-    std::atomic_bool sendLarge_ = false;
-
-    cs::SpinLock aLock_{ATOMIC_FLAG_INIT};
-    std::map<cs::PublicKey, EndpointData> addresses_;
-
-public:
-    inline static size_t cntDirtyAllocs = 0;
-    inline static size_t cntCorruptedFragments = 0;
-    inline static size_t cntExtraLargeNotSent = 0;
 };
-
 #endif  // TRANSPORT_HPP

@@ -1354,7 +1354,6 @@ void Node::writeDefaultStream(Args&&... args) {
 
 template <typename... Args>
 bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    auto lock = transport_->getNeighboursLock();
     Connections connections = transport_->getNeighboursWithoutSS();
 
     if (connections.empty()) {
@@ -2841,10 +2840,6 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     cslog() << s;
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
     cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq()) << ", neighbours = " << transport_->getNeighboursCount();
-
-    if (Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 || Transport::cntExtraLargeNotSent > 0) {
-        cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments << " / " << Transport::cntExtraLargeNotSent;
-    }
 
     std::ostringstream line2;
 
