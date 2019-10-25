@@ -1353,19 +1353,6 @@ void Node::writeDefaultStream(Args&&... args) {
 }
 
 template <typename... Args>
-bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    Connections connections = transport_->getNeighboursWithoutSS();
-
-    if (connections.empty()) {
-        return false;
-    }
-
-    for (auto connection : connections) {
-        sendToNeighbour(connection, msgType, round, std::forward<Args>(args)...);
-    }
-}
-
-template <typename... Args>
 void Node::sendToBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
     ostream_ << msgType << round;
 

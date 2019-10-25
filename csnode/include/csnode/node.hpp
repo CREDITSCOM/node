@@ -338,10 +338,6 @@ private:
     template <class... Args>
     void sendToSingle(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
-    // to neighbours
-    template <typename... Args>
-    bool sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
     // broadcast
     template <class... Args>
     void sendToBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
