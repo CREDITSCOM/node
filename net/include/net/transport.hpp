@@ -111,15 +111,12 @@ public:
 
     // neighbours interface
     uint32_t getNeighboursCount();
-    uint32_t getNeighboursCountWithoutSS();
     uint32_t getMaxNeighbours() const;
     ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
     ConnectionPtr getConnectionByNumber(const std::size_t number);
     cs::Sequence getConnectionLastSequence(const std::size_t number);
 
-    // no thread safe
-    const Connections getNeighbours() const;
-    const Connections getNeighboursWithoutSS() const;
+    void forEachNeighbour(std::function<bool(const ConnectionPtr)>) {}
 
     void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}
 

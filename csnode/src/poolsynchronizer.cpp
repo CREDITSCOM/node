@@ -137,26 +137,16 @@ void cs::PoolSynchronizer::syncLastPool() {
     }
 
     auto lastWrittenSequence = blockChain_->getLastSeq();
-    ConnectionPtr connection;
 
-    {
-        auto neighbours = transport_->getNeighboursWithoutSS();
-
-        auto iterator = std::find_if(std::begin(neighbours), std::end(neighbours), [lastWrittenSequence](const auto& neighobur) {
-            return neighobur->lastSeq > lastWrittenSequence;
-        });
-
-        if (iterator != std::end(neighbours)) {
-            connection = *iterator;
+    auto f = [this, lastWrittenSequence](const ConnectionPtr neighbour) -> bool {
+        if (!neighbour.isNull() && neighbour->lastSeq > lastWrittenSequence) {
+            isSyncroStarted_ = true;
+            emit sendRequest(neighbour, PoolsRequestedSequences { lastWrittenSequence + 1}, 0);
+            return false;
         }
-    }
-
-    if (connection.isNull()) {
-        return;
-    }
-
-    isSyncroStarted_ = true;
-    emit sendRequest(connection, PoolsRequestedSequences { lastWrittenSequence + 1}, 0);
+        return true;
+    };
+    transport_->forEachNeighbour(f);
 }
 
 void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_t packetNum) {
@@ -588,16 +578,14 @@ void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, c
 }
 
 void cs::PoolSynchronizer::refreshNeighbours() {
-    const size_t neededNeighboursCount = transport_->getNeighboursCountWithoutSS();
+    const size_t neededNeighboursCount = transport_->getNeighboursCount();
     const size_t nSize = neighbours_.size();
 
     if (nSize == neededNeighboursCount) {
         return;
     }
 
-    csmeta(csdetails) << "Neighbours count without ss: " << static_cast<int>(neededNeighboursCount);
-
-    const size_t allNeighboursCount = transport_->getNeighboursCount();
+    csmeta(csdetails) << "Neighbours count without: " << static_cast<int>(neededNeighboursCount);
 
     // 1) sort neighbours by lastSeq descending
     std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>> sortBySeqDesc;
@@ -628,7 +616,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
         }
 
         // add new neighbors
-        for (size_t i = nSize; i < allNeighboursCount; ++i) {
+        for (size_t i = nSize; i < neededNeighboursCount; ++i) {
             // get the i-th connection with max sequence
             size_t connectionNumber = i;
 
@@ -657,7 +645,7 @@ void cs::PoolSynchronizer::refreshNeighbours() {
     std::multimap<cs::Sequence, size_t, std::greater<cs::Sequence>>::const_iterator it = sortBySeqDesc.cbegin();
     std::size_t currentNh = 0;
 
-    for (size_t i = 0; i < allNeighboursCount; ++i) {
+    for (size_t i = 0; i < neededNeighboursCount; ++i) {
         // get the i-th connection with max sequence
         size_t connectionNumber = i;
 

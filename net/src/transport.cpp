@@ -479,10 +479,6 @@ uint32_t Transport::getNeighboursCount() {
     return 0;
 }
 
-uint32_t Transport::getNeighboursCountWithoutSS() {
-    return 0;
-}
-
 uint32_t Transport::getMaxNeighbours() const {
     return config_->getMaxNeighbours();
 }
@@ -506,16 +502,6 @@ cs::Sequence Transport::getConnectionLastSequence(const std::size_t number) {
 /*bool Transport::isShouldUpdateNeighbours() const {
     return nh_.getNeighboursCountWithoutSS() < config_->getMinNeighbours();
 }*/
-
-const Connections Transport::getNeighbours() const {
-    return Connections{};
-//    return nh_.getNeigbours();
-}
-
-const Connections Transport::getNeighboursWithoutSS() const {
-    return Connections{};
-//    return nh_.getNeighboursWithoutSS();
-}
 
 void Transport::onConfigChanged(const Config& updated) {
     config_.exchange(updated);
