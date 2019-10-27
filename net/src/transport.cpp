@@ -736,7 +736,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
         case MsgTypes::ThirdStageRequest:
             return node_->getStageRequest(type, data, size, firstPack.getSender());
         case MsgTypes::ThirdStage:
-            return node_->getStageThree(data, size);
+            return node_->getStageThree(data, size, firstPack.getSender());
         case MsgTypes::FirstSmartStage:
             return node_->getSmartStageOne(data, size, rNum, firstPack.getSender());
         case MsgTypes::SecondSmartStage:

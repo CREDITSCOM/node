@@ -1543,7 +1543,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     csmeta(csdetails) << "done";
 }
 
-void Node::getStageThree(const uint8_t* data, const size_t size) {
+void Node::getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
     csmeta(csdetails);
 
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
@@ -1567,7 +1567,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     istream_ >> bytes;
 
     if (!istream_.good() || !istream_.end()) {
-        cserror() << "NODE> Bad stage-3 packet format";
+        cserror() << "NODE> Bad stage-3 packet format. Packet received from: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
         return;
     }
 
@@ -1666,7 +1666,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
     }
 
     if (!istream_.good() || !istream_.end()) {
-        cserror() << "Bad StageThree packet format";
+        cserror() << "Bad StageRequest packet format";
         return;
     }
 
