@@ -346,7 +346,10 @@ bool Transport::checkConfidants(const std::vector<cs::PublicKey>& list, int exce
     int i = 0;
     for (const auto& pkey: list) {
         if (i++ == except) continue;
-        if (addresses_.find(pkey) == end) return false;
+        if (addresses_.find(pkey) == end) {
+            csdebug() << "Transport> Confidant " << cs::Utils::byteStreamToHex(pkey.data(), pkey.size()) << " not found";
+            return false;
+        }
     }
     return true;
 }

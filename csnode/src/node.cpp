@@ -1360,9 +1360,8 @@ void Node::sendToBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber ro
 
     writeDefaultStream(std::forward<Args>(args)...);
 
-    csdetails() << "NODE> Sending broadcast data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
+    csdebug() << "NODE> Sending broadcast data: size: " << ostream_.getCurrentSize() << ", round: " << round
                 << ", msgType: " << Packet::messageTypeToString(msgType);
-
     transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
     ostream_.clear();
 }
@@ -1527,7 +1526,6 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 }
 
 void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
-
     csdebug() << __func__;
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -1571,6 +1569,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
         return;
     }
 
+
     cs::DataStream stream(bytes.data(), bytes.size());
     stream >> stage.sender;
     stream >> stage.writer;
@@ -1591,7 +1590,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
     }
 
     if (stage.iteration < solver_->currentStage3iteration()) {
-        stageRequest(MsgTypes::ThirdStage, myConfidantIndex_, stage.sender, solver_->currentStage3iteration());
+        stageRequest(MsgTypes::ThirdStageRequest, stage.sender, myConfidantIndex_, solver_->currentStage3iteration());
         return;
     }
     else if (stage.iteration > solver_->currentStage3iteration()) {
@@ -1619,6 +1618,16 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, 
     csdebug() << __func__;
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
         cswarning() << "NODE> Only confidant nodes can request consensus stages";
+        return;
+    }
+
+    switch (msgType) {
+    case MsgTypes::FirstStageRequest:
+    case MsgTypes::SecondStageRequest:
+    case MsgTypes::ThirdStageRequest:
+        break;
+    default:
+        csdebug() << "NODE: illegal call to method, ignore";
         return;
     }
 
