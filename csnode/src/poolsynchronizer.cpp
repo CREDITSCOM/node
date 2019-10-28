@@ -138,8 +138,8 @@ void cs::PoolSynchronizer::syncLastPool() {
 
     auto lastWrittenSequence = blockChain_->getLastSeq();
 
-    auto f = [this, lastWrittenSequence](const ConnectionPtr neighbour) -> bool {
-        if (!neighbour.isNull() && neighbour->lastSeq > lastWrittenSequence) {
+    auto f = [this, lastWrittenSequence](const PublicKey& neighbour) -> bool {
+        if (transport_->getNeighbourLastSequence(neighbour) > lastWrittenSequence) {
             isSyncroStarted_ = true;
             emit sendRequest(neighbour, PoolsRequestedSequences { lastWrittenSequence + 1}, 0);
             return false;
@@ -380,9 +380,9 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType counterType) {
 }
 
 void cs::PoolSynchronizer::sendBlock(const NeighboursSetElemet& neighbour) {
-    ConnectionPtr target = getConnection(neighbour);
+    auto& target = getPublicKey(neighbour);
 
-    if (!target) {
+    if (!transport_->hasNeighbour(target)) {
         csmeta(cserror) << "Target is not valid";
         return;
     }
@@ -725,21 +725,15 @@ void cs::PoolSynchronizer::synchroFinished() {
     csmeta(csdebug) << "Synchro finished";
 }
 
-ConnectionPtr cs::PoolSynchronizer::getConnection(const NeighboursSetElemet& neighbour) const {
-    ConnectionPtr target = transport_->getConnectionByKey(neighbour.publicKey());
-
-    if (!target) {
-        target = transport_->getConnectionByNumber(neighbour.index());
-    }
-
-    return target;
+const cs::PublicKey& cs::PoolSynchronizer::getPublicKey(const NeighboursSetElemet& neighbour) const {
+    return neighbour.publicKey();
 }
 
 void cs::PoolSynchronizer::printNeighbours(const std::string& funcName) const {
     for (const auto& neighbour : neighbours_) {
-        ConnectionPtr target = getConnection(neighbour);
+        auto& target = getPublicKey(neighbour);
 
-        if (target) {
+        if (transport_->hasNeighbour(target)) {
             csmeta(csdebug) << funcName << " Neighbour: " << neighbour;
         }
         else {

@@ -19,7 +19,7 @@ class Node;
 class Transport;
 
 namespace cs {
-using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, std::size_t packet)>;
+using PoolSynchronizerRequestSignal = cs::Signal<void(const PublicKey& target, const PoolsRequestedSequences& sequences, std::size_t packet)>;
 
 class PoolSynchronizer {
 public:
@@ -82,7 +82,7 @@ private:
 
     void synchroFinished();
 
-    ConnectionPtr getConnection(const NeighboursSetElemet& neighbour) const;
+    const PublicKey& getPublicKey(const NeighboursSetElemet& neighbour) const;
 
     void printNeighbours(const std::string& funcName) const;
 

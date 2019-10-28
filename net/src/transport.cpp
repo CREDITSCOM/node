@@ -150,7 +150,7 @@ uint16_t getHashIndex(const ip::udp::endpoint& ep) {
     return result;
 }
 
-void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {}
+void Transport::deliverDirect(const Packet* pack, const uint32_t size, const cs::PublicKey& target) {}
 
 void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {}
 
@@ -480,10 +480,6 @@ uint32_t Transport::getNeighboursCount() {
 
 uint32_t Transport::getMaxNeighbours() const {
     return config_->getMaxNeighbours();
-}
-
-ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
-    return ConnectionPtr();
 }
 
 ConnectionPtr Transport::getConnectionByNumber(const std::size_t number) {

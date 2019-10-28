@@ -768,11 +768,9 @@ void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& has
 
     bool successRequest = false;
 
-    auto f = [this, &successRequest, msgType, round, &hashes](const ConnectionPtr neighbour) -> bool {
-        if (neighbour) {
-          successRequest = true;
-          sendToNeighbour(neighbour, msgType, round, hashes);
-        }
+    auto f = [this, &successRequest, msgType, round, &hashes](const cs::PublicKey& neighbour) -> bool {
+        successRequest = true;
+        sendToNeighbour(neighbour, msgType, round, hashes);
         return !successRequest;
     };
 
@@ -1037,7 +1035,7 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     point = now;
 }
 
-void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packetNum) {
+void Node::sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences, std::size_t packetNum) {
     const auto round = cs::Conveyer::instance().currentRoundNumber();
     csmeta(csdetails) << "Target out(): " << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
                       << ", round: " << round;
@@ -1264,27 +1262,20 @@ void Node::sendToTargetBroadcast(const cs::PublicKey& target, const MsgTypes msg
 
 template <typename... Args>
 bool Node::sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    ConnectionPtr connection = transport_->getConnectionByKey(target);
+    if (transport_->hasNeighbour(target)) {
+        ostream_.init(BaseFlags::Direct | /*| BaseFlags::Fragmented*/ BaseFlags::Compressed);
+        ostream_ << msgType << round;
 
-    if (connection) {
-        sendToNeighbour(connection, msgType, round, std::forward<Args>(args)...);
+        writeDefaultStream(std::forward<Args>(args)...);
+
+        csdetails() << "NODE> Sending Direct data: packets count: " << ostream_.getPacketsCount() << ", last packet size: " << ostream_.getCurrentSize()
+                    << ", msgType: " << Packet::messageTypeToString(msgType);
+
+        transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
+        ostream_.clear();
+        return true;
     }
-
-    return static_cast<bool>(connection);
-}
-
-template <typename... Args>
-void Node::sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    ostream_.init(BaseFlags::Direct | /*| BaseFlags::Fragmented*/ BaseFlags::Compressed);
-    ostream_ << msgType << round;
-
-    writeDefaultStream(std::forward<Args>(args)...);
-
-    csdetails() << "NODE> Sending Direct data: packets count: " << ostream_.getPacketsCount() << ", last packet size: " << ostream_.getCurrentSize()
-                << ", msgType: " << Packet::messageTypeToString(msgType);
-
-    transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
-    ostream_.clear();
+    return false;
 }
 
 template <class... Args>

@@ -101,7 +101,7 @@ public:
         return good_;
     }
 
-    void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
+    void deliverDirect(const Packet*, const uint32_t, const cs::PublicKey&);
     void deliverBroadcast(const Packet*, const uint32_t);
     void deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
     bool checkConfidants(const std::vector<cs::PublicKey>& list, int except = -1);
@@ -111,11 +111,12 @@ public:
     // neighbours interface
     uint32_t getNeighboursCount();
     uint32_t getMaxNeighbours() const;
-    ConnectionPtr getConnectionByKey(const cs::PublicKey& pk);
     ConnectionPtr getConnectionByNumber(const std::size_t number);
     cs::Sequence getConnectionLastSequence(const std::size_t number);
 
-    void forEachNeighbour(std::function<bool(const ConnectionPtr)>) {}
+    void forEachNeighbour(std::function<bool(const cs::PublicKey&)>) {}
+    bool hasNeighbour(const cs::PublicKey&) { return false; }
+    cs::Sequence getNeighbourLastSequence(const cs::PublicKey&) { return 1; }
 
     void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}
 

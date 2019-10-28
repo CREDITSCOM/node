@@ -287,7 +287,7 @@ public slots:
     void processTimer();
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
     void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
-    void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
+    void sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
     void validateBlock(csdb::Pool block, bool* shouldStop);
     void onRoundTimeElapsed();
 
@@ -318,9 +318,6 @@ private:
     // to neighbour
     template <typename... Args>
     bool sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    template <typename... Args>
-    void sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     template <class... Args>
     void tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
