@@ -109,7 +109,7 @@ public:
 
     void getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
     void getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
-    void getStageThree(const uint8_t* data, const size_t size);
+    void getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
     void adjustStageThreeStorage();
     void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, uint8_t iteration);

@@ -1329,9 +1329,8 @@ void Node::sendToBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber ro
 
     writeDefaultStream(std::forward<Args>(args)...);
 
-    csdetails() << "NODE> Sending broadcast data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
+    csdebug() << "NODE> Sending broadcast data: size: " << ostream_.getCurrentSize() << ", round: " << round
                 << ", msgType: " << Packet::messageTypeToString(msgType);
-
     transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
     ostream_.clear();
 }
@@ -1496,7 +1495,6 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 }
 
 void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
-
     csdebug() << __func__;
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -1512,7 +1510,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     csmeta(csdetails) << "done";
 }
 
-void Node::getStageThree(const uint8_t* data, const size_t size) {
+void Node::getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
     csmeta(csdetails);
 
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
@@ -1536,9 +1534,10 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     istream_ >> bytes;
 
     if (!istream_.good() || !istream_.end()) {
-        cserror() << "NODE> Bad stage-3 packet format";
+        cserror() << "NODE> Bad stage-3 packet format. Packet received from: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
         return;
     }
+
 
     cs::DataStream stream(bytes.data(), bytes.size());
     stream >> stage.sender;
@@ -1560,7 +1559,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     }
 
     if (stage.iteration < solver_->currentStage3iteration()) {
-        stageRequest(MsgTypes::ThirdStage, myConfidantIndex_, stage.sender, solver_->currentStage3iteration());
+        stageRequest(MsgTypes::ThirdStageRequest, stage.sender, myConfidantIndex_, solver_->currentStage3iteration());
         return;
     }
     else if (stage.iteration > solver_->currentStage3iteration()) {
@@ -1588,6 +1587,16 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, 
     csdebug() << __func__;
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
         cswarning() << "NODE> Only confidant nodes can request consensus stages";
+        return;
+    }
+
+    switch (msgType) {
+    case MsgTypes::FirstStageRequest:
+    case MsgTypes::SecondStageRequest:
+    case MsgTypes::ThirdStageRequest:
+        break;
+    default:
+        csdebug() << "NODE: illegal call to method, ignore";
         return;
     }
 
@@ -1635,7 +1644,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
     }
 
     if (!istream_.good() || !istream_.end()) {
-        cserror() << "Bad StageThree packet format";
+        cserror() << "Bad StageRequest packet format";
         return;
     }
 

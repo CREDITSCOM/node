@@ -242,7 +242,7 @@ void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required, uint8
     // const auto ptr = find_stage3(required);
 
     for (auto& it : stageThreeStorage) {
-        if (it.iteration == iteration && it.sender == requester) {
+        if (it.iteration == iteration && it.sender == required) {
             pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester, it.messageBytes);
             return;
         }
