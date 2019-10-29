@@ -379,7 +379,12 @@ public:
     }
 
     bool is_payable_call(const csdb::Transaction& t) {
+        if (SmartContracts::is_smart_contract(t)) {
+            return false;
+        }
+
         cs::Lock lock(public_access_lock);
+
         return is_payable_target(t);
     }
 
