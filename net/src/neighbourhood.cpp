@@ -397,7 +397,9 @@ Connections Neighbourhood::getNeighboursWithoutSS() const {
     Connections connections;
     connections.reserve(neighbours_.size());
 
-    std::copy_if(std::begin(neighbours_), std::end(neighbours_), std::back_inserter(connections), [&](const ConnectionPtr neighbour) { return (!neighbour->isSignal); });
+    std::copy_if(std::begin(neighbours_), std::end(neighbours_), std::back_inserter(connections), [&](const ConnectionPtr neighbour) {
+        return (!neighbour->isSignal);
+    });
 
     return connections;
 }
