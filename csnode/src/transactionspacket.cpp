@@ -20,7 +20,7 @@ TransactionsPacketHash TransactionsPacketHash::fromString(const ::std::string& s
     const cs::Bytes hash = ::csdb::internal::from_hex(str);
 
     if (::csdb::priv::crypto::hash_size == hash.size()) {
-        res.m_bytes = hash;
+        res.bytes_ = hash;
     }
 
     return res;
@@ -31,7 +31,7 @@ TransactionsPacketHash TransactionsPacketHash::fromBinary(const cs::Bytes& data)
     TransactionsPacketHash hash;
 
     if (::csdb::priv::crypto::hash_size == size) {
-        hash.m_bytes = data;
+        hash.bytes_ = data;
     }
 
     return hash;
@@ -42,7 +42,7 @@ TransactionsPacketHash TransactionsPacketHash::fromBinary(cs::Bytes&& data) {
     TransactionsPacketHash hash;
 
     if (::csdb::priv::crypto::hash_size == size) {
-        hash.m_bytes = std::move(data);
+        hash.bytes_ = std::move(data);
     }
 
     return hash;
@@ -50,7 +50,7 @@ TransactionsPacketHash TransactionsPacketHash::fromBinary(cs::Bytes&& data) {
 
 TransactionsPacketHash TransactionsPacketHash::calcFromData(const cs::Bytes& data) {
     TransactionsPacketHash resHash;
-    resHash.m_bytes = ::csdb::priv::crypto::calc_hash(data);
+    resHash.bytes_ = ::csdb::priv::crypto::calc_hash(data);
     return resHash;
 }
 
@@ -59,23 +59,23 @@ TransactionsPacketHash TransactionsPacketHash::calcFromData(const cs::Bytes& dat
 //
 
 bool TransactionsPacketHash::isEmpty() const noexcept {
-    return m_bytes.empty();
+    return bytes_.empty();
 }
 
 size_t TransactionsPacketHash::size() const noexcept {
-    return m_bytes.size();
+    return bytes_.size();
 }
 
 std::string TransactionsPacketHash::toString() const noexcept {
-    return csdb::internal::to_hex(m_bytes.begin(), m_bytes.end());
+    return csdb::internal::to_hex(bytes_.begin(), bytes_.end());
 }
 
 const cs::Bytes& TransactionsPacketHash::toBinary() const noexcept {
-    return m_bytes;
+    return bytes_;
 }
 
 bool TransactionsPacketHash::operator==(const TransactionsPacketHash& other) const noexcept {
-    return m_bytes == other.m_bytes;
+    return bytes_ == other.bytes_;
 }
 
 bool TransactionsPacketHash::operator!=(const TransactionsPacketHash& other) const noexcept {
@@ -83,7 +83,7 @@ bool TransactionsPacketHash::operator!=(const TransactionsPacketHash& other) con
 }
 
 bool TransactionsPacketHash::operator<(const TransactionsPacketHash& other) const noexcept {
-    return m_bytes < other.m_bytes;
+    return bytes_ < other.bytes_;
 }
 
 //
@@ -108,12 +108,12 @@ TransactionsPacket TransactionsPacket::fromByteStream(const char* data, size_t s
 }
 
 TransactionsPacket::TransactionsPacket(TransactionsPacket&& packet)
-: m_hash(std::move(packet.m_hash))
-, m_transactions(std::move(packet.m_transactions))
-, m_stateTransactions(std::move(packet.m_stateTransactions))
-, m_signatures(std::move(packet.m_signatures)) {
-    packet.m_hash = TransactionsPacketHash();
-    packet.m_transactions.clear();
+: hash_(std::move(packet.hash_))
+, transactions_(std::move(packet.transactions_))
+, stateTransactions_(std::move(packet.stateTransactions_))
+, signatures_(std::move(packet.signatures_)) {
+    packet.hash_ = TransactionsPacketHash();
+    packet.transactions_.clear();
 }
 
 TransactionsPacket& TransactionsPacket::operator=(const TransactionsPacket& packet) {
@@ -121,10 +121,10 @@ TransactionsPacket& TransactionsPacket::operator=(const TransactionsPacket& pack
         return *this;
     }
 
-    m_hash = packet.m_hash;
-    m_transactions = packet.m_transactions;
-    m_signatures = packet.m_signatures;
-    m_stateTransactions = packet.m_stateTransactions;
+    hash_ = packet.hash_;
+    transactions_ = packet.transactions_;
+    signatures_ = packet.signatures_;
+    stateTransactions_ = packet.stateTransactions_;
 
     return *this;
 }
@@ -143,22 +143,22 @@ bool TransactionsPacket::makeHash() {
     bool isEmpty = isHashEmpty();
 
     if (isEmpty) {
-        m_hash = TransactionsPacketHash::calcFromData(toBinary(Serialization::Transactions));
+        hash_ = TransactionsPacketHash::calcFromData(toBinary(Serialization::Transactions));
     }
 
     return isEmpty;
 }
 
 bool TransactionsPacket::isHashEmpty() const noexcept {
-    return m_hash.isEmpty();
+    return hash_.isEmpty();
 }
 
 const TransactionsPacketHash& TransactionsPacket::hash() const noexcept {
-    return m_hash;
+    return hash_;
 }
 
 size_t TransactionsPacket::transactionsCount() const noexcept {
-    return m_transactions.size();
+    return transactions_.size();
 }
 
 bool TransactionsPacket::addTransaction(const csdb::Transaction& transaction) {
@@ -166,7 +166,7 @@ bool TransactionsPacket::addTransaction(const csdb::Transaction& transaction) {
         return false;
     }
 
-    m_transactions.push_back(transaction);
+    transactions_.push_back(transaction);
     return true;
 }
 
@@ -175,39 +175,91 @@ bool TransactionsPacket::addStateTransaction(const csdb::Transaction& transactio
         return false;
     }
 
-    m_stateTransactions.push_back(transaction);
+    stateTransactions_.push_back(transaction);
     return true;
 }
 
 bool TransactionsPacket::addSignature(const cs::Byte index, const cs::Signature& signature) {
-    auto iter = std::find_if(m_signatures.begin(), m_signatures.end(), [&](const auto& element) { return index == element.first; });
+    auto iter = std::find_if(signatures_.begin(), signatures_.end(), [&](const auto& element) {
+        return index == element.first;
+    });
 
-    if (iter != m_signatures.end()) {
+    if (iter != signatures_.end()) {
         return false;
     }
 
-    m_signatures.push_back(std::make_pair(index, signature));
+    signatures_.push_back(std::make_pair(index, signature));
     return true;
 }
 
+bool TransactionsPacket::sign(const cs::PrivateKey& privKey) {
+    if (signatures_.size() > 0) {
+        return false;
+    }
+
+    if (isHashEmpty()) {
+        return false;
+    }
+
+    signatures_.push_back(std::make_pair(cs::Byte(0), cscrypto::generateSignature(privKey, hash_.toBinary().data(), hash_.toBinary().size())));
+    return true;
+}
+
+bool TransactionsPacket::verify(const cs::PublicKey& publicKey) {
+    if (isHashEmpty()) {
+        return false;
+    }
+
+    if (signatures_.size() != 1) {
+        return false;
+    }
+
+    return cscrypto::verifySignature(signatures_.back().second.data(), publicKey.data(), hash_.toBinary().data(), hash_.toBinary().size());
+}
+
+bool TransactionsPacket::verify(const std::vector<cs::PublicKey>& publicKeys) {
+    if (isHashEmpty()) {
+        return false;
+    }
+
+    if (signatures_.size() < 3) {
+        return false;
+    }
+
+    size_t count = 0;
+
+    for (auto it : signatures_) {
+        if (it.first < publicKeys.size()) {
+            if (cscrypto::verifySignature(it.second.data(), publicKeys[it.first].data(), hash_.toBinary().data(), hash_.toBinary().size())) {
+                ++count;
+            }
+        }
+        else {
+            return false;
+        }
+    }
+
+    return count > publicKeys.size() / 2;
+}
+
 const cs::BlockSignatures& TransactionsPacket::signatures() const noexcept {
-    return m_signatures;
+    return signatures_;
 }
 
 const std::vector<csdb::Transaction>& TransactionsPacket::transactions() const noexcept {
-    return m_transactions;
+    return transactions_;
 }
 
 const std::vector<csdb::Transaction>& TransactionsPacket::stateTransactions() const noexcept {
-    return m_stateTransactions;
+    return stateTransactions_;
 }
 
 std::vector<csdb::Transaction>& TransactionsPacket::transactions() {
-    return m_transactions;
+    return transactions_;
 }
 
 void TransactionsPacket::clear() noexcept {
-    m_transactions.clear();
+    transactions_.clear();
 }
 
 //
@@ -216,25 +268,25 @@ void TransactionsPacket::clear() noexcept {
 
 void TransactionsPacket::put(::csdb::priv::obstream& os, Serialization options) const {
     if (options & Serialization::Transactions) {
-        os.put(m_transactions.size());
+        os.put(transactions_.size());
 
-        for (const auto& it : m_transactions) {
+        for (const auto& it : transactions_) {
             os.put(it);
         }
     }
 
     if (options & Serialization::States) {
-        os.put(m_stateTransactions.size());
+        os.put(stateTransactions_.size());
 
-        for (const auto& state : m_stateTransactions) {
+        for (const auto& state : stateTransactions_) {
             os.put(state);
         }
     }
 
     if (options & Serialization::Signatures) {
-        os.put(m_signatures.size());
+        os.put(signatures_.size());
 
-        for (const auto& it : m_signatures) {
+        for (const auto& it : signatures_) {
             os.put(it.first);
             os.put(it.second);
         }
@@ -248,8 +300,8 @@ bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
         return false;
     }
 
-    m_transactions.clear();
-    m_transactions.reserve(transactionsCount);
+    transactions_.clear();
+    transactions_.reserve(transactionsCount);
 
     for (std::size_t i = 0; i < transactionsCount; ++i) {
         csdb::Transaction transaction;
@@ -258,14 +310,14 @@ bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
             return false;
         }
 
-        m_transactions.push_back(transaction);
+        transactions_.push_back(transaction);
     }
 
     std::size_t statesCount = 0;
 
     if (is.get(statesCount)) {
-        m_stateTransactions.clear();
-        m_stateTransactions.reserve(statesCount);
+        stateTransactions_.clear();
+        stateTransactions_.reserve(statesCount);
 
         for (std::size_t i = 0; i < statesCount; ++i) {
             csdb::Transaction state;
@@ -274,15 +326,15 @@ bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
                 return false;
             }
 
-            m_stateTransactions.push_back(state);
+            stateTransactions_.push_back(state);
         }
     }
 
     std::size_t signaturesCount = 0;
 
     if (is.get(signaturesCount)) {
-        m_signatures.clear();
-        m_signatures.reserve(signaturesCount);
+        signatures_.clear();
+        signatures_.reserve(signaturesCount);
 
         for (std::size_t i = 0; i < signaturesCount; ++i) {
             cs::Byte index;
@@ -296,7 +348,7 @@ bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
                 return false;
             }
 
-            m_signatures.push_back(std::make_pair(index, signature));
+            signatures_.push_back(std::make_pair(index, signature));
         }
     }
 

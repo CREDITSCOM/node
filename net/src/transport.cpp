@@ -723,7 +723,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
         case MsgTypes::HashReply:
             return node_->getHashReply(data, size, rNum, firstPack.getSender());
         case MsgTypes::TransactionPacket:
-            return node_->getTransactionsPacket(data, size);
+            return node_->getTransactionsPacket(data, size, firstPack.getSender());
         case MsgTypes::TransactionsPacketRequest:
             return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::TransactionsPacketReply:
