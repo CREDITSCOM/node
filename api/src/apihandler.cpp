@@ -843,7 +843,8 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
         return;
     }
 
-    if(!transaction.__isset.smartContract && !solver_.smart_contracts().is_known_smart_contract(BlockChain::getAddressFromKey(transaction.target)))
+    auto dbTransaction = makeTransaction(transaction);
+    if(!transaction.__isset.smartContract && !solver_.smart_contracts().is_payable_call(dbTransaction))
         dumb_transaction_flow(_return, transaction);
     else
         smart_transaction_flow(_return, transaction);
