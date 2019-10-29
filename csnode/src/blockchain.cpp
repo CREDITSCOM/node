@@ -12,93 +12,17 @@
 #include <csnode/fee.hpp>
 #include <csnode/nodeutils.hpp>
 #include <csnode/node.hpp>
+#include <csnode/transactionsindex.hpp>
 #include <csnode/transactionsiterator.hpp>
 #include <solver/smartcontracts.hpp>
 
 #include <boost/filesystem.hpp>
-#include <boost/iostreams/device/mapped_file.hpp>
 
 using namespace cs;
 namespace fs = boost::filesystem;
 
 namespace {
 const char* cachesPath = "./caches";
-const std::string lastIndexedPath = std::string(cachesPath) + "/last_indexed";
-cs::Sequence lastIndexedPool;
-
-using FileSource = boost::iostreams::mapped_file_source;
-using FileSink = boost::iostreams::mapped_file_sink;
-
-template <class BoostMMapedFile>
-class MMappedFileWrap {
-public:
-    MMappedFileWrap(const std::string& path,
-            size_t maxSize = boost::iostreams::mapped_file::max_length,
-            bool createNew = true) {
-        try {
-            if (!createNew) {
-                file_.open(path, maxSize);
-            }
-            else {
-                boost::iostreams::mapped_file_params params;
-                params.path = path;
-                params.new_file_size = maxSize;
-                file_.open(params);
-            }
-        }
-        catch (std::exception& e) {
-            cserror() << e.what();
-        }
-        catch (...) {
-            cserror() << __FILE__ << ", "
-                      << __LINE__
-                      << " exception ...";
-        }
-    }
-
-    bool isOpen() {
-        return file_.is_open();
-    }
-
-    ~MMappedFileWrap() {
-        if (isOpen()) {
-            file_.close();
-        }
-    }
-
-    template<typename T>
-    T* data() {
-        return isOpen() ? (T*)file_.data() : nullptr;
-    }
-
-private:
-    BoostMMapedFile file_;
-};
-
-inline void checkLastIndFile(bool& recreateIndex) {
-    fs::path p(lastIndexedPath);
-    if (!fs::is_regular_file(p)) {
-        recreateIndex = true;
-        return;
-    }
-    MMappedFileWrap<FileSource> f(lastIndexedPath, sizeof(cs::Sequence), false);
-    if (!f.isOpen()) {
-        recreateIndex = true; 
-        return;
-    }
-    lastIndexedPool = *(f.data<const cs::Sequence>());
-    if (lastIndexedPool == kWrongSequence) {
-      recreateIndex = true;
-    }
-}
-
-inline void updateLastIndFile() {
-    static MMappedFileWrap<FileSink> f(lastIndexedPath, sizeof(cs::Sequence));
-    auto ptr = f.data<cs::Sequence>();
-    if (ptr) {
-        *ptr = lastIndexedPool;
-    }
-}
 } // namespace
 
 BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress, bool recreateIndex)
@@ -110,18 +34,21 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , walletsCacheStorage_(new WalletsCache(*walletIds_))
 , walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , multiWallets_(new MultiWallets())
-, cacheMutex_()
-, recreateIndex_(recreateIndex) {
-    cs::Connector::connect(&storage_.readingStartedEvent(), this, &BlockChain::onStartReadFromDB);
-    cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
-
+, cacheMutex_() {
     createCachesPath();
-    if (!recreateIndex_) {
-        checkLastIndFile(recreateIndex_);
-    }
 
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
+    blockHashes_ = std::make_unique<cs::BlockHashes>(cachesPath);
+    trxIndex_ = std::make_unique<cs::TransactionsIndex>(*this, cachesPath, recreateIndex);
 
+    cs::Connector::connect(&storage_.readingStartedEvent(), trxIndex_.get(), &TransactionsIndex::onStartReadFromDb);
+    cs::Connector::connect(&storage_.readingStartedEvent(), this, &BlockChain::onStartReadFromDB);
+
+    // the order of two following calls matters
+    cs::Connector::connect(&storage_.readBlockEvent(), trxIndex_.get(), &TransactionsIndex::onReadFromDb);
+    cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
+
+    cs::Connector::connect(&storage_.readingStoppedEvent(), trxIndex_.get(), &TransactionsIndex::onDbReadFinished);
     cs::Connector::connect(&storage_.readingStoppedEvent(), walletsCacheUpdater_.get(), &WalletsCache::Updater::onStopReadingFromDB);
 
 #ifdef MONITOR_NODE
@@ -130,14 +57,13 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
         cs::Connector::connect(&walletsCacheUpdater_->walletUpdateEvent, multiWallets_.get(), &MultiWallets::onWalletCacheUpdated);
     });
 #endif
-
-    blockHashes_ = std::make_unique<cs::BlockHashes>(cachesPath);
 }
 
-BlockChain::~BlockChain() {
-}
+BlockChain::~BlockChain() {}
 
 bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
+    cs::Connector::connect(&this->removeBlockEvent, trxIndex_.get(), &TransactionsIndex::onRemoveBlock);
+
     cslog() << "Trying to open DB...";
 
     size_t totalLoaded = 0;
@@ -175,13 +101,6 @@ bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
         }
     }
 
-    if (recreateIndex_) {
-        recreateIndex_ = false;
-        lapoos.clear();
-        cslog() << "Recreated index 0 -> " << getLastSeq()
-                << ". Continue to keep it actual from new blocks.";
-    }
-
     good_ = true;
     blocksToBeRemoved_ = totalLoaded - 1; // any amount to remave after start
     return true;
@@ -197,9 +116,6 @@ uint64_t BlockChain::uuid() const {
 }
 
 void BlockChain::onStartReadFromDB(cs::Sequence lastWrittenPoolSeq) {
-    if (!recreateIndex_ && lastIndexedPool != lastWrittenPoolSeq) {
-        recreateIndex_ = true;
-    }
     if (lastWrittenPoolSeq > 0) {
         cslog() << "Blockchain: start reading " << WithDelimiters(lastWrittenPoolSeq + 1)
             << " blocks from DB, 0.." << WithDelimiters(lastWrittenPoolSeq);
@@ -209,14 +125,6 @@ void BlockChain::onStartReadFromDB(cs::Sequence lastWrittenPoolSeq) {
 void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
     auto blockSeq = block.sequence();
     lastSequence_ = blockSeq;
-    if (blockSeq == 0 && recreateIndex_) {
-        cs::Lock lock(dbLock_);
-        if (!storage_.truncate_trxs_index()) {
-            cserror() << "Can't truncate trxs index";
-            *shouldStop = true;
-            return;
-        }
-    }
     if (blockSeq == 1) {
         cs::Lock lock(dbLock_);
         uuid_ = uuidFromBlock(block);
@@ -232,12 +140,7 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
             cserror() << "Blockchain: blockHashes_->onReadBlock(block) failed on block #" << block.sequence();
             *shouldStop = true;
         }
-        else {
-            if (recreateIndex_ || lastIndexedPool < block.sequence()) {
-                createTransactionsIndex(block);
-            }
-            updateNonEmptyBlocks(block);
-        }
+        updateNonEmptyBlocks(block);
         walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
     }
 }
@@ -267,46 +170,6 @@ bool BlockChain::postInitFromDB() {
     };
     walletsCacheStorage_->iterateOverWallets(func);
     return true;
-}
-
-void BlockChain::createTransactionsIndex(csdb::Pool& pool) {
-    std::set<csdb::Address> indexedAddrs;
-
-    auto lbd = [&indexedAddrs, &pool, this](const csdb::Address& addr) {
-        auto key = getAddressByType(addr, BlockChain::AddressType::PublicKey);
-        if (indexedAddrs.insert(key).second) {
-            cs::Sequence lapoo;
-            if (recreateIndex_) {
-                auto it = lapoos.find(key);
-                if (it == lapoos.end()) {
-                    lapoo = cs::kWrongSequence;
-                }
-                else {
-                    lapoo = it->second;
-                }
-                lapoos[key] = pool.sequence();
-            }
-            else {
-                lapoo = getLastTransaction(key).pool_seq();
-            }
-            std::lock_guard<decltype(dbLock_)> l(dbLock_);
-            if (!storage_.set_previous_transaction_block(key, pool.sequence(), lapoo)) {
-            // errors in database, or handler has been deleted
-                csdebug() << "Create trx index: can't set_previous_transaction_block"
-                          << " on pool sequence " << pool.sequence();
-                return false;
-            }
-        }
-        return true;
-    };
-
-    for (auto& tr : pool.transactions()) {
-        if (!lbd(tr.source())) return;
-        if (!lbd(tr.target())) return;
-    }
-
-    lastIndexedPool = pool.sequence();
-    updateLastIndFile();
 }
 
 csdb::PoolHash BlockChain::getLastHash() const {
@@ -518,8 +381,11 @@ void BlockChain::removeLastBlock() {
 		removeWalletsInPoolFromCache(pool);
 		// signal all subscribers, transaction index is still consistent up to removed block!
 		emit removeBlockEvent(pool);
-		// erase indexes from the block
-		removeLastBlockFromTrxIndex(pool);
+
+        if (lastNonEmptyBlock_.poolSeq == pool.sequence()) {
+            lastNonEmptyBlock_ = previousNonEmpty_[lastNonEmptyBlock_.poolSeq];
+            previousNonEmpty_.erase(pool.sequence());
+        }
 	}
 
     // to be sure, try to remove both sequence and hash
@@ -531,6 +397,11 @@ void BlockChain::removeLastBlock() {
     csmeta(csdebug) << "done";
 }
 
+void BlockChain::updateLastTransactions(const std::vector<std::pair<cs::PublicKey, csdb::TransactionID>>& updates) {
+    std::lock_guard l(cacheMutex_);
+    walletsCacheUpdater_->updateLastTransactions(updates);
+}
+
 csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
     if (key.size() == kPublicKeyLength) {
         csdb::Address res = csdb::Address::from_public_key(key.data());
@@ -540,52 +411,6 @@ csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
         csdb::internal::WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(key.data());
         csdb::Address res = csdb::Address::from_wallet_id(id);
         return res;
-    }
-}
-
-void BlockChain::removeLastBlockFromTrxIndex(const csdb::Pool& pool) {
-    std::set<csdb::Address> uniqueAddresses;
-    std::vector<std::pair<cs::PublicKey, csdb::TransactionID>> updates;
-
-    auto lbd = [&updates, &uniqueAddresses, this](const csdb::Address& addr, cs::Sequence sq) {
-        auto key = getAddressByType(addr, AddressType::PublicKey);
-
-        if (uniqueAddresses.insert(key).second) {
-            auto it = cs::TransactionsIterator(*this, addr);
-            bool found = false;
-
-            for (; it.isValid(); it.next()) {
-                if (it->id().pool_seq() < sq) {
-                    updates.push_back(std::make_pair(key.public_key(), it->id()));
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                updates.push_back(std::make_pair(key.public_key(),
-                                                 csdb::TransactionID(kWrongSequence, kWrongSequence)));
-            }
-
-            std::lock_guard<decltype(dbLock_)> l(dbLock_);
-            storage_.remove_last_from_trx_index(key, sq);
-        }
-    };
-
-    for (const auto& t : pool.transactions()) {
-        lbd(t.source(), lastIndexedPool);
-        lbd(t.target(), lastIndexedPool);
-    }
-    --lastIndexedPool;
-    updateLastIndFile();
-
-    if (lastNonEmptyBlock_.poolSeq == pool.sequence()) {
-        lastNonEmptyBlock_ = previousNonEmpty_[lastNonEmptyBlock_.poolSeq];
-        previousNonEmpty_.erase(pool.sequence());
-    }
-
-    if (updates.size()) {
-        std::lock_guard l(cacheMutex_);
-        walletsCacheUpdater_->updateLastTransactions(updates);
     }
 }
 
@@ -707,7 +532,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
     }
     // pool signatures check: end
 
-    createTransactionsIndex(pool);
+    trxIndex_->update(pool);
     updateNonEmptyBlocks(pool);
 
     if (!updateFromNextBlock(pool)) {
@@ -1023,11 +848,17 @@ void BlockChain::close() {
     storage_.close();
     cs::Connector::disconnect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     blockHashes_->close();
+    trxIndex_->close();
 }
 
 bool BlockChain::getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const {
-    cs::Lock lock(dbLock_);
-    return storage_.get_from_blockchain(addr, innerId, getLastTransaction(addr).pool_seq(), result);
+    for (auto it = cs::TransactionsIterator(*this, addr); it.isValid(); it.next()) {
+        if (it->innerID() == innerId) {
+            result = *it;
+            return true;
+        }
+    }
+    return false;
 }
 
 bool BlockChain::updateContractData(const csdb::Address& abs_addr, const cs::Bytes& data) const {
@@ -1648,15 +1479,12 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) co
 }
 
 cs::Sequence BlockChain::getPreviousPoolSeq(const csdb::Address& addr, cs::Sequence ps) const {
-    std::lock_guard lock(dbLock_);
-    auto prev_seq = storage_.get_previous_transaction_block(
-            getAddressByType(addr, AddressType::PublicKey), ps);
+    auto prev_seq = trxIndex_->getPrevTransBlock(addr, ps);
 
     if (prev_seq == ps) {
         if (Node::autoShutdownEnabled()) {
             cserror() << "Inconsistent transaction index. Node will be stopped. Please restart it.";
-            lastIndexedPool = kWrongSequence;
-            updateLastIndFile();
+            trxIndex_->invalidate();
             Node::requestStop();
         }
         return kWrongSequence;
