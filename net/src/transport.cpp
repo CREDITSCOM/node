@@ -1307,13 +1307,7 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
 }
 
 
-void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender, bool resend) {
-    sendPackInform(pack, sender);
-
-    if (!resend) {
-        return;
-    }
-
+void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
     if (pack.isDirect()) {
         return;  // Do not redirect packs
     }
@@ -1342,7 +1336,7 @@ void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
     oPackStream_ << NetworkCommand::PackInform << static_cast<cs::Byte>(pack.isDirect()) << pack.getHash();
-    sendDirect(oPackStream_.getPackets(), addr);
+    sendDirectToSock(oPackStream_.getPackets(), addr);
     oPackStream_.clear();
 }
 
