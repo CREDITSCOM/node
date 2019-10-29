@@ -81,7 +81,8 @@ public:
     // incoming requests processing
     void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum);
     void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
-    void getTransactionsPacket(const uint8_t* data, const std::size_t size);
+    bool verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender);
+    void getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
 
     // critical is true if network near to be down, all capable trusted node required

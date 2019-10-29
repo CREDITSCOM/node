@@ -112,6 +112,8 @@ public:
     ///
     void updateRoundTable(cs::RoundNumber cachedRound, const RoundTable& table);
 
+    void setPrivateKey(const cs::PrivateKey & pKey);
+
     ///
     /// @brief Returns current blockchain round table.
     ///
@@ -336,7 +338,7 @@ protected:
 private:
     struct Impl;
     std::unique_ptr<Impl> pimpl_;
-
+    cs::PrivateKey& pKey = cs::PrivateKey{};
     mutable cs::SharedMutex sharedMutex_;
 };
 

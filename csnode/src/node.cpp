@@ -127,14 +127,16 @@ bool Node::init() {
         return false;
     }
 
-    std::cout << "Transport is init\n";
+    std::cout << "Transport is initialized\n";
 
     if (!solver_) {
         return false;
     }
 
-    std::cout << "Solver is init\n";
-    std::cout << "Everything is init\n";
+    std::cout << "Solver is initialized\n";
+
+    cs::Conveyer::instance().setPrivateKey(solver_->getPrivateKey());
+    std::cout << "Initialization finished\n";
 
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
@@ -344,7 +346,57 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
     poolSynchronizer_->sync(rNum);
 }
 
-void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
+bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
+    std::string verb;
+    if (packet.signatures().size() == 1) {
+        if (!packet.verify(sender)) {
+            csdebug() << "NODE> Packet " << packet.hash().toString() << " signature isn't correct";
+            return false;
+        }
+        else {
+            verb = " is Ok";
+        }
+    }
+    else if (packet.signatures().size() > 2) {
+        const csdb::Transaction& tr = packet.transactions().front();
+        if (cs::SmartContracts::is_new_state(tr)) {
+            csdb::UserField fld;
+            fld = tr.user_field(cs::trx_uf::new_state::RefStart);
+            if (fld.is_valid()) {
+                cs::SmartContractRef ref(fld);
+                if (ref.is_valid()) {
+                    cs::RoundNumber smartRound = ref.sequence;
+                    auto& block = getBlockChain().loadBlock(smartRound);
+                    if (!packet.verify(block.confidants())) {
+                        csdebug() << "NODE> Packet " << packet.hash().toString() << " signatures aren't correct";
+                        return false;
+                    }
+                    else {
+                        verb = "s are Ok";
+                    }
+                }
+                else {
+                    return false;
+                }
+            }
+            else {
+                return false;
+            }
+        }
+        else {
+            csdebug() << "NODE> Packet is not possibly correct smart contract packet, throw it";
+            return false;
+        }
+    }
+    else {
+        cswarning() << "NODE> Usually packets can't have " << packet.signatures().size() << " signatures";
+        return false;
+    }
+    csdebug() << "NODE> Packet " << packet.hash().toString() << " signature" << verb;
+    return true;
+}
+
+void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
     istream_.init(data, size);
     cs::TransactionsPacket packet;
     istream_ >> packet;
@@ -353,8 +405,11 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
         cswarning() << "Received transaction packet hash is empty";
         return;
     }
+    
+    if (verifyPacketSignatures(packet, sender)) {
+        processTransactionsPacket(std::move(packet));
+    }
 
-    processTransactionsPacket(std::move(packet));
 }
 
 void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size) {
