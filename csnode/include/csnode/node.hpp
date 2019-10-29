@@ -187,7 +187,7 @@ public:
     // transaction's pack syncro
     void sendTransactionsPacket(const cs::TransactionsPacket& packet);
     void sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::RoundNumber round, uint32_t requestStep);
-    void sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& hashes, const cs::RoundNumber round);
+    void sendPacketHashesRequestToNeighbours(const cs::PacketsHashes& hashes, const cs::RoundNumber round);
     void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target);
 
     // smarts consensus additional functions:

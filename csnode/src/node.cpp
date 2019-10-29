@@ -778,18 +778,7 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
 
     csdebug() << "NODE> Sending packet hashes request: " << hashes.size();
 
-    cs::PublicKey main;
-    const auto msgType = MsgTypes::TransactionsPacketRequest;
-    const auto roundTable = conveyer.roundTable(round);
-
-    // look at main node
-    main = (roundTable != nullptr) ? roundTable->confidants.front(): conveyer.currentRoundTable().confidants.front();
-
-    const bool sendToGeneral = sendToNeighbour(main, msgType, round, hashes);
-
-    if (!sendToGeneral) {
-        sendPacketHashesRequestToRandomNeighbour(hashes, round);
-    }
+    sendPacketHashesRequestToNeighbours(hashes, round);
 
     auto requestClosure = [round, requestStep, this] {
         const cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -806,26 +795,8 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
     cs::Timer::singleShot(static_cast<int>(cs::NeighboursRequestDelay + requestStep), cs::RunPolicy::CallQueuePolicy, requestClosure);
 }
 
-void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& hashes, const cs::RoundNumber round) {
-    const auto msgType = MsgTypes::TransactionsPacketRequest;
-    const auto neighboursCount = transport_->getNeighboursCount();
-
-    bool successRequest = false;
-
-    for (std::size_t i = 0; i < neighboursCount; ++i) {
-        ConnectionPtr connection = transport_->getConnectionByNumber(i);
-
-        if (connection && !connection->isSignal) {
-            successRequest = true;
-            sendToNeighbour(connection, msgType, round, hashes);
-        }
-    }
-
-    if (!successRequest) {
-        csdebug() << "NODE> Send broadcast hashes request, no neigbours";
-        sendToBroadcast(msgType, round, hashes);
-        return;
-    }
+void Node::sendPacketHashesRequestToNeighbours(const cs::PacketsHashes& hashes, const cs::RoundNumber round) {
+    sendToNeighbours(MsgTypes::TransactionsPacketRequest, round, hashes);
 
     csdebug() << "NODE> Send hashes request to all neigbours";
 }
@@ -837,12 +808,8 @@ void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumb
 
     csdebug() << "NODE> Reply transaction packets: " << packets.size();
 
-    const auto msgType = MsgTypes::TransactionsPacketReply;
-    const bool success = sendToNeighbour(target, msgType, round, packets);
-
-    if (!success) {
-        csdebug() << "NODE> Reply transaction packets: failed send to " << cs::Utils::byteStreamToHex(target.data(), target.size()) << ", perform broadcast";
-        sendToTargetBroadcast(target, msgType, round, packets);
+    if (!sendToNeighbour(target, MsgTypes::TransactionsPacketReply, round, packets)) {
+        csdebug() << "NODE> Reply transaction packets: failed send to " << cs::Utils::byteStreamToHex(target.data(), target.size());
     }
 }
 
@@ -1363,12 +1330,12 @@ void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round,
         i = cs::ConfidantConsts::InvalidConfidantIndex;
     }
 
-    sendToList(confidants, (cs::Byte)i, msgType, round, std::forward<Args>(args)...);
+    sendToList(confidants, static_cast<cs::Byte>(i), msgType, round, std::forward<Args>(args)...);
 }
 
 template <class... Args>
 void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    if (!transport_->checkConfidants(listMembers, (int)listExeption)) {
+    if (!transport_->checkConfidants(listMembers, static_cast<int>(listExeption))) {
         sendToBroadcast(msgType, round, std::forward<Args>(args)...);
         return;
     }
@@ -1381,7 +1348,7 @@ void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::B
     csdebug() << "NODE> Sending confidants list data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
                 << ", msgType: " << Packet::messageTypeToString(msgType);
 
-    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount(), listMembers, (int)listExeption);
+    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount(), listMembers, static_cast<int>(listExeption));
     ostream_.clear();
 }
 
@@ -1407,6 +1374,8 @@ bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round,
     for (auto connection : connections) {
         sendToNeighbour(connection, msgType, round, std::forward<Args>(args)...);
     }
+
+    return true;
 }
 
 template <typename... Args>
