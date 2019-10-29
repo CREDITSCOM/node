@@ -419,14 +419,6 @@ std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(con
     return std::nullopt;
 }
 
-bool SmartContracts::is_replenish_contract(const csdb::Transaction& tr) {
-    if (is_smart_contract(tr)) {
-        // must not be deploy/execute/new_state transaction
-        return false;
-    }
-    return in_known_contracts(tr.target());
-}
-
 std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract_impl(const csdb::Transaction& tr) {
     // currently calls to is_***() from this method are prohibited, infinite recursion is possible!
     using namespace trx_uf;

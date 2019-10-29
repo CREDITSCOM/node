@@ -378,6 +378,11 @@ public:
         return is_locked(absolute_address(addr));
     }
 
+    bool is_payable_call(const csdb::Transaction& t) {
+        cs::Lock lock(public_access_lock);
+        return is_payable_target(t);
+    }
+
     bool executionAllowed();
 
     // return true if SmartContracts provide special handling for transaction, so
@@ -676,9 +681,6 @@ private:
 
     // true if target of transaction is smart contract which implements payable() method
     bool is_payable_target(const csdb::Transaction& tr);
-
-    // true if transaction replenishes balance of smart contract
-    bool is_replenish_contract(const csdb::Transaction& tr);
 
     // tests passed list of trusted nodes to contain own node
     bool contains_me(const std::vector<cs::PublicKey>& list) const {

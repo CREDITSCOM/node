@@ -1228,7 +1228,7 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
     }
 
     for (auto& trx : pool.transactions()) {
-        if (is_smart(trx) || is_smart_state(trx)) {
+        if (is_smart(trx) || is_smart_state(trx) || solver_.smart_contracts().is_payable_call(trx)) {
             updateSmartCachesTransaction(trx, pool.sequence());
         }
         else { // if dumb transaction
