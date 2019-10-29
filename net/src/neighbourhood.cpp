@@ -113,6 +113,12 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp, bool separate) {
                     }
                 }
             }
+
+            auto& dp = msgDirects_.tryStore(bp.pack.getHash());
+
+            dp.pack = bp.pack;
+            dp.receiver = nb;
+
             if (!nb->isSignal || send_to_ss) {
                 if (separate) {
                     sent = transport_->sendDirectToSock(&(bp.pack), **nb) || sent;
@@ -683,23 +689,8 @@ void Neighbourhood::neighbourHasPacket(RemoteNodePtr node, const cs::Hash& hash,
         return;
     }
 
-    if (isDirect) {
-        auto& dp = msgDirects_.tryStore(hash);
-        dp.received = true;
-    }
-    else {
-        auto& bp = msgBroads_.tryStore(hash);
-
-        for (auto ptr = bp.receivers; ptr != bp.recEnd; ++ptr) {
-            if (*ptr == conn->id) {
-                return;
-            }
-        }
-
-        if ((bp.recEnd - bp.receivers) < MaxNeighbours) {
-            *(bp.recEnd++) = conn->id;
-        }
-    }
+    auto& dp = msgDirects_.tryStore(hash);
+    dp.received = true;
 }
 
 void Neighbourhood::neighbourSentPacket(RemoteNodePtr node, const cs::Hash& hash) {
@@ -802,7 +793,7 @@ void Neighbourhood::resendPackets() {
 
         bp.data.sentLastTime = false;
     }
-
+/*
     for (auto& dp : msgDirects_) {
         if (!dp.data.pack) {
             continue;
@@ -815,6 +806,7 @@ void Neighbourhood::resendPackets() {
             ++cnt2;
         }
     }
+*/
 }
 
 ConnectionPtr Neighbourhood::getConnection(const RemoteNodePtr node) {

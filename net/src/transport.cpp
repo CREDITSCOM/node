@@ -1336,7 +1336,7 @@ void Transport::sendPackInform(const Packet& pack, const Connection& addr) {
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
     oPackStream_ << NetworkCommand::PackInform << static_cast<cs::Byte>(pack.isDirect()) << pack.getHash();
-    sendDirectToSock(oPackStream_.getPackets(), addr);
+    sendDirect(oPackStream_.getPackets(), addr);
     oPackStream_.clear();
 }
 
