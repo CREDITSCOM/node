@@ -1066,7 +1066,7 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                                                         StateItem& item = known_contracts[req_abs_addr];
                                                         if (!item.ref_cache.is_valid() || item.ref_cache > ref_start) {
                                                             if (dbcache_update(req_abs_addr, ref_start, state, true /*force_update*/)) {
-                                                                csdebug() << kLogPrefix << to_base58(req_abs_addr) << "state is replaced, all future calls will be re-executed";
+                                                                csdebug() << kLogPrefix << to_base58(req_abs_addr) << " state is replaced, all future calls will be re-executed";
                                                                 item.state = state;
                                                                 item.ref_cache = ref_start;
                                                             }
