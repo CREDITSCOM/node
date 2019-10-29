@@ -156,42 +156,52 @@ inline std::ostream& operator <<(std::ostream& os, const csdb::TransactionID& ti
 }
 
 struct SmartContractRef {
-    // block hash
-    csdb::PoolHash hash;
     // block sequence
     cs::Sequence sequence;
     // transaction sequence in block, instead of ID
     size_t transaction;
 
-    SmartContractRef()
-    : sequence(std::numeric_limits<decltype(sequence)>().max())
-    , transaction(std::numeric_limits<decltype(sequence)>().max()) {
+    SmartContractRef() {
+        invalidate();
     }
 
-    SmartContractRef(const csdb::PoolHash block_hash, cs::Sequence block_sequence, size_t transaction_index)
-    : hash(block_hash)
-    , sequence(block_sequence)
-    , transaction(transaction_index) {
+    SmartContractRef(cs::Sequence block_sequence, size_t transaction_index)
+        : sequence(block_sequence)
+        , transaction(transaction_index) {
     }
 
     SmartContractRef(const csdb::UserField& user_field) {
         from_user_field(user_field);
     }
 
-    bool is_valid() const {
-        if (hash.is_empty()) {
-            return false;
+    SmartContractRef(const csdb::TransactionID& tid) {
+        if (tid.is_valid()) {
+            sequence = tid.pool_seq();
+            transaction = tid.index();
         }
-        return (sequence != std::numeric_limits<decltype(sequence)>().max() && transaction != std::numeric_limits<decltype(sequence)>().max() && !hash.is_empty());
+        else {
+            invalidate();
+        }
+    }
+
+    bool is_valid() const {
+        return (sequence != std::numeric_limits<decltype(sequence)>().max() &&
+            transaction != std::numeric_limits<decltype(sequence)>().max());
     }
 
     // "serialization" methods
 
     csdb::UserField to_user_field() const;
+
     void from_user_field(const csdb::UserField& fld);
 
     csdb::TransactionID getTransactionID() const {
         return csdb::TransactionID(sequence, transaction);
+    }
+
+    void invalidate() {
+        sequence = std::numeric_limits<decltype(sequence)>().max();
+        transaction = std::numeric_limits<decltype(sequence)>().max();
     }
 };
 
@@ -201,7 +211,7 @@ inline std::ostream& operator <<(std::ostream& os, const SmartContractRef& ref) 
 }
 
 inline bool operator==(const SmartContractRef& l, const SmartContractRef& r) {
-    return (l.transaction == r.transaction && l.sequence == r.sequence /*&& l.hash == r.hash*/);
+    return (l.transaction == r.transaction && l.sequence == r.sequence);
 }
 
 inline bool operator<(const SmartContractRef& l, const SmartContractRef& r) {
