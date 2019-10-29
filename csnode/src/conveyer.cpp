@@ -202,6 +202,10 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundNumber cachedRound, const cs::R
     setTable(table);
 }
 
+void cs::ConveyerBase::setPrivateKey(const cs::PrivateKey& privKey) {
+    pKey = privKey;
+}
+
 void cs::ConveyerBase::setTable(const RoundTable& table) {
     csmeta(csdebug) << "started";
 
@@ -700,6 +704,8 @@ void cs::ConveyerBase::flushTransactions() {
                     continue;
                 }
             }
+
+            packet.sign(pKey);
 
             emit packetFlushed(packet);
 

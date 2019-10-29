@@ -152,6 +152,12 @@ public:  // Interface
     ///
     bool addSignature(const cs::Byte index, const cs::Signature& signature);
 
+    bool sign(const cs::PrivateKey & privateKey);
+
+    bool verify(const cs::PublicKey & privateKey);
+
+    bool verify(const std::vector<cs::PublicKey>& pubKeys);
+
     ///
     /// @brief Adds transaction to transaction vector
     /// @param transaction Any transaction to add

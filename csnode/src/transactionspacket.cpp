@@ -190,6 +190,72 @@ bool TransactionsPacket::addSignature(const cs::Byte index, const cs::Signature&
     return true;
 }
 
+bool TransactionsPacket::sign(const cs::PrivateKey& privKey) {
+    
+    if (m_signatures.size() > 0) {
+        return false;
+    }
+
+    if (isHashEmpty()) {
+        return false;
+    }
+
+    cs::Signature sig;
+    sig = cscrypto::generateSignature(privKey, m_hash.toBinary().data(), m_hash.toBinary().size());
+
+    m_signatures.push_back(std::make_pair(0U, sig));
+    return true;
+}
+
+bool TransactionsPacket::verify(const cs::PublicKey& pubKey) {
+
+    if (isHashEmpty()) {
+
+        return false;
+    }
+
+    if (m_signatures.size() == 1) {
+        return cscrypto::verifySignature(m_signatures.back().second.data(), pubKey.data(), m_hash.toBinary().data(), m_hash.toBinary().size());
+    }
+    else {
+        return false;
+    }
+}
+
+bool TransactionsPacket::verify(const std::vector<cs::PublicKey>& pubKeys) {
+
+    if (isHashEmpty()) {
+
+        return false;
+    }
+
+    if (m_signatures.size() < 3) {
+        return false;
+    }
+    else  {
+        size_t cnt = 0;
+        for (auto it : m_signatures) {
+            if (it.first < pubKeys.size()) {
+                if (cscrypto::verifySignature(it.second.data(), pubKeys.at(it.first).data(), m_hash.toBinary().data(), m_hash.toBinary().size())) {
+                    ++cnt;
+                }
+            }
+            else {
+                return false;
+            }
+
+        }
+        if (cnt > pubKeys.size() / 2) {
+            return true;
+        }
+        else {
+            return false;
+        }
+
+    }
+
+}
+
 const cs::BlockSignatures& TransactionsPacket::signatures() const noexcept {
     return m_signatures;
 }
