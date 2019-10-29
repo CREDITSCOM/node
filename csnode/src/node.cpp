@@ -723,7 +723,9 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
 
     csdebug() << "NODE> Sending packet hashes request: " << hashes.size();
 
-    sendPacketHashesRequestToNeighbours(hashes, round);
+    if (!sendToNeighbours(MsgTypes::TransactionsPacketRequest, round, hashes)) {
+        cswarning() << csname() << "Can not send packet hashes to neighbours: no neighbours";
+    }
 
     auto requestClosure = [round, requestStep, this] {
         const cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -740,11 +742,6 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
     cs::Timer::singleShot(static_cast<int>(cs::NeighboursRequestDelay + requestStep), cs::RunPolicy::CallQueuePolicy, requestClosure);
 }
 
-void Node::sendPacketHashesRequestToNeighbours(const cs::PacketsHashes& hashes, const cs::RoundNumber round) {
-    sendToNeighbours(MsgTypes::TransactionsPacketRequest, round, hashes);
-
-    csdebug() << "NODE> Send hashes request to all neigbours";
-}
 
 void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target) {
     if (packets.empty()) {
@@ -1309,11 +1306,17 @@ void Node::writeDefaultStream(Args&&... args) {
 
 template <typename... Args>
 bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    auto lock = transport_->getNeighboursLock();
-    Connections connections = transport_->getNeighboursWithoutSS();
+    Connections connections;
 
-    if (connections.empty()) {
-        return false;
+    {
+        auto lock = transport_->getNeighboursLock();
+        auto neighbours = transport_->getNeighboursWithoutSS();
+
+        if (neighbours.empty()) {
+            return false;
+        }
+
+        connections = std::move(neighbours);
     }
 
     for (auto connection : connections) {

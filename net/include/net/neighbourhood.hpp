@@ -172,7 +172,7 @@ public:
     ConnectionPtr getRandomNeighbour();
 
     // uses to iterate connections
-    std::unique_lock< std::mutex > getNeighboursLock() const;
+    std::unique_lock<std::mutex> getNeighboursLock() const;
 
     // thread safe
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);
