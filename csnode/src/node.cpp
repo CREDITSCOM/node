@@ -366,7 +366,7 @@ bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::Publ
                 cs::SmartContractRef ref(fld);
                 if (ref.is_valid()) {
                     cs::RoundNumber smartRound = ref.sequence;
-                    auto& block = getBlockChain().loadBlock(smartRound);
+                    auto block = getBlockChain().loadBlock(smartRound);
                     if (!packet.verify(block.confidants())) {
                         csdebug() << "NODE> Packet " << packet.hash().toString() << " signatures aren't correct";
                         return false;
