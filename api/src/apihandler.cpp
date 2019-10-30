@@ -843,7 +843,8 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
         return;
     }
 
-    if(!transaction.__isset.smartContract && !solver_.smart_contracts().is_known_smart_contract(BlockChain::getAddressFromKey(transaction.target)))
+    auto dbTransaction = makeTransaction(transaction);
+    if(!transaction.__isset.smartContract && !solver_.smart_contracts().is_payable_call(dbTransaction))
         dumb_transaction_flow(_return, transaction);
     else
         smart_transaction_flow(_return, transaction);
@@ -1067,7 +1068,8 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
         csdb::TransactionID trId(scr.sequence, scr.transaction);
         const auto execTrans = solver_.smart_contracts().get_contract_call(trxn);
 
-        csdebug() << "[API]: transaction state writed in blockchain: " << sequence << "." << trxn.innerID();
+        csdebug() << "[API]: state transaction found: " << trxn.id().pool_seq() << '.' << trxn.id().index()
+            << " <- " << execTrans.id().pool_seq() << '.' << execTrans.id().index();
 
         if ((execTrans.is_valid() && is_smart(execTrans)) ||
             execTrans.amount().to_double()) { // payable TODO: maybe > 0 ?
@@ -1091,7 +1093,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 op.state = cs::SmartContracts::is_state_updated(trxn) ? SmartOperation::State::Success : SmartOperation::State::Failed;
                 op.stateTransaction = trxn.id();
 
-                csdebug() << "[API]: status of state transaction(" << sequence << "." << trxn.innerID() << ") is " << static_cast<int>(op.state);
+                csdebug() << "[API]: status of state " << trxn.id().pool_seq() << '.' << trxn.id().index() << " is " << static_cast<int>(op.state);
 
                 auto sp = lockedReference(this->smarts_pending);// std::map<cs::Sequence, std::vector<csdb::TransactionID>>
                 auto seq = execTrans.id().pool_seq();
@@ -1145,7 +1147,8 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                         res.condFlg = true;
                         return res;
                         });
-                    csdebug() << "[API]: sended signal, state trx: " << sequence << "." << trxn.innerID() << ", hash: " << cs::Utils::byteStreamToHex(newHashStr.data(), newHashStr.size());
+                    csdebug() << "[API]: sended signal, state trx: " << trxn.id().pool_seq() << '.' << trxn.id().index()
+                        << ", hash: " << cs::Utils::byteStreamToHex(newHashStr.data(), newHashStr.size());
                 }
             }
 
@@ -1166,7 +1169,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
         }
     }
     else {
-        csdebug() << "[API]: transaction writed in blockchain: " << sequence << "." << trxn.innerID();
+        csdebug() << "[API]: deploy/execute found: " << trxn.id().pool_seq() << '.' << trxn.id().index();
         {
             auto& e = [&]() -> decltype(auto) {
                 auto smartLastTrxn = lockedReference(this->smartLastTrxn_);
@@ -1226,7 +1229,7 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
     }
 
     for (auto& trx : pool.transactions()) {
-        if (is_smart(trx) || is_smart_state(trx)) {
+        if (is_smart(trx) || is_smart_state(trx) || solver_.smart_contracts().is_payable_call(trx)) {
             updateSmartCachesTransaction(trx, pool.sequence());
         }
         else { // if dumb transaction

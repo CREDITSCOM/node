@@ -156,42 +156,52 @@ inline std::ostream& operator <<(std::ostream& os, const csdb::TransactionID& ti
 }
 
 struct SmartContractRef {
-    // block hash
-    csdb::PoolHash hash;
     // block sequence
     cs::Sequence sequence;
     // transaction sequence in block, instead of ID
     size_t transaction;
 
-    SmartContractRef()
-    : sequence(std::numeric_limits<decltype(sequence)>().max())
-    , transaction(std::numeric_limits<decltype(sequence)>().max()) {
+    SmartContractRef() {
+        invalidate();
     }
 
-    SmartContractRef(const csdb::PoolHash block_hash, cs::Sequence block_sequence, size_t transaction_index)
-    : hash(block_hash)
-    , sequence(block_sequence)
-    , transaction(transaction_index) {
+    SmartContractRef(cs::Sequence block_sequence, size_t transaction_index)
+        : sequence(block_sequence)
+        , transaction(transaction_index) {
     }
 
     SmartContractRef(const csdb::UserField& user_field) {
         from_user_field(user_field);
     }
 
-    bool is_valid() const {
-        if (hash.is_empty()) {
-            return false;
+    SmartContractRef(const csdb::TransactionID& tid) {
+        if (tid.is_valid()) {
+            sequence = tid.pool_seq();
+            transaction = tid.index();
         }
-        return (sequence != std::numeric_limits<decltype(sequence)>().max() && transaction != std::numeric_limits<decltype(sequence)>().max() && !hash.is_empty());
+        else {
+            invalidate();
+        }
+    }
+
+    bool is_valid() const {
+        return (sequence != std::numeric_limits<decltype(sequence)>().max() &&
+            transaction != std::numeric_limits<decltype(sequence)>().max());
     }
 
     // "serialization" methods
 
     csdb::UserField to_user_field() const;
+
     void from_user_field(const csdb::UserField& fld);
 
     csdb::TransactionID getTransactionID() const {
         return csdb::TransactionID(sequence, transaction);
+    }
+
+    void invalidate() {
+        sequence = std::numeric_limits<decltype(sequence)>().max();
+        transaction = std::numeric_limits<decltype(sequence)>().max();
     }
 };
 
@@ -201,11 +211,17 @@ inline std::ostream& operator <<(std::ostream& os, const SmartContractRef& ref) 
 }
 
 inline bool operator==(const SmartContractRef& l, const SmartContractRef& r) {
-    return (l.transaction == r.transaction && l.sequence == r.sequence /*&& l.hash == r.hash*/);
+    return (l.transaction == r.transaction && l.sequence == r.sequence);
 }
 
 inline bool operator<(const SmartContractRef& l, const SmartContractRef& r) {
-    if (!l.is_valid() || !r.is_valid()) {
+    if (!l.is_valid()) {
+        // !valid < valid => true
+        // !valid < !valid => false
+        return r.is_valid();
+    }
+    if (!r.is_valid()) {
+        // valid < !valid => false
         return false;
     }
     if (l.sequence < r.sequence) {
@@ -218,7 +234,13 @@ inline bool operator<(const SmartContractRef& l, const SmartContractRef& r) {
 }
 
 inline bool operator>(const SmartContractRef& l, const SmartContractRef& r) {
-    if (!l.is_valid() || !r.is_valid()) {
+    if(!r.is_valid()) {
+        // valid > !valid => true
+        // !valid > !valid => false
+        return l.is_valid();
+    }
+    if (!l.is_valid()) {
+        // !valid > valid => false
         return false;
     }
     return !(l < r) && !(l == r);
@@ -368,6 +390,16 @@ public:
         return is_locked(absolute_address(addr));
     }
 
+    bool is_payable_call(const csdb::Transaction& t) {
+        if (SmartContracts::is_smart_contract(t)) {
+            return false;
+        }
+
+        cs::Lock lock(public_access_lock);
+
+        return is_payable_target(t);
+    }
+
     bool executionAllowed();
 
     // return true if SmartContracts provide special handling for transaction, so
@@ -473,6 +505,8 @@ private:
         SmartContractRef ref_execute;
         // Reference to execution which state is cached in DB
         SmartContractRef ref_cache;
+        // Reference to last state update transaction
+        SmartContractRef ref_state;
         // deploy transaction referenced by ref_deploy
         csdb::Transaction deploy{};
         // the last execute transaction referenced by ref_execute
@@ -666,9 +700,6 @@ private:
 
     // true if target of transaction is smart contract which implements payable() method
     bool is_payable_target(const csdb::Transaction& tr);
-
-    // true if transaction replenishes balance of smart contract
-    bool is_replenish_contract(const csdb::Transaction& tr);
 
     // tests passed list of trusted nodes to contain own node
     bool contains_me(const std::vector<cs::PublicKey>& list) const {

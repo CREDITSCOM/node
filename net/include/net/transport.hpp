@@ -117,7 +117,7 @@ public:
     bool checkConfidants(const std::vector<cs::PublicKey>& list, int except = -1);
 
     void gotPacket(const Packet&, RemoteNodePtr&);
-    void redirectPacket(const Packet&, RemoteNodePtr&, bool resend = true);
+    void redirectPacket(const Packet&, RemoteNodePtr&);
     bool shouldSendPacket(const Packet&);
 
     void refillNeighbourhood();
