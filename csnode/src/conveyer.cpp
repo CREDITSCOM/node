@@ -708,7 +708,9 @@ void cs::ConveyerBase::flushTransactions() {
                 }
             }
 
-            packet.sign(pimpl_->privateKey);
+            if (!packet.sign(pimpl_->privateKey)) {
+                cswarning() << "Can not sign transaction packet";
+            }
 
             emit packetFlushed(packet);
 

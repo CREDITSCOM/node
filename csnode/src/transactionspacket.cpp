@@ -192,7 +192,11 @@ bool TransactionsPacket::addSignature(const cs::Byte index, const cs::Signature&
     return true;
 }
 
-bool TransactionsPacket::sign(const cs::PrivateKey& privKey) {
+bool TransactionsPacket::sign(const cs::PrivateKey& privateKey) {
+    if (!privateKey) {
+        return false;
+    }
+
     if (signatures_.size() > 0) {
         return false;
     }
@@ -201,7 +205,7 @@ bool TransactionsPacket::sign(const cs::PrivateKey& privKey) {
         return false;
     }
 
-    signatures_.push_back(std::make_pair(cs::Byte(0), cscrypto::generateSignature(privKey, hash_.toBinary().data(), hash_.toBinary().size())));
+    signatures_.push_back(std::make_pair(cs::Byte(0), cscrypto::generateSignature(privateKey, hash_.toBinary().data(), hash_.toBinary().size())));
     return true;
 }
 
