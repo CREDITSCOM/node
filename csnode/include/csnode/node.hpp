@@ -81,7 +81,9 @@ public:
     // incoming requests processing
     void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum);
     void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
-    void getTransactionsPacket(const uint8_t* data, const std::size_t size);
+    bool verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender);
+    bool verifyPacketTransactions(cs::TransactionsPacket packet);
+    void getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
 
     // critical is true if network near to be down, all capable trusted node required
@@ -109,7 +111,7 @@ public:
 
     void getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
     void getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
-    void getStageThree(const uint8_t* data, const size_t size);
+    void getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
 
     void adjustStageThreeStorage();
     void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, uint8_t iteration);
@@ -191,7 +193,6 @@ public:
     // transaction's pack syncro
     void sendTransactionsPacket(const cs::TransactionsPacket& packet);
     void sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::RoundNumber round, uint32_t requestStep);
-    void sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& hashes, const cs::RoundNumber round);
     void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target);
 
     // smarts consensus additional functions:

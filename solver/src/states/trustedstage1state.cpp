@@ -180,9 +180,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::Transactio
     if (transactionsCount > 0) {
         characteristic = pValidator_->formCharacteristic(context, packet.transactions(), smartsPackets);
     }
-    for (int i = 0; i < characteristic.mask.size(); ++i) {
-        characteristic.mask[i] = 1U;
-    }
+
     if (characteristic.mask.size() != transactionsCount) {
         cserror() << name() << ": characteristic mask size is not equal to transactions count in build_vector()";
     }

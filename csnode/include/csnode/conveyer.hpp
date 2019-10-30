@@ -47,6 +47,8 @@ public:
         MaxQueueSize = 1000000
     };
 
+    void setPrivateKey(const cs::PrivateKey& privateKey);
+
     ///
     /// @brief Sets cached conveyer round number for utility.
     /// @warning Call this method before setTable method.

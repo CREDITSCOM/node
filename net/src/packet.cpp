@@ -291,6 +291,8 @@ std::ostream& operator<<(std::ostream& os, const Packet& packet) {
         os << Transport::networkCommandToString(static_cast<NetworkCommand>(*data)) << "(" << int(*data) << "), ";
         os << "flags: " << PacketFlags(packet);
         return os;
+    } else {
+        os << "MessageType: " << Packet::messageTypeToString(packet.getType()) << ", ";
     }
 
     if (packet.isFragmented()) {

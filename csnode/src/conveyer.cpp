@@ -44,6 +44,9 @@ struct cs::ConveyerBase::Impl {
     // cached active current round number
     std::atomic<cs::RoundNumber> currentRound = 0;
 
+    // to sign transaction packets
+    cs::PrivateKey privateKey;
+
     // helpers
     const cs::ConveyerMeta* validMeta() &;
 };
@@ -68,6 +71,10 @@ cs::ConveyerBase::ConveyerBase() {
     pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
 
     std::call_once(::onceFlag, &::setup, this);
+}
+
+void cs::ConveyerBase::setPrivateKey(const cs::PrivateKey& privateKey) {
+    pimpl_->privateKey = privateKey;
 }
 
 void cs::ConveyerBase::setRound(cs::RoundNumber round) {
@@ -700,6 +707,8 @@ void cs::ConveyerBase::flushTransactions() {
                     continue;
                 }
             }
+
+            packet.sign(pimpl_->privateKey);
 
             emit packetFlushed(packet);
 

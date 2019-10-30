@@ -843,7 +843,8 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
         return;
     }
 
-    if(!transaction.__isset.smartContract && !solver_.smart_contracts().is_known_smart_contract(BlockChain::getAddressFromKey(transaction.target)))
+    auto dbTransaction = makeTransaction(transaction);
+    if(!transaction.__isset.smartContract && !solver_.smart_contracts().is_payable_call(dbTransaction))
         dumb_transaction_flow(_return, transaction);
     else
         smart_transaction_flow(_return, transaction);
@@ -1067,7 +1068,8 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
         csdb::TransactionID trId(scr.sequence, scr.transaction);
         const auto execTrans = solver_.smart_contracts().get_contract_call(trxn);
 
-        csdebug() << "[API]: transaction state writed in blockchain: " << sequence << "." << trxn.innerID();
+        csdebug() << "[API]: state transaction found: " << trxn.id().pool_seq() << '.' << trxn.id().index()
+            << " <- " << execTrans.id().pool_seq() << '.' << execTrans.id().index();
 
         if ((execTrans.is_valid() && is_smart(execTrans)) ||
             execTrans.amount().to_double()) { // payable TODO: maybe > 0 ?
@@ -1091,7 +1093,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 op.state = cs::SmartContracts::is_state_updated(trxn) ? SmartOperation::State::Success : SmartOperation::State::Failed;
                 op.stateTransaction = trxn.id();
 
-                csdebug() << "[API]: status of state transaction(" << sequence << "." << trxn.innerID() << ") is " << static_cast<int>(op.state);
+                csdebug() << "[API]: status of state " << trxn.id().pool_seq() << '.' << trxn.id().index() << " is " << static_cast<int>(op.state);
 
                 auto sp = lockedReference(this->smarts_pending);// std::map<cs::Sequence, std::vector<csdb::TransactionID>>
                 auto seq = execTrans.id().pool_seq();
@@ -1145,7 +1147,8 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                         res.condFlg = true;
                         return res;
                         });
-                    csdebug() << "[API]: sended signal, state trx: " << sequence << "." << trxn.innerID() << ", hash: " << cs::Utils::byteStreamToHex(newHashStr.data(), newHashStr.size());
+                    csdebug() << "[API]: sended signal, state trx: " << trxn.id().pool_seq() << '.' << trxn.id().index()
+                        << ", hash: " << cs::Utils::byteStreamToHex(newHashStr.data(), newHashStr.size());
                 }
             }
 
@@ -1166,7 +1169,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
         }
     }
     else {
-        csdebug() << "[API]: transaction writed in blockchain: " << sequence << "." << trxn.innerID();
+        csdebug() << "[API]: deploy/execute found: " << trxn.id().pool_seq() << '.' << trxn.id().index();
         {
             auto& e = [&]() -> decltype(auto) {
                 auto smartLastTrxn = lockedReference(this->smartLastTrxn_);
@@ -1226,7 +1229,7 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
     }
 
     for (auto& trx : pool.transactions()) {
-        if (is_smart(trx) || is_smart_state(trx)) {
+        if (is_smart(trx) || is_smart_state(trx) || solver_.smart_contracts().is_payable_call(trx)) {
             updateSmartCachesTransaction(trx, pool.sequence());
         }
         else { // if dumb transaction
@@ -1997,6 +2000,7 @@ void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, i
 }
 
 //////////Wallets
+#ifndef MONITOR_NODE
 typedef std::list<std::pair<const cs::PublicKey*, const cs::WalletsCache::WalletData*>> WCSortedList;
 template <typename T>
 void walletStep(const cs::PublicKey* addr, const cs::WalletsCache::WalletData* wd, const uint64_t num,
@@ -2031,6 +2035,7 @@ void iterateOverWallets(std::function<const T&(const cs::WalletsCache::WalletDat
         return true;
     });
 }
+#endif
 
 void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t _limit, int8_t _ordCol, bool _desc) {
     if (!validatePagination(_return, *this, _offset, _limit)) {
@@ -2039,20 +2044,13 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 
+#ifndef MONITOR_NODE
     WCSortedList lst;
     const uint64_t num = static_cast<uint64_t>(_offset + _limit);
 
     if (_ordCol == 0) {  // Balance
         iterateOverWallets<csdb::Amount>([](const cs::WalletsCache::WalletData& wd) -> const csdb::Amount& { return wd.balance_; }, num, _desc, lst, blockchain_);
     }
-#ifdef MONITOR_NODE
-    else if (_ordCol == 1) {  // TimeReg
-        iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.createTime_; }, num, _desc, lst, blockchain_);
-    }
-    else {  // Tx count
-        iterateOverWallets<uint64_t>([](const cs::WalletsCache::WalletData& wd) -> const uint64_t& { return wd.transNum_; }, num, _desc, lst, blockchain_);
-    }
-#endif
 
     if (lst.size() < static_cast<uint64_t>(_offset)) {
         return;
@@ -2067,13 +2065,37 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
         wi.address = fromByteArray(addr_b);
         wi.balance.integral = ptr->second->balance_.integral();
         wi.balance.fraction = static_cast<int64_t>(ptr->second->balance_.fraction());
-#ifdef MONITOR_NODE
-        wi.transactionsNumber = ptr->second->transNum_;
-        wi.firstTransactionTime = ptr->second->createTime_;
-#endif
 
         _return.wallets.push_back(wi);
     }
+#else
+    const auto& multiWallets = blockchain_.multiWallets();
+    auto order = _desc ? cs::MultiWallets::Order::Greater : cs::MultiWallets::Order::Less;
+    std::vector<cs::MultiWallets::InternalData> result;
+
+    if (_ordCol == 0) {  // Balance
+        result = multiWallets.iterate<cs::MultiWallets::ByBalance>(_offset, _limit, order);
+    }
+    else if (_ordCol == 1) {  // Create time
+        result = multiWallets.iterate<cs::MultiWallets::ByCreateTime>(_offset, _limit, order);
+    }
+    else {  // Transactions count
+        result = multiWallets.iterate<cs::MultiWallets::ByTransactionsCount>(_offset, _limit, order);
+    }
+
+    for (const auto& data : result) {
+        api::WalletInfo wi;
+
+        wi.address = std::string(data.key.begin(), data.key.end());
+        wi.balance.integral = data.balance.integral();
+        wi.balance.fraction = static_cast<int64_t>(data.balance.fraction());
+        wi.transactionsNumber = static_cast<int64_t>(data.transactionsCount);
+        wi.firstTransactionTime = static_cast<int64_t>(data.createTime);
+
+        _return.wallets.push_back(wi);
+    }
+
+#endif
 
     _return.count = static_cast<int32_t>(blockchain_.getWalletsCountWithBalance());
 }

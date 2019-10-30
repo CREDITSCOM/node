@@ -34,6 +34,7 @@
 #include <cscrypto/cscrypto.hpp>
 
 #include <observer.hpp>
+#inclue  <numeric>
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
@@ -127,14 +128,16 @@ bool Node::init() {
         return false;
     }
 
-    std::cout << "Transport is init\n";
+    std::cout << "Transport is initialized\n";
 
     if (!solver_) {
         return false;
     }
 
-    std::cout << "Solver is init\n";
-    std::cout << "Everything is init\n";
+    std::cout << "Solver is initialized\n";
+
+    cs::Conveyer::instance().setPrivateKey(solver_->getPrivateKey());
+    std::cout << "Initialization finished\n";
 
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
@@ -344,7 +347,97 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
     poolSynchronizer_->sync(rNum);
 }
 
-void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
+bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
+    std::string verb;
+    if (packet.signatures().size() == 1) {
+        if (!packet.verify(sender)) {
+            csdebug() << "NODE> Packet " << packet.hash().toString() << " signature isn't correct";
+            return false;
+        }
+        else {
+            verb = " is Ok";
+        }
+    }
+    else if (packet.signatures().size() > 2) {
+        const csdb::Transaction& tr = packet.transactions().front();
+        if (cs::SmartContracts::is_new_state(tr)) {
+            csdb::UserField fld;
+            fld = tr.user_field(cs::trx_uf::new_state::RefStart);
+            if (fld.is_valid()) {
+                cs::SmartContractRef ref(fld);
+                if (ref.is_valid()) {
+                    cs::RoundNumber smartRound = ref.sequence;
+                    auto block = getBlockChain().loadBlock(smartRound);
+                    if (!packet.verify(block.confidants())) {
+                        csdebug() << "NODE> Packet " << packet.hash().toString() << " signatures aren't correct";
+                        return false;
+                    }
+                    else {
+                        verb = "s are Ok";
+                    }
+                }
+                else {
+                    return false;
+                }
+            }
+            else {
+                return false;
+            }
+        }
+        else {
+            csdebug() << "NODE> Packet is not possibly correct smart contract packet, throw it";
+            return false;
+        }
+    }
+    else {
+        cswarning() << "NODE> Usually packets can't have " << packet.signatures().size() << " signatures";
+        return false;
+    }
+    csdebug() << "NODE> Packet " << packet.hash().toString() << " signature" << verb;
+    return true;
+}
+
+bool Node::verifyPacketTransactions(cs::TransactionsPacket packet) {
+    cs::Characteristic characteristic;
+    std::vector<cs::TransactionsPacket> packets;
+    packets.clear();
+    if (packet.signatures == 1) {
+        characteristic = solver_->ownValidation(packet, pakets);
+    }
+    else if (packet.signatures > 2) {
+        packets.push_back(packet);
+        characteristic = solver_->ownValidations(packet, packets);
+    }
+    int sum = std::accumulate(characteristic.mask.begin(), characteristic.mask.end(), 0);
+    if (sum > packet.transactions().size()) {
+        csdebug() << "NODE> Invalid mask obtained";
+        return false;
+    }
+    int cnt = packet.transactions().size();
+    if (sum == cnt) {
+        return true;
+    }
+    else {
+
+        if (cnt > Consensus::AccusalPacketSize) {
+            if (sum < cnt/2) {
+                // put sender to black list
+            }
+            else {
+                // put sender to black list counter
+            }
+        }
+        else {
+            if (sum < cnt / 2) {
+                // put sender to black list counter
+            }
+        }
+
+        return false;
+    }
+}
+
+void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
     istream_.init(data, size);
     cs::TransactionsPacket packet;
     istream_ >> packet;
@@ -353,8 +446,11 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size) {
         cswarning() << "Received transaction packet hash is empty";
         return;
     }
+    
+    if (verifyPacketSignatures(packet, sender) && verifyPacketTransactions(packet)) {
+        processTransactionsPacket(std::move(packet));
+    }
 
-    processTransactionsPacket(std::move(packet));
 }
 
 void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size) {
@@ -660,7 +756,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
 }
 
 void Node::createTestTransaction() {
-    //return;
+    return;
     csdb::Transaction transaction;
 
     std::string strAddr1 = "G2GeLfwjg6XuvoWnZ7ssx9EPkEBqbYL3mw3fusgpzoBk";
@@ -832,17 +928,8 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
 
     csdebug() << "NODE> Sending packet hashes request: " << hashes.size();
 
-    cs::PublicKey main;
-    const auto msgType = MsgTypes::TransactionsPacketRequest;
-    const auto roundTable = conveyer.roundTable(round);
-
-    // look at main node
-    main = (roundTable != nullptr) ? roundTable->confidants.front(): conveyer.currentRoundTable().confidants.front();
-
-    const bool sendToGeneral = sendToNeighbour(main, msgType, round, hashes);
-
-    if (!sendToGeneral) {
-        sendPacketHashesRequestToRandomNeighbour(hashes, round);
+    if (!sendToNeighbours(MsgTypes::TransactionsPacketRequest, round, hashes)) {
+        cswarning() << csname() << "Can not send packet hashes to neighbours: no neighbours";
     }
 
     auto requestClosure = [round, requestStep, this] {
@@ -860,29 +947,6 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
     cs::Timer::singleShot(static_cast<int>(cs::NeighboursRequestDelay + requestStep), cs::RunPolicy::CallQueuePolicy, requestClosure);
 }
 
-void Node::sendPacketHashesRequestToRandomNeighbour(const cs::PacketsHashes& hashes, const cs::RoundNumber round) {
-    const auto msgType = MsgTypes::TransactionsPacketRequest;
-    const auto neighboursCount = transport_->getNeighboursCount();
-
-    bool successRequest = false;
-
-    for (std::size_t i = 0; i < neighboursCount; ++i) {
-        ConnectionPtr connection = transport_->getConnectionByNumber(i);
-
-        if (connection && !connection->isSignal) {
-            successRequest = true;
-            sendToNeighbour(connection, msgType, round, hashes);
-        }
-    }
-
-    if (!successRequest) {
-        csdebug() << "NODE> Send broadcast hashes request, no neigbours";
-        sendToBroadcast(msgType, round, hashes);
-        return;
-    }
-
-    csdebug() << "NODE> Send hashes request to all neigbours";
-}
 
 void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target) {
     if (packets.empty()) {
@@ -891,12 +955,8 @@ void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumb
 
     csdebug() << "NODE> Reply transaction packets: " << packets.size();
 
-    const auto msgType = MsgTypes::TransactionsPacketReply;
-    const bool success = sendToNeighbour(target, msgType, round, packets);
-
-    if (!success) {
-        csdebug() << "NODE> Reply transaction packets: failed send to " << cs::Utils::byteStreamToHex(target.data(), target.size()) << ", perform broadcast";
-        sendToTargetBroadcast(target, msgType, round, packets);
+    if (!sendToNeighbour(target, MsgTypes::TransactionsPacketReply, round, packets)) {
+        csdebug() << "NODE> Reply transaction packets: failed send to " << cs::Utils::byteStreamToHex(target.data(), target.size());
     }
 }
 
@@ -1418,12 +1478,12 @@ void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round,
         i = cs::ConfidantConsts::InvalidConfidantIndex;
     }
 
-    sendToList(confidants, (cs::Byte)i, msgType, round, std::forward<Args>(args)...);
+    sendToList(confidants, static_cast<cs::Byte>(i), msgType, round, std::forward<Args>(args)...);
 }
 
 template <class... Args>
 void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    if (!transport_->checkConfidants(listMembers, (int)listExeption)) {
+    if (!transport_->checkConfidants(listMembers, static_cast<int>(listExeption))) {
         sendToBroadcast(msgType, round, std::forward<Args>(args)...);
         return;
     }
@@ -1436,7 +1496,7 @@ void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::B
     csdebug() << "NODE> Sending confidants list data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
                 << ", msgType: " << Packet::messageTypeToString(msgType);
 
-    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount(), listMembers, (int)listExeption);
+    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount(), listMembers, static_cast<int>(listExeption));
     ostream_.clear();
 }
 
@@ -1452,16 +1512,24 @@ void Node::writeDefaultStream(Args&&... args) {
 
 template <typename... Args>
 bool Node::sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    auto lock = transport_->getNeighboursLock();
-    Connections connections = transport_->getNeighboursWithoutSS();
+    Connections connections;
 
-    if (connections.empty()) {
-        return false;
+    {
+        auto lock = transport_->getNeighboursLock();
+        auto neighbours = transport_->getNeighboursWithoutSS();
+
+        if (neighbours.empty()) {
+            return false;
+        }
+
+        connections = std::move(neighbours);
     }
 
     for (auto connection : connections) {
         sendToNeighbour(connection, msgType, round, std::forward<Args>(args)...);
     }
+
+    return true;
 }
 
 template <typename... Args>
@@ -1470,9 +1538,8 @@ void Node::sendToBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber ro
 
     writeDefaultStream(std::forward<Args>(args)...);
 
-    csdetails() << "NODE> Sending broadcast data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
+    csdebug() << "NODE> Sending broadcast data: size: " << ostream_.getCurrentSize() << ", round: " << round
                 << ", msgType: " << Packet::messageTypeToString(msgType);
-
     transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
     ostream_.clear();
 }
@@ -1637,7 +1704,6 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 }
 
 void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
-
     csdebug() << __func__;
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
@@ -1653,7 +1719,7 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     csmeta(csdetails) << "done";
 }
 
-void Node::getStageThree(const uint8_t* data, const size_t size) {
+void Node::getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
     csmeta(csdetails);
 
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
@@ -1677,9 +1743,10 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     istream_ >> bytes;
 
     if (!istream_.good() || !istream_.end()) {
-        cserror() << "NODE> Bad stage-3 packet format";
+        cserror() << "NODE> Bad stage-3 packet format. Packet received from: " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
         return;
     }
+
 
     cs::DataStream stream(bytes.data(), bytes.size());
     stream >> stage.sender;
@@ -1701,7 +1768,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size) {
     }
 
     if (stage.iteration < solver_->currentStage3iteration()) {
-        stageRequest(MsgTypes::ThirdStage, myConfidantIndex_, stage.sender, solver_->currentStage3iteration());
+        stageRequest(MsgTypes::ThirdStageRequest, stage.sender, myConfidantIndex_, solver_->currentStage3iteration());
         return;
     }
     else if (stage.iteration > solver_->currentStage3iteration()) {
@@ -1729,6 +1796,16 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, 
     csdebug() << __func__;
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
         cswarning() << "NODE> Only confidant nodes can request consensus stages";
+        return;
+    }
+
+    switch (msgType) {
+    case MsgTypes::FirstStageRequest:
+    case MsgTypes::SecondStageRequest:
+    case MsgTypes::ThirdStageRequest:
+        break;
+    default:
+        csdebug() << "NODE: illegal call to method, ignore";
         return;
     }
 
@@ -1776,7 +1853,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
     }
 
     if (!istream_.good() || !istream_.end()) {
-        cserror() << "Bad StageThree packet format";
+        cserror() << "Bad StageRequest packet format";
         return;
     }
 
