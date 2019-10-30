@@ -683,7 +683,7 @@ bool Neighbourhood::dropConnection(Connection::Id id) {
 }
 
 // Not thread safe. Need lock nLockFlag_ above.
-void Neighbourhood::neighbourHasPacket(RemoteNodePtr node, const cs::Hash& hash, const bool isDirect) {
+void Neighbourhood::neighbourHasPacket(RemoteNodePtr node, const cs::Hash& hash) {
     auto conn = node->connection.load(std::memory_order_relaxed);
     if (!conn) {
         return;
@@ -777,7 +777,6 @@ bool Neighbourhood::isPingDone() {
 void Neighbourhood::resendPackets() {
     cs::Lock lock(nLockFlag_);
     uint32_t cnt1 = 0;
-    uint32_t cnt2 = 0;
 
     for (auto& bp : msgBroads_) {
         if (!bp.data.pack) {
@@ -793,20 +792,6 @@ void Neighbourhood::resendPackets() {
 
         bp.data.sentLastTime = false;
     }
-/*
-    for (auto& dp : msgDirects_) {
-        if (!dp.data.pack) {
-            continue;
-        }
-
-        if (!dispatch(dp.data)) {
-            dp.data.pack = Packet();
-        }
-        else {
-            ++cnt2;
-        }
-    }
-*/
 }
 
 ConnectionPtr Neighbourhood::getConnection(const RemoteNodePtr node) {

@@ -1341,7 +1341,7 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
         }
 
         auto lock = getNeighboursLock();
-        neighbourhood_.neighbourHasPacket(sender, pack.getHash(), false);
+        neighbourhood_.neighbourHasPacket(sender, pack.getHash());
         sendBroadcast(&pack);
     }
 }
@@ -1372,7 +1372,7 @@ bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
     }
 
     auto lock = getNeighboursLock();
-    neighbourhood_.neighbourHasPacket(sender, hHash, isDirect);
+    neighbourhood_.neighbourHasPacket(sender, hHash);
     return true;
 }
 

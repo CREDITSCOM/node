@@ -170,7 +170,7 @@ public:
 
     bool canHaveNewConnection();
 
-    void neighbourHasPacket(RemoteNodePtr, const cs::Hash&, const bool isDirect);
+    void neighbourHasPacket(RemoteNodePtr, const cs::Hash&);
     void neighbourSentPacket(RemoteNodePtr, const cs::Hash&);
     void neighbourSentRenounce(RemoteNodePtr, const cs::Hash&);
 
