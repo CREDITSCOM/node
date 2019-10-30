@@ -47,6 +47,8 @@ public:
         MaxQueueSize = 1000000
     };
 
+    void setPrivateKey(const cs::PrivateKey& privateKey);
+
     ///
     /// @brief Sets cached conveyer round number for utility.
     /// @warning Call this method before setTable method.
@@ -111,8 +113,6 @@ public:
     /// @warning all meta in conveyer will be removed from cached round to table round number.
     ///
     void updateRoundTable(cs::RoundNumber cachedRound, const RoundTable& table);
-
-    void setPrivateKey(const cs::PrivateKey & pKey);
 
     ///
     /// @brief Returns current blockchain round table.
@@ -338,7 +338,7 @@ protected:
 private:
     struct Impl;
     std::unique_ptr<Impl> pimpl_;
-    cs::PrivateKey& pKey = cs::PrivateKey{};
+
     mutable cs::SharedMutex sharedMutex_;
 };
 

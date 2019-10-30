@@ -512,6 +512,7 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
 
 
     // Non-network data
+    transport_->sendPackInform(task->pack, remoteSender);
     uint32_t& recCounter = packetMap_.tryStore(task->pack.getHash());
     if (!recCounter && task->pack.addressedToMe(transport_->getMyPublicKey())) {
         if (task->pack.isFragmented() || task->pack.isCompressed()) {
@@ -544,7 +545,9 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         }
     }
 
-    transport_->redirectPacket(task->pack, remoteSender, resend);
+    if (resend) {
+        transport_->redirectPacket(task->pack, remoteSender);
+    }
     ++recCounter;
 }
 

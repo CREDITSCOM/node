@@ -1307,13 +1307,7 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
 }
 
 
-void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender, bool resend) {
-    sendPackInform(pack, sender);
-
-    if (!resend) {
-        return;
-    }
-
+void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
     if (pack.isDirect()) {
         return;  // Do not redirect packs
     }
