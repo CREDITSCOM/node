@@ -505,6 +505,8 @@ private:
         SmartContractRef ref_execute;
         // Reference to execution which state is cached in DB
         SmartContractRef ref_cache;
+        // Reference to last state update transaction
+        SmartContractRef ref_state;
         // deploy transaction referenced by ref_deploy
         csdb::Transaction deploy{};
         // the last execute transaction referenced by ref_execute

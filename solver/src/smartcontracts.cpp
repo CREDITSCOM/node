@@ -2317,6 +2317,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
 
         // there is only one place to update state in "memory cache" and only after successful dbcache_update()!!!
         item.state = std::move(state_value);
+        item.ref_state = SmartContractRef(t.id());
         // determine it is the result of whether deploy or execute
         if (!replenish) {
             // deploy is execute also
@@ -2704,7 +2705,15 @@ bool SmartContracts::dbcache_read(const BlockChain& blockchain, const csdb::Addr
     }
     cs::DataStream stream(data.data(), data.size());
     stream >> ref_start.sequence >> ref_start.transaction >> state;
-    return stream.isValid() && !stream.isAvailable(1);
+    // compatibility with obsolete format, possible the block hash has been read instead of contract state
+    if (stream.isAvailable(sizeof(size_t)) && state.size() == cscrypto::kHashSize) {
+        stream >> state;
+    }
+    bool ok = (stream.isValid() && !stream.isAvailable(1));
+    if (!ok && !state.empty()) {
+        state.clear();
+    }
+    return ok;
 
 }
 
