@@ -240,11 +240,11 @@ public:
 
     void setDeltaTimeSS(long long timeSS) {
         auto curTime = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        deltaTimeSS = curTime - timeSS;
+        deltaTimeSS_ = curTime - timeSS;
     }
 
     long long getDeltaTimeSS() const {
-        return deltaTimeSS;
+        return deltaTimeSS_;
     }
 
     long long timePassedSinceBB(long long receiveTime) {
@@ -301,6 +301,9 @@ private:
     void reviewConveyerHashes();
 
     void processSync();
+
+    // transport
+    void addToBlackList(const cs::PublicKey& key);
 
     // conveyer
     void processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
@@ -446,18 +449,21 @@ private:
     //expected rounds
     std::vector<cs::RoundNumber> expectedRounds_;
     cs::Bytes lastTrustedMask_;
+
     std::unique_ptr<cs::BlockValidator> blockValidator_;
     std::vector<cs::RoundPackage> roundPackageCache_;
-    cs::RoundPackage currentRp_;
+
+    cs::RoundPackage currentRoundPackage_;
     size_t roundPackRequests_ = 0;
-    std::map<cs::RoundNumber, uint8_t> recdBangs;
+
+    std::map<cs::RoundNumber, uint8_t> receivedBangs;
 
     bool alwaysExecuteContracts_ = false;
 
     cs::config::Observer& observer_;
     cs::Compressor compressor_;
 
-    long long deltaTimeSS{};
+    long long deltaTimeSS_{};
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

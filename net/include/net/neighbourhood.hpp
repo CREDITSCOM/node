@@ -119,6 +119,19 @@ struct Connection {
 using ConnectionPtr = MemPtr<TypedSlot<Connection>>;
 using Connections = std::vector<ConnectionPtr>;
 
+struct Neighbour {
+    ConnectionPtr connection;
+    RemoteNodePtr remoteNode;
+
+    bool isValid() const {
+        return !connection.isNull() && !remoteNode.isNull();
+    }
+
+    operator bool() const {
+        return isValid();
+    }
+};
+
 class Neighbourhood {
 public:
     const static uint32_t MinConnections = 1;
