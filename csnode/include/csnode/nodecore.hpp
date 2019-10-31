@@ -24,10 +24,7 @@ struct hash<cs::TransactionsPacketHash> {
 
 namespace cs {
 // table for fast transactions storage
-using TransactionsPacketTable = std::map<TransactionsPacketHash, TransactionsPacket>;  // TODO: check performance of map/unordered_map
-
-// send transactions packet cache for conveyer
-using TransactionPacketSendCache = std::multimap<cs::RoundNumber, TransactionsPacketHash>;
+using TransactionsPacketTable = std::map<TransactionsPacketHash, TransactionsPacket>;   // to be sorted by default
 
 // array of packets
 using TransactionsBlock = std::vector<cs::TransactionsPacket>;
@@ -124,6 +121,28 @@ struct RoundTableMessage {
 // meta storages
 using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;
 using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
+
+class SendCacheData {
+public:
+    SendCacheData();
+    explicit SendCacheData(const cs::TransactionsPacketHash& hash);
+    explicit SendCacheData(const cs::TransactionsPacketHash& hash, size_t count);
+
+    const cs::TransactionsPacketHash& hash() const {
+        return hash_;
+    }
+
+    size_t count() const {
+        return count_;
+    }
+
+private:
+    cs::TransactionsPacketHash hash_;
+    size_t count_;
+};
+
+// send transactions packet cache for conveyer
+using TransactionPacketSendCache = std::multimap<cs::RoundNumber, SendCacheData>;
 
 // zero constants, used as "empty"
 struct Zero {
