@@ -1344,8 +1344,10 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
     deferredBlock_.set_signatures(tmp);
     deferredBlock_.compose();
     Hash tempHash;
-    auto hash = deferredBlock_.hash().to_binary();
-    std::copy(hash.cbegin(), hash.cend(), tempHash.data());
+    auto hash = deferredBlock_.hash();
+    this->blockHashes_->update(deferredBlock_);
+    auto bytes = hash.to_binary();
+    std::copy(bytes.cbegin(), bytes.cend(), tempHash.data());
     if (NodeUtils::checkGroupSignature(deferredBlock_.confidants(), rPackage.poolMetaInfo().realTrustedMask, rPackage.poolSignatures(), tempHash)) {
         csmeta(csdebug) << "The number of signatures is sufficient and all of them are OK!";
 
