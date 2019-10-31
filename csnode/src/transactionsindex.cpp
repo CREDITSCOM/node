@@ -149,7 +149,7 @@ void TransactionsIndex::updateFromNextBlock(const csdb::Pool& _pool) {
                 cserror() << "Attempt to make trx index inconsistent, curr pool num is "
                           << _pool.sequence() << ", prev pool num is " << lapoo
                           << ". For public key: "
-                          << EncodeBase58(key.public_key().begin(), key.public_key().end())
+                          << EncodeBase58(key.public_key().data(), key.public_key().data() + key.public_key().size())
                           << ", recreate status is " << recreate_;
             }
         }
