@@ -17,6 +17,7 @@ add_library(lib
   include/lib/system/cache.hpp
   include/lib/system/signals.hpp
   include/lib/system/metastorage.hpp
+  include/lib/system/mmappedfile.hpp
   include/lib/system/progressbar.hpp
   include/lib/system/concurrent.hpp
   include/lib/system/scopeguard.hpp
@@ -52,11 +53,12 @@ if(NOT APPLE)
 endif()
 set (BOOST_ALL_DYN_LINK OFF)
 
-find_package (Boost REQUIRED COMPONENTS log log_setup)
+find_package (Boost REQUIRED COMPONENTS log log_setup iostreams)
 # resolve cyclic dependency
 target_link_libraries (Boost::log INTERFACE Boost::log_setup)
 target_link_libraries (Boost::log_setup INTERFACE Boost::log)
 target_link_libraries (lib
+                       Boost::iostreams
                        Boost::log
                        Boost::log_setup
                        Boost::disable_autolinking)

@@ -241,12 +241,6 @@ public:
      */
     Transaction get_last_by_target(Address target) const noexcept;
 
-    // And now for something completely different
-    cs::Sequence get_previous_transaction_block(const Address&, cs::Sequence) const;
-    bool set_previous_transaction_block(const Address&, cs::Sequence currTransBlock, cs::Sequence prevTransBlock);
-    bool remove_last_from_trx_index(const Address&, cs::Sequence lastIndexed);
-    bool truncate_trxs_index();
-
     /**
      * @brief size возвращает количество пулов в хранилище
      * @return количество блоков в хранилище
@@ -274,19 +268,6 @@ public:
      * \deprecated Функция будет удалена в последующих версиях.
      */
     std::vector<Transaction> transactions(const Address& addr, size_t limit = 100, const TransactionID& offset = TransactionID()) const;
-
-    /**
-     * @brief get_from_blockchain возвращает true, если транзакция с addr и innerId есть в blockchain
-     * @param addr       адрес кошелька (input)
-     * @param InnerId    id транзакции (input)
-     * @Transaction trx  полученная транзакция (output)
-     * @return содержит ли blockchain транзакцию
-     *
-     * \параметр addr должен точно совпадать с полем source у транзакции в блокчейне (если addr - id, source должен быть также id)
-     * \используется для входного параметра addr в виде id кошелька
-     */
-    bool get_from_blockchain(const Address& addr /*input*/, int64_t innerId /*input*/,
-                             cs::Sequence lastTrxPs, Transaction& trx /*output*/) const;
 
     /**
      * Gets contract data from storage.
@@ -334,7 +315,6 @@ public signals:
     const BlockReadingStoppedSignal& readingStoppedEvent() const;
 
 private:
-  static cs::Bytes get_trans_index_key(const Address&, cs::Sequence);
   Pool pool_load_internal(const PoolHash& hash, const bool metaOnly, size_t& trxCnt) const;
 
   ::std::shared_ptr<priv> d;
