@@ -141,7 +141,17 @@ void TransactionsIndex::updateFromNextBlock(const csdb::Pool& _pool) {
             else {
                 lapoo = bc_.getLastTransaction(key).pool_seq();
             }
-            setPrevTransBlock(key.public_key(), _pool.sequence(), lapoo);
+
+            if (lapoo != _pool.sequence()) {
+                setPrevTransBlock(key.public_key(), _pool.sequence(), lapoo);
+            }
+            else {
+                cserror() << "Attempt to make trx index inconsistent, curr pool num is "
+                          << _pool.sequence() << ", prev pool num is " << lapoo
+                          << ". For public key: "
+                          << EncodeBase58(key.public_key().begin(), key.public_key().end())
+                          << ", recreate status is " << recreate_;
+            }
         }
     };
 
@@ -212,5 +222,4 @@ inline void TransactionsIndex::reset() {
     csdb::internal::path_remove(rootPath_ + kDbPath);
     db_ = std::make_unique<Lmdb>(rootPath_ + kDbPath);
 }
-
 } // namespace cs
