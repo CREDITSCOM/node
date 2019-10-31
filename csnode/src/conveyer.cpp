@@ -7,6 +7,7 @@
 
 #include <csnode/configholder.hpp>
 #include <csnode/datastream.hpp>
+#include <csnode/sendcachedata.hpp>
 
 #include <solver/smartcontracts.hpp>
 

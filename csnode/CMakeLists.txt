@@ -67,6 +67,7 @@ add_library(csnode
   include/csnode/compressor.hpp
   include/csnode/configholder.hpp
   include/csnode/multiwallets.hpp
+  include/csnode/sendcachedata.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -93,6 +94,7 @@ add_library(csnode
   src/roundpackage.cpp
   src/configholder.cpp
   src/multiwallets.cpp
+  src/sendcachedata.cpp
 )
 
 configure_msvc_flags()
