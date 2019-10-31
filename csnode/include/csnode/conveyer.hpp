@@ -316,6 +316,7 @@ public slots:
     void flushTransactions();
 
 protected:
+    void addPacketToMeta(cs::RoundNumber round, cs::TransactionsPacket& packet);
     void changeRound(cs::RoundNumber round);
 
     // searches transactions packet at all conveyer cache

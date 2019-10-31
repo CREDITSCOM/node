@@ -516,7 +516,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
         const auto& transactions = packet.transactions();
 
         // first look at signatures if it is smarts packet
-        if (packet.signatures().size() > 1) {
+        if (packet.isSmart()) {
             const auto& stateTransaction = transactions.front();
 
             // check range
@@ -719,22 +719,26 @@ void cs::ConveyerBase::flushTransactions() {
 
             emit packetFlushed(packet);
 
-            auto hash = packet.hash();
-
-            if (!isHashAtSendCache(hash)) {
-                pimpl_->sendPacketsCache.emplace(round, cs::SendCacheData { hash });
-            }
-
-            if (!isPacketAtCache(packet)) {
-                pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
-            }
-            else {
-                csdebug() << csname() << "Same transaction packet already in packet table " << hash.toString();
-            }
+            addPacketToMeta(round, packet);
         }
     }
 
     checkSendCache();
+}
+
+void cs::ConveyerBase::addPacketToMeta(cs::RoundNumber round, cs::TransactionsPacket& packet) {
+    auto hash = packet.hash();
+
+    if (!isHashAtSendCache(hash)) {
+        pimpl_->sendPacketsCache.emplace(round, cs::SendCacheData { hash });
+    }
+
+    if (!isPacketAtCache(packet)) {
+        pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
+    }
+    else {
+        csdebug() << csname() << "Same transaction packet already in packet table " << hash.toString();
+    }
 }
 
 void cs::ConveyerBase::changeRound(cs::RoundNumber round) {
