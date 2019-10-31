@@ -266,6 +266,10 @@ void TransactionsPacket::clear() noexcept {
     transactions_.clear();
 }
 
+bool TransactionsPacket::isSmart() const {
+    return signatures_.size() > 1;
+}
+
 //
 // Service
 //
