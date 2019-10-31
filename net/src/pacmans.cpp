@@ -1,4 +1,3 @@
-/* Send blaming letters to @yrtimd */
 #include "pacmans.hpp"
 
 IPacMan::Task& IPacMan::allocNext() {
@@ -15,9 +14,6 @@ void IPacMan::enQueueLast() {
     task.pack.setSize(static_cast<uint32_t>(task.size));
 
     size_.fetch_add(1, std::memory_order_acq_rel);
-	//if (size_ > 500) {
-	//	csinfo() << __func__ << ": IPackMan queue size = " << queue_.size();
-	//}
 }
 
 void IPacMan::rejectLast() {
@@ -34,9 +30,7 @@ TaskPtr<IPacMan> IPacMan::getNextTask(bool &is_empty) {
     std::lock_guard<std::mutex> lock(mutex_);
     result.owner_ = this;
     result.it_ = queue_.begin();
-	//if (size_ > 500) {
-	//	csinfo() << __func__ << ": IPackMan queue size = " << queue_.size();
-	//}
+
     return result;
 }
 
@@ -44,9 +38,6 @@ void IPacMan::releaseTask(TaskIterator& it) {
     std::lock_guard<std::mutex> lock(mutex_);
     queue_.erase(it);
     size_.fetch_sub(1, std::memory_order_acq_rel);
-	//if (size_ > 500) {
-	//	csinfo() << __func__ << ": IPackMan queue size = " << queue_.size();
-	//}
 }
 
 OPacMan::Task* OPacMan::allocNext() {
@@ -59,9 +50,6 @@ OPacMan::Task* OPacMan::allocNext() {
 
 void OPacMan::enQueueLast() {
     size_.fetch_add(1, std::memory_order_acq_rel);
-	//if (size_ > 500) {
-	//	csinfo() << __func__ << ": OPackMan queue size = " << queue_.size();
-	//}
 }
 
 TaskPtr<OPacMan> OPacMan::getNextTask(bool &is_empty) {
@@ -73,9 +61,6 @@ TaskPtr<OPacMan> OPacMan::getNextTask(bool &is_empty) {
     std::lock_guard<std::mutex> lock(mutex_);
     result.owner_ = this;
     result.it_ = queue_.begin();
-	//if (size_ > 500) {
-	//	csinfo() << __func__ << ": OPackMan queue size = " << queue_.size();
-	//}
     return result;
 }
 
@@ -83,7 +68,4 @@ void OPacMan::releaseTask(TaskIterator& it) {
     std::lock_guard<std::mutex> lock(mutex_);
     queue_.erase(it);
     size_.fetch_sub(1, std::memory_order_acq_rel);
-	//if (size_ > 500) {
-	//	csinfo() << __func__ << ": OPackMan queue size = " << queue_.size();
-	//}
 }

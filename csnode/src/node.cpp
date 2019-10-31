@@ -208,8 +208,8 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     uint8_t tmp = 0;
     istream_ >> tmp;
 
-    if (tmp <= recdBangs[rNum] && !(tmp < Consensus::MaxSubroundDelta && recdBangs[rNum] > std::numeric_limits<uint8_t>::max() - Consensus::MaxSubroundDelta)) {
-        cswarning() << "Old Big Bang received: " << rNum << "." << static_cast<int>(tmp) << " is <= " << rNum << "." << static_cast<int>(recdBangs[rNum]);
+    if (tmp <= receivedBangs[rNum] && !(tmp < Consensus::MaxSubroundDelta && receivedBangs[rNum] > std::numeric_limits<uint8_t>::max() - Consensus::MaxSubroundDelta)) {
+        cswarning() << "Old Big Bang received: " << rNum << "." << static_cast<int>(tmp) << " is <= " << rNum << "." << static_cast<int>(receivedBangs[rNum]);
         return;
     }
 
@@ -248,7 +248,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
     // update round data
     subRound_ = tmp;
-    recdBangs[rNum] = subRound_;
+    receivedBangs[rNum] = subRound_;
 
     if (stat_.isLastRoundTooLong()) {
         poolSynchronizer_->syncLastPool();
@@ -398,6 +398,7 @@ bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::Publ
 
 void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
     istream_.init(data, size);
+
     cs::TransactionsPacket packet;
     istream_ >> packet;
 
@@ -409,7 +410,9 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
     if (verifyPacketSignatures(packet, sender)) {
         processTransactionsPacket(std::move(packet));
     }
-
+    else {
+        addToBlackList(sender);
+    }
 }
 
 void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size) {
@@ -994,6 +997,12 @@ void Node::processSync() {
     }
     else {
         poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber(), cs::PoolSynchronizer::roundDifferentForSync);
+    }
+}
+
+void Node::addToBlackList(const cs::PublicKey& key) {
+    if (transport_->markNeighbourAsBlackListed(key)) {
+        cswarning() << "Neigbour " << cs::Utils::byteStreamToHex(key) << " added to network black list";
     }
 }
 
@@ -2311,7 +2320,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     }
 
     bool updateRound = false;
-    if (currentRp_.roundTable().round == 0) {//if normal or trusted  node that got RP has probably received a new RP with not full stake
+    if (currentRoundPackage_.roundTable().round == 0) {//if normal or trusted  node that got RP has probably received a new RP with not full stake
         if (roundPackageCache_.empty()) {
             roundPackageCache_.push_back(rPackage);
         }
@@ -2343,20 +2352,20 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         }
     }
     else {//if trusted node has probably received a new RP with not full stake, but has an RP with full one
-        if (rPackage.roundTable().round == currentRp_.roundTable().round) {
-            auto mask = currentRp_.poolMetaInfo().realTrustedMask;
+        if (rPackage.roundTable().round == currentRoundPackage_.roundTable().round) {
+            auto mask = currentRoundPackage_.poolMetaInfo().realTrustedMask;
             if (cs::TrustedMask::trustedSize(rPackage.poolMetaInfo().realTrustedMask) > cs::TrustedMask::trustedSize(mask)) {
                 csdebug() << "Current Roundpackage of " << rNum << " will be replaced by new one";
                 roundPackageCache_.push_back(rPackage);
             }
             else {
                 csdebug() << "Throw received RP " << rNum << " using the own one";
-                roundPackageCache_.push_back(currentRp_);
-                rPackage = currentRp_;
+                roundPackageCache_.push_back(currentRoundPackage_);
+                rPackage = currentRoundPackage_;
             }
         }
         else {
-            if (rPackage.roundTable().round > currentRp_.roundTable().round) {
+            if (rPackage.roundTable().round > currentRoundPackage_.roundTable().round) {
                 roundPackageCache_.push_back(rPackage);
             }
             else {
@@ -2409,7 +2418,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 }
 
 void Node::setCurrentRP(const cs::RoundPackage& rp) {
-    currentRp_ = rp;
+    currentRoundPackage_ = rp;
 }
 
 void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& /*sender*/, bool updateRound) {
@@ -2459,7 +2468,7 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
 
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
 	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
-    currentRp_ = cs::RoundPackage();
+    currentRoundPackage_ = cs::RoundPackage();
     reviewConveyerHashes();
 
     csmeta(csdetails) << "done\n";

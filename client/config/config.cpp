@@ -180,6 +180,10 @@ void Config::swap(Config& config) {
     (*this) = std::move(temp);
 }
 
+Config::Config(const ConveyerData& conveyerData)
+: conveyerData_(conveyerData) {
+}
+
 Config Config::read(po::variables_map& vm) {
     Config result = readFromFile(getArgFromCmdLine(vm, ARG_NAME_CONFIG_FILE, DEFAULT_PATH_TO_CONFIG));
 

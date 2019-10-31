@@ -91,8 +91,9 @@ struct ConveyerData {
 
 class Config {
 public:
-    Config() {
-    }  // necessary for testing
+    Config() = default;
+
+    explicit Config(const ConveyerData& conveyerData);
 
     Config(const Config&) = default;
     Config(Config&&) = default;

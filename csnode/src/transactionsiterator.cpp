@@ -5,7 +5,7 @@
 
 namespace cs {
 
-TransactionsIterator::TransactionsIterator(BlockChain& bc,
+TransactionsIterator::TransactionsIterator(const BlockChain& bc,
                                            const csdb::Address& addr)
         : bc_(bc),
           addr_(bc_.getAddressByType(addr, BlockChain::AddressType::PublicKey)) {

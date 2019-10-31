@@ -1,13 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <queue>
+#include <iostream>
+
 #include <csdb/amount_commission.hpp>
 #include <csdb/currency.hpp>
 
 #include <csnode/conveyer.hpp>
-
-#include <iostream>
+#include <csnode/configholder.hpp>
 
 #include <lib/system/hash.hpp>
+#include <lib/system/random.hpp>
 
 const cs::RoundNumber kRoundNumber = 12345;
 [[maybe_unused]]
@@ -271,7 +274,7 @@ TEST(Conveyer, TestSendCache) {
     }
 
     ASSERT_EQ(conveyer.packetQueueTransactionsCount(), 0);
-    ASSERT_EQ(conveyer.sendCacheCount(), 2);
+    ASSERT_EQ(conveyer.sendCacheSize(), 2);
     ASSERT_EQ(counter, 2);
 
     // try to resend
@@ -286,7 +289,7 @@ TEST(Conveyer, TestSendCache) {
     conveyer.flushTransactions();
 
     ASSERT_EQ(counter, 5);
-    ASSERT_EQ(conveyer.sendCacheCount(), 3);
+    ASSERT_EQ(conveyer.sendCacheSize(), 3);
 
     conveyer.flushTransactions();
 
@@ -307,12 +310,12 @@ TEST(Conveyer, TestSendCache) {
 
     auto pool { conveyer.applyCharacteristic(metaInfo) };
 
-    ASSERT_EQ(conveyer.sendCacheCount(), 1);
+    ASSERT_EQ(conveyer.sendCacheSize(), 1);
 
     conveyer.flushTransactions();
 
     ASSERT_EQ(counter, 5);
-    ASSERT_EQ(conveyer.sendCacheCount(), 1);
+    ASSERT_EQ(conveyer.sendCacheSize(), 1);
     ASSERT_EQ(pool->transactions().size(), 3);
 }
 
@@ -375,4 +378,121 @@ TEST(Conveyer, TestRoundChangeSignal) {
 
     conveyer.setTable(table);
     ASSERT_TRUE(called);
+}
+
+static Config setupConfigToTestMaxResends() {
+    ConveyerData conveyerData;
+    conveyerData.maxResendsSendCache = cs::Random::generateValue<size_t>(10, 30);
+    conveyerData.sendCacheValue = cs::Random::generateValue<size_t>(10, 30);
+
+    return Config { conveyerData };
+}
+
+TEST(Conveyer, TestMaxResendCountNotZero) {
+    size_t sendCount = 0;
+    std::queue<size_t> tasks;
+
+    cs::ConfigHolder::instance().setConfig(setupConfigToTestMaxResends());
+
+    auto conveyerData = cs::ConfigHolder::instance().config()->conveyerData();
+    tasks.push(conveyerData.sendCacheValue);
+
+    while (tasks.size() != conveyerData.maxResendsSendCache) {
+        tasks.push(tasks.back() + conveyerData.sendCacheValue);
+    }
+
+    ConveyerTest conveyer{};
+    conveyer.setRound(0);
+
+    auto packet = CreateTestPacket(20);
+
+    for (const auto& transaction : packet.transactions()) {
+        conveyer.addTransaction(transaction);
+    }
+
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(conveyer.sendCacheSize(), 1);
+
+    cs::Connector::connect(&conveyer.packetFlushed, [&](const auto&) {
+        ++sendCount;
+    });
+
+    size_t index = 0;
+
+    while (!tasks.empty()) {
+        if (index++ == tasks.front()) {
+            auto round = tasks.front();
+            tasks.pop();
+
+            conveyer.setRound(round);
+        }
+
+        conveyer.flushTransactions();
+
+        ASSERT_EQ(conveyer.sendCacheSize(), 1);
+        ASSERT_EQ(conveyer.packetsTableSize(), 1);
+    }
+
+    ASSERT_EQ(sendCount, conveyerData.maxResendsSendCache);
+
+    // one more should not be flushed
+    conveyer.setRound(conveyer.currentRoundNumber() + conveyerData.sendCacheValue);
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(sendCount, conveyerData.maxResendsSendCache);
+
+    ASSERT_EQ(conveyer.sendCacheSize(), 0);
+    ASSERT_EQ(conveyer.packetsTableSize(), 0);
+}
+
+static Config setupConfigToTestZeroMaxResends() {
+    ConveyerData conveyerData;
+    conveyerData.maxResendsSendCache = 0;
+    conveyerData.sendCacheValue = cs::Random::generateValue<size_t>(10, 30);
+
+    return Config { conveyerData };
+}
+
+// should send forever
+TEST(Conveyer, TestMaxResendCountZero) {
+    size_t sendCount = 0;
+    size_t generatedSendCount = cs::Random::generateValue<size_t>(10, 100);
+
+    cs::ConfigHolder::instance().setConfig(setupConfigToTestZeroMaxResends());
+
+    ConveyerTest conveyer{};
+    conveyer.setRound(0);
+
+    auto packet = CreateTestPacket(30);
+
+    for (const auto& transaction : packet.transactions()) {
+        conveyer.addTransaction(transaction);
+    }
+
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(conveyer.sendCacheSize(), 1);
+
+    cs::Connector::connect(&conveyer.packetFlushed, [&](const auto&) {
+        ++sendCount;
+    });
+
+    auto value = cs::ConfigHolder::instance().config()->conveyerData().sendCacheValue;
+
+    for (size_t index = 0; index < generatedSendCount; ++index) {
+        conveyer.setRound(conveyer.currentRoundNumber() + value);
+        conveyer.flushTransactions();
+
+        ASSERT_EQ(conveyer.sendCacheSize(), 1);
+        ASSERT_EQ(conveyer.packetsTableSize(), 1);
+    }
+
+    ASSERT_EQ(sendCount, generatedSendCount);
+
+    conveyer.setRound(conveyer.currentRoundNumber() + value);
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(conveyer.sendCacheSize(), 1);
+    ASSERT_EQ(conveyer.packetsTableSize(), 1);
 }
