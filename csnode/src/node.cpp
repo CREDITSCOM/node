@@ -2241,7 +2241,7 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
 }
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
-    csdebug() << "NODE> next round table received, round: " << rNum;
+    csdebug() << "NODE> get round table R-" << WithDelimiters(rNum) << " from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
     csmeta(csdetails) << "started";
 
     if (myLevel_ == Level::Writer) {
