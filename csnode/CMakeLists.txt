@@ -41,7 +41,6 @@ add_library(csnode
   include/csnode/node.hpp
   include/csnode/packstream.hpp
   include/csnode/datastream.hpp
-  include/csnode/dynamicbuffer.hpp
   include/csnode/nodecore.hpp
   include/csnode/conveyer.hpp
   include/csnode/transactionspacket.hpp
@@ -73,7 +72,6 @@ add_library(csnode
   src/nodecore.cpp
   src/conveyer.cpp
   src/transactionspacket.cpp
-  src/dynamicbuffer.cpp
   src/walletscache.cpp
   src/walletsids.cpp
   src/walletspools.cpp

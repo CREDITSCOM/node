@@ -1,4 +1,4 @@
-#include "../include/csnode/dynamicbuffer.hpp"
+#include <lib/system/dynamicbuffer.hpp>
 
 #include <algorithm>
 
