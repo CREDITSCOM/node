@@ -1482,8 +1482,14 @@ cs::Sequence BlockChain::getPreviousPoolSeq(const csdb::Address& addr, cs::Seque
     auto prev_seq = trxIndex_->getPrevTransBlock(addr, ps);
 
     if (prev_seq == ps) {
+        auto pubKey = getAddressByType(addr, AddressType::PublicKey).public_key();
+        cserror() << "Inconsistent transaction index for public key: "
+                  << EncodeBase58(Bytes(pubKey.begin(), pubKey.end()))
+                  << ", block seq is " << ps;
+
         if (Node::autoShutdownEnabled()) {
-            cserror() << "Inconsistent transaction index. Node will be stopped. Please restart it.";
+            cserror() << "Node will be stopped due to index error. Please restart it.";
+
             trxIndex_->invalidate();
             Node::requestStop();
         }

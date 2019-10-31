@@ -1,6 +1,7 @@
 #ifndef TRANSACTIONSINDEX_HPP
 #define TRANSACTIONSINDEX_HPP
 
+#include <map>
 #include <memory>
 #include <string>
 
@@ -20,14 +21,13 @@ namespace cs {
 class TransactionsIndex {
 public:
     TransactionsIndex(BlockChain&, const std::string& _path, bool _recreate = false);
-    ~TransactionsIndex() {}
+    ~TransactionsIndex() = default;
 
     void update(const csdb::Pool&);
-
-    Sequence getPrevTransBlock(const csdb::Address& _addr, Sequence _curr) const;
-
     void invalidate();
     void close();
+
+    Sequence getPrevTransBlock(const csdb::Address& _addr, Sequence _curr) const;
 
 public slots:
     void onStartReadFromDb(Sequence _lastWrittenPoolSeq);
@@ -40,11 +40,12 @@ private slots:
 
 private:
     void init();
+    void reset();
+
     void updateFromNextBlock(const csdb::Pool&);
-    static bool hasToRecreate(const std::string&, cs::Sequence&);
     void updateLastIndexed();
 
-    void reset();
+    static bool hasToRecreate(const std::string&, cs::Sequence&);
 
     void setPrevTransBlock(const PublicKey&, cs::Sequence _curr, cs::Sequence _prev);
     void removeLastTransBlock(const PublicKey&, cs::Sequence _curr);
