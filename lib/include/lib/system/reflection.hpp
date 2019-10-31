@@ -80,6 +80,9 @@ constexpr Array zero() {
     return Array{};
 }
 
+template<typename ... Ts>
+using IsConvertToString = std::enable_if_t<(std::is_convertible_v<Ts, std::string>&& ...)>;
+
 }
 
 #endif  //  REFLECTION_HPP
