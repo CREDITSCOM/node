@@ -713,8 +713,11 @@ void cs::ConveyerBase::flushTransactions() {
                 }
             }
 
-            if (!packet.sign(pimpl_->privateKey)) {
-                cswarning() << "Can not sign transaction packet";
+            if (packet.signatures().empty()) {
+                if (!packet.sign(pimpl_->privateKey)) {
+                    cswarning() << "Can not sign unsigned transaction packet, drop";
+                    break;
+                }
             }
 
             emit packetFlushed(packet);
