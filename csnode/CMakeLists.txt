@@ -49,7 +49,6 @@ add_library(csnode
   include/csnode/transactionsiterator.hpp
   include/csnode/walletscache.hpp
   include/csnode/walletsids.hpp
-  include/csnode/walletspools.hpp
   include/csnode/blockhashes.hpp
   include/csnode/poolsynchronizer.hpp
   include/csnode/fee.hpp
@@ -74,7 +73,6 @@ add_library(csnode
   src/transactionspacket.cpp
   src/walletscache.cpp
   src/walletsids.cpp
-  src/walletspools.cpp
   src/blockhashes.cpp
   src/poolsynchronizer.cpp
   src/fee.cpp
