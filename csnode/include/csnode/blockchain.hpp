@@ -21,7 +21,6 @@
 #include <csnode/nodecore.hpp>
 #include <csnode/multiwallets.hpp>
 #include <csnode/walletsids.hpp>
-#include <csnode/walletspools.hpp>
 #include <roundpackage.hpp>
 
 #include <lib/system/concurrent.hpp>
@@ -314,11 +313,6 @@ private:
 
     class TransactionsLoader;
 
-    bool findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id, cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
-
-    void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id, const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset,
-                         uint64_t limit);
-
     void updateNonEmptyBlocks(const csdb::Pool&);
 
     bool good_;
@@ -334,7 +328,6 @@ private:
     std::unique_ptr<cs::WalletsIds> walletIds_;
     std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
     std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
-    std::unique_ptr<cs::WalletsPools> walletsPools_;
     std::unique_ptr<cs::MultiWallets> multiWallets_;
 
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
