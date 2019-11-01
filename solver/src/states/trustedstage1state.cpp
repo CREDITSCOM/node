@@ -14,13 +14,16 @@
 
 #include <csnode/datastream.hpp>
 #include <cscrypto/cscrypto.hpp>
+#include <string>
 
 namespace cs {
 void TrustedStage1State::on(SolverContext& context) {
     if (!pValidator_) {
         pValidator_ = std::make_unique<IterValidator>(context.wallets());
     }
-
+    likeMineHashes = 0;
+    differentHashes = 0;
+    differKeys.clear();
     DefaultStateBehavior::on(context);
     context.init_zero(stage);
     stage.sender = context.own_conf_number();
@@ -123,13 +126,18 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
 
     {
         std::unique_lock<cs::SharedMutex> lock = conveyer.lock();
+        size_t trxCounter = 0;
         const cs::RoundTable& roundTable = conveyer.currentRoundTable();
 
         for (const auto& element : conveyer.transactionsPacketTable()) {
             const cs::PacketsHashes& hashes = roundTable.hashes;
 
             if (std::find(hashes.cbegin(), hashes.cend(), element.first) == hashes.cend()) {
+                if (trxCounter + element.second.transactionsCount() > Consensus::MaxStageOneTransactions) {
+                    break;
+                }
                 stage.hashesCandidates.push_back(element.first);
+                trxCounter += element.second.transactionsCount();
 
                 if (stage.hashesCandidates.size() > Consensus::MaxStageOneHashes) {
                     break;
@@ -146,27 +154,44 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
 Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& pool_hash, const cs::PublicKey& sender) {
     csdb::PoolHash lastHash = context.blockchain().getLastHash();
     csdb::PoolHash spoiledHash = context.spoileHash(lastHash, sender);
-    csdebug() << name() << ": <-- hash from " << context.sender_description(sender);
+    std::string stagesPlot;
+    std::string hString = std::string(name()) + ": <-- hash from " + std::string(context.sender_description(sender));
     if (spoiledHash == pool_hash) {
         // get node status for useful logging
-
-        // if (stage.trustedCandidates.size() <= Consensus::MaxTrustedNodes) {
-        csdebug() << name() << ": hash is OK";
+        if (cs::Conveyer::instance().isConfidantExists(sender)) {
+            ++likeMineHashes;
+        }
+        
+        csdebug() << hString<< ": hash is OK";
         if (std::find(stage.trustedCandidates.cbegin(), stage.trustedCandidates.cend(), sender) == stage.trustedCandidates.cend()) {
             stage.trustedCandidates.push_back(sender);
         }
-        //}
+        //TODO: print hashMask string
         if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes) {
-            // enough hashes
-            // flush deferred block to blockchain if any
-            enough_hashes = true;
-            bool other_conditions = transactions_checked && min_time_expired;
-            return (other_conditions ? Result::Finish : Result::Ignore);
+            if (likeMineHashes >= cs::Conveyer::instance().confidantsCount() / 2) {
+                enough_hashes = true;
+                bool other_conditions = transactions_checked && min_time_expired;
+                return (other_conditions ? Result::Finish : Result::Ignore);
+            }
+            else if(differentHashes >= cs::Conveyer::instance().confidantsCount() / 2){
+                context.askTrustedRound(cs::Conveyer::instance().currentRoundNumber(), differKeys);
+            }
         }
     }
     else {
-        csdebug() << name() << ": DOES NOT MATCH my value " << lastHash.to_string();
-        context.sendHashReply(std::move(pool_hash), sender);
+        csdebug() << hString << ": DOES NOT MATCH my value " << lastHash.to_string();
+        //TODO: print hashMask string
+        if (cs::Conveyer::instance().isConfidantExists(sender)) {
+            ++differentHashes;
+            differKeys.push_back(sender);
+        }
+        else {
+            context.sendHashReply(std::move(pool_hash), sender);
+        }
+        if (differentHashes >= cs::Conveyer::instance().confidantsCount() / 2) {
+            context.askTrustedRound(cs::Conveyer::instance().currentRoundNumber(), differKeys);
+        }
+
     }
 
     return Result::Ignore;

@@ -1554,6 +1554,10 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
 void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     csdebug() << __func__;
+    if (myConfidantIndex_ == 1 && myConfidantIndex_ == 1 && cs::Conveyer::instance().currentRoundNumber() % 10 == 0) {
+        csdebug() << "NODE> won't send";
+        return;
+    }
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
         return;
@@ -1617,7 +1621,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
     }
 
     if (stage.iteration < solver_->currentStage3iteration()) {
-        stageRequest(MsgTypes::ThirdStageRequest, stage.sender, myConfidantIndex_, solver_->currentStage3iteration());
+        stageRequest(MsgTypes::ThirdStageRequest, myConfidantIndex_, stage.sender, solver_->currentStage3iteration());
         return;
     }
     else if (stage.iteration > solver_->currentStage3iteration()) {
@@ -1724,6 +1728,9 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
             solver_->gotStageTwoRequest(requesterNumber, requiredNumber);
             break;
         case MsgTypes::ThirdStageRequest:
+            if (myConfidantIndex_ == 1 && myConfidantIndex_ == 1 && conveyer.currentRoundNumber() % 10 == 0) {
+                return;
+            }
             solver_->gotStageThreeRequest(requesterNumber, requiredNumber, iteration);
             break;
         default:
@@ -1755,6 +1762,10 @@ void Node::sendConfidants(const std::vector<cs::PublicKey>& keys) {
 }
 
 void Node::sendSmartReject(const std::vector<RefExecution>& rejectList) {
+    if (myLevel_ != Level::Confidant) {
+        cswarning() << "NODE> Only confidant nodes can send smart Reject messages";
+        return;
+    }
     if (rejectList.empty()) {
         csmeta(cserror) << "must not send empty rejected contracts pack";
         return;
@@ -2240,6 +2251,16 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
     return true;
 }
 
+bool Node::isLastRPStakeFull(cs::RoundNumber rNum) {
+    if (!roundPackageCache_.empty()) {
+        auto mask = roundPackageCache_.back().poolMetaInfo().realTrustedMask;
+        if (cs::Conveyer::instance().currentRoundNumber() == rNum && cs::TrustedMask::trustedSize(mask) == mask.size()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
     csdebug() << "NODE> next round table received, round: " << rNum;
     csmeta(csdetails) << "started";
@@ -2264,12 +2285,8 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    if (!roundPackageCache_.empty()) {
-        auto mask = roundPackageCache_.back().poolMetaInfo().realTrustedMask;
-        if (conveyer.currentRoundNumber() == rNum && cs::TrustedMask::trustedSize(mask) == mask.size()) {
-            csdebug() << "NODE> last RoundPackage has full stake";
+    if (isLastRPStakeFull(rNum)) {
             return;
-        }
     }
     
 
@@ -2294,6 +2311,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     //}
 
     if (!rpSpeedOk(rPackage)) {
+        csdebug() << "NODE> last RoundPackage has full stake";
         return;
     }
 
@@ -2584,20 +2602,8 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
         cswarning() << exception.what();
     }
 
-    csdebug() << "Got Hash message (" << tmp.size() << "): " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
-        << " : " << static_cast<int>(sHash.trustedSize) << " - " << static_cast<int>(sHash.realTrustedSize);
-
-    if (!roundPackageCache_.empty()) {
-        auto mask = roundPackageCache_.back().poolMetaInfo().realTrustedMask;
-        if (mask.size() > cs::TrustedMask::trustedSize(mask)) {
-            if (sHash.realTrustedSize > cs::TrustedMask::trustedSize(mask)) {
-                roundPackRequest(sender, rNum);
-            }
-        }
-    }
-
-    
-    csdebug() << "TimeStamp     = " << std::to_string(sHash.timeStamp);
+   
+    csdebug() << "NODE> GetHash - TimeStamp     = " << std::to_string(sHash.timeStamp);
     uint64_t deltaStamp = currentTimeStamp - lastTimeStamp;
     if (deltaStamp > Consensus::DefaultTimeStampRange) {
         deltaStamp = Consensus::DefaultTimeStampRange;
@@ -2624,16 +2630,13 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
 
     }
     csdebug() << "Hash message signature is  VALID";
-    //cs::PublicKeys confidants = cs::Conveyer::instance().confidants();
-    uint8_t myRealTrustedSize = 0U;
-    if (roundPackageCache_.size() > 0) { // if cache.size > 0 current won't be  nullptr
-        csdebug() << "roundPackageList.size() = " << roundPackageCache_.size();
-        auto myTrustedSize = roundPackageCache_.back().poolMetaInfo().realTrustedMask.size();
-        myRealTrustedSize = cs::TrustedMask::trustedSize(roundPackageCache_.back().poolMetaInfo().realTrustedMask);
-        if (myRealTrustedSize < myTrustedSize && myRealTrustedSize < sHash.realTrustedSize) {
-            csdebug() << "Starting RoundPackage request";
-         //   roundPackageRequest(rNum, sender);
-        }
+    csdebug() << "Got Hash message (" << tmp.size() << "): " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size())
+        << " : " << static_cast<int>(sHash.trustedSize) << " - " << static_cast<int>(sHash.realTrustedSize);
+    uint8_t myRealTrustedSize = 0;
+
+    if (cs::Conveyer::instance().currentRoundNumber() > 1) {
+        cs::Bytes lastTrusted = getBlockChain().getLastRealTrusted();
+        myRealTrustedSize = cs::TrustedMask::trustedSize(lastTrusted);
     }
 
     solver_->gotHash(std::move(sHash), myRealTrustedSize);
@@ -2642,6 +2645,14 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
 void Node::roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round) {
     csdebug() << "NODE> send request for round info  #" << round;
     sendToTargetBroadcast(respondent, MsgTypes::RoundPackRequest, round, round /*dummy data to prevent packet drop on receiver side*/);
+}
+
+void Node::askConfidantsRound(cs::RoundNumber round, const cs::ConfidantsKeys& confidants) {
+    csdebug() << "NODE> send round info #" << round << " to confidants";
+    if (confidants.empty()) {
+        return;
+    }
+    sendToSingle(confidants.front(), MsgTypes::RoundPackRequest, round, round /*dummy data to prevent packet drop on receiver side*/);
 }
 
 void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -2835,6 +2846,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     stageThreeMessage_.resize(roundTable.confidants.size());
     stageThreeSent_ = false;
     roundPackRequests_ = 0;
+    lastBlockRemoved_ = false;
     constexpr int padWidth = 30;
 
     badHashReplyCounter_.clear();
@@ -3017,12 +3029,13 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
 
     const auto badHashReplySummary = std::count_if(badHashReplyCounter_.begin(), badHashReplyCounter_.end(), [](bool badHash) { return badHash; });
 
-    if (static_cast<size_t>(badHashReplySummary) > conveyer.confidantsCount() / 2) {
+    if (static_cast<size_t>(badHashReplySummary) > conveyer.confidantsCount() / 2 && !lastBlockRemoved_) {
         csmeta(csdebug) << "This node really have not valid HASH!!! Removing last block from DB and trying to syncronize";
         // TODO: examine what will be done without this function
         if (!roundPackageCache_.empty() && roundPackageCache_.back().poolMetaInfo().realTrustedMask.size() > cs::TrustedMask::trustedSize(roundPackageCache_.back().poolMetaInfo().realTrustedMask)) {
             blockChain_.setBlocksToBeRemoved(1U);
             blockChain_.removeLastBlock();
+            lastBlockRemoved_ = true;
         }
 
     }

@@ -120,6 +120,8 @@ public:
     void resetGrayList() {
         grayList_.clear();
     }
+
+    void askTrustedRound(cs::RoundNumber rNum, const cs::ConfidantsKeys& confidants);
     uint64_t lastTimeStamp();
     void uploadNewStates(std::vector<csdb::Transaction> newStates);
     cs::Bytes getRealTrusted();

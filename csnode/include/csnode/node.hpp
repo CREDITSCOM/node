@@ -96,6 +96,7 @@ public:
     void sendHash(cs::RoundNumber round);
     void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
     void roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round);
+    void askConfidantsRound(cs::RoundNumber round, const cs::ConfidantsKeys& confidants);
     void getRoundPackRequest(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
     void emptyRoundPackReply(const cs::PublicKey & respondent);
     void getEmptyRoundPack(const uint8_t * data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey & sender);
@@ -148,6 +149,7 @@ public:
     void prepareRoundTable(cs::RoundTable& roundTable, const cs::PoolMetaInfo& poolMetaInfo, cs::StageThree& st3);
     bool receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants);
     bool rpSpeedOk(cs::RoundPackage& rPackage);
+    bool isLastRPStakeFull(cs::RoundNumber rNum);
     void addRoundSignature(const cs::StageThree& st3);
     // smart-contracts consensus stages sending and getting
 
@@ -450,6 +452,7 @@ private:
     std::vector<cs::RoundPackage> roundPackageCache_;
     cs::RoundPackage currentRp_;
     size_t roundPackRequests_ = 0;
+    bool lastBlockRemoved_ = false;
     std::map<cs::RoundNumber, uint8_t> recdBangs;
 
     bool alwaysExecuteContracts_ = false;

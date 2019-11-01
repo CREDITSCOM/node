@@ -78,7 +78,7 @@ bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
 }
 
 void SolverCore::addToGraylist(const cs::PublicKey & sender, uint32_t rounds) {
-
+    return;
     if (grayList_.find(sender) == grayList_.cend()) {
         grayList_.emplace(sender, rounds);
         csdebug() << "Node " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " is in gray list now";
@@ -551,6 +551,17 @@ bool SolverCore::stopNodeRequested() const {
         return pnode->isStopRequested();
     }
     return false;
+}
+
+void SolverCore::askTrustedRound(cs::RoundNumber rNum, const cs::ConfidantsKeys& confidants) {
+    if (pnode->isLastRPStakeFull(rNum)) {
+        csdebug() << "SolverCore: this node has full stake last round Package, the request will not be performed";
+        return;
+    }
+    if (confidants.empty()) {
+        return;
+    }
+    pnode->askConfidantsRound(rNum, confidants);
 }
 
 
