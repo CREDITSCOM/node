@@ -41,7 +41,6 @@ add_library(csnode
   include/csnode/node.hpp
   include/csnode/packstream.hpp
   include/csnode/datastream.hpp
-  include/csnode/dynamicbuffer.hpp
   include/csnode/nodecore.hpp
   include/csnode/conveyer.hpp
   include/csnode/transactionspacket.hpp
@@ -67,12 +66,12 @@ add_library(csnode
   include/csnode/compressor.hpp
   include/csnode/configholder.hpp
   include/csnode/multiwallets.hpp
+  include/csnode/sendcachedata.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
   src/conveyer.cpp
   src/transactionspacket.cpp
-  src/dynamicbuffer.cpp
   src/walletscache.cpp
   src/walletsids.cpp
   src/walletspools.cpp
@@ -93,6 +92,7 @@ add_library(csnode
   src/roundpackage.cpp
   src/configholder.cpp
   src/multiwallets.cpp
+  src/sendcachedata.cpp
 )
 
 configure_msvc_flags()

@@ -9,6 +9,7 @@
 #include <boost/program_options.hpp>
 
 #include <lib/system/common.hpp>
+#include <lib/system/reflection.hpp>
 
 #include <net/neighbourhood.hpp> // using Neighbourhood::MaxNeighbours constant
 
@@ -102,10 +103,7 @@ public:
 
     static Config read(po::variables_map&);
     
-    template<typename ... Ts>
-    using IsConvertToString = std::enable_if_t<(std::is_convertible_v<Ts, std::string>&& ...)>;
-
-    template<typename T, typename ... Ts, typename = IsConvertToString<T, Ts...>>
+    template<typename T, typename ... Ts, typename = cs::IsConvertToString<T, Ts...>>
     static bool replaceBlock(T&& blockName, Ts&& ... newLines);
 
     const EndpointData& getInputEndpoint() const {

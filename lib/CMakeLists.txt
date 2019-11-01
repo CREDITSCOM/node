@@ -6,6 +6,7 @@ add_library(lib
   src/lib/system/logger.cpp
   src/lib/system/timer.cpp
   src/lib/system/progressbar.cpp
+  src/lib/system/dynamicbuffer.cpp
   include/lib/system/hash.hpp
   include/lib/system/queues.hpp
   include/lib/system/structures.hpp
@@ -30,6 +31,7 @@ add_library(lib
   include/lib/system/fileutils.hpp
   include/lib/system/shareable.hpp
   include/lib/system/lockfreechanger.hpp
+  include/lib/system/dynamicbuffer.hpp
 )
 
 if (MSVC)

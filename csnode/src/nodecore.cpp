@@ -7,20 +7,6 @@ Zero::Zero() {
     signature.fill(0);
     key.fill(0);
 }
-
-SendCacheData::SendCacheData()
-: count_(0) {
-}
-
-SendCacheData::SendCacheData(const TransactionsPacketHash& hash)
-: hash_(hash)
-, count_(0) {
-}
-
-SendCacheData::SendCacheData(const TransactionsPacketHash& hash, size_t count)
-: hash_(hash)
-, count_(count) {
-}
 }  // namespace cs
 
 namespace {
@@ -48,11 +34,12 @@ std::size_t std::hash<cs::TransactionsPacketHash>::operator()(const cs::Transact
     return hash;
 }
 
-cs::Bytes cs::RoundTable::toBinary()
-{
+cs::Bytes cs::RoundTable::toBinary(){
     cs::Bytes bytes;
     cs::DataStream tth(bytes);
+
     tth << round;
     tth << confidants;
+
     return bytes;
 }

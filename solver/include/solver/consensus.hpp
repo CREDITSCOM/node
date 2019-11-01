@@ -73,6 +73,12 @@ public:
     /** @brief   Max hashes count to include in stage one data */
     constexpr static size_t MaxStageOneHashes = 100;
 
+    /** @brief   Max hashes count to include in stage one data */
+    constexpr static size_t MaxStageOneTransactions = 1000;
+
+    /** @brief   Max transactions in the packet, the sender won't be accused for, if all them are invalid */
+    constexpr static size_t AccusalPacketSize = 10;
+
     /** @brief   Max count of rounds to execute smart contract. After that contract is assumed failed unconditionally */
     constexpr static unsigned int MaxRoundsCancelContract = 100;
 
