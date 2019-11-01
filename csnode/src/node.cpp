@@ -13,6 +13,7 @@
 #include <csnode/nodecore.hpp>
 #include <csnode/nodeutils.hpp>
 #include <csnode/poolsynchronizer.hpp>
+#include <csnode/itervalidator.hpp>
 #include <csnode/blockvalidator.hpp>
 #include <csnode/roundpackage.hpp>
 #include <csnode/configholder.hpp>
@@ -34,7 +35,7 @@
 #include <cscrypto/cscrypto.hpp>
 
 #include <observer.hpp>
-#inclue  <numeric>
+#include  <numeric>
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
@@ -368,19 +369,26 @@ bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::Publ
                 if (ref.is_valid()) {
                     cs::RoundNumber smartRound = ref.sequence;
                     auto block = getBlockChain().loadBlock(smartRound);
-                    if (!packet.verify(block.confidants())) {
-                        csdebug() << "NODE> Packet " << packet.hash().toString() << " signatures aren't correct";
-                        return false;
+                    if (block.is_valid()) {
+                        if (!packet.verify(block.confidants())) {
+                            csdebug() << "NODE> Packet " << packet.hash().toString() << " signatures aren't correct";
+                            return false;
+                        }
+                        else {
+                            verb = "s are Ok";
+                        }
                     }
                     else {
-                        verb = "s are Ok";
+                        verb = "s can't be verified. Leave it as is ...";
                     }
                 }
                 else {
+                    csdebug() << "NODE> Contract ref is invalid";
                     return false;
                 }
             }
             else {
+                csdebug() << "NODE> Contract user fielsd is invalid";
                 return false;
             }
         }
@@ -398,22 +406,24 @@ bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::Publ
 }
 
 bool Node::verifyPacketTransactions(cs::TransactionsPacket packet) {
-    cs::Characteristic characteristic;
-    std::vector<cs::TransactionsPacket> packets;
-    packets.clear();
-    if (packet.signatures == 1) {
-        characteristic = solver_->ownValidation(packet, pakets);
+    size_t sum = 0;
+    size_t cnt = packet.transactionsCount();
+    if (packet.signatures().size() == 1) {
+        auto& transactions = packet.transactions();
+        for (auto& it : transactions) {
+            if (cs::IterValidator::SimpleValidator::validate(it, getBlockChain())) {
+                ++sum;
+            }
+        }
     }
-    else if (packet.signatures > 2) {
-        packets.push_back(packet);
-        characteristic = solver_->ownValidations(packet, packets);
+    else if (packet.signatures().size() > 2) {
+        return true;
     }
-    int sum = std::accumulate(characteristic.mask.begin(), characteristic.mask.end(), 0);
-    if (sum > packet.transactions().size()) {
-        csdebug() << "NODE> Invalid mask obtained";
+    else {
+        csdebug() << "NODE> Illegal number of signatures";
         return false;
     }
-    int cnt = packet.transactions().size();
+
     if (sum == cnt) {
         return true;
     }
@@ -422,14 +432,17 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet) {
         if (cnt > Consensus::AccusalPacketSize) {
             if (sum < cnt/2) {
                 // put sender to black list
+                csdebug() << "NODE> Sender should be put to the black list: valid trxs = " << sum << ", total trxs = " << cnt;
             }
             else {
                 // put sender to black list counter
+                csdebug() << "NODE> Sender should be send to the black list counter: valid trxs = " << sum << ", total trxs = " << cnt;
             }
         }
         else {
             if (sum < cnt / 2) {
                 // put sender to black list counter
+                csdebug() << "NODE> Sender should be send to the black list counter: valid trxs = " << sum << ", total trxs = " << cnt;
             }
         }
 
@@ -650,8 +663,8 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
 
     auto myCharacteristic = conveyer.characteristic(rPackage.poolMetaInfo().sequenceNumber);
     csdebug() << "NODE> Trying to get characteristic from conveyer";
-    std::vector<cscrypto::Byte> maskOnly;
-    std::vector<cscrypto::Byte>::const_iterator myIt;
+    std::vector<cscrypto::Byte> ownMask;
+    //std::vector<cscrypto::Byte>::const_iterator myIt;
     if (myCharacteristic == nullptr || myCharacteristic->mask.size() < rPackage.poolMetaInfo().characteristic.mask.size()) {
         csdebug() << "NODE> Characteristic from conveyer doesn't exist";
         auto data = conveyer.createPacket(rPackage.poolMetaInfo().sequenceNumber);
@@ -666,36 +679,39 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         auto myMask = solver_->ownValidation(packet, smartPackets);
         csdebug() << "NODE> Characteristic calculated from the very transactions";
         if (myMask.has_value()) {
-            maskOnly = myMask.value().mask;
+            ownMask = myMask.value().mask;
         }
         else {
-            maskOnly.clear();
+            ownMask.clear();
         }
-        myIt = maskOnly.cbegin();
+//        myIt = maskOnly.cbegin();
     }
     else {
-        maskOnly = myCharacteristic->mask;
-        myIt = maskOnly.cbegin();
+        ownMask = myCharacteristic->mask;
+//        myIt = maskOnly.cbegin();
     }
-    auto it = rPackage.poolMetaInfo().characteristic.mask.cbegin();
+    auto otherMask = rPackage.poolMetaInfo().characteristic.mask;
     bool identic = true;
-    csdebug() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(maskOnly.data(), maskOnly.size())
-        << " and received: " << cs::Utils::byteStreamToHex(rPackage.poolMetaInfo().characteristic.mask.data(), rPackage.poolMetaInfo().characteristic.mask.size());
-    while (!(myIt == maskOnly.cend() || it == rPackage.poolMetaInfo().characteristic.mask.cend())) {
-        if (*myIt != *it) {
-            identic = false;
-            csdebug() << "NODE> Comparing " << static_cast<int>(*myIt) << " versus " << static_cast<int>(*it) << " ... False";
-            break;
-        }
-        else {
-            csdebug() << "NODE> Comparing " << static_cast<int>(*myIt) << " versus " << static_cast<int>(*it) << " ... Ok";
-        }
-        ++myIt;
-        ++it;
-    }
-    if (maskOnly.size() != rPackage.poolMetaInfo().characteristic.mask.size()) {
+    csdebug() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(ownMask.data(), ownMask.size())
+        << " and received: " << cs::Utils::byteStreamToHex(otherMask.data(), otherMask.size());
+    //TODO: this code is to be refactored - may cause some problems
+    if (otherMask.size() != ownMask.size()) {
+        csdebug() << "NODE> masks have different length's";
         identic = false;
     }
+    if (identic) {
+        for (int i = 0; i < ownMask.size(); ++i) {
+            if (otherMask[i] != ownMask[i]) {
+                identic = false;
+                csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... False";
+                break;
+            }
+            else {
+                csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... Ok";
+            }
+        }
+    }
+
     if (!identic) {
         cserror() << "NODE> We probably got the roundPackage with invalid characteristic, can't build block";
         sendBlockAlarm(rPackage.poolMetaInfo().sequenceNumber);
@@ -1714,10 +1730,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
 void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     csdebug() << __func__;
-    if (myConfidantIndex_ == 1 && myConfidantIndex_ == 1 && cs::Conveyer::instance().currentRoundNumber() % 10 == 0) {
-        csdebug() << "NODE> won't send";
-        return;
-    }
+
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
         return;
@@ -1888,9 +1901,6 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
             solver_->gotStageTwoRequest(requesterNumber, requiredNumber);
             break;
         case MsgTypes::ThirdStageRequest:
-            if (myConfidantIndex_ == 1 && myConfidantIndex_ == 1 && conveyer.currentRoundNumber() % 10 == 0) {
-                return;
-            }
             solver_->gotStageThreeRequest(requesterNumber, requiredNumber, iteration);
             break;
         default:
