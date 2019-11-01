@@ -1,18 +1,19 @@
 #include "csnode/conveyer.hpp"
 
-#include <csdb/transaction.hpp>
-
-#include <csnode/datastream.hpp>
-#include <solver/smartcontracts.hpp>
-
 #include <exception>
 #include <iomanip>
+
+#include <csdb/transaction.hpp>
+
+#include <csnode/configholder.hpp>
+#include <csnode/datastream.hpp>
+#include <csnode/sendcachedata.hpp>
+
+#include <solver/smartcontracts.hpp>
 
 #include <lib/system/hash.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
-
-#include <csnode/configholder.hpp>
 
 namespace {
 cs::ConveyerBase* conveyerView = nullptr;
@@ -516,7 +517,7 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
         const auto& transactions = packet.transactions();
 
         // first look at signatures if it is smarts packet
-        if (packet.signatures().size() > 1) {
+        if (packet.isSmart()) {
             const auto& stateTransaction = transactions.front();
 
             // check range
@@ -659,9 +660,14 @@ size_t cs::ConveyerBase::packetQueueTransactionsCount() const {
     return count;
 }
 
-size_t cs::ConveyerBase::sendCacheCount() const {
+size_t cs::ConveyerBase::sendCacheSize() const {
     cs::SharedLock lock(sharedMutex_);
     return pimpl_->sendPacketsCache.size();
+}
+
+size_t cs::ConveyerBase::packetsTableSize() const {
+    cs::SharedLock lock(sharedMutex_);
+    return pimpl_->packetsTable.size();
 }
 
 std::unique_lock<cs::SharedMutex> cs::ConveyerBase::lock() const {
@@ -708,26 +714,32 @@ void cs::ConveyerBase::flushTransactions() {
                 }
             }
 
-            packet.sign(pimpl_->privateKey);
+            if (!packet.sign(pimpl_->privateKey)) {
+                cswarning() << "Can not sign transaction packet";
+            }
 
             emit packetFlushed(packet);
 
-            auto hash = packet.hash();
-
-            if (!isHashAtSendCache(hash)) {
-                pimpl_->sendPacketsCache.emplace(round, hash);
-            }
-
-            if (!isPacketAtCache(packet)) {
-                pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
-            }
-            else {
-                csdebug() << csname() << "Same transaction packet already in packet table " << hash.toString();
-            }
+            addPacketToMeta(round, packet);
         }
     }
 
     checkSendCache();
+}
+
+void cs::ConveyerBase::addPacketToMeta(cs::RoundNumber round, cs::TransactionsPacket& packet) {
+    auto hash = packet.hash();
+
+    if (!isHashAtSendCache(hash)) {
+        pimpl_->sendPacketsCache.emplace(round, cs::SendCacheData { hash });
+    }
+
+    if (!isPacketAtCache(packet)) {
+        pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
+    }
+    else {
+        csdebug() << csname() << "Same transaction packet already in packet table " << hash.toString();
+    }
 }
 
 void cs::ConveyerBase::changeRound(cs::RoundNumber round) {
@@ -802,7 +814,7 @@ bool cs::ConveyerBase::isHashAtSendCache(cs::RoundNumber round, const cs::Transa
     auto [begin, end] = pimpl_->sendPacketsCache.equal_range(round);
 
     for (; begin != end; ++begin) {
-        if (begin->second == hash) {
+        if (begin->second.hash() == hash) {
             return true;
         }
     }
@@ -812,7 +824,7 @@ bool cs::ConveyerBase::isHashAtSendCache(cs::RoundNumber round, const cs::Transa
 
 bool cs::ConveyerBase::isHashAtSendCache(const cs::TransactionsPacketHash& hash) {
     for (const auto& pair : pimpl_->sendPacketsCache) {
-        if (pair.second == hash) {
+        if (pair.second.hash() == hash) {
             return true;
         }
     }
@@ -821,8 +833,13 @@ bool cs::ConveyerBase::isHashAtSendCache(const cs::TransactionsPacketHash& hash)
 }
 
 void cs::ConveyerBase::checkSendCache() {
+    if (pimpl_->sendPacketsCache.empty()) {
+        return;
+    }
+
     auto round = currentRoundNumber();
     auto sendCacheValue = cs::ConfigHolder::instance().config()->conveyerData().sendCacheValue;
+    auto maxResends = cs::ConfigHolder::instance().config()->conveyerData().maxResendsSendCache;
 
     if (round < sendCacheValue) {
         return;
@@ -836,27 +853,32 @@ void cs::ConveyerBase::checkSendCache() {
 
     auto iterator = pimpl_->sendPacketsCache.upper_bound(delta);
 
-    if (iterator == pimpl_->sendPacketsCache.end()) {
-        if (pimpl_->sendPacketsCache.empty()) {
-            return;
-        }
-    }
+    std::vector<cs::SendCacheData> hashesToSend;
+    PacketsHashes notFoundHashes;
+    PacketsHashes hashesToRemove;
 
-    // store hashes to resend
-    std::vector<cs::TransactionsPacketHash> hashes;
-    std::vector<cs::TransactionsPacketHash> notFoundHashes;
-
+    // add all hashes that should be resend or to remove
     for (auto iter = pimpl_->sendPacketsCache.begin(); iter != iterator; ++iter) {
-        hashes.push_back(iter->second);
+        ((iter->second.count() < maxResends) || (maxResends == 0)) ?
+            hashesToSend.push_back(iter->second) : hashesToRemove.push_back(iter->second.hash());
     }
 
-    if (hashes.empty()) {
+    // first, remove this hashes, they sended too much
+    if (!hashesToRemove.empty()) {
+        std::for_each(std::begin(hashesToRemove), std::end(hashesToRemove), [this](const auto& hash) {
+            pimpl_->packetsTable.erase(hash);
+        });
+    }
+
+    // return if all hashes is empty.
+    // cuz if iterator is end() then all elements will be removed from send packets cache.
+    if (hashesToSend.empty() && hashesToRemove.empty()) {
         return;
     }
 
     // send it
-    for (const auto& hash : hashes) {
-        auto iter = pimpl_->packetsTable.find(hash);
+    for (const auto& element : hashesToSend) {
+        auto iter = pimpl_->packetsTable.find(element.hash());
 
         if (iter != pimpl_->packetsTable.end()) {
             iter->second.makeHash();
@@ -864,7 +886,7 @@ void cs::ConveyerBase::checkSendCache() {
             emit packetFlushed(iter->second);
         }
         else {
-            notFoundHashes.push_back(hash);
+            notFoundHashes.push_back(element.hash());
         }
     }
 
@@ -872,12 +894,12 @@ void cs::ConveyerBase::checkSendCache() {
     pimpl_->sendPacketsCache.erase(pimpl_->sendPacketsCache.begin(), iterator);
 
     // add with new round key this hashes
-    for (const auto& hash : hashes) {
-        auto iter = std::find(notFoundHashes.begin(), notFoundHashes.end(), hash);
+    for (const auto& element : hashesToSend) {
+        auto iter = std::find(notFoundHashes.begin(), notFoundHashes.end(), element.hash());
 
         // if not found at broken hashes, add it again
         if (iter == notFoundHashes.end()) {
-            pimpl_->sendPacketsCache.emplace(round, hash);
+            pimpl_->sendPacketsCache.emplace(round, cs::SendCacheData { element.hash(), element.count() + 1 } );
         }
     }
 }
@@ -888,14 +910,14 @@ void cs::ConveyerBase::removeHashFromSendCache(const cs::TransactionsPacketHash&
     auto iter = end;
 
     for (; begin != end; ++begin) {
-        if (begin->second == hash) {
+        if (begin->second.hash() == hash) {
             iter = begin;
             break;
         }
     }
 
     if (iter != end) {
-        csdetails() << csname() << "remove hash from send cache " << iter->second.toString();
+        csdetails() << csname() << "remove hash from send cache " << iter->second.hash().toString();
         pimpl_->sendPacketsCache.erase(iter);
     }
 }

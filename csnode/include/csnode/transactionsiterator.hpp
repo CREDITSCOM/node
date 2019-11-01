@@ -11,7 +11,7 @@ namespace cs {
 
 class TransactionsIterator {
 public:
-    TransactionsIterator(BlockChain&, const csdb::Address&);
+    TransactionsIterator(const BlockChain&, const csdb::Address&);
 
     void next();
     bool isValid() const;
@@ -30,7 +30,7 @@ public:
 private:
     void setFromTransId(const csdb::TransactionID&);
 
-    BlockChain& bc_;
+    const BlockChain& bc_;
 
     csdb::Address addr_;
     csdb::Pool lapoo_;

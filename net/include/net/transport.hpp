@@ -106,7 +106,7 @@ public:
     bool isOwnNodeTrusted() const;
 
     void sendBroadcast(const Packet* pack) {
-        nh_.sendByNeighbours(pack);
+        neighbourhood_.sendByNeighbours(pack);
     }
 
     bool sendDirect(const Packet*, const Connection&);
@@ -144,8 +144,11 @@ public:
     ConnectionPtr getRandomNeighbour();
     cs::Sequence getConnectionLastSequence(const std::size_t number);
 
+    Neighbour getNeigbour(const cs::PublicKey& key);
+    bool markNeighbourAsBlackListed(const cs::PublicKey& key);
+
     auto getNeighboursLock() const {
-        return nh_.getNeighboursLock();
+        return neighbourhood_.getNeighboursLock();
     }
 
     bool isShouldUpdateNeighbours() const;
@@ -273,7 +276,7 @@ private:
     Network* net_;
     Node* node_;
 
-    Neighbourhood nh_;
+    Neighbourhood neighbourhood_;
 
     static constexpr uint32_t fragmentsFixedMapSize_ = 10000;
     FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, fragmentsFixedMapSize_> fragOnRound_;

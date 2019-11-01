@@ -152,10 +152,8 @@ public:  // Interface
     ///
     bool addSignature(const cs::Byte index, const cs::Signature& signature);
 
-    bool sign(const cs::PrivateKey & privateKey);
-
-    bool verify(const cs::PublicKey & publicKey);
-
+    bool sign(const cs::PrivateKey& privateKey);
+    bool verify(const cs::PublicKey& publicKey);
     bool verify(const std::vector<cs::PublicKey>& publicKeys);
 
     ///
@@ -199,6 +197,11 @@ public:  // Interface
     /// @brief Clears transactions vector
     ///
     void clear() noexcept;
+
+    ///
+    /// @brief Returns packet smart state
+    ///
+    bool isSmart() const;
 
 private:  // Service
     void put(::csdb::priv::obstream& os, Serialization options) const;

@@ -1,17 +1,14 @@
 #ifndef CONVEYER_HPP
 #define CONVEYER_HPP
 
+#include <memory>
+#include <optional>
+
 #include <csnode/nodecore.hpp>
 #include <csnode/packetqueue.hpp>
 
 #include <lib/system/common.hpp>
 #include <lib/system/signals.hpp>
-
-#include <memory>
-#include <optional>
-
-class Config;
-struct ConveyerData;
 
 namespace csdb {
 class Transaction;
@@ -290,7 +287,12 @@ public:
     ///
     /// @brief Returns current send cache size
     ///
-    size_t sendCacheCount() const;
+    size_t sendCacheSize() const;
+
+    ///
+    /// @brief Returns current packets table size
+    ///
+    size_t packetsTableSize() const;
 
     // sync, try do not use it :]
     std::unique_lock<cs::SharedMutex> lock() const;
@@ -314,6 +316,7 @@ public slots:
     void flushTransactions();
 
 protected:
+    void addPacketToMeta(cs::RoundNumber round, cs::TransactionsPacket& packet);
     void changeRound(cs::RoundNumber round);
 
     // searches transactions packet at all conveyer cache

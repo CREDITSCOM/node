@@ -33,6 +33,7 @@ namespace cs {
 class BlockHashes;
 class WalletsIds;
 class Fee;
+class TransactionsIndex;
 class TransactionsPacket;
 
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
@@ -115,7 +116,6 @@ public:
     }
 
     void removeWalletsInPoolFromCache(const csdb::Pool& pool);
-    void removeLastBlockFromTrxIndex(const csdb::Pool&);
     void removeLastBlock();
 
     // updates fees in every transaction
@@ -125,6 +125,7 @@ public:
     void setTransactionsFees(std::vector<csdb::Transaction>& transactions, const cs::Bytes& characteristicMask);
 
     void addNewWalletsToPool(csdb::Pool& pool);
+    void updateLastTransactions(const std::vector<std::pair<cs::PublicKey, csdb::TransactionID>>&);
 
     bool checkForConsistency(csdb::Pool & pool);
 
@@ -290,7 +291,6 @@ private:
     void createCachesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
     void writeGenesisBlock();
-    void createTransactionsIndex(csdb::Pool&);
 
     void logBlockInfo(csdb::Pool& pool);
 
@@ -327,6 +327,7 @@ private:
     csdb::Storage storage_;
 
     std::unique_ptr<cs::BlockHashes> blockHashes_;
+    std::unique_ptr<cs::TransactionsIndex> trxIndex_;
 
     const csdb::Address genesisAddress_;
     const csdb::Address startAddress_;
@@ -395,8 +396,6 @@ private:
 
     // may be modified once in uuid() method:
     mutable uint64_t uuid_ = 0;
-    bool recreateIndex_;
-    std::map<csdb::Address, cs::Sequence> lapoos;
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
 };
