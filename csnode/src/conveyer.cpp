@@ -146,14 +146,14 @@ const cs::PacketQueue& cs::ConveyerBase::packetQueue() const {
     return pimpl_->packetQueue;
 }
 
-std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::createPacket() const {
+std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::createPacket(cs::RoundNumber rNum) const {
     cs::Lock lock(sharedMutex_);
 
     static constexpr size_t smartContractDetector = 1;
-    cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
+    cs::ConveyerMeta* meta = pimpl_->metaStorage.get(rNum);
 
     if (!meta) {
-        cserror() << csname() << "Can not create transactions packet at round " << currentRoundNumber();
+        cserror() << csname() << "Can not create transactions packet at round " << rNum;
         return std::nullopt;
     }
 

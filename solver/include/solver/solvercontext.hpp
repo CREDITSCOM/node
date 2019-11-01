@@ -100,6 +100,11 @@ public:
     void back_to_stage3() {
         core.handleTransitions(SolverCore::Event::Stage3NonComplete);
     }
+
+    void askTrustedRound(cs::RoundNumber rNum, const cs::ConfidantsKeys& confidants) {
+        core.askTrustedRound(rNum, confidants);
+    }
+
     /**
      * @fn  NodeLevel SolverContext::level() const;
      *
