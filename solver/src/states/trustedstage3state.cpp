@@ -453,6 +453,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
 
     csdebug() << name() << ": election table ready";
     size_t max_conf = 0;
+    size_t eLiars = 0;
     if (candidatesElection.size() < 4) {
         max_conf = candidatesElection.size();
         csdebug() << name() << ": too few TRUSTED NODES, but we continue at the minimum ...";
@@ -463,16 +464,50 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
             max_conf = Consensus::MaxTrustedNodes;
         }
     }
-    csdebug() << name() << ": max confidant: " << max_conf;
-
+    if (max_conf > 5) {
+        eLiars = max_conf / 4;
+    }
+    else {
+        eLiars = 0;
+    }
+    csdebug() << name() << ": next round max confidants: " << max_conf << ", estimated liars " << eLiars;
+    csdebug() << "===================================================================";
+    std::vector<StakeHolder> stakers;
     for (auto& it : candidatesElection) {
-        // csdebug() << byteStreamToHex(it.first.str, cscrypto::kPublicKeySize) << " - " << (int) it.second;
-        if (it.second > cr) {
-            aboveThreshold.emplace_back(it.first);
+        BlockChain::WalletData wData;
+        context.blockchain().findWalletData(csdb::Address::from_public_key(it.first), wData);
+        csdb::Amount st = wData.balance_;
+        stakers.emplace_back(it.first, st);
+    }
+
+    std::sort(stakers.begin(), stakers.end(), [](const StakeHolder &a, const StakeHolder &b) { return a.stake > b.stake; });
+
+    auto itStake = stakers.begin();
+    int cnt = 0;
+    while (itStake != stakers.end()) {
+        if(cnt < max_conf - eLiars) {
+            aboveThreshold.emplace_back(itStake->key);
         }
         else {
-            belowThreshold.emplace_back(it.first);
+            belowThreshold.emplace_back(itStake->key);
         }
+        if (cnt == max_conf) {
+            csdebug() << "-------------------------------------------------------------------";
+        }
+        ++cnt;
+        csdebug() << cnt << ". " << cs::Utils::byteStreamToHex(itStake->key.data(), itStake->key.size()) << "  " << itStake->stake.to_string();
+        ++itStake;
+    }
+    csdebug() << "===================================================================";
+
+
+    std::mt19937 g;
+    g.seed(uint32_t(Conveyer::instance().currentRoundNumber()));
+    cs::Random::shuffle(belowThreshold.begin(), belowThreshold.end(), g);
+    auto itt = belowThreshold.begin();
+    for (int j = 0; j < eLiars; ++j) {
+        aboveThreshold.emplace_back(*itt);
+        ++itt;
     }
 
     for (auto& it : hashesElection) {
@@ -498,26 +533,26 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     }
 
     csdebug() << name() << ": initial amount: " << myPacks << ", next round hashes: " << next_round_hashes.size() << ", accepted: " << acceptedPacks;
-    csdebug() << name() << ": candidates divided: above = " << aboveThreshold.size() << ", below = " << belowThreshold.size();
-    csdebug() << "======================================================";
+    csdebug() << name() << ": candidates divided: accepted = " << aboveThreshold.size() << ", rejected = " << belowThreshold.size() - eLiars;
+    csdebug() << "===================================================================";
 
-    for (size_t i = 0; i < aboveThreshold.size(); i++) {
-        const auto& tmp = aboveThreshold[i];
-        csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << static_cast<int>(candidatesElection.at(tmp));
-    }
+    //for (size_t i = 0; i < aboveThreshold.size(); i++) {
+    //    const auto& tmp = aboveThreshold[i];
+    //    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << static_cast<int>(candidatesElection.at(tmp));
+    //}
 
-    csdebug() << "------------------------------------------------------";
-    for (size_t i = 0; i < belowThreshold.size(); i++) {
-        const auto& tmp = belowThreshold[i];
-        csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << static_cast<int>(candidatesElection.at(tmp));
-    }
+    //csdebug() << "------------------------------------------------------";
+    //for (size_t i = 0; i < belowThreshold.size(); i++) {
+    //    const auto& tmp = belowThreshold[i];
+    //    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << static_cast<int>(candidatesElection.at(tmp));
+    //}
 
+    g.seed(uint32_t(Conveyer::instance().currentRoundNumber()));
+    cs::Random::shuffle(aboveThreshold.begin(), aboveThreshold.end(), g);
     csdebug() << name() << ": final list of next round trusted:";
 
-    if (aboveThreshold.size() >= max_conf) {  // Consensus::MinTrustedNodes) {
-        std::mt19937 g;
-        g.seed(uint32_t(Conveyer::instance().currentRoundNumber()));
-        cs::Random::shuffle(aboveThreshold.begin(), aboveThreshold.end(), g);
+    if (aboveThreshold.size() >= Consensus::MinTrustedNodes) {  // Consensus::MinTrustedNodes) {
+
         for (size_t i = 0; i < max_conf; ++i) {
             const auto& tmp = aboveThreshold.at(i);
             next_round_trust.emplace_back(tmp);
@@ -525,26 +560,9 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
         }
     }
     else {
-        if (belowThreshold.size() >= max_conf - aboveThreshold.size()) {
-            for (size_t i = 0; i < aboveThreshold.size(); i++) {
-                const auto& tmp = aboveThreshold.at(i);
-                next_round_trust.emplace_back(tmp);
-                csdebug() << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
-            }
-            const size_t toAdd = max_conf - next_round_trust.size();
-            std::mt19937 g;
-            g.seed(uint32_t(Conveyer::instance().currentRoundNumber()));
-            cs::Random::shuffle(belowThreshold.begin(), belowThreshold.end(), g);
-            for (size_t i = 0; i < toAdd; i++) {
-                const auto& tmp = belowThreshold.at(i);
-                next_round_trust.emplace_back(tmp);
-                csdebug() << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
-            }
-        }
-        else {
-            cslog() << name() << ": cannot create list of trusted, too few candidates.";
-        }
+        cslog() << name() << ": cannot create list of trusted, too few candidates.";
     }
+
     csdebug() << name() << ": end of trusted election";
 }
 
