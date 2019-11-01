@@ -291,7 +291,6 @@ private:
     void createCachesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
     void writeGenesisBlock();
-    void createTransactionsIndex(csdb::Pool&);
 
     void logBlockInfo(csdb::Pool& pool);
 
