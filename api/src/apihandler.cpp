@@ -1,6 +1,7 @@
 #include <apihandler.hpp>
 
 #include <csnode/conveyer.hpp>
+#include <csnode/itervalidator.hpp>
 #include <csnode/transactionsiterator.hpp>
 #include <csnode/fee.hpp>
 
@@ -670,31 +671,14 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
         trxn.add_user_field(cs::trx_uf::ordinary::UsedContracts, uf);
     }
 
-    // check money
-    const auto source_addr = blockchain_.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey);
-    BlockChain::WalletData wallData{};
-    if (!blockchain_.findWalletData(source_addr, wallData)) {
-        return "not enough money!";
-    }
-
-    const auto max_fee = trxn.max_fee().to_double();
-    const auto balance = wallData.balance_.to_double();
-    if (max_fee > balance) {
-        return "not enough money!\nmax_fee: " + std::to_string(max_fee) + "\nbalance: " + std::to_string(balance);
-    }
-
-    // check max fee
+    cs::IterValidator::SimpleValidator::RejectCode err;
     csdb::AmountCommission countedFee;
-    if (!cs::fee::estimateMaxFee(trxn, countedFee)) {
-        return "max fee is not enough, counted fee will be " + std::to_string(countedFee.to_double());
-    }
-
-    // check signature
-    const auto byteStream = trxn.to_byte_stream_for_sig();
-    if (!cscrypto::verifySignature(trxn.signature(), blockchain_.getAddressByType(trxn.source(), BlockChain::AddressType::PublicKey).public_key(),
-        byteStream.data(), byteStream.size())) {
-        cslog() << "API: reject transaction with wrong signature";
-        return "wrong signature! ByteStream: " + cs::Utils::byteStreamToHex(fromByteArray(byteStream));
+    if (!cs::IterValidator::SimpleValidator::validate(trxn, blockchain_, &countedFee, &err)) {
+        auto msg = cs::IterValidator::SimpleValidator::getRejectMessage(err);
+        if (err == cs::IterValidator::SimpleValidator::kInsufficientMaxFee) {
+            msg += " Counted fee will be " + std::to_string(countedFee.to_double()) + ".";
+        }
+        return msg;
     }
     return std::nullopt;
 }
