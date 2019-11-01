@@ -7,6 +7,8 @@
 #include "stage.hpp"
 #include "timeouttracking.hpp"
 
+#include <csnode/itervalidator.hpp>
+
 #include <csdb/pool.hpp>
 #include <csnode/transactionspacket.hpp>
 #include <csnode/roundpackage.hpp>
@@ -26,6 +28,8 @@ class Node;
 namespace cs {
 class WalletsState;
 class SmartContracts;
+class TransactionsPacket;
+class IterValidator;
 }  // namespace cs
 
 // TODO: discuss possibility to switch states after timeout expired, timeouts can be individual but controlled by
@@ -127,6 +131,8 @@ public:
     cs::Bytes getRealTrusted();
     size_t trueStagesThree();
     uint8_t currentStage3iteration();
+
+    std::optional<cs::Characteristic> ownValidation(cs::TransactionsPacket& packet, cs::Packets& smartsPackets);
 
     size_t stagesThree();
     bool stateFailed(Result res);
@@ -343,6 +349,7 @@ private:
     cs::RoundNumber lastGrayUpdated_ = 0;
     RoundPackage justCreatedRoundPackage;
     SentSignatures lastSentSignatures_;
+    std::unique_ptr<IterValidator> pVal_;
 };
 
 }  // namespace cs

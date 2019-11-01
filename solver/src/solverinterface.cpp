@@ -219,7 +219,7 @@ void SolverCore::gotStageOneRequest(uint8_t requester, uint8_t required) {
 
     const auto ptr = find_stage1(required);
     if (ptr != nullptr) {
-        pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::FirstStage, requester, ptr->messageBytes);
+        pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::FirstStage, requester, ptr->message);
     }
 }
 
@@ -228,7 +228,7 @@ void SolverCore::gotStageTwoRequest(uint8_t requester, uint8_t required) {
 
     const auto ptr = find_stage2(required);
     if (ptr != nullptr) {
-        pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::SecondStage, requester, ptr->messageBytes);
+        pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::SecondStage, requester, ptr->message);
     }
 }
 
@@ -243,7 +243,7 @@ void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required, uint8
 
     for (auto& it : stageThreeStorage) {
         if (it.iteration == iteration && it.sender == required) {
-            pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester, it.messageBytes);
+            pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester, it.message);
             return;
         }
     }

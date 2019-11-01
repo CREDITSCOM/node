@@ -34,6 +34,7 @@
 #include <cscrypto/cscrypto.hpp>
 
 #include <observer.hpp>
+#inclue  <numeric>
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
@@ -396,6 +397,46 @@ bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::Publ
     return true;
 }
 
+bool Node::verifyPacketTransactions(cs::TransactionsPacket packet) {
+    cs::Characteristic characteristic;
+    std::vector<cs::TransactionsPacket> packets;
+    packets.clear();
+    if (packet.signatures == 1) {
+        characteristic = solver_->ownValidation(packet, pakets);
+    }
+    else if (packet.signatures > 2) {
+        packets.push_back(packet);
+        characteristic = solver_->ownValidations(packet, packets);
+    }
+    int sum = std::accumulate(characteristic.mask.begin(), characteristic.mask.end(), 0);
+    if (sum > packet.transactions().size()) {
+        csdebug() << "NODE> Invalid mask obtained";
+        return false;
+    }
+    int cnt = packet.transactions().size();
+    if (sum == cnt) {
+        return true;
+    }
+    else {
+
+        if (cnt > Consensus::AccusalPacketSize) {
+            if (sum < cnt/2) {
+                // put sender to black list
+            }
+            else {
+                // put sender to black list counter
+            }
+        }
+        else {
+            if (sum < cnt / 2) {
+                // put sender to black list counter
+            }
+        }
+
+        return false;
+    }
+}
+
 void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
     istream_.init(data, size);
 
@@ -407,7 +448,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
         return;
     }
     
-    if (verifyPacketSignatures(packet, sender)) {
+    if (verifyPacketSignatures(packet, sender) && verifyPacketTransactions(packet)) {
         processTransactionsPacket(std::move(packet));
     }
     else {
@@ -607,6 +648,60 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         return;
     }
 
+    auto myCharacteristic = conveyer.characteristic(rPackage.poolMetaInfo().sequenceNumber);
+    csdebug() << "NODE> Trying to get characteristic from conveyer";
+    std::vector<cscrypto::Byte> maskOnly;
+    std::vector<cscrypto::Byte>::const_iterator myIt;
+    if (myCharacteristic == nullptr || myCharacteristic->mask.size() < rPackage.poolMetaInfo().characteristic.mask.size()) {
+        csdebug() << "NODE> Characteristic from conveyer doesn't exist";
+        auto data = conveyer.createPacket(rPackage.poolMetaInfo().sequenceNumber);
+
+        if (!data.has_value()) {
+            cserror() << "NODE> error while prepare to calculate characteristic, maybe method called before sync completed?";
+            return;
+        }
+        // bindings
+        auto&&[packet, smartPackets] = std::move(data).value();
+        csdebug() << "NODE> Packet size: " << packet.transactionsCount() << ", smartPackets: " << smartPackets.size();
+        auto myMask = solver_->ownValidation(packet, smartPackets);
+        csdebug() << "NODE> Characteristic calculated from the very transactions";
+        if (myMask.has_value()) {
+            maskOnly = myMask.value().mask;
+        }
+        else {
+            maskOnly.clear();
+        }
+        myIt = maskOnly.cbegin();
+    }
+    else {
+        maskOnly = myCharacteristic->mask;
+        myIt = maskOnly.cbegin();
+    }
+    auto it = rPackage.poolMetaInfo().characteristic.mask.cbegin();
+    bool identic = true;
+    csdebug() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(maskOnly.data(), maskOnly.size())
+        << " and received: " << cs::Utils::byteStreamToHex(rPackage.poolMetaInfo().characteristic.mask.data(), rPackage.poolMetaInfo().characteristic.mask.size());
+    while (!(myIt == maskOnly.cend() || it == rPackage.poolMetaInfo().characteristic.mask.cend())) {
+        if (*myIt != *it) {
+            identic = false;
+            csdebug() << "NODE> Comparing " << static_cast<int>(*myIt) << " versus " << static_cast<int>(*it) << " ... False";
+            break;
+        }
+        else {
+            csdebug() << "NODE> Comparing " << static_cast<int>(*myIt) << " versus " << static_cast<int>(*it) << " ... Ok";
+        }
+        ++myIt;
+        ++it;
+    }
+    if (maskOnly.size() != rPackage.poolMetaInfo().characteristic.mask.size()) {
+        identic = false;
+    }
+    if (!identic) {
+        cserror() << "NODE> We probably got the roundPackage with invalid characteristic, can't build block";
+        sendBlockAlarm(rPackage.poolMetaInfo().sequenceNumber);
+        return;
+    }
+    csdebug() << "NODE> Previous block mask validation finished successfully";
     // otherwise senseless, this block is already in chain
     conveyer.setCharacteristic(rPackage.poolMetaInfo().characteristic, rPackage.poolMetaInfo().sequenceNumber);
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(rPackage.poolMetaInfo());
@@ -661,6 +756,61 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     }
 
     csmeta(csdetails) << "done";
+}
+
+void Node::createTestTransaction() {
+    return;
+    csdb::Transaction transaction;
+
+    std::string strAddr1 = "G2GeLfwjg6XuvoWnZ7ssx9EPkEBqbYL3mw3fusgpzoBk";
+    std::string strAddr2 = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
+
+    std::vector<uint8_t> pub_key1;
+    DecodeBase58(strAddr1, pub_key1);   
+    std::vector<uint8_t> pub_key2;
+    DecodeBase58(strAddr2, pub_key2);
+
+    csdb::Address test_address1 = csdb::Address::from_public_key(pub_key1);
+    csdb::Address test_address2 = csdb::Address::from_public_key(pub_key2);
+    transaction.set_target(test_address1);
+    transaction.set_source(test_address2);
+    transaction.set_currency(csdb::Currency(1));
+    transaction.set_amount(csdb::Amount(1, 0));
+    transaction.set_max_fee(csdb::AmountCommission(0.0));
+    transaction.set_counted_fee(csdb::AmountCommission(0.0));
+    transaction.set_innerID(0);
+    cs::TransactionsPacket transactionPack;
+    transactionPack.addTransaction(transaction);
+    transactionPack.makeHash();
+
+    cs::Conveyer::instance().addSeparatePacket(transactionPack);
+    csmeta(csdebug) << "NODE> Sending bad transaction's packet to all";
+}
+
+void Node::sendBlockAlarm(cs::Sequence seq) {
+    cs::Bytes message;
+    cs::DataStream stream(message);
+    stream << seq;
+    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+    sendToBroadcast(MsgTypes::BlockAlarm, seq, sig);
+    csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
+}
+
+void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+
+    istream_.init(data, size);
+    cs::Signature sig;
+    istream_ >> sig;
+    cs::Bytes message;
+    cs::DataStream stream(message);
+    stream << rNum;
+    if (!cscrypto::verifySignature(sig, sender, message.data(), message.size())) {
+        csdebug() << "NODE> BlockAlarm message from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " -  WRONG SIGNATURE!!!";
+        return;
+    }
+    else {
+        csdebug() << "NODE> Got BlockAlarm message from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    }
 }
 
 void Node::cleanConfirmationList(cs::RoundNumber rNum) {
@@ -1099,6 +1249,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         case MsgTypes::EmptyRoundPack:
         case MsgTypes::StateRequest:
         case MsgTypes::StateReply:
+        case MsgTypes::BlockAlarm:
             return MessageActions::Process;
 
         default:
@@ -1412,13 +1563,13 @@ void Node::sendStageOne(const cs::StageOne& stageOneInfo) {
         << cs::StageOne::toString(stageOneInfo);
 
     csdebug() << "Stage one Message R-" << cs::Conveyer::instance().currentRoundNumber() << "[" << static_cast<int>(stageOneInfo.sender)
-        << "]: " << cs::Utils::byteStreamToHex(stageOneInfo.messageBytes.data(), stageOneInfo.messageBytes.size());
+        << "]: " << cs::Utils::byteStreamToHex(stageOneInfo.message.data(), stageOneInfo.message.size());
     csdebug() << "Stage one Signature R-" << cs::Conveyer::instance().currentRoundNumber() << "[" << static_cast<int>(stageOneInfo.sender)
         << "]: " << cs::Utils::byteStreamToHex(stageOneInfo.signature.data(), stageOneInfo.signature.size());
 
-    sendToConfidants(MsgTypes::FirstStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageOneInfo.signature, stageOneInfo.messageBytes);
+    sendToConfidants(MsgTypes::FirstStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageOneInfo.signature, stageOneInfo.message);
 
-    csmeta(csdetails) << "Sent message size " << stageOneInfo.messageBytes.size();
+    csmeta(csdetails) << "Sent message size " << stageOneInfo.message.size();
 }
 
 void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1441,19 +1592,19 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
     cs::StageOne stage;
     istream_ >> stage.signature;
-    istream_ >> stage.messageBytes;
+    istream_ >> stage.message;
 
     if (!istream_.good() || !istream_.end()) {
         csmeta(cserror) << "Bad stage-1 packet format";
         return;
     }
-    csdetails() << "Stage1 message: " << cs::Utils::byteStreamToHex(stage.messageBytes);
+    csdetails() << "Stage1 message: " << cs::Utils::byteStreamToHex(stage.message);
     csdetails() << "Stage1 signature: " << cs::Utils::byteStreamToHex(stage.signature);
 
 
 
     // hash of part received message
-    stage.messageHash = cscrypto::calculateHash(stage.messageBytes.data(), stage.messageBytes.size());
+    stage.messageHash = cscrypto::calculateHash(stage.message.data(), stage.message.size());
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
     cs::Bytes signedMessage;
@@ -1463,7 +1614,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     signedStream << stage.messageHash;
 
     // stream for main message
-    cs::DataStream stream(stage.messageBytes.data(), stage.messageBytes.size());
+    cs::DataStream stream(stage.message.data(), stage.message.size());
     stream >> stage.sender;
     stream >> stage.hash;
     stream >> stage.trustedCandidates;
@@ -1475,7 +1626,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     }
 
     const cs::PublicKey& confidant = conveyer.confidantByIndex(stage.sender);
-    csdebug() << "StageMessage[" << static_cast<int>(stage.sender) <<"]: " << cs::Utils::byteStreamToHex(stage.messageBytes.data(), stage.messageBytes.size());
+    csdebug() << "StageMessage[" << static_cast<int>(stage.sender) <<"]: " << cs::Utils::byteStreamToHex(stage.message.data(), stage.message.size());
     if (!cscrypto::verifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
         cswarning() << "NODE> Stage-1 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
         return;
@@ -1501,10 +1652,10 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
         return;
     }
 
-    sendToConfidants(MsgTypes::SecondStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageTwoInfo.signature, stageTwoInfo.messageBytes);
+    sendToConfidants(MsgTypes::SecondStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageTwoInfo.signature, stageTwoInfo.message);
 
     // cash our stage two
-    csmeta(csdetails) << "Bytes size " << stageTwoInfo.messageBytes.size() << " ... done";
+    csmeta(csdetails) << "Bytes size " << stageTwoInfo.message.size() << " ... done";
 }
 
 void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
@@ -1555,7 +1706,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     }
 
     csmeta(csdetails) << "Signature is OK";
-    stage.messageBytes = std::move(bytes);
+    stage.message = std::move(bytes);
 
     csdebug() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] is OK!";
     solver_->gotStageTwo(stage);
@@ -1573,10 +1724,10 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
     }
 
     // TODO: think how to improve this code
-    sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, stageThreeInfo.messageBytes);
+    sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, stageThreeInfo.message);
 
     // cach stage three
-    csmeta(csdetails) << "bytes size " << stageThreeInfo.messageBytes.size();
+    csmeta(csdetails) << "bytes size " << stageThreeInfo.message.size();
     stageThreeSent_ = true;
     csmeta(csdetails) << "done";
 }
@@ -1643,7 +1794,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
         return;
     }
 
-    stage.messageBytes = std::move(bytes);
+    stage.message = std::move(bytes);
 
     csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] - preliminary check ... passed!";
 
@@ -2486,6 +2637,12 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
 
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
 	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
+
+
+    if (rPackage.roundTable().round == 30 && myConfidantIndex_ == 1) {
+        createTestTransaction();
+    }
+
     currentRoundPackage_ = cs::RoundPackage();
     reviewConveyerHashes();
 
@@ -2840,6 +2997,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     if (!found) {
         myLevel_ = Level::Normal;
+        myConfidantIndex_ = cs::ConfidantConsts::InvalidConfidantIndex;
         if (stopRequested_) {
             stop();
             return;

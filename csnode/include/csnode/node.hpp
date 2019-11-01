@@ -82,6 +82,7 @@ public:
     void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum);
     void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
     bool verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender);
+    bool verifyPacketTransactions(cs::TransactionsPacket packet);
     void getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
 
@@ -170,8 +171,13 @@ public:
     // transaction's pack syncro
     void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
     void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
+    void getBlockAlarm(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
     void getCharacteristic(cs::RoundPackage& rPackage);
+
+    void createTestTransaction();
+
+    void sendBlockAlarm(cs::Sequence seq);
 
     void cleanConfirmationList(cs::RoundNumber rNum);
 
@@ -433,8 +439,9 @@ private:
     std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
     std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
 
-    std::vector<cs::Stage> smartStageTemporary_;
-    std::vector<uint64_t> activeSmartConsensuses_;  // smart consensus IDs:
+    //std::vector<cs::Stage> smartStageTemporary_;
+    // smart consensus IDs:
+    std::vector<uint64_t> activeSmartConsensuses_;
 
     SentRoundData lastSentRoundData_;
     SentSignatures lastSentSignatures_;

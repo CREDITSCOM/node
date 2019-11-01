@@ -72,7 +72,7 @@ void TrustedStage1State::finalizeStage(SolverContext& context) {
     stage.roundTimeStamp = std::to_string(currentTimeStamp);
         /*}*/
     stage.toBytes();
-    stage.messageHash = cscrypto::calculateHash(stage.messageBytes.data(), stage.messageBytes.size());
+    stage.messageHash = cscrypto::calculateHash(stage.message.data(), stage.message.size());
     cs::Bytes messageToSign;
     messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
     cs::DataStream signStream(messageToSign);
@@ -101,7 +101,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
     }
 
     csdebug() << name() << ": -------> STARTING CONSENSUS #" << conveyer.currentRoundNumber() << " <------- ";
-    auto data = conveyer.createPacket();
+    auto data = conveyer.createPacket(round);
 
     if (!data.has_value()) {
         cserror() << name() << ": error while prepare consensus to build vector, maybe method called before sync completed?";
@@ -205,6 +205,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::Transactio
     if (transactionsCount > 0) {
         characteristic = pValidator_->formCharacteristic(context, packet.transactions(), smartsPackets);
     }
+
     if (characteristic.mask.size() != transactionsCount) {
         cserror() << name() << ": characteristic mask size is not equal to transactions count in build_vector()";
     }
