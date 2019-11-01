@@ -67,15 +67,15 @@ void TransactionsIndex::onDbReadFinished() {
     }
 }
 
-void TransactionsIndex::onRemoveBlock(const csdb::Pool& pool) {
+void TransactionsIndex::onRemoveBlock(const csdb::Pool& _pool) {
     std::set<csdb::Address> uniqueAddresses;
     std::vector<std::pair<cs::PublicKey, csdb::TransactionID>> updates;
 
-    auto lbd = [&updates, &uniqueAddresses, this](const csdb::Address& _addr, cs::Sequence _sq) {
+    auto lbd = [&_pool, &updates, &uniqueAddresses, this](const csdb::Address& _addr, cs::Sequence _sq) {
         auto key = bc_.getAddressByType(_addr, BlockChain::AddressType::PublicKey);
 
         if (uniqueAddresses.insert(key).second) {
-            auto it = TransactionsIterator(bc_, _addr);
+            auto it = TransactionsIterator(bc_, _addr, _pool);
             bool found = false;
 
             for (; it.isValid(); it.next()) {
@@ -93,7 +93,7 @@ void TransactionsIndex::onRemoveBlock(const csdb::Pool& pool) {
         }
     };
 
-    for (const auto& t : pool.transactions()) {
+    for (const auto& t : _pool.transactions()) {
         lbd(t.source(), lastIndexedPool_);
         lbd(t.target(), lastIndexedPool_);
     }
