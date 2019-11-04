@@ -75,11 +75,14 @@ Transport::Transport(const Config& config, Node* node)
 , myPublicKey_(node->getNodeIdKey())
 , oLock_()
 , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
-, node_(node) {
+, node_(node)
+, host_(net::Config(id_), static_cast<HostEventHandler&>(*this)) {
     good_ = true;
 }
 
-void Transport::run() {}
+void Transport::run() {
+  host_.Run();
+}
 
 const char* Transport::networkCommandToString(NetworkCommand command) {
     switch (command) {

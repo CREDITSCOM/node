@@ -16,7 +16,6 @@ add_library(net
   src/packetvalidator.cpp
 )
 
-add_dependencies(${PROJECT_NAME} csconnector)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
                                       ${CMAKE_CURRENT_SOURCE_DIR}/include/net)
 
@@ -26,4 +25,4 @@ set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 suppress_boost_cmake_warnings()
 configure_msvc_flags()
 
-target_link_libraries(${PROJECT_NAME} csnode lib cscrypto)
+target_link_libraries(${PROJECT_NAME} csnode lib cscrypto p2p_network)

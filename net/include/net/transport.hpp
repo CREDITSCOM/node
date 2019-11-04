@@ -16,6 +16,8 @@
 #include <lib/system/signals.hpp>
 #include <lib/system/lockfreechanger.hpp>
 
+#include <p2p_network.h>
+
 #include "neighbourhood.hpp"
 #include "packet.hpp"
 #include "pacmans.hpp"
@@ -74,7 +76,7 @@ uint16_t getHashIndex(const ip::udp::endpoint&);
 
 class Node;
 
-class Transport {
+class Transport : public net::HostEventHandler {
 public:
     explicit Transport(const Config& config, Node* node);
     ~Transport() {}
@@ -119,6 +121,7 @@ public:
     cs::Sequence getNeighbourLastSequence(const cs::PublicKey&) { return 1; }
 
     void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}
+    void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override {}
 
 public signals:
     PingSignal pingReceived;
@@ -202,5 +205,7 @@ private:
     std::deque<ConnectionPtr> neighbours_;
 
     Node* node_;
+    net::NodeId id_;
+    net::Host host_;
 };
 #endif  // TRANSPORT_HPP
