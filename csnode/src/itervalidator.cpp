@@ -2,6 +2,8 @@
 
 #include <cstring>
 
+#include <csdb/amount_commission.hpp>
+#include <csnode/fee.hpp>
 #include <csnode/walletsstate.hpp>
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
@@ -228,5 +230,50 @@ void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packe
             }
         }
     }
+}
+
+std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
+    switch (rc) {
+        case kAllCorrect :
+            return "Transaction is correct.";
+        case kInsufficientBalance :
+            return "Source wallet has insufficient balance to issue trasaction.";
+        case kWrongSignature :
+            return "Transaction has wrong signature.";
+        case kInsufficientMaxFee :
+            return "Transaction's max fee is not enough to issue transaction.";
+        case kSourceDoesNotExists :
+            return "Transaction's source doesn't exist in blockchain.";
+        default :
+            return "Unknown reject reason.";
+    }
+}
+
+bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const BlockChain& bc, csdb::AmountCommission* countedFeePtr, RejectCode* rcPtr) {
+    RejectCode rc = kAllCorrect;
+
+    BlockChain::WalletData wallet;
+    csdb::AmountCommission countedFee;
+
+    if (!fee::estimateMaxFee(t, countedFee)) {
+        rc = kInsufficientMaxFee;
+    }
+
+    if (!rc && !bc.findWalletData(t.source(), wallet)) {
+        rc = kSourceDoesNotExists;
+    }
+
+    if (!rc && wallet.balance_ < (t.amount() + t.max_fee().to_double())) {
+        rc = kInsufficientBalance;
+    }
+
+    if (!rc && !t.verify_signature(bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey).public_key())) {
+        rc = kWrongSignature;
+    }
+
+    if (countedFeePtr) *countedFeePtr = countedFee;
+    if (rcPtr) *rcPtr = rc;
+
+    return rc == kAllCorrect;
 }
 }  // namespace cs

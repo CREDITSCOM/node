@@ -32,7 +32,6 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , startAddress_(startAddress)
 , walletIds_(new WalletsIds)
 , walletsCacheStorage_(new WalletsCache(*walletIds_))
-, walletsPools_(new WalletsPools(genesisAddress, startAddress, *walletIds_))
 , multiWallets_(new MultiWallets())
 , cacheMutex_() {
     createCachesPath();
@@ -589,62 +588,6 @@ uint64_t BlockChain::getWalletsCountWithBalance() {
     return count;
 }
 
-class BlockChain::TransactionsLoader {
-public:
-    using Transactions = std::vector<csdb::Transaction>;
-
-public:
-    TransactionsLoader(csdb::Address wallPubKey, BlockChain::WalletId id, bool isToLoadWalletsPoolsCache, BlockChain& blockchain, Transactions& transactions)
-    : wallPubKey_(wallPubKey)
-    , isToLoadWalletsPoolsCache_(isToLoadWalletsPoolsCache)
-    , blockchain_(blockchain)
-    , transactions_(transactions) {
-        if (isToLoadWalletsPoolsCache_) {
-            std::lock_guard lock(blockchain_.cacheMutex_);
-            blockchain.walletsPools_->addWallet(id);
-        }
-    }
-
-    bool load(const csdb::PoolHash& poolHash, uint64_t& offset, uint64_t limit, csdb::PoolHash& prevPoolHash) {
-        csdb::Pool curr = blockchain_.loadBlock(poolHash);
-        if (!curr.is_valid())
-            return false;
-
-        if (curr.transactions_count()) {
-            bool hasMyTransactions = false;
-
-            for (auto trans : curr.transactions()) {
-                if (transactions_.size() == limit)
-                    break;
-
-                if (trans.target() == wallPubKey_ || trans.source() == wallPubKey_) {
-                    hasMyTransactions = true;
-
-                    if (offset == 0)
-                        transactions_.push_back(trans);
-                    else
-                        --offset;
-                }
-            }
-
-            if (hasMyTransactions && isToLoadWalletsPoolsCache_) {
-                std::lock_guard lock(blockchain_.cacheMutex_);
-                blockchain_.walletsPools_->loadPrevBlock(curr);
-            }
-        }
-
-        prevPoolHash = curr.previous_hash();
-
-        return true;
-    }
-
-private:
-    csdb::Address wallPubKey_;
-    const bool isToLoadWalletsPoolsCache_;
-    BlockChain& blockchain_;
-    Transactions& transactions_;
-};
-
 void BlockChain::getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit) {
     for (auto trIt = cs::TransactionsIterator(*this, address); trIt.isValid(); trIt.next()) {
         if (offset > 0) {
@@ -657,83 +600,6 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
 
         if (--limit == 0)
             break;
-    }
-}
-
-bool BlockChain::findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id, WalletsPools::WalletData::PoolsHashes& hashesArray) const {
-    std::lock_guard lock(cacheMutex_);
-
-    if (address.is_wallet_id()) {
-        id = address.wallet_id();
-
-        auto pubKey = getAddressByType(address, AddressType::PublicKey);
-        const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
-
-        if (!wallDataPtr) {
-            return false;
-        }
-
-        wallPubKey = pubKey;
-    }
-    else
-    {
-        if (!walletIds_->normal().find(address, id)) {
-            return false;
-        }
-
-        wallPubKey = address;
-    }
-
-    const WalletsPools::WalletData* wallData = walletsPools_->findWallet(id);
-    if (wallData) {
-        hashesArray = wallData->poolsHashes_;
-    }
-
-    return true;
-}
-
-void BlockChain::getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id, const WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset,
-                                 uint64_t limit) {
-    bool isToLoadWalletsPoolsCache = hashesArray.empty() && wallPubKey != genesisAddress_ && wallPubKey != startAddress_;
-    if (wallPubKey.is_public_key()) {
-        WalletId _id;
-
-        if (!findWalletId(wallPubKey, _id)) {
-            return;
-        }
-
-        wallPubKey = csdb::Address::from_wallet_id(_id);
-    }
-
-    TransactionsLoader trxLoader(wallPubKey, id, isToLoadWalletsPoolsCache, *this, transactions);
-    csdb::PoolHash prevHash = getLastHash();
-
-    for (size_t i = hashesArray.size() - 1; i != std::numeric_limits<decltype(i)>::max(); --i) {
-        const auto& poolHashData = hashesArray[i];
-
-        if (poolHashData.trxNum < WalletsPools::WalletData::PoolHashData::maxTrxNum && poolHashData.trxNum <= offset) {
-            offset -= poolHashData.trxNum;
-            continue;
-        }
-
-        csdb::PoolHash currHash;
-        WalletsPools::convert(poolHashData.poolHash, currHash);
-
-        if (!trxLoader.load(currHash, offset, limit, prevHash)) {
-            return;
-        }
-
-        if (transactions.size() >= limit) {
-            return;
-        }
-    }
-
-    while (true) {
-        csdb::PoolHash currHash = prevHash;
-
-        if (!trxLoader.load(currHash, offset, limit, prevHash)) {
-            break;
-        }
     }
 }
 
@@ -893,7 +759,6 @@ bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
         // currently block stores own round confidants, not next round:
         const auto& currentRoundConfidants = nextPool.confidants();
         walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants, *this);
-        walletsPools_->loadNextBlock(nextPool);
         if (!blockHashes_->onNextBlock(nextPool)) {
             cslog() << "Error writing DB structure";
         }
