@@ -9,7 +9,6 @@ public:
     static PacketValidator& instance();
 
     bool validate(const Packet& pack);
-    bool validate(const Message& msg);
 
     const cs::PublicKey& getStarterKey() const {
         return starterKey_;

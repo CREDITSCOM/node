@@ -293,15 +293,15 @@ bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
 
 
 constexpr const uint32_t StrippedDataSize = sizeof(cs::RoundNumber) + sizeof(MsgTypes);
-void Transport::processNodeMessage(const Message& msg) {
-    auto type = msg.getFirstPack().getType();
-    auto rNum = msg.getFirstPack().getRoundNum();
+void Transport::processNodeMessage(const Packet& pack) {
+    auto type = pack.getType();
+    auto rNum = pack.getRoundNum();
 
-    switch (node_->chooseMessageAction(rNum, type, msg.getFirstPack().getSender())) {
+    switch (node_->chooseMessageAction(rNum, type, pack.getSender())) {
         case Node::MessageActions::Process:
-            return dispatchNodeMessage(type, rNum, msg.getFirstPack(), msg.getFullData() + StrippedDataSize, msg.getFullSize() - StrippedDataSize);
+            return dispatchNodeMessage(type, rNum, pack, pack.getMsgData() + StrippedDataSize, pack.getMsgSize() - StrippedDataSize);
         case Node::MessageActions::Postpone:
-            return postponePacket(rNum, type, msg.extractData());
+            return postponePacket(rNum, type, pack);
         case Node::MessageActions::Drop:
             return;
     }
@@ -342,20 +342,6 @@ bool Transport::shouldSendPacket(const Packet& pack) {
     }
 
     return !rn || rn >= currentRound;
-}
-
-void Transport::processNodeMessage(const Packet& pack) {
-    auto type = pack.getType();
-    auto rNum = pack.getRoundNum();
-
-    switch (node_->chooseMessageAction(rNum, type, pack.getSender())) {
-        case Node::MessageActions::Process:
-            return dispatchNodeMessage(type, rNum, pack, pack.getMsgData() + StrippedDataSize, pack.getMsgSize() - StrippedDataSize);
-        case Node::MessageActions::Postpone:
-            return postponePacket(rNum, type, pack);
-        case Node::MessageActions::Drop:
-            return;
-    }
 }
 
 inline void Transport::postponePacket(const cs::RoundNumber rNum, const MsgTypes type, const Packet& pack) {

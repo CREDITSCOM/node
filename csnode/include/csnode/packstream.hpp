@@ -361,7 +361,7 @@ private:
             }
         }
 
-        new (packetsEnd_) Packet(allocator_->allocateNext(Packet::MaxSize));
+        new (packetsEnd_) Packet(cs::Bytes(Packet::MaxSize));
 
         ptr_ = static_cast<cs::Byte*>(packetsEnd_->data());
         end_ = ptr_ + packetsEnd_->size();

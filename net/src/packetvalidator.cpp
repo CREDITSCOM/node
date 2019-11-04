@@ -57,20 +57,6 @@ bool PacketValidator::validate(const Packet& pack) {
     return result;
 }
 
-bool PacketValidator::validate(const Message& msg) {
-    if (!msg.isComplete()) {
-        return false;
-    }
-    if (!msg.getFirstPack().hasValidFragmentation()) {
-        return false;
-    }
-    return validate(msg.getFirstPack());
-
-    // require to compose full message to validate:
-    // MsgTypes type = msg.getFirstPack().getType();
-    // return validate(type, msg.getFullData(), msg.getFullSize());
-}
-
 bool PacketValidator::validate(MsgTypes msg, const uint8_t* data, size_t size) {
     switch (msg) {
         case MsgTypes::BigBang:

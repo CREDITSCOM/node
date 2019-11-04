@@ -4,7 +4,7 @@
 #include "packet.hpp"
 #include "transport.hpp"  // for NetworkCommand
 
-RegionAllocator Message::allocator_;
+// RegionAllocator Message::allocator_;
 
 enum Lengths {
     FragmentedHeader = 36
@@ -89,7 +89,7 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
 
 const cs::Hash& Packet::getHeaderHash() const {
     if (!headerHashed_) {
-        headerHash_ = generateHash(static_cast<const char*>(region_->data()) + Offsets::FragmentsNum, Lengths::FragmentedHeader);
+        headerHash_ = generateHash(region_.data() + Offsets::FragmentsNum, Lengths::FragmentedHeader);
         headerHashed_ = true;
     }
 
@@ -149,95 +149,6 @@ uint32_t Packet::calculateHeadersLength() const {
 
 void Packet::recalculateHeadersLength() {
     headersLength_ = calculateHeadersLength();
-}
-
-MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMsg) {
-    if (!pack.isFragmented()) {
-        return MessagePtr();
-    }
-
-    if (!pack.hasValidFragmentation()) {
-        return MessagePtr();
-    }
-
-    newFragmentedMsg = false;
-
-    MessagePtr* msgPtr;
-    MessagePtr msg;
-
-    {
-        cs::Lock l(mLock_);
-        msgPtr = &map_.tryStore(pack.getHeaderHash());
-    }
-
-    if (!*msgPtr) {  // First time
-        *msgPtr = msg = msgAllocator_.emplace();
-        msg->packetsLeft_ = pack.getFragmentsNum();
-        msg->packetsTotal_ = pack.getFragmentsNum();
-        msg->packets_.resize(msg->packetsTotal_);
-        msg->headerHash_ = pack.getHeaderHash();
-        newFragmentedMsg = true;
-    }
-    else {
-        msg = *msgPtr;
-        if (msg->packets_.size() == 0) {
-            msg->packets_.resize(msg->packetsTotal_);
-        }
-    }
-
-    {
-        cs::Lock lock(msg->pLock_);
-        auto& goodPlace = msg->packets_[pack.getFragmentId()]; // valid fragmentation has already been tested
-        if (!goodPlace) {
-            msg->maxFragment_ = std::max(pack.getFragmentsNum(), msg->maxFragment_);
-            --msg->packetsLeft_;
-            goodPlace = pack;
-        }
-
-        if (msg->packetsTotal_ >= 20) {
-            if (msg->packetsLeft_ != 0) {
-                // the 1st fragment contains full info:
-                if (pack.getFragmentId() == 0) {
-                    csdetails() << "COLLECT> recv pack " << Packet::messageTypeToString(pack.getType()) << " of " << msg->packetsTotal_ << ", round " << pack.getRoundNum();
-                }
-                csdetails() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
-            }
-            else {
-                csdetails() << "COLLECT> done (" << msg->packetsTotal_ << ") " << Packet::messageTypeToString(msg->getFirstPack().getType()) << ", round "
-                            << msg->getFirstPack().getRoundNum();
-            }
-        }
-    }
-    return msg;
-}
-
-void PacketCollector::dropMessage(MessagePtr msg) {
-    (*msg)->packetsLeft_ = (*msg)->packetsTotal_;
-    (*msg)->packets_.clear();
-}
-
-/* WARN: All the cases except FRAG + COMPRESSED have bugs in them */
-void Message::composeFullData() const {
-    if (getFirstPack().isFragmented()) {
-        uint32_t headersLength = packets_[0].getHeadersLength();
-        uint32_t totalSize = headersLength;
-
-        for (auto& pack: packets_) {
-            totalSize += static_cast<uint32_t>((pack.size() - headersLength));
-        }
-
-        fullData_ = allocator_.allocateNext(totalSize);
-        uint8_t* data = static_cast<uint8_t*>(fullData_->data());
-        for (auto pack = packets_.begin(), end = packets_.end(); pack != end; ++pack) {
-            uint32_t headerSize = static_cast<uint32_t>((pack == packets_.begin()) ? 0 : headersLength);
-
-            uint32_t cSize = cs::numeric_cast<uint32_t>(pack->size()) - headerSize;
-            auto source = (reinterpret_cast<const char*>(pack->data())) + headerSize;
-
-            std::copy(source, source + cSize, data);
-            data += cSize;
-        }
-    }
 }
 
 class PacketFlags {

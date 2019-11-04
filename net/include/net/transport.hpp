@@ -92,7 +92,6 @@ public:
     static const char* networkCommandToString(NetworkCommand command);
 
     void processNetworkTask(const TaskPtr<IPacMan>&, RemoteNodePtr&);
-    void processNodeMessage(const Message&);
     void processNodeMessage(const Packet&);
 
     const cs::PublicKey& getMyPublicKey() const {

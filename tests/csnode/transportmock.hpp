@@ -15,7 +15,6 @@ public:
   MOCK_METHOD1(getPackSenderEntry, RemoteNodePtr(const ip::udp::endpoint&));
 
   MOCK_METHOD2(processNetworkTask, void(const TaskPtr<IPacMan>&, RemoteNodePtr&));
-  MOCK_METHOD1(processNodeMessage, void(const Message&));
   MOCK_METHOD1(processNodeMessage, void(const Packet&));
 
   MOCK_METHOD4(addTask, void(Packet*, const uint32_t packNum, bool incrementWhenResend, bool sendToNeighbours));
@@ -40,8 +39,6 @@ public:
   MOCK_METHOD2(sendPackRenounce, void(const cs::Hash&, const Connection&));
 
   MOCK_METHOD1(sendPingPack, void(const Connection&));
-
-  MOCK_METHOD1(registerMessage, void(MessagePtr));
 
   MOCK_METHOD3(registerTask, void(Packet* pack, const uint32_t packNum, const bool));
 

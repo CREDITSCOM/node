@@ -6,7 +6,7 @@ IPacMan::Task& IPacMan::allocNext() {
     queue_.emplace_back();
     auto end = queue_.end();
     Task& task = *(--end);
-    task.pack.region_ = allocator_.allocateNext(Packet::MaxSize);
+    task.pack.region_ = cs::Bytes(Packet::MaxSize);
     return task;
 }
 

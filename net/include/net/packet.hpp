@@ -97,7 +97,7 @@ public:
     static const char* messageTypeToString(MsgTypes messageType);
 
     Packet() = default;
-    explicit Packet(RegionPtr&& data)
+    explicit Packet(cs::Bytes&& data)
     : region_(std::move(data)) {
     }
 
@@ -126,7 +126,7 @@ public:
 
     const cs::Hash& getHash() const {
         if (!hashed_) {
-            hash_ = generateHash(region_->data(), region_->size());
+            hash_ = generateHash(region_.data(), region_.size());
             hashed_ = true;
         }
 
@@ -169,23 +169,23 @@ public:
     }
 
     void* data() {
-        return region_->data();
+        return region_.data();
     }
 
     const void* data() const {
-        return region_->data();
+        return region_.data();
     }
 
     size_t size() const {
-        return region_->size();
+        return region_.size();
     }
 
     void setSize(uint32_t size) {
-        region_->setSize(size);
+        region_.resize(size);
     }
 
     const uint8_t* getMsgData() const {
-        return static_cast<const uint8_t*>(region_->data()) + getHeadersLength();
+        return static_cast<const uint8_t*>(region_.data()) + getHeadersLength();
     }
 
     size_t getMsgSize() const {
@@ -196,11 +196,11 @@ public:
     void recalculateHeadersLength();
 
     explicit operator bool() const {
-        return region_.get();
+        return region_.size();
     }
 
     boost::asio::mutable_buffer encode(boost::asio::mutable_buffer tempBuffer) {
-        if (region_->size() == 0) {
+        if (region_.size() == 0) {
             cswarning() << "Encoding empty packet";
             return boost::asio::buffer(tempBuffer.data(), 0);
         }
@@ -212,13 +212,13 @@ public:
             // Packet::MaxSize is a part of implementation magic(
             assert(tempBuffer.size() == Packet::MaxSize);
 
-            char* source = static_cast<char*>(region_->data());
+            char* source = reinterpret_cast<char*>(region_.data());
             char* dest = static_cast<char*>(tempBuffer.data());
 
             // copy header
             std::copy(source, source + headerSize, dest);
 
-            int sourceSize = static_cast<int>(region_->size() - headerSize);
+            int sourceSize = static_cast<int>(region_.size() - headerSize);
             int destSize = static_cast<int>(tempBuffer.size() - headerSize);
 
             int compressedSize = LZ4_compress_default(source + headerSize, dest + headerSize, sourceSize, destSize);
@@ -232,11 +232,11 @@ public:
             }
         }
 
-        char* source = static_cast<char*>(region_->data());
+        char* source = reinterpret_cast<char*>(region_.data());
         char* dest = static_cast<char*>(tempBuffer.data());
 
-        std::copy(source, source + region_->size(), dest);
-        return boost::asio::buffer(dest, region_->size());
+        std::copy(source, source + region_.size(), dest);
+        return boost::asio::buffer(dest, region_.size());
     }
 
     size_t decode(size_t packetSize = 0) {
@@ -261,9 +261,9 @@ public:
 
             // It's a part of implementation magic(
             // eg. <IPackMan> allocates Packet::MaxSize packet implicitly
-            assert(region_->size() == Packet::MaxSize);
+            assert(region_.size() == Packet::MaxSize);
 
-            char* source = static_cast<char*>(region_->data());
+            char* source = reinterpret_cast<char*>(region_.data());
             char dest[Packet::MaxSize];
 
             int sourceSize = static_cast<int>(packetSize - headerSize);
@@ -301,18 +301,18 @@ public:
 
 private:
     bool checkFlag(const BaseFlags flag) const {
-        return (*static_cast<const uint8_t*>(region_->data()) & flag) != 0;
+        return (*static_cast<const uint8_t*>(region_.data()) & flag) != 0;
     }
 
     uint32_t calculateHeadersLength() const;
 
     template <typename T>
     const T& getWithOffset(const uint32_t offset) const {
-        return *(reinterpret_cast<const T*>(static_cast<const uint8_t*>(region_->data()) + offset));
+        return *(reinterpret_cast<const T*>(static_cast<const uint8_t*>(region_.data()) + offset));
     }
 
 private:
-    RegionPtr region_;
+    cs::Bytes region_;
     friend class Network;
 
     mutable bool hashed_ = false;
@@ -324,101 +324,9 @@ private:
     mutable uint32_t headersLength_ = 0;
 
     friend class IPacMan;
-    friend class Message;
 };
 
 using PacketPtr = Packet*;
-
-class Message {
-public:
-    Message() = default;
-    ~Message() = default;
-
-    Message(Message&&) = default;
-    Message& operator=(Message&&) = default;
-
-    Message(const Message&) = delete;
-    Message& operator=(const Message&) = delete;
-
-    bool isComplete() const {
-        return packetsLeft_ == 0;
-    }
-
-    const Packet& getFirstPack() const {
-        return packets_[0];
-    }
-
-    const uint8_t* getFullData() const {
-        if (!fullData_) {
-            composeFullData();
-        }
-
-        return static_cast<const uint8_t*>(fullData_->data()) + packets_[0].getHeadersLength();
-    }
-
-    size_t getFullSize() const {
-        if (!fullData_) {
-            composeFullData();
-        }
-
-        return fullData_->size() - packets_[0].getHeadersLength();
-    }
-
-    Packet extractData() const {
-        if (!fullData_) {
-            composeFullData();
-        }
-
-        Packet result(std::move(fullData_));
-        result.headersLength_ = packets_[0].getHeadersLength();
-
-        return result;
-    }
-
-private:
-    static RegionAllocator allocator_;
-
-    void composeFullData() const;
-
-    cs::SpinLock pLock_{ATOMIC_FLAG_INIT};
-
-    uint32_t packetsLeft_;
-    uint32_t packetsTotal_ = 0;
-
-    uint16_t maxFragment_ = 0;
-    std::vector<Packet> packets_;
-
-    cs::Hash headerHash_;
-
-    mutable RegionPtr fullData_;
-
-    friend class PacketCollector;
-    friend class Transport;
-    friend class Network;
-};
-
-using MessagePtr = MemPtr<TypedSlot<Message>>;
-
-class PacketCollector {
-public:
-    static const uint32_t MaxParallelCollections = 1024;
-
-    PacketCollector()
-    : msgAllocator_(MaxParallelCollections + 1) {
-    }
-
-    MessagePtr getMessage(const Packet&, bool&);
-    void dropMessage(MessagePtr);
-
-private:
-    TypedAllocator<Message> msgAllocator_;
-
-    cs::SpinLock mLock_{ATOMIC_FLAG_INIT};
-    FixedHashMap<cs::Hash, MessagePtr, uint16_t, MaxParallelCollections> map_;
-
-    Message lastMessage_;
-    friend class Network;
-};
 
 std::ostream& operator<<(std::ostream& os, const Packet& packet);
 
