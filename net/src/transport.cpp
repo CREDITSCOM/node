@@ -60,6 +60,10 @@ static std::string parseRefusalReason(RegistrationRefuseReasons reason) {
     case RegistrationRefuseReasons::LimitReached:
         reasonInfo = "maximum connections limit on remote node is reached";
         break;
+    case RegistrationRefuseReasons::BlackListed:
+        reasonInfo = "remote node marked you as blacklisted";
+        break;
+
     default:
         {
             std::ostringstream os;
@@ -827,6 +831,9 @@ bool Transport::markNeighbourAsBlackListed(const cs::PublicKey& key) {
 
     if (neighbour.isValid()) {
         neighbour.remoteNode->setBlackListed(true);
+
+        // do not have bussiness with remote node
+        neighbourhood_.dropConnection(neighbour.connection->id);
     }
 
     return neighbour.isValid();
@@ -1082,6 +1089,7 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 
     switch (reason) {
     case RegistrationRefuseReasons::BadClientVersion:
+    case RegistrationRefuseReasons::BlackListed:
         neighbourhood_.dropConnection(id);
         break;
 
