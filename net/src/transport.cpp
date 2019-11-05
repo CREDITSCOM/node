@@ -50,14 +50,6 @@ constexpr cs::RoundNumber getRoundTimeout(const MsgTypes type) {
 // Extern function dfined in main.cpp to poll and handle signal status.
 extern void pollSignalFlag();
 
-
-
-enum Platform : uint8_t {
-    Linux,
-    MacOS,
-    Windows
-};
-
 static std::string parseRefusalReason(RegistrationRefuseReasons reason) {
     std::string reasonInfo;
 
@@ -127,11 +119,10 @@ void Transport::processorRoutine() {
     }
 }
 
-void Transport::deliverDirect(const Packet* pack, const uint32_t size, const cs::PublicKey& target) {}
+void Transport::deliverDirect(const Packet*, const uint32_t, const cs::PublicKey&) {}
+void Transport::deliverBroadcast(const Packet*, const uint32_t) {}
 
-void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {}
-
-bool Transport::checkConfidants(const std::vector<cs::PublicKey>& list, int except) {
+bool Transport::checkConfidants(const std::vector<cs::PublicKey>& /*list*/, int /*except*/) {
 /*    auto end = addresses_.end();
     int i = 0;
     for (const auto& pkey: list) {
@@ -140,8 +131,7 @@ bool Transport::checkConfidants(const std::vector<cs::PublicKey>& list, int exce
     } */
     return true;
 }
-
-void Transport::deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>& list, int except) {}
+void Transport::deliverConfidants(const Packet*, const uint32_t, const std::vector<cs::PublicKey>&, int /*except*/) {}
 
 void Transport::processNetworkMessage(const Packet& pack) {
     iPackStream_.init(pack.getMsgData(), pack.getMsgSize());
@@ -474,11 +464,11 @@ uint32_t Transport::getMaxNeighbours() const {
     return config_->getMaxNeighbours();
 }
 
-ConnectionPtr Transport::getConnectionByNumber(const std::size_t number) {
+ConnectionPtr Transport::getConnectionByNumber(const std::size_t) {
     return ConnectionPtr();
 }
 
-cs::Sequence Transport::getConnectionLastSequence(const std::size_t number) {
+cs::Sequence Transport::getConnectionLastSequence(const std::size_t) {
 /*    ConnectionPtr ptr = getConnectionByNumber(number);
     if (ptr && !ptr->isSignal) {
         return ptr->lastSeq;
