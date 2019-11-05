@@ -50,45 +50,36 @@ class Node;
 
 class Transport : public net::HostEventHandler {
 public:
+    inline static volatile std::sig_atomic_t gSignalStatus = 0;
+    static void stop() { Transport::gSignalStatus = 1; }
+    static const char* networkCommandToString(NetworkCommand command);
+
     explicit Transport(const Config& config, Node* node);
     ~Transport() {}
 
     void run();
+    bool isGood() const { return good_; }
 
-    inline static volatile std::sig_atomic_t gSignalStatus = 0;
-
-    static void stop() {
-        Transport::gSignalStatus = 1;
-    }
-
-    static const char* networkCommandToString(NetworkCommand command);
-
+    void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
     void processNodeMessage(const Packet&);
-
-    bool isGood() const {
-        return good_;
-    }
+    void processPostponed(const cs::RoundNumber); // @TODO move to Node
 
     void deliverDirect(const Packet*, const uint32_t, const cs::PublicKey&);
     void deliverBroadcast(const Packet*, const uint32_t);
     void deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
     bool checkConfidants(const std::vector<cs::PublicKey>& list, int except = -1);
 
-    void processPostponed(const cs::RoundNumber);
-
     // neighbours interface
     uint32_t getNeighboursCount();
     uint32_t getMaxNeighbours() const;
     ConnectionPtr getConnectionByNumber(const std::size_t number);
     cs::Sequence getConnectionLastSequence(const std::size_t number);
-
     void forEachNeighbour(std::function<bool(const cs::PublicKey&)>) {}
     bool hasNeighbour(const cs::PublicKey&) { return false; }
     cs::Sequence getNeighbourLastSequence(const cs::PublicKey&) { return 1; }
 
+    // @TODO remove, used in Node
     void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}
-
-    void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
 
 public signals:
     PingSignal pingReceived;
@@ -119,19 +110,8 @@ private:
     void sendPingPack();
 // Network packages processing - end
 
-    bool good_;
-    cs::LockFreeChanger<Config> config_;
-    RegionAllocator netPacksAllocator_;
-
-    cs::PublicKey myPublicKey_;
-
-    cs::IPackStream iPackStream_;
-
-    cs::SpinLock oLock_{ATOMIC_FLAG_INIT};
-    cs::OPackStream oPackStream_;
-
-    // Postpone logic - beg
-    // @TODO move to Node
+// Postpone logic - beg
+// @TODO move to Node
     void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
     bool shouldSendPacket(const Packet& pack);
 
@@ -152,16 +132,21 @@ private:
     PPBuf postponedPacketsSecond_;
     static constexpr uint32_t posponedPointerBufferSize_ = 2;
     PPBuf* postponed_[posponedPointerBufferSize_] = {&postponedPacketsFirst_, &postponedPacketsSecond_};
-    // Postpone logic - end
+// Postpone logic - end
 
+    bool good_;
+    cs::LockFreeChanger<Config> config_;
 
+    RegionAllocator netPacksAllocator_;
+    cs::SpinLock oLock_{ATOMIC_FLAG_INIT};
+    cs::OPackStream oPackStream_;
+    cs::IPackStream iPackStream_;
 
-
-//---------------------------------------
     cs::Sequence maxBlock_ = 0;
     cs::Sequence maxBlockCount_;
 
     Node* node_;
+    cs::PublicKey myPublicKey_;
 
     // new logic
     net::NodeId id_;

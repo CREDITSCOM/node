@@ -77,10 +77,10 @@ static std::string parseRefusalReason(RegistrationRefuseReasons reason) {
 
 Transport::Transport(const Config& config, Node* node)
 : config_(config)
-, myPublicKey_(node->getNodeIdKey())
 , oLock_()
 , oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
 , node_(node)
+, myPublicKey_(node->getNodeIdKey())
 , host_(net::Config(id_), static_cast<HostEventHandler&>(*this)) {
     good_ = true;
 }
