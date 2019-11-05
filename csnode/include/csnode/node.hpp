@@ -128,7 +128,7 @@ public:
     void sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::StageThreeSmarts& stageThreeInfo);
     void getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
     void smartStageEmptyReply(uint8_t requesterNumber);
-    void smartStageRequest(MsgTypes msgType, uint64_t smartID, cs::PublicKey confidant, uint8_t respondent, uint8_t required);
+    void smartStageRequest(MsgTypes msgType, uint64_t smartID, const cs::PublicKey& confidant, uint8_t respondent, uint8_t required);
     void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
     void sendSmartStageReply(const cs::Bytes& message, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey& requester);
 
@@ -268,7 +268,7 @@ public:
 
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;
-    using SmartStageRequestSignal = cs::Signal<void(uint8_t, uint64_t, uint8_t, uint8_t, cs::PublicKey&)>;
+    using SmartStageRequestSignal = cs::Signal<void(uint8_t, uint64_t, uint8_t, uint8_t, const cs::PublicKey&)>;
     using StopSignal = cs::Signal<void()>;
 
     // args: [failed list, restart list]
@@ -334,18 +334,16 @@ private:
     template <class... Args>
     void tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
+    // to confidants, returns actual sent count
     template <class... Args>
-    bool sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    uint32_t sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+    // to confidants, returns actual sent count
+    template <class... Args>
+    uint32_t sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     template <class... Args>
-    void sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // smarts
-    template <class... Args>
-    void sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    template <class... Args>
-    void sendToSingle(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    bool sendToConfidant(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     // to neighbours
     template <typename... Args>
