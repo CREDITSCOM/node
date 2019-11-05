@@ -8,9 +8,7 @@
 #include <mutex>
 
 #include <config.hpp>
-
 #include <csnode/packstream.hpp>
-
 #include <lib/system/allocators.hpp>
 #include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
@@ -22,7 +20,6 @@
 
 #include "neighbourhood.hpp"
 #include "packet.hpp"
-#include "pacmans.hpp"
 
 inline volatile std::sig_atomic_t gSignalStatus = 0;
 
@@ -33,25 +30,10 @@ using PingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
 enum class NetworkCommand : uint8_t {
     Registration = 2,
-    ConfirmationRequest,
-    ConfirmationResponse,
     RegistrationConfirmed,
     RegistrationRefused,
     Ping,
-    PackRequest,
-    PackRenounce,
-    BlockSyncRequest,
-    SSRegistration = 1,
-    SSFirstRound = 31,
-    SSRegistrationRefused = 25,
-    SSPingWhiteNode = 32,
-    SSLastBlock = 34,
-    SSReRegistration = 36,
-    SSSpecificBlock = 37,
-    SSNewFriends = 38,
-    SSUpdateServer = 39,
-    IntroduceConsensus = 40,
-    IntroduceConsensusReply = 41
+    BlockSyncRequest
 };
 
 enum class RegistrationRefuseReasons : uint8_t {
@@ -63,17 +45,6 @@ enum class RegistrationRefuseReasons : uint8_t {
     BadResponse,
     IncompatibleBlockchain
 };
-
-enum class SSBootstrapStatus : uint8_t {
-    Empty,
-    Requested,
-    RegisteredWait,
-    Complete,
-    Denied
-};
-
-template <>
-uint16_t getHashIndex(const ip::udp::endpoint&);
 
 class Node;
 
@@ -93,10 +64,6 @@ public:
     static const char* networkCommandToString(NetworkCommand command);
 
     void processNodeMessage(const Packet&);
-
-    const cs::PublicKey& getMyPublicKey() const {
-        return myPublicKey_;
-    }
 
     bool isGood() const {
         return good_;
@@ -131,41 +98,31 @@ public slots:
     void onConfigChanged(const Config& updated);
 
 private:
-    bool shouldSendPacket(const Packet& pack);
-    void sendRegistrationRequest(Connection& conn);
-    void sendRegistrationConfirmation(const Connection& conn, const Connection::Id requestedId);
-    void sendRegistrationRefusal(const Connection& conn, const RegistrationRefuseReasons reason);
-    void sendPingPack(const Connection& conn);
-    void addMyOut(const uint8_t initFlagValue = 0);
-    void formRegPack(uint64_t** regPackConnId, const cs::PublicKey& pk, uint64_t uuid);
-    void formSSConnectPack(const cs::PublicKey& pk, uint64_t uuid);
-
-    void registerTask(Packet* pack, const uint32_t packNum, const bool);
-    void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
-
-    // Dealing with network connections
-    bool parseSSSignal(const TaskPtr<IPacMan>&);
-
     void dispatchNodeMessage(const MsgTypes, const cs::RoundNumber, const Packet&, const uint8_t* data, size_t);
 
-    /* Network packages processing */
-    bool gotRegistrationRequest(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+// Network packages processing - beg
+// @TODO protocol
+    void processNetworkMessage(const Packet&);
 
-    bool gotRegistrationConfirmation(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+    Packet regPack_;
+    void formRegPack(uint64_t uuid);
+    void addMyOut(const uint8_t initFlagValue = 0); // to Reg Pack
 
-    bool gotRegistrationRefusal(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+    bool gotRegistrationRequest();
+    bool gotRegistrationConfirmation();
+    bool gotRegistrationRefusal();
+    bool gotPing();
 
-    bool gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr&);
-    bool gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+    void sendRegistrationRequest();
+    void sendRegistrationConfirmation();
+    void sendRegistrationRefusal(const RegistrationRefuseReasons reason);
+    void sendPingPack();
+// Network packages processing - end
 
-    bool gotPing(const TaskPtr<IPacMan>&, RemoteNodePtr&);
-    bool gotSSIntroduceConsensusReply();
-
-    /* Actions */
     bool good_;
     cs::LockFreeChanger<Config> config_;
-
     RegionAllocator netPacksAllocator_;
+
     cs::PublicKey myPublicKey_;
 
     cs::IPackStream iPackStream_;
@@ -173,10 +130,10 @@ private:
     cs::SpinLock oLock_{ATOMIC_FLAG_INIT};
     cs::OPackStream oPackStream_;
 
-    // Registration data
-    Packet regPack_;
-    uint64_t* regPackConnId_;
-    bool acceptRegistrations_ = false;
+    // Postpone logic - beg
+    // @TODO move to Node
+    void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
+    bool shouldSendPacket(const Packet& pack);
 
     struct PostponedPacket {
         cs::RoundNumber round;
@@ -189,26 +146,22 @@ private:
         , pack(p) {
         }
     };
-
     static constexpr uint32_t posponedBufferSize_ = 1024;
     using PPBuf = FixedCircularBuffer<PostponedPacket, posponedBufferSize_>;
-
     PPBuf postponedPacketsFirst_;
     PPBuf postponedPacketsSecond_;
-
     static constexpr uint32_t posponedPointerBufferSize_ = 2;
     PPBuf* postponed_[posponedPointerBufferSize_] = {&postponedPacketsFirst_, &postponedPacketsSecond_};
+    // Postpone logic - end
 
+
+
+
+//---------------------------------------
     cs::Sequence maxBlock_ = 0;
     cs::Sequence maxBlockCount_;
-    std::deque<ConnectionPtr> neighbours_;
 
     Node* node_;
-
-    void processNetworkMessage(const Packet&) {}
-
-    // @TODO move logic to processNetworkMessage
-    void processNetworkTask(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
     // new logic
     net::NodeId id_;

@@ -5,13 +5,11 @@ project(net)
 add_library(net
   include/net/neighbourhood.hpp
   include/net/packet.hpp
-  include/net/pacmans.hpp
   include/net/transport.hpp
   include/net/logger.hpp
   include/net/packetvalidator.hpp
   src/neighbourhood.cpp
   src/packet.cpp
-  src/pacmans.cpp
   src/transport.cpp
   src/packetvalidator.cpp
 )

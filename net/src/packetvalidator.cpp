@@ -28,9 +28,6 @@ bool PacketValidator::validate(const Packet& pack) {
                     case NetworkCommand::Registration:
                         result = validateRegistration(pack.getMsgSize());
                         break;
-                    case NetworkCommand::SSRegistration:
-                        result = validateStarterRegistration(pack);
-                        break;
                     default:
                         break;
                 }
