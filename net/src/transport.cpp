@@ -1,14 +1,16 @@
 /* Send blaming letters to @yrtimd */
 #include "transport.hpp"
 
+#include <thread>
+
 #include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/packstream.hpp>
-
 #include <lib/system/allocators.hpp>
 #include <lib/system/utils.hpp>
 
-#include <thread>
+#include <packetvalidator.hpp>
+
 
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
@@ -82,6 +84,36 @@ Transport::Transport(const Config& config, Node* node)
 
 void Transport::run() {
   host_.Run();
+  processorRoutine();
+}
+
+void Transport::OnMessageReceived(const net::NodeId&, net::ByteVector&& data) {
+    {
+        std::lock_guard<std::mutex> g(inboxMux_);
+        inboxQueue_.emplace_back(std::move(data));
+    }
+    newPacketsReceived_.notify_one();
+}
+
+void Transport::processorRoutine() {
+    while (true) {
+        std::unique_lock lk(inboxMux_);
+        newPacketsReceived_.wait(lk, [this]() { return !inboxQueue_.empty(); });
+
+        while (!inboxQueue_.empty()) {
+            Packet pack(std::move(inboxQueue_.front()));
+            inboxQueue_.pop_front();
+
+            if (cs::PacketValidator::instance().validate(pack) && pack.addressedToMe(myPublicKey_)) {
+                if (pack.isNetwork()) {
+                    processNetworkMessage(pack);
+                }
+                else {
+                    processNodeMessage(pack);
+                }
+            }
+        }
+    }
 }
 
 const char* Transport::networkCommandToString(NetworkCommand command) {
@@ -98,8 +130,6 @@ const char* Transport::networkCommandToString(NetworkCommand command) {
         return "RegistrationRefused";
     case NetworkCommand::Ping:
         return "Ping";
-    case NetworkCommand::PackInform:
-        return "PackInform";
     case NetworkCommand::PackRequest:
         return "PackRequest";
     case NetworkCommand::PackRenounce:
@@ -232,9 +262,6 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             }
             break;
         }
-        case NetworkCommand::PackInform:
-            gotPackInform(task, sender);
-            break;
         case NetworkCommand::PackRenounce:
             // gotPackRenounce(task, sender);
             break;
@@ -277,20 +304,6 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 
     return true;
 }
-
-bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
-    uint8_t isDirect = 0;
-    cs::Hash hHash;
-    iPackStream_ >> isDirect >> hHash;
-
-    if (!iPackStream_.good() || !iPackStream_.end()) {
-        return false;
-    }
-
-//    nh_.neighbourHasPacket(sender, hHash, isDirect);
-    return true;
-}
-
 
 constexpr const uint32_t StrippedDataSize = sizeof(cs::RoundNumber) + sizeof(MsgTypes);
 void Transport::processNodeMessage(const Packet& pack) {

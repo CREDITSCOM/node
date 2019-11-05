@@ -2,8 +2,10 @@
 #ifndef TRANSPORT_HPP
 #define TRANSPORT_HPP
 
-#include <csignal>
 #include <atomic>
+#include <csignal>
+#include <list>
+#include <mutex>
 
 #include <config.hpp>
 
@@ -36,7 +38,6 @@ enum class NetworkCommand : uint8_t {
     RegistrationConfirmed,
     RegistrationRefused,
     Ping,
-    PackInform,
     PackRequest,
     PackRenounce,
     BlockSyncRequest,
@@ -91,7 +92,6 @@ public:
 
     static const char* networkCommandToString(NetworkCommand command);
 
-    void processNetworkTask(const TaskPtr<IPacMan>&, RemoteNodePtr&);
     void processNodeMessage(const Packet&);
 
     const cs::PublicKey& getMyPublicKey() const {
@@ -120,7 +120,8 @@ public:
     cs::Sequence getNeighbourLastSequence(const cs::PublicKey&) { return 1; }
 
     void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}
-    void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override {}
+
+    void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
 
 public signals:
     PingSignal pingReceived;
@@ -154,7 +155,6 @@ private:
 
     bool gotRegistrationRefusal(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
-    bool gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr&);
     bool gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr&);
     bool gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
@@ -204,7 +204,24 @@ private:
     std::deque<ConnectionPtr> neighbours_;
 
     Node* node_;
+
+    void processNetworkMessage(const Packet&) {}
+
+    // @TODO move logic to processNetworkMessage
+    void processNetworkTask(const TaskPtr<IPacMan>&, RemoteNodePtr&);
+
+    // new logic
     net::NodeId id_;
     net::Host host_;
+
+    std::condition_variable newPacketsReceived_;
+    std::mutex inboxMux_;
+    std::list<Packet> inboxQueue_;
+
+    void processorRoutine();
+
+    // @TODO move to PacketValidator
+    bool isBlackListed(const net::NodeId&) { return false; }
+    void addStrike(const net::NodeId&) {}
 };
 #endif  // TRANSPORT_HPP
