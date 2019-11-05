@@ -446,7 +446,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             gotSSRefusal(task);
             break;
         case NetworkCommand::SSPingWhiteNode:
-            gotSSPingWhiteNode(task);
+            gotSSPingWhiteNode(task, node_->getBlockChain().getLastSeq(), node_->getBlockChain().getLastHash());
             break;
         case NetworkCommand::SSLastBlock: {
             long long timeSS{};
@@ -1181,13 +1181,20 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>&) {
     return true;
 }
 
-bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
+bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task, const cs::Sequence lastBlock, const csdb::PoolHash& lastHash) {
 	// MUST NOT call nh_ under oLock_!!!
     const auto nh_size = neighbourhood_.size();
 
     cs::Lock lock(oLock_);
     oPackStream_.init(task->pack);
     oPackStream_ << nh_size;
+
+    cs::Hash lastHash_;
+    const auto hashBinary = lastHash.to_binary();
+    std::copy(hashBinary.begin(), hashBinary.end(), lastHash_.begin());
+    
+    oPackStream_ << lastBlock << lastHash_;
+
 
     Connection conn;
     conn.in = task->sender;

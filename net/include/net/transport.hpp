@@ -196,7 +196,7 @@ private:
     bool gotSSReRegistration();
     bool gotSSRefusal(const TaskPtr<IPacMan>&);
     bool gotSSDispatch(const TaskPtr<IPacMan>&);
-    bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&);
+    bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&, const cs::Sequence, const csdb::PoolHash&);
     bool gotSSLastBlock(const TaskPtr<IPacMan>&, cs::Sequence, const csdb::PoolHash&, bool canBeTrusted);
     bool gotSSNewFriends();
     bool gotSSUpdateServer();
