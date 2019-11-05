@@ -114,8 +114,9 @@ public:
     bool sendDirectToSock(Packet*, const Connection&);
     void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
     void deliverBroadcast(const Packet*, const uint32_t);
-    void deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
-    bool checkConfidants(const std::vector<cs::PublicKey>& list, int except = -1);
+    // returns pair of (sent count, list of unable-to-send items in input list)
+    std::pair< uint32_t, std::list<int> > deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
+    bool checkConfidant(const cs::PublicKey& key);
 
     void gotPacket(const Packet&, RemoteNodePtr&);
     void redirectPacket(const Packet&, RemoteNodePtr&);
@@ -206,6 +207,8 @@ private:
 
     bool gotPing(const TaskPtr<IPacMan>&, RemoteNodePtr&);
     bool gotSSIntroduceConsensusReply();
+
+    void storeAddress(const cs::PublicKey& key, const EndpointData& ep);
 
     void askForMissingPackages();
     void requestMissing(const cs::Hash&, const uint16_t, const uint64_t);
