@@ -177,6 +177,8 @@ public:
     void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
     void getBlockAlarm(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
+    bool checkCharacteristic(cs::RoundPackage& rPackage);
+
     void getCharacteristic(cs::RoundPackage& rPackage);
 
     void createTestTransaction();
