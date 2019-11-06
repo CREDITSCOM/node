@@ -2256,7 +2256,7 @@ namespace executor {
 
                     cvErrorConnect_.wait_for(lock, std::chrono::seconds(5), [&] {
                         return !isConnected() || requestStop_;
-                        });
+                    });
                 }
 
                 if (requestStop_) {
@@ -2269,7 +2269,7 @@ namespace executor {
                     }
                 }
             }
-            });
+        });
 
         thread.detach();
     }
