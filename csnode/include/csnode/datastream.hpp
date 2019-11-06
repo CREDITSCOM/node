@@ -648,6 +648,11 @@ inline DataStream& operator<<(DataStream& stream, const cs::Bytes& data) {
     return stream;
 }
 
+inline DataStream& operator<<(DataStream& stream, const CompressedRegion& data) {
+    stream << cs::Bytes(data.data(), data.data() + data.size());
+    return stream;
+}
+
 inline DataStream& operator<<(DataStream& stream, const boost::asio::ip::udp::endpoint& endpoint) {
     stream.addEndpoint(endpoint);
     return stream;

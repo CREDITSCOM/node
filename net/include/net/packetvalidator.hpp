@@ -18,15 +18,6 @@ private:
     cs::PublicKey starterKey_;
 
     PacketValidator();
-
-    bool validate(MsgTypes msg, const uint8_t* data, size_t size);
-    bool validateFirstFragment(MsgTypes msg, const uint8_t* data, size_t size);
-
-    bool validateStarterSignature(const uint8_t* data, size_t size);
-
-    bool validateRegistration(size_t size);
-    bool validateStarterRegistration(const Packet& pack);
-    bool validateStopRequest(const uint8_t* data, size_t size);
 };
 }  // namespace cs
 

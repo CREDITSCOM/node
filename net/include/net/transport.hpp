@@ -61,13 +61,12 @@ public:
     bool isGood() const { return good_; }
 
     void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
-    void processNodeMessage(const Packet&);
+    void processNodeMessage(const cs::PublicKey&, const Packet&);
     void processPostponed(const cs::RoundNumber); // @TODO move to Node
 
-    void deliverDirect(const Packet*, const uint32_t, const cs::PublicKey&);
-    void deliverBroadcast(const Packet*, const uint32_t);
-    void deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
-    bool checkConfidants(const std::vector<cs::PublicKey>& list, int except = -1);
+    void sendDirect(Packet&&, const cs::PublicKey&) {}
+    void sendMulticast(Packet&&, const std::vector<cs::PublicKey>&) {}
+    void sendBroadcast(Packet&&) {}
 
     // neighbours interface
     uint32_t getNeighboursCount();
@@ -89,11 +88,12 @@ public slots:
     void onConfigChanged(const Config& updated);
 
 private:
-    void dispatchNodeMessage(const MsgTypes, const cs::RoundNumber, const Packet&, const uint8_t* data, size_t);
+    void dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes,
+                             const cs::RoundNumber, const uint8_t* data, size_t);
 
 // Network packages processing - beg
 // @TODO protocol
-    void processNetworkMessage(const Packet&);
+    void processNetworkMessage(const cs::PublicKey& sender, const Packet&);
 
     Packet regPack_;
     void formRegPack(uint64_t uuid);
@@ -137,9 +137,6 @@ private:
     bool good_;
     cs::LockFreeChanger<Config> config_;
 
-    RegionAllocator netPacksAllocator_;
-    cs::SpinLock oLock_{ATOMIC_FLAG_INIT};
-    cs::OPackStream oPackStream_;
     cs::IPackStream iPackStream_;
 
     cs::Sequence maxBlock_ = 0;
@@ -154,7 +151,7 @@ private:
 
     std::condition_variable newPacketsReceived_;
     std::mutex inboxMux_;
-    std::list<Packet> inboxQueue_;
+    std::list<std::pair<cs::PublicKey, Packet>> inboxQueue_;
 
     void processorRoutine();
 

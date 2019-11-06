@@ -34,6 +34,19 @@
 
 #include <observer.hpp>
 
+namespace {
+template<class... Args>
+Packet formPacket(BaseFlags flags, MsgTypes msgType, cs::RoundNumber round, Args&&... args) {
+    cs::Bytes packetBytes;
+    cs::DataStream stream(packetBytes);
+    stream << flags;
+    stream << msgType;
+    stream << round;
+    (void)(stream << ... << std::forward<Args>(args));
+    return Packet(std::move(packetBytes));
+}
+} // namespace
+
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
 
@@ -41,7 +54,6 @@ Node::Node(const Config& config, cs::config::Observer& observer)
 : nodeIdKey_(config.getMyPublicKey())
 , nodeIdPrivate_(config.getMyPrivateKey())
 , blockChain_(genesisAddress_, startAddress_, config.recreateIndex())
-, ostream_(&packStreamAllocator_, nodeIdKey_)
 , stat_(config)
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this))
 , observer_(observer) {
@@ -1037,18 +1049,12 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
 
 void Node::sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences, std::size_t packetNum) {
     const auto round = cs::Conveyer::instance().currentRoundNumber();
-    csmeta(csdetails) << "Target out(): " << ", sequence from: " << sequences.front() << ", to: " << sequences.back() << ", packet: " << packetNum
+    csmeta(csdetails) << "Target out(): " << ", sequence from: " << sequences.front()
+                      << ", to: " << sequences.back() << ", packet: " << packetNum
                       << ", round: " << round;
 
-    ostream_.init(BaseFlags::Direct | BaseFlags::Signed | BaseFlags::Compressed);
-    ostream_ << MsgTypes::BlockRequest;
-    ostream_ << round;
-    ostream_ << sequences;
-    ostream_ << packetNum;
-
-    transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
-
-    ostream_.clear();
+    BaseFlags flags = static_cast<BaseFlags>(BaseFlags::Signed | BaseFlags::Compressed);
+    transport_->sendDirect(formPacket(flags, MsgTypes::BlockRequest, round, sequences, packetNum), target);
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type, const cs::PublicKey sender) {
@@ -1252,27 +1258,20 @@ std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel) {
 
 template <typename... Args>
 void Node::sendToTargetBroadcast(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    static constexpr cs::Byte flags = 0; // BaseFlags::Fragmented;
+    static constexpr BaseFlags flags = BaseFlags::Clear;
 
-    ostream_.init(flags, target);
     csdetails() << "NODE> Sending default to key: " << cs::Utils::byteStreamToHex(target.data(), target.size());
-
-    sendToBroadcastImpl(msgType, round, std::forward<Args>(args)...);
+    sendToBroadcastImpl(flags, msgType, round, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 bool Node::sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
     if (transport_->hasNeighbour(target)) {
-        ostream_.init(BaseFlags::Direct | /*| BaseFlags::Fragmented*/ BaseFlags::Compressed);
-        ostream_ << msgType << round;
 
-        writeDefaultStream(std::forward<Args>(args)...);
-
-        csdetails() << "NODE> Sending Direct data: packets count: " << ostream_.getPacketsCount() << ", last packet size: " << ostream_.getCurrentSize()
+        csdetails() << "NODE> Sending Direct data: packets count: " << 1
                     << ", msgType: " << Packet::messageTypeToString(msgType);
 
-        transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
-        ostream_.clear();
+        transport_->sendDirect(formPacket(BaseFlags::Compressed, msgType, round, args...), target);
         return true;
     }
     return false;
@@ -1280,10 +1279,10 @@ bool Node::sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, 
 
 template <class... Args>
 void Node::sendToBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    ostream_.init(BaseFlags::Broadcast /*| BaseFlags::Fragmented*/ | BaseFlags::Compressed);
     csdebug() << "NODE> Sending broadcast";
 
-    sendToBroadcastImpl(msgType, round, std::forward<Args>(args)...);
+    BaseFlags flags = BaseFlags::Compressed;
+    sendToBroadcastImpl(flags, msgType, round, std::forward<Args>(args)...);
 }
 
 template <class... Args>
@@ -1314,23 +1313,13 @@ void Node::sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round,
     sendToList(confidants, (cs::Byte)i, msgType, round, std::forward<Args>(args)...);
 }
 
+
 template <class... Args>
-void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
-    if (!transport_->checkConfidants(listMembers, (int)listExeption)) {
-        sendToBroadcast(msgType, round, std::forward<Args>(args)...);
-        return;
-    }
-
-    ostream_.init(BaseFlags::Direct | BaseFlags::Compressed);
-    ostream_ << msgType << round;
-
-    writeDefaultStream(std::forward<Args>(args)...);
-
-    csdebug() << "NODE> Sending confidants list data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
+void Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte /*listExeption*/, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+    csdebug() << "NODE> Sending confidants list data: round: " << round
                 << ", msgType: " << Packet::messageTypeToString(msgType);
 
-    transport_->deliverConfidants(ostream_.getPackets(), ostream_.getPacketsCount(), listMembers, (int)listExeption);
-    ostream_.clear();
+    transport_->sendMulticast(formPacket(BaseFlags::Compressed, msgType, round, args...), listMembers);
 }
 
 template <class... Args>
@@ -1339,21 +1328,11 @@ void Node::sendToSingle(const cs::PublicKey& target, const MsgTypes msgType, con
 }
 
 template <typename... Args>
-void Node::writeDefaultStream(Args&&... args) {
-    (void)(ostream_ << ... << std::forward<Args>(args));  // fold expression
-}
-
-template <typename... Args>
-void Node::sendToBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
-    ostream_ << msgType << round;
-
-    writeDefaultStream(std::forward<Args>(args)...);
-
-    csdetails() << "NODE> Sending broadcast data: size: " << ostream_.getCurrentSize() << ", last packet size: " << ostream_.getCurrentSize() << ", round: " << round
+void Node::sendToBroadcastImpl(BaseFlags flags, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args) {
+    csdetails() << "NODE> Sending broadcast data: round: " << round
                 << ", msgType: " << Packet::messageTypeToString(msgType);
 
-    transport_->deliverBroadcast(ostream_.getPackets(), ostream_.getPacketsCount());
-    ostream_.clear();
+    transport_->sendBroadcast(formPacket(flags, msgType, round, args...));
 }
 
 void Node::sendStageOne(const cs::StageOne& stageOneInfo) {

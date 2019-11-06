@@ -1,6 +1,7 @@
 /* Send blaming letters to @yrtimd */
 #include "transport.hpp"
 
+#include <algorithm>
 #include <thread>
 
 #include <csnode/node.hpp>
@@ -10,6 +11,15 @@
 #include <lib/system/utils.hpp>
 
 #include <packetvalidator.hpp>
+
+namespace {
+cs::PublicKey toPublicKey(const net::NodeId& id) {
+    auto ptr = reinterpret_cast<const uint8_t*>(id.GetPtr());
+    cs::PublicKey ret;
+    std::copy(ptr, ptr + id.size(), ret.data());
+    return ret;
+}
+} // namespace
 
 // Signal transport to stop and stop Node
 static void stopNode() noexcept(false) {
@@ -77,8 +87,6 @@ static std::string parseRefusalReason(RegistrationRefuseReasons reason) {
 
 Transport::Transport(const Config& config, Node* node)
 : config_(config)
-, oLock_()
-, oPackStream_(&netPacksAllocator_, node->getNodeIdKey())
 , node_(node)
 , myPublicKey_(node->getNodeIdKey())
 , host_(net::Config(id_), static_cast<HostEventHandler&>(*this)) {
@@ -90,10 +98,10 @@ void Transport::run() {
   processorRoutine();
 }
 
-void Transport::OnMessageReceived(const net::NodeId&, net::ByteVector&& data) {
+void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data) {
     {
         std::lock_guard<std::mutex> g(inboxMux_);
-        inboxQueue_.emplace_back(std::move(data));
+        inboxQueue_.emplace_back(std::make_pair(toPublicKey(id), Packet(std::move(data))));
     }
     newPacketsReceived_.notify_one();
 }
@@ -104,36 +112,23 @@ void Transport::processorRoutine() {
         newPacketsReceived_.wait(lk, [this]() { return !inboxQueue_.empty(); });
 
         while (!inboxQueue_.empty()) {
-            Packet pack(std::move(inboxQueue_.front()));
+            Packet pack(std::move(inboxQueue_.front().second));
+            cs::PublicKey sender(inboxQueue_.front().first);
             inboxQueue_.pop_front();
 
-            if (cs::PacketValidator::instance().validate(pack) && pack.addressedToMe(myPublicKey_)) {
+            if (cs::PacketValidator::instance().validate(pack)) {
                 if (pack.isNetwork()) {
-                    processNetworkMessage(pack);
+                    processNetworkMessage(sender, pack);
                 }
                 else {
-                    processNodeMessage(pack);
+                    processNodeMessage(sender, pack);
                 }
             }
         }
     }
 }
 
-void Transport::deliverDirect(const Packet*, const uint32_t, const cs::PublicKey&) {}
-void Transport::deliverBroadcast(const Packet*, const uint32_t) {}
-
-bool Transport::checkConfidants(const std::vector<cs::PublicKey>& /*list*/, int /*except*/) {
-/*    auto end = addresses_.end();
-    int i = 0;
-    for (const auto& pkey: list) {
-        if (i++ == except) continue;
-        if (addresses_.find(pkey) == end) return false;
-    } */
-    return true;
-}
-void Transport::deliverConfidants(const Packet*, const uint32_t, const std::vector<cs::PublicKey>&, int /*except*/) {}
-
-void Transport::processNetworkMessage(const Packet& pack) {
+void Transport::processNetworkMessage(const cs::PublicKey&, const Packet& pack) {
     iPackStream_.init(pack.getMsgData(), pack.getMsgSize());
 
     NetworkCommand cmd;
@@ -170,10 +165,10 @@ void Transport::processNetworkMessage(const Packet& pack) {
     }
 }
 
-void Transport::formRegPack(uint64_t uuid) {
-    oPackStream_.init(BaseFlags::NetworkMsg);
-    oPackStream_ << NetworkCommand::Registration << NODE_VERSION << uuid;
-    oPackStream_ << static_cast<ConnectionId>(0) << myPublicKey_;
+void Transport::formRegPack(uint64_t /* uuid */) {
+//    oPackStream_.init(BaseFlags::NetworkMsg);
+//    oPackStream_ << NetworkCommand::Registration << NODE_VERSION << uuid;
+//    oPackStream_ << static_cast<ConnectionId>(0) << myPublicKey_;
 }
 
 void Transport::sendRegistrationRequest() {
@@ -190,12 +185,11 @@ bool Transport::gotRegistrationRequest() {
 }
 
 void Transport::sendRegistrationConfirmation() {
-    cs::Lock lock(oLock_);
-    oPackStream_.init(BaseFlags::NetworkMsg);
-    oPackStream_ << NetworkCommand::RegistrationConfirmed << myPublicKey_;
-
+//    for example:
+//    oPackStream_.init(BaseFlags::NetworkMsg);
+//    oPackStream_ << NetworkCommand::RegistrationConfirmed << myPublicKey_;
 //    sendDirect(oPackStream_.getPackets(), conn);
-    oPackStream_.clear();
+//    oPackStream_.clear();
 }
 
 bool Transport::gotRegistrationConfirmation() {
@@ -209,15 +203,7 @@ bool Transport::gotRegistrationConfirmation() {
     return true;
 }
 
-void Transport::sendRegistrationRefusal(const RegistrationRefuseReasons reason) {
-    cs::Lock lock(oLock_);
-    oPackStream_.init(BaseFlags::NetworkMsg);
-    oPackStream_ << NetworkCommand::RegistrationRefused << reason;
-
-//    sendDirect(oPackStream_.getPackets(), conn);
-    oPackStream_.clear();
-}
-
+void Transport::sendRegistrationRefusal(const RegistrationRefuseReasons) {}
 
 bool Transport::gotRegistrationRefusal() {
     RegistrationRefuseReasons reason;
@@ -237,6 +223,7 @@ bool Transport::gotRegistrationRefusal() {
 #define PING_WITH_BCHID
 
 void Transport::sendPingPack() {
+/*
     cs::Sequence seq = node_->getBlockChain().getLastSeq();
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
@@ -251,8 +238,9 @@ void Transport::sendPingPack() {
         oPackStream_ << NODE_VERSION;
     }
 
-//    sendDirect(oPackStream_.getPackets(), conn);
+    sendDirect(oPackStream_.getPackets(), conn);
     oPackStream_.clear();
+*/
 }
 
 bool Transport::gotPing() {
@@ -301,14 +289,13 @@ bool Transport::gotPing() {
     return true;
 }
 
-constexpr const uint32_t StrippedDataSize = sizeof(cs::RoundNumber) + sizeof(MsgTypes);
-void Transport::processNodeMessage(const Packet& pack) {
+void Transport::processNodeMessage(const cs::PublicKey& sender, const Packet& pack) {
     auto type = pack.getType();
     auto rNum = pack.getRoundNum();
 
-    switch (node_->chooseMessageAction(rNum, type, pack.getSender())) {
+    switch (node_->chooseMessageAction(rNum, type, sender)) {
         case Node::MessageActions::Process:
-            return dispatchNodeMessage(type, rNum, pack, pack.getMsgData() + StrippedDataSize, pack.getMsgSize() - StrippedDataSize);
+            return dispatchNodeMessage(sender, type, rNum, pack.getMsgData(), pack.getMsgSize());
         case Node::MessageActions::Postpone:
             return postponePacket(rNum, type, pack);
         case Node::MessageActions::Drop:
@@ -316,32 +303,26 @@ void Transport::processNodeMessage(const Packet& pack) {
     }
 }
 
-void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber rNum, const Packet& firstPack, const uint8_t* data, size_t size) {
+void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes type, const cs::RoundNumber rNum, const uint8_t* data, size_t size) {
     if (size == 0) {
         cserror() << "Bad packet size, why is it zero?";
-        return;
-    }
-
-    // cut my packs
-    if (firstPack.getSender() == node_->getNodeIdKey()) {
-        csdebug() << "TRANSPORT> Ignore own packs";
         return;
     }
 
     // never cut packets
     switch (type) {
         case MsgTypes::BlockRequest:
-            return node_->getBlockRequest(data, size, firstPack.getSender());
+            return node_->getBlockRequest(data, size, sender);
         case MsgTypes::RequestedBlock:
             return node_->getBlockReply(data, size);
         case MsgTypes::BigBang:  // any round (in theory) may be set
             return node_->getBigBang(data, size, rNum);
         case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
-            return node_->getRoundTableRequest(data, size, rNum, firstPack.getSender());
+            return node_->getRoundTableRequest(data, size, rNum, sender);
         case MsgTypes::NodeStopRequest:
             return node_->getNodeStopRequest(rNum, data, size);
         case MsgTypes::RoundTable:
-            return node_->getRoundTable(data, size, rNum, firstPack.getSender());
+            return node_->getRoundTable(data, size, rNum, sender);
         case MsgTypes::RoundTableSS:
             return node_->getRoundTableSS(data, size, rNum);
         default:
@@ -350,7 +331,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
 
     // cut slow packs
     if ((rNum + getRoundTimeout(type)) < cs::Conveyer::instance().currentRoundNumber()) {
-        csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << ", type " << Packet::messageTypeToString(type) << ", fragments " << firstPack.getFragmentsNum();
+        csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << ", type " << Packet::messageTypeToString(type);
         return;
     }
 
@@ -361,51 +342,51 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
     // packets which transport may cut
     switch (type) {
         case MsgTypes::BlockHash:
-            return node_->getHash(data, size, rNum, firstPack.getSender());
+            return node_->getHash(data, size, rNum, sender);
         case MsgTypes::HashReply:
-            return node_->getHashReply(data, size, rNum, firstPack.getSender());
+            return node_->getHashReply(data, size, rNum, sender);
         case MsgTypes::TransactionPacket:
             return node_->getTransactionsPacket(data, size);
         case MsgTypes::TransactionsPacketRequest:
-            return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
+            return node_->getPacketHashesRequest(data, size, rNum, sender);
         case MsgTypes::TransactionsPacketReply:
-            return node_->getPacketHashesReply(data, size, rNum, firstPack.getSender());
+            return node_->getPacketHashesReply(data, size, rNum, sender);
         case MsgTypes::FirstStage:
-            return node_->getStageOne(data, size, firstPack.getSender());
+            return node_->getStageOne(data, size, sender);
         case MsgTypes::SecondStage:
-            return node_->getStageTwo(data, size, firstPack.getSender());
+            return node_->getStageTwo(data, size, sender);
         case MsgTypes::FirstStageRequest:
-            return node_->getStageRequest(type, data, size, firstPack.getSender());
+            return node_->getStageRequest(type, data, size, sender);
         case MsgTypes::SecondStageRequest:
-            return node_->getStageRequest(type, data, size, firstPack.getSender());
+            return node_->getStageRequest(type, data, size, sender);
         case MsgTypes::ThirdStageRequest:
-            return node_->getStageRequest(type, data, size, firstPack.getSender());
+            return node_->getStageRequest(type, data, size, sender);
         case MsgTypes::ThirdStage:
             return node_->getStageThree(data, size);
         case MsgTypes::FirstSmartStage:
-            return node_->getSmartStageOne(data, size, rNum, firstPack.getSender());
+            return node_->getSmartStageOne(data, size, rNum, sender);
         case MsgTypes::SecondSmartStage:
-            return node_->getSmartStageTwo(data, size, rNum, firstPack.getSender());
+            return node_->getSmartStageTwo(data, size, rNum, sender);
         case MsgTypes::ThirdSmartStage:
-            return node_->getSmartStageThree(data, size, rNum, firstPack.getSender());
+            return node_->getSmartStageThree(data, size, rNum, sender);
         case MsgTypes::SmartFirstStageRequest:
-            return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
+            return node_->getSmartStageRequest(type, data, size, sender);
         case MsgTypes::SmartSecondStageRequest:
-            return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
+            return node_->getSmartStageRequest(type, data, size, sender);
         case MsgTypes::SmartThirdStageRequest:
-            return node_->getSmartStageRequest(type, data, size, firstPack.getSender());
+            return node_->getSmartStageRequest(type, data, size, sender);
         case MsgTypes::RejectedContracts:
-            return node_->getSmartReject(data, size, rNum, firstPack.getSender());
+            return node_->getSmartReject(data, size, rNum, sender);
         case MsgTypes::RoundTableReply:
-            return node_->getRoundTableReply(data, size, firstPack.getSender());
+            return node_->getRoundTableReply(data, size, sender);
         case MsgTypes::RoundPackRequest:
-            return node_->getRoundPackRequest(data, size, rNum, firstPack.getSender());
+            return node_->getRoundPackRequest(data, size, rNum, sender);
         case MsgTypes::EmptyRoundPack:
-            return node_->getEmptyRoundPack(data, size, rNum, firstPack.getSender());
+            return node_->getEmptyRoundPack(data, size, rNum, sender);
         case MsgTypes::StateRequest:
-            return node_->getStateRequest(data, size, rNum, firstPack.getSender());
+            return node_->getStateRequest(data, size, rNum, sender);
         case MsgTypes::StateReply:
-            return node_->getStateReply(data, size, rNum, firstPack.getSender());
+            return node_->getStateReply(data, size, rNum, sender);
         default:
             cserror() << "TRANSPORT> Unknown message type " << Packet::messageTypeToString(type) << " pack round " << rNum;
             break;
@@ -418,17 +399,7 @@ bool Transport::shouldSendPacket(const Packet& pack) {
     }
 
     const cs::RoundNumber currentRound = cs::Conveyer::instance().currentRoundNumber();
-
-    if (!pack.isFragmented()) {
-        return (pack.getRoundNum() + getRoundTimeout(pack.getType())) >= currentRound;
-    }
-
-//    auto& rn = fragOnRound_.tryStore(pack.getHeaderHash());
-    cs::RoundNumber rn;
-
-    if (pack.getFragmentId() == 0) {
-        rn = pack.getRoundNum() + getRoundTimeout(pack.getType());
-    }
+    cs::RoundNumber rn = pack.getRoundNum() + getRoundTimeout(pack.getType());
 
     return !rn || rn >= currentRound;
 }
@@ -437,14 +408,15 @@ inline void Transport::postponePacket(const cs::RoundNumber rNum, const MsgTypes
     (*postponed_)->emplace(rNum, type, pack);
 }
 
-void Transport::processPostponed(const cs::RoundNumber rNum) {
+void Transport::processPostponed(const cs::RoundNumber /* rNum */) {
+/*
     auto& ppBuf = *postponed_[1];
     for (auto& pp : **postponed_) {
         if (pp.round > rNum) {
             ppBuf.emplace(std::move(pp));
         }
         else if (pp.round == rNum) {
-            dispatchNodeMessage(pp.type, pp.round, pp.pack, pp.pack.getMsgData() + StrippedDataSize, pp.pack.getMsgSize() - StrippedDataSize);
+            dispatchNodeMessage(sender, pp.type, pp.round, pp.pack, pp.pack.getMsgData(), pp.pack.getMsgSize());
         }
     }
 
@@ -454,6 +426,7 @@ void Transport::processPostponed(const cs::RoundNumber rNum) {
     postponed_[0] = &ppBuf;
 
     csdebug() << "TRANSPORT> POSTPHONED finished, round " << rNum;
+*/
 }
 
 uint32_t Transport::getNeighboursCount() {

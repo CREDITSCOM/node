@@ -340,11 +340,7 @@ private:
     void sendToBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     template <typename... Args>
-    void sendToBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
-
-    // write values to stream
-    template <typename... Args>
-    void writeDefaultStream(Args&&... args);
+    void sendToBroadcastImpl(BaseFlags, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
 
     // TODO: C++ 17 static inline?
     static const csdb::Address genesisAddress_;
@@ -376,7 +372,6 @@ private:
 #endif
 
     RegionAllocator allocator_;
-    RegionAllocator packStreamAllocator_;
 
     uint32_t startPacketRequestPoint_ = 0;
 
@@ -387,7 +382,6 @@ private:
 
     // serialization/deserialization entities
     cs::IPackStream istream_;
-    cs::OPackStream ostream_;
 
     cs::PoolSynchronizer* poolSynchronizer_;
 
