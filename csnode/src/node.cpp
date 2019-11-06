@@ -422,7 +422,7 @@ void Node::addToBlackListCounter(const cs::PublicKey& key) {
 
 void Node::updateBlackListCounter() {
     csdebug() << __func__;
-    auto& it = blackListCounter_.begin();
+    auto it = blackListCounter_.begin();
     while (it != blackListCounter_.end()) {
         --it->second;
         if (it->second == 0) {
@@ -931,7 +931,7 @@ void Node::sendStateReply(const cs::PublicKey& respondent, const csdb::Address& 
     const cs::PublicKey& key = contract_abs_addr.public_key();
     stream << round << key << data;
     cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), signed_data.data(), signed_data.size());
-    sendToTargetBroadcast(respondent, MsgTypes::StateReply, round, key, data, sig);
+    sendDirect(respondent, MsgTypes::StateReply, round, key, data, sig);
 }
 
 void Node::getStateReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -1118,7 +1118,7 @@ void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey&
     }
 
     auto region = compressor_.compress(poolsBlock);
-    tryToSendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), region, packetNum);
+    sendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), region, packetNum);
 }
 
 void Node::becomeWriter() {
@@ -1526,14 +1526,14 @@ void Node::sendToBroadcast(const MsgTypes msgType, const cs::RoundNumber round, 
 }
 
 template <class... Args>
-void Node::tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+bool Node::sendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
     if (sendToNeighbour(target, msgType, round, std::forward<Args>(args)...)) {
-        return;
+        return true;
     }
     if (sendToConfidant(target, msgType, round, std::forward<Args>(args)...)) {
-        return;
+        return true;
     }
-    sendToTargetBroadcast(target, msgType, round, std::forward<Args>(args)...);
+    return false;
 }
 
 template <class... Args>
@@ -2320,23 +2320,31 @@ void Node::checkForSavedSmartStages(uint64_t id) {
 
 
 //TODO: this code should be refactored
-void Node::sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target) {
+bool Node::sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target) {
     csdebug() << "Send round table: ";
     if (roundPackageCache_.size() == 0) {
-        csdebug() << "No active round table, can't send";
-        return;
+        csdebug() << "No active round table, so cannot send";
+        return false;
     }
     auto rpCurrent = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum](cs::RoundPackage& rp) {return rp.roundTable().round == rNum;});
+    if (rpCurrent == roundPackageCache_.end()) {
+        csdebug() << "Cannot find round table, so cannot send";
+        return false;
+    }
 
     //////////////////////////////////////////////////
     //if (std::find(lastRoundPackage->roundTable().confidants.cbegin(), lastRoundPackage->roundTable().confidants.cend(), target) != lastRoundPackage->roundTable().confidants.end()) {
     //    solver_->changeHashCollectionTimer();
     //}
-    tryToSendDirect(target, MsgTypes::RoundTable, rpCurrent->roundTable().round, rpCurrent->subRound(), rpCurrent->toBinary());
-    csdebug() << "Done";
-    if (!rpCurrent->poolMetaInfo().characteristic.mask.empty()) {
-        csmeta(csdebug) << "Packing " << rpCurrent->poolMetaInfo().characteristic.mask.size() << " bytes of char. mask to send";
+    if (sendDirect(target, MsgTypes::RoundTable, rpCurrent->roundTable().round, rpCurrent->subRound(), rpCurrent->toBinary())) {
+        csdebug() << "Done";
+        if (!rpCurrent->poolMetaInfo().characteristic.mask.empty()) {
+            csmeta(csdebug) << "Packing " << rpCurrent->poolMetaInfo().characteristic.mask.size() << " bytes of char. mask to send";
+        }
+        return true;
     }
+    csdebug() << "Unable to send round table directly";
+    return false;
 }
 
 void Node::sendRoundPackageToAll(cs::RoundPackage& rPackage) {
@@ -2919,8 +2927,8 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
 }
 
 void Node::roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round) {
-    csdebug() << "NODE> send request for round info  #" << round;
-    tryToSendDirect(respondent, MsgTypes::RoundPackRequest, round, round /*dummy data to prevent packet drop on receiver side*/);
+    csdebug() << "NODE> send request for round info #" << round;
+    /*bool notused =*/ sendDirect(respondent, MsgTypes::RoundPackRequest, round, round /*dummy data to prevent packet drop on receiver side*/);
 }
 
 void Node::askConfidantsRound(cs::RoundNumber round, const cs::ConfidantsKeys& confidants) {
@@ -2971,7 +2979,7 @@ void Node::emptyRoundPackReply(const cs::PublicKey& respondent) {
     cs::DataStream stream(bytes);
     stream << seq;
     cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
-    sendToTargetBroadcast(respondent, MsgTypes::EmptyRoundPack, seq, signature);
+    sendDirect(respondent, MsgTypes::EmptyRoundPack, seq, signature);
 }
 
 void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -3002,7 +3010,7 @@ void Node::roundPackReply(const cs::PublicKey& respondent) {
         return;
     }
     cs::RoundPackage rp = roundPackageCache_.back();
-    tryToSendDirect(respondent, MsgTypes::RoundTable, rp.roundTable().round, rp.subRound(), rp.toBinary());
+    /*bool notused =*/ sendDirect(respondent, MsgTypes::RoundTable, rp.roundTable().round, rp.subRound(), rp.toBinary());
 }
 
 void Node::sendRoundTableRequest(uint8_t respondent) {
@@ -3022,7 +3030,7 @@ void Node::sendRoundTableRequest(const cs::PublicKey& respondent) {
     csdebug() << "NODE> send request for next round info after #" << round;
 
     // ask for next round info:
-    tryToSendDirect(respondent, MsgTypes::RoundTableRequest, round, myConfidantIndex_);
+    /*bool notused =*/ sendDirect(respondent, MsgTypes::RoundTableRequest, round, myConfidantIndex_);
 }
 
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& requester) {
@@ -3056,7 +3064,7 @@ void Node::sendRoundTableReply(const cs::PublicKey& target, bool hasRequestedInf
         csdebug() << "Only confidant nodes can reply consensus stages";
     }
 
-    tryToSendDirect(target, MsgTypes::RoundTableReply, cs::Conveyer::instance().currentRoundNumber(), hasRequestedInfo);
+    /*bool notused =*/ sendDirect(target, MsgTypes::RoundTableReply, cs::Conveyer::instance().currentRoundNumber(), hasRequestedInfo);
 }
 
 bool Node::tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum) {
@@ -3070,9 +3078,7 @@ bool Node::tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumbe
     if (rPackage == roundPackageCache_.cend()) {
         return false;
     }
-    sendRoundPackage(rNum, target);
-
-    return true;
+    return sendRoundPackage(rNum, target);
 }
 
 void Node::getRoundTableReply(const uint8_t* data, const size_t size, const cs::PublicKey& respondent) {
@@ -3262,7 +3268,7 @@ void Node::sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respon
     }
 
     cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), hash.to_binary().data(), hash.size());
-    tryToSendDirect(respondent, MsgTypes::HashReply, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, getConfidantNumber(), hash);
+    /*bool notused =*/ sendDirect(respondent, MsgTypes::HashReply, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, getConfidantNumber(), hash);
 }
 
 void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
