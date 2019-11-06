@@ -422,7 +422,7 @@ void Node::addToBlackListCounter(const cs::PublicKey& key) {
 
 void Node::updateBlackListCounter() {
     csdebug() << __func__;
-    auto& it = blackListCounter_.begin();
+    auto it = blackListCounter_.begin();
     while (it != blackListCounter_.end()) {
         --it->second;
         if (it->second == 0) {
