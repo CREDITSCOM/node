@@ -302,7 +302,7 @@ private:
     bool init();
     void setupNextMessageBehaviour();
 
-    void sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
+    bool sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);
 
     bool readRoundData(cs::RoundTable& roundTable, bool bang);
@@ -320,19 +320,20 @@ private:
 
     /// sending interace methods
 
-    // default methods without flags
+    // sends to specific target through all the network, not having its direct address
     template <typename... Args>
     void sendToTargetBroadcast(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
-    // to neighbour
+    // to neighbor or not at all
     template <typename... Args>
     bool sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     template <typename... Args>
     void sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
+    // directly to target or not at all
     template <class... Args>
-    void tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    bool sendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     // to confidants, returns actual sent count
     template <class... Args>
@@ -345,7 +346,7 @@ private:
     template <class... Args>
     bool sendToConfidant(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
-    // to neighbours
+    // to neighbors
     template <typename... Args>
     bool sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
