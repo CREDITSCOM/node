@@ -106,6 +106,16 @@ void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data)
     newPacketsReceived_.notify_one();
 }
 
+void Transport::OnNodeDiscovered(const net::NodeId& id) {
+    std::lock_guard g(peersMux_);
+    knownPeers_.insert(id);
+}
+
+void Transport::OnNodeRemoved(const net::NodeId& id) {
+    std::lock_guard g(peersMux_);
+    knownPeers_.erase(id);
+}
+
 void Transport::processorRoutine() {
     while (true) {
         std::unique_lock lk(inboxMux_);

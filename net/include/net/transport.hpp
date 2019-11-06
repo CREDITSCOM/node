@@ -6,6 +6,7 @@
 #include <csignal>
 #include <list>
 #include <mutex>
+#include <unordered_set>
 
 #include <config.hpp>
 #include <csnode/packstream.hpp>
@@ -60,7 +61,6 @@ public:
     void run();
     bool isGood() const { return good_; }
 
-    void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
     void processNodeMessage(const cs::PublicKey&, const Packet&);
     void processPostponed(const cs::RoundNumber); // @TODO move to Node
 
@@ -79,6 +79,11 @@ public:
 
     // @TODO remove, used in Node
     void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}
+
+    // HostEventHandler
+    void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
+    void OnNodeDiscovered(const net::NodeId&) override;
+    void OnNodeRemoved(const net::NodeId&) override;
 
 public signals:
     PingSignal pingReceived;
@@ -152,6 +157,9 @@ private:
     std::condition_variable newPacketsReceived_;
     std::mutex inboxMux_;
     std::list<std::pair<cs::PublicKey, Packet>> inboxQueue_;
+
+    std::mutex peersMux_;
+    std::unordered_set<net::NodeId> knownPeers_;
 
     void processorRoutine();
 
