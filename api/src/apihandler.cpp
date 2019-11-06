@@ -680,6 +680,11 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
         }
         return msg;
     }
+
+    if (!solver_.isTransactionsInputAvailable()) {
+        auto msg = " Node is not syncronized or last round duration is too long. You are prevented from sending this transaction to avoid the Black List.";
+        return msg;
+    }
     return std::nullopt;
 }
 

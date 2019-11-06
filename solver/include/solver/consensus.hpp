@@ -25,6 +25,9 @@ public:
      * activates */
     constexpr static unsigned int PostConsensusTimeout = 60000;
 
+    /** @brief   Maximum round duration when the transaction input is allowed - used to avoid BlackList */
+    constexpr static size_t MaxRoundDuration = 300000;
+
     /** @brief   The minimum trusted nodes to start consensus */
     constexpr static unsigned int MinTrustedNodes = 3;
 

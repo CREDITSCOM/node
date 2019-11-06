@@ -96,6 +96,7 @@ public:
     void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
     void setCurrentRP(const cs::RoundPackage& rp);
     void performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& sender, bool updateRound);
+    bool isTransactionsInputAvailable();
     void clearRPCache(cs::RoundNumber rNum);
     void sendHash(cs::RoundNumber round);
     void getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender);
@@ -468,6 +469,7 @@ private:
     bool lastBlockRemoved_ = false;
     std::map<cs::RoundNumber, uint8_t> receivedBangs;
     std::map<cs::PublicKey, size_t> blackListCounter_;
+    size_t lastRoundPackageTime_ = 0;
 
     bool alwaysExecuteContracts_ = false;
 

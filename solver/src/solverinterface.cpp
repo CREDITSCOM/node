@@ -214,6 +214,10 @@ void SolverCore::gotStageOne(const cs::StageOne& stage) {
     }
 }
 
+bool SolverCore::isTransactionsInputAvailable() {
+    return pnode->isTransactionsInputAvailable();
+}
+
 void SolverCore::gotStageOneRequest(uint8_t requester, uint8_t required) {
     csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-1 of [" << static_cast<int>(required) << "]";
 

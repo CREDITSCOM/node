@@ -2701,6 +2701,15 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     // create pool by previous round, then change conveyer state.
     getCharacteristic(rPackage);
 
+
+    try {
+        lastRoundPackageTime_ = std::stoull(cs::Utils::currentTimestamp());
+    }
+    catch (...) {
+        csdebug() << __func__ << ": current Timestamp was announced as zero";
+        return;
+    }
+
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
 	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
 
@@ -2718,6 +2727,33 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
 
     csmeta(csdetails) << "done\n";
 }
+
+bool Node::isTransactionsInputAvailable() {
+    size_t justTime;
+    try {
+        justTime = std::stoull(cs::Utils::currentTimestamp());
+    }
+    catch (...) {
+        csdebug() << __func__ << ": current Timestamp was announced as zero";
+        return false;
+    }
+    if (justTime > lastRoundPackageTime_) {
+        if (justTime - lastRoundPackageTime_ > Consensus::MaxRoundDuration) {
+            csdebug() << "NODE> The current round lasts too long, possible traffic problems";
+            return false; //
+        }
+        else {
+            bool condition = (!poolSynchronizer_->isSyncroStarted()) && (cs::Conveyer::instance().currentRoundNumber() - getBlockChain().getLastSeq() < 2);
+            return condition;
+        }
+    }
+    else {
+        csdebug() << "NODE> Possible wrong node clock";
+        return false;
+    }
+
+}
+
 
 void Node::clearRPCache(cs::RoundNumber rNum) {
     bool flagg = true;
