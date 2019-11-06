@@ -82,10 +82,13 @@ public:
     void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum);
     void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
     bool verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender);
-    bool verifyPacketTransactions(cs::TransactionsPacket packet);
+    bool verifyPacketTransactions(cs::TransactionsPacket packet, const cs::PublicKey& sender);
     void getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
 
+
+    void addToBlackListCounter(const cs::PublicKey& key);
+    void updateBlackListCounter();
     // critical is true if network near to be down, all capable trusted node required
     bool canBeTrusted(bool critical);
 
@@ -466,6 +469,7 @@ private:
     size_t roundPackRequests_ = 0;
     bool lastBlockRemoved_ = false;
     std::map<cs::RoundNumber, uint8_t> receivedBangs;
+    std::map<cs::PublicKey, size_t> blackListCounter_;
 
     bool alwaysExecuteContracts_ = false;
 
