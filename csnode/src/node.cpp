@@ -405,9 +405,43 @@ bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::Publ
     return true;
 }
 
-bool Node::verifyPacketTransactions(cs::TransactionsPacket packet) {
+void Node::addToBlackListCounter(const cs::PublicKey& key) {
+    if (blackListCounter_.find(key) == blackListCounter_.end()) {
+        blackListCounter_.emplace(key, Consensus::BlackListCounterSinglePenalty);
+    }
+    else {
+        blackListCounter_.at(key) += Consensus::BlackListCounterSinglePenalty;
+        if (blackListCounter_.at(key) > Consensus::BlackListCounterMaxValue) {
+            addToBlackList(key);
+            return;
+        }
+    }
+    csdebug() << "NODE> Node with Key: " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " gained " 
+        << Consensus::BlackListCounterSinglePenalty << " penalty points, total: " << blackListCounter_.at(key);
+}
+
+void Node::updateBlackListCounter() {
+    csdebug() << __func__;
+    auto& it = blackListCounter_.begin();
+    while (it != blackListCounter_.end()) {
+        --it->second;
+        if (it->second == 0) {
+            it = blackListCounter_.erase(it);
+            //TODO: make possible to uncomment this code
+            //if (isBlackListed(it->first) {
+            //    transport_->unmarkNeighbourAsBlackListed(it->first);
+            //}
+        }
+        else {
+            ++it;
+        }
+    }
+}
+
+bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::PublicKey& key) {
     size_t sum = 0;
     size_t cnt = packet.transactionsCount();
+
     if (packet.signatures().size() == 1) {
         auto& transactions = packet.transactions();
         for (auto& it : transactions) {
@@ -437,12 +471,21 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet) {
             else {
                 // put sender to black list counter
                 csdebug() << "NODE> Sender should be send to the black list counter: valid trxs = " << sum << ", total trxs = " << cnt;
+                addToBlackListCounter(key);
+                return true;
             }
         }
         else {
             if (sum < cnt / 2) {
                 // put sender to black list counter
                 csdebug() << "NODE> Sender should be send to the black list counter: valid trxs = " << sum << ", total trxs = " << cnt;
+                addToBlackListCounter(key);
+                return true;
+            }
+            else {
+                // put sender to black list counter
+                csdebug() << "NODE> Sender shouldn't be send to the black list counter: valid trxs = " << sum << ", total trxs = " << cnt;
+                return true;
             }
         }
 
@@ -461,7 +504,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
         return;
     }
     
-    if (verifyPacketSignatures(packet, sender) && verifyPacketTransactions(packet)) {
+    if (verifyPacketSignatures(packet, sender) && verifyPacketTransactions(packet, sender)) {
         processTransactionsPacket(std::move(packet));
     }
     else {
@@ -794,9 +837,12 @@ void Node::createTestTransaction() {
     transaction.set_amount(csdb::Amount(1, 0));
     transaction.set_max_fee(csdb::AmountCommission(0.0));
     transaction.set_counted_fee(csdb::AmountCommission(0.0));
-    transaction.set_innerID(0);
-    cs::TransactionsPacket transactionPack;
-    transactionPack.addTransaction(transaction);
+    cs::TransactionsPacket transactionPack;    
+    for (size_t i = 0; i < 9; ++i) {
+        transaction.set_innerID(i);
+        transactionPack.addTransaction(transaction);
+    }
+
     transactionPack.makeHash();
 
     cs::Conveyer::instance().addSeparatePacket(transactionPack);
@@ -2476,7 +2522,6 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     if (isLastRPStakeFull(rNum)) {
             return;
     }
-    
 
     cs::Bytes bytes;
     istream_ >> bytes;
@@ -2647,6 +2692,7 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     //    ++it;
     //}
 
+
     cs::PacketsHashes hashes = rPackage.roundTable().hashes;
     cs::PublicKeys confidants = rPackage.roundTable().confidants;
     cs::RoundTable roundTable;
@@ -2666,10 +2712,14 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
 	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
 
+    //auto myPublicKey = solver_->getPublicKey();
 
-    if (rPackage.roundTable().round == 30 && myConfidantIndex_ == 1) {
-        createTestTransaction();
-    }
+    //std::string strAddr1 = "4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsBPXX4fXef7FuL";
+    //std::vector<uint8_t> pub_key1;
+    //DecodeBase58(strAddr1, pub_key1);
+    //if (rPackage.roundTable().round % 10 == 0  && std::memcmp(myPublicKey.data(), pub_key1.data(), 32) == 0) {
+    //    createTestTransaction();
+    //}
 
     currentRoundPackage_ = cs::RoundPackage();
     reviewConveyerHashes();
@@ -3039,6 +3089,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
         }
     }
 
+    updateBlackListCounter();
     // TODO: think how to improve this code.
     stageOneMessage_.clear();
     stageOneMessage_.resize(roundTable.confidants.size());
