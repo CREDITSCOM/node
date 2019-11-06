@@ -73,6 +73,15 @@ public:
     /** @brief   Max hashes count to include in stage one data */
     constexpr static size_t MaxStageOneHashes = 100;
 
+    /** @brief   Black list counter - max number of penalty points to get to the black list */
+    constexpr static size_t BlackListCounterMaxValue = 100000;
+
+    /** @brief   Black list counter - amount of penalty points for one mistake */
+    constexpr static size_t BlackListCounterSinglePenalty = 10000;
+
+    /** @brief   Max transaction size */
+    constexpr static size_t MaxTransactionSize = 8000;
+
     /** @brief   Max hashes count to include in stage one data */
     constexpr static size_t MaxStageOneTransactions = 1000;
 

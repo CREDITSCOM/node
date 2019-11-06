@@ -343,56 +343,57 @@ void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     }
 }
 
-bool Transport::checkConfidants(const std::vector<cs::PublicKey>& list, int except) {
+bool Transport::checkConfidant(const cs::PublicKey& key) {
     cs::Lock lock(aLock_);
 
-    auto end = addresses_.end();
-    int i = 0;
-    for (const auto& pkey: list) {
-        if (i++ == except) continue;
-        if (addresses_.find(pkey) == end) {
-            csdebug() << "Transport> Confidant " << cs::Utils::byteStreamToHex(pkey.data(), pkey.size()) << " not found";
-            return false;
-        }
+    if (addresses_.find(key) == addresses_.end()) {
+        csdebug() << "Transport> Confidant " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " not found";
+        return false;
     }
     return true;
 }
 
-void Transport::deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>& list, int except) {
+// returns pair of (sent count, list of unable-to-send items in input list)
+std::pair< uint32_t, std::list<int> > Transport::deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>& list, int except) {
     std::vector<ConnectionPtr> conns;
     conns.reserve(list.size());
-    bool finded = true;
+    std::pair< uint32_t, std::list<int> > result = std::make_pair(0, std::list<int>{});
     int i = 0;
     {
         cs::Lock lock(aLock_);
         for (const auto& pkey: list) {
-            if (i++ == except) continue;
-            auto res = addresses_.find(pkey);
-            if (res == addresses_.end()) {
-                finded = false;
-                break;
+            if (i != except) {
+                auto res = addresses_.find(pkey);
+                if (res == addresses_.end()) {
+                    result.second.push_back(i);
+                }
+                else {
+                    conns.emplace_back(neighbourhood_.addConfidant(net_->resolve(res->second)));
+                    ++result.first;
+                }
             }
-            conns.emplace_back(neighbourhood_.addConfidant(net_->resolve(res->second)));
+            ++i;
         }
     }
 
-    if (!finded) {
-        deliverBroadcast(pack, size);
-        return;
-    }
+    if (result.first > 0) {
 
-    if (size >= Packet::MaxFragments) {
-        ++Transport::cntExtraLargeNotSent;
-        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
-    }
-
-    for (auto& conn: conns) {
-        const auto packEnd = pack + size;
-        for (auto ptr = pack; ptr != packEnd; ++ptr) {
-            csdebug() << "Transport: sending to " << (conn->specialOut ? conn->out : conn->in);
-            neighbourhood_.sendByConfidant(ptr, conn);
+        if (size >= Packet::MaxFragments) {
+            ++Transport::cntExtraLargeNotSent;
+            csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
         }
+
+        for (auto& conn : conns) {
+            const auto packEnd = pack + size;
+            for (auto ptr = pack; ptr != packEnd; ++ptr) {
+                csdebug() << "Transport: sending to " << (conn->specialOut ? conn->out : conn->in);
+                neighbourhood_.sendByConfidant(ptr, conn);
+            }
+        }
+
     }
+
+    return result;
 }
 
 // Processing network packages
@@ -445,7 +446,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             gotSSRefusal(task);
             break;
         case NetworkCommand::SSPingWhiteNode:
-            gotSSPingWhiteNode(task);
+            gotSSPingWhiteNode(task, node_->getBlockChain().getLastSeq(), node_->getBlockChain().getLastHash());
             break;
         case NetworkCommand::SSLastBlock: {
             long long timeSS{};
@@ -578,6 +579,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
                 if (count <= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
                     neighbourhood_.establishConnection(net_->resolve(ep));
                 }
+                storeAddress(key, ep);
             }
 
             if (!neighbourhood_.canHaveNewConnection()) {
@@ -1179,13 +1181,20 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>&) {
     return true;
 }
 
-bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
+bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task, const cs::Sequence lastBlock, const csdb::PoolHash& lastHash) {
 	// MUST NOT call nh_ under oLock_!!!
     const auto nh_size = neighbourhood_.size();
 
     cs::Lock lock(oLock_);
     oPackStream_.init(task->pack);
     oPackStream_ << nh_size;
+
+    cs::Hash lastHash_;
+    const auto hashBinary = lastHash.to_binary();
+    std::copy(hashBinary.begin(), hashBinary.end(), lastHash_.begin());
+    
+    oPackStream_ << lastBlock << lastHash_;
+
 
     Connection conn;
     conn.in = task->sender;
@@ -1265,6 +1274,7 @@ bool Transport::gotSSNewFriends()
             if (ctr <= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
                 neighbourhood_.establishConnection(net_->resolve(ep));
             }
+            storeAddress(key, ep);
         }
 
         if (!neighbourhood_.canHaveNewConnection()) {
@@ -1622,19 +1632,23 @@ bool Transport::gotSSIntroduceConsensusReply()
         }
 
         if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
-            cs::Lock lock(aLock_);
-            auto value = std::make_pair(key, ep);
-            auto res = addresses_.insert(value);
-            if (!res.second && res.first->second != ep) {
-                auto hint = res.first;
-                --hint;
-                addresses_.erase(res.first);
-                addresses_.insert(hint, value);
-            }
+            storeAddress(key, ep);
         }
     }
 
     return true;
+}
+
+void Transport::storeAddress(const cs::PublicKey& key, const EndpointData& ep) {
+    cs::Lock lock(aLock_);
+    auto value = std::make_pair(key, ep);
+    auto res = addresses_.insert(value);
+    if (!res.second && res.first->second != ep) {
+        auto hint = res.first;
+        --hint;
+        addresses_.erase(res.first);
+        addresses_.insert(hint, value);
+    }
 }
 
 void Transport::sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys) {

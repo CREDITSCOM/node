@@ -459,7 +459,7 @@ void SolverCore::realTrustedSet(cs::Bytes realTrusted) {
 }
 
 void SolverCore::updateGrayList(cs::RoundNumber round) {
-    csdebug() << __func__;
+    //csdebug() << __func__;
     if (lastGrayUpdated_ >= round) {
         csdebug() << "Gray list will update only if the round number changes";
         return;

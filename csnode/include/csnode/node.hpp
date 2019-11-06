@@ -82,10 +82,13 @@ public:
     void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum);
     void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
     bool verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender);
-    bool verifyPacketTransactions(cs::TransactionsPacket packet);
+    bool verifyPacketTransactions(cs::TransactionsPacket packet, const cs::PublicKey& sender);
     void getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
 
+
+    void addToBlackListCounter(const cs::PublicKey& key);
+    void updateBlackListCounter();
     // critical is true if network near to be down, all capable trusted node required
     bool canBeTrusted(bool critical);
 
@@ -128,7 +131,7 @@ public:
     void sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::StageThreeSmarts& stageThreeInfo);
     void getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
     void smartStageEmptyReply(uint8_t requesterNumber);
-    void smartStageRequest(MsgTypes msgType, uint64_t smartID, cs::PublicKey confidant, uint8_t respondent, uint8_t required);
+    void smartStageRequest(MsgTypes msgType, uint64_t smartID, const cs::PublicKey& confidant, uint8_t respondent, uint8_t required);
     void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
     void sendSmartStageReply(const cs::Bytes& message, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey& requester);
 
@@ -268,7 +271,7 @@ public:
 
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;
-    using SmartStageRequestSignal = cs::Signal<void(uint8_t, uint64_t, uint8_t, uint8_t, cs::PublicKey&)>;
+    using SmartStageRequestSignal = cs::Signal<void(uint8_t, uint64_t, uint8_t, uint8_t, const cs::PublicKey&)>;
     using StopSignal = cs::Signal<void()>;
 
     // args: [failed list, restart list]
@@ -302,7 +305,7 @@ private:
     bool init();
     void setupNextMessageBehaviour();
 
-    void sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
+    bool sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);
 
     bool readRoundData(cs::RoundTable& roundTable, bool bang);
@@ -320,34 +323,33 @@ private:
 
     /// sending interace methods
 
-    // default methods without flags
+    // sends to specific target through all the network, not having its direct address
     template <typename... Args>
     void sendToTargetBroadcast(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
-    // to neighbour
+    // to neighbor or not at all
     template <typename... Args>
     bool sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     template <typename... Args>
     void sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
+    // directly to target or not at all
     template <class... Args>
-    void tryToSendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    bool sendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+    // to confidants, returns actual sent count
+    template <class... Args>
+    uint32_t sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+    // to confidants, returns actual sent count
+    template <class... Args>
+    uint32_t sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     template <class... Args>
-    bool sendToRandomNeighbour(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    bool sendToConfidant(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
-    template <class... Args>
-    void sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // smarts
-    template <class... Args>
-    void sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    template <class... Args>
-    void sendToSingle(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // to neighbours
+    // to neighbors
     template <typename... Args>
     bool sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
@@ -466,6 +468,7 @@ private:
     size_t roundPackRequests_ = 0;
     bool lastBlockRemoved_ = false;
     std::map<cs::RoundNumber, uint8_t> receivedBangs;
+    std::map<cs::PublicKey, size_t> blackListCounter_;
 
     bool alwaysExecuteContracts_ = false;
 
