@@ -7,7 +7,7 @@
 #include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/packstream.hpp>
-#include <lib/system/allocators.hpp>
+#include <lib/system/structures.hpp>
 #include <lib/system/utils.hpp>
 
 #include <packetvalidator.hpp>
@@ -122,6 +122,7 @@ void Transport::sendBroadcast(Packet&& pack) {
 
 void Transport::processorRoutine() {
     while (true) {
+        CallsQueue::instance().callAll();
         std::unique_lock lk(inboxMux_);
         newPacketsReceived_.wait(lk, [this]() { return !inboxQueue_.empty(); });
 
