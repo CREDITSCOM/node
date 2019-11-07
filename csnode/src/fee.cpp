@@ -48,6 +48,10 @@ csdb::AmountCommission getFee(const csdb::Transaction& t) {
     return csdb::AmountCommission(std::get<1>(feeLevels[feeLevels.size() - 1]) * k);
 }
 
+csdb::AmountCommission getContractStateMinFee() {
+    return csdb::AmountCommission(std::get<2>(feeLevels[0])); // cheapest new state
+}
+
 bool estimateMaxFee(const csdb::Transaction& t, csdb::AmountCommission& countedFee) {
     countedFee = getFee(t);
 

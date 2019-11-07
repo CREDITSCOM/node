@@ -29,6 +29,11 @@ bool estimateMaxFee(const csdb::Transaction&, csdb::AmountCommission& countedFee
 ///
 csdb::AmountCommission getFee(const csdb::Transaction&);
 
+///
+/// @return minimal fee for contract new state transaction
+///
+csdb::AmountCommission getContractStateMinFee();
+
 /// <summary>   Gets execution fee. </summary>
 ///
 /// <remarks>   Alexander Avramenko, 11.06.2019. </remarks>
