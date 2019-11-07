@@ -97,6 +97,20 @@ auto CreateTestRoundTable(const cs::PacketsHashes& hashes) {
     return cs::RoundTable{kRoundNumber, /*kPublicKey, */kConfidantsKeys, hashes/*, kCharacteristic*/};
 }
 
+class LibsodiumInit {
+public:
+    LibsodiumInit() {
+        cscrypto::cryptoInit();
+    }
+};
+
+static cs::PrivateKey generatePrivateKey() {
+    cs::PublicKey key = kPublicKey;
+    [[maybe_unused]] static LibsodiumInit init;
+
+    return cs::PrivateKey::generateWithPair(key);
+}
+
 TEST(TransactionsEqualityOperator, SameAreEqual) {
     auto transaction1 = CreateTestTransaction(123, uint8_t{45}), transaction2 = transaction1;
     ASSERT_EQ(transaction1, transaction2);
@@ -214,7 +228,7 @@ TEST(Conveyer, MainLogic) {
     ASSERT_TRUE(conveyer.currentNeededHashes().empty());
     ASSERT_TRUE(conveyer.isSyncCompleted());
 
-    auto created_packet{conveyer.createPacket(1)};
+    auto created_packet{conveyer.createPacket(kRoundNumber)};
     ASSERT_TRUE(created_packet.has_value());
     ASSERT_EQ(packet.transactionsCount(), created_packet.value().first.transactionsCount());
 
@@ -237,9 +251,9 @@ TEST(Conveyer, MainLogic) {
 
     csdb::PoolHash ph;
     cs::Bytes tmpCharacteristic;
-    cs::PoolMetaInfo pool_meta_info{ { tmpCharacteristic }, "1542617459297", ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}};
+    cs::PoolMetaInfo poolMetaInfo{ { tmpCharacteristic }, "1542617459297", ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}};
 
-    auto pool{conveyer.applyCharacteristic(pool_meta_info)};
+    auto pool{conveyer.applyCharacteristic(poolMetaInfo)};
 
     ASSERT_TRUE(pool.has_value());
     ASSERT_EQ(3, pool.value().transactions_count());
@@ -252,8 +266,9 @@ TEST(Conveyer, TestSendCache) {
     cs::PacketsHashes hashes;
 
     size_t counter = 0;
-    ConveyerTest conveyer{};
 
+    ConveyerTest conveyer{};
+    conveyer.setPrivateKey(generatePrivateKey());
     conveyer.setRound(0);
 
     cs::Connector::connect(&conveyer.packetFlushed, [&](const auto& packet) {
@@ -323,6 +338,7 @@ TEST(Conveyer, TestRejectedHashes) {
     bool called = false;
 
     ConveyerTest conveyer{};
+    conveyer.setPrivateKey(generatePrivateKey());
     conveyer.setRound(0);
 
     auto packet1 = CreateTestPacket(20);
@@ -354,6 +370,7 @@ TEST(Conveyer, TestRoundChangeSignal) {
     bool called = false;
 
     ConveyerTest conveyer{};
+    conveyer.setPrivateKey(generatePrivateKey());
     conveyer.setRound(0);
 
     cs::Connector::connect(&conveyer.roundChanged, [&](const cs::RoundNumber) {
@@ -402,6 +419,7 @@ TEST(Conveyer, TestMaxResendCountNotZero) {
     }
 
     ConveyerTest conveyer{};
+    conveyer.setPrivateKey(generatePrivateKey());
     conveyer.setRound(0);
 
     auto packet = CreateTestPacket(20);
@@ -462,6 +480,7 @@ TEST(Conveyer, TestMaxResendCountZero) {
     cs::ConfigHolder::instance().setConfig(setupConfigToTestZeroMaxResends());
 
     ConveyerTest conveyer{};
+    conveyer.setPrivateKey(generatePrivateKey());
     conveyer.setRound(0);
 
     auto packet = CreateTestPacket(30);
