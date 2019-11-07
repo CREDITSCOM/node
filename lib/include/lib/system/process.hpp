@@ -46,10 +46,10 @@ using ProcessErrorSignal = cs::Signal<void(const cs::ProcessException&)>;
 class Process {
 public:
     enum Options : int {
-        None,
-        NewConsole = 0x02,
-        OutToFile = 0x04,
-        OutToStream = 0x06,
+        None = 0x00,
+        NewConsole = 0x01,
+        OutToFile = 0x02,
+        OutToStream = 0x04,
         Attach = 0x08,
         ConsoleAndToFile = NewConsole | OutToFile
     };
