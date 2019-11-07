@@ -159,7 +159,7 @@ void Neighbourhood::gotRegistrationConfirmation(const cs::PublicKey& sender, con
         if (!info.nodeVersion) { // case we have not info about peer yet
             info.nodeVersion = NODE_VERSION;
             info.uuid = uuid_;
-            sendRegistrationConfirmation(sender); // let him measure timeout
+            sendRegistrationConfirmation(sender); // let him check timeout
         }
     }
 }
@@ -177,70 +177,33 @@ void Neighbourhood::gotRegistrationRefusal(const cs::PublicKey& sender, const Pa
     stream >> reason;
     cslog() << "Registration to " << EncodeBase58(sender.data(), sender.data() + sender.size())
             << " refused: " << parseRefusalReason(reason);
+
+    std::lock_guard<std::mutex> g(neighbourMux_);
+    neighbours_.erase(sender);
+    --neighboursCount_;
 }
 
-void Neighbourhood::sendPingPack(const cs::PublicKey&) {
-/*
-    cs::Sequence seq = node_->getBlockChain().getLastSeq();
-    cs::Lock lock(oLock_);
-    oPackStream_.init(BaseFlags::NetworkMsg);
-    Connection::Id id(0); // do we need connection id?
-    oPackStream_ << NetworkCommand::Ping << id << seq << myPublicKey_;
-
-    oPackStream_ << node_->getBlockChain().uuid();
-
-    if (!config_->isCompatibleVersion()) {
-        oPackStream_ << NODE_VERSION;
-    }
-
-    sendDirect(oPackStream_.getPackets(), conn);
-    oPackStream_.clear();
-*/
+void Neighbourhood::sendPingPack(const cs::PublicKey& receiver) {
+    transport_->sendDirect(formPacket(BaseFlags::NetworkMsg,
+                                      NetworkCommand::Ping,
+                                      node_->getBlockChain().getLastSeq()), receiver);
 }
 
-void Neighbourhood::gotPing(const cs::PublicKey&, const Packet&) {
-/*    Connection::Id id = 0u;
-    cs::Sequence lastSeq = 0u;
-
-    cs::PublicKey publicKey;
-    iPackStream_ >> id >> lastSeq >> publicKey;
-
-#if defined(PING_WITH_BCHID)
-    uint64_t remoteUuid = 0;
-    iPackStream_ >> remoteUuid;
-
-    auto uuid = node_->getBlockChain().uuid();
-
-    if (uuid != 0 && remoteUuid != 0) {
-        if (uuid != remoteUuid) {
-            return false;   // remote is incompatible
+void Neighbourhood::gotPing(const cs::PublicKey& sender, const Packet& pack) {
+    std::lock_guard<std::mutex> g(neighbourMux_);
+    auto neighbour = neighbours_.find(sender);
+    if (neighbour != neighbours_.end() && neighbour->second.nodeVersion) {
+        auto now = std::chrono::steady_clock::now();
+        PeerInfo& info = neighbour->second;
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - info.lastSeen) > LastSeenTimeout) {
+            sendRegistrationRefusal(sender, RegistrationRefuseReasons::Timeout);
+            neighbours_.erase(neighbour);
+            --neighboursCount_;
+            return;
         }
+
+        info.lastSeen = now;
+        cs::DataStream stream(pack.getMsgData(), pack.getMsgSize());
+        stream >> info.lastSeq;
     }
-#endif
-    if (!config_->isCompatibleVersion() && iPackStream_.end()) {
-//        nh_.gotBadPing(id);
-        return false;
-    }
-
-    uint16_t nodeVersion = 0;
-
-    if (!iPackStream_.end()) {
-        iPackStream_ >> nodeVersion;
-    }
-
-    if (!iPackStream_.good() || !iPackStream_.end()) {
-        return false;
-    }
-
-    if (lastSeq > maxBlock_) {
-        maxBlock_ = lastSeq;
-        maxBlockCount_ = 1;
-    }
-
-//    if (nh_.validateConnectionId(sender, id, task->sender, publicKey, lastSeq)) {
-        emit pingReceived(lastSeq, publicKey);
-//    }
-
-    return true;
-*/
 }
