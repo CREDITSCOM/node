@@ -2750,7 +2750,7 @@ namespace executor {
         ExecutorBuildVersionResult _return;
         bool result = false;
 
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(cs::ConfigHolder::instance().config()->getApiSettings().executorCheckVersionDelay));
 
         if (requestStop_) {
             return;
