@@ -249,6 +249,11 @@ std::string SmartContracts::get_error_message(int8_t code) {
 
 /*static*/
 bool SmartContracts::is_smart_contract(const csdb::Transaction& tr) {
+    return SmartContracts::is_smart_contract(tr) || SmartContracts::is_new_state(tr);
+}
+
+/*static*/
+bool SmartContracts::is_executable(const csdb::Transaction& tr) {
     if (!tr.is_valid()) {
         return false;
     }
@@ -260,15 +265,7 @@ bool SmartContracts::is_smart_contract(const csdb::Transaction& tr) {
             f = tr.user_field(trx_uf::start::Methods);
         }
     }
-    if (f.is_valid()) {
-        return f.type() == csdb::UserField::Type::String;
-    }
-    return SmartContracts::is_new_state(tr);
-}
-
-/*static*/
-bool SmartContracts::is_executable(const csdb::Transaction& tr) {
-    return SmartContracts::is_smart_contract(tr) && !SmartContracts::is_new_state(tr);
+    return (f.is_valid() && f.type() == csdb::UserField::Type::String);
 }
 
 /*static*/
@@ -295,6 +292,9 @@ bool SmartContracts::is_start(const csdb::Transaction& tr) {
 
 /*static*/
 bool SmartContracts::is_new_state(const csdb::Transaction& tr) {
+    if (!tr.is_valid()) {
+        return false;
+    }
     // must contain user field new_state::Value and new_state::RefStart
     using namespace cs::trx_uf;
     // test user_field[RefStart] helps filter out ancient smart contracts:
@@ -396,6 +396,28 @@ std::string SmartContracts::to_base58(const BlockChain& storage, const csdb::Add
     csdb::Address abs_addr = storage.getAddressByType(addr, BlockChain::AddressType::PublicKey);
     const cs::PublicKey& key = abs_addr.public_key();
     return EncodeBase58(key.data(), key.data() + key.size());
+}
+
+/*static*/
+bool SmartContracts::validate(const csdb::Transaction& contract_call) {
+    if (!SmartContracts::is_executable(contract_call)) {
+        return false;
+    }
+    csdb::AmountCommission estimated_fee;
+    bool max_fee_ok =  cs::fee::estimateMaxFee(contract_call, estimated_fee);
+    if (!max_fee_ok) {
+        cslog() << kLogPrefix << "insufficient max fee to deploy or execute contract";
+    }
+    return max_fee_ok;
+}
+
+bool SmartContracts::validate_payable(const csdb::Transaction& payable_call) {
+    cs::Lock lock(public_access_lock);
+
+    if (!is_payable_target(payable_call)) {
+        return false;
+    }
+    return SmartContracts::validate(payable_call);
 }
 
 std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address& abs_addr) const {

@@ -252,7 +252,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     subRound_ = tmp;
     receivedBangs[rNum] = subRound_;
 
-    if (stat_.isLastRoundTooLong()) {
+    if (stat_.isCurrentRoundTooLong()) {
         poolSynchronizer_->syncLastPool();
     }
 

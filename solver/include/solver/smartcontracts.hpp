@@ -347,6 +347,10 @@ public:
 
     static std::string to_base58(const BlockChain& storage, const csdb::Address& addr);
 
+    static bool validate(const csdb::Transaction& contract_call);
+
+    bool validate_payable(const csdb::Transaction& payable_call);
+
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
