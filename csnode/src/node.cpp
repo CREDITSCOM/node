@@ -2242,9 +2242,10 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
     emit gotSmartStageThree(stage, false);
 }
 
-void Node::smartStageRequest(MsgTypes msgType, uint64_t smartID, const cs::PublicKey& confidant, uint8_t respondent, uint8_t required) {
-    sendToConfidant(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartID, respondent, required);
+bool Node::smartStageRequest(MsgTypes msgType, uint64_t smartID, const cs::PublicKey& confidant, uint8_t respondent, uint8_t required) {
+    const auto res = sendToConfidant(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartID, respondent, required);
     csmeta(csdetails) << "done";
+    return res;
 }
 
 void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
