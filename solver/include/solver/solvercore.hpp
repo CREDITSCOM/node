@@ -125,6 +125,8 @@ public:
         grayList_.clear();
     }
 
+    bool isTransactionsInputAvailable();
+
     void askTrustedRound(cs::RoundNumber rNum, const cs::ConfidantsKeys& confidants);
     uint64_t lastTimeStamp();
     void uploadNewStates(std::vector<csdb::Transaction> newStates);

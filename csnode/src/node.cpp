@@ -633,6 +633,69 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
     processPacketsReply(std::move(packets), round);
 }
 
+
+bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
+    auto& conveyer = cs::Conveyer::instance();
+    auto myCharacteristic = conveyer.characteristic(rPackage.poolMetaInfo().sequenceNumber);
+    csdebug() << "NODE> Trying to get characteristic from conveyer";
+    std::vector<cscrypto::Byte> ownMask;
+    //std::vector<cscrypto::Byte>::const_iterator myIt;
+    if (myCharacteristic == nullptr || myCharacteristic->mask.size() < rPackage.poolMetaInfo().characteristic.mask.size()) {
+        csdebug() << "NODE> Characteristic from conveyer doesn't exist";
+        auto data = conveyer.createPacket(rPackage.poolMetaInfo().sequenceNumber);
+
+        if (!data.has_value()) {
+            cserror() << "NODE> error while prepare to calculate characteristic, maybe method called before sync completed?";
+            return false;
+        }
+        // bindings
+        auto&&[packet, smartPackets] = std::move(data).value();
+        csdebug() << "NODE> Packet size: " << packet.transactionsCount() << ", smartPackets: " << smartPackets.size();
+        auto myMask = solver_->ownValidation(packet, smartPackets);
+        csdebug() << "NODE> Characteristic calculated from the very transactions";
+        if (myMask.has_value()) {
+            ownMask = myMask.value().mask;
+        }
+        else {
+            ownMask.clear();
+        }
+        //        myIt = maskOnly.cbegin();
+    }
+    else {
+        ownMask = myCharacteristic->mask;
+        //        myIt = maskOnly.cbegin();
+    }
+    auto otherMask = rPackage.poolMetaInfo().characteristic.mask;
+    bool identic = true;
+    csdebug() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(ownMask.data(), ownMask.size())
+        << " and received: " << cs::Utils::byteStreamToHex(otherMask.data(), otherMask.size());
+    //TODO: this code is to be refactored - may cause some problems
+    if (otherMask.size() != ownMask.size()) {
+        csdebug() << "NODE> masks have different length's";
+        identic = false;
+    }
+    if (identic) {
+        for (int i = 0; i < ownMask.size(); ++i) {
+            if (otherMask[i] != ownMask[i]) {
+                identic = false;
+                csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... False";
+                break;
+            }
+            else {
+                csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... Ok";
+            }
+        }
+    }
+
+    if (!identic) {
+        cserror() << "NODE> We probably got the roundPackage with invalid characteristic, can't build block";
+        //sendBlockAlarm(rPackage.poolMetaInfo().sequenceNumber);
+        return false;
+    }
+    csdebug() << "NODE> Previous block mask validation finished successfully";
+    return true;
+}
+
 void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     csmeta(csdetails) << "started";
     cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -703,64 +766,12 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
             << " > pool meta info seq: " << rPackage.poolMetaInfo().sequenceNumber;
         return;
     }
-
-    auto myCharacteristic = conveyer.characteristic(rPackage.poolMetaInfo().sequenceNumber);
-    csdebug() << "NODE> Trying to get characteristic from conveyer";
-    std::vector<cscrypto::Byte> ownMask;
-    //std::vector<cscrypto::Byte>::const_iterator myIt;
-    if (myCharacteristic == nullptr || myCharacteristic->mask.size() < rPackage.poolMetaInfo().characteristic.mask.size()) {
-        csdebug() << "NODE> Characteristic from conveyer doesn't exist";
-        auto data = conveyer.createPacket(rPackage.poolMetaInfo().sequenceNumber);
-
-        if (!data.has_value()) {
-            cserror() << "NODE> error while prepare to calculate characteristic, maybe method called before sync completed?";
+    if (rPackage.poolMetaInfo().sequenceNumber > getBlockChain().getLastSeq() && rPackage.poolMetaInfo().sequenceNumber - getBlockChain().getLastSeq() == 1) {
+        if (!checkCharacteristic(rPackage)) {
             return;
         }
-        // bindings
-        auto&&[packet, smartPackets] = std::move(data).value();
-        csdebug() << "NODE> Packet size: " << packet.transactionsCount() << ", smartPackets: " << smartPackets.size();
-        auto myMask = solver_->ownValidation(packet, smartPackets);
-        csdebug() << "NODE> Characteristic calculated from the very transactions";
-        if (myMask.has_value()) {
-            ownMask = myMask.value().mask;
-        }
-        else {
-            ownMask.clear();
-        }
-//        myIt = maskOnly.cbegin();
-    }
-    else {
-        ownMask = myCharacteristic->mask;
-//        myIt = maskOnly.cbegin();
-    }
-    auto otherMask = rPackage.poolMetaInfo().characteristic.mask;
-    bool identic = true;
-    csdebug() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(ownMask.data(), ownMask.size())
-        << " and received: " << cs::Utils::byteStreamToHex(otherMask.data(), otherMask.size());
-    //TODO: this code is to be refactored - may cause some problems
-    if (otherMask.size() != ownMask.size()) {
-        csdebug() << "NODE> masks have different length's";
-        identic = false;
-    }
-    if (identic) {
-        for (int i = 0; i < ownMask.size(); ++i) {
-            if (otherMask[i] != ownMask[i]) {
-                identic = false;
-                csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... False";
-                break;
-            }
-            else {
-                csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... Ok";
-            }
-        }
     }
 
-    if (!identic) {
-        cserror() << "NODE> We probably got the roundPackage with invalid characteristic, can't build block";
-        sendBlockAlarm(rPackage.poolMetaInfo().sequenceNumber);
-        return;
-    }
-    csdebug() << "NODE> Previous block mask validation finished successfully";
     // otherwise senseless, this block is already in chain
     conveyer.setCharacteristic(rPackage.poolMetaInfo().characteristic, rPackage.poolMetaInfo().sequenceNumber);
     std::optional<csdb::Pool> pool = conveyer.applyCharacteristic(rPackage.poolMetaInfo());
@@ -2709,6 +2720,15 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     // create pool by previous round, then change conveyer state.
     getCharacteristic(rPackage);
 
+
+    try {
+        lastRoundPackageTime_ = std::stoull(cs::Utils::currentTimestamp());
+    }
+    catch (...) {
+        csdebug() << __func__ << ": current Timestamp was announced as zero";
+        return;
+    }
+
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
 	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
 
@@ -2726,6 +2746,34 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
 
     csmeta(csdetails) << "done\n";
 }
+
+bool Node::isTransactionsInputAvailable() {
+    size_t justTime;
+    try {
+        justTime = std::stoull(cs::Utils::currentTimestamp());
+    }
+    catch (...) {
+        csdebug() << __func__ << ": current Timestamp was announced as zero";
+        return false;
+    }
+    if (justTime > lastRoundPackageTime_) {
+        if (justTime - lastRoundPackageTime_ > Consensus::MaxRoundDuration) {
+            csdebug() << "NODE> The current round lasts too long, possible traffic problems";
+            return false; //
+        }
+        else {
+            bool condition = (!poolSynchronizer_->isSyncroStarted()) && (cs::Conveyer::instance().currentRoundNumber() 
+                - getBlockChain().getLastSeq() < cs::PoolSynchronizer::roundDifferentForSync);
+            return condition;
+        }
+    }
+    else {
+        csdebug() << "NODE> Possible wrong node clock";
+        return false;
+    }
+
+}
+
 
 void Node::clearRPCache(cs::RoundNumber rNum) {
     bool flagg = true;
