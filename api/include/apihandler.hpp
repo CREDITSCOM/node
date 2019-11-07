@@ -37,6 +37,7 @@
 #include <lib/system/process.hpp>
 
 #include "tokens.hpp"
+#include "executormanager.hpp"
 
 #include <tuple>
 #include <any>
@@ -383,6 +384,11 @@ public:
         ServerStartError
     };
 
+    enum class ExecutorState {
+        Launching,
+        Launched
+    };
+
     enum ACCESS_ID_RESERVE { GETTER, START_INDEX };
 
     struct ExecuteTransactionInfo {
@@ -487,32 +493,10 @@ public slots:
     }
 
     void onExecutorStarted();
+    void onExecutorFinished(int code, const std::error_code&);
+    void onExecutorProcessError(const cs::ProcessException& exception);
 
-    void onExecutorFinished(int code, const std::error_code&) {
-        if (requestStop_) {
-            return;
-        }
-
-        if (!executorMessages_.count(code)) {
-            cswarning() << "Executor unknown error";
-        }
-        else {
-            cswarning() << executorMessages_[code];
-        }
-
-        if (code == ExecutorErrorCode::ServerStartError ||
-            code == ExecutorErrorCode::IncorrecJdkVersion) {
-            return;
-        }
-
-        cs::Concurrent::run([this] {
-            runProcess();
-        });
-    }
-
-    void onExecutorProcessError(const cs::ProcessException& exception) {
-        cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
-    }
+    void checkExecutorVersion();
 
 private:
     int commitMin_{};
@@ -527,13 +511,19 @@ private:
     }
 
     void runProcess() {
+        state_ = ExecutorState::Launching;
+
         executorProcess_->terminate();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(cs::ConfigHolder::instance().config()->getApiSettings().executorRunDelay));
 
         executorProcess_->setProgram(cs::ConfigHolder::instance().config()->getApiSettings().executorCmdLine);
         executorProcess_->launch(cs::Process::Options::None);
+
+        state_ = ExecutorState::Launched;
     }
+
+    void runProcessAsync();
 
     struct OriginExecuteResult {
         ExecuteByteCodeResult resp;
@@ -627,6 +617,9 @@ private:
     const int16_t EXECUTOR_VERSION = 3;
 
     std::mutex callExecutorLock_;
+
+    cs::ExecutorManager manager_;
+    ExecutorState state_;
 
     std::map<int, const char*> executorMessages_ = {
         { NoError, "Executor finished with no error code" },

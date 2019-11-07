@@ -79,7 +79,7 @@ struct ApiData {
     int ajaxServerReceiveTimeout = 30000;
     std::string executorHost{ "localhost" };
     std::string executorCmdLine{};
-    int executorRunDelay = 10;
+    int executorRunDelay = 100;
     int executorBackgroundThreadDelay = 100;
     int executorCommitMin = 1506;   // first commit with support of checking
     int executorCommitMax{-1};      // unlimited range on the right

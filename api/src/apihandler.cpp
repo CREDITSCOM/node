@@ -2239,8 +2239,11 @@ namespace executor {
         cs::Connector::connect(&executorProcess_->started, this, &Executor::onExecutorStarted);
         cs::Connector::connect(&executorProcess_->finished, this, &Executor::onExecutorFinished);
         cs::Connector::connect(&executorProcess_->errorOccured, this, &Executor::onExecutorProcessError);
+        cs::Connector::connect(&executorProcess_->started, this, &Executor::checkExecutorVersion);
 
+        manager_.stopExecutorProcess();
         executorProcess_->launch(cs::Process::Options::None);
+
         while (!executorProcess_->isRunning()) {
             if (solver_.stopNodeRequested()) {
                 requestStop_ = true;
@@ -2248,7 +2251,9 @@ namespace executor {
             }
         }
 
-        std::thread thread([this]() {
+        state_ = ExecutorState::Launched;
+
+        auto watcher = [this]() {
             while (!requestStop_) {
                 if (isConnected()) {
                     static std::mutex mutex;
@@ -2268,10 +2273,18 @@ namespace executor {
                         connect();
                     }
                 }
+                else if (state_ != ExecutorState::Launching) {
+                    manager_.stopExecutorProcess();
+                    runProcess();
+                }
             }
-        });
+        };
 
-        thread.detach();
+        cs::Concurrent::run(watcher, cs::ConcurrentPolicy::Thread);
+    }
+
+    void Executor::runProcessAsync() {
+        cs::Concurrent::run([this] { runProcess(); }, cs::ConcurrentPolicy::Thread);
     }
 
     void Executor::executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject>& code,
@@ -2692,34 +2705,61 @@ namespace executor {
             connect();
         }
 
-        // executor version checking        
-        ExecutorBuildVersionResult _return;
-        bool isOutOfRange{ false };
-        do {
-            do {
-                if (solver_.stopNodeRequested()) {
-                    return;
-                }
-                getExecutorBuildVersion(_return);
-                if (!_return.status.code)
-                    break;
-                cserror() << "start contract executor error code " << int(_return.status.code) << ": " << _return.status.message;
-                connect();
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-            } while (_return.status.code);
-
-            isOutOfRange = _return.commitNumber < commitMin_ || (_return.commitNumber > commitMax_ && commitMax_ != -1);
-            csdebug() << "[executorInfo]: commitNumber: " << _return.commitNumber << ", commitHash: " << _return.commitHash;
-            if (isOutOfRange) {
-                if (commitMax_ != -1)
-                    cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. " << commitMax_ << ")";
-                else
-                    cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. any)";
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-            }
-        } while (isOutOfRange);
-
         csdebug() << csname() << "started";
     }
 
-} // Executor namespace
+    void Executor::onExecutorFinished(int code, const std::error_code&) {
+        if (requestStop_) {
+            return;
+        }
+
+        if (!executorMessages_.count(code)) {
+            cswarning() << "Executor unknown error";
+        }
+        else {
+            cswarning() << executorMessages_[code];
+        }
+
+        if (code == ExecutorErrorCode::ServerStartError ||
+            code == ExecutorErrorCode::IncorrecJdkVersion) {
+            return;
+        }
+
+        notifyError();
+    }
+
+    void Executor::onExecutorProcessError(const cs::ProcessException& exception) {
+        cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
+    }
+
+    void Executor::checkExecutorVersion() {
+        ExecutorBuildVersionResult _return;
+        bool result = false;
+
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        connect();
+        getExecutorBuildVersion(_return);
+
+        cserror() << "start contract executor error code " << int(_return.status.code) << ": " << _return.status.message;
+
+        result = _return.commitNumber < commitMin_ || (_return.commitNumber > commitMax_ && commitMax_ != -1);
+        csdebug() << "[executorInfo]: commitNumber: " << _return.commitNumber << ", commitHash: " << _return.commitHash;
+
+        if (result) {
+            if (commitMax_ != -1) {
+                cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. " << commitMax_ << ")";
+            }
+            else {
+                cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. any)";
+            }
+
+            auto terminate = [this] {
+                executorProcess_->terminate();
+                notifyError();
+            };
+
+            cs::Concurrent::run(terminate, cs::ConcurrentPolicy::Thread);
+        }
+    }
+}  // Executor namespace
