@@ -249,7 +249,7 @@ std::string SmartContracts::get_error_message(int8_t code) {
 
 /*static*/
 bool SmartContracts::is_smart_contract(const csdb::Transaction& tr) {
-    return SmartContracts::is_smart_contract(tr) || SmartContracts::is_new_state(tr);
+    return SmartContracts::is_executable(tr) || SmartContracts::is_new_state(tr);
 }
 
 /*static*/
@@ -404,20 +404,16 @@ bool SmartContracts::validate(const csdb::Transaction& contract_call) {
         return false;
     }
     csdb::AmountCommission estimated_fee;
-    bool max_fee_ok =  cs::fee::estimateMaxFee(contract_call, estimated_fee);
-    if (!max_fee_ok) {
-        cslog() << kLogPrefix << "insufficient max fee to deploy or execute contract";
-    }
-    return max_fee_ok;
+    return cs::fee::estimateMaxFee(contract_call, estimated_fee);
 }
 
+/*private*/
 bool SmartContracts::validate_payable(const csdb::Transaction& payable_call) {
-    cs::Lock lock(public_access_lock);
-
     if (!is_payable_target(payable_call)) {
         return false;
     }
-    return SmartContracts::validate(payable_call);
+    csdb::AmountCommission estimated_fee(cs::fee::getFee(payable_call).to_double() + cs::fee::getContractStateMinFee().to_double());
+    return csdb::Amount(payable_call.max_fee().to_double()) >= csdb::Amount(estimated_fee.to_double());
 }
 
 std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address& abs_addr) const {
@@ -863,6 +859,10 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
         double amount = tr.amount().to_double();
         // possible blocking call to executor for the first time:
         if (!is_payable(abs_addr)) {
+            if (!SmartContracts::validate(tr)) {
+                cslog() << kLogPrefix << "invalid deploy/execute, drop transaction";
+                return true; // block from conveyer sync
+            }
             if (amount > std::numeric_limits<double>::epsilon()) {
                 cslog() << kLogPrefix << "unable replenish balance of contract without payable() feature, drop transaction";
                 return true;  // block from conveyer sync
@@ -892,6 +892,10 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
                 csdebug() << kLogPrefix << "allow deploy/executable transaction";
             }
             else /* not executable transaction */ {
+                if (!validate_payable(tr)) {
+                    cslog() << kLogPrefix << "invalid payable call, drop transaction";
+                    return true;  // block from conveyer sync
+                }
                 // contract is payable and transaction addresses it, ok then
                 csdebug() << kLogPrefix << "allow transaction to target payable contract";
             }

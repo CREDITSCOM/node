@@ -349,8 +349,6 @@ public:
 
     static bool validate(const csdb::Transaction& contract_call);
 
-    bool validate_payable(const csdb::Transaction& payable_call);
-
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
@@ -865,6 +863,7 @@ private:
     // request correct state in network
     void net_request_contract_state(const csdb::Address& abs_addr);
 
+    bool validate_payable(const csdb::Transaction& payable_call);
 };
 
 }  // namespace cs
