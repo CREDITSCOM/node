@@ -1,7 +1,6 @@
-#include "packet.hpp"
+#include <packet.hpp>
 
 #include <lib/system/utils.hpp>
-#include <networkcommands.hpp>
 
 const char* Packet::messageTypeToString(MsgTypes messageType) {
     switch (messageType) {

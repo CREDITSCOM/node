@@ -6,7 +6,6 @@
 namespace cs {
 /*private*/
 PacketValidator::PacketValidator() {
-    starterKey_ = cs::Zero::key;
 }
 
 /*static*/

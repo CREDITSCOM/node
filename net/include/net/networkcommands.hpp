@@ -4,6 +4,7 @@
 #include <cinttypes>
 
 enum class NetworkCommand : uint8_t {
+    Error = 1,
     Registration = 2,
     RegistrationConfirmed,
     RegistrationRefused,
@@ -14,7 +15,6 @@ enum class NetworkCommand : uint8_t {
 enum class RegistrationRefuseReasons : uint8_t {
     Unspecified,
     LimitReached,
-    BadId,
     BadClientVersion,
     Timeout,
     BadResponse,

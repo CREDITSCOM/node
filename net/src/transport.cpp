@@ -64,7 +64,8 @@ Transport::Transport(const Config& config, Node* node)
 : config_(config)
 , node_(node)
 , myPublicKey_(node->getNodeIdKey())
-, host_(net::Config(id_), static_cast<HostEventHandler&>(*this)) {
+, host_(net::Config(id_), static_cast<HostEventHandler&>(*this))
+, neighbourhood_(this, node_) {
     good_ = true;
 }
 

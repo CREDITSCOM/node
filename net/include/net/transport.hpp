@@ -48,6 +48,9 @@ public:
     void sendMulticast(Packet&&, const std::vector<cs::PublicKey>&) {}
     void sendBroadcast(Packet&&) {}
 
+    void ban(const cs::PublicKey&) {}
+    void revertBan(const cs::PublicKey&) {}
+
     // neighbours interface
     uint32_t getNeighboursCount();
     uint32_t getMaxNeighbours() const;
@@ -121,9 +124,5 @@ private:
     Neighbourhood neighbourhood_;
 
     void processorRoutine();
-
-    // @TODO move to PacketValidator
-    bool isBlackListed(const net::NodeId&) { return false; }
-    void addStrike(const net::NodeId&) {}
 };
 #endif  // TRANSPORT_HPP

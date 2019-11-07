@@ -2,49 +2,59 @@
 #ifndef NEIGHBOURHOOD_HPP
 #define NEIGHBOURHOOD_HPP
 
-#include <memory>
-#include <vector>
+#include <chrono>
+#include <map>
+#include <mutex>
+#include <set>
 
-#include <csnode/packstream.hpp>
 #include <lib/system/common.hpp>
 #include <networkcommands.hpp>
 #include <packet.hpp>
 
+class Node;
+class Transport;
+
 class Neighbourhood {
 public:
-    const static uint32_t MaxNeighbours = 256;
-    const static uint32_t MinNeighbours = 3;
+    const static uint32_t MaxNeighbours = 16;
+    const static uint32_t MinNeighbours = 2;
+
+    Neighbourhood(Transport*, Node*);
     
     void processNeighbourMessage(const cs::PublicKey& sender, const Packet&);
+    void newPeerDiscovered(const cs::PublicKey&);
+    void peerDisconnected(const cs::PublicKey&);
 
 private:
-    struct Connection {
-        using Id = uint64_t;
+    constexpr static std::chrono::seconds LastSeenTimeout{5};
 
-        Id id = 0;
-        cs::Version version = 0;
-        cs::PublicKey key{};
+    struct PeerInfo {
+        cs::Version nodeVersion = 0;
+        uint64_t uuid = 0;
         cs::Sequence lastSeq = 0;
+        bool connectionEstablished = false;
+        std::chrono::time_point<std::chrono::steady_clock> lastSeen;
     };
 
-    using ConnectionPtr = std::shared_ptr<Connection>;
-    using Connections = std::vector<ConnectionPtr>;
+    Packet formRegPack();
 
-    void formRegPack(uint64_t uuid);
-    void addMyOut(const uint8_t initFlagValue = 0); // to Reg Pack
+    void sendRegistrationRequest(const cs::PublicKey& receiver);
+    void sendRegistrationConfirmation(const cs::PublicKey& receiver);
+    void sendRegistrationRefusal(const cs::PublicKey& reciever, const RegistrationRefuseReasons reason);
+    void sendPingPack(const cs::PublicKey& receiver);
 
-    void sendRegistrationRequest();
-    void sendRegistrationConfirmation();
-    void sendRegistrationRefusal(const RegistrationRefuseReasons reason);
-    void sendPingPack();
+    void gotRegistrationRequest(const cs::PublicKey& sender, const Packet&);
+    void gotRegistrationConfirmation(const cs::PublicKey& sender, const Packet&);
+    void gotRegistrationRefusal(const cs::PublicKey& sender, const Packet&);
+    void gotPing(const cs::PublicKey&, const Packet&);
 
-    bool gotRegistrationRequest();
-    bool gotRegistrationConfirmation();
-    bool gotRegistrationRefusal();
-    bool gotPing();
+    Transport* transport_;
+    Node* node_;
 
-    Packet regPack_;
-    cs::IPackStream iPackStream_;
-    Connections neighbours_;
+    std::mutex neighbourMux_;
+    std::map<cs::PublicKey, PeerInfo> neighbours_;
+    std::atomic<size_t> neighboursCount_ = 0;
+
+    uint64_t uuid_;
 };
 #endif  // NEIGHBOURHOOD_HPP

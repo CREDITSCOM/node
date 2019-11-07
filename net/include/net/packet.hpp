@@ -10,6 +10,7 @@
 #include <lib/system/hash.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+#include <networkcommands.hpp>
 
 enum BaseFlags : uint8_t {
     Clear = 0,
@@ -60,8 +61,10 @@ enum MsgTypes : uint8_t {
 enum class Offsets : uint32_t {
     BaseFlags = 0,
     MsgTypes = 1,
+    NetworkCommand = 1,
     RoundNumber = 2,
-    HeaderLength = RoundNumber + sizeof(cs::RoundNumber)
+    HeaderLength = RoundNumber + sizeof(cs::RoundNumber), // BaseFlags + MsgTypes + RoundNumber
+    NetworkHeaderLength = 2 // BaseFlags + NetworkCommand
 };
 
 class Packet {
@@ -96,6 +99,10 @@ public:
         return getWithOffset<MsgTypes>(Offsets::MsgTypes);
     }
 
+    NetworkCommand getNetworkCommand() const {
+        return isNetwork() ? getWithOffset<NetworkCommand>(Offsets::NetworkCommand) : NetworkCommand::Error;
+    }
+
     cs::RoundNumber getRoundNum() const {
         return getWithOffset<cs::RoundNumber>(Offsets::RoundNumber);
     }
@@ -127,7 +134,7 @@ public:
     }
 
     uint32_t getHeadersLength() const {
-        return static_cast<uint32_t>(Offsets::HeaderLength);
+        return isNetwork() ? static_cast<uint32_t>(Offsets::NetworkHeaderLength) : static_cast<uint32_t>(Offsets::HeaderLength);
     }
 
     explicit operator bool() const {
