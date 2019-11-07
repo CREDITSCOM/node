@@ -630,7 +630,11 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
     }
 
     // remember dumb transaction 
-    dumbCv_.addCVInfo(tr.signature());
+    if (!dumbCv_.addCVInfo(tr.signature())) {
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = "This signature is already there!";
+        return;
+    }
 
     solver_.send_wallet_transaction(tr);
 
@@ -726,9 +730,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         }
     }
 
-    auto& hashStateEntry = [this, &smart_addr]() -> decltype(auto) {
+    auto& hashStateEntry = [this, &send_transaction]() -> decltype(auto) {
         auto hashStateInst(lockedReference(this->hashStateSL));
-        return (*hashStateInst)[smart_addr];
+        return (*hashStateInst)[send_transaction.signature()];
     }();
 
     hashStateEntry.getPosition();
@@ -777,6 +781,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             ss.condFlg = false;         
             return true;
         });
+
+        this->hashStateSL.erase(send_transaction.signature());
+
         if (!resWait) {  // time is over
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
             return;
@@ -798,6 +805,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             ss.condFlg  = false;
             return true;
         });
+
+        this->hashStateSL.erase(send_transaction.signature());
 
         if (!resWait) { // time is over
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
@@ -1121,7 +1130,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();              
                 if (isBDLoaded_) { // signal to end waiting for a transaction
                     auto hashStateInst(lockedReference(this->hashStateSL));
-                    (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
+                    (*hashStateInst)[execTrans.signature()].updateHash([&](const HashState& oldHash) {
                         if (!newHashStr.empty())
                             std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
                         else

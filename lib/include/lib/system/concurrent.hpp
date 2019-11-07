@@ -505,6 +505,10 @@ struct SpinLockable {
         mutex_.unlock();
     }
 
+    void erase(const cs::Signature& elm) {
+        type_.erase(elm);
+    }
+
 private:
     std::mutex mutex_;
     T type_;
