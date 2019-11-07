@@ -128,7 +128,7 @@ void Transport::processorRoutine() {
 
             if (cs::PacketValidator::instance().validate(pack)) {
                 if (pack.isNetwork()) {
-                    processNetworkMessage(sender, pack);
+                    neighbourhood_.processNeighbourMessage(sender, pack);
                 }
                 else {
                     processNodeMessage(sender, pack);
@@ -138,7 +138,7 @@ void Transport::processorRoutine() {
     }
 }
 
-void Transport::processNetworkMessage(const cs::PublicKey&, const Packet& pack) {
+void Transport::processNetworkMessage(const cs::PublicKey& sender, const Packet& pack) {
     iPackStream_.init(pack.getMsgData(), pack.getMsgSize());
 
     NetworkCommand cmd;
@@ -254,7 +254,7 @@ void Transport::sendPingPack() {
 }
 
 bool Transport::gotPing() {
-    Connection::Id id = 0u;
+/*    Connection::Id id = 0u;
     cs::Sequence lastSeq = 0u;
 
     cs::PublicKey publicKey;
@@ -297,6 +297,7 @@ bool Transport::gotPing() {
 //    }
 
     return true;
+*/
 }
 
 void Transport::processNodeMessage(const cs::PublicKey& sender, const Packet& pack) {
@@ -447,35 +448,6 @@ uint32_t Transport::getMaxNeighbours() const {
     return config_->getMaxNeighbours();
 }
 
-ConnectionPtr Transport::getConnectionByNumber(const std::size_t) {
-    return ConnectionPtr();
-}
-
-cs::Sequence Transport::getConnectionLastSequence(const std::size_t) {
-/*    ConnectionPtr ptr = getConnectionByNumber(number);
-    if (ptr && !ptr->isSignal) {
-        return ptr->lastSeq;
-    } */
-    return cs::Sequence{};
-}
-
 void Transport::onConfigChanged(const Config& updated) {
     config_.exchange(updated);
-}
-
-const char* Transport::networkCommandToString(NetworkCommand command) {
-    switch (command) {
-    case NetworkCommand::Registration:
-        return "Registration";
-    case NetworkCommand::RegistrationConfirmed:
-        return "RegistrationConfirmed";
-    case NetworkCommand::RegistrationRefused:
-        return "RegistrationRefused";
-    case NetworkCommand::Ping:
-        return "Ping";
-    case NetworkCommand::BlockSyncRequest:
-        return "BlockSyncRequest";
-    default:
-        return "Unknown";
-    }
 }

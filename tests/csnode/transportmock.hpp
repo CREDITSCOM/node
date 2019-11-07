@@ -12,8 +12,6 @@ class TransportMock : public Transport {
 public:
   MOCK_METHOD0(run, void());
 
-  MOCK_METHOD1(getPackSenderEntry, RemoteNodePtr(const ip::udp::endpoint&));
-
   MOCK_METHOD1(processNodeMessage, void(const Packet&));
 
   MOCK_METHOD4(addTask, void(Packet*, const uint32_t packNum, bool incrementWhenResend, bool sendToNeighbours));
@@ -24,9 +22,6 @@ public:
 
   MOCK_METHOD1(sendBroadcast, void(const Packet* pack));
 
-  MOCK_METHOD2(sendDirect, void(const Packet* pack, const Connection& conn));
-
-  MOCK_METHOD2(gotPacket, void(const Packet&, RemoteNodePtr&));
   MOCK_METHOD1(redirectPacket, void(const Packet&));
 
   MOCK_METHOD0(refillNeighbourhood, void());

@@ -1,7 +1,7 @@
 #include "packet.hpp"
 
 #include <lib/system/utils.hpp>
-#include "transport.hpp"  // for NetworkCommand
+#include <networkcommands.hpp>
 
 const char* Packet::messageTypeToString(MsgTypes messageType) {
     switch (messageType) {
@@ -100,7 +100,7 @@ std::ostream& operator<<(std::ostream& os, const Packet& packet) {
 
     if (packet.isNetwork()) {
         const uint8_t* data = packet.getMsgData();
-        os << Transport::networkCommandToString(static_cast<NetworkCommand>(*data))
+        os << networkCommandToString(static_cast<NetworkCommand>(*data))
            << "(" << int(*data) << "), ";
     }
 

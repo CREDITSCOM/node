@@ -29,31 +29,12 @@ using Tick = uint64_t;
 
 using PingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
-enum class NetworkCommand : uint8_t {
-    Registration = 2,
-    RegistrationConfirmed,
-    RegistrationRefused,
-    Ping,
-    BlockSyncRequest
-};
-
-enum class RegistrationRefuseReasons : uint8_t {
-    Unspecified,
-    LimitReached,
-    BadId,
-    BadClientVersion,
-    Timeout,
-    BadResponse,
-    IncompatibleBlockchain
-};
-
 class Node;
 
 class Transport : public net::HostEventHandler {
 public:
     inline static volatile std::sig_atomic_t gSignalStatus = 0;
     static void stop() { Transport::gSignalStatus = 1; }
-    static const char* networkCommandToString(NetworkCommand command);
 
     explicit Transport(const Config& config, Node* node);
     ~Transport() {}
@@ -71,11 +52,9 @@ public:
     // neighbours interface
     uint32_t getNeighboursCount();
     uint32_t getMaxNeighbours() const;
-    ConnectionPtr getConnectionByNumber(const std::size_t number);
-    cs::Sequence getConnectionLastSequence(const std::size_t number);
     void forEachNeighbour(std::function<bool(const cs::PublicKey&)>) {}
     bool hasNeighbour(const cs::PublicKey&) { return false; }
-    cs::Sequence getNeighbourLastSequence(const cs::PublicKey&) { return 1; }
+    cs::Sequence getNeighbourLastSequence(const cs::PublicKey&) { return 0; }
 
     // @TODO remove, used in Node
     void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}
@@ -160,6 +139,8 @@ private:
 
     std::mutex peersMux_;
     std::unordered_set<net::NodeId> knownPeers_;
+
+    Neighbourhood neighbourhood_;
 
     void processorRoutine();
 
