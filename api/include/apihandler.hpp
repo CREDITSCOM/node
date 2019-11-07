@@ -758,11 +758,16 @@ private:
     // for answer dumb transactions        
     class DUMBCV {
     public:
-        void addCVInfo(const cs::Signature& signature) {
+        bool addCVInfo(const cs::Signature& signature) {
+            std::lock_guard<std::mutex> lk(dumbMutex);
+            if (const auto& it = mCvInfo_.find(signature); it != mCvInfo_.end())
+                return false;
             mCvInfo_[signature];
+            return true;
         }
 
         void sendCvSignal(const cs::Signature& signature) {
+            std::lock_guard<std::mutex> lk(dumbMutex);
             if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
                 auto&[cv, condFlg] = it->second;
                 cv.notify_one();
@@ -772,11 +777,8 @@ private:
 
         bool waitCvSignal(const cs::Signature& signature) {
             bool isTimeOver = false;
-
+            std::unique_lock lock(dumbMutex);
             if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
-                std::mutex dumbMutex;
-                std::unique_lock lock(dumbMutex);
-
                 isTimeOver = it->second.cv_.wait_for(lock, std::chrono::seconds(30), [it]() -> bool {
                     return it->second.condFlg_;
                 });
@@ -792,6 +794,7 @@ private:
             std::atomic_bool condFlg_{ false };
         };
         std::map<cs::Signature, CVInfo> mCvInfo_;
+        std::mutex dumbMutex;
     } dumbCv_;
     //
 
@@ -872,7 +875,7 @@ private:
     cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
     cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smartLastTrxn_;
 
-    cs::SpinLockable<std::map<csdb::Address, smartHashStateEntry>> hashStateSL;
+    cs::SpinLockable<std::map<cs::Signature, smartHashStateEntry>> hashStateSL;
 
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployedByCreator_;
 
