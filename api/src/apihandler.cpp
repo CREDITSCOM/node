@@ -630,7 +630,11 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
     }
 
     // remember dumb transaction 
-    dumbCv_.addCVInfo(tr.signature());
+    if (!dumbCv_.addCVInfo(tr.signature())) {
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = "This signature is already there!";
+        return;
+    }
 
     solver_.send_wallet_transaction(tr);
 
@@ -731,9 +735,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         }
     }
 
-    auto& hashStateEntry = [this, &smart_addr]() -> decltype(auto) {
+    auto& hashStateEntry = [this, &send_transaction]() -> decltype(auto) {
         auto hashStateInst(lockedReference(this->hashStateSL));
-        return (*hashStateInst)[smart_addr];
+        return (*hashStateInst)[send_transaction.signature()];
     }();
 
     hashStateEntry.getPosition();
@@ -782,6 +786,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             ss.condFlg = false;         
             return true;
         });
+
+        this->hashStateSL.erase(send_transaction.signature());
+
         if (!resWait) {  // time is over
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
             return;
@@ -803,6 +810,8 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             ss.condFlg  = false;
             return true;
         });
+
+        this->hashStateSL.erase(send_transaction.signature());
 
         if (!resWait) { // time is over
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
@@ -1126,7 +1135,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();              
                 if (isBDLoaded_) { // signal to end waiting for a transaction
                     auto hashStateInst(lockedReference(this->hashStateSL));
-                    (*hashStateInst)[target_pk].updateHash([&](const HashState& oldHash) {
+                    (*hashStateInst)[execTrans.signature()].updateHash([&](const HashState& oldHash) {
                         if (!newHashStr.empty())
                             std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
                         else
@@ -2244,8 +2253,11 @@ namespace executor {
         cs::Connector::connect(&executorProcess_->started, this, &Executor::onExecutorStarted);
         cs::Connector::connect(&executorProcess_->finished, this, &Executor::onExecutorFinished);
         cs::Connector::connect(&executorProcess_->errorOccured, this, &Executor::onExecutorProcessError);
+        cs::Connector::connect(&executorProcess_->started, this, &Executor::checkExecutorVersion);
 
+        manager_.stopExecutorProcess();
         executorProcess_->launch(cs::Process::Options::None);
+
         while (!executorProcess_->isRunning()) {
             if (solver_.stopNodeRequested()) {
                 requestStop_ = true;
@@ -2253,7 +2265,9 @@ namespace executor {
             }
         }
 
-        std::thread thread([this]() {
+        state_ = ExecutorState::Launched;
+
+        auto watcher = [this]() {
             while (!requestStop_) {
                 if (isConnected()) {
                     static std::mutex mutex;
@@ -2261,7 +2275,7 @@ namespace executor {
 
                     cvErrorConnect_.wait_for(lock, std::chrono::seconds(5), [&] {
                         return !isConnected() || requestStop_;
-                        });
+                    });
                 }
 
                 if (requestStop_) {
@@ -2273,10 +2287,18 @@ namespace executor {
                         connect();
                     }
                 }
+                else if (state_ != ExecutorState::Launching) {
+                    manager_.stopExecutorProcess();
+                    runProcess();
+                }
             }
-            });
+        };
 
-        thread.detach();
+        cs::Concurrent::run(watcher, cs::ConcurrentPolicy::Thread);
+    }
+
+    void Executor::runProcessAsync() {
+        cs::Concurrent::run([this] { runProcess(); }, cs::ConcurrentPolicy::Thread);
     }
 
     void Executor::executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject>& code,
@@ -2697,34 +2719,65 @@ namespace executor {
             connect();
         }
 
-        // executor version checking        
-        ExecutorBuildVersionResult _return;
-        bool isOutOfRange{ false };
-        do {
-            do {
-                if (solver_.stopNodeRequested()) {
-                    return;
-                }
-                getExecutorBuildVersion(_return);
-                if (!_return.status.code)
-                    break;
-                cserror() << "start contract executor error code " << int(_return.status.code) << ": " << _return.status.message;
-                connect();
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-            } while (_return.status.code);
-
-            isOutOfRange = _return.commitNumber < commitMin_ || (_return.commitNumber > commitMax_ && commitMax_ != -1);
-            csdebug() << "[executorInfo]: commitNumber: " << _return.commitNumber << ", commitHash: " << _return.commitHash;
-            if (isOutOfRange) {
-                if (commitMax_ != -1)
-                    cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. " << commitMax_ << ")";
-                else
-                    cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. any)";
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-            }
-        } while (isOutOfRange);
-
         csdebug() << csname() << "started";
     }
 
-} // Executor namespace
+    void Executor::onExecutorFinished(int code, const std::error_code&) {
+        if (requestStop_) {
+            return;
+        }
+
+        if (!executorMessages_.count(code)) {
+            cswarning() << "Executor unknown error";
+        }
+        else {
+            cswarning() << executorMessages_[code];
+        }
+
+        if (code == ExecutorErrorCode::ServerStartError ||
+            code == ExecutorErrorCode::IncorrecJdkVersion) {
+            return;
+        }
+
+        notifyError();
+    }
+
+    void Executor::onExecutorProcessError(const cs::ProcessException& exception) {
+        cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
+    }
+
+    void Executor::checkExecutorVersion() {
+        ExecutorBuildVersionResult _return;
+        bool result = false;
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(cs::ConfigHolder::instance().config()->getApiSettings().executorCheckVersionDelay));
+
+        if (requestStop_) {
+            return;
+        }
+
+        connect();
+        getExecutorBuildVersion(_return);
+
+        cserror() << "start contract executor error code " << int(_return.status.code) << ": " << _return.status.message;
+
+        result = _return.commitNumber < commitMin_ || (_return.commitNumber > commitMax_ && commitMax_ != -1);
+        csdebug() << "[executorInfo]: commitNumber: " << _return.commitNumber << ", commitHash: " << _return.commitHash;
+
+        if (result) {
+            if (commitMax_ != -1) {
+                cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. " << commitMax_ << ")";
+            }
+            else {
+                cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. any)";
+            }
+
+            auto terminate = [this] {
+                executorProcess_->terminate();
+                notifyError();
+            };
+
+            cs::Concurrent::run(terminate, cs::ConcurrentPolicy::Thread);
+        }
+    }
+}  // Executor namespace

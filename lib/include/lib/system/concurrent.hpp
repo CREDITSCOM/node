@@ -26,6 +26,11 @@ enum class RunPolicy : cs::Byte {
     ThreadPolicy
 };
 
+enum class ConcurrentPolicy : cs::Byte {
+    Thread,
+    ThreadPool
+};
+
 enum class WatcherState : cs::Byte {
     Idle,
     Running,
@@ -357,6 +362,17 @@ public:
         Worker::execute(std::forward<Func>(function));
     }
 
+    // runs function entity by concurrent policy
+    template <typename Func>
+    static void run(Func&& function, cs::ConcurrentPolicy policy) {
+        if (policy == cs::ConcurrentPolicy::ThreadPool) {
+            Worker::execute(std::forward<Func>(function));
+        }
+        else {
+            Worker::run(std::forward<Func>(function));
+        }
+    }
+
     // runs non-binded function in thread pool
     template <typename Func, typename... Args>
     static void run(Func&& func, Args&&... args) {
@@ -503,6 +519,10 @@ struct SpinLockable {
 
     void unlock() {
         mutex_.unlock();
+    }
+
+    void erase(const cs::Signature& elm) {
+        type_.erase(elm);
     }
 
 private:

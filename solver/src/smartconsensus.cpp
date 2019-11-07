@@ -942,8 +942,10 @@ void SmartConsensus::requestSmartStagesNeighbors(int st) {
 
         if (required == cs::ConfidantConsts::InvalidConfidantIndex) {
             if (idx != ownSmartsConfNum_ && idx != required && smartConfidantExist(idx)) {
-                pnode_->smartStageRequest(messageType, id(), smartConfidants_.at(idx), ownSmartsConfNum_, required);
-                isRequested = true;
+                if (pnode_->smartStageRequest(messageType, id(), smartConfidants_.at(idx), ownSmartsConfNum_, required)) {
+                    isRequested = true;
+                    break;
+                }
             }
         }
     }
