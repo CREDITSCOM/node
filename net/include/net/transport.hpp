@@ -9,7 +9,6 @@
 #include <unordered_set>
 
 #include <config.hpp>
-#include <csnode/packstream.hpp>
 #include <lib/system/allocators.hpp>
 #include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
@@ -75,25 +74,6 @@ private:
     void dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes,
                              const cs::RoundNumber, const uint8_t* data, size_t);
 
-// Network packages processing - beg
-// @TODO protocol
-    void processNetworkMessage(const cs::PublicKey& sender, const Packet&);
-
-    Packet regPack_;
-    void formRegPack(uint64_t uuid);
-    void addMyOut(const uint8_t initFlagValue = 0); // to Reg Pack
-
-    bool gotRegistrationRequest();
-    bool gotRegistrationConfirmation();
-    bool gotRegistrationRefusal();
-    bool gotPing();
-
-    void sendRegistrationRequest();
-    void sendRegistrationConfirmation();
-    void sendRegistrationRefusal(const RegistrationRefuseReasons reason);
-    void sendPingPack();
-// Network packages processing - end
-
 // Postpone logic - beg
 // @TODO move to Node
     void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
@@ -120,8 +100,6 @@ private:
 
     bool good_;
     cs::LockFreeChanger<Config> config_;
-
-    cs::IPackStream iPackStream_;
 
     cs::Sequence maxBlock_ = 0;
     cs::Sequence maxBlockCount_;
