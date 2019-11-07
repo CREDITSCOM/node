@@ -49,6 +49,8 @@ public:
         None,
         NewConsole = 0x02,
         OutToFile = 0x04,
+        OutToStream = 0x06,
+        Attach = 0x08,
         ConsoleAndToFile = NewConsole | OutToFile
     };
 
@@ -56,6 +58,7 @@ public:
 
     template <typename... Args>
     explicit Process(const std::string& program, Args&&... args);
+    explicit Process(boost::process::pid_t pid);
 
     Process(const Process&) = delete;
     Process(Process&&) = delete;
@@ -78,6 +81,9 @@ public:
     // returns current process running state
     bool isRunning() const;
 
+    // returns process out pipe
+    boost::process::ipstream& out();
+
     // waits of process end at blocking mode, better to use finished signal
     void wait();
     void terminate();
@@ -93,10 +99,12 @@ public signals:
 
 private:
     mutable boost::process::child process_;
+    mutable boost::process::ipstream out_;
 
     std::string program_;
     std::vector<std::string> args_;
     boost::asio::io_context io_;
+    boost::process::pid_t pid_;
 
     std::string file_;
 };
@@ -109,6 +117,10 @@ template <typename... Args>
 inline cs::Process::Process(const std::string& program, Args&&... args)
 : program_(program) {
     setArgs(std::forward<Args>(args)...);
+}
+
+inline cs::Process::Process(boost::process::pid_t pid)
+: pid_(pid) {
 }
 
 inline Process::~Process() noexcept {
@@ -158,6 +170,10 @@ inline bool Process::isRunning() const {
     return false;
 }
 
+inline boost::process::ipstream& Process::out() {
+    return out_;
+}
+
 inline void Process::wait() {
     try {
         process_.wait();
@@ -172,6 +188,7 @@ inline void Process::terminate() {
     try {
         io_.stop();
         process_.terminate();
+        out_.clear();
     }
     catch (const std::exception& exception) {
         emit errorOccured(cs::ProcessException(exception.what()));
@@ -215,11 +232,19 @@ inline void Process::launch(Process::Options options) {
     };
 
     io_.restart();
+    out_.clear();
 
     try {
         if ((options & Options::OutToFile) && !file_.empty()) {
             process_ = boost::process::child(program_, args_, io_, boost::process::std_out > file_, boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
                                              boost::process::extend::on_success = success, boost::process::extend::on_error = error);
+        }
+        else if (options & Options::OutToStream) {
+            process_ = boost::process::child(program_, args_, io_, boost::process::std_out > out_, boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
+                                             boost::process::extend::on_success = success, boost::process::extend::on_error = error);
+        }
+        else if (options & Options::Attach) {
+            process_ = boost::process::child(pid_);
         }
         else {
             process_ = boost::process::child(program_, args_, io_, boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
