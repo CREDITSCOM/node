@@ -44,9 +44,9 @@ public:
     void processNodeMessage(const cs::PublicKey&, const Packet&);
     void processPostponed(const cs::RoundNumber); // @TODO move to Node
 
-    void sendDirect(Packet&&, const cs::PublicKey&) {}
-    void sendMulticast(Packet&&, const std::vector<cs::PublicKey>&) {}
-    void sendBroadcast(Packet&&) {}
+    void sendDirect(Packet&&, const cs::PublicKey&);
+    void sendMulticast(Packet&&, const std::vector<cs::PublicKey>&);
+    void sendBroadcast(Packet&&);
 
     void ban(const cs::PublicKey&) {}
     void revertBan(const cs::PublicKey&) {}

@@ -19,6 +19,13 @@ cs::PublicKey toPublicKey(const net::NodeId& id) {
     std::copy(ptr, ptr + id.size(), ret.data());
     return ret;
 }
+
+net::NodeId toNodeId(const cs::PublicKey& key) {
+    const uint8_t* ptr = key.data();
+    net::NodeId ret;
+    std::copy(ptr, ptr + key.size(), reinterpret_cast<uint8_t*>(ret.GetPtr()));
+    return ret;
+}
 } // namespace
 
 // Signal transport to stop and stop Node
@@ -83,13 +90,34 @@ void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data)
 }
 
 void Transport::OnNodeDiscovered(const net::NodeId& id) {
-    std::lock_guard g(peersMux_);
-    knownPeers_.insert(id);
+    {
+        std::lock_guard g(peersMux_);
+        knownPeers_.insert(id);
+    }
+    neighbourhood_.newPeerDiscovered(toPublicKey(id));
 }
 
 void Transport::OnNodeRemoved(const net::NodeId& id) {
-    std::lock_guard g(peersMux_);
-    knownPeers_.erase(id);
+    {
+        std::lock_guard g(peersMux_);
+        knownPeers_.erase(id);
+    }
+    neighbourhood_.peerDisconnected(toPublicKey(id));
+}
+
+void Transport::sendDirect(Packet&& pack, const cs::PublicKey& receiver) {
+    host_.SendDirect(toNodeId(receiver), pack.moveData());
+}
+
+void Transport::sendMulticast(Packet&& pack, const std::vector<cs::PublicKey>& receivers) {
+    for (auto& receiver : receivers) {
+        auto ptr = reinterpret_cast<const uint8_t*>(pack.data());
+        host_.SendDirect(toNodeId(receiver), cs::Bytes(ptr, ptr + pack.size()));
+    }
+}
+
+void Transport::sendBroadcast(Packet&& pack) {
+    host_.SendBroadcast(pack.moveData());
 }
 
 void Transport::processorRoutine() {

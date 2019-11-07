@@ -141,6 +141,10 @@ public:
         return data_.size();
     }
 
+    cs::Bytes&& moveData() {
+        return std::move(data_);
+    }
+
 private:
     bool checkFlag(const BaseFlags flag) const {
         return (*static_cast<const uint8_t*>(data_.data()) & flag) != 0;

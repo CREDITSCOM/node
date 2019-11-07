@@ -26,7 +26,7 @@ public:
     void peerDisconnected(const cs::PublicKey&);
 
 private:
-    constexpr static std::chrono::seconds LastSeenTimeout{5};
+    constexpr static std::chrono::seconds LastSeenTimeout{60};
 
     struct PeerInfo {
         cs::Version nodeVersion = 0;
