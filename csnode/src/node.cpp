@@ -1216,11 +1216,13 @@ void Node::reviewConveyerHashes() {
 }
 
 void Node::processSync() {
-    if (stat_.lastRoundMs() > maxPingSynchroDelay_) {
+    const auto last_seq = blockChain_.getLastSeq();
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    if (stat_.lastRoundMs() > maxPingSynchroDelay_ && round < last_seq + cs::PoolSynchronizer::roundDifferentForSync) {
         poolSynchronizer_->syncLastPool();
     }
     else {
-        poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber(), cs::PoolSynchronizer::roundDifferentForSync);
+        poolSynchronizer_->sync(round, cs::PoolSynchronizer::roundDifferentForSync);
     }
 }
 
