@@ -25,6 +25,9 @@ public:
      * activates */
     constexpr static unsigned int PostConsensusTimeout = 60000;
 
+    /** @brief   Maximum round duration when the transaction input is allowed - used to avoid BlackList */
+    constexpr static size_t MaxRoundDuration = 300000;
+
     /** @brief   The minimum trusted nodes to start consensus */
     constexpr static unsigned int MinTrustedNodes = 3;
 
@@ -73,8 +76,20 @@ public:
     /** @brief   Max hashes count to include in stage one data */
     constexpr static size_t MaxStageOneHashes = 100;
 
+    /** @brief   Black list counter - max number of penalty points to get to the black list */
+    constexpr static size_t BlackListCounterMaxValue = 100000;
+
+    /** @brief   Black list counter - amount of penalty points for one mistake */
+    constexpr static size_t BlackListCounterSinglePenalty = 10000;
+
+    /** @brief   Max transaction size */
+    constexpr static size_t MaxTransactionSize = 8000;
+
     /** @brief   Max hashes count to include in stage one data */
     constexpr static size_t MaxStageOneTransactions = 1000;
+
+    /** @brief   Max transaction's size to include in stage one data */
+    constexpr static size_t MaxPreliminaryBlockSize = 2000000;
 
     /** @brief   Max transactions in the packet, the sender won't be accused for, if all them are invalid */
     constexpr static size_t AccusalPacketSize = 10;

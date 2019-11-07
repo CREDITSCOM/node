@@ -496,7 +496,13 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         return;
     }
 
-    // Pure network processing, prior blacklist inspection to allow re-registration
+    // test blacklist, no way to get back
+    if (remoteSender->isBlackListed()) {
+        csdebug() << "Message is ignored from blacklisted " << task->sender;
+        return;
+    }
+
+    // Pure network processing
     if (task->pack.isNetwork()) {
         if (cs::PacketValidator::instance().validate(task->pack)) {
             transport_->processNetworkTask(task, remoteSender);
@@ -504,11 +510,7 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         return;
     }
 
-    // test blacklist, the only way to remove from the list is to re-register again
-    if (remoteSender->isBlackListed()) {
-        csdebug() << "Message is ignored from blacklisted " << task->sender;
-        return;
-    }
+
 
 
     // Non-network data

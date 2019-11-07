@@ -240,6 +240,8 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
             return "Source wallet has insufficient balance to issue trasaction.";
         case kWrongSignature :
             return "Transaction has wrong signature.";
+        case kTooLarge :
+            return "Transaction is too large.";
         case kInsufficientMaxFee :
             return "Transaction's max fee is not enough to issue transaction.";
         case kSourceDoesNotExists :
@@ -265,6 +267,10 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
 
     if (!rc && wallet.balance_ < (t.amount() + t.max_fee().to_double())) {
         rc = kInsufficientBalance;
+    }
+
+    if (!rc && t.to_byte_stream().size() > Consensus::MaxTransactionSize) {
+        rc = kTooLarge;
     }
 
     if (!rc && !t.verify_signature(bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey).public_key())) {

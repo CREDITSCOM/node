@@ -145,12 +145,9 @@ public:
     void chooseNeighbours();
     void sendByNeighbours(const Packet*, bool separate = false);
     void sendByConfidant(const Packet* pack, ConnectionPtr conn);
-    void sendByConfidants(const Packet* pack);
 
     void establishConnection(const ip::udp::endpoint&);
-    ConnectionPtr addConfidant(const ip::udp::endpoint&, bool insert = true);
-    bool isConfidants() { return confidants_.size() != 0; }
-    void removeConfidants();
+    ConnectionPtr addConfidant(const ip::udp::endpoint&);
     void addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr);
     bool updateSignalServer(const ip::udp::endpoint& in);
 

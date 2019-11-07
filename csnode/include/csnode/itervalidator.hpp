@@ -50,7 +50,8 @@ public:
         kInsufficientBalance,
         kWrongSignature,
         kInsufficientMaxFee,
-        kSourceDoesNotExists
+        kSourceDoesNotExists,
+        kTooLarge
     };
 
     static std::string getRejectMessage(RejectCode);

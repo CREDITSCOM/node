@@ -127,21 +127,46 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
     {
         std::unique_lock<cs::SharedMutex> lock = conveyer.lock();
         size_t trxCounter = 0;
+        size_t preliminaryBlockSize = 0;
         const cs::RoundTable& roundTable = conveyer.currentRoundTable();
-
+        bool finishFlag = false;
+        bool continueFlag = false;
+        size_t tSize = 0;
         for (const auto& element : conveyer.transactionsPacketTable()) {
             const cs::PacketsHashes& hashes = roundTable.hashes;
-
+            continueFlag = false;
             if (std::find(hashes.cbegin(), hashes.cend(), element.first) == hashes.cend()) {
-                if (trxCounter + element.second.transactionsCount() > Consensus::MaxStageOneTransactions) {
-                    break;
-                }
-                stage.hashesCandidates.push_back(element.first);
-                trxCounter += element.second.transactionsCount();
-
+                
                 if (stage.hashesCandidates.size() > Consensus::MaxStageOneHashes) {
                     break;
                 }
+
+                trxCounter += element.second.transactionsCount();
+                if (trxCounter + element.second.transactionsCount() > Consensus::MaxStageOneTransactions) {
+                    break;
+                }
+
+                for (auto& it : element.second.transactions()) {
+                    tSize = it.to_byte_stream().size();
+                    preliminaryBlockSize += tSize;
+                    if (preliminaryBlockSize > Consensus::MaxPreliminaryBlockSize) {
+                        finishFlag = true;
+                        break;
+                    }
+                    if (tSize > Consensus::MaxTransactionSize) {
+                        continueFlag = true;
+                        break;
+                    }
+
+                }
+                if (finishFlag) {
+                    break;
+                }
+                if (continueFlag) {
+                    continue;
+                }
+
+                stage.hashesCandidates.push_back(element.first);
             }
         }
     }
