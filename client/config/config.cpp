@@ -125,7 +125,7 @@ static EndpointData readEndpoint(const boost::property_tree::ptree& config, cons
 }
 
 EndpointData EndpointData::fromString(const std::string& str) {
-    static std::regex ipv4Regex("^([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3})\\:([0-9]{1,5})$");
+    static std::regex ipv4Regex("^([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3})\\:([0-9]{1,5}) ([[:alnum:]]{32,})$");
     static std::regex ipv6Regex("^\\[([0-9a-z\\:\\.]+)\\]\\:([0-9]{1,5})$");
 
     std::smatch match;
