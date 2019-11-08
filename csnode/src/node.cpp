@@ -252,7 +252,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     subRound_ = tmp;
     receivedBangs[rNum] = subRound_;
 
-    if (stat_.isLastRoundTooLong()) {
+    if (stat_.isCurrentRoundTooLong()) {
         poolSynchronizer_->syncLastPool();
     }
 
@@ -1216,11 +1216,13 @@ void Node::reviewConveyerHashes() {
 }
 
 void Node::processSync() {
-    if (stat_.lastRoundMs() > maxPingSynchroDelay_) {
+    const auto last_seq = blockChain_.getLastSeq();
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    if (stat_.lastRoundMs() > maxPingSynchroDelay_ && round < last_seq + cs::PoolSynchronizer::roundDifferentForSync) {
         poolSynchronizer_->syncLastPool();
     }
     else {
-        poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber(), cs::PoolSynchronizer::roundDifferentForSync);
+        poolSynchronizer_->sync(round, cs::PoolSynchronizer::roundDifferentForSync);
     }
 }
 
@@ -2061,17 +2063,18 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs
                       << "Smart starting Round: " << cs::SmartConsensus::blockPart(stageOneInfo.id) << '.' << cs::SmartConsensus::transactionPart(stageOneInfo.id) << std::endl
                       << "Sender: " << static_cast<int>(stageOneInfo.sender) << std::endl
                       << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
-    if (stageOneInfo.sender == 1) {
-        cserror() << "Don't send smart stage one to all";
-        sendToConfidant(smartConfidants[2], MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
-               // payload
-               stageOneInfo.message, stageOneInfo.signature);
-    }
-    else {
+    //test feature
+    //if (stageOneInfo.sender == 1) {
+    //    cserror() << "Don't send smart stage one to all";
+    //    sendToConfidant(smartConfidants[2], MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
+    //           // payload
+    //           stageOneInfo.message, stageOneInfo.signature);
+    //}
+    //else {
         sendToList(smartConfidants, stageOneInfo.sender, MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
             // payload
             stageOneInfo.message, stageOneInfo.signature);
-    }
+    //}
 
 
     csmeta(csdebug) << "done";

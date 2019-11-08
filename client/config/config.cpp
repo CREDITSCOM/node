@@ -80,6 +80,7 @@ const std::string PARAM_NAME_EXECUTOR_CMDLINE = "executor_command";
 const std::string PARAM_NAME_EXECUTOR_RUN_DELAY = "executor_run_delay";
 const std::string PARAM_NAME_EXECUTOR_BACKGROUND_THREAD_DELAY = "executor_background_thread_delay";
 const std::string PARAM_NAME_EXECUTOR_CHECK_VERSION_DELAY = "executor_check_version_delay";
+const std::string PARAM_NAME_EXECUTOR_MULTI_INSTANCE = "executor_multi_instance";
 const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MIN = "executor_commit_min";
 const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MAX = "executor_commit_max";
 
@@ -852,6 +853,7 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_RUN_DELAY, apiData_.executorRunDelay);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_BACKGROUND_THREAD_DELAY, apiData_.executorBackgroundThreadDelay);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_CHECK_VERSION_DELAY, apiData_.executorCheckVersionDelay);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_MULTI_INSTANCE, apiData_.executorMultiInstance);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_SEND_TIMEOUT, apiData_.serverSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_RECEIVE_TIMEOUT, apiData_.serverReceiveTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_SEND_TIMEOUT, apiData_.ajaxServerSendTimeout);
@@ -945,6 +947,7 @@ bool operator==(const ApiData& lhs, const ApiData& rhs) {
            lhs.executorRunDelay == rhs.executorRunDelay &&
            lhs.executorBackgroundThreadDelay == rhs.executorBackgroundThreadDelay &&
            lhs.executorCheckVersionDelay == rhs.executorCheckVersionDelay &&
+           lhs.executorMultiInstance == rhs.executorMultiInstance &&
            lhs.executorCommitMin == rhs.executorCommitMin &&
            lhs.executorCommitMax == rhs.executorCommitMax;
 }

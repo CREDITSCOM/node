@@ -41,7 +41,7 @@ public:
     size_t lastRoundMs() const;
 
     void resetLastRoundMs();
-    bool isLastRoundTooLong() const;
+    bool isCurrentRoundTooLong(size_t long_duration_ms = kMaxRoundDelay) const;
 
 public slots:
     void onPingReceived(cs::Sequence, const cs::PublicKey&);

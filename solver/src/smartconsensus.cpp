@@ -774,9 +774,10 @@ void SmartConsensus::gotSmartStageRequest(uint8_t msgType, uint64_t smartID, uin
                     pnode_->smartStageEmptyReply(requesterNumber);
                 }
                 else {
-                    if (ownSmartsConfNum_ == 1) {
-                        return;
-                    }
+                    //test feature
+                    //if (ownSmartsConfNum_ == 1) {
+                    //    return;
+                    //}
                     pnode_->sendSmartStageReply(smartStageOneStorage_.at(requiredNumber).message, smartStageOneStorage_.at(requiredNumber).signature,
                                                 MsgTypes::FirstSmartStage, requester);
                 }
@@ -909,7 +910,7 @@ void SmartConsensus::requestSmartStages(int st) {
                 pnode_->smartStageRequest(msg, id(), smartConfidants_.at(i), ownSmartsConfNum_, i);
 
                 csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " " << __func__
-                    << ": about SmastStage-" << stageNumber(msg) << " of ST[" << static_cast<int>(i) << "]";
+                    << ": about SmartStage-" << stageNumber(msg) << " of ST[" << static_cast<int>(i) << "]";
             }
             isRequested = true;
         }
@@ -922,7 +923,7 @@ void SmartConsensus::requestSmartStages(int st) {
 
 int SmartConsensus::stageNumber(MsgTypes msg) {
     int sn;
-    if (msg > MsgTypes::SmartFirstStageRequest) {
+    if (msg >= MsgTypes::SmartFirstStageRequest) {
         sn = static_cast<int>(msg - MsgTypes::SmartFirstStageRequest + 1);
         if (sn > 3) {
             sn = 255;
@@ -939,31 +940,49 @@ void SmartConsensus::requestSmartStagesNeighbors(int st) {
     csmeta(csdetails);
     const uint8_t cnt = static_cast<uint8_t>(smartConfidants_.size());
     bool isRequested = false;
-    uint8_t required = 0;
+    uint8_t sender = 0;
     MsgTypes messageType = MsgTypes::SmartFirstStageRequest;
+    std::vector<uint8_t> required;
 
     for (uint8_t idx = 0; idx < cnt; ++idx) {
         switch (st) {
-            case 1:
-                required = smartStageOneStorage_[idx].sender;
-                messageType = MsgTypes::SmartFirstStageRequest;
-                break;
-            case 2:
-                required = smartStageTwoStorage_[idx].sender;
-                messageType = MsgTypes::SmartSecondStageRequest;
-                break;
-            case 3:
-                required = smartStageThreeStorage_[idx].sender;
-                messageType = MsgTypes::SmartThirdStageRequest;
-                break;
+        case 1:
+            sender = smartStageOneStorage_[idx].sender;
+            messageType = MsgTypes::SmartFirstStageRequest;
+            break;
+        case 2:
+            sender = smartStageTwoStorage_[idx].sender;
+            messageType = MsgTypes::SmartSecondStageRequest;
+            break;
+        case 3:
+            sender = smartStageThreeStorage_[idx].sender;
+            messageType = MsgTypes::SmartThirdStageRequest;
+            break;
         }
 
-        if (required == cs::ConfidantConsts::InvalidConfidantIndex) {
-            if (idx != ownSmartsConfNum_ && idx != required && smartConfidantExist(idx)) {
-                if (pnode_->smartStageRequest(messageType, id(), smartConfidants_.at(idx), ownSmartsConfNum_, required)) {
-                    isRequested = true;
-                    break;
-                }
+        if (sender == cs::ConfidantConsts::InvalidConfidantIndex && idx != ownSmartsConfNum_) {
+            required.push_back(idx);
+        }
+    }
+
+    std::vector<uint8_t> respondents;
+    bool contFlag = false;
+    for (uint8_t i = 0; i < cnt; ++i) {
+        contFlag = false;
+        for (auto it : required) {
+            if (it == i) {
+                contFlag = true;
+            }
+        }
+        if (contFlag || i == ownSmartsConfNum_ || !smartConfidantExist(i)) {
+            continue;
+        }
+        for (auto it : required) {
+            if (pnode_->smartStageRequest(messageType, id(), smartConfidants_.at(i), ownSmartsConfNum_, it)) {
+                isRequested = true;
+                csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " " << __func__
+                    << ": from " << static_cast<int>(i) << " about SmartStage-" << stageNumber(messageType) << " of ST[" << static_cast<int>(it) << "]";
+                break;
             }
         }
     }
