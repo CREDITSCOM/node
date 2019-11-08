@@ -5,12 +5,27 @@
 
 namespace cs {
 
-TransactionsIterator::TransactionsIterator(BlockChain& bc,
+TransactionsIterator::TransactionsIterator(const BlockChain& bc,
                                            const csdb::Address& addr)
         : bc_(bc),
           addr_(bc_.getAddressByType(addr, BlockChain::AddressType::PublicKey)) {
     setFromTransId(bc_.getLastTransaction(addr));
 }
+
+TransactionsIterator::TransactionsIterator(const BlockChain& bc, const csdb::Address& addr, const csdb::Pool& pool)
+    : bc_(bc),
+      addr_(bc_.getAddressByType(addr, BlockChain::AddressType::PublicKey)),
+      lapoo_(pool) {
+    for (it_ = lapoo_.transactions().crbegin(); it_ != lapoo_.transactions().crend(); ++it_) {
+        if (bc_.isEqual(it_->source(), addr_) || bc_.isEqual(it_->target(), addr_)) {
+            break;
+        }
+    }
+    if (it_ == lapoo_.transactions().crend()) {
+        lapoo_ = csdb::Pool{};
+    }
+}
+
 
 void TransactionsIterator::setFromTransId(const csdb::TransactionID& lTrans) {
     if (lTrans.is_valid()) {

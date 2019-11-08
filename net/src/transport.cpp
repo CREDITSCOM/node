@@ -60,6 +60,10 @@ static std::string parseRefusalReason(RegistrationRefuseReasons reason) {
     case RegistrationRefuseReasons::LimitReached:
         reasonInfo = "maximum connections limit on remote node is reached";
         break;
+    case RegistrationRefuseReasons::BlackListed:
+        reasonInfo = "remote node marked you as blacklisted";
+        break;
+
     default:
         {
             std::ostringstream os;
@@ -81,7 +85,7 @@ Transport::Transport(Node* node)
 , uLock_()
 , net_(new Network(this))
 , node_(node)
-, nh_(this) {
+, neighbourhood_(this) {
     good_ = net_->isGood();
 }
 
@@ -123,24 +127,24 @@ void Transport::run() {
         }
 
         if (checkPending) {
-            nh_.checkPending(cs::ConfigHolder::instance().config()->getMaxNeighbours());
+            neighbourhood_.checkPending(cs::ConfigHolder::instance().config()->getMaxNeighbours());
         }
 
         if (checkSilent) {
-            nh_.checkSilent();
-            nh_.checkNeighbours();
+            neighbourhood_.checkSilent();
+            neighbourhood_.checkNeighbours();
         }
 
         if (resendPacks) {
-            nh_.resendPackets();
+            neighbourhood_.resendPackets();
         }
 
         if (sendPing) {
-            nh_.pingNeighbours();
+            neighbourhood_.pingNeighbours();
         }
 
         if (refreshLimits) {
-            nh_.refreshLimits();
+            neighbourhood_.refreshLimits();
         }
 
         pollSignalFlag();
@@ -268,7 +272,7 @@ void Transport::deliverDirect(const Packet* pack, const uint32_t size, Connectio
 
                 {
                     for (uint32_t i = 0; i < toSend; i++) {
-                        nh_.registerDirect(&packets[j], conn);
+                        neighbourhood_.registerDirect(&packets[j], conn);
                         sendDirectToSock(&packets[j++], **conn);
                     }
                 }
@@ -280,7 +284,7 @@ void Transport::deliverDirect(const Packet* pack, const uint32_t size, Connectio
     } else {
         const auto packEnd = pack + size;
         for (auto ptr = pack; ptr != packEnd; ++ptr) {
-            nh_.registerDirect(ptr, conn);
+            neighbourhood_.registerDirect(ptr, conn);
             sendDirect(ptr, **conn);
         }
     }
@@ -299,7 +303,7 @@ void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
             {
                 auto lock = getNeighboursLock();
                 sendLarge_.store(true, std::memory_order_relaxed);
-                nh_.chooseNeighbours();
+                neighbourhood_.chooseNeighbours();
             }
 
             uint32_t allSize = size, toSend, j = 0;
@@ -317,7 +321,7 @@ void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
                 {
                     auto lock = getNeighboursLock();
                     for (uint32_t i = 0; i < toSend; i++) {
-                        nh_.sendByNeighbours(&packets[j++], true);
+                        neighbourhood_.sendByNeighbours(&packets[j++], true);
                     }
                 }
 
@@ -330,7 +334,7 @@ void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     }
     else {
         auto lock = getNeighboursLock();
-        nh_.chooseNeighbours();
+        neighbourhood_.chooseNeighbours();
 
         const auto packEnd = pack + size;
         for (auto ptr = pack; ptr != packEnd; ++ptr) {
@@ -339,53 +343,57 @@ void Transport::deliverBroadcast(const Packet* pack, const uint32_t size) {
     }
 }
 
-bool Transport::checkConfidants(const std::vector<cs::PublicKey>& list, int except) {
+bool Transport::checkConfidant(const cs::PublicKey& key) {
     cs::Lock lock(aLock_);
 
-    auto end = addresses_.end();
-    int i = 0;
-    for (const auto& pkey: list) {
-        if (i++ == except) continue;
-        if (addresses_.find(pkey) == end) return false;
+    if (addresses_.find(key) == addresses_.end()) {
+        csdebug() << "Transport> Confidant " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " not found";
+        return false;
     }
     return true;
 }
 
-void Transport::deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>& list, int except) {
+// returns pair of (sent count, list of unable-to-send items in input list)
+std::pair< uint32_t, std::list<int> > Transport::deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>& list, int except) {
     std::vector<ConnectionPtr> conns;
     conns.reserve(list.size());
-    bool finded = true;
+    std::pair< uint32_t, std::list<int> > result = std::make_pair(0, std::list<int>{});
     int i = 0;
     {
         cs::Lock lock(aLock_);
         for (const auto& pkey: list) {
-            if (i++ == except) continue;
-            auto res = addresses_.find(pkey);
-            if (res == addresses_.end()) {
-                finded = false;
-                break;
+            if (i != except) {
+                auto res = addresses_.find(pkey);
+                if (res == addresses_.end()) {
+                    result.second.push_back(i);
+                }
+                else {
+                    conns.emplace_back(neighbourhood_.addConfidant(net_->resolve(res->second)));
+                    ++result.first;
+                }
             }
-            conns.emplace_back(nh_.addConfidant(net_->resolve(res->second)));
+            ++i;
         }
     }
 
-    if (!finded) {
-        deliverBroadcast(pack, size);
-        return;
-    }
+    if (result.first > 0) {
 
-    if (size >= Packet::MaxFragments) {
-        ++Transport::cntExtraLargeNotSent;
-        csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
-    }
-
-    for (auto& conn: conns) {
-        const auto packEnd = pack + size;
-        for (auto ptr = pack; ptr != packEnd; ++ptr) {
-            csdebug() << "Transport: sending to " << (conn->specialOut ? conn->out : conn->in);
-            nh_.sendByConfidant(ptr, conn);
+        if (size >= Packet::MaxFragments) {
+            ++Transport::cntExtraLargeNotSent;
+            csinfo() << __func__ << ": packSize(" << Transport::cntExtraLargeNotSent << ") = " << size;
         }
+
+        for (auto& conn : conns) {
+            const auto packEnd = pack + size;
+            for (auto ptr = pack; ptr != packEnd; ++ptr) {
+                csdebug() << "Transport: sending to " << (conn->specialOut ? conn->out : conn->in);
+                neighbourhood_.sendByConfidant(ptr, conn);
+            }
+        }
+
     }
+
+    return result;
 }
 
 // Processing network packages
@@ -438,7 +446,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             gotSSRefusal(task);
             break;
         case NetworkCommand::SSPingWhiteNode:
-            gotSSPingWhiteNode(task);
+            gotSSPingWhiteNode(task, node_->getBlockChain().getLastSeq(), node_->getBlockChain().getLastHash());
             break;
         case NetworkCommand::SSLastBlock: {
             long long timeSS{};
@@ -498,13 +506,13 @@ void Transport::refillNeighbourhood() {
     // TODO: check this algorithm when all list nodes are dead
     if (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::IpList) {
         for (auto& ep : cs::ConfigHolder::instance().config()->getIpList()) {
-            if (!nh_.canHaveNewConnection()) {
+            if (!neighbourhood_.canHaveNewConnection()) {
                 cswarning() << "Connections limit reached";
                 break;
             }
 
             cslog() << "Creating connection to " << ep.ip;
-            nh_.establishConnection(net_->resolve(ep));
+            neighbourhood_.establishConnection(net_->resolve(ep));
         }
     }
 
@@ -551,7 +559,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
         return false;
     }
 
-    uint32_t count = nh_.size();
+    uint32_t count = neighbourhood_.size();
 
     if (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::SignalServer) {
         for (uint8_t i = 0; i < numCirc; ++i) {
@@ -569,11 +577,12 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
             if (key != cs::ConfigHolder::instance().config()->getMyPublicKey()) {
                 if (count <= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
-                    nh_.establishConnection(net_->resolve(ep));
+                    neighbourhood_.establishConnection(net_->resolve(ep));
                 }
+                storeAddress(key, ep);
             }
 
-            if (!nh_.canHaveNewConnection()) {
+            if (!neighbourhood_.canHaveNewConnection()) {
                 break;
             }
         }
@@ -720,7 +729,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
         case MsgTypes::HashReply:
             return node_->getHashReply(data, size, rNum, firstPack.getSender());
         case MsgTypes::TransactionPacket:
-            return node_->getTransactionsPacket(data, size);
+            return node_->getTransactionsPacket(data, size, firstPack.getSender());
         case MsgTypes::TransactionsPacketRequest:
             return node_->getPacketHashesRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::TransactionsPacketReply:
@@ -736,7 +745,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
         case MsgTypes::ThirdStageRequest:
             return node_->getStageRequest(type, data, size, firstPack.getSender());
         case MsgTypes::ThirdStage:
-            return node_->getStageThree(data, size);
+            return node_->getStageThree(data, size, firstPack.getSender());
         case MsgTypes::FirstSmartStage:
             return node_->getSmartStageOne(data, size, rNum, firstPack.getSender());
         case MsgTypes::SecondSmartStage:
@@ -761,6 +770,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
             return node_->getStateRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::StateReply:
             return node_->getStateReply(data, size, rNum, firstPack.getSender());
+        case MsgTypes::BlockAlarm:
+            return node_->getBlockAlarm(data, size, rNum, firstPack.getSender());
         default:
             cserror() << "TRANSPORT> Unknown message type " << Packet::messageTypeToString(type) << " pack round " << rNum;
             break;
@@ -780,11 +791,11 @@ void Transport::registerTask(Packet* pack, const uint32_t packNum, const bool in
 }
 
 uint32_t Transport::getNeighboursCount() {
-    return nh_.size();
+    return neighbourhood_.size();
 }
 
 uint32_t Transport::getNeighboursCountWithoutSS() {
-    return nh_.getNeighboursCountWithoutSS();
+    return neighbourhood_.getNeighboursCountWithoutSS();
 }
 
 uint32_t Transport::getMaxNeighbours() const {
@@ -792,23 +803,48 @@ uint32_t Transport::getMaxNeighbours() const {
 }
 
 ConnectionPtr Transport::getConnectionByKey(const cs::PublicKey& pk) {
-    return nh_.getNeighbourByKey(pk);
+    return neighbourhood_.getNeighbourByKey(pk);
 }
 
 ConnectionPtr Transport::getConnectionByNumber(const std::size_t number) {
-    return nh_.getNeighbour(number);
+    return neighbourhood_.getNeighbour(number);
 }
 
 cs::Sequence Transport::getConnectionLastSequence(const std::size_t number) {
     ConnectionPtr ptr = getConnectionByNumber(number);
+
     if (ptr && !ptr->isSignal) {
         return ptr->lastSeq;
     }
+
     return cs::Sequence{};
 }
 
+Neighbour Transport::getNeigbour(const cs::PublicKey& key) {
+    auto connection = neighbourhood_.getNeighbourByKey(key);
+
+    if (!connection.isNull()) {
+        return Neighbour { connection, connection->node };
+    }
+
+    return Neighbour{};
+}
+
+bool Transport::markNeighbourAsBlackListed(const cs::PublicKey& key) {
+    auto neighbour = getNeigbour(key);
+
+    if (neighbour.isValid()) {
+        neighbour.remoteNode->setBlackListed(true);
+
+        // do not have bussiness with remote node
+        neighbourhood_.dropConnection(neighbour.connection->id);
+    }
+
+    return neighbour.isValid();
+}
+
 bool Transport::isShouldUpdateNeighbours() const {
-    return nh_.getNeighboursCountWithoutSS() < cs::ConfigHolder::instance().config()->getMinNeighbours();
+    return neighbourhood_.getNeighboursCountWithoutSS() < cs::ConfigHolder::instance().config()->getMinNeighbours();
 }
 
 bool Transport::requireStartNode() const {
@@ -822,27 +858,27 @@ bool Transport::isShouldPending(Connection* connection) const {
 }
 
 ConnectionPtr Transport::getRandomNeighbour() {
-    return nh_.getRandomNeighbour();
+    return neighbourhood_.getRandomNeighbour();
 }
 
 void Transport::forEachNeighbour(std::function<void(ConnectionPtr)> func) {
-    nh_.forEachNeighbour(std::move(func));
+    neighbourhood_.forEachNeighbour(std::move(func));
 }
 
 void Transport::forEachNeighbourWithoudSS(std::function<void(ConnectionPtr)> func) {
-    nh_.forEachNeighbourWithoutSS(std::move(func));
+    neighbourhood_.forEachNeighbourWithoutSS(std::move(func));
 }
 
 const Connections Transport::getNeighbours() const {
-    return nh_.getNeigbours();
+    return neighbourhood_.getNeigbours();
 }
 
 const Connections Transport::getNeighboursWithoutSS() const {
-    return nh_.getNeighboursWithoutSS();
+    return neighbourhood_.getNeighboursWithoutSS();
 }
 
 bool Transport::isPingDone() {
-    return nh_.isPingDone();
+    return neighbourhood_.isPingDone();
 }
 
 void Transport::addMyOut(const uint8_t initFlagValue) {
@@ -1021,7 +1057,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         return false;
     }
 
-    nh_.gotRegistration(std::move(conn), sender);
+    neighbourhood_.gotRegistration(std::move(conn), sender);
     return true;
 }
 
@@ -1037,7 +1073,7 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, Remote
         return false;
     }
 
-    nh_.gotConfirmation(myCId, realCId, task->sender, key, sender);
+    neighbourhood_.gotConfirmation(myCId, realCId, task->sender, key, sender);
     return true;
 }
 
@@ -1057,11 +1093,12 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
 
     switch (reason) {
     case RegistrationRefuseReasons::BadClientVersion:
-        nh_.dropConnection(id);
+    case RegistrationRefuseReasons::BlackListed:
+        neighbourhood_.dropConnection(id);
         break;
 
     default:
-        nh_.gotRefusal(id);
+        neighbourhood_.gotRefusal(id);
         break;
     }
 
@@ -1075,7 +1112,7 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
     }
     
     cslog() << "Connection to the start node has been established";
-    nh_.addSignalServer(task->sender, ssEp_, rNode);
+    neighbourhood_.addSignalServer(task->sender, ssEp_, rNode);
 
     constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
     size_t msgSize = task->pack.getMsgSize();
@@ -1144,13 +1181,20 @@ bool Transport::gotSSRefusal(const TaskPtr<IPacMan>&) {
     return true;
 }
 
-bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task) {
+bool Transport::gotSSPingWhiteNode(const TaskPtr<IPacMan>& task, const cs::Sequence lastBlock, const csdb::PoolHash& lastHash) {
 	// MUST NOT call nh_ under oLock_!!!
-	const auto nh_size = nh_.size();
+    const auto nh_size = neighbourhood_.size();
 
     cs::Lock lock(oLock_);
     oPackStream_.init(task->pack);
     oPackStream_ << nh_size;
+
+    cs::Hash lastHash_;
+    const auto hashBinary = lastHash.to_binary();
+    std::copy(hashBinary.begin(), hashBinary.end(), lastHash_.begin());
+    
+    oPackStream_ << lastBlock << lastHash_;
+
 
     Connection conn;
     conn.in = task->sender;
@@ -1209,7 +1253,7 @@ bool Transport::gotSSNewFriends()
         return false;
     }
 
-    uint32_t ctr = nh_.size();
+    uint32_t ctr = neighbourhood_.size();
     uint8_t numCirc{ 0 };
     iPackStream_ >> numCirc;
 
@@ -1228,11 +1272,12 @@ bool Transport::gotSSNewFriends()
 
         if (key != cs::ConfigHolder::instance().config()->getMyPublicKey()) {
             if (ctr <= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
-                nh_.establishConnection(net_->resolve(ep));
+                neighbourhood_.establishConnection(net_->resolve(ep));
             }
+            storeAddress(key, ep);
         }
 
-        if (!nh_.canHaveNewConnection()) {
+        if (!neighbourhood_.canHaveNewConnection()) {
             break;
         }
     }
@@ -1267,7 +1312,7 @@ bool Transport::gotSSUpdateServer()
     EndpointData ep;
     iPackStream_ >> ep.ip >> ep.port;
     
-    if (!nh_.updateSignalServer(net_->resolve(ep)))
+    if (!neighbourhood_.updateSignalServer(net_->resolve(ep)))
     {
         cswarning() << "Don't update start node. Error updating neighbours_";
         return false;
@@ -1300,17 +1345,11 @@ void Transport::gotPacket(const Packet& pack, RemoteNodePtr& sender) {
         return;
     }
 
-    nh_.neighbourSentPacket(sender, pack.getHeaderHash());
+    neighbourhood_.neighbourSentPacket(sender, pack.getHeaderHash());
 }
 
 
-void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender, bool resend) {
-    sendPackInform(pack, sender);
-
-    if (!resend) {
-        return;
-    }
-
+void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender) {
     if (pack.isDirect()) {
         return;  // Do not redirect packs
     }
@@ -1318,17 +1357,17 @@ void Transport::redirectPacket(const Packet& pack, RemoteNodePtr& sender, bool r
     {
         if (!sendLarge_.load(std::memory_order_acquire)) {
             auto lock = getNeighboursLock();
-            nh_.chooseNeighbours();
+            neighbourhood_.chooseNeighbours();
         }
 
         auto lock = getNeighboursLock();
-        nh_.neighbourHasPacket(sender, pack.getHash(), false);
+        neighbourhood_.neighbourHasPacket(sender, pack.getHash());
         sendBroadcast(&pack);
     }
 }
 
 void Transport::sendPackInform(const Packet& pack, RemoteNodePtr& sender) {
-    ConnectionPtr conn = nh_.getConnection(sender);
+    ConnectionPtr conn = neighbourhood_.getConnection(sender);
     if (!conn) {
         return;
     }
@@ -1353,7 +1392,7 @@ bool Transport::gotPackInform(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
     }
 
     auto lock = getNeighboursLock();
-    nh_.neighbourHasPacket(sender, hHash, isDirect);
+    neighbourhood_.neighbourHasPacket(sender, hHash);
     return true;
 }
 
@@ -1376,7 +1415,7 @@ bool Transport::gotPackRenounce(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) 
         return false;
     }
 
-    nh_.neighbourSentRenounce(sender, hHash);
+    neighbourhood_.neighbourSentRenounce(sender, hHash);
 
     return true;
 }
@@ -1450,7 +1489,7 @@ void Transport::requestMissing(const cs::Hash& hash, const uint16_t start, const
         oPackStream_.clear();
     }
 
-    ConnectionPtr requestee = nh_.getNextRequestee(hash);
+    ConnectionPtr requestee = neighbourhood_.getNextRequestee(hash);
 
     if (requestee) {
         sendDirect(&p, **requestee);
@@ -1465,7 +1504,7 @@ void Transport::registerMessage(MessagePtr msg) {
 }
 
 bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
-    ConnectionPtr conn = nh_.getConnection(sender);
+    ConnectionPtr conn = neighbourhood_.getConnection(sender);
     if (!conn) {
         return false;
     }
@@ -1541,7 +1580,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     }
 #endif
     if (!cs::ConfigHolder::instance().config()->isCompatibleVersion() && iPackStream_.end()) {
-        nh_.gotBadPing(id);
+        neighbourhood_.gotBadPing(id);
         return false;
     }
 
@@ -1560,7 +1599,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
         maxBlockCount_ = 1;
     }
 
-    if (nh_.validateConnectionId(sender, id, task->sender, publicKey, lastSeq)) {
+    if (neighbourhood_.validateConnectionId(sender, id, task->sender, publicKey, lastSeq)) {
         emit pingReceived(lastSeq, publicKey);
     }
 
@@ -1593,19 +1632,23 @@ bool Transport::gotSSIntroduceConsensusReply()
         }
 
         if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
-            cs::Lock lock(aLock_);
-            auto value = std::make_pair(key, ep);
-            auto res = addresses_.insert(value);
-            if (!res.second && res.first->second != ep) {
-                auto hint = res.first;
-                --hint;
-                addresses_.erase(res.first);
-                addresses_.insert(hint, value);
-            }
+            storeAddress(key, ep);
         }
     }
 
     return true;
+}
+
+void Transport::storeAddress(const cs::PublicKey& key, const EndpointData& ep) {
+    cs::Lock lock(aLock_);
+    auto value = std::make_pair(key, ep);
+    auto res = addresses_.insert(value);
+    if (!res.second && res.first->second != ep) {
+        auto hint = res.first;
+        --hint;
+        addresses_.erase(res.first);
+        addresses_.insert(hint, value);
+    }
 }
 
 void Transport::sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys) {

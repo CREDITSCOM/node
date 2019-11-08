@@ -58,7 +58,8 @@ enum class RegistrationRefuseReasons : uint8_t {
     BadClientVersion,
     Timeout,
     BadResponse,
-    IncompatibleBlockchain
+    IncompatibleBlockchain,
+    BlackListed
 };
 
 enum class SSBootstrapStatus : uint8_t {
@@ -106,18 +107,19 @@ public:
     bool isOwnNodeTrusted() const;
 
     void sendBroadcast(const Packet* pack) {
-        nh_.sendByNeighbours(pack);
+        neighbourhood_.sendByNeighbours(pack);
     }
 
     bool sendDirect(const Packet*, const Connection&);
     bool sendDirectToSock(Packet*, const Connection&);
     void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
     void deliverBroadcast(const Packet*, const uint32_t);
-    void deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
-    bool checkConfidants(const std::vector<cs::PublicKey>& list, int except = -1);
+    // returns pair of (sent count, list of unable-to-send items in input list)
+    std::pair< uint32_t, std::list<int> > deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
+    bool checkConfidant(const cs::PublicKey& key);
 
     void gotPacket(const Packet&, RemoteNodePtr&);
-    void redirectPacket(const Packet&, RemoteNodePtr&, bool resend = true);
+    void redirectPacket(const Packet&, RemoteNodePtr&);
     bool shouldSendPacket(const Packet&);
 
     void refillNeighbourhood();
@@ -144,8 +146,11 @@ public:
     ConnectionPtr getRandomNeighbour();
     cs::Sequence getConnectionLastSequence(const std::size_t number);
 
+    Neighbour getNeigbour(const cs::PublicKey& key);
+    bool markNeighbourAsBlackListed(const cs::PublicKey& key);
+
     auto getNeighboursLock() const {
-        return nh_.getNeighboursLock();
+        return neighbourhood_.getNeighboursLock();
     }
 
     bool isShouldUpdateNeighbours() const;
@@ -191,7 +196,7 @@ private:
     bool gotSSReRegistration();
     bool gotSSRefusal(const TaskPtr<IPacMan>&);
     bool gotSSDispatch(const TaskPtr<IPacMan>&);
-    bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&);
+    bool gotSSPingWhiteNode(const TaskPtr<IPacMan>&, const cs::Sequence, const csdb::PoolHash&);
     bool gotSSLastBlock(const TaskPtr<IPacMan>&, cs::Sequence, const csdb::PoolHash&, bool canBeTrusted);
     bool gotSSNewFriends();
     bool gotSSUpdateServer();
@@ -202,6 +207,8 @@ private:
 
     bool gotPing(const TaskPtr<IPacMan>&, RemoteNodePtr&);
     bool gotSSIntroduceConsensusReply();
+
+    void storeAddress(const cs::PublicKey& key, const EndpointData& ep);
 
     void askForMissingPackages();
     void requestMissing(const cs::Hash&, const uint16_t, const uint64_t);
@@ -273,7 +280,7 @@ private:
     Network* net_;
     Node* node_;
 
-    Neighbourhood nh_;
+    Neighbourhood neighbourhood_;
 
     static constexpr uint32_t fragmentsFixedMapSize_ = 10000;
     FixedHashMap<cs::Hash, cs::RoundNumber, uint16_t, fragmentsFixedMapSize_> fragOnRound_;

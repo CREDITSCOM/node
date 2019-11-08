@@ -52,8 +52,10 @@ protected:
     void finalizeStage(SolverContext& context);
 
     // TimeoutTracking min_time_tracking;
-
     cs::StageOne stage;
+    size_t likeMineHashes;
+    size_t differentHashes;
+    cs::ConfidantsKeys differKeys;
 
     cs::Hash build_vector(SolverContext& context, TransactionsPacket& trans_pack, cs::Packets& smartsPackets);
     cs::Hash formHashFromCharacteristic(const cs::Characteristic& characteristic);

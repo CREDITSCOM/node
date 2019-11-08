@@ -71,6 +71,7 @@ public:
         const cs::PublicKey& requester);
 
     void requestSmartStages(int st);
+    int stageNumber(MsgTypes msg);
     void requestSmartStagesNeighbors(int st);
     void markSmartOutboundNodes(int st);
 
@@ -149,7 +150,7 @@ private:
     std::vector<cs::Bytes> smartStageTwoMessage_;
     std::vector<cs::Bytes> smartStageThreeMessage_;
 
-    std::vector<cs::Stage> smartStageTemporary_;
+    //std::vector<cs::Stage> smartStageTemporary_;
     cs::Bytes smartConsensusMask;
     std::vector<csdb::Transaction> finalStateTransaction_;
 };

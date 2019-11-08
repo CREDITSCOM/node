@@ -19,10 +19,14 @@ public:
     size_t size() const;
 
     void close();
-    bool onNextBlock(const csdb::Pool& block);
+    bool onNextBlock(const csdb::Pool& block) {
+        return update(block);
+    }
 
     csdb::PoolHash find(cs::Sequence seq) const;
     cs::Sequence find(const csdb::PoolHash& hash) const;
+
+    bool update(const csdb::Pool& block);
 
     bool remove(cs::Sequence);
     bool remove(const csdb::PoolHash& hash);

@@ -133,9 +133,9 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 }
 
 void cs::PoolSynchronizer::syncLastPool() {
-    if (isSyncroStarted_) {
-        return;
-    }
+    //if (isSyncroStarted_) {
+    //    return;
+    //}
 
     auto lastWrittenSequence = blockChain_->getLastSeq();
     ConnectionPtr connection;

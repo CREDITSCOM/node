@@ -185,6 +185,7 @@ private:
 private signals:
     ReadBlockSignal read_block_event;
     BlockReadingStartedSingal start_reading_event;
+    BlockReadingStoppedSignal stop_reading_event;
 };
 
 void Storage::priv::set_last_error(Storage::Error error, const ::std::string& message) {
@@ -279,6 +280,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
             }
         }
     }
+    emit stop_reading_event();
 
     return true;
 
@@ -830,36 +832,16 @@ Wallet Storage::wallet(const Address& addr) const {
     return Wallet::get(addr);
 }
 
-static bool checkPool(const Pool& pool, const Address& addr,
-                      int64_t innerId, Transaction& trx) {
-    const auto& trxs = pool.transactions();
-    for (const auto& t : trxs) {
-        if (t.source() == addr && t.innerID() == innerId) {
-            trx = t;
-            return true;
-        }
-    }
-    return false;
-}
-
-bool Storage::get_from_blockchain(const Address& addr, int64_t innerId,
-                                  cs::Sequence lastTrxPs, Transaction& trx) const {
-    auto poolSeq = lastTrxPs;
-    while (poolSeq != cs::kWrongSequence) {
-        if (checkPool(pool_load(poolSeq), addr, innerId, trx)) {
-            return true;
-        }
-        poolSeq = get_previous_transaction_block(addr, poolSeq);
-    }
-    return false;
-}
-
 const ReadBlockSignal& Storage::readBlockEvent() const {
     return d->read_block_event;
 }
 
 const BlockReadingStartedSingal& Storage::readingStartedEvent() const {
     return d->start_reading_event;
+}
+
+const BlockReadingStoppedSignal& Storage::readingStoppedEvent() const {
+    return d->stop_reading_event;
 }
 
 std::vector<Transaction> Storage::transactions(const Address& addr, size_t limit, const TransactionID& offset) const {
@@ -958,63 +940,6 @@ Transaction Storage::get_last_by_target(Address target) const noexcept {
     }
 
     return Transaction{};
-}
-
-cs::Bytes Storage::get_trans_index_key(const Address& addr, cs::Sequence seq) {
-    ::csdb::priv::obstream os;
-    addr.put(os);
-    os.put(seq);
-    return os.buffer();
-}
-
-cs::Sequence Storage::get_previous_transaction_block(const Address& addr, cs::Sequence seq) const {
-    cs::Sequence result = cs::kWrongSequence;
-
-    if (!isOpen()) {
-        d->set_last_error(NotOpen);
-        return result;
-    }
-
-    const auto key = get_trans_index_key(addr, seq);
-    cs::Bytes data;
-
-    if (d->db->getFromTransIndex(key, &data)) {
-        ::csdb::priv::ibstream is(data.data(), data.size());
-        is.get(result);
-    }
-
-    return result;
-}
-
-bool Storage::set_previous_transaction_block(const Address& addr, cs::Sequence currTransBlock, cs::Sequence prevTransBlock) {
-    if (!isOpen()) {
-        d->set_last_error(NotOpen);
-        return false;
-    }
-
-    const auto key = get_trans_index_key(addr, currTransBlock);
-
-    ::csdb::priv::obstream os;
-    os.put(prevTransBlock);
-
-    return d->db->putToTransIndex(key, os.buffer());
-}
-
-bool Storage::remove_last_from_trx_index(const Address& addr, cs::Sequence lastIndexed) {
-    if (!isOpen()) {
-        d->set_last_error(NotOpen);
-        return false;
-    }
-
-    return d->db->removeLastFromTrxIndex(get_trans_index_key(addr, lastIndexed));
-}
-
-bool Storage::truncate_trxs_index() {
-    if (!isOpen()) {
-        d->set_last_error(NotOpen);
-        return false;
-    }
-    return d->db->truncateTransIndex();
 }
 
 bool Storage::get_contract_data(const Address& abs_addr /*input*/, cs::Bytes& data /*output*/) const {

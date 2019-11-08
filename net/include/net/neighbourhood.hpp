@@ -119,6 +119,19 @@ struct Connection {
 using ConnectionPtr = MemPtr<TypedSlot<Connection>>;
 using Connections = std::vector<ConnectionPtr>;
 
+struct Neighbour {
+    ConnectionPtr connection;
+    RemoteNodePtr remoteNode;
+
+    bool isValid() const {
+        return !connection.isNull() && !remoteNode.isNull();
+    }
+
+    operator bool() const {
+        return isValid();
+    }
+};
+
 class Neighbourhood {
 public:
     const static uint32_t MinConnections = 1;
@@ -132,12 +145,9 @@ public:
     void chooseNeighbours();
     void sendByNeighbours(const Packet*, bool separate = false);
     void sendByConfidant(const Packet* pack, ConnectionPtr conn);
-    void sendByConfidants(const Packet* pack);
 
     void establishConnection(const ip::udp::endpoint&);
-    ConnectionPtr addConfidant(const ip::udp::endpoint&, bool insert = true);
-    bool isConfidants() { return confidants_.size() != 0; }
-    void removeConfidants();
+    ConnectionPtr addConfidant(const ip::udp::endpoint&);
     void addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr);
     bool updateSignalServer(const ip::udp::endpoint& in);
 
@@ -157,7 +167,7 @@ public:
 
     bool canHaveNewConnection();
 
-    void neighbourHasPacket(RemoteNodePtr, const cs::Hash&, const bool isDirect);
+    void neighbourHasPacket(RemoteNodePtr, const cs::Hash&);
     void neighbourSentPacket(RemoteNodePtr, const cs::Hash&);
     void neighbourSentRenounce(RemoteNodePtr, const cs::Hash&);
 
@@ -172,7 +182,7 @@ public:
     ConnectionPtr getRandomNeighbour();
 
     // uses to iterate connections
-    std::unique_lock< std::mutex > getNeighboursLock() const;
+    std::unique_lock<std::mutex> getNeighboursLock() const;
 
     // thread safe
     void forEachNeighbour(std::function<void(ConnectionPtr)> func);

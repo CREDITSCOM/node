@@ -100,6 +100,11 @@ public:
     void back_to_stage3() {
         core.handleTransitions(SolverCore::Event::Stage3NonComplete);
     }
+
+    void askTrustedRound(cs::RoundNumber rNum, const cs::ConfidantsKeys& confidants) {
+        core.askTrustedRound(rNum, confidants);
+    }
+
     /**
      * @fn  NodeLevel SolverContext::level() const;
      *
@@ -465,23 +470,6 @@ public:
      */
 
     void request_round_table() const;
-
-    /**
-     * @fn  void SolverContext::add(const csdb::Transaction& tr);
-     *
-     * @brief   Adds transaction to inner list
-     *
-     * @author  aae
-     * @date    03.10.2018
-     *
-     * @param   tr  The tr to add.
-     *
-     * ### remarks  Aae, 30.09.2018.
-     */
-
-    void add(const csdb::Transaction& tr) {
-        core.send_wallet_transaction(tr);
-    }
 
     /**
      * @fn  csdb::Address SolverContext::address_genesis() const

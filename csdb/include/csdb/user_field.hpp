@@ -137,6 +137,9 @@ inline bool UserField::operator !=(const UserField& other) const noexcept
 template<>
 UserField::UserField(uint64_t value);
 
+template<>
+UserField::UserField(const std::string& value);
+
 template<typename T, typename>
 inline UserField::UserField(T value) :
   UserField(static_cast<uint64_t>(value))

@@ -19,9 +19,8 @@
 
 #include <csdb/internal/types.hpp>
 #include <csnode/nodecore.hpp>
-#include <csnode/walletscache.hpp>
+#include <csnode/multiwallets.hpp>
 #include <csnode/walletsids.hpp>
-#include <csnode/walletspools.hpp>
 #include <roundpackage.hpp>
 
 #include <lib/system/concurrent.hpp>
@@ -33,6 +32,7 @@ namespace cs {
 class BlockHashes;
 class WalletsIds;
 class Fee;
+class TransactionsIndex;
 class TransactionsPacket;
 
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
@@ -115,7 +115,6 @@ public:
     }
 
     void removeWalletsInPoolFromCache(const csdb::Pool& pool);
-    void removeLastBlockFromTrxIndex(const csdb::Pool&);
     void removeLastBlock();
 
     // updates fees in every transaction
@@ -125,6 +124,7 @@ public:
     void setTransactionsFees(std::vector<csdb::Transaction>& transactions, const cs::Bytes& characteristicMask);
 
     void addNewWalletsToPool(csdb::Pool& pool);
+    void updateLastTransactions(const std::vector<std::pair<cs::PublicKey, csdb::TransactionID>>&);
 
     bool checkForConsistency(csdb::Pool & pool);
 
@@ -139,6 +139,8 @@ public:
     bool updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom);
     bool deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool);
     cs::Sequence getLastSeq() const;
+
+    const cs::MultiWallets& multiWallets() const;
 
     /**
      * @fn    std::size_t BlockChain::getCachedBlocksSize() const;
@@ -288,7 +290,6 @@ private:
     void createCachesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
     void writeGenesisBlock();
-    void createTransactionsIndex(csdb::Pool&);
 
     void logBlockInfo(csdb::Pool& pool);
 
@@ -312,11 +313,6 @@ private:
 
     class TransactionsLoader;
 
-    bool findDataForTransactions(csdb::Address address, csdb::Address& wallPubKey, WalletId& id, cs::WalletsPools::WalletData::PoolsHashes& hashesArray) const;
-
-    void getTransactions(Transactions& transactions, csdb::Address wallPubKey, WalletId id, const cs::WalletsPools::WalletData::PoolsHashes& hashesArray, uint64_t offset,
-                         uint64_t limit);
-
     void updateNonEmptyBlocks(const csdb::Pool&);
 
     bool good_;
@@ -325,13 +321,15 @@ private:
     csdb::Storage storage_;
 
     std::unique_ptr<cs::BlockHashes> blockHashes_;
+    std::unique_ptr<cs::TransactionsIndex> trxIndex_;
 
     const csdb::Address genesisAddress_;
     const csdb::Address startAddress_;
     std::unique_ptr<cs::WalletsIds> walletIds_;
     std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
     std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
-    std::unique_ptr<cs::WalletsPools> walletsPools_;
+    std::unique_ptr<cs::MultiWallets> multiWallets_;
+
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
     uint64_t total_transactions_count_ = 0;
@@ -391,8 +389,6 @@ private:
 
     // may be modified once in uuid() method:
     mutable uint64_t uuid_ = 0;
-    bool recreateIndex_;
-    std::map<csdb::Address, cs::Sequence> lapoos;
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
 };
