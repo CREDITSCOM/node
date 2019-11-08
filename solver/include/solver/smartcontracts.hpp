@@ -398,8 +398,12 @@ public:
         }
 
         cs::Lock lock(public_access_lock);
-
         return is_payable_target(t);
+    }
+
+    bool validate_payable(const csdb::Transaction& payable_call) {
+        cs::Lock lock(public_access_lock);
+        return validate_payable_impl(payable_call);
     }
 
     bool executionAllowed();
@@ -863,7 +867,7 @@ private:
     // request correct state in network
     void net_request_contract_state(const csdb::Address& abs_addr);
 
-    bool validate_payable(const csdb::Transaction& payable_call);
+    bool validate_payable_impl(const csdb::Transaction& payable_call);
 };
 
 }  // namespace cs

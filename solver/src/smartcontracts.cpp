@@ -407,15 +407,6 @@ bool SmartContracts::validate(const csdb::Transaction& contract_call) {
     return cs::fee::estimateMaxFee(contract_call, estimated_fee);
 }
 
-/*private*/
-bool SmartContracts::validate_payable(const csdb::Transaction& payable_call) {
-    if (!is_payable_target(payable_call)) {
-        return false;
-    }
-    csdb::AmountCommission estimated_fee(cs::fee::getFee(payable_call).to_double() + cs::fee::getContractStateMinFee().to_double());
-    return csdb::Amount(payable_call.max_fee().to_double()) >= csdb::Amount(estimated_fee.to_double());
-}
-
 std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address& abs_addr) const {
     using namespace trx_uf;
     const auto item = known_contracts.find(abs_addr);
@@ -892,7 +883,7 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
                 csdebug() << kLogPrefix << "allow deploy/executable transaction";
             }
             else /* not executable transaction */ {
-                if (!validate_payable(tr)) {
+                if (!validate_payable_impl(tr)) {
                     cslog() << kLogPrefix << "invalid payable call, drop transaction";
                     return true;  // block from conveyer sync
                 }
@@ -902,11 +893,12 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
         }
     }
 
-    if (SmartContracts::is_deploy(tr)) {
-        csdebug() << kLogPrefix << "deploy transaction detected";
-    }
-    else if (SmartContracts::is_start(tr)) {
-        csdebug() << kLogPrefix << "start transaction detected";
+    if (SmartContracts::is_executable(tr)) {
+        if (SmartContracts::is_start(tr)) {
+            csdebug() << kLogPrefix << "start transaction detected";
+        } else {
+            csdebug() << kLogPrefix << "deploy transaction detected";
+        }
     }
 
     return false;  // allow pass to conveyer sync
@@ -2859,6 +2851,15 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
         cswarning() << kLogPrefix << "ignore incompatible net package with " << cs::SmartContracts::to_base58(contract_abs_addr)
             << " state";
     }
+}
+
+/*private*/
+bool SmartContracts::validate_payable_impl(const csdb::Transaction& payable_call) {
+    if (!is_payable_target(payable_call)) {
+        return false;
+    }
+    csdb::AmountCommission estimated_fee(cs::fee::getFee(payable_call).to_double() + cs::fee::getContractStateMinFee().to_double());
+    return csdb::Amount(payable_call.max_fee().to_double()) >= csdb::Amount(estimated_fee.to_double());
 }
 
 }  // namespace cs
