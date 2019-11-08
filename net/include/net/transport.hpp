@@ -6,6 +6,7 @@
 #include <csignal>
 #include <list>
 #include <mutex>
+#include <thread>
 #include <unordered_set>
 
 #include <config.hpp>
@@ -113,5 +114,6 @@ private:
     std::unordered_set<net::NodeId> knownPeers_;
 
     Neighbourhood neighbourhood_;
+    std::thread processorThread_;
 };
 #endif  // TRANSPORT_HPP

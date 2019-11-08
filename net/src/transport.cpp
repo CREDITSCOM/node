@@ -111,8 +111,14 @@ Transport::Transport(const Config& config, Node* node)
 , neighbourhood_(this, node_) {}
 
 void Transport::run() {
-  host_.Run();
-  processorRoutine();
+    host_.Run();
+    processorThread_ = std::thread(&Transport::processorRoutine, this);
+
+    while (Transport::gSignalStatus == 0) {
+        pollSignalFlag();
+        emit mainThreadIterated();
+        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+    }
 }
 
 void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data) {
