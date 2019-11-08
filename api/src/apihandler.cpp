@@ -2255,7 +2255,7 @@ namespace executor {
         cs::Connector::connect(&executorProcess_->errorOccured, this, &Executor::onExecutorProcessError);
         cs::Connector::connect(&executorProcess_->started, this, &Executor::checkExecutorVersion);
 
-        manager_.stopExecutorProcess();
+        checkAnotherExecutor();
         executorProcess_->launch(cs::Process::Options::None);
 
         while (!executorProcess_->isRunning()) {
@@ -2288,7 +2288,7 @@ namespace executor {
                     }
                 }
                 else if (state_ != ExecutorState::Launching) {
-                    manager_.stopExecutorProcess();
+                    checkAnotherExecutor();
                     runProcess();
                 }
             }
@@ -2299,6 +2299,12 @@ namespace executor {
 
     void Executor::runProcessAsync() {
         cs::Concurrent::run([this] { runProcess(); }, cs::ConcurrentPolicy::Thread);
+    }
+
+    void Executor::checkAnotherExecutor() {
+        if (!cs::ConfigHolder::instance().config()->getApiSettings().executorMultiInstance) {
+            manager_.stopExecutorProcess();
+        }
     }
 
     void Executor::executeByteCode(executor::ExecuteByteCodeResult& resp, const std::string& address, const std::string& smart_address, const std::vector<general::ByteCodeObject>& code,
