@@ -9,12 +9,9 @@
 #include <unordered_set>
 
 #include <config.hpp>
-#include <lib/system/allocators.hpp>
-#include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
-#include <lib/system/lockfreechanger.hpp>
 
 #include <p2p_network.h>
 
@@ -74,9 +71,6 @@ public slots:
     void onConfigChanged(const Config& updated);
 
 private:
-    void dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes,
-                             const cs::RoundNumber, const uint8_t* data, size_t);
-
 // Postpone logic - beg
 // @TODO move to Node
     void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
@@ -101,17 +95,14 @@ private:
     PPBuf* postponed_[posponedPointerBufferSize_] = {&postponedPacketsFirst_, &postponedPacketsSecond_};
 // Postpone logic - end
 
-    bool good_;
-    cs::LockFreeChanger<Config> config_;
+    void dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes,
+                             const cs::RoundNumber, const uint8_t* data, size_t);
+    void processorRoutine();
 
-    cs::Sequence maxBlock_ = 0;
-    cs::Sequence maxBlockCount_;
+    bool good_ = false;
+    net::Config config_;
 
     Node* node_;
-    cs::PublicKey myPublicKey_;
-
-    // new logic
-    net::NodeId id_;
     net::Host host_;
 
     std::condition_variable newPacketsReceived_;
@@ -122,7 +113,5 @@ private:
     std::unordered_set<net::NodeId> knownPeers_;
 
     Neighbourhood neighbourhood_;
-
-    void processorRoutine();
 };
 #endif  // TRANSPORT_HPP

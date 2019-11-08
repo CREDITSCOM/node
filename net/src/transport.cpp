@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <thread>
 
+#include <cscrypto/cscrypto.hpp>
 #include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/packstream.hpp>
@@ -25,6 +26,42 @@ net::NodeId toNodeId(const cs::PublicKey& key) {
     net::NodeId ret;
     std::copy(ptr, ptr + key.size(), reinterpret_cast<uint8_t*>(ret.GetPtr()));
     return ret;
+}
+
+net::Config createNetConfig(Config config, bool& good) {
+    net::Config result(toNodeId(config.getMyPublicKey()));
+    good = true;
+
+    auto& ep = config.getInputEndpoint();
+    result.listen_address = !ep.ip.empty() ? ep.ip : net::kLocalHost;
+    result.listen_port = ep.port ? ep.port : net::kDefaultPort;
+    result.traverse_nat = config.traverseNAT();
+
+    auto& customBootNodes = config.getIpList();
+    if (customBootNodes.empty()) {
+        result.use_default_boot_nodes = true;
+    }
+    else {
+        result.use_default_boot_nodes = false;
+        for (auto& node : customBootNodes) {
+            if (node.ip.empty() || node.id.empty() || node.port == 0) {
+                good = false;
+                break;
+            }
+
+            net::NodeEntrance entry;
+            entry.address = net::bi::address::from_string(node.ip); // @TODO change it
+            entry.udp_port = entry.tcp_port = node.port;
+            std::vector<uint8_t> idBytes;
+            if (!DecodeBase58(node.id, idBytes)) {
+                good = false;
+                break;
+            }
+            std::copy(idBytes.begin(), idBytes.end(), reinterpret_cast<uint8_t*>(entry.id.GetPtr()));
+            result.custom_boot_nodes.push_back(entry);
+        }
+    }
+    return result;
 }
 } // namespace
 
@@ -68,13 +105,10 @@ constexpr cs::RoundNumber getRoundTimeout(const MsgTypes type) {
 extern void pollSignalFlag();
 
 Transport::Transport(const Config& config, Node* node)
-: config_(config)
+: config_(createNetConfig(config, good_))
 , node_(node)
-, myPublicKey_(node->getNodeIdKey())
-, host_(net::Config(id_), static_cast<HostEventHandler&>(*this))
-, neighbourhood_(this, node_) {
-    good_ = true;
-}
+, host_(config_, static_cast<HostEventHandler&>(*this))
+, neighbourhood_(this, node_) {}
 
 void Transport::run() {
   host_.Run();
@@ -288,9 +322,10 @@ uint32_t Transport::getNeighboursCount() {
 }
 
 uint32_t Transport::getMaxNeighbours() const {
-    return config_->getMaxNeighbours();
+//    return config_->getMaxNeighbours();
+    return Neighbourhood::MaxNeighbours;
 }
 
-void Transport::onConfigChanged(const Config& updated) {
-    config_.exchange(updated);
+void Transport::onConfigChanged(const Config& /* updated */) {
+//    config_.exchange(updated);
 }
