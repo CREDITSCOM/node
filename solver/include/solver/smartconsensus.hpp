@@ -71,6 +71,7 @@ public:
         const cs::PublicKey& requester);
 
     void requestSmartStages(int st);
+    int stageNumber(MsgTypes msg);
     void requestSmartStagesNeighbors(int st);
     void markSmartOutboundNodes(int st);
 
