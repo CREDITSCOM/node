@@ -164,7 +164,8 @@ int main(int argc, char* argv[]) {
         ("public-key-file", po::value<std::string>(), "path to public key file (default: \"NodePublic.txt\")")
         ("private-key-file", po::value<std::string>(), "path to private key file (default: \"NodePrivate.txt\")")
         ("dumpkeys", po::value<std::string>(), "dump your public and private keys into a JSON file with the specified name (UNENCRYPTED!)")
-        ("encryptkey", "encrypts the private key with password upon startup (if not yet encrypted)");
+        ("encryptkey", "encrypts the private key with password upon startup (if not yet encrypted)")
+        ("traverse-nat", "try to travese NAT if exists");
 
     variables_map vm;
     try {

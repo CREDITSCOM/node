@@ -25,7 +25,7 @@ const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
 const std::string DEFAULT_PATH_TO_PUBLIC_KEY = "NodePublic.txt";
 const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 
-const uint32_t DEFAULT_MIN_NEIGHBOURS = 5;
+const uint32_t DEFAULT_MIN_NEIGHBOURS = Neighbourhood::MinNeighbours;
 const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::MaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
@@ -40,8 +40,10 @@ using Port = short unsigned;
 
 struct EndpointData {
     bool ipSpecified = false;
+
+    std::string id;
+    std::string ip;
     short unsigned port = 0;
-    ip::address ip{};
 
     static EndpointData fromString(const std::string&);
 };
@@ -210,6 +212,10 @@ public:
         return compatibleVersion_;
     }
 
+    bool traverseNAT() const {
+        return traverseNAT_;
+    }
+
     uint64_t newBlockchainTopSeq() const {
         return newBlockchainTopSeq_;
     }
@@ -287,6 +293,7 @@ private:
     bool newBlockchainTop_ = false;
     bool autoShutdownEnabled_ = true;
     bool compatibleVersion_ = true;
+    bool traverseNAT_ = false;
     uint64_t newBlockchainTopSeq_;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;

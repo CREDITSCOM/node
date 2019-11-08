@@ -55,6 +55,7 @@ const std::string PARAM_NAME_COMPATIBLE_VERSION = "compatible_version";
 const std::string PARAM_NAME_CONVEYER_SEND_CACHE = "send_cache_value";
 const std::string PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE = "max_resends_send_cache";
 
+const std::string PARAM_NAME_ID = "id";
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
 
@@ -90,6 +91,7 @@ const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
 const std::string ARG_NAME_RECREATE_INDEX = "recreate-index";
 const std::string ARG_NAME_NEW_BC_TOP = "set-bc-top";
 const std::string ARG_NAME_DISABLE_AUTO_SHUTDOWN = "disable-auto-shutdown";
+const std::string ARG_NAME_TRAVERSE_NAT = "traverse-nat";
 
 const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
@@ -105,9 +107,13 @@ static EndpointData readEndpoint(const boost::property_tree::ptree& config, cons
 
     EndpointData result;
 
+    if (epTree.count(PARAM_NAME_ID)) {
+        result.id = epTree.get<std::string>(PARAM_NAME_ID);
+    }
+
     if (epTree.count(PARAM_NAME_IP)) {
         result.ipSpecified = true;
-        result.ip = ip::make_address(epTree.get<std::string>(PARAM_NAME_IP));
+        result.ip = epTree.get<std::string>(PARAM_NAME_IP);
     }
     else {
         result.ipSpecified = false;
@@ -126,16 +132,17 @@ EndpointData EndpointData::fromString(const std::string& str) {
     EndpointData result;
 
     if (std::regex_match(str, match, ipv4Regex)) {
-        result.ip = ip::make_address_v4(match[1]);
+        result.ip = match[1];
     }
     else if (std::regex_match(str, match, ipv6Regex)) {
-        result.ip = ip::make_address_v6(match[1]);
+        result.ip = match[1];
     }
     else {
         throw std::invalid_argument(str);
     }
 
     result.port = static_cast<uint16_t>(std::stoul(match[2]));
+    result.id = match[3];
 
     return result;
 }
@@ -185,6 +192,7 @@ Config Config::read(po::variables_map& vm) {
 
     result.recreateIndex_ = vm.count(ARG_NAME_RECREATE_INDEX);
     result.autoShutdownEnabled_ = !vm.count(ARG_NAME_DISABLE_AUTO_SHUTDOWN);
+    result.traverseNAT_ = vm.count(ARG_NAME_TRAVERSE_NAT);
     result.pathToDb_ = getArgFromCmdLine(vm, ARG_NAME_DB_PATH, DEFAULT_PATH_TO_DB);
 
     if (vm.count(ARG_NAME_NEW_BC_TOP)) {
@@ -895,13 +903,7 @@ bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const st
 }
 
 bool operator==(const EndpointData& lhs, const EndpointData& rhs) {
-#if !defined(BOOST_ASIO_NO_DEPRECATED)
-    boost::system::error_code ec;
-    auto result = lhs.ip.to_string(ec) == rhs.ip.to_string(ec);
-#else
-    auto result = lhs.ip.to_string() == rhs.ip.to_string();
-#endif
-    return result &&
+    return lhs.ip == rhs.ip &&
            lhs.port == rhs.port &&
            lhs.ipSpecified == rhs.ipSpecified;
 }
