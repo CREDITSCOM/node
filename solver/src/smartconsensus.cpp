@@ -277,7 +277,7 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
     else {
         if (stage.signature == Zero::signature) {
             cswarning() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
-            << " Smart stage One from ST[" << static_cast<int>(stage.sender) << "]  -  marked as silent";
+            << " Smart stage One from ST[" << static_cast<int>(stage.sender) << "]  -  marked as silent by this node";
         }
         else {
             if (!cscrypto::verifySignature(stage.signature, smartConfidants_.at(stage.sender), stage.messageHash.data(), stage.messageHash.size())) {
@@ -286,7 +286,7 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
                 return;
             }
         }
-        csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " SmartStage One from T[" << static_cast<int>(stage.sender) << "] is OK!";
+        csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " SmartStage One from ST[" << static_cast<int>(stage.sender) << "] is OK!";
     }
 
     if (smartStageOneStorage_.size() <= (size_t)stage.sender) {
@@ -752,7 +752,8 @@ void SmartConsensus::gotSmartStageRequest(uint8_t msgType, uint64_t smartID, uin
         return;
     }
 
-    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " " << __func__ << ": from ST[" << static_cast<int>(requesterNumber) << "] about ST[" << static_cast<int>(requiredNumber) << "]";
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " " << __func__ 
+        << ": from ST[" << static_cast<int>(requesterNumber) << "] about SmartStage-" << stageNumber(static_cast<MsgTypes>(msgType)) << " of ST[" << static_cast<int>(requiredNumber) << "]";
 
     
     if (!smartConfidantExist(requesterNumber)) {
@@ -881,7 +882,7 @@ void SmartConsensus::killTimer() {
 }
 
 void SmartConsensus::requestSmartStages(int st) {
-    csmeta(csdebug) << __func__ << ": " << st;
+    csmeta(csdebug) << __func__ << "-" << st << ":";
     uint8_t cnt = static_cast<uint8_t>(smartConfidants_.size());
     bool isRequested = false;
     MsgTypes msg = MsgTypes::SmartFirstStageRequest;
@@ -906,6 +907,9 @@ void SmartConsensus::requestSmartStages(int st) {
         if (sender == cs::ConfidantConsts::InvalidConfidantIndex) {
             if (i != ownSmartsConfNum_ && i != sender && smartConfidantExist(i)) {
                 pnode_->smartStageRequest(msg, id(), smartConfidants_.at(i), ownSmartsConfNum_, i);
+
+                csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " " << __func__
+                    << ": about SmastStage-" << stageNumber(msg) << " of ST[" << static_cast<int>(i) << "]";
             }
             isRequested = true;
         }
@@ -914,6 +918,20 @@ void SmartConsensus::requestSmartStages(int st) {
     if (!isRequested) {
         csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << __func__ << ": no node to request";
     }
+}
+
+int SmartConsensus::stageNumber(MsgTypes msg) {
+    int sn;
+    if (msg > MsgTypes::SmartFirstStageRequest) {
+        sn = static_cast<int>(msg - MsgTypes::SmartFirstStageRequest + 1);
+        if (sn > 3) {
+            sn = 255;
+        }
+    }
+    else {
+        sn = 0;
+    }
+    return sn;
 }
 
 // requests stages from any available neighbor nodes
@@ -1067,7 +1085,7 @@ void SmartConsensus::sendFakeStageOne(Node* pnode, cs::PublicKeys confidants, cs
     fake.hash.fill(0);
     fake.id = smartId;
     if (!fake.fillBinary()) {
-        csdebug() << "Can't fill fake smart stage one";
+        csdebug() << " Can't fill fake smart stage one";
         return;
     }
     fake.signature = cscrypto::generateSignature(pnode->getSolver()->getPrivateKey(), fake.messageHash.data(), fake.messageHash.size());
