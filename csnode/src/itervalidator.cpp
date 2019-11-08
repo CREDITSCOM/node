@@ -246,19 +246,29 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
             return "Transaction's max fee is not enough to issue transaction.";
         case kSourceDoesNotExists :
             return "Transaction's source doesn't exist in blockchain.";
+        case kContractViolation:
+            return "Contract execution violations detected";
         default :
             return "Unknown reject reason.";
     }
 }
 
-bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const BlockChain& bc, csdb::AmountCommission* countedFeePtr, RejectCode* rcPtr) {
+bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const BlockChain& bc, SmartContracts& sc, csdb::AmountCommission* countedFeePtr, RejectCode* rcPtr) {
     RejectCode rc = kAllCorrect;
 
     BlockChain::WalletData wallet;
     csdb::AmountCommission countedFee;
 
-    if (!fee::estimateMaxFee(t, countedFee)) {
+    if (!fee::estimateMaxFee(t, countedFee, sc)) {
         rc = kInsufficientMaxFee;
+    }
+
+    if (!rc) {
+        if (sc.is_known_smart_contract(t.source()) || sc.is_known_smart_contract(t.target())) {
+            if (sc.test_violations(t) != cs::SmartContracts::Violations::None) {
+                rc = kContractViolation;
+            }
+        }
     }
 
     if (!rc && !bc.findWalletData(t.source(), wallet)) {

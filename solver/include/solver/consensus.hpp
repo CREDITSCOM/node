@@ -83,7 +83,7 @@ public:
     constexpr static size_t BlackListCounterSinglePenalty = 10000;
 
     /** @brief   Max transaction size */
-    constexpr static size_t MaxTransactionSize = 8000;
+    constexpr static size_t MaxTransactionSize = 100 * 1024;
 
     /** @brief   Max hashes count to include in stage one data */
     constexpr static size_t MaxStageOneTransactions = 1000;

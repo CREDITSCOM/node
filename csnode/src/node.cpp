@@ -445,7 +445,7 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::Pub
     if (packet.signatures().size() == 1) {
         auto& transactions = packet.transactions();
         for (auto& it : transactions) {
-            if (cs::IterValidator::SimpleValidator::validate(it, getBlockChain())) {
+            if (cs::IterValidator::SimpleValidator::validate(it, getBlockChain(), solver_->smart_contracts())) {
                 ++sum;
             }
         }
