@@ -785,16 +785,19 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     cs::Conveyer::instance().addTransaction(send_transaction);
 
     cs::Hash hashState;
-    if (deploy) {        
+    if (deploy) {
         auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) {
-            hashState = ss.hash;
-            if (!ss.condFlg)
-                return false;
-            ss.condFlg = false;         
-            return true;
-        });
+                hashState = ss.hash;
+                if (!ss.condFlg)
+                    return false;
+                ss.condFlg = false;
+                return true;
+                });
 
-        this->hashStateSL.erase(send_transaction.signature());
+        {
+            auto hashStateInst(lockedReference(this->hashStateSL));
+            hashStateInst->erase(send_transaction.signature());
+        }
 
         if (!resWait) {  // time is over
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
@@ -818,7 +821,10 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             return true;
         });
 
-        this->hashStateSL.erase(send_transaction.signature());
+        {
+            auto hashStateInst(lockedReference(this->hashStateSL));
+            hashStateInst->erase(send_transaction.signature());
+        }
 
         if (!resWait) { // time is over
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);

@@ -872,13 +872,13 @@ void SmartConsensus::startTimer(int st) {
 
 void SmartConsensus::killTimer() {
     if (timeout_request_stage.cancel()) {
-        csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << __func__ << " cancel track timeout of stages-" << timeoutStageCounter_;
+        csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " " << __func__ << " cancel track timeout of stages-" << timeoutStageCounter_;
     }
     if (timeout_request_neighbors.cancel()) {
-        csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << __func__ << " cancel track timeout to request neighbors about stages-" << timeoutStageCounter_;
+        csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " " << __func__ << " cancel track timeout to request neighbors about stages-" << timeoutStageCounter_;
     }
     if (timeout_force_transition.cancel()) {
-        csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << __func__ << " cancel track timeout to force transition to next state after stages-" << timeoutStageCounter_;
+        csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " " << __func__ << " cancel track timeout to force transition to next state after stages-" << timeoutStageCounter_;
     }
 }
 
