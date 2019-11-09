@@ -504,7 +504,10 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
         return;
     }
     
-    if (verifyPacketSignatures(packet, sender) && verifyPacketTransactions(packet, sender)) {
+    if (!verifyPacketSignatures(packet, sender)) {
+        return;
+    }
+    if(verifyPacketTransactions(packet, sender)) {
         processTransactionsPacket(std::move(packet));
     }
     else {
