@@ -7,6 +7,8 @@
 #include <lib/system/common.hpp>
 #include <limits>
 #include <map>
+#include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 namespace cs {
@@ -33,8 +35,13 @@ public:
     size_t checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
     void validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded, const Transactions& trxs);
 
+    bool isRejectedSmart(const csdb::Address&) const;
+    auto getValidNewStates() const {
+        return validNewStates_;
+    }
+
     void clearCaches();
-    void addRejectedNewState(const csdb::Address& newState);
+    void saveNewState(const csdb::Address&, size_t blockIndex, bool valid);
 
     size_t getCntRemovedTrxsByGraph() const;
     bool duplicatedNewState(SolverContext&, const csdb::Address&) const;
@@ -65,8 +72,9 @@ private:
     WalletsState& walletsState_;
     TrxList trxList_;
     std::map<csdb::Address, csdb::Amount> payableMaxFees_;
-    std::vector<csdb::Address> rejectedNewStates_;
-    std::vector<csdb::Address> duplicatedNewStates_;
+    std::unordered_set<csdb::Address> rejectedNewStates_;
+    std::vector<size_t> validNewStates_;
+    std::unordered_set<csdb::Address> duplicatedNewStates_;
     Stack negativeNodes_;
     size_t cntRemovedTrxs_;
 };
@@ -74,16 +82,25 @@ private:
 inline void TransactionsValidator::clearCaches() {
     payableMaxFees_.clear();
     rejectedNewStates_.clear();
+    validNewStates_.clear();
     duplicatedNewStates_.clear();
 }
 
-inline void TransactionsValidator::addRejectedNewState(const csdb::Address& newState) {
-    rejectedNewStates_.push_back(newState);
+inline void TransactionsValidator::saveNewState(const csdb::Address& addr, size_t index, bool valid) {
+    if (!valid) {
+        rejectedNewStates_.insert(addr);
+    }
+    else {
+        validNewStates_.push_back(index);
+    }
 }
 
 inline size_t TransactionsValidator::getCntRemovedTrxsByGraph() const {
     return cntRemovedTrxs_;
 }
 
+inline bool TransactionsValidator::isRejectedSmart(const csdb::Address& addr) const {
+    return rejectedNewStates_.find(addr) != rejectedNewStates_.end();
+}
 }  // namespace cs
 #endif  // TRANSACTIONS_VALIDATOR_HPP
