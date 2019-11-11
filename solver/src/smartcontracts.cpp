@@ -398,24 +398,6 @@ std::string SmartContracts::to_base58(const BlockChain& storage, const csdb::Add
     return EncodeBase58(key.data(), key.data() + key.size());
 }
 
-/*static*/
-bool SmartContracts::validate(const csdb::Transaction& contract_call) {
-    if (!SmartContracts::is_executable(contract_call)) {
-        return false;
-    }
-    csdb::AmountCommission estimated_fee;
-    return cs::fee::estimateMaxFee(contract_call, estimated_fee);
-}
-
-/*private*/
-bool SmartContracts::validate_payable(const csdb::Transaction& payable_call) {
-    if (!is_payable_target(payable_call)) {
-        return false;
-    }
-    csdb::AmountCommission estimated_fee(cs::fee::getFee(payable_call).to_double() + cs::fee::getContractStateMinFee().to_double());
-    return csdb::Amount(payable_call.max_fee().to_double()) >= csdb::Amount(estimated_fee.to_double());
-}
-
 std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(const csdb::Address& abs_addr) const {
     using namespace trx_uf;
     const auto item = known_contracts.find(abs_addr);
@@ -828,15 +810,17 @@ bool SmartContracts::executionAllowed() {
 }
 
 /*public*/
-bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
+uint32_t SmartContracts::test_violations(const csdb::Transaction& tr) {
     cs::Lock lock(public_access_lock);
+
+    uint32_t result = Violations::None;
 
     // test smart contract as source of transaction
     // the new_state transaction is unable met here, we are the only one source of new_state
     csdb::Address abs_addr = absolute_address(tr.source());
     if (in_known_contracts(abs_addr)) {
         csdebug() << kLogPrefix << "smart contract is not allowed to emit transaction via API, drop it";
-        return true;  // avoid from conveyer sync
+        result += Violations::SourceIsContract;
     }
 
     // test smart contract as target of transaction (is it payable?)
@@ -853,25 +837,21 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
         // test contract was deployed (and maybe called successfully)
         if (!has_state) {
             cslog() << kLogPrefix << "unable execute not successfully deployed contract, drop transaction";
-            return true;  // block from conveyer sync
+            result += Violations::ContractIsNotDeployed;
         }
 
         double amount = tr.amount().to_double();
         // possible blocking call to executor for the first time:
         if (!is_payable(abs_addr)) {
-            if (!SmartContracts::validate(tr)) {
-                cslog() << kLogPrefix << "invalid deploy/execute, drop transaction";
-                return true; // block from conveyer sync
-            }
             if (amount > std::numeric_limits<double>::epsilon()) {
                 cslog() << kLogPrefix << "unable replenish balance of contract without payable() feature, drop transaction";
-                return true;  // block from conveyer sync
+                result += Violations::ReplenishNonPayable;
             }
             else /*amount is 0*/ {
                 if (!is_smart_contract(tr)) {
                     // not deploy/execute/new_state transaction as well as smart is not payable
                     cslog() << kLogPrefix << "unable call to payable(), feature is not implemented in contract, drop transaction";
-                    return true;  // block from conveyer sync
+                    result += Violations::ReplenishNonPayable;
                 }
             }
         }
@@ -885,31 +865,39 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
                         auto invoke = deserialize<api::SmartContractInvocation>(std::move(data));
                         if (invoke.method == PayableName) {
                             cslog() << kLogPrefix << "unable call to payable() directly, drop transaction";
-                            return true;  // block from conveyer sync
+                            result += Violations::DirectCallToPayable;
                         }
                     }
                 }
-                csdebug() << kLogPrefix << "allow deploy/executable transaction";
             }
             else /* not executable transaction */ {
-                if (!validate_payable(tr)) {
-                    cslog() << kLogPrefix << "invalid payable call, drop transaction";
-                    return true;  // block from conveyer sync
-                }
                 // contract is payable and transaction addresses it, ok then
-                csdebug() << kLogPrefix << "allow transaction to target payable contract";
             }
         }
     }
 
-    if (SmartContracts::is_deploy(tr)) {
-        csdebug() << kLogPrefix << "deploy transaction detected";
-    }
-    else if (SmartContracts::is_start(tr)) {
-        csdebug() << kLogPrefix << "start transaction detected";
-    }
+    return result; 
+}
 
-    return false;  // allow pass to conveyer sync
+/*static*/
+std::string SmartContracts::violations_message(uint32_t flags) {
+    if (flags == Violations::None) {
+        return "no violations";
+    }
+    std::ostringstream os;
+    if ((flags & Violations::SourceIsContract) != 0) {
+        os << "Contract is not allowed to emit transaction via API. ";
+    }
+    if ((flags & Violations::ContractIsNotDeployed) != 0) {
+        os << "Contract is not deployed successfully. ";
+    }
+    if ((flags & Violations::ReplenishNonPayable) != 0) {
+        os << "Cannot replenish unpayable contract. ";
+    }
+    if ((flags & Violations::DirectCallToPayable) != 0) {
+        os << "Unable perform direct call to payable(). ";
+    }
+    return os.str();
 }
 
 bool SmartContracts::test_executor_availability() {

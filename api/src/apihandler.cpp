@@ -636,7 +636,7 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
         return;
     }
 
-    solver_.send_wallet_transaction(tr);
+    cs::Conveyer::instance().addTransaction(tr);
 
     // wait for transaction in blockchain  
     if (!dumbCv_.waitCvSignal(tr.signature())) {
@@ -675,9 +675,20 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
         trxn.add_user_field(cs::trx_uf::ordinary::UsedContracts, uf);
     }
 
+    if (!solver_.isTransactionsInputAvailable()) {
+        auto msg = " Node is not syncronized or last round duration is too long.";
+        return msg;
+    }
+
     cs::IterValidator::SimpleValidator::RejectCode err;
     csdb::AmountCommission countedFee;
-    if (!cs::IterValidator::SimpleValidator::validate(trxn, blockchain_, &countedFee, &err)) {
+    if (!cs::IterValidator::SimpleValidator::validate(trxn, blockchain_, solver_.smart_contracts(), &countedFee, &err)) {
+        if (err == cs::IterValidator::SimpleValidator::kContractViolation) {
+            std::string s = cs::SmartContracts::violations_message(solver_.smart_contracts().test_violations(trxn));
+            if (!s.empty()) {
+                return std::make_optional(s);
+            }
+        }
         auto msg = cs::IterValidator::SimpleValidator::getRejectMessage(err);
         if (err == cs::IterValidator::SimpleValidator::kInsufficientMaxFee) {
             msg += " Counted fee will be " + std::to_string(countedFee.to_double()) + ".";
@@ -685,10 +696,6 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
         return msg;
     }
 
-    if (!solver_.isTransactionsInputAvailable()) {
-        auto msg = " Node is not syncronized or last round duration is too long. You are prevented from sending this transaction to avoid the Black List.";
-        return msg;
-    }
     return std::nullopt;
 }
 
@@ -775,19 +782,22 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         return;
     }
 
-    solver_.send_wallet_transaction(send_transaction);
+    cs::Conveyer::instance().addTransaction(send_transaction);
 
     cs::Hash hashState;
-    if (deploy) {        
+    if (deploy) {
         auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) {
-            hashState = ss.hash;
-            if (!ss.condFlg)
-                return false;
-            ss.condFlg = false;         
-            return true;
-        });
+                hashState = ss.hash;
+                if (!ss.condFlg)
+                    return false;
+                ss.condFlg = false;
+                return true;
+                });
 
-        this->hashStateSL.erase(send_transaction.signature());
+        {
+            auto hashStateInst(lockedReference(this->hashStateSL));
+            hashStateInst->erase(send_transaction.signature());
+        }
 
         if (!resWait) {  // time is over
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
@@ -811,7 +821,10 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             return true;
         });
 
-        this->hashStateSL.erase(send_transaction.signature());
+        {
+            auto hashStateInst(lockedReference(this->hashStateSL));
+            hashStateInst->erase(send_transaction.signature());
+        }
 
         if (!resWait) { // time is over
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);

@@ -30,6 +30,7 @@ public:
         *this = other;
     }
     inline csdb::AmountCommission& operator=(const AmountCommission& other) {
+        cached_ = false;
         u_ = other.u_;
         return *this;
     }

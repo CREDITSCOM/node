@@ -347,8 +347,6 @@ public:
 
     static std::string to_base58(const BlockChain& storage, const csdb::Address& addr);
 
-    static bool validate(const csdb::Transaction& contract_call);
-
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
@@ -398,16 +396,32 @@ public:
         }
 
         cs::Lock lock(public_access_lock);
-
         return is_payable_target(t);
     }
 
     bool executionAllowed();
 
     // return true if SmartContracts provide special handling for transaction, so
-    // the transaction is not pass through conveyer
+    // the transaction has not to pass through conveyer
     // method is thread-safe to be called from API thread
-    bool capture_transaction(const csdb::Transaction& t);
+    // upon return, is_rejected signals if transaction is not valid
+    uint32_t test_violations(const csdb::Transaction& t);
+
+    struct Violations {
+        constexpr static uint32_t None = 0;
+        // smart contract is not allowed to emit transaction via API
+        constexpr static uint32_t SourceIsContract = 1;
+        // unable execute not successfully deployed contract
+        constexpr static uint32_t ContractIsNotDeployed = 2;
+        // unable replenish balance of contract without payable() feature
+        constexpr static uint32_t ReplenishNonPayable = 4;
+        // unable call to payable() directly
+        constexpr static uint32_t DirectCallToPayable = 8;
+    };
+
+    static std::string violations_message(uint32_t flags);
+
+public:
 
     CallsQueueScheduler& getScheduler();
 
@@ -863,7 +877,6 @@ private:
     // request correct state in network
     void net_request_contract_state(const csdb::Address& abs_addr);
 
-    bool validate_payable(const csdb::Transaction& payable_call);
 };
 
 }  // namespace cs

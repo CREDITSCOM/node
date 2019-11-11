@@ -139,14 +139,6 @@ public:
     size_t stagesThree();
     bool stateFailed(Result res);
 
-    /// <summary>   Adds a transaction passed to send pool </summary>
-    ///
-    /// <remarks>   Aae, 14.10.2018. </remarks>
-    ///
-    /// <param name="tr">   The transaction </param>
-
-    void send_wallet_transaction(const csdb::Transaction& tr);
-
     cs::SmartContracts& smart_contracts() const {
         return *psmarts;
     }
