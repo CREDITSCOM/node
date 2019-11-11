@@ -1218,7 +1218,7 @@ void Node::reviewConveyerHashes() {
 void Node::processSync() {
     const auto last_seq = blockChain_.getLastSeq();
     const auto round = cs::Conveyer::instance().currentRoundNumber();
-    if (stat_.lastRoundMs() > maxPingSynchroDelay_ && round < last_seq + cs::PoolSynchronizer::roundDifferentForSync) {
+    if (stat_.isCurrentRoundTooLong(120000) && round < last_seq + cs::PoolSynchronizer::roundDifferentForSync) {
         poolSynchronizer_->syncLastPool();
     }
     else {
