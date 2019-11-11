@@ -504,10 +504,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
         return;
     }
     
-    if (!verifyPacketSignatures(packet, sender)) {
-        return;
-    }
-    if(verifyPacketTransactions(packet, sender)) {
+    if (verifyPacketSignatures(packet, sender) && verifyPacketTransactions(packet, sender)) {
         processTransactionsPacket(std::move(packet));
     }
     else {
@@ -995,7 +992,7 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
         cswarning() << "Send transaction packet with empty hash failed";
         return;
     }
-
+    csdebug() << "NODE> Sending transaction's packet with hash: " << cs::Utils::byteStreamToHex(packet.hash().toBinary().data(), packet.hash().size());
     sendToBroadcast(MsgTypes::TransactionPacket, cs::Conveyer::instance().currentRoundNumber(), packet);
 }
 
