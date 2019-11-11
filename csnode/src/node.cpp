@@ -992,7 +992,7 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
         cswarning() << "Send transaction packet with empty hash failed";
         return;
     }
-
+    csdebug() << "NODE> Sending transaction's packet with hash: " << cs::Utils::byteStreamToHex(packet.hash().toBinary().data(), packet.hash().size());
     sendToBroadcast(MsgTypes::TransactionPacket, cs::Conveyer::instance().currentRoundNumber(), packet);
 }
 

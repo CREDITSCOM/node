@@ -138,11 +138,13 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
             if (std::find(hashes.cbegin(), hashes.cend(), element.first) == hashes.cend()) {
                 
                 if (stage.hashesCandidates.size() > Consensus::MaxStageOneHashes) {
+                    csdebug() << name() << ": stage-1 transactions " << trxCounter;
                     break;
                 }
 
                 trxCounter += element.second.transactionsCount();
                 if (trxCounter + element.second.transactionsCount() > Consensus::MaxStageOneTransactions) {
+                    csdebug() << name() << ": stage-1 transactions " << trxCounter - element.second.transactionsCount();
                     break;
                 }
 
@@ -151,15 +153,18 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
                     preliminaryBlockSize += tSize;
                     if (preliminaryBlockSize > Consensus::MaxPreliminaryBlockSize) {
                         finishFlag = true;
+                        csdebug() << name() << ": stage-1 transactions " << trxCounter - element.second.transactionsCount();
                         break;
                     }
                     if (tSize > Consensus::MaxTransactionSize) {
                         continueFlag = true;
+                        csdebug() << name() << ": stage-1 transactions " << trxCounter - element.second.transactionsCount();
                         break;
                     }
 
                 }
                 if (finishFlag) {
+                    csdebug() << name() << ": stage-1 transactions " << trxCounter - element.second.transactionsCount();
                     break;
                 }
                 if (continueFlag) {

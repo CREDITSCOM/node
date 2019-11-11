@@ -303,6 +303,7 @@ public:
     /// @return returns true, if hash does not exist at send cache and exists at hash table.
     ///  returns false if hash exists at send cache or does not found at packets table.
     ///
+    [[deprecated]]
     bool addRejectedHashToCache(const cs::TransactionsPacketHash& hash);
 
 public signals:
