@@ -421,6 +421,8 @@ public:
 
     static std::string violations_message(uint32_t flags);
 
+    static bool prevalidate(const BlockChain& bc, const cs::TransactionsPacket& pack);
+
 public:
 
     CallsQueueScheduler& getScheduler();
