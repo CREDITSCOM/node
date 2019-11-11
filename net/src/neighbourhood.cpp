@@ -41,7 +41,8 @@ Neighbourhood::Neighbourhood(Transport* net)
 : transport_(net)
 , connectionsAllocator_(MaxConnections + 1)
 , nLockFlag_()
-, mLockFlag_() {
+, mLockFlag_()
+, resqueue(this) {
 }
 
 void Neighbourhood::chooseNeighbours() {
@@ -115,9 +116,10 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp, bool separate) {
             }
 
             auto& dp = msgDirects_.tryStore(bp.pack.getHash());
-
             dp.pack = bp.pack;
             dp.receiver = nb;
+
+            resqueue.insert(bp.pack, nb);
 
             if (!nb->isSignal || send_to_ss) {
                 if (separate) {
@@ -166,6 +168,8 @@ void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
             bp.pack = *pack;
             bp.receiver = nb;
 
+            resqueue.insert(*pack, nb);
+
             transport_->sendDirect(pack, **nb);
         }
     }
@@ -185,6 +189,7 @@ void Neighbourhood::sendByConfidant(const Packet* pack, ConnectionPtr conn) {
 
     bp.pack = *pack;
     bp.receiver = conn;
+    resqueue.insert(*pack, conn);
 
     transport_->sendDirect(pack, **conn);
 }
@@ -671,6 +676,8 @@ void Neighbourhood::neighbourHasPacket(RemoteNodePtr node, const cs::Hash& hash)
 
     auto& dp = msgDirects_.tryStore(hash);
     dp.received = true;
+    resqueue.remove(hash, conn);
+    resqueue.resend();
 }
 
 void Neighbourhood::neighbourSentPacket(RemoteNodePtr node, const cs::Hash& hash) {
@@ -756,22 +763,7 @@ bool Neighbourhood::isPingDone() {
 
 void Neighbourhood::resendPackets() {
     cs::Lock lock(nLockFlag_);
-    uint32_t cnt1 = 0;
-
-    for (auto& bp : msgBroads_) {
-        if (!bp.data.pack) {
-            continue;
-        }
-
-        if (!dispatch(bp.data)) {
-            bp.data.pack = Packet();
-        }
-        else {
-            ++cnt1;
-        }
-
-        bp.data.sentLastTime = false;
-    }
+    resqueue.resend();
 }
 
 ConnectionPtr Neighbourhood::getConnection(const RemoteNodePtr node) {
@@ -851,6 +843,7 @@ void Neighbourhood::registerDirect(const Packet* packPtr, ConnectionPtr conn) {
     auto& bp = msgDirects_.tryStore(packPtr->getHash());
     bp.pack = *packPtr;
     bp.receiver = conn;
+    resqueue.insert(*packPtr, conn);
 }
 
 bool Neighbourhood::isNewConnectionAvailable() const {
@@ -868,4 +861,86 @@ ConnectionPtr Neighbourhood::getRandomNeighbour() {
     const int randomNumber = cs::Random::generateValue<int>(0, static_cast<int>(neighbourCount));
 
     return *(neighbours_.begin() + randomNumber);
+}
+
+bool Neighbourhood::ResendQueue::insert(Packet pack, ConnectionPtr conn) {
+    cs::Lock lock(qLock);
+
+    static int count = 0;
+
+    DirectPackInfo info;
+    info.pack = pack;
+    info.receiver = conn;
+    info.startTPoint = std::chrono::system_clock::now();
+    info.tpoint = info.startTPoint;
+    info.mixHash = pack.getHash();
+    makeMixHash(info.mixHash, (**conn).id);
+    auto res = packetsRef.insert(std::make_pair(info.mixHash, nullptr));
+    if (res.second) {
+        packets.push(info);
+        res.first->second = &packets.back();
+        csdebug() << "Insert packet: " << (**conn).id << " " << (**conn).in << " " << cs::Utils::byteStreamToHex(info.mixHash.begin(), info.mixHash.size());
+        csdebug() << cs::Utils::byteStreamToHex(pack.getHash().begin(), pack.getHash().size());
+        return true;
+    }
+    return false;
+}
+
+void Neighbourhood::ResendQueue::remove(const cs::Hash& hash, Connection* conn) {
+    cs::Lock lock(qLock);
+
+    static int count = 0;
+
+    cs::Hash mixHash = hash;
+    makeMixHash(mixHash, conn->id);
+    auto it = packetsRef.find(mixHash);
+    if (it != packetsRef.end()) {
+        it->second->received = true;
+        csdebug() << "Receive packet: " << conn->in << " " << cs::Utils::byteStreamToHex(mixHash.begin(), mixHash.size());
+        csdebug() << cs::Utils::byteStreamToHex(hash.begin(), hash.size());
+    } else {
+        csdebug() << "Miss!!!!!!!!!!!!!!" << " " << conn->in << " " << cs::Utils::byteStreamToHex(mixHash.begin(), mixHash.size());
+        csdebug() << cs::Utils::byteStreamToHex(hash.begin(), hash.size());
+    }
+}
+
+void Neighbourhood::ResendQueue::resend() {
+    std::vector<DirectPackInfo *> toSend;
+    {
+        cs::Lock lock(qLock);
+        auto now = std::chrono::system_clock::now();
+        while (!packets.empty()) {
+            auto& packinfo = packets.front();
+            std::chrono::duration<double> diff = now - packinfo.tpoint;
+            if (diff.count() > resendPeriod) {
+                std::chrono::duration<double> diffAtStart = now - packinfo.startTPoint;
+                if (diffAtStart.count() > resendTimeout) {
+                    csdebug() << "Timeout packet: " << diffAtStart.count();
+                    packetsRef.erase(packinfo.mixHash);
+                    packets.pop();
+                    continue;
+                }
+                if (!packinfo.received) {
+                    csdebug() << "Resend packet: " << diff.count();
+                    auto tmp = packinfo;
+                    tmp.tpoint = now;
+                    packetsRef.erase(packinfo.mixHash);
+                    packets.pop();
+                    auto res = packetsRef.insert(std::make_pair(tmp.mixHash, nullptr));
+                    packets.push(tmp);
+                    res.first->second = &packets.back();
+                    toSend.push_back(&packets.back());
+                } else {
+                    csdebug() << "Received packet: " << diff.count();
+                    packetsRef.erase(packinfo.mixHash);
+                    packets.pop();
+                }
+                continue;
+            }
+            break;
+        }
+    }
+    for (auto out: toSend) {
+        nh->transport_->sendDirect(&out->pack, **out->receiver);
+    }
 }

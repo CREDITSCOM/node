@@ -344,6 +344,10 @@ void Network::writerRoutine() {
                     continue;
                 }
 
+#ifdef LOG_NET
+                csdebug(logger::Net) << "--> " << task->pack.size() << " bytes to " << task->endpoint << " " << task->pack;
+#endif
+
                 encoded_packets.emplace_back(task->pack.encode(buffer(packets_buffer[j].data(), Packet::MaxSize)));
                 endpoints[j] = task->endpoint;
                 iovecs[j].iov_base = encoded_packets[j].data();
