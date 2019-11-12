@@ -107,8 +107,8 @@ extern void pollSignalFlag();
 Transport::Transport(const Config& config, Node* node)
 : config_(createNetConfig(config, good_))
 , node_(node)
-, host_(config_, static_cast<HostEventHandler&>(*this))
-, neighbourhood_(this, node_) {}
+, neighbourhood_(this, node_)
+, host_(config_, static_cast<HostEventHandler&>(*this)) {}
 
 void Transport::run() {
     host_.Run();

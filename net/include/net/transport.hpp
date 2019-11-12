@@ -104,7 +104,6 @@ private:
     net::Config config_;
 
     Node* node_;
-    net::Host host_;
 
     std::condition_variable newPacketsReceived_;
     std::mutex inboxMux_;
@@ -115,5 +114,7 @@ private:
 
     Neighbourhood neighbourhood_;
     std::thread processorThread_;
+
+    net::Host host_;
 };
 #endif  // TRANSPORT_HPP
