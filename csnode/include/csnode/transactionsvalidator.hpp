@@ -8,7 +8,6 @@
 #include <limits>
 #include <map>
 #include <unordered_set>
-#include <unordered_map>
 #include <vector>
 
 namespace cs {
@@ -73,7 +72,7 @@ private:
     TrxList trxList_;
     std::map<csdb::Address, csdb::Amount> payableMaxFees_;
     std::unordered_set<csdb::Address> rejectedNewStates_;
-    std::vector<size_t> validNewStates_;
+    std::vector<std::pair<size_t, bool>> validNewStates_; // index in block + false if invalidated by smart source trx
     std::unordered_set<csdb::Address> duplicatedNewStates_;
     Stack negativeNodes_;
     size_t cntRemovedTrxs_;
@@ -91,7 +90,7 @@ inline void TransactionsValidator::saveNewState(const csdb::Address& addr, size_
         rejectedNewStates_.insert(addr);
     }
     else {
-        validNewStates_.push_back(index);
+        validNewStates_.push_back(std::make_pair(index, valid));
     }
 }
 

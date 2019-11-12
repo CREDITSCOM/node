@@ -112,7 +112,7 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
                 return false;
             }
 
-            csdb::Transaction initTransaction = cs::SmartContracts::get_transaction(context.blockchain(), trxs[validNewStates_.back()]);
+            csdb::Transaction initTransaction = cs::SmartContracts::get_transaction(context.blockchain(), trxs[validNewStates_.back().first]);
 
             if (initTransaction.is_valid() && smarts.absolute_address(initTransaction.target()) == sourceAbsAddr) {
                 auto initerAddr = smarts.absolute_address(initTransaction.source());
@@ -126,14 +126,16 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
                 }
                 if (leftFromMaxFee < zeroBalance_) {
                     cslog() << kLogPrefix << __func__ << ": reject contract emitted transaction, out of fee in starter transaction";
-                    rejectedNewStates_.insert(context.smart_contracts().absolute_address(trx.source()));
+                    rejectedNewStates_.insert(sourceAbsAddr);
+                    validNewStates_.back().second = false;
                     return false;
                 }
                 payableMaxFees_[initerAddr] = leftFromMaxFee;
             }
             else {
                 cslog() << kLogPrefix << __func__ << ": reject contract emitted transaction, problems with starter transaction";
-                rejectedNewStates_.insert(context.smart_contracts().absolute_address(trx.source()));
+                rejectedNewStates_.insert(sourceAbsAddr);
+                validNewStates_.back().second = false;
                 return false;
             }
 

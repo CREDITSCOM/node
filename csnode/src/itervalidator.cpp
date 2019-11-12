@@ -59,7 +59,11 @@ void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& chara
     };
 
     for (auto it = pTransval_->getValidNewStates().rbegin(); it != pTransval_->getValidNewStates().rend(); ++it) {
-        auto& t = transactions[*it];
+        if (it->second) {
+            continue;
+        }
+
+        auto& t = transactions[it->first];
         auto absAddr = context.smart_contracts().absolute_address(t.source());
 
         if (pTransval_->isRejectedSmart(absAddr)) {
