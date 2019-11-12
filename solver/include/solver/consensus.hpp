@@ -47,7 +47,7 @@ public:
     constexpr static uint64_t MaxTimeStampDelta = 1000 * 60 * 3;
 
     /** @brief   Min duration (msec) to collect hashes in stage-1 of consensus */
-    constexpr static uint32_t T_min_stage1 = 170;
+    constexpr static uint32_t T_min_stage1 = 500;
 
     /** @brief   Number of rounds to prevent node from consensus participation */
     constexpr static uint32_t GrayListPunishment = 1000;
