@@ -45,23 +45,44 @@ Characteristic IterValidator::formCharacteristic(SolverContext& context, Transac
 }
 
 void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& characteristicMask, const Transactions& transactions) {
-    // test if any of smart-emitted transaction rejected, reject all transactions from this smart
-    // 1. collect rejected smart addresses
     std::vector<SolverContext::RefExecution> rejectList;
-    size_t maskSize = characteristicMask.size();
-    size_t i = 0;
-    for (const auto& tr : transactions) {
-        if (i < maskSize && *(characteristicMask.cbegin() + static_cast<std::ptrdiff_t>(i)) == kInvalidMarker) {
-            if (SmartContracts::is_new_state(tr) && !pTransval_->duplicatedNewState(context, tr.source())) {
-                csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
-                if (fld.is_valid()) {
-                    SmartContractRef ref(fld);
-                    rejectList.emplace_back(std::make_pair(ref.sequence, static_cast<uint32_t>(ref.transaction)));
-                }
+    std::set<csdb::Address> firstRejected;
+
+    auto tryAddToRejected = [this, &rejectList, &firstRejected, &context](const csdb::Transaction& tr, const csdb::Address& absAddr) mutable {
+        if (!pTransval_->duplicatedNewState(context, tr.source()) && firstRejected.insert(absAddr).second) {
+            csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
+            if (fld.is_valid()) {
+                SmartContractRef ref(fld);
+                rejectList.emplace_back(std::make_pair(ref.sequence, static_cast<uint32_t>(ref.transaction)));
             }
         }
-        ++i;
+    };
+
+    for (auto it = pTransval_->getValidNewStates().rbegin(); it != pTransval_->getValidNewStates().rend(); ++it) {
+        if (it->second) {
+            continue;
+        }
+
+        auto& t = transactions[it->first];
+        auto absAddr = context.smart_contracts().absolute_address(t.source());
+
+        if (pTransval_->isRejectedSmart(absAddr)) {
+            tryAddToRejected(t, absAddr);
+        }
     }
+
+    for (size_t i = 0; i < transactions.size() && i < characteristicMask.size(); ++i) {
+        auto absAddr = context.smart_contracts().absolute_address(transactions[i].source());
+        bool valid = characteristicMask[i] == kValidMarker;
+
+        if (!valid && SmartContracts::is_new_state(transactions[i])) {
+            tryAddToRejected(transactions[i], absAddr);
+        }
+        else if (valid && pTransval_->isRejectedSmart(absAddr)) {
+            characteristicMask[i] = kInvalidMarker;
+        }
+    }
+
     if (!rejectList.empty()) {
         cslog() << kLogPrefix << "reject " << rejectList.size() << " new_state(s) of smart contract(s)";
         context.send_rejected_smarts(rejectList);
@@ -144,7 +165,7 @@ void IterValidator::checkTransactionsSignatures(SolverContext& context, const Tr
                 rejectedCounter++;
                 cslog() << kLogPrefix << "transaction[" << i << "] rejected, incorrect signature.";
                 if (SmartContracts::is_new_state(transactions[i])) {
-                    pTransval_->addRejectedNewState(context.smart_contracts().absolute_address(transactions[i].source()));
+                    pTransval_->saveNewState(context.smart_contracts().absolute_address(transactions[i].source()), i, false);
                 }
             }
         }

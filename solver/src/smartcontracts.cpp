@@ -900,6 +900,88 @@ std::string SmartContracts::violations_message(uint32_t flags) {
     return os.str();
 }
 
+/*static*/
+bool SmartContracts::prevalidate(const BlockChain& bc, const cs::TransactionsPacket& pack) {
+    // count: 0 < count < max
+    const auto total_cnt = pack.transactionsCount();
+    if (total_cnt > Consensus::MaxContractResultTransactions) {
+        csdebug() << kLogPrefix << "too many transactions in execute result, prevalidation failed";
+        return false;
+    }
+    if (total_cnt < 1) {
+        csdebug() << kLogPrefix << "no transactions in execute result, prevalidation failed";
+        return false;
+    }
+
+    // logical rules:
+    // a) strong packet structure, state[0] + {emitted[0][0]..emitted[0][N0]} opt + ... + state[N] + {emitted[N][0]..emitted[N][NN]} opt
+    // b) emitted source == previous new state source
+    // c) source != target in emitted transactions
+    // d) no executions in contract emitted transactions
+    csdb::Address contract_abs_addr;
+    double total_min_fee = 0;
+    size_t i = 0;
+    for (const auto& t : pack.transactions()) {
+        if (SmartContracts::is_new_state(t)) {
+            contract_abs_addr = bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey);
+            total_min_fee += cs::fee::getContractStateMinFee().to_double();
+        }
+        else {
+            if (i == 0) {
+                csdebug() << kLogPrefix << "execute result does not start with new state, prevalidation failed";
+                return false;
+            }
+            const csdb::Address src_abs_addr = bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey);
+            if (!(src_abs_addr == contract_abs_addr)) {
+                csdebug() << kLogPrefix << "incorrect source in emitted transaction, prevalidation failed";
+                return false;
+            }
+            if (src_abs_addr == bc.getAddressByType(t.target(), BlockChain::AddressType::PublicKey)) {
+                csdebug() << kLogPrefix << "source equeals target in emitted transaction, prevalidation failed";
+                return false;
+            }
+            if (SmartContracts::is_executable(t)) {
+                csdebug() << kLogPrefix << "execute transaction in execute result, prevalidation failed";
+                return false;
+            }
+            total_min_fee += cs::fee::getFee(t).to_double();// getContractStateMinFee().to_double();
+        }
+        ++i;
+    }
+
+    // sufficient max fee in start transaction, assume logical structure has been tested
+    const csdb::Transaction& prim_new_state = pack.transactions().front();
+    if (!SmartContracts::is_new_state(prim_new_state)) {
+        // never should happens
+        return false;
+    }
+    csdb::Transaction start = SmartContracts::get_transaction(bc, prim_new_state);
+    if (!start.is_valid()) {
+        csdebug() << kLogPrefix << "incorrect start transaction is referred by new state, prevalidation failed";
+        return false;
+    }
+    const double avail_fee = start.max_fee().to_double() - start.counted_fee().to_double();
+    if (avail_fee - total_min_fee < std::numeric_limits<double>::epsilon()) {
+        csdebug() << kLogPrefix << "insufficient max fee in start transaction, prevalidation failed";
+        return false;
+    }
+
+    // test initer actual balance
+    //csdb::Address initer_abs_addr = bc.getAddressByType(start.source(), BlockChain::AddressType::PublicKey);
+    //BlockChain::WalletData wallet;
+    //if (!bc.findWalletData(initer_abs_addr, wallet)) {
+    //    csdebug() << kLogPrefix << "incorrect source wallet in start transaction, prevalidation failed";
+    //    return false;
+    //}
+    //if (wallet.balance_.to_double() - total_min_fee < std::numeric_limits<double>::epsilon()) {
+    //    csdebug() << kLogPrefix << "insufficient initer balance to pay min fee, prevalidation failed";
+    //    return false;
+    //}
+
+    // all tests passed
+    return true;
+}
+
 bool SmartContracts::test_executor_availability() {
     if (!executor_ready) {
         // ask user to restart executor every 2 seconds
@@ -1903,8 +1985,8 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             if (execution_result.states.count(primary_abs_addr) == 0) {
                 cswarning() << kLogPrefix << "primary " << data_item.contract_ref << " new state is empty";
                 result.add_user_field(new_state::Value, std::string{});
-                packet.addTransaction(result);
                 set_return_value(result, error::ContractError);
+                packet.addTransaction(result);
             }
             else {
                 const auto& primary_new_state = execution_result.states.at(primary_abs_addr);
@@ -1999,6 +2081,19 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                             }
                         }
                     }
+                }
+            }
+            // perform just created packet pre-validation
+            if (!SmartContracts::prevalidate(bc, packet)) {
+                if (packet.transactionsCount() > 0) {
+                    csdb::Transaction tmp = packet.transactions().front();
+                    cswarning() << kLogPrefix << "packet result prevalidation failed, make " << data_item.contract_ref << " new state is empty";
+                    tmp.add_user_field(new_state::Value, std::string{});
+                    set_return_value(tmp, error::ConsensusRejected);
+
+                    packet.clear();
+                    packet.addTransaction(tmp);
+
                 }
             }
         }
