@@ -128,6 +128,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
         std::unique_lock<cs::SharedMutex> lock = conveyer.lock();
         size_t trxCounter = 0;
         size_t preliminaryBlockSize = 0;
+        size_t deltaBlockSize = 0;
         const cs::RoundTable& roundTable = conveyer.currentRoundTable();
         bool finishFlag = false;
         bool continueFlag = false;
@@ -138,42 +139,43 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
             if (std::find(hashes.cbegin(), hashes.cend(), element.first) == hashes.cend()) {
                 
                 if (stage.hashesCandidates.size() > Consensus::MaxStageOneHashes) {
-                    csdebug() << name() << ": stage-1 transactions " << trxCounter;
-                    break;
+                    finishFlag = true;
                 }
 
                 trxCounter += element.second.transactionsCount();
-                if (trxCounter + element.second.transactionsCount() > Consensus::MaxStageOneTransactions) {
-                    csdebug() << name() << ": stage-1 transactions " << trxCounter - element.second.transactionsCount();
-                    break;
+                if (trxCounter > Consensus::MaxStageOneTransactions) {
+                    finishFlag = true;
                 }
 
+                deltaBlockSize = 0;
                 for (auto& it : element.second.transactions()) {
                     tSize = it.to_byte_stream().size();
+                    deltaBlockSize += tSize;
                     preliminaryBlockSize += tSize;
                     if (preliminaryBlockSize > Consensus::MaxPreliminaryBlockSize) {
                         finishFlag = true;
-                        csdebug() << name() << ": stage-1 transactions " << trxCounter - element.second.transactionsCount();
-                        break;
                     }
                     if (tSize > Consensus::MaxTransactionSize) {
                         continueFlag = true;
-                        csdebug() << name() << ": stage-1 transactions " << trxCounter - element.second.transactionsCount();
-                        break;
                     }
 
                 }
+
                 if (finishFlag) {
-                    csdebug() << name() << ": stage-1 transactions " << trxCounter - element.second.transactionsCount();
+                    trxCounter -= element.second.transactionsCount();
+                    preliminaryBlockSize -= deltaBlockSize;
                     break;
                 }
                 if (continueFlag) {
+                    trxCounter -= element.second.transactionsCount();
+                    preliminaryBlockSize -= deltaBlockSize;
                     continue;
                 }
 
                 stage.hashesCandidates.push_back(element.first);
             }
         }
+        csdebug() << name() << ": transactions: " << trxCounter << ", preliminary block size: " << preliminaryBlockSize;
     }
 
     transactions_checked = true;

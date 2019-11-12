@@ -451,6 +451,11 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::Pub
         }
     }
     else if (packet.signatures().size() > 2) {
+        //TODO: insert maxSmartTransactions in packet
+        if (packet.transactions().size() > 100 /*insert*/) {
+            csdebug() << "NODE> Illegal number of transactions";
+            return false;
+        }
         return true;
     }
     else {
