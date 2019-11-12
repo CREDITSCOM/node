@@ -451,8 +451,7 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::Pub
         }
     }
     else if (packet.signatures().size() > 2) {
-        //TODO: insert maxSmartTransactions in packet
-        if (packet.transactions().size() > 100 /*insert*/) {
+        if (packet.transactions().size() > Consensus::MaxContractResultTransactions) {
             csdebug() << "NODE> Illegal number of transactions";
             return false;
         }
@@ -740,22 +739,6 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         csmeta(cserror) << ", real trusted mask size: " << realTrustedMaskSize << ", confidants count " << confidantsReference.size() << ", on round " << round;
         return;
     }
-
-    //for (size_t idx = 0; idx < realTrustedMaskSize; ++idx) {
-    //    const auto& key = confidantsReference[idx];
-
-    //    if (rPackage.poolMetaInfo().realTrustedMask[idx] == 0) {
-    //        poolMetaInfo.writerKey = key;
-    //    }
-    //}
-
-    //if (round != 0) {
-    //    auto confirmation = confirmationList_.find(round);
-    //    if (confirmation.has_value()) {
-    //        poolMetaInfo.confirmationMask = confirmation.value().mask;
-    //        poolMetaInfo.confirmations = confirmation.value().signatures;
-    //    }
-    //}
 
     if (!istream_.good()) {
         csmeta(cserror) << "Round info parsing failed, data is corrupted";

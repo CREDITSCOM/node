@@ -297,10 +297,10 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
         return;
     }
     if (!std::equal(stage.hash.cbegin(), stage.hash.cend(), Zero::hash.cbegin())) {
-        smartConsensusMask[stage.sender] = 0;
+        smartConsensusMask[stage.sender] = cs::ConfidantConsts::FirstWriterIndex;
     }
     else {
-        smartConsensusMask[stage.sender] = 254;
+        smartConsensusMask[stage.sender] = cs::ConfidantConsts::LiarIndex;
     }
     smartStageOneStorage_.at(stage.sender) = stage;
     std::string stagesPlot;
@@ -319,7 +319,7 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
         addSmartStageTwo(st2, true);
         uint8_t index = 0;
         for (auto it : smartConsensusMask) {
-            if (it == 255 || it == 254) {
+            if (it == cs::ConfidantConsts::InvalidConfidantIndex || it == cs::ConfidantConsts::LiarIndex) {
                 fake_stage2(index);
             }
             ++index;
@@ -404,7 +404,13 @@ void SmartConsensus::processStages() {
             csdebug() << kLogPrefix << "own stage-1 hash: " << cs::Utils::byteStreamToHex(st.hash.data(), st.hash.size());
             continue;
         }
-        if (st.fees.size() != currentSmartsNumber) {
+        
+        if (st.fees.size() == 0) {
+            ++(smartUntrusted.at(st.sender));
+            st3.realTrustedMask.at(st.sender) = cs::ConfidantConsts::InvalidConfidantIndex;
+            cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (different fee-vector size)";
+        }
+        else if (st.fees.size() != currentSmartsNumber) {
             ++(smartUntrusted.at(st.sender));
             st3.realTrustedMask.at(st.sender) = cs::ConfidantConsts::LiarIndex;
             cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (different fee-vector size)";
