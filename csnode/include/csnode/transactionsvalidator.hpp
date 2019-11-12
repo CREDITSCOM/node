@@ -35,7 +35,7 @@ public:
     void validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded, const Transactions& trxs);
 
     bool isRejectedSmart(const csdb::Address&) const;
-    auto getValidNewStates() const {
+    auto& getValidNewStates() const {
         return validNewStates_;
     }
 

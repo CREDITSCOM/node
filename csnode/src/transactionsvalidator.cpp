@@ -258,7 +258,7 @@ size_t TransactionsValidator::makeSmartsValid(SolverContext& context, RejectedSm
         if (s.absolute_address(smarts[i].first.source()) == s.absolute_address(source) && smarts[i].second < maskSize) {
             maskIncluded[smarts[i].second] = kValidMarker;
             ++restoredCounter;
-            csdetails() << kLogPrefix << "balance of transation[" << smarts[i].second << "] source is replenished by other transaction";
+            csdebug() << kLogPrefix << "source of transation[" << smarts[i].second << "] is replenished, cancel reject";
 
             WalletsState::WalletData& wallState = walletsState_.getData(smarts[i].first.source());
             wallState.trxTail_.push(smarts[i].first.innerID());
