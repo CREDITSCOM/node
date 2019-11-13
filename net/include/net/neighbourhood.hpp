@@ -16,8 +16,10 @@ class Transport;
 
 class Neighbourhood {
 public:
-    const static uint32_t MaxNeighbours = 16;
-    const static uint32_t MinNeighbours = 2;
+    constexpr static uint32_t MaxNeighbours = 16;
+    constexpr static uint32_t MinNeighbours = 2;
+
+    constexpr static std::chrono::seconds kPingInterval{2};
 
     Neighbourhood(Transport*, Node*);
     
@@ -25,18 +27,20 @@ public:
     void newPeerDiscovered(const cs::PublicKey&);
     void peerDisconnected(const cs::PublicKey&);
 
+    void removeSilent();
+    void pingNeighbours();
+
 private:
-    constexpr static std::chrono::seconds LastSeenTimeout{60};
+    constexpr static std::chrono::seconds LastSeenTimeout{5};
 
     struct PeerInfo {
         cs::Version nodeVersion = 0;
         uint64_t uuid = 0;
         cs::Sequence lastSeq = 0;
+        cs::RoundNumber roundNumber = 0;
         bool connectionEstablished = false;
         std::chrono::time_point<std::chrono::steady_clock> lastSeen;
     };
-
-    Packet formRegPack();
 
     void sendRegistrationRequest(const cs::PublicKey& receiver);
     void sendRegistrationConfirmation(const cs::PublicKey& receiver);

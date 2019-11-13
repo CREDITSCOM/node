@@ -1,6 +1,7 @@
 #include <neighbourhood.hpp>
 
 #include <cscrypto/cscrypto.hpp>
+#include <csnode/conveyer.hpp>
 #include <csnode/datastream.hpp>
 #include <csnode/node.hpp>
 #include <transport.hpp>
@@ -71,9 +72,23 @@ void Neighbourhood::processNeighbourMessage(const cs::PublicKey& sender, const P
 }
 
 void Neighbourhood::newPeerDiscovered(const cs::PublicKey& peer) {
-    if (neighboursCount_ < MaxNeighbours) {
-        sendRegistrationRequest(peer);    
+    if (neighboursCount_ >= MaxNeighbours) {
+        return;
     }
+
+    {
+        std::lock_guard<std::mutex> g(neighbourMux_);
+        if (neighbours_.find(peer) != neighbours_.end()) {
+            return;
+        }
+
+        PeerInfo info;
+        info.lastSeen = std::chrono::steady_clock::now();
+        neighbours_[peer] = info;
+        ++neighboursCount_;
+    }
+
+    sendRegistrationRequest(peer);
 }
 
 void Neighbourhood::peerDisconnected(const cs::PublicKey& peer) {
@@ -89,14 +104,8 @@ void Neighbourhood::sendRegistrationRequest(const cs::PublicKey& receiver) {
                                       NetworkCommand::Registration,
                                       NODE_VERSION,
                                       uuid_,
-                                      node_->getBlockChain().getLastSeq()), receiver);
-
-    PeerInfo info;
-    info.lastSeen = std::chrono::steady_clock::now();
-
-    std::lock_guard<std::mutex> g(neighbourMux_);
-    neighbours_[receiver] = info;
-    ++neighboursCount_;
+                                      node_->getBlockChain().getLastSeq(),
+                                      cs::Conveyer::instance().currentRoundNumber()), receiver);
 }
 
 void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Packet& pack) {
@@ -121,7 +130,11 @@ void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Pa
     }
 
     stream >> info.lastSeq;
+    stream >> info.roundNumber;
     info.lastSeen = std::chrono::steady_clock::now();
+    info.connectionEstablished = true;
+
+    cslog() << "New peer added to neighbours " << EncodeBase58(sender.data(), sender.data() + sender.size());
     sendRegistrationConfirmation(sender);
 
     std::lock_guard<std::mutex> g(neighbourMux_);
@@ -132,7 +145,8 @@ void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Pa
 void Neighbourhood::sendRegistrationConfirmation(const cs::PublicKey& receiver) {
     transport_->sendDirect(formPacket(BaseFlags::NetworkMsg,
                                       NetworkCommand::RegistrationConfirmed,
-                                      node_->getBlockChain().getLastSeq()), receiver);
+                                      node_->getBlockChain().getLastSeq(),
+                                      cs::Conveyer::instance().currentRoundNumber()), receiver);
 }
 
 void Neighbourhood::gotRegistrationConfirmation(const cs::PublicKey& sender, const Packet& pack) {
@@ -152,14 +166,19 @@ void Neighbourhood::gotRegistrationConfirmation(const cs::PublicKey& sender, con
         }
 
         info.lastSeen = now;
+        if (info.connectionEstablished) {
+            return;
+        }
+
         cs::DataStream stream(pack.getMsgData(), pack.getMsgSize());
         stream >> info.lastSeq;
+        stream >> info.roundNumber;
         info.connectionEstablished = true;
+        cslog() << "New peer added to neighbours " << EncodeBase58(sender.data(), sender.data() + sender.size());
 
-        if (!info.nodeVersion) { // case we have not info about peer yet
+        if (!info.nodeVersion) { // case we have no info about peer yet
             info.nodeVersion = NODE_VERSION;
             info.uuid = uuid_;
-            sendRegistrationConfirmation(sender); // let him check timeout
         }
     }
 }
