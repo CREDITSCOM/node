@@ -451,6 +451,10 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::Pub
         }
     }
     else if (packet.signatures().size() > 2) {
+        if (packet.transactions().size() > Consensus::MaxContractResultTransactions) {
+            csdebug() << "NODE> Illegal number of transactions";
+            return false;
+        }
         return true;
     }
     else {
@@ -735,22 +739,6 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         csmeta(cserror) << ", real trusted mask size: " << realTrustedMaskSize << ", confidants count " << confidantsReference.size() << ", on round " << round;
         return;
     }
-
-    //for (size_t idx = 0; idx < realTrustedMaskSize; ++idx) {
-    //    const auto& key = confidantsReference[idx];
-
-    //    if (rPackage.poolMetaInfo().realTrustedMask[idx] == 0) {
-    //        poolMetaInfo.writerKey = key;
-    //    }
-    //}
-
-    //if (round != 0) {
-    //    auto confirmation = confirmationList_.find(round);
-    //    if (confirmation.has_value()) {
-    //        poolMetaInfo.confirmationMask = confirmation.value().mask;
-    //        poolMetaInfo.confirmations = confirmation.value().signatures;
-    //    }
-    //}
 
     if (!istream_.good()) {
         csmeta(cserror) << "Round info parsing failed, data is corrupted";
@@ -1218,7 +1206,7 @@ void Node::reviewConveyerHashes() {
 void Node::processSync() {
     const auto last_seq = blockChain_.getLastSeq();
     const auto round = cs::Conveyer::instance().currentRoundNumber();
-    if (stat_.lastRoundMs() > maxPingSynchroDelay_ && round < last_seq + cs::PoolSynchronizer::roundDifferentForSync) {
+    if (stat_.isCurrentRoundTooLong(120000) && round < last_seq + cs::PoolSynchronizer::roundDifferentForSync) {
         poolSynchronizer_->syncLastPool();
     }
     else {

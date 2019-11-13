@@ -47,6 +47,8 @@ namespace cs {
         constexpr int8_t InternalBug = -9; // -9
         // network error while call to executor
         constexpr int8_t ThriftException = -10;
+        // logic violation, execution result breaks the rules
+        constexpr int8_t LogicViolation = -11;
         // error in contract, value is hard-coded in ApiExec module
         constexpr int8_t ContractError = 1;
         // incompatible version
@@ -417,9 +419,15 @@ public:
         constexpr static uint32_t ReplenishNonPayable = 4;
         // unable call to payable() directly
         constexpr static uint32_t DirectCallToPayable = 8;
+        // incompatible deploy/execute info
+        constexpr static uint32_t BadInvoke = 16;
+        // unable call contract from other contract method
+        constexpr static uint32_t SubsequentCall = 32;
     };
 
     static std::string violations_message(uint32_t flags);
+
+    static bool prevalidate(const BlockChain& bc, const cs::TransactionsPacket& pack);
 
 public:
 
@@ -877,6 +885,7 @@ private:
     // request correct state in network
     void net_request_contract_state(const csdb::Address& abs_addr);
 
+    bool prevalidate_inner(const cs::TransactionsPacket& pack);
 };
 
 }  // namespace cs

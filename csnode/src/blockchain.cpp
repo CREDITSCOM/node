@@ -1056,10 +1056,9 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
 }
 
 bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
-    csdebug() << csfunc() << ":";
-
     const auto lastSequence = getLastSeq();
     const auto poolSequence = pool.sequence();
+    csdebug() << csfunc() << "last #" << lastSequence << ", pool #" << poolSequence;
 
     if (poolSequence <= lastSequence) {
         // ignore

@@ -47,7 +47,7 @@ public:
     constexpr static uint64_t MaxTimeStampDelta = 1000 * 60 * 3;
 
     /** @brief   Min duration (msec) to collect hashes in stage-1 of consensus */
-    constexpr static uint32_t T_min_stage1 = 170;
+    constexpr static uint32_t T_min_stage1 = 500;
 
     /** @brief   Number of rounds to prevent node from consensus participation */
     constexpr static uint32_t GrayListPunishment = 1000;
@@ -89,7 +89,10 @@ public:
     constexpr static size_t MaxStageOneTransactions = 1000;
 
     /** @brief   Max transaction's size to include in stage one data */
-    constexpr static size_t MaxPreliminaryBlockSize = 2000000;
+    constexpr static size_t MaxPreliminaryBlockSize = 1 * 1024 * 1024;
+
+    /** @brief   Max transactions count in smart contract execution result, both new state and emitted ones */
+    constexpr static size_t MaxContractResultTransactions = 100;
 
     /** @brief   Max transactions in the packet, the sender won't be accused for, if all them are invalid */
     constexpr static size_t AccusalPacketSize = 10;
