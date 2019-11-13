@@ -139,6 +139,12 @@ void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Pa
         return;
     }
 
+    std::lock_guard<std::mutex> g(neighbourMux_);
+    auto it = neighbours_.find(sender);
+    if (it != neighbours_.end() && it->second.connectionEstablished) {
+        return;
+    }
+
     cs::DataStream stream(pack.getMsgData(), pack.getMsgSize());
 
     PeerInfo info;
@@ -162,7 +168,6 @@ void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Pa
     sendRegistrationConfirmation(sender);
     transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, true);
 
-    std::lock_guard<std::mutex> g(neighbourMux_);
     neighbours_[sender] = info;
     ++neighboursCount_;
 }
