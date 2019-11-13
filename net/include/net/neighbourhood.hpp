@@ -31,7 +31,7 @@ public:
     void pingNeighbours();
 
 private:
-    constexpr static std::chrono::seconds LastSeenTimeout{5};
+    constexpr static std::chrono::seconds LastSeenTimeout{10};
 
     struct PeerInfo {
         cs::Version nodeVersion = 0;

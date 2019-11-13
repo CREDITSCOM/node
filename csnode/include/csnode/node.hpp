@@ -85,6 +85,9 @@ public:
     void getTransactionsPacket(const uint8_t* data, const std::size_t size);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
 
+    void neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
+    void neighbourRemoved(const cs::PublicKey& neigbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
+
     // critical is true if network near to be down, all capable trusted node required
     bool canBeTrusted(bool critical);
 

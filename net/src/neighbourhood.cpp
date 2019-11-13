@@ -107,6 +107,7 @@ void Neighbourhood::removeSilent() {
     for (auto it = neighbours_.begin(); it != neighbours_.end();) {
         if (duration_cast<seconds>(now - it->second.lastSeen) > LastSeenTimeout) {
             sendRegistrationRefusal(it->first, RegistrationRefuseReasons::Timeout);
+            transport_->onNeighboursChanged(it->first, it->second.lastSeq, it->second.roundNumber, false);
             it = neighbours_.erase(it);
             --neighboursCount_;
         }
@@ -159,6 +160,7 @@ void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Pa
     info.connectionEstablished = true;
 
     sendRegistrationConfirmation(sender);
+    transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, true);
 
     std::lock_guard<std::mutex> g(neighbourMux_);
     neighbours_[sender] = info;
@@ -183,6 +185,10 @@ void Neighbourhood::gotRegistrationConfirmation(const cs::PublicKey& sender, con
         // check timeout
         if (std::chrono::duration_cast<std::chrono::seconds>(now - info.lastSeen) > LastSeenTimeout) {
             sendRegistrationRefusal(sender, RegistrationRefuseReasons::Timeout);
+            if (info.connectionEstablished) {
+                transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, false);
+            }
+
             neighbours_.erase(neighbour);
             --neighboursCount_;
             return;
@@ -197,6 +203,7 @@ void Neighbourhood::gotRegistrationConfirmation(const cs::PublicKey& sender, con
         stream >> info.lastSeq;
         stream >> info.roundNumber;
         info.connectionEstablished = true;
+        transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, true);
 
         if (!info.nodeVersion) { // case we have no info about peer yet
             info.nodeVersion = NODE_VERSION;
@@ -239,6 +246,9 @@ void Neighbourhood::gotPing(const cs::PublicKey& sender, const Packet& pack) {
         PeerInfo& info = neighbour->second;
         if (std::chrono::duration_cast<std::chrono::seconds>(now - info.lastSeen) > LastSeenTimeout) {
             sendRegistrationRefusal(sender, RegistrationRefuseReasons::Timeout);
+            if (info.connectionEstablished) {
+                transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, false);
+            }
             neighbours_.erase(neighbour);
             --neighboursCount_;
             return;

@@ -113,6 +113,7 @@ Transport::Transport(const Config& config, Node* node)
 void Transport::run() {
     host_.Run();
     processorThread_ = std::thread(&Transport::processorRoutine, this);
+    std::this_thread::sleep_for(std::chrono::seconds{10});
 
     while (Transport::gSignalStatus == 0) {
         pollSignalFlag();
@@ -149,6 +150,12 @@ void Transport::OnNodeRemoved(const net::NodeId& id) {
     neighbourhood_.peerDisconnected(toPublicKey(id));
 }
 
+void Transport::onNeighboursChanged(const cs::PublicKey& neighbour, cs::Sequence lastSeq,
+                                   cs::RoundNumber lastRound, bool added) {
+    std::lock_guard<std::mutex> g(neighboursMux_);
+    neighboursToHandle_.emplace_back(neighbour, lastSeq, lastRound, added);
+}
+
 void Transport::sendDirect(Packet&& pack, const cs::PublicKey& receiver) {
     host_.SendDirect(toNodeId(receiver), pack.moveData());
 }
@@ -167,8 +174,12 @@ void Transport::sendBroadcast(Packet&& pack) {
 void Transport::processorRoutine() {
     while (true) {
         CallsQueue::instance().callAll();
+
         std::unique_lock lk(inboxMux_);
-        newPacketsReceived_.wait(lk, [this]() { return !inboxQueue_.empty(); });
+        newPacketsReceived_.wait_for(lk, std::chrono::seconds{1},
+                                    [this]() { return !inboxQueue_.empty(); });
+        CallsQueue::instance().callAll();
+        checkNeighboursChange();
 
         while (!inboxQueue_.empty()) {
             Packet pack(std::move(inboxQueue_.front().second));
@@ -184,6 +195,20 @@ void Transport::processorRoutine() {
                 }
             }
         }
+    }
+}
+
+void Transport::checkNeighboursChange() {
+    std::lock_guard<std::mutex> g(neighboursMux_);
+    while (!neighboursToHandle_.empty()) {
+        auto& neighbour = neighboursToHandle_.front();
+        if (neighbour.added) {
+            node_->neighbourAdded(neighbour.key, neighbour.lastSeq, neighbour.lastRound);
+        }
+        else {
+            node_->neighbourRemoved(neighbour.key, neighbour.lastSeq, neighbour.lastRound);
+        }
+        neighboursToHandle_.pop_front();
     }
 }
 

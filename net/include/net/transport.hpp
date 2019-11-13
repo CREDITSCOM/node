@@ -64,6 +64,11 @@ public:
     void OnNodeDiscovered(const net::NodeId&) override;
     void OnNodeRemoved(const net::NodeId&) override;
 
+    // from neigbours
+    // @param added - true if new neighbour adder, false if removed
+    void onNeighboursChanged(const cs::PublicKey&, cs::Sequence lastSeq,
+                            cs::RoundNumber lastRound, bool added);
+
 public signals:
     PingSignal pingReceived;
     cs::Action mainThreadIterated;
@@ -100,6 +105,8 @@ private:
                              const cs::RoundNumber, const uint8_t* data, size_t);
     void processorRoutine();
 
+    void checkNeighboursChange();
+
     bool good_ = false;
     net::Config config_;
 
@@ -114,6 +121,19 @@ private:
 
     Neighbourhood neighbourhood_;
     std::thread processorThread_;
+
+    struct NeighbourData {
+        const cs::PublicKey key;
+        cs::Sequence lastSeq;
+        cs::RoundNumber lastRound;
+        bool added; // true if should be added, false if should be removed
+
+        NeighbourData(const cs::PublicKey& key, cs::Sequence s, cs::RoundNumber r, bool a)
+            : key(key), lastSeq(s), lastRound(r), added(a) {}
+    };
+
+    std::mutex neighboursMux_;
+    std::list<NeighbourData> neighboursToHandle_;
 
     net::Host host_;
 };

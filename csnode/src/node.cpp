@@ -218,6 +218,16 @@ void Node::initCurrentRP() {
     roundPackageCache_.push_back(rp);
 }
 
+void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
+    cslog() << "NODE: new neigbour added " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
+            << " last seq " << lastSeq << " last round " << lastRound;
+}
+
+void Node::neighbourRemoved(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
+    cslog() << "NODE: neigbour removed " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
+            << " last seq " << lastSeq << " last round " << lastRound;
+}
+
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
     auto& conveyer = cs::Conveyer::instance();
 
