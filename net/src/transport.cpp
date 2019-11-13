@@ -116,8 +116,12 @@ void Transport::run() {
 
     while (Transport::gSignalStatus == 0) {
         pollSignalFlag();
+
+        neighbourhood_.removeSilent();
+        neighbourhood_.pingNeighbours();
+
         emit mainThreadIterated();
-        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        std::this_thread::sleep_for(Neighbourhood::kPingInterval);
     }
 }
 

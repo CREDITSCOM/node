@@ -99,6 +99,30 @@ void Neighbourhood::peerDisconnected(const cs::PublicKey& peer) {
     }
 }
 
+void Neighbourhood::removeSilent() {
+    using namespace std::chrono;
+    auto now = steady_clock::now();
+
+    std::lock_guard<std::mutex> g(neighbourMux_);
+    for (auto it = neighbours_.begin(); it != neighbours_.end();) {
+        if (duration_cast<seconds>(now - it->second.lastSeen) > LastSeenTimeout) {
+            sendRegistrationRefusal(it->first, RegistrationRefuseReasons::Timeout);
+            it = neighbours_.erase(it);
+            --neighboursCount_;
+        }
+        else {
+            ++it;
+        }
+    }
+}
+
+void Neighbourhood::pingNeighbours() {
+    std::lock_guard<std::mutex> g(neighbourMux_);
+    for (auto& n : neighbours_) {
+        sendPingPack(n.first);
+    }
+}
+
 void Neighbourhood::sendRegistrationRequest(const cs::PublicKey& receiver) {
     transport_->sendDirect(formPacket(BaseFlags::NetworkMsg,
                                       NetworkCommand::Registration,
@@ -134,7 +158,6 @@ void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Pa
     info.lastSeen = std::chrono::steady_clock::now();
     info.connectionEstablished = true;
 
-    cslog() << "New peer added to neighbours " << EncodeBase58(sender.data(), sender.data() + sender.size());
     sendRegistrationConfirmation(sender);
 
     std::lock_guard<std::mutex> g(neighbourMux_);
@@ -174,7 +197,6 @@ void Neighbourhood::gotRegistrationConfirmation(const cs::PublicKey& sender, con
         stream >> info.lastSeq;
         stream >> info.roundNumber;
         info.connectionEstablished = true;
-        cslog() << "New peer added to neighbours " << EncodeBase58(sender.data(), sender.data() + sender.size());
 
         if (!info.nodeVersion) { // case we have no info about peer yet
             info.nodeVersion = NODE_VERSION;
@@ -205,7 +227,8 @@ void Neighbourhood::gotRegistrationRefusal(const cs::PublicKey& sender, const Pa
 void Neighbourhood::sendPingPack(const cs::PublicKey& receiver) {
     transport_->sendDirect(formPacket(BaseFlags::NetworkMsg,
                                       NetworkCommand::Ping,
-                                      node_->getBlockChain().getLastSeq()), receiver);
+                                      node_->getBlockChain().getLastSeq(),
+                                      cs::Conveyer::instance().currentRoundNumber()), receiver);
 }
 
 void Neighbourhood::gotPing(const cs::PublicKey& sender, const Packet& pack) {
@@ -224,5 +247,6 @@ void Neighbourhood::gotPing(const cs::PublicKey& sender, const Packet& pack) {
         info.lastSeen = now;
         cs::DataStream stream(pack.getMsgData(), pack.getMsgSize());
         stream >> info.lastSeq;
+        stream >> info.roundNumber;
     }
 }
