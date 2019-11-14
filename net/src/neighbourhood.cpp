@@ -266,3 +266,31 @@ void Neighbourhood::gotPing(const cs::PublicKey& sender, const Packet& pack) {
         stream >> info.roundNumber;
     }
 }
+
+void Neighbourhood::forEachNeighbour(std::function<bool(const cs::PublicKey&)> f) {
+    std::lock_guard<std::mutex> g(neighbourMux_);
+    for (auto& n : neighbours_) {
+        if (!f(n.first)) {
+            break;
+        }
+    }
+}
+
+uint32_t Neighbourhood::getNeighboursCount() const {
+    std::lock_guard<std::mutex> g(neighbourMux_);
+    return neighbours_.size();
+}
+
+bool Neighbourhood::contains(const cs::PublicKey& neighbour) const {
+    std::lock_guard<std::mutex> g(neighbourMux_);
+    return neighbours_.find(neighbour) != neighbours_.end();
+}
+
+cs::Sequence Neighbourhood::getNeighbourLastSequence(const cs::PublicKey& neighbour) const {
+    std::lock_guard<std::mutex> g(neighbourMux_);
+    auto it = neighbours_.find(neighbour);
+    if (it == neighbours_.end()) {
+        return cs::kWrongSequence;
+    }
+    return it->second.lastSeq;
+}

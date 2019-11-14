@@ -21,9 +21,6 @@
 
 inline volatile std::sig_atomic_t gSignalStatus = 0;
 
-using ConnectionId = uint64_t;
-using Tick = uint64_t;
-
 using PingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
 class Node;
@@ -50,11 +47,11 @@ public:
     void revertBan(const cs::PublicKey&) {}
 
     // neighbours interface
-    uint32_t getNeighboursCount();
+    uint32_t getNeighboursCount() const;
     uint32_t getMaxNeighbours() const;
-    void forEachNeighbour(std::function<bool(const cs::PublicKey&)>) {}
-    bool hasNeighbour(const cs::PublicKey&) { return false; }
-    cs::Sequence getNeighbourLastSequence(const cs::PublicKey&) { return 0; }
+    void forEachNeighbour(std::function<bool(const cs::PublicKey&)>);
+    bool hasNeighbour(const cs::PublicKey&) const;
+    cs::Sequence getNeighbourLastSequence(const cs::PublicKey&) const;
 
     // @TODO remove, used in Node
     void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}

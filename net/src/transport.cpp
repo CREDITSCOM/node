@@ -352,8 +352,16 @@ void Transport::processPostponed(const cs::RoundNumber /* rNum */) {
 */
 }
 
-uint32_t Transport::getNeighboursCount() {
-    return 0;
+void Transport::forEachNeighbour(std::function<bool(const cs::PublicKey&)> f) {
+    neighbourhood_.forEachNeighbour(f);
+}
+
+uint32_t Transport::getNeighboursCount() const {
+    return neighbourhood_.getNeighboursCount();
+}
+
+bool Transport::hasNeighbour(const cs::PublicKey& neighbour) const {
+    return neighbourhood_.contains(neighbour);
 }
 
 uint32_t Transport::getMaxNeighbours() const {
@@ -363,4 +371,8 @@ uint32_t Transport::getMaxNeighbours() const {
 
 void Transport::onConfigChanged(const Config& /* updated */) {
 //    config_.exchange(updated);
+}
+
+cs::Sequence Transport::getNeighbourLastSequence(const cs::PublicKey& neighbour) const {
+    return neighbourhood_.getNeighbourLastSequence(neighbour);
 }

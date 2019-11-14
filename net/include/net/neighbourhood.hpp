@@ -3,6 +3,7 @@
 #define NEIGHBOURHOOD_HPP
 
 #include <chrono>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <set>
@@ -30,6 +31,11 @@ public:
     void removeSilent();
     void pingNeighbours();
 
+    void forEachNeighbour(std::function<bool(const cs::PublicKey&)>);
+    uint32_t getNeighboursCount() const;
+    bool contains(const cs::PublicKey& neighbour) const;
+    cs::Sequence getNeighbourLastSequence(const cs::PublicKey& neighbour) const;
+
 private:
     constexpr static std::chrono::seconds LastSeenTimeout{10};
 
@@ -55,7 +61,7 @@ private:
     Transport* transport_;
     Node* node_;
 
-    std::mutex neighbourMux_;
+    mutable std::mutex neighbourMux_;
     std::map<cs::PublicKey, PeerInfo> neighbours_;
 
     const uint64_t uuid_;
