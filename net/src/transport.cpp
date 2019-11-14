@@ -1644,9 +1644,7 @@ void Transport::storeAddress(const cs::PublicKey& key, const EndpointData& ep) {
     auto value = std::make_pair(key, ep);
     auto res = addresses_.insert(value);
     if (!res.second && res.first->second != ep) {
-        auto hint = res.first;
-        --hint;
-        addresses_.erase(res.first);
+        auto hint = addresses_.erase(res.first);
         addresses_.insert(hint, value);
     }
 }
