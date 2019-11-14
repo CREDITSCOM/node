@@ -302,6 +302,7 @@ public slots:
     void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
     void validateBlock(csdb::Pool block, bool* shouldStop);
+    void deepBlockValidation(csdb::Pool block, bool* shouldStop);
     void onRoundTimeElapsed();
 
 private:

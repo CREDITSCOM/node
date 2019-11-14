@@ -74,6 +74,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
+    cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
 
     setupNextMessageBehaviour();
 
@@ -3365,6 +3366,20 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
             /*| cs::BlockValidator::ValidationLevel::smartStates*/
             /*| cs::BlockValidator::ValidationLevel::accountBalance*/,
         cs::BlockValidator::SeverityLevel::onlyFatalErrors)) {
+        *shouldStop = true;
+        return;
+    }
+}
+
+void Node::deepBlockValidation(csdb::Pool block, bool* shouldStop) {
+    if (!blockValidator_->validateBlock(block,
+        cs::BlockValidator::ValidationLevel::hashIntergrity
+        | cs::BlockValidator::ValidationLevel::blockSignatures
+        | cs::BlockValidator::ValidationLevel::smartSignatures
+        | cs::BlockValidator::ValidationLevel::balances
+        /*| cs::BlockValidator::ValidationLevel::smartStates*/
+        /*| cs::BlockValidator::ValidationLevel::accountBalance*/,
+        cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
         *shouldStop = true;
         return;
     }
