@@ -103,6 +103,11 @@ Node::~Node() {
 }
 
 bool Node::init(const Config& config) {
+    if (!fillBootstrapKeys(config)) {
+        cserror() << "Can't fill bootstrap keys";
+        return false;
+    }
+
 #ifdef NODE_API
     std::cout << "Init API... ";
 
@@ -160,6 +165,25 @@ bool Node::init(const Config& config) {
     return true;
 }
 
+bool Node::fillBootstrapKeys(const Config& config) {
+    auto& list = config.getIpList();
+    if (list.size() == 0) {
+        return false;
+    }
+
+    std::vector<uint8_t> buf;
+    for (auto& item : list) {
+        if (!DecodeBase58(item.id, buf)) {
+            return false;
+        }
+
+        cs::PublicKey key;
+        std::copy(buf.begin(), buf.end(), key.begin());
+        bootstrapKeys_.push_back(key);
+    }
+    return true;
+}
+
 void Node::setupObserver() {
     // connect config observer to entities
     cs::Connector::connect(&observer_.configChanged, &cs::Conveyer::instance(), &cs::Conveyer::onConfigChanged);
@@ -206,7 +230,7 @@ void Node::initCurrentRP() {
     cs::RoundPackage rp;
     if (getBlockChain().getLastSeq() == 0) {
         cs::RoundTable rt;
-        rt.round = 0;
+        rt.round = 1;
         cs::PublicKey pKey = solver_->getPublicKey();
         for (auto& it : bootstrapKeys_){
             rt.confidants.push_back(it);
@@ -232,7 +256,7 @@ void Node::initCurrentRP() {
 }
 
 void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
-    cslog() << "NODE: new neigbour added " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
+    cslog() << "NODE: new neighbour added " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
             << " last seq " << lastSeq << " last round " << lastRound;
     auto& conveyer = cs::Conveyer::instance();
     
@@ -247,7 +271,7 @@ void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, 
             }
             size_t cnt = 0;
             for (auto& it : initialConfidants_) {
-                if (it.second) {
+                if (!it.second) {
                     break;
                 }
                 else {
@@ -256,6 +280,9 @@ void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, 
             }
             if (cnt == initialConfidants_.size()) {
                 if (!roundPackageCache_.empty()) {
+                    cs::Conveyer::instance().setRound(roundPackageCache_.back().roundTable().round);
+                    cs::Conveyer::instance().setTable(roundPackageCache_.back().roundTable());
+
                     onRoundStart(roundPackageCache_.back().roundTable(), false);
                     reviewConveyerHashes();                
                 }
@@ -271,7 +298,7 @@ void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, 
 }
 
 void Node::neighbourRemoved(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
-    cslog() << "NODE: neigbour removed " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
+    cslog() << "NODE: neighbour removed " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
             << " last seq " << lastSeq << " last round " << lastRound;
 }
 

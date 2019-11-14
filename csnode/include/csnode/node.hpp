@@ -311,6 +311,7 @@ private:
     void processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
     void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
     void processTransactionsPacket(cs::TransactionsPacket&& packet);
+    bool fillBootstrapKeys(const Config& config);
 
     /// sending interace methods
 
