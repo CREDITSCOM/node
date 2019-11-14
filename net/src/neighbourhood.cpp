@@ -72,12 +72,12 @@ void Neighbourhood::processNeighbourMessage(const cs::PublicKey& sender, const P
 }
 
 void Neighbourhood::newPeerDiscovered(const cs::PublicKey& peer) {
-    if (neighboursCount_ >= MaxNeighbours) {
-        return;
-    }
-
     {
         std::lock_guard<std::mutex> g(neighbourMux_);
+        if (neighbours_.size() >= MaxNeighbours) {
+            return;
+        }
+
         if (neighbours_.find(peer) != neighbours_.end()) {
             return;
         }
@@ -85,7 +85,6 @@ void Neighbourhood::newPeerDiscovered(const cs::PublicKey& peer) {
         PeerInfo info;
         info.lastSeen = std::chrono::steady_clock::now();
         neighbours_[peer] = info;
-        ++neighboursCount_;
     }
 
     sendRegistrationRequest(peer);
@@ -95,7 +94,6 @@ void Neighbourhood::peerDisconnected(const cs::PublicKey& peer) {
     std::lock_guard<std::mutex> g(neighbourMux_);
     if (neighbours_.find(peer) != neighbours_.end()) {
         neighbours_.erase(peer);
-        --neighboursCount_;
     }
 }
 
@@ -107,9 +105,10 @@ void Neighbourhood::removeSilent() {
     for (auto it = neighbours_.begin(); it != neighbours_.end();) {
         if (duration_cast<seconds>(now - it->second.lastSeen) > LastSeenTimeout) {
             sendRegistrationRefusal(it->first, RegistrationRefuseReasons::Timeout);
-            transport_->onNeighboursChanged(it->first, it->second.lastSeq, it->second.roundNumber, false);
+            if (it->second.connectionEstablished) {
+                transport_->onNeighboursChanged(it->first, it->second.lastSeq, it->second.roundNumber, false);
+            }
             it = neighbours_.erase(it);
-            --neighboursCount_;
         }
         else {
             ++it;
@@ -134,12 +133,12 @@ void Neighbourhood::sendRegistrationRequest(const cs::PublicKey& receiver) {
 }
 
 void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Packet& pack) {
-    if (neighboursCount_ >= MaxNeighbours) {
+    std::lock_guard<std::mutex> g(neighbourMux_);
+    if (neighbours_.size() >= MaxNeighbours) {
         sendRegistrationRefusal(sender, RegistrationRefuseReasons::LimitReached);
         return;
     }
 
-    std::lock_guard<std::mutex> g(neighbourMux_);
     auto it = neighbours_.find(sender);
     if (it != neighbours_.end() && it->second.connectionEstablished) {
         return;
@@ -169,7 +168,6 @@ void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Pa
     transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, true);
 
     neighbours_[sender] = info;
-    ++neighboursCount_;
 }
 
 void Neighbourhood::sendRegistrationConfirmation(const cs::PublicKey& receiver) {
@@ -195,7 +193,6 @@ void Neighbourhood::gotRegistrationConfirmation(const cs::PublicKey& sender, con
             }
 
             neighbours_.erase(neighbour);
-            --neighboursCount_;
             return;
         }
 
@@ -232,8 +229,13 @@ void Neighbourhood::gotRegistrationRefusal(const cs::PublicKey& sender, const Pa
             << " refused: " << parseRefusalReason(reason);
 
     std::lock_guard<std::mutex> g(neighbourMux_);
-    neighbours_.erase(sender);
-    --neighboursCount_;
+    auto it = neighbours_.find(sender);
+    if (it != neighbours_.end()) {
+        if (it->second.connectionEstablished) {
+            transport_->onNeighboursChanged(sender, it->second.lastSeq, it->second.roundNumber, false);
+        }
+        neighbours_.erase(it);
+    }
 }
 
 void Neighbourhood::sendPingPack(const cs::PublicKey& receiver) {
@@ -255,7 +257,6 @@ void Neighbourhood::gotPing(const cs::PublicKey& sender, const Packet& pack) {
                 transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, false);
             }
             neighbours_.erase(neighbour);
-            --neighboursCount_;
             return;
         }
 

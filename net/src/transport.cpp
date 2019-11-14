@@ -151,7 +151,7 @@ void Transport::OnNodeRemoved(const net::NodeId& id) {
 }
 
 void Transport::onNeighboursChanged(const cs::PublicKey& neighbour, cs::Sequence lastSeq,
-                                   cs::RoundNumber lastRound, bool added) {
+                                    cs::RoundNumber lastRound, bool added) {
     std::lock_guard<std::mutex> g(neighboursMux_);
     neighboursToHandle_.emplace_back(neighbour, lastSeq, lastRound, added);
 }

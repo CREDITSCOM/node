@@ -57,8 +57,7 @@ private:
 
     std::mutex neighbourMux_;
     std::map<cs::PublicKey, PeerInfo> neighbours_;
-    std::atomic<size_t> neighboursCount_ = 0;
 
-    uint64_t uuid_;
+    const uint64_t uuid_;
 };
 #endif  // NEIGHBOURHOOD_HPP
