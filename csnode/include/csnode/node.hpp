@@ -449,6 +449,9 @@ private:
     cs::config::Observer& observer_;
     cs::Compressor compressor_;
     long long deltaTimeSS{};
+
+    std::vector<cs::PublicKey> bootstrapKeys_;
+    std::map<cs::PublicKey,bool> initialConfidants_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

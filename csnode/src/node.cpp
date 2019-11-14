@@ -207,6 +207,13 @@ void Node::initCurrentRP() {
     if (getBlockChain().getLastSeq() == 0) {
         cs::RoundTable rt;
         rt.round = 0;
+        for (auto& it : bootstrapKeys_){
+            rt.confidants.push_back(it);
+            initialConfidants_.emplace(it, false);
+            if (rt.confidants.size() > Consensus::MinTrustedNodes) {
+                break;
+            }
+        }
         rp.updateRoundTable(rt);
     }
     else {
@@ -221,6 +228,38 @@ void Node::initCurrentRP() {
 void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
     cslog() << "NODE: new neigbour added " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
             << " last seq " << lastSeq << " last round " << lastRound;
+    auto& conveyer = cs::Conveyer::instance();
+    
+    if (conveyer.currentRoundNumber() == 0) {
+        if (lastRound == 0) {
+            cs::PublicKey pKey = solver_->getPublicKey();
+
+            if (initialConfidants_.find(pKey) != initialConfidants_.cend() && !initialConfidants_.at(neighbour)) {
+                initialConfidants_.at(neighbour) = true;
+            }
+            size_t cnt = 0;
+            for (auto& it : initialConfidants_) {
+                if (it.second) {
+                    break;
+                }
+                else {
+                    ++cnt;
+                }
+            }
+            if (cnt == initialConfidants_.size()) {
+                if (!roundPackageCache_.empty()) {
+                    onRoundStart(roundPackageCache_.back().roundTable(), false);
+                    reviewConveyerHashes();                
+                }
+
+            }
+            return;
+        }
+    }
+    if (lastRound > conveyer.currentRoundNumber()) {
+        roundPackRequest(neighbour, lastRound);
+    }
+
 }
 
 void Node::neighbourRemoved(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
@@ -2595,7 +2634,10 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
 
     if (rp.roundTable().round >= rNum) {
         if(!rp.roundSignatures().empty()) {
-            ++roundPackRequests_;
+            if (std::find(rp.roundTable().confidants.cbegin(), rp.roundTable().confidants.cend(), sender)!= rp.roundTable().confidants.cend()) {
+                ++roundPackRequests_;
+            }
+
             if (roundPackRequests_ > rp.roundTable().confidants.size() / 2 && roundPackRequests_ <= rp.roundTable().confidants.size() / 2 + 1) {
                 sendRoundPackageToAll(rp);
             }
