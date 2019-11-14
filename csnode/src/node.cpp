@@ -207,9 +207,15 @@ void Node::initCurrentRP() {
     if (getBlockChain().getLastSeq() == 0) {
         cs::RoundTable rt;
         rt.round = 0;
+        cs::PublicKey pKey = solver_->getPublicKey();
         for (auto& it : bootstrapKeys_){
             rt.confidants.push_back(it);
-            initialConfidants_.emplace(it, false);
+            if (it == pKey) {
+                initialConfidants_.emplace(it, true);
+            }
+            else {
+                initialConfidants_.emplace(it, false);
+            }
             if (rt.confidants.size() > Consensus::MinTrustedNodes) {
                 break;
             }
@@ -234,8 +240,10 @@ void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, 
         if (lastRound == 0) {
             cs::PublicKey pKey = solver_->getPublicKey();
 
-            if (initialConfidants_.find(pKey) != initialConfidants_.cend() && !initialConfidants_.at(neighbour)) {
-                initialConfidants_.at(neighbour) = true;
+            if (initialConfidants_.find(pKey) != initialConfidants_.cend()) {
+                if (initialConfidants_.find(neighbour) != initialConfidants_.cend() && !initialConfidants_.at(neighbour)) {
+                    initialConfidants_.at(neighbour) = true;
+                }
             }
             size_t cnt = 0;
             for (auto& it : initialConfidants_) {
