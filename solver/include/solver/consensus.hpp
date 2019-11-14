@@ -89,7 +89,7 @@ public:
     constexpr static size_t MaxStageOneTransactions = 1000;
 
     /** @brief   Max transaction's size to include in stage one data */
-    constexpr static size_t MaxPreliminaryBlockSize = 2000000;
+    constexpr static size_t MaxPreliminaryBlockSize = 1 * 1024 * 1024;
 
     /** @brief   Max transactions count in smart contract execution result, both new state and emitted ones */
     constexpr static size_t MaxContractResultTransactions = 100;

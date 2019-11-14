@@ -256,7 +256,7 @@ ValidationPlugin::ErrorType SmartSourceSignaturesValidator::validateBlock(const 
   }
 
   bool switchCountedFees = block.version() == kBlockVerToSwitchCountedFees;
-  auto smartPacks = grepNewStatesPacks(transactions, switchCountedFees);
+  auto smartPacks = SmartContracts::grepNewStatesPacks(transactions, getBlockChain(), switchCountedFees);
 
   if (!checkSignatures(smartSignatures, smartPacks)) {
     return ErrorType::error;
@@ -313,39 +313,6 @@ inline bool SmartSourceSignaturesValidator::containsNewState(const Transactions&
   return false;
 }
 
-Packets SmartSourceSignaturesValidator::grepNewStatesPacks(const Transactions& trxs, bool switchFees) {
-  Packets res;
-  for (size_t i = 0; i < trxs.size(); ++i) {
-    if (SmartContracts::is_new_state(trxs[i])) {
-      cs::TransactionsPacket pack;
-      pack.addTransaction(switchFees ? switchCountedFee(trxs[i]) : trxs[i]);
-      std::for_each(trxs.begin() + i + 1, trxs.end(),
-          [&] (const csdb::Transaction& t) {
-            if (t.source() == trxs[i].source()) {
-              pack.addTransaction(switchFees ? switchCountedFee(t) : t);
-            }
-          });
-      pack.makeHash();
-      res.push_back(pack);
-    }
-  }
-  return res;
-}
-
-csdb::Transaction SmartSourceSignaturesValidator::switchCountedFee(const csdb::Transaction& t) {
-  csdb::Transaction initTrx = cs::SmartContracts::get_transaction(getBlockChain(), t);
-  if (!initTrx.is_valid()) {
-    cserror() << kLogPrefix << " no init transaction for smart state transaction in blockchain";
-    return t;
-  }
-  csdb::Transaction res(t.innerID(), t.source(), t.target(), t.currency(), t.amount(), t.max_fee(),
-                        initTrx.counted_fee(), t.signature());
-  auto ufIds = t.user_field_ids();
-  for (const auto& id : ufIds) {
-    res.add_user_field(id, t.user_field(id));
-  }
-  return res;
-}
 
 ValidationPlugin::ErrorType BalanceChecker::validateBlock(const csdb::Pool&) {
   const auto& prevBlock = getPrevBlock();

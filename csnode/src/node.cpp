@@ -2962,7 +2962,9 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
 
     if (rp.roundTable().round >= rNum) {
         if(!rp.roundSignatures().empty()) {
-            ++roundPackRequests_;
+            if (std::find(rp.roundTable().confidants.cbegin(), rp.roundTable().confidants.cend(), sender) != rp.roundTable().confidants.cend()) {
+                ++roundPackRequests_;
+            }
             if (roundPackRequests_ > rp.roundTable().confidants.size() / 2 && roundPackRequests_ <= rp.roundTable().confidants.size() / 2 + 1) {
                 sendRoundPackageToAll(rp);
             }

@@ -8,6 +8,7 @@
 #include <lib/system/concurrent.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
+#include <csnode/transactionspacket.hpp>
 
 #include <csnode/node.hpp>  // introduce csconnector::connector::ApiExecHandlerPtr at least
 
@@ -47,6 +48,8 @@ namespace cs {
         constexpr int8_t InternalBug = -9; // -9
         // network error while call to executor
         constexpr int8_t ThriftException = -10;
+        // logic violation, execution result breaks the rules
+        constexpr int8_t LogicViolation = -11;
         // error in contract, value is hard-coded in ApiExec module
         constexpr int8_t ContractError = 1;
         // incompatible version
@@ -347,6 +350,9 @@ public:
 
     static std::string to_base58(const BlockChain& storage, const csdb::Address& addr);
 
+    static std::vector<cs::TransactionsPacket> grepNewStatesPacks(const std::vector<csdb::Transaction>& trxs, const BlockChain& bc, bool switchFees = false);
+    static csdb::Transaction switchCountedFee(const csdb::Transaction& t, const BlockChain& bc);
+
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
@@ -417,6 +423,10 @@ public:
         constexpr static uint32_t ReplenishNonPayable = 4;
         // unable call to payable() directly
         constexpr static uint32_t DirectCallToPayable = 8;
+        // incompatible deploy/execute info
+        constexpr static uint32_t BadInvoke = 16;
+        // unable call contract from other contract method
+        constexpr static uint32_t SubsequentCall = 32;
     };
 
     static std::string violations_message(uint32_t flags);
@@ -879,6 +889,7 @@ private:
     // request correct state in network
     void net_request_contract_state(const csdb::Address& abs_addr);
 
+    bool prevalidate_inner(const cs::TransactionsPacket& pack);
 };
 
 }  // namespace cs

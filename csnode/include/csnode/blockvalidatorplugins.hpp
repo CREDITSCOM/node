@@ -104,12 +104,12 @@ public:
 
 private:
     bool containsNewState(const Transactions&);
-    Packets grepNewStatesPacks(const Transactions&, bool switchFees);
+    //Packets grepNewStatesPacks(const Transactions&, bool switchFees); moved to static in SmartContracts
     bool checkSignatures(const SmartSignatures&, const Packets&);
 
     // must be performed if block version is 0
     // to pass validation
-    csdb::Transaction switchCountedFee(const csdb::Transaction& newState);
+   // csdb::Transaction switchCountedFee(const csdb::Transaction& newState);
 };
 
 ///
