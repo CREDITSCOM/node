@@ -37,6 +37,7 @@
 #include <lib/system/process.hpp>
 
 #include "tokens.hpp"
+#include "dumbcv.hpp"
 #include "executormanager.hpp"
 
 #include <tuple>
@@ -748,49 +749,7 @@ private:
     ::csstats::AllStats stats_;
 #endif // 0
     executor::Executor& executor_;
-
-    // for answer dumb transactions        
-    class DUMBCV {
-    public:
-        bool addCVInfo(const cs::Signature& signature) {
-            std::lock_guard<std::mutex> lk(dumbMutex);
-            if (const auto& it = mCvInfo_.find(signature); it != mCvInfo_.end())
-                return false;
-            mCvInfo_[signature];
-            return true;
-        }
-
-        void sendCvSignal(const cs::Signature& signature) {
-            std::lock_guard<std::mutex> lk(dumbMutex);
-            if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
-                auto&[cv, condFlg] = it->second;
-                cv.notify_one();
-                condFlg = true;
-            }
-        }
-
-        bool waitCvSignal(const cs::Signature& signature) {
-            bool isTimeOver = false;
-            std::unique_lock lock(dumbMutex);
-            if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
-                isTimeOver = it->second.cv_.wait_for(lock, std::chrono::seconds(30), [it]() -> bool {
-                    return it->second.condFlg_;
-                });
-
-                mCvInfo_.erase(signature);
-            }
-
-            return isTimeOver;
-        }
-    private:
-        struct CVInfo {
-            std::condition_variable cv_;
-            std::atomic_bool condFlg_{ false };
-        };
-        std::map<cs::Signature, CVInfo> mCvInfo_;
-        std::mutex dumbMutex;
-    } dumbCv_;
-    //
+    cs::DumbCv dumbCv_;
 
     bool isBDLoaded_{ false };
 
@@ -814,9 +773,9 @@ private:
         bool condFlg{false};
     };
 
-    using client_type           = executor::ContractExecutorConcurrentClient;
-    using smartHashStateEntry   = cs::WorkerQueue<HashState>;
-   
+    using client_type = executor::ContractExecutorConcurrentClient;
+    using smartHashStateEntry = cs::WorkerQueue<HashState>;
+
     BlockChain& blockchain_;
     cs::SolverCore& solver_;
 #ifdef USE_DEPRECATED_STATS // MONITOR_NODE
