@@ -102,13 +102,13 @@ struct EventsReportData {
     // report filters, only actual if on is true
     
     // report every liar in consensus
-    bool consensus_liar = true;
+    bool consensus_liar = false;
     // report every silent trusted node in consensus
     bool consensus_silent = false;
     // report consensus is not achieved
     bool consensus_failed = true;
     // report every liar in smart contracts consensus
-    bool contracts_liar = true;
+    bool contracts_liar = false;
     // report every silent trusted node in smart contracts consensus
     bool contracts_silent = false;
     // report smart contracts consensus is not achieved
@@ -125,6 +125,8 @@ struct EventsReportData {
     bool reject_contract_consensus = true;
     // invalid block detected by node
     bool alarm_invalid_block = true;
+    // big bang occurred
+    bool big_bang = false;
 };
 
 class Config {

@@ -38,7 +38,7 @@ const std::string BLOCK_NAME_HOST_ADDRESS = "host_address";
 const std::string BLOCK_NAME_POOL_SYNC = "pool_sync";
 const std::string BLOCK_NAME_API = "api";
 const std::string BLOCK_NAME_CONVEYER = "conveyer";
-const std::string BLOCK_NAME_EVENT_REPORTER = "event_reporter";
+const std::string BLOCK_NAME_EVENT_REPORTER = "event_report";
 
 const std::string PARAM_NAME_NODE_TYPE = "node_type";
 const std::string PARAM_NAME_BOOTSTRAP_TYPE = "bootstrap_type";
@@ -97,6 +97,7 @@ const std::string PARAM_NAME_EVENTS_REJECT_TRANSACTION = "reject_transaction";
 const std::string PARAM_NAME_EVENTS_REJECT_CONTRACT_EXECUTION = "reject_contract_execution";
 const std::string PARAM_NAME_EVENTS_REJECT_CONTRACT_CONSENSUS = "reject_contract_consensus";
 const std::string PARAM_NAME_EVENTS_ALARM_INVALID_BLOCK = "alarm_invalid_block";
+const std::string PARAM_NAME_EVENTS_BIG_BANG = "big_bang";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
@@ -918,6 +919,7 @@ void Config::readEventsReportData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_REJECT_CONTRACT_EXECUTION, eventsReport_.reject_contract_execution);
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_REJECT_CONTRACT_CONSENSUS, eventsReport_.reject_contract_consensus);
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_ALARM_INVALID_BLOCK, eventsReport_.alarm_invalid_block);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_BIG_BANG, eventsReport_.big_bang);
 }
 
 template <typename T>
