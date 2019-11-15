@@ -904,7 +904,7 @@ void Config::readEventsReportData(const boost::property_tree::ptree& config) {
         return;
     }
     eventsReport_.on = true;
-    eventsReport_.collector_ep = readEndpoint(config, BLOCK_NAME_HOST_INPUT);
+    eventsReport_.collector_ep = readEndpoint(config, BLOCK_NAME_EVENT_REPORTER);
 
     const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_EVENT_REPORTER);
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_CONSENSUS_LIAR, eventsReport_.consensus_liar);

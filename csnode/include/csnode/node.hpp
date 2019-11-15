@@ -284,6 +284,8 @@ public:
         return alwaysExecuteContracts_;
     }
 
+    void reportEvent(const cs::Bytes& bin_pack);
+
 public signals:
     SmartsSignal<cs::StageOneSmarts> gotSmartStageOne;
     SmartsSignal<cs::StageTwoSmarts> gotSmartStageTwo;

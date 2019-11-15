@@ -858,6 +858,27 @@ void Node::sendBlockAlarm(cs::Sequence seq) {
     csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
 }
 
+void Node::reportEvent(const cs::Bytes& bin_pack) {
+    const auto& conf = cs::ConfigHolder::instance().config()->getEventsReportData();
+    if (!conf.on) {
+        return;
+    }
+    cs::Bytes message;
+    cs::DataStream stream(message);
+    
+    constexpr uint8_t kEventReportVersion = 0;
+
+    if constexpr (kEventReportVersion == 0) {
+        stream << kEventReportVersion << blockChain_.getLastSeq() << bin_pack;
+    }
+    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+    ostream_.init(BaseFlags::Direct);
+    ostream_ << MsgTypes::EventReport << cs::Conveyer::instance().currentRoundNumber() << sig << message;
+    transport_->sendDirectToSock(ostream_.getPackets(), conf.collector_ep);
+    ostream_.clear();
+    csmeta(csdebug) << "event report -> " << conf.collector_ep.ip << ':' << conf.collector_ep.port;
+}
+
 void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
 
     istream_.init(data, size);
@@ -1314,6 +1335,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         case MsgTypes::StateRequest:
         case MsgTypes::StateReply:
         case MsgTypes::BlockAlarm:
+        case MsgTypes::EventReport:
             return MessageActions::Process;
 
         default:
@@ -3211,6 +3233,9 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
         csdebug() << "NODE> Transaction timer started";
         sendingTimer_.start(cs::TransactionsPacketInterval);
     }
+
+    cs::Bytes b{};
+    reportEvent(b);
 }
 
 void Node::startConsensus() {
