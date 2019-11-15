@@ -11,7 +11,6 @@
 
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
-
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>

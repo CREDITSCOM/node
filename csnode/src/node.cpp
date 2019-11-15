@@ -17,6 +17,7 @@
 #include <csnode/blockvalidator.hpp>
 #include <csnode/roundpackage.hpp>
 #include <csnode/configholder.hpp>
+#include <csnode/eventreport.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/progressbar.hpp>
@@ -914,12 +915,27 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
     if (report_version == 0) {
         stream >> sender_last_block >> bin_pack;
         csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+            << ", sender round R-" << WithDelimiters(rNum)
             << ", sender last block #" << WithDelimiters(sender_last_block)
             << ", info size " << bin_pack.size();
+        const auto event_id = EventReport::getId(bin_pack);
+        if (event_id == EventReport::Id::RejectTransactions) {
+            const auto resume = EventReport::parseReject(bin_pack);
+            if (!resume.empty()) {
+                size_t cnt = 0;
+                std::ostringstream os;
+                std::for_each(resume.cbegin(), resume.cend(), [&](const auto& item) {
+                    cnt += item.second;
+                    os << Reject::to_string(item.first) << " (" << item.second << ") ";
+                });
+                csdebug() << EventReport::log_prefix << "rejected " << cnt << "transactions the following reasons: " << os.str();
+            }
+        }
     }
     else {
         csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
-            << " of incompatible version " << int(report_version);
+            << " of incompatible version " << int(report_version)
+            << ", sender round R-" << WithDelimiters(rNum);
     }
 }
 
