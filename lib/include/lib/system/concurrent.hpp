@@ -9,7 +9,7 @@
 #include <memory>
 #include <thread>
 #include <type_traits>
-#include <unordered_map>
+#include <unordered_set>
 
 #include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
@@ -410,16 +410,15 @@ inline bool operator==(const FutureWatcher<T>& watcher, uint64_t value) {
 }
 
 // for api threading
-template <typename S>
-struct WorkerQueue {
+template <typename T>
+struct WorkerQueue : public std::enable_shared_from_this<WorkerQueue<T>> {
 private:
-    using tids_t = std::list<std::tuple<>>;
-    tids_t tids_;
-    std::unordered_map<std::thread::id, typename tids_t::iterator> tidMap_;
+    using Tid = std::thread::id;
+    std::unordered_set<Tid> tidMap_;
 
-    std::condition_variable_any conditionalVariable_;
-    cs::SpinLock lock_{ATOMIC_FLAG_INIT};
-    S hash_;
+    std::condition_variable conditionalVariable_;
+    std::mutex lock_;
+    T hash_;
 
     const unsigned int kWaitSecondsTime{ 30 };
 
@@ -431,16 +430,23 @@ public:
     void getPosition() {
         cs::Lock lock(lock_);
         auto tid = std::this_thread::get_id();
-        tidMap_[tid] = tids_.insert(tids_.end(), std::make_tuple());
+        tidMap_.insert(tid);
     }
 
-    template <typename T>
-    bool waitTillFront(const T& type) {
+    template <typename Func>
+    bool waitTillFront(const Func& type) {
         std::unique_lock lock(lock_);
-        auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(kWaitSecondsTime), [&]() { return type(hash_); });
+
+        auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(kWaitSecondsTime), [&]() {
+            return type(hash_);
+        });
+
+        auto tid = std::this_thread::get_id();
+        tidMap_.erase(tid);
+
         hash_.condFlg = false;
-        tidMap_.erase(std::this_thread::get_id());
         conditionalVariable_.notify_all();
+
         return res;
     }
 
@@ -454,10 +460,7 @@ public:
             return;
         }
 
-        bool needNotifyAll = tit->second == tids_.begin();
-        tids_.erase(tit->second);
-
-        tidMap_.erase(tit);
+        auto needNotifyAll = static_cast<bool>(tidMap_.erase(tid));
 
         if (needNotifyAll) {
             conditionalVariable_.notify_all();
@@ -469,35 +472,6 @@ public:
         cs::Lock lock(lock_);
         hash_ = hash(hash_);
         conditionalVariable_.notify_all();
-    }
-};
-
-// what is sweet spot?
-struct SweetSpot {
-private:
-    std::condition_variable_any conditionalVariable_;
-    cs::SpinLock lock_{ATOMIC_FLAG_INIT};
-    bool occupied_ = false;
-
-public:
-    inline SweetSpot() noexcept
-    : lock_() {
-    }
-
-    void occupy() {
-        std::unique_lock lock(lock_);
-
-        conditionalVariable_.wait(lock, [this]() {
-            auto res = !occupied_;
-            occupied_ = true;
-            return res;
-        });
-    }
-
-    void leave() {
-        cs::Lock lock(lock_);
-        occupied_ = false;
-        conditionalVariable_.notify_one();
     }
 };
 
