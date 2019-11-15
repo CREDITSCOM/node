@@ -1112,7 +1112,6 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             csdebug() << kLogPrefix << "The pool " << pool.sequence() << " is invalid, won't be stored";
             return false;
         }
-
         // update wallet ids
         // it should be done before check pool's signature,
         // because it can change pool's binary representation
@@ -1125,6 +1124,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             csdebug() << kLogPrefix << "store block #" << poolSequence << " add new wallets to pool";
             addNewWalletsToPool(pool);
         }
+
 
         // write immediately
         if (recordBlock(pool, false).has_value()) {

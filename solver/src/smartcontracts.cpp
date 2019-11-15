@@ -3009,30 +3009,16 @@ bool SmartContracts::prevalidate_inner(const cs::TransactionsPacket& pack) {
     return true;
 }
 
-csdb::Transaction SmartContracts::switchCountedFee(const csdb::Transaction& t, const BlockChain& bc) {
-    csdb::Transaction initTrx = cs::SmartContracts::get_transaction(bc, t);
-    if (!initTrx.is_valid()) {
-        cserror() << kLogPrefix << " no init transaction for smart state transaction in blockchain";
-        return t;
-    }
-    csdb::Transaction res(t.innerID(), t.source(), t.target(), t.currency(), t.amount(), t.max_fee(),
-        initTrx.counted_fee(), t.signature());
-    auto ufIds = t.user_field_ids();
-    for (const auto& id : ufIds) {
-        res.add_user_field(id, t.user_field(id));
-    }
-    return res;
-}
-
-std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const std::vector<csdb::Transaction>& trxs, const BlockChain& bc, bool switchFees) {
+std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const std::vector<csdb::Transaction>& trxs) {
     Packets res;
     cs::TransactionsPacket pack;
     SmartContractRef currentRef;
     SmartContractRef newRef;
     csdb::Address zeroSource = csdb::Address::from_public_key(cs::Zero::key);
     csdb::Address currentSource = zeroSource;
-
+    size_t counter = 0;
     for (auto& it : trxs) {
+        ++counter;
         if (SmartContracts::is_new_state(it)) {
 
             csdb::UserField fld;
@@ -3042,37 +3028,56 @@ std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const std
                 if (ref.is_valid()) {
                     newRef = ref;
                 }
+                else {
+                    break;
+                }
             }
 
             if (!currentRef.is_valid() && it.source() != zeroSource) {
                 currentRef = newRef;
-                currentSource == it.source();
-                pack.addTransaction(switchFees ? switchCountedFee(it, bc) : it);
+                currentSource = it.source();
+                pack.addTransaction(it);
+                continue;
             }
             else {
                 if (it.source() == currentSource || newRef == currentRef) {
-                    pack.addTransaction(switchFees ? switchCountedFee(it, bc) : it);
+                    if (it.source() != currentSource) {
+                        currentSource = it.source();
+                    }
+                    pack.addTransaction(it);
+                    continue;
                 }
                 else {
                     currentRef = newRef;
-                    currentSource == it.source();
+                    currentSource = it.source();
                     pack.makeHash();
                     res.push_back(pack);
-                    pack.clear();
-                    pack.addTransaction(switchFees ? switchCountedFee(it, bc) : it);
+                    pack = TransactionsPacket();
+                    pack.addTransaction(it);
+                    continue;
                 }
             }
 
         }
         if (it.source() == currentSource && it.source() != zeroSource) {
-            pack.addTransaction(switchFees ? switchCountedFee(it, bc) : it);
+            pack.addTransaction(it);
+            continue;
+        }
+        else {
+            if (pack.transactionsCount() > 0) {
+                pack.makeHash();
+                res.push_back(pack);
+                pack = TransactionsPacket();
+            }
+            currentRef = SmartContractRef{};
+            currentSource = zeroSource;
         }
 
-        if (pack.transactionsCount() > 0) {
-            pack.makeHash();
-            res.push_back(pack);
-        }
+    }
 
+    if (pack.transactionsCount() > 0) {
+        pack.makeHash();
+        res.push_back(pack);
     }
     return res;
 }

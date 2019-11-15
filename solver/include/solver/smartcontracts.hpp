@@ -350,8 +350,8 @@ public:
 
     static std::string to_base58(const BlockChain& storage, const csdb::Address& addr);
 
-    static std::vector<cs::TransactionsPacket> grepNewStatesPacks(const std::vector<csdb::Transaction>& trxs, const BlockChain& bc, bool switchFees = false);
-    static csdb::Transaction switchCountedFee(const csdb::Transaction& t, const BlockChain& bc);
+    static std::vector<cs::TransactionsPacket> grepNewStatesPacks(const std::vector<csdb::Transaction>& trxs);
+
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);

@@ -109,7 +109,7 @@ private:
 
     // must be performed if block version is 0
     // to pass validation
-   // csdb::Transaction switchCountedFee(const csdb::Transaction& newState);
+    Packets switchCountedFee(const Packets& packs);
 };
 
 ///

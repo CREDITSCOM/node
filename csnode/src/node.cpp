@@ -2962,10 +2962,11 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
 
     if (rp.roundTable().round >= rNum) {
         if(!rp.roundSignatures().empty()) {
-            if (std::find(rp.roundTable().confidants.cbegin(), rp.roundTable().confidants.cend(), sender) != rp.roundTable().confidants.cend()) {
+            auto confidants = rp.roundTable().confidants;
+            if (std::find(confidants.cbegin(), confidants.cend(), sender) != confidants.cend()) {
                 ++roundPackRequests_;
             }
-            if (roundPackRequests_ > rp.roundTable().confidants.size() / 2 && roundPackRequests_ <= rp.roundTable().confidants.size() / 2 + 1) {
+            if (roundPackRequests_ > confidants.size() / 2 && roundPackRequests_ <= confidants.size() / 2 + 1) {
                 sendRoundPackageToAll(rp);
             }
             else {
@@ -3376,9 +3377,9 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
 void Node::deepBlockValidation(csdb::Pool block, bool* shouldStop) {
     if (!blockValidator_->validateBlock(block,
         cs::BlockValidator::ValidationLevel::hashIntergrity
-        | cs::BlockValidator::ValidationLevel::blockSignatures
+        /*| cs::BlockValidator::ValidationLevel::blockSignatures*/
         | cs::BlockValidator::ValidationLevel::smartSignatures
-        | cs::BlockValidator::ValidationLevel::balances
+        /*| cs::BlockValidator::ValidationLevel::balances*/
         /*| cs::BlockValidator::ValidationLevel::smartStates*/
         /*| cs::BlockValidator::ValidationLevel::accountBalance*/,
         cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
