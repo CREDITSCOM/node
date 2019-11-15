@@ -828,7 +828,7 @@ private:
     cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
     cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smartLastTrxn_;
 
-    cs::SpinLockable<std::map<cs::Signature, smartHashStateEntry>> hashStateSL;
+    cs::SpinLockable<std::map<cs::Signature, std::shared_ptr<smartHashStateEntry>>> hashStateSL;
 
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployedByCreator_;
 

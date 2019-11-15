@@ -693,7 +693,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
         if (err == cs::IterValidator::SimpleValidator::kInsufficientMaxFee) {
             msg += " Counted fee will be " + std::to_string(countedFee.to_double()) + ".";
         }
-        return msg;
+        return std::make_optional(std::move(msg));
     }
 
     return std::nullopt;
@@ -742,12 +742,18 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         }
     }
 
-    auto& hashStateEntry = [this, &send_transaction]() -> decltype(auto) {
+    auto hashStateEntry = [this, &send_transaction]() -> decltype(auto) {
         auto hashStateInst(lockedReference(this->hashStateSL));
-        return (*hashStateInst)[send_transaction.signature()];
+        auto& item = (*hashStateInst)[send_transaction.signature()];
+
+        if (!item) {
+            item = std::make_shared<smartHashStateEntry>();
+        }
+
+        return item;
     }();
 
-    hashStateEntry.getPosition();
+    hashStateEntry->getPosition();
 
     if (input_smart.forgetNewState) {
         auto source_pk = blockchain_.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey).to_api_addr();
@@ -769,7 +775,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             if (api_resp.status.code) {
                 _return.status.code = api_resp.status.code;
                 _return.status.message = api_resp.status.message;
-                hashStateEntry.yield();
+                hashStateEntry->yield();
                 return;
             }
             _return.__isset.smart_contract_result = api_resp.__isset.results;
@@ -778,21 +784,25 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         }
 
         SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
-        hashStateEntry.yield();
+        hashStateEntry->yield();
         return;
     }
 
     cs::Conveyer::instance().addTransaction(send_transaction);
 
     cs::Hash hashState;
+
     if (deploy) {
-        auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) {
-                hashState = ss.hash;
-                if (!ss.condFlg)
-                    return false;
-                ss.condFlg = false;
-                return true;
-                });
+        auto resWait = hashStateEntry->waitTillFront([&](HashState& ss) {
+            hashState = ss.hash;
+
+            if (!ss.condFlg) {
+                return false;
+            }
+
+            ss.condFlg = false;
+            return true;
+        });
 
         {
             auto hashStateInst(lockedReference(this->hashStateSL));
@@ -811,13 +821,15 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     }
     else {
         std::string retVal;
-        auto resWait = hashStateEntry.waitTillFront([&](HashState& ss) {
+        auto resWait = hashStateEntry->waitTillFront([&](HashState& ss) {
             if (!ss.condFlg) {
                 return false;
             }
+
             hashState   = ss.hash;
             retVal      = ss.retVal;
             ss.condFlg  = false;
+
             return true;
         });
 
@@ -1145,19 +1157,28 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 newStateStr = trxn.user_field(cs::trx_uf::new_state::Value).template value<std::string>();
             }
             else {
-                newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();              
+                newHashStr = trxn.user_field(cs::trx_uf::new_state::Hash).template value<std::string>();
                 if (isBDLoaded_) { // signal to end waiting for a transaction
                     auto hashStateInst(lockedReference(this->hashStateSL));
-                    (*hashStateInst)[execTrans.signature()].updateHash([&](const HashState& oldHash) {
-                        if (!newHashStr.empty())
+                    auto& item = (*hashStateInst)[execTrans.signature()];
+
+                    if (!item) {
+                        item = std::make_shared<smartHashStateEntry>();
+                    }
+
+                    item->updateHash([&](const HashState& oldHash) {
+                        if (!newHashStr.empty()) {
                             std::copy(newHashStr.begin(), newHashStr.end(), res.hash.begin());
-                        else
+                        }
+                        else {
                             res.hash = cs::Zero::hash;
+                        }
+
                         res.retVal = trxn.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();
                         res.isOld = (res.hash == oldHash.hash);
                         res.condFlg = true;
                         return res;
-                        });
+                    });
                     csdebug() << "[API]: sended signal, state trx: " << trxn.id().pool_seq() << '.' << trxn.id().index()
                         << ", hash: " << cs::Utils::byteStreamToHex(newHashStr.data(), newHashStr.size());
                 }
