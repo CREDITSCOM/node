@@ -48,15 +48,18 @@ csdb::AmountCommission getFee(const csdb::Transaction& t) {
     return csdb::AmountCommission(std::get<1>(feeLevels[feeLevels.size() - 1]) * k);
 }
 
-bool estimateMaxFee(const csdb::Transaction& t, csdb::AmountCommission& countedFee) {
+csdb::AmountCommission getContractStateMinFee() {
+    return csdb::AmountCommission(std::get<2>(feeLevels[0])); // cheapest new state
+}
+
+bool estimateMaxFee(const csdb::Transaction& t, csdb::AmountCommission& countedFee, SmartContracts& sc) {
     countedFee = getFee(t);
 
-    if (SmartContracts::is_smart_contract(t)) {
-        countedFee = csdb::AmountCommission(countedFee.to_double() +
-                     std::get<2>(feeLevels[0])); // cheapest new state
+    if (SmartContracts::is_executable(t) || sc.is_payable_call(t)) {
+        countedFee = csdb::AmountCommission(countedFee.to_double() + getContractStateMinFee().to_double());
     }
 
-    return csdb::Amount(t.max_fee().to_double()) >= csdb::Amount(countedFee.to_double());
+    return (t.max_fee().to_double() - countedFee.to_double() > std::numeric_limits<double>::epsilon());
 }
 
 void setCountedFees(Transactions& trxs) {

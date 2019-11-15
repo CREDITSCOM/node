@@ -19,7 +19,7 @@ constexpr size_t kMaxRoundDelay = 30000;
 
 class RoundStat {
 public:
-    RoundStat(const Config& config);
+    RoundStat();
 
     void onRoundStart(cs::RoundNumber round, bool skipLogs);
 
@@ -41,11 +41,10 @@ public:
     size_t lastRoundMs() const;
 
     void resetLastRoundMs();
-    bool isLastRoundTooLong() const;
+    bool isCurrentRoundTooLong(size_t long_duration_ms = kMaxRoundDelay) const;
 
 public slots:
     void onPingReceived(cs::Sequence, const cs::PublicKey&);
-    void onConfigChanged(const Config& updated, const Config& previous);
     void onRoundChanged();
     void onMainThreadIterated();
 

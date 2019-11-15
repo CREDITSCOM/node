@@ -19,6 +19,15 @@ namespace cs {
  * ### remarks  Aae, 30.09.2018.
  */
 
+    struct StakeHolder {
+        StakeHolder(PublicKey pKey, csdb::Amount st) {
+            key = pKey;
+            stake = st;
+        }
+        PublicKey key;
+        csdb::Amount stake;
+    };
+
 class TrustedStage3State final : public DefaultStateBehavior {
 public:
     ~TrustedStage3State() override {
@@ -33,6 +42,7 @@ public:
     const char* name() const override {
         return "Trusted-3";
     }
+
 
 protected:
     // timeout tracking

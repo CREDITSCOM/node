@@ -14,9 +14,10 @@
 #pragma warning(pop)
 #endif
 
-#include <config.hpp>
 #include <client/params.hpp>
+
 #include <csdb/pool.hpp>
+
 #include <solvercore.hpp>
 
 #include <memory>
@@ -39,7 +40,7 @@ public:
     using ApiProcessor = ::api::APIProcessor;
 #endif
 
-    explicit connector(BlockChain& m_blockchain, cs::SolverCore* solver, const Config& config);
+    explicit connector(BlockChain& m_blockchain, cs::SolverCore* solver);
     ~connector();
 
     connector(const connector&) = delete;

@@ -5,10 +5,11 @@
 #include <lib/system/utils.hpp>
 
 #include <csnode/conveyer.hpp>
+#include <csnode/configholder.hpp>
 
 #include <net/transport.hpp>
 
-cs::PoolSynchronizer::PoolSynchronizer(const PoolSyncData&, Transport*, BlockChain*) {}
+cs::PoolSynchronizer::PoolSynchronizer(Transport*, BlockChain*) {}
 
 void cs::PoolSynchronizer::sync(cs::RoundNumber, cs::RoundNumber, bool) {}
 
@@ -24,4 +25,3 @@ bool cs::PoolSynchronizer::isOneBlockReply() const { return false; }
 
 bool cs::PoolSynchronizer::isFastMode() const { return false; }
 
-void cs::PoolSynchronizer::onConfigChanged(const Config&) {}

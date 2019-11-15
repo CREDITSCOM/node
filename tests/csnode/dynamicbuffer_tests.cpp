@@ -1,8 +1,10 @@
 #define TESTING
 
-#include <gtest/gtest.h>
 #include <algorithm>
-#include "dynamicbuffer.hpp"
+
+#include <gtest/gtest.h>
+
+#include <lib/system/dynamicbuffer.hpp>
 
 using namespace cs;
 

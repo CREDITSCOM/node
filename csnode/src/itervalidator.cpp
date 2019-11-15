@@ -2,6 +2,8 @@
 
 #include <cstring>
 
+#include <csdb/amount_commission.hpp>
+#include <csnode/fee.hpp>
 #include <csnode/walletsstate.hpp>
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
@@ -43,23 +45,44 @@ Characteristic IterValidator::formCharacteristic(SolverContext& context, Transac
 }
 
 void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& characteristicMask, const Transactions& transactions) {
-    // test if any of smart-emitted transaction rejected, reject all transactions from this smart
-    // 1. collect rejected smart addresses
     std::vector<SolverContext::RefExecution> rejectList;
-    size_t maskSize = characteristicMask.size();
-    size_t i = 0;
-    for (const auto& tr : transactions) {
-        if (i < maskSize && *(characteristicMask.cbegin() + static_cast<std::ptrdiff_t>(i)) == kInvalidMarker) {
-            if (SmartContracts::is_new_state(tr) && !pTransval_->duplicatedNewState(context, tr.source())) {
-                csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
-                if (fld.is_valid()) {
-                    SmartContractRef ref(fld);
-                    rejectList.emplace_back(std::make_pair(ref.sequence, static_cast<uint32_t>(ref.transaction)));
-                }
+    std::set<csdb::Address> firstRejected;
+
+    auto tryAddToRejected = [this, &rejectList, &firstRejected, &context](const csdb::Transaction& tr, const csdb::Address& absAddr) mutable {
+        if (!pTransval_->duplicatedNewState(context, tr.source()) && firstRejected.insert(absAddr).second) {
+            csdb::UserField fld = tr.user_field(trx_uf::new_state::RefStart);
+            if (fld.is_valid()) {
+                SmartContractRef ref(fld);
+                rejectList.emplace_back(std::make_pair(ref.sequence, static_cast<uint32_t>(ref.transaction)));
             }
         }
-        ++i;
+    };
+
+    for (auto it = pTransval_->getValidNewStates().rbegin(); it != pTransval_->getValidNewStates().rend(); ++it) {
+        if (it->second) {
+            continue;
+        }
+
+        auto& t = transactions[it->first];
+        auto absAddr = context.smart_contracts().absolute_address(t.source());
+
+        if (pTransval_->isRejectedSmart(absAddr)) {
+            tryAddToRejected(t, absAddr);
+        }
     }
+
+    for (size_t i = 0; i < transactions.size() && i < characteristicMask.size(); ++i) {
+        auto absAddr = context.smart_contracts().absolute_address(transactions[i].source());
+        bool valid = characteristicMask[i] == kValidMarker;
+
+        if (!valid && SmartContracts::is_new_state(transactions[i])) {
+            tryAddToRejected(transactions[i], absAddr);
+        }
+        else if (valid && pTransval_->isRejectedSmart(absAddr)) {
+            characteristicMask[i] = kInvalidMarker;
+        }
+    }
+
     if (!rejectList.empty()) {
         cslog() << kLogPrefix << "reject " << rejectList.size() << " new_state(s) of smart contract(s)";
         context.send_rejected_smarts(rejectList);
@@ -142,7 +165,7 @@ void IterValidator::checkTransactionsSignatures(SolverContext& context, const Tr
                 rejectedCounter++;
                 cslog() << kLogPrefix << "transaction[" << i << "] rejected, incorrect signature.";
                 if (SmartContracts::is_new_state(transactions[i])) {
-                    pTransval_->addRejectedNewState(context.smart_contracts().absolute_address(transactions[i].source()));
+                    pTransval_->saveNewState(context.smart_contracts().absolute_address(transactions[i].source()), i, false);
                 }
             }
         }
@@ -228,5 +251,66 @@ void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packe
             }
         }
     }
+}
+
+std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
+    switch (rc) {
+        case kAllCorrect :
+            return "Transaction is correct.";
+        case kInsufficientBalance :
+            return "Source wallet has insufficient balance to issue trasaction.";
+        case kWrongSignature :
+            return "Transaction has wrong signature.";
+        case kTooLarge :
+            return "Transaction is too large.";
+        case kInsufficientMaxFee :
+            return "Transaction's max fee is not enough to issue transaction.";
+        case kSourceDoesNotExists :
+            return "Transaction's source doesn't exist in blockchain.";
+        case kContractViolation:
+            return "Contract execution violations detected";
+        default :
+            return "Unknown reject reason.";
+    }
+}
+
+bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const BlockChain& bc, SmartContracts& sc, csdb::AmountCommission* countedFeePtr, RejectCode* rcPtr) {
+    RejectCode rc = kAllCorrect;
+
+    BlockChain::WalletData wallet;
+    csdb::AmountCommission countedFee;
+
+    if (!fee::estimateMaxFee(t, countedFee, sc)) {
+        rc = kInsufficientMaxFee;
+    }
+
+    if (!rc) {
+        if (sc.is_known_smart_contract(t.source()) || sc.is_known_smart_contract(t.target())) {
+            if (sc.test_violations(t) != cs::SmartContracts::Violations::None) {
+                rc = kContractViolation;
+            }
+        }
+    }
+
+    if (!rc && !bc.findWalletData(t.source(), wallet)) {
+        rc = kSourceDoesNotExists;
+    }
+
+    if (!rc && wallet.balance_ < (t.amount() + t.max_fee().to_double())) {
+        rc = kInsufficientBalance;
+    }
+
+    if (!rc && t.to_byte_stream().size() > Consensus::MaxTransactionSize) {
+        rc = kTooLarge;
+    }
+
+    if (!rc && !t.verify_signature(bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey).public_key())) {
+        rc = kWrongSignature;
+    }
+
+    if (countedFeePtr) *countedFeePtr = countedFee;
+    if (rcPtr) *rcPtr = rc;
+
+    return rc == kAllCorrect;
 }
 }  // namespace cs

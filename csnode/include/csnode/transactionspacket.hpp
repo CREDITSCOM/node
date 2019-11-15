@@ -74,7 +74,7 @@ public:  // Interface
     bool operator<(const TransactionsPacketHash& other) const noexcept;
 
 private:  // Members
-    cs::Bytes m_bytes;
+    cs::Bytes bytes_;
 };
 
 ///
@@ -152,6 +152,10 @@ public:  // Interface
     ///
     bool addSignature(const cs::Byte index, const cs::Signature& signature);
 
+    bool sign(const cs::PrivateKey& privateKey);
+    bool verify(const cs::PublicKey& publicKey);
+    bool verify(const std::vector<cs::PublicKey>& publicKeys);
+
     ///
     /// @brief Adds transaction to transaction vector
     /// @param transaction Any transaction to add
@@ -194,15 +198,20 @@ public:  // Interface
     ///
     void clear() noexcept;
 
+    ///
+    /// @brief Returns packet smart state
+    ///
+    bool isSmart() const;
+
 private:  // Service
     void put(::csdb::priv::obstream& os, Serialization options) const;
     bool get(::csdb::priv::ibstream& is);
 
 private:  // Members
-    TransactionsPacketHash m_hash;
-    std::vector<csdb::Transaction> m_transactions;
-    std::vector<csdb::Transaction> m_stateTransactions;
-    cs::BlockSignatures m_signatures;
+    TransactionsPacketHash hash_;
+    std::vector<csdb::Transaction> transactions_;
+    std::vector<csdb::Transaction> stateTransactions_;
+    cs::BlockSignatures signatures_;
 };
 }  // namespace cs
 

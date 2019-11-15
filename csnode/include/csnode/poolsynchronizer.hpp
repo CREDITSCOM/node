@@ -9,11 +9,8 @@
 
 #include <lib/system/timer.hpp>
 #include <lib/system/signals.hpp>
-#include <lib/system/lockfreechanger.hpp>
 
 #include <net/neighbourhood.hpp>
-
-#include <config.hpp>
 
 class Node;
 class Transport;
@@ -23,7 +20,7 @@ using PoolSynchronizerRequestSignal = cs::Signal<void(const PublicKey& target, c
 
 class PoolSynchronizer {
 public:
-    explicit PoolSynchronizer(const PoolSyncData& data, Transport* transport, BlockChain* blockChain);
+    explicit PoolSynchronizer(Transport* transport, BlockChain* blockChain);
 
     void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = roundDifferentForSync, bool isBigBand = false);
     void syncLastPool();
@@ -45,8 +42,6 @@ public:
 public signals:
     PoolSynchronizerRequestSignal sendRequest;
 
-public slots:
-    void onConfigChanged(const Config& updated);
 };
 }  // namespace cs
 #endif  // POOLSYNCHRONIZER_HPP

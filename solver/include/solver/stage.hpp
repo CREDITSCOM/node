@@ -56,42 +56,47 @@ private:
     bool isReadOnly_;
 };
 
-struct StageOne {
+struct Stage {
+    Stage();
+    uint8_t msgType;
+    uint8_t sender;
+    cs::PublicKey senderKey;
+    cs::Bytes message;
+    cs::RoundNumber msgRoundNum;
+    cs::PublicKey msgSender;
+    cs::Signature signature;
+};
+
+struct StageOne : Stage {
+    StageOne();
     void toBytes();
     static StageOne fromBytes(const cs::Bytes bytes);
     static std::string toString(const StageOne stage);
-    uint8_t msgType = MsgTypes::FirstStage;
-    uint8_t sender;
     Hash hash;
     std::string roundTimeStamp;
     std::vector<PublicKey> trustedCandidates;
     std::vector<TransactionsPacketHash> hashesCandidates;
     Hash messageHash;
-    Signature signature;
-    cs::Bytes messageBytes;
     //TrustedMask stageMask;
 };
 
-struct StageTwo {
+struct StageTwo : Stage {
+    StageTwo();
     void toBytes();
     static StageTwo fromBytes(const cs::Bytes bytes);
     static std::string toString(const StageTwo stage);
-    uint8_t msgType = MsgTypes::SecondStage;
-    uint8_t sender;
     cs::Hashes hashes;  // hashes of stage one
     cs::Signatures signatures;
-    Signature signature;
-    cs::Bytes messageBytes;
+
     //TrustedMask stageMask;
 };
 
 
-struct StageThree {
+struct StageThree : Stage {
+    StageThree();
     void toBytes();
     static StageThree fromBytes(const cs::Bytes bytes);
     static std::string toString(const StageThree stage);
-    uint8_t msgType = MsgTypes::ThirdStage;
-    uint8_t sender;
     uint8_t writer;
     uint8_t iteration;
     std::vector<uint8_t> realTrustedMask;
@@ -101,9 +106,6 @@ struct StageThree {
     Hash roundHash;
     Hash trustedHash;
     Signature trustedSignature;
-    Signature signature;
-    cs::Bytes messageBytes;
-
 };
 
 // smart-contracts stages
@@ -147,13 +149,6 @@ struct StageThreeSmarts {
     Signature packageSignature;
     Signature signature;
     Bytes message;
-};
-
-struct Stage {
-    uint8_t msgType;
-    std::string msgData;
-    cs::RoundNumber msgRoundNum;
-    cs::PublicKey msgSender;
 };
 
 struct StageHash {

@@ -269,7 +269,7 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
         case MsgTypes::HashReply:
             return node_->getHashReply(data, size, rNum, sender);
         case MsgTypes::TransactionPacket:
-            return node_->getTransactionsPacket(data, size);
+            return node_->getTransactionsPacket(data, size, sender);
         case MsgTypes::TransactionsPacketRequest:
             return node_->getPacketHashesRequest(data, size, rNum, sender);
         case MsgTypes::TransactionsPacketReply:
@@ -285,7 +285,7 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
         case MsgTypes::ThirdStageRequest:
             return node_->getStageRequest(type, data, size, sender);
         case MsgTypes::ThirdStage:
-            return node_->getStageThree(data, size);
+            return node_->getStageThree(data, size, sender);
         case MsgTypes::FirstSmartStage:
             return node_->getSmartStageOne(data, size, rNum, sender);
         case MsgTypes::SecondSmartStage:
@@ -310,6 +310,8 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
             return node_->getStateRequest(data, size, rNum, sender);
         case MsgTypes::StateReply:
             return node_->getStateReply(data, size, rNum, sender);
+        case MsgTypes::BlockAlarm:
+            return node_->getBlockAlarm(data, size, rNum, sender);
         default:
             cserror() << "TRANSPORT> Unknown message type " << Packet::messageTypeToString(type) << " pack round " << rNum;
             break;

@@ -29,7 +29,7 @@ size_t BlockHashes::size() const {
     return seqDb_.size();
 }
 
-bool BlockHashes::onNextBlock(const csdb::Pool& block) {
+bool BlockHashes::update(const csdb::Pool& block) {
     cs::Sequence seq = block.sequence();
 
     auto hash = block.hash();

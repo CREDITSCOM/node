@@ -6,6 +6,7 @@ add_library(lib
   src/lib/system/logger.cpp
   src/lib/system/timer.cpp
   src/lib/system/progressbar.cpp
+  src/lib/system/dynamicbuffer.cpp
   include/lib/system/hash.hpp
   include/lib/system/queues.hpp
   include/lib/system/structures.hpp
@@ -17,6 +18,7 @@ add_library(lib
   include/lib/system/cache.hpp
   include/lib/system/signals.hpp
   include/lib/system/metastorage.hpp
+  include/lib/system/mmappedfile.hpp
   include/lib/system/progressbar.hpp
   include/lib/system/concurrent.hpp
   include/lib/system/scopeguard.hpp
@@ -29,6 +31,7 @@ add_library(lib
   include/lib/system/fileutils.hpp
   include/lib/system/shareable.hpp
   include/lib/system/lockfreechanger.hpp
+  include/lib/system/dynamicbuffer.hpp
 )
 
 if (MSVC)
@@ -52,11 +55,12 @@ if(NOT APPLE)
 endif()
 set (BOOST_ALL_DYN_LINK OFF)
 
-find_package (Boost REQUIRED COMPONENTS log log_setup)
+find_package (Boost REQUIRED COMPONENTS log log_setup iostreams)
 # resolve cyclic dependency
 target_link_libraries (Boost::log INTERFACE Boost::log_setup)
 target_link_libraries (Boost::log_setup INTERFACE Boost::log)
 target_link_libraries (lib
+                       Boost::iostreams
                        Boost::log
                        Boost::log_setup
                        Boost::disable_autolinking)

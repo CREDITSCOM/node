@@ -1,14 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <queue>
+#include <iostream>
+
 #include <csdb/amount_commission.hpp>
 #include <csdb/currency.hpp>
 
 #include <csnode/conveyer.hpp>
-
-#include <config.hpp>
-#include <iostream>
+#include <csnode/configholder.hpp>
 
 #include <lib/system/hash.hpp>
+#include <lib/system/random.hpp>
 
 const cs::RoundNumber kRoundNumber = 12345;
 [[maybe_unused]]
@@ -93,6 +95,20 @@ auto CreateTestPacket(const size_t number_of_transactions) {
 
 auto CreateTestRoundTable(const cs::PacketsHashes& hashes) {
     return cs::RoundTable{kRoundNumber, /*kPublicKey, */kConfidantsKeys, hashes/*, kCharacteristic*/};
+}
+
+class LibsodiumInit {
+public:
+    LibsodiumInit() {
+        cscrypto::cryptoInit();
+    }
+};
+
+static cs::PrivateKey generatePrivateKey() {
+    cs::PublicKey key = kPublicKey;
+    [[maybe_unused]] static LibsodiumInit init;
+
+    return cs::PrivateKey::generateWithPair(key);
 }
 
 TEST(TransactionsEqualityOperator, SameAreEqual) {
@@ -212,7 +228,7 @@ TEST(Conveyer, MainLogic) {
     ASSERT_TRUE(conveyer.currentNeededHashes().empty());
     ASSERT_TRUE(conveyer.isSyncCompleted());
 
-    auto created_packet{conveyer.createPacket()};
+    auto created_packet{conveyer.createPacket(kRoundNumber)};
     ASSERT_TRUE(created_packet.has_value());
     ASSERT_EQ(packet.transactionsCount(), created_packet.value().first.transactionsCount());
 
@@ -235,9 +251,9 @@ TEST(Conveyer, MainLogic) {
 
     csdb::PoolHash ph;
     cs::Bytes tmpCharacteristic;
-    cs::PoolMetaInfo pool_meta_info{ { tmpCharacteristic }, "1542617459297", ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}};
+    cs::PoolMetaInfo poolMetaInfo{ { tmpCharacteristic }, "1542617459297", ph, kRoundNumber, cs::Bytes{}, std::vector<csdb::Pool::SmartSignature>{}};
 
-    auto pool{conveyer.applyCharacteristic(pool_meta_info)};
+    auto pool{conveyer.applyCharacteristic(poolMetaInfo)};
 
     ASSERT_TRUE(pool.has_value());
     ASSERT_EQ(3, pool.value().transactions_count());
@@ -251,11 +267,9 @@ TEST(Conveyer, TestSendCache) {
 
     size_t counter = 0;
 
-    ConveyerData data;
     ConveyerTest conveyer{};
-
+    conveyer.setPrivateKey(generatePrivateKey());
     conveyer.setRound(0);
-    conveyer.setData(data);
 
     cs::Connector::connect(&conveyer.packetFlushed, [&](const auto& packet) {
         if (counter < 2) {
@@ -275,7 +289,7 @@ TEST(Conveyer, TestSendCache) {
     }
 
     ASSERT_EQ(conveyer.packetQueueTransactionsCount(), 0);
-    ASSERT_EQ(conveyer.sendCacheCount(), 2);
+    ASSERT_EQ(conveyer.sendCacheSize(), 2);
     ASSERT_EQ(counter, 2);
 
     // try to resend
@@ -290,7 +304,7 @@ TEST(Conveyer, TestSendCache) {
     conveyer.flushTransactions();
 
     ASSERT_EQ(counter, 5);
-    ASSERT_EQ(conveyer.sendCacheCount(), 3);
+    ASSERT_EQ(conveyer.sendCacheSize(), 3);
 
     conveyer.flushTransactions();
 
@@ -311,53 +325,20 @@ TEST(Conveyer, TestSendCache) {
 
     auto pool { conveyer.applyCharacteristic(metaInfo) };
 
-    ASSERT_EQ(conveyer.sendCacheCount(), 1);
+    ASSERT_EQ(conveyer.sendCacheSize(), 1);
 
     conveyer.flushTransactions();
 
     ASSERT_EQ(counter, 5);
-    ASSERT_EQ(conveyer.sendCacheCount(), 1);
+    ASSERT_EQ(conveyer.sendCacheSize(), 1);
     ASSERT_EQ(pool->transactions().size(), 3);
-}
-
-TEST(Conveyer, TestRejectedHashes) {
-    bool called = false;
-
-    ConveyerData data;
-    ConveyerTest conveyer{};
-
-    conveyer.setRound(0);
-    conveyer.setData(data);
-
-    auto packet1 = CreateTestPacket(20);
-    auto packet2 = CreateTestPacket(25);
-
-    conveyer.addTransactionsPacket(packet1);
-    conveyer.addTransactionsPacket(packet2);
-
-    conveyer.flushTransactions();
-
-    cs::Connector::connect(&conveyer.packetFlushed, [&](const auto&) {
-        called = true;
-    });
-
-    ASSERT_TRUE(conveyer.addRejectedHashToCache(packet2.hash()));
-
-    conveyer.flushTransactions();
-
-    ASSERT_FALSE(called);
-    ASSERT_FALSE(conveyer.addRejectedHashToCache(packet2.hash()));
-
-    conveyer.setRound(100);
-    conveyer.flushTransactions();
-
-    ASSERT_TRUE(called);
 }
 
 TEST(Conveyer, TestRoundChangeSignal) {
     bool called = false;
 
     ConveyerTest conveyer{};
+    conveyer.setPrivateKey(generatePrivateKey());
     conveyer.setRound(0);
 
     cs::Connector::connect(&conveyer.roundChanged, [&](const cs::RoundNumber) {
@@ -382,4 +363,123 @@ TEST(Conveyer, TestRoundChangeSignal) {
 
     conveyer.setTable(table);
     ASSERT_TRUE(called);
+}
+
+static Config setupConfigToTestMaxResends() {
+    ConveyerData conveyerData;
+    conveyerData.maxResendsSendCache = cs::Random::generateValue<size_t>(10, 30);
+    conveyerData.sendCacheValue = cs::Random::generateValue<size_t>(10, 30);
+
+    return Config { conveyerData };
+}
+
+TEST(Conveyer, TestMaxResendCountNotZero) {
+    size_t sendCount = 0;
+    std::queue<size_t> tasks;
+
+    cs::ConfigHolder::instance().setConfig(setupConfigToTestMaxResends());
+
+    auto conveyerData = cs::ConfigHolder::instance().config()->conveyerData();
+    tasks.push(conveyerData.sendCacheValue);
+
+    while (tasks.size() != conveyerData.maxResendsSendCache) {
+        tasks.push(tasks.back() + conveyerData.sendCacheValue);
+    }
+
+    ConveyerTest conveyer{};
+    conveyer.setPrivateKey(generatePrivateKey());
+    conveyer.setRound(0);
+
+    auto packet = CreateTestPacket(20);
+
+    for (const auto& transaction : packet.transactions()) {
+        conveyer.addTransaction(transaction);
+    }
+
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(conveyer.sendCacheSize(), 1);
+
+    cs::Connector::connect(&conveyer.packetFlushed, [&](const auto&) {
+        ++sendCount;
+    });
+
+    size_t index = 0;
+
+    while (!tasks.empty()) {
+        if (index++ == tasks.front()) {
+            auto round = tasks.front();
+            tasks.pop();
+
+            conveyer.setRound(round);
+        }
+
+        conveyer.flushTransactions();
+
+        ASSERT_EQ(conveyer.sendCacheSize(), 1);
+        ASSERT_EQ(conveyer.packetsTableSize(), 1);
+    }
+
+    ASSERT_EQ(sendCount, conveyerData.maxResendsSendCache);
+
+    // one more should not be flushed
+    conveyer.setRound(conveyer.currentRoundNumber() + conveyerData.sendCacheValue);
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(sendCount, conveyerData.maxResendsSendCache);
+
+    ASSERT_EQ(conveyer.sendCacheSize(), 0);
+    ASSERT_EQ(conveyer.packetsTableSize(), 0);
+}
+
+static Config setupConfigToTestZeroMaxResends() {
+    ConveyerData conveyerData;
+    conveyerData.maxResendsSendCache = 0;
+    conveyerData.sendCacheValue = cs::Random::generateValue<size_t>(10, 30);
+
+    return Config { conveyerData };
+}
+
+// should send forever
+TEST(Conveyer, TestMaxResendCountZero) {
+    size_t sendCount = 0;
+    size_t generatedSendCount = cs::Random::generateValue<size_t>(10, 100);
+
+    cs::ConfigHolder::instance().setConfig(setupConfigToTestZeroMaxResends());
+
+    ConveyerTest conveyer{};
+    conveyer.setPrivateKey(generatePrivateKey());
+    conveyer.setRound(0);
+
+    auto packet = CreateTestPacket(30);
+
+    for (const auto& transaction : packet.transactions()) {
+        conveyer.addTransaction(transaction);
+    }
+
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(conveyer.sendCacheSize(), 1);
+
+    cs::Connector::connect(&conveyer.packetFlushed, [&](const auto&) {
+        ++sendCount;
+    });
+
+    auto value = cs::ConfigHolder::instance().config()->conveyerData().sendCacheValue;
+
+    for (size_t index = 0; index < generatedSendCount; ++index) {
+        conveyer.setRound(conveyer.currentRoundNumber() + value);
+        conveyer.flushTransactions();
+
+        ASSERT_EQ(conveyer.sendCacheSize(), 1);
+        ASSERT_EQ(conveyer.packetsTableSize(), 1);
+    }
+
+    ASSERT_EQ(sendCount, generatedSendCount);
+
+    conveyer.setRound(conveyer.currentRoundNumber() + value);
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(conveyer.sendCacheSize(), 1);
+    ASSERT_EQ(conveyer.packetsTableSize(), 1);
 }

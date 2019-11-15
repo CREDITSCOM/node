@@ -24,20 +24,20 @@
 #endif
 
 #include <csnode/blockchain.hpp>
+#include <csnode/configholder.hpp>
 
 #include <csstats.hpp>
 #include <deque>
 #include <queue>
 
 #include <client/params.hpp>
-#include <config.hpp>
 
 #include <lib/system/reference.hpp>
 #include <lib/system/concurrent.hpp>
 #include <lib/system/process.hpp>
-#include <lib/system/lockfreechanger.hpp>
 
 #include "tokens.hpp"
+#include "executormanager.hpp"
 
 #include <tuple>
 #include <any>
@@ -105,33 +105,27 @@ class Executor;
 
 struct ExecutorSettings {
     using Types = std::tuple<cs::Reference<const BlockChain>,
-                             cs::Reference<const cs::SolverCore>,
-                             cs::Reference<const Config>>;
+                             cs::Reference<const cs::SolverCore>>;
 
     static void set(cs::Reference<const BlockChain> blockchain,
-                    cs::Reference<const cs::SolverCore> solver,
-                    cs::Reference<const Config> config) {
+                    cs::Reference<const cs::SolverCore> solver) {
         blockchain_ = blockchain;
         solver_ = solver;
-        config_ = config;
     }
 
 private:
     static Types get() {
         auto tuple = std::make_tuple(std::any_cast<cs::Reference<const BlockChain>>(blockchain_),
-                                     std::any_cast<cs::Reference<const cs::SolverCore>>(solver_),
-                                     std::any_cast<cs::Reference<const Config>>(config_));
+                                     std::any_cast<cs::Reference<const cs::SolverCore>>(solver_));
 
         blockchain_.reset();
         solver_.reset();
-        config_.reset();
 
         return tuple;
     }
 
     inline static std::any blockchain_;
     inline static std::any solver_;
-    inline static std::any config_;
 
     friend class Executor;
 };
@@ -390,6 +384,11 @@ public:
         ServerStartError
     };
 
+    enum class ExecutorState {
+        Launching,
+        Launched
+    };
+
     enum ACCESS_ID_RESERVE { GETTER, START_INDEX };
 
     struct ExecuteTransactionInfo {
@@ -489,42 +488,15 @@ public slots:
         stateUpdate(pool);
     }
 
-    void onReadBlock(const csdb::Pool& block, bool* test_failed) {
-        csunused(test_failed);
+    void onReadBlock(const csdb::Pool& block) {
         stateUpdate(block);
     }
 
     void onExecutorStarted();
+    void onExecutorFinished(int code, const std::error_code&);
+    void onExecutorProcessError(const cs::ProcessException& exception);
 
-    void onExecutorFinished(int code, const std::error_code&) {
-        if (requestStop_) {
-            return;
-        }
-
-        if (!executorMessages_.count(code)) {
-            cswarning() << "Executor unknown error";
-        }
-        else {
-            cswarning() << executorMessages_[code];
-        }
-
-        if (code == ExecutorErrorCode::ServerStartError ||
-            code == ExecutorErrorCode::IncorrecJdkVersion) {
-            return;
-        }
-
-        cs::Concurrent::run([this] {
-            runProcess();
-        });
-    }
-
-    void onExecutorProcessError(const cs::ProcessException& exception) {
-        cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
-    }
-
-    void onConfigChanged(const Config& updated) {
-        config_.exchange(updated);
-    }
+    void checkExecutorVersion();
 
 private:
     int commitMin_{};
@@ -539,13 +511,20 @@ private:
     }
 
     void runProcess() {
+        state_ = ExecutorState::Launching;
+
         executorProcess_->terminate();
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(config_->getApiSettings().executorRunDelay));
+        std::this_thread::sleep_for(std::chrono::milliseconds(cs::ConfigHolder::instance().config()->getApiSettings().executorRunDelay));
 
-        executorProcess_->setProgram(config_->getApiSettings().executorCmdLine);
+        executorProcess_->setProgram(cs::ConfigHolder::instance().config()->getApiSettings().executorCmdLine);
         executorProcess_->launch(cs::Process::Options::None);
+
+        state_ = ExecutorState::Launched;
     }
+
+    void runProcessAsync();
+    void checkAnotherExecutor();
 
     struct OriginExecuteResult {
         ExecuteByteCodeResult resp;
@@ -616,7 +595,6 @@ private:
 private:
     const BlockChain& blockchain_;
     const cs::SolverCore& solver_;
-    cs::LockFreeChanger<Config> config_;
 
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TSocket> socket_;
     ::apache::thrift::stdcxx::shared_ptr<::apache::thrift::transport::TTransport> executorTransport_;
@@ -641,6 +619,9 @@ private:
 
     std::mutex callExecutorLock_;
 
+    cs::ExecutorManager manager_;
+    ExecutorState state_;
+
     std::map<int, const char*> executorMessages_ = {
         { NoError, "Executor finished with no error code" },
         { GeneralError, "Executor unexpected error, try to launch again" },
@@ -652,7 +633,7 @@ private:
 namespace apiexec {
 class APIEXECHandler : public APIEXECNull, public APIHandlerBase {
 public:
-    explicit APIEXECHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
+    explicit APIEXECHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor);
     APIEXECHandler(const APIEXECHandler&) = delete;
     void GetSeed(apiexec::GetSeedResult& _return, const general::AccessID accessId) override;
     void SendTransaction(apiexec::SendTransactionResult& _return, const general::AccessID accessId, const api::Transaction& transaction) override;
@@ -675,7 +656,7 @@ private:
 namespace api {
 class APIHandler : public APIHandlerInterface {
 public:
-    explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor, const Config& config);
+    explicit APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, executor::Executor& executor);
     ~APIHandler() override;
 
     APIHandler(const APIHandler&) = delete;
@@ -771,11 +752,16 @@ private:
     // for answer dumb transactions        
     class DUMBCV {
     public:
-        void addCVInfo(const cs::Signature& signature) {
+        bool addCVInfo(const cs::Signature& signature) {
+            std::lock_guard<std::mutex> lk(dumbMutex);
+            if (const auto& it = mCvInfo_.find(signature); it != mCvInfo_.end())
+                return false;
             mCvInfo_[signature];
+            return true;
         }
 
         void sendCvSignal(const cs::Signature& signature) {
+            std::lock_guard<std::mutex> lk(dumbMutex);
             if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
                 auto&[cv, condFlg] = it->second;
                 cv.notify_one();
@@ -785,11 +771,8 @@ private:
 
         bool waitCvSignal(const cs::Signature& signature) {
             bool isTimeOver = false;
-
+            std::unique_lock lock(dumbMutex);
             if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
-                std::mutex dumbMutex;
-                std::unique_lock lock(dumbMutex);
-
                 isTimeOver = it->second.cv_.wait_for(lock, std::chrono::seconds(30), [it]() -> bool {
                     return it->second.condFlg_;
                 });
@@ -805,6 +788,7 @@ private:
             std::atomic_bool condFlg_{ false };
         };
         std::map<cs::Signature, CVInfo> mCvInfo_;
+        std::mutex dumbMutex;
     } dumbCv_;
     //
 
@@ -885,7 +869,7 @@ private:
     cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
     cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smartLastTrxn_;
 
-    cs::SpinLockable<std::map<csdb::Address, smartHashStateEntry>> hashStateSL;
+    cs::SpinLockable<std::map<cs::Signature, smartHashStateEntry>> hashStateSL;
 
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployedByCreator_;
 

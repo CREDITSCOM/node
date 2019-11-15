@@ -9,6 +9,9 @@
 #include <csdb/amount.hpp>
 
 namespace cs {
+
+class SmartContracts;
+
 namespace fee {
 
 using Transactions = std::vector<csdb::Transaction>;
@@ -22,12 +25,17 @@ void setCountedFees(Transactions&);
 /// @brief allows to estimate weather max fee is enough before consensus
 /// @return true if max fee >= countedFee
 ///
-bool estimateMaxFee(const csdb::Transaction&, csdb::AmountCommission& countedFee);
+bool estimateMaxFee(const csdb::Transaction&, csdb::AmountCommission& countedFee, SmartContracts& sc);
 
 ///
 /// @return counted fee for transaction
 ///
 csdb::AmountCommission getFee(const csdb::Transaction&);
+
+///
+/// @return minimal fee for contract new state transaction
+///
+csdb::AmountCommission getContractStateMinFee();
 
 /// <summary>   Gets execution fee. </summary>
 ///

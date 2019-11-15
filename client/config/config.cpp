@@ -28,7 +28,7 @@
 #include <unistd.h>
 #endif
 
-const NodeVersion NODE_VERSION = 431;
+const NodeVersion NODE_VERSION = 435;
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
@@ -80,6 +80,8 @@ const std::string PARAM_NAME_EXECUTOR_IP = "executor_ip";
 const std::string PARAM_NAME_EXECUTOR_CMDLINE = "executor_command";
 const std::string PARAM_NAME_EXECUTOR_RUN_DELAY = "executor_run_delay";
 const std::string PARAM_NAME_EXECUTOR_BACKGROUND_THREAD_DELAY = "executor_background_thread_delay";
+const std::string PARAM_NAME_EXECUTOR_CHECK_VERSION_DELAY = "executor_check_version_delay";
+const std::string PARAM_NAME_EXECUTOR_MULTI_INSTANCE = "executor_multi_instance";
 const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MIN = "executor_commit_min";
 const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MAX = "executor_commit_max";
 
@@ -185,6 +187,10 @@ void Config::swap(Config& config) {
     Config temp = std::move(config);
     config = std::move(*this);
     (*this) = std::move(temp);
+}
+
+Config::Config(const ConveyerData& conveyerData)
+: conveyerData_(conveyerData) {
 }
 
 Config Config::read(po::variables_map& vm) {
@@ -854,6 +860,8 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_RECEIVE_TIMEOUT, apiData_.executorReceiveTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_RUN_DELAY, apiData_.executorRunDelay);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_BACKGROUND_THREAD_DELAY, apiData_.executorBackgroundThreadDelay);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_CHECK_VERSION_DELAY, apiData_.executorCheckVersionDelay);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_MULTI_INSTANCE, apiData_.executorMultiInstance);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_SEND_TIMEOUT, apiData_.serverSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_SERVER_RECEIVE_TIMEOUT, apiData_.serverReceiveTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_SERVER_SEND_TIMEOUT, apiData_.ajaxServerSendTimeout);
@@ -940,6 +948,8 @@ bool operator==(const ApiData& lhs, const ApiData& rhs) {
            lhs.executorCmdLine == rhs.executorCmdLine &&
            lhs.executorRunDelay == rhs.executorRunDelay &&
            lhs.executorBackgroundThreadDelay == rhs.executorBackgroundThreadDelay &&
+           lhs.executorCheckVersionDelay == rhs.executorCheckVersionDelay &&
+           lhs.executorMultiInstance == rhs.executorMultiInstance &&
            lhs.executorCommitMin == rhs.executorCommitMin &&
            lhs.executorCommitMax == rhs.executorCommitMax;
 }

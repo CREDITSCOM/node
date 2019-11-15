@@ -16,7 +16,7 @@ if(NOT APPLE)
 endif()
 set (BOOST_ALL_DYN_LINK OFF)
 
-find_package (Boost 1.66.0 REQUIRED COMPONENTS iostreams thread system filesystem)
+find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem)
 if (Boost_FOUND)
   # From the offical documentation:
   # Add include directories to the build. [...] If the SYSTEM option is given,
@@ -41,15 +41,14 @@ add_library(csnode
   include/csnode/node.hpp
   include/csnode/packstream.hpp
   include/csnode/datastream.hpp
-  include/csnode/dynamicbuffer.hpp
   include/csnode/nodecore.hpp
   include/csnode/conveyer.hpp
   include/csnode/transactionspacket.hpp
   include/csnode/transactionstail.hpp
+  include/csnode/transactionsindex.hpp
   include/csnode/transactionsiterator.hpp
   include/csnode/walletscache.hpp
   include/csnode/walletsids.hpp
-  include/csnode/walletspools.hpp
   include/csnode/blockhashes.hpp
   include/csnode/poolsynchronizer.hpp
   include/csnode/fee.hpp
@@ -64,19 +63,21 @@ add_library(csnode
   include/csnode/packetqueue.hpp
   include/csnode/roundpackage.hpp
   include/csnode/compressor.hpp
+  include/csnode/configholder.hpp
+  include/csnode/multiwallets.hpp
+  include/csnode/sendcachedata.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
   src/conveyer.cpp
   src/transactionspacket.cpp
-  src/dynamicbuffer.cpp
   src/walletscache.cpp
   src/walletsids.cpp
-  src/walletspools.cpp
   src/blockhashes.cpp
   src/poolsynchronizer.cpp
   src/fee.cpp
   src/transactionsvalidator.cpp
+  src/transactionsindex.cpp
   src/transactionsiterator.cpp
   src/walletsstate.cpp
   src/roundstat.cpp
@@ -87,6 +88,9 @@ add_library(csnode
   src/blockvalidatorplugins.cpp
   src/packetqueue.cpp
   src/roundpackage.cpp
+  src/configholder.cpp
+  src/multiwallets.cpp
+  src/sendcachedata.cpp
 )
 
 configure_msvc_flags()
