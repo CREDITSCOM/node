@@ -784,8 +784,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
         case MsgTypes::BlockAlarm:
             return node_->getBlockAlarm(data, size, rNum, firstPack.getSender());
         case MsgTypes::EventReport:
-            csdebug() << "TRANSPORT> get event report message";
-            break;
+            return node_->getEventReport(data, size, rNum, firstPack.getSender());
         default:
             cserror() << "TRANSPORT> Unknown message type " << Packet::messageTypeToString(type) << " pack round " << rNum;
             break;

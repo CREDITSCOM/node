@@ -858,27 +858,6 @@ void Node::sendBlockAlarm(cs::Sequence seq) {
     csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
 }
 
-void Node::reportEvent(const cs::Bytes& bin_pack) {
-    const auto& conf = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!conf.on) {
-        return;
-    }
-    cs::Bytes message;
-    cs::DataStream stream(message);
-    
-    constexpr uint8_t kEventReportVersion = 0;
-
-    if constexpr (kEventReportVersion == 0) {
-        stream << kEventReportVersion << blockChain_.getLastSeq() << bin_pack;
-    }
-    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
-    ostream_.init(BaseFlags::Direct);
-    ostream_ << MsgTypes::EventReport << cs::Conveyer::instance().currentRoundNumber() << sig << message;
-    transport_->sendDirectToSock(ostream_.getPackets(), conf.collector_ep);
-    ostream_.clear();
-    csmeta(csdebug) << "event report -> " << conf.collector_ep.ip << ':' << conf.collector_ep.port;
-}
-
 void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
 
     istream_.init(data, size);
@@ -893,6 +872,54 @@ void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::
     }
     else {
         csdebug() << "NODE> Got BlockAlarm message from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    }
+}
+
+void Node::reportEvent(const cs::Bytes& bin_pack) {
+    const auto& conf = cs::ConfigHolder::instance().config()->getEventsReportData();
+    if (!conf.on) {
+        return;
+    }
+    cs::Bytes message;
+    cs::DataStream stream(message);
+
+    constexpr uint8_t kEventReportVersion = 0;
+
+    if constexpr (kEventReportVersion == 0) {
+        stream << kEventReportVersion << blockChain_.getLastSeq() << bin_pack;
+    }
+    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+    ostream_.init(BaseFlags::Direct);
+    ostream_ << MsgTypes::EventReport << cs::Conveyer::instance().currentRoundNumber() << sig << message;
+    transport_->sendDirectToSock(ostream_.getPackets(), conf.collector_ep);
+    ostream_.clear();
+    csmeta(csdebug) << "event report -> " << conf.collector_ep.ip << ':' << conf.collector_ep.port;
+}
+
+void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+    istream_.init(data, size);
+    cs::Signature sig;
+    cs::Bytes message;
+    istream_ >> sig >> message;
+    if (!cscrypto::verifySignature(sig, sender, message.data(), message.size())) {
+        csdebug() << "NODE> event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " -  WRONG SIGNATURE!!!";
+        return;
+    }
+
+    cs::DataStream stream(message.data(), message.size());
+    uint8_t report_version = 0;
+    cs::Sequence sender_last_block = 0;
+    cs::Bytes bin_pack;
+    stream >> report_version;
+    if (report_version == 0) {
+        stream >> sender_last_block >> bin_pack;
+        csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+            << ", sender last block #" << WithDelimiters(sender_last_block)
+            << ", info size " << bin_pack.size();
+    }
+    else {
+        csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+            << " of incompatible version " << int(report_version);
     }
 }
 
