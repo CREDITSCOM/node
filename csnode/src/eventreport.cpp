@@ -37,11 +37,12 @@ std::string Reject::to_string(Reason r) {
     return "?";
 }
 
-void EventReport::sendReject(const std::vector<Reject::Reason>& rejected) {
+/*static*/
+void EventReport::sendReject(Node& node, const cs::Bytes& rejected) {
     std::map<Reject::Reason, uint16_t> resume;
-    for (const Reject::Reason r : rejected) {
+    for (const auto r : rejected) {
         if (r != Reject::Reason::None) {
-            resume[r] += 1;
+            resume[Reject::Reason(r)] += 1;
         }
     }
     if (!resume.empty()) {
@@ -51,7 +52,7 @@ void EventReport::sendReject(const std::vector<Reject::Reason>& rejected) {
         for (const auto& item : resume) {
             stream << item.first << item.second;
         }
-        node_.reportEvent(bin_pack);
+        node.reportEvent(bin_pack);
     }
 }
 
