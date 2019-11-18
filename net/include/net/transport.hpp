@@ -5,9 +5,11 @@
 #include <atomic>
 #include <csignal>
 #include <list>
+#include <map>
 #include <mutex>
 #include <thread>
 #include <unordered_set>
+#include <vector>
 
 #include <config.hpp>
 #include <lib/system/common.hpp>
@@ -76,32 +78,18 @@ public slots:
 private:
 // Postpone logic - beg
 // @TODO move to Node
-    void postponePacket(const cs::RoundNumber, const MsgTypes, const Packet&);
-    bool shouldSendPacket(const Packet& pack);
+    void postponePacket(const cs::PublicKey& sender, const cs::RoundNumber, const Packet&);
 
-    struct PostponedPacket {
-        cs::RoundNumber round;
-        MsgTypes type;
+    struct PostponedPack {
+        cs::PublicKey sender;
         Packet pack;
-
-        PostponedPacket(const cs::RoundNumber r, const MsgTypes t, const Packet& p)
-        : round(r)
-        , type(t)
-        , pack(p) {
-        }
     };
-    static constexpr uint32_t posponedBufferSize_ = 1024;
-    using PPBuf = FixedCircularBuffer<PostponedPacket, posponedBufferSize_>;
-    PPBuf postponedPacketsFirst_;
-    PPBuf postponedPacketsSecond_;
-    static constexpr uint32_t posponedPointerBufferSize_ = 2;
-    PPBuf* postponed_[posponedPointerBufferSize_] = {&postponedPacketsFirst_, &postponedPacketsSecond_};
+    std::map<cs::RoundNumber, std::vector<PostponedPack>> postponed_;
 // Postpone logic - end
 
     void dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes,
                              const cs::RoundNumber, const uint8_t* data, size_t);
     void processorRoutine();
-
     void checkNeighboursChange();
 
     bool good_ = false;

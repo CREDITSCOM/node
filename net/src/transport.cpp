@@ -219,7 +219,7 @@ void Transport::processNodeMessage(const cs::PublicKey& sender, const Packet& pa
         case Node::MessageActions::Process:
             return dispatchNodeMessage(sender, type, rNum, pack.getMsgData(), pack.getMsgSize());
         case Node::MessageActions::Postpone:
-            return postponePacket(rNum, type, pack);
+            return postponePacket(sender, rNum, pack);
         case Node::MessageActions::Drop:
             return;
     }
@@ -317,40 +317,19 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
     }
 }
 
-bool Transport::shouldSendPacket(const Packet& pack) {
-    if (pack.isNetwork()) {
-        return false;
-    }
-
-    const cs::RoundNumber currentRound = cs::Conveyer::instance().currentRoundNumber();
-    cs::RoundNumber rn = pack.getRoundNum() + getRoundTimeout(pack.getType());
-
-    return !rn || rn >= currentRound;
+inline void Transport::postponePacket(const cs::PublicKey& sender, const cs::RoundNumber rNum, const Packet& pack) {
+    postponed_[rNum].push_back(PostponedPack{sender, pack});
 }
 
-inline void Transport::postponePacket(const cs::RoundNumber rNum, const MsgTypes type, const Packet& pack) {
-    (*postponed_)->emplace(rNum, type, pack);
-}
-
-void Transport::processPostponed(const cs::RoundNumber /* rNum */) {
-/*
-    auto& ppBuf = *postponed_[1];
-    for (auto& pp : **postponed_) {
-        if (pp.round > rNum) {
-            ppBuf.emplace(std::move(pp));
-        }
-        else if (pp.round == rNum) {
-            dispatchNodeMessage(sender, pp.type, pp.round, pp.pack, pp.pack.getMsgData(), pp.pack.getMsgSize());
-        }
+void Transport::processPostponed(const cs::RoundNumber rNum) {
+    auto& packs = postponed_[rNum];
+    for (auto& p: packs) {
+        dispatchNodeMessage(p.sender, p.pack.getType(), rNum, p.pack.getMsgData(), p.pack.getMsgSize());
     }
 
-    (*postponed_)->clear();
-
-    postponed_[1] = *postponed_;
-    postponed_[0] = &ppBuf;
+    postponed_ = decltype(postponed_)(postponed_.upper_bound(rNum), postponed_.end());
 
     csdebug() << "TRANSPORT> POSTPHONED finished, round " << rNum;
-*/
 }
 
 void Transport::forEachNeighbour(std::function<bool(const cs::PublicKey&)> f) {
