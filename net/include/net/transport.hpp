@@ -112,6 +112,7 @@ public:
 
     bool sendDirect(const Packet*, const Connection&);
     bool sendDirectToSock(Packet*, const Connection&);
+    bool sendDirectToSock(Packet*, const EndpointData&);
     void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
     void deliverBroadcast(const Packet*, const uint32_t);
     // returns pair of (sent count, list of unable-to-send items in input list)
@@ -166,7 +167,7 @@ public:
 
     bool isPingDone();
 
-    bool requireStartNode() const;
+    bool requireStartNode();
 
 public signals:
     PingSignal pingReceived;
