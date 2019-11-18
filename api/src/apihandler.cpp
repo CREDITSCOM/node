@@ -660,6 +660,12 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
 
     auto trxn = makeTransaction(transaction);
     if (transaction.__isset.smartContract) {
+        if (!transaction.smartContract.method.empty()) {
+            // call to contract, not deployment!
+            if (transaction.smartContract.__isset.smartContractDeploy) {
+                return std::make_optional("Malformed contract execution, unnecessary info provided (smartContractDeploy)");
+            }
+        }
         trxn.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
     }
     else if (!transaction.userFields.empty()) {
@@ -761,17 +767,17 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
         executor::ExecuteByteCodeResult api_resp;
         const std::vector<general::ByteCodeObject>& bytecode = deploy ? input_smart.smartContractDeploy.byteCodeObjects : origin_bytecode;
         if (!deploy || !input_smart.smartContractDeploy.byteCodeObjects.empty()) {
-            std::vector<executor::MethodHeader> methodHeader;
+            std::vector<executor::MethodHeader> methodHeaders;
             {
                 executor::MethodHeader tmp;
                 tmp.methodName  = input_smart.method;
                 tmp.params      = input_smart.params;
-                methodHeader.push_back(tmp);
+                methodHeaders.push_back(tmp);
             }
             auto smartAddr = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
             std::string contract_state = cs::SmartContracts::get_contract_state(blockchain_, smartAddr);
 
-            executor_.executeByteCode(api_resp, source_pk, target_pk, bytecode, contract_state, methodHeader, true, executor::Executor::kUseLastSequence);
+            executor_.executeByteCode(api_resp, source_pk, target_pk, bytecode, contract_state, methodHeaders, true, executor::Executor::kUseLastSequence);
             if (api_resp.status.code) {
                 _return.status.code = api_resp.status.code;
                 _return.status.message = api_resp.status.message;
@@ -2466,8 +2472,8 @@ namespace executor {
         }
         smartContractBinary.stateCanModify = solver_.isContractLocked(smartTarget);
 
-        // fill methodHeader
-        std::vector<executor::MethodHeader> methodHeader;
+        // fill methodHeaders
+        std::vector<executor::MethodHeader> methodHeaders;
         for (const auto& smart_item : smarts) {
             executor::MethodHeader header;
             const csdb::Transaction& smart = smart_item.transaction;
@@ -2499,7 +2505,7 @@ namespace executor {
             }
             else {
                 api::SmartContractInvocation sci;
-                const auto fld = smart.user_field(0);
+                const auto fld = smart.user_field(cs::trx_uf::start::Methods);
                 if (!fld.is_valid()) {
                     return std::nullopt;
                 }
@@ -2513,10 +2519,10 @@ namespace executor {
                     }
                 }
             }
-            methodHeader.push_back(header);
+            methodHeaders.push_back(header);
         }
 
-        const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeader, false /*isGetter*/, smarts[0].sequence /*sequence*/);
+        const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeaders, false /*isGetter*/, smarts[0].sequence /*sequence*/);
 
         for (const auto& smart : smarts) {
             if (!isdeploy) {
@@ -2597,8 +2603,8 @@ namespace executor {
         }
         smartContractBinary.stateCanModify = true;
 
-        // fill methodHeader
-        std::vector<executor::MethodHeader> methodHeader;
+        // fill methodHeaders
+        std::vector<executor::MethodHeader> methodHeaders;
 
         executor::MethodHeader header;
         if (contract.convention != MethodNameConvention::Default) {
@@ -2643,9 +2649,9 @@ namespace executor {
                 }
             }
         }
-        methodHeader.push_back(header);
+        methodHeaders.push_back(header);
 
-        const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeader, false /*! isGetter*/, contract.sequence);
+        const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeaders, false /*! isGetter*/, contract.sequence);
 
         if (!isdeploy) {
             if (contract.convention == MethodNameConvention::Default) {
