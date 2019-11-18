@@ -113,7 +113,7 @@ Transport::Transport(const Config& config, Node* node)
 void Transport::run() {
     host_.Run();
     processorThread_ = std::thread(&Transport::processorRoutine, this);
-    std::this_thread::sleep_for(std::chrono::seconds{10});
+    std::this_thread::sleep_for(Neighbourhood::kPingInterval);
 
     while (Transport::gSignalStatus == 0) {
         pollSignalFlag();
@@ -176,9 +176,8 @@ void Transport::processorRoutine() {
         CallsQueue::instance().callAll();
 
         std::unique_lock lk(inboxMux_);
-        newPacketsReceived_.wait_for(lk, std::chrono::seconds{1},
+        newPacketsReceived_.wait_for(lk, std::chrono::milliseconds{50},
                                     [this]() { return !inboxQueue_.empty(); });
-        CallsQueue::instance().callAll();
         checkNeighboursChange();
 
         while (!inboxQueue_.empty()) {
