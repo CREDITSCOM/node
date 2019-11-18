@@ -248,6 +248,17 @@ bool Transport::sendDirectToSock(Packet* pack, const Connection& conn) {
     return true;
 }
 
+bool Transport::sendDirectToSock(Packet* pack, const EndpointData& ep_data) {
+    if (ep_data.ipSpecified) {
+        net_->sendPackDirect(*pack, net_->resolve(ep_data));
+    }
+    else {
+        const bool ipv6 = cs::ConfigHolder::instance().config()->useIPv6();
+        net_->sendPackDirect(*pack, ip::udp::endpoint(ipv6 ? ip::udp::v6() : ip::udp::v4(), ep_data.port));
+    }
+    return true;
+}
+
 void Transport::deliverDirect(const Packet* pack, const uint32_t size, ConnectionPtr conn) {
     if (size >= Packet::MaxFragments) {
         ++Transport::cntExtraLargeNotSent;
@@ -772,6 +783,9 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
             return node_->getStateReply(data, size, rNum, firstPack.getSender());
         case MsgTypes::BlockAlarm:
             return node_->getBlockAlarm(data, size, rNum, firstPack.getSender());
+        case MsgTypes::EventReport:
+            csdebug() << "TRANSPORT> get event report message";
+            break;
         default:
             cserror() << "TRANSPORT> Unknown message type " << Packet::messageTypeToString(type) << " pack round " << rNum;
             break;
@@ -847,9 +861,17 @@ bool Transport::isShouldUpdateNeighbours() const {
     return neighbourhood_.getNeighboursCountWithoutSS() < cs::ConfigHolder::instance().config()->getMinNeighbours();
 }
 
-bool Transport::requireStartNode() const {
-    return (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::SignalServer ||
+bool Transport::requireStartNode() {
+    bool req = (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::SignalServer ||
             cs::ConfigHolder::instance().config()->getNodeType() == NodeType::Router);
+    if (req) {
+        neighbourhood_.forEachNeighbour([&](ConnectionPtr ptr) {
+            if (ptr->isSignal) {
+                req = false;
+            }
+        });
+    }
+    return req;
 }
 
 bool Transport::isShouldPending(Connection* connection) const {
