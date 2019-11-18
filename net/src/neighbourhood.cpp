@@ -879,8 +879,8 @@ bool Neighbourhood::ResendQueue::insert(Packet pack, ConnectionPtr conn) {
     if (res.second) {
         packets.push(info);
         res.first->second = &packets.back();
-        csdebug() << "Insert packet: " << (**conn).id << " " << (**conn).in << " " << cs::Utils::byteStreamToHex(info.mixHash.begin(), info.mixHash.size());
-        csdebug() << cs::Utils::byteStreamToHex(pack.getHash().begin(), pack.getHash().size());
+        csdebug() << "Insert packet: " << (**conn).id << " " << (**conn).in << " " << cs::Utils::byteStreamToHex(info.mixHash.data(), info.mixHash.size());
+        csdebug() << cs::Utils::byteStreamToHex(pack.getHash().data(), pack.getHash().size());
         return true;
     }
     return false;
@@ -896,11 +896,11 @@ void Neighbourhood::ResendQueue::remove(const cs::Hash& hash, Connection* conn) 
     auto it = packetsRef.find(mixHash);
     if (it != packetsRef.end()) {
         it->second->received = true;
-        csdebug() << "Receive packet: " << conn->in << " " << cs::Utils::byteStreamToHex(mixHash.begin(), mixHash.size());
-        csdebug() << cs::Utils::byteStreamToHex(hash.begin(), hash.size());
+        csdebug() << "Receive packet: " << conn->in << " " << cs::Utils::byteStreamToHex(mixHash.data(), mixHash.size());
+        csdebug() << cs::Utils::byteStreamToHex(hash.data(), hash.size());
     } else {
-        csdebug() << "Miss!!!!!!!!!!!!!!" << " " << conn->in << " " << cs::Utils::byteStreamToHex(mixHash.begin(), mixHash.size());
-        csdebug() << cs::Utils::byteStreamToHex(hash.begin(), hash.size());
+        csdebug() << "Miss!!!!!!!!!!!!!!" << " " << conn->in << " " << cs::Utils::byteStreamToHex(mixHash.data(), mixHash.size());
+        csdebug() << cs::Utils::byteStreamToHex(hash.data(), hash.size());
     }
 }
 
