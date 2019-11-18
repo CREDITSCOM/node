@@ -99,7 +99,7 @@ template <typename T>
 using Future = std::future<T>;
 
 template <typename Result>
-class FutureBase {
+class FutureBase : public std::enable_shared_from_this<FutureBase<Result>> {
     friend class Concurrent;
 
 public:
@@ -335,7 +335,7 @@ public:
         }
 
         // watcher will be removed after lambda called
-        cs::Connector::connect(&watcher->completed, [](typename FutureWatcher<ReturnType>::Id id) {
+        cs::Connector::connect(&watcher->completed, [storage = watcher->shared_from_this()](typename FutureWatcher<ReturnType>::Id id) {
             ExecutionsIterator iter;
 
             {
@@ -346,10 +346,8 @@ public:
             }
 
             if (iter != executions.end()) {
-                cs::Concurrent::run([=]() {
-                    cs::Lock lock(executionsMutex_);
-                    executions.erase(iter);
-                });
+                cs::Lock lock(executionsMutex_);
+                executions.erase(iter);
             }
         });
 
@@ -418,7 +416,7 @@ private:
 
     std::condition_variable conditionalVariable_;
     std::mutex lock_;
-    T hash_;
+    T data_;
 
     const unsigned int kWaitSecondsTime{ 30 };
 
@@ -434,17 +432,17 @@ public:
     }
 
     template <typename Func>
-    bool waitTillFront(const Func& type) {
+    bool waitTillFront(Func func) {
         std::unique_lock lock(lock_);
 
         auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(kWaitSecondsTime), [&]() {
-            return type(hash_);
+            return func(data_);
         });
 
         auto tid = std::this_thread::get_id();
         tidMap_.erase(tid);
 
-        hash_.condFlg = false;
+        data_.condFlg = false;
         conditionalVariable_.notify_all();
 
         return res;
@@ -467,11 +465,11 @@ public:
         }
     }
 
-    template <typename Hash>
-    void updateHash(const Hash& hash) {
+    template <typename Func>
+    void updateHash(Func func) {
         {
             cs::Lock lock(lock_);
-            hash_ = hash(hash_);
+            data_ = func(data_);
         }
 
         conditionalVariable_.notify_all();
@@ -505,9 +503,6 @@ struct SpinLockable {
 private:
     std::mutex mutex_;
     T type_;
-#ifdef API_SPINLOCK
-    __cacheline_aligned std::atomic_flag atomicFlag_ = ATOMIC_FLAG_INIT;
-#endif
 
     friend struct SpinLockedRef<T>;
 };
@@ -519,23 +514,11 @@ private:
 public:
     SpinLockedRef(SpinLockable<T>& lockable)
     : lockable_(&lockable) {
-#ifdef API_SPINLOCK
-        while (this->lockable_->atomicFlag_.test_and_set(std::memory_order_acquire)) {
-            std::this_thread::yield();
-        }
-#else
         lockable_->lock();
-#endif
     }
 
     ~SpinLockedRef() {
-#ifdef API_SPINLOCK
-        if (lockable_) {
-            lockable_->atomicFlag_.clear(std::memory_order_release);
-        }
-#else
         lockable_->unlock();
-#endif
     }
 
     SpinLockedRef(const SpinLockedRef&) = delete;
