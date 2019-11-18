@@ -38,6 +38,7 @@ const std::string BLOCK_NAME_HOST_ADDRESS = "host_address";
 const std::string BLOCK_NAME_POOL_SYNC = "pool_sync";
 const std::string BLOCK_NAME_API = "api";
 const std::string BLOCK_NAME_CONVEYER = "conveyer";
+const std::string BLOCK_NAME_EVENT_REPORTER = "event_report";
 
 const std::string PARAM_NAME_NODE_TYPE = "node_type";
 const std::string PARAM_NAME_BOOTSTRAP_TYPE = "bootstrap_type";
@@ -83,6 +84,20 @@ const std::string PARAM_NAME_EXECUTOR_CHECK_VERSION_DELAY = "executor_check_vers
 const std::string PARAM_NAME_EXECUTOR_MULTI_INSTANCE = "executor_multi_instance";
 const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MIN = "executor_commit_min";
 const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MAX = "executor_commit_max";
+
+const std::string PARAM_NAME_EVENTS_CONSENSUS_LIAR = "consensus_liar";
+const std::string PARAM_NAME_EVENTS_CONSENSUS_SILENT = "consensus_silent";
+const std::string PARAM_NAME_EVENTS_CONSENSUS_FAILED = "consensus_failed";
+const std::string PARAM_NAME_EVENTS_CONTRACTS_LIAR = "contracts_liar";
+const std::string PARAM_NAME_EVENTS_CONTRACTS_SILENT = "contracts_silent";
+const std::string PARAM_NAME_EVENTS_CONTRACTS_FAILED = "contracts_failed";
+const std::string PARAM_NAME_EVENTS_ADD_GRAY_LIST = "add_gray_list";
+const std::string PARAM_NAME_EVENTS_ERASE_GRAY_LIST = "erase_gray_list";
+const std::string PARAM_NAME_EVENTS_REJECT_TRANSACTION = "reject_transaction";
+const std::string PARAM_NAME_EVENTS_REJECT_CONTRACT_EXECUTION = "reject_contract_execution";
+const std::string PARAM_NAME_EVENTS_REJECT_CONTRACT_CONSENSUS = "reject_contract_consensus";
+const std::string PARAM_NAME_EVENTS_ALARM_INVALID_BLOCK = "alarm_invalid_block";
+const std::string PARAM_NAME_EVENTS_BIG_BANG = "big_bang";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
@@ -771,6 +786,7 @@ Config Config::readFromFile(const std::string& fileName) {
         result.readPoolSynchronizerData(config);
         result.readApiData(config);
         result.readConveyerData(config);
+        result.readEventsReportData(config);
 
         result.good_ = true;
     }
@@ -882,6 +898,30 @@ void Config::readConveyerData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE, conveyerData_.maxResendsSendCache);
 }
 
+void Config::readEventsReportData(const boost::property_tree::ptree& config) {
+    if (!config.count(BLOCK_NAME_EVENT_REPORTER)) {
+        eventsReport_.on = false;
+        return;
+    }
+    eventsReport_.on = true;
+    eventsReport_.collector_ep = readEndpoint(config, BLOCK_NAME_EVENT_REPORTER);
+
+    const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_EVENT_REPORTER);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_CONSENSUS_LIAR, eventsReport_.consensus_liar);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_CONSENSUS_SILENT, eventsReport_.consensus_silent);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_CONSENSUS_FAILED, eventsReport_.consensus_failed);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_CONTRACTS_LIAR, eventsReport_.contracts_liar);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_CONTRACTS_SILENT, eventsReport_.contracts_silent);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_CONTRACTS_FAILED, eventsReport_.contracts_failed);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_ADD_GRAY_LIST, eventsReport_.add_to_gray_list);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_ERASE_GRAY_LIST, eventsReport_.erase_from_gray_list);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_REJECT_TRANSACTION, eventsReport_.reject_transaction);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_REJECT_CONTRACT_EXECUTION, eventsReport_.reject_contract_execution);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_REJECT_CONTRACT_CONSENSUS, eventsReport_.reject_contract_consensus);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_ALARM_INVALID_BLOCK, eventsReport_.alarm_invalid_block);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_BIG_BANG, eventsReport_.big_bang);
+}
+
 template <typename T>
 bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value) {
     if (data.count(param)) {
@@ -965,34 +1005,56 @@ bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs) {
     return !(lhs == rhs);
 }
 
+bool operator==(const EventsReportData& lhs, const EventsReportData rhs) {
+    return lhs.on == rhs.on &&
+        lhs.add_to_gray_list == rhs.add_to_gray_list &&
+        lhs.alarm_invalid_block == rhs.alarm_invalid_block &&
+        lhs.consensus_failed == rhs.consensus_failed &&
+        lhs.consensus_liar == rhs.consensus_liar &&
+        lhs.consensus_silent == rhs.consensus_silent &&
+        lhs.contracts_failed == rhs.contracts_failed &&
+        lhs.contracts_liar == rhs.contracts_liar &&
+        lhs.contracts_silent == rhs.contracts_silent &&
+        lhs.erase_from_gray_list == rhs.erase_from_gray_list &&
+        lhs.reject_contract_consensus == rhs.reject_contract_consensus &&
+        lhs.reject_contract_execution == rhs.reject_contract_execution &&
+        lhs.reject_transaction == rhs.reject_transaction &&
+        lhs.collector_ep == rhs.collector_ep;
+}
+
+bool operator!=(const EventsReportData& lhs, const EventsReportData& rhs) {
+    return !(lhs == rhs);
+}
+
 // logger settings not checked
 bool operator==(const Config& lhs, const Config& rhs) {
     return lhs.good_ == rhs.good_ &&
-           lhs.inputEp_ == rhs.inputEp_ &&
-           lhs.twoSockets_ == rhs.twoSockets_ &&
-           lhs.outputEp_ == rhs.outputEp_ &&
-           lhs.nType_ == rhs.nType_ &&
-           lhs.ipv6_ == rhs.ipv6_ &&
-           lhs.minNeighbours_ == rhs.minNeighbours_ &&
-           lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
-           lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
-           lhs.symmetric_ == rhs.symmetric_ &&
-           lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
-           lhs.bType_ == rhs.bType_ &&
-           lhs.signalServerEp_ == rhs.signalServerEp_ &&
-           lhs.bList_ == rhs.bList_ &&
-           lhs.pathToDb_ == rhs.pathToDb_ &&
-           lhs.publicKey_ == rhs.publicKey_ &&
-           lhs.privateKey_ == rhs.privateKey_ &&
-           lhs.poolSyncData_ == rhs.poolSyncData_ &&
-           lhs.apiData_ == rhs.apiData_ &&
-           lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
-           lhs.compatibleVersion_ == rhs.compatibleVersion_ &&
-           lhs.recreateIndex_ == rhs.recreateIndex_ &&
-           lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
-           lhs.roundElapseTime_ == rhs.roundElapseTime_ &&
-           lhs.conveyerData_ == rhs.conveyerData_ &&
-           lhs.minCompatibleVersion_ == rhs.minCompatibleVersion_;
+        lhs.inputEp_ == rhs.inputEp_ &&
+        lhs.twoSockets_ == rhs.twoSockets_ &&
+        lhs.outputEp_ == rhs.outputEp_ &&
+        lhs.nType_ == rhs.nType_ &&
+        lhs.ipv6_ == rhs.ipv6_ &&
+        lhs.minNeighbours_ == rhs.minNeighbours_ &&
+        lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
+        lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
+        lhs.symmetric_ == rhs.symmetric_ &&
+        lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
+        lhs.bType_ == rhs.bType_ &&
+        lhs.signalServerEp_ == rhs.signalServerEp_ &&
+        lhs.bList_ == rhs.bList_ &&
+        lhs.pathToDb_ == rhs.pathToDb_ &&
+        lhs.publicKey_ == rhs.publicKey_ &&
+        lhs.privateKey_ == rhs.privateKey_ &&
+        lhs.poolSyncData_ == rhs.poolSyncData_ &&
+        lhs.apiData_ == rhs.apiData_ &&
+        lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
+        lhs.compatibleVersion_ == rhs.compatibleVersion_ &&
+        lhs.recreateIndex_ == rhs.recreateIndex_ &&
+        lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
+        lhs.roundElapseTime_ == rhs.roundElapseTime_ &&
+        lhs.conveyerData_ == rhs.conveyerData_ &&
+        lhs.minCompatibleVersion_ == rhs.minCompatibleVersion_ &&
+        lhs.eventsReport_ == rhs.eventsReport_;
 }
 
 bool operator!=(const Config& lhs, const Config& rhs) {

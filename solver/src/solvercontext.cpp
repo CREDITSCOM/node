@@ -246,4 +246,8 @@ void SolverContext::next_trusted_candidates(const std::vector<cs::PublicKey>& no
     core.hashes_candidates = hashes;
 }
 
+void SolverContext::send_rejected_report(const cs::Bytes& rejected_pack) {
+    EventReport::sendReject(*core.pnode, rejected_pack);
+}
+
 }  // namespace cs

@@ -17,6 +17,7 @@
 #include <csnode/blockvalidator.hpp>
 #include <csnode/roundpackage.hpp>
 #include <csnode/configholder.hpp>
+#include <csnode/eventreport.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/progressbar.hpp>
@@ -875,6 +876,69 @@ void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::
     }
 }
 
+void Node::reportEvent(const cs::Bytes& bin_pack) {
+    const auto& conf = cs::ConfigHolder::instance().config()->getEventsReportData();
+    if (!conf.on) {
+        return;
+    }
+    cs::Bytes message;
+    cs::DataStream stream(message);
+
+    constexpr uint8_t kEventReportVersion = 0;
+
+    if constexpr (kEventReportVersion == 0) {
+        stream << kEventReportVersion << blockChain_.getLastSeq() << bin_pack;
+    }
+    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+    ostream_.init(BaseFlags::Direct);
+    ostream_ << MsgTypes::EventReport << cs::Conveyer::instance().currentRoundNumber() << sig << message;
+    transport_->sendDirectToSock(ostream_.getPackets(), conf.collector_ep);
+    ostream_.clear();
+    csmeta(csdebug) << "event report -> " << conf.collector_ep.ip << ':' << conf.collector_ep.port;
+}
+
+void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+    istream_.init(data, size);
+    cs::Signature sig;
+    cs::Bytes message;
+    istream_ >> sig >> message;
+    if (!cscrypto::verifySignature(sig, sender, message.data(), message.size())) {
+        csdebug() << "NODE> event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " -  WRONG SIGNATURE!!!";
+        return;
+    }
+
+    cs::DataStream stream(message.data(), message.size());
+    uint8_t report_version = 0;
+    cs::Sequence sender_last_block = 0;
+    cs::Bytes bin_pack;
+    stream >> report_version;
+    if (report_version == 0) {
+        stream >> sender_last_block >> bin_pack;
+        csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+            << ", sender round R-" << WithDelimiters(rNum)
+            << ", sender last block #" << WithDelimiters(sender_last_block)
+            << ", info size " << bin_pack.size();
+        const auto event_id = EventReport::getId(bin_pack);
+        if (event_id == EventReport::Id::RejectTransactions) {
+            const auto resume = EventReport::parseReject(bin_pack);
+            if (!resume.empty()) {
+                size_t cnt = 0;
+                std::ostringstream os;
+                std::for_each(resume.cbegin(), resume.cend(), [&](const auto& item) {
+                    cnt += item.second;
+                    os << Reject::to_string(item.first) << " (" << item.second << ") ";
+                });
+                csdebug() << EventReport::log_prefix << "rejected " << cnt << "transactions the following reasons: " << os.str();
+            }
+        }
+    }
+    else {
+        csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+            << " of incompatible version " << int(report_version)
+            << ", sender round R-" << WithDelimiters(rNum);
+    }
+}
+
 void Node::cleanConfirmationList(cs::RoundNumber rNum) {
     confirmationList_.remove(rNum);
 }
@@ -1314,6 +1378,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         case MsgTypes::StateRequest:
         case MsgTypes::StateReply:
         case MsgTypes::BlockAlarm:
+        case MsgTypes::EventReport:
             return MessageActions::Process;
 
         default:
@@ -3211,6 +3276,9 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
         csdebug() << "NODE> Transaction timer started";
         sendingTimer_.start(cs::TransactionsPacketInterval);
     }
+
+    cs::Bytes b{};
+    reportEvent(b);
 }
 
 void Node::startConsensus() {
