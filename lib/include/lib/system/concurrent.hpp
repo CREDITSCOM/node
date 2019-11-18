@@ -437,8 +437,6 @@ public:
     bool waitTillFront(const Func& type) {
         std::unique_lock lock(lock_);
 
-        auto point = std::chrono::steady_clock::now();
-
         auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(kWaitSecondsTime), [&]() {
             return type(hash_);
         });
