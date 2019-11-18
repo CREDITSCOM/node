@@ -241,7 +241,7 @@ protected:
         };
 
         Super::state_ = WatcherState::Running;
-        Worker::execute(std::move(closure));
+        Worker::run(std::move(closure));
     }
 
 public signals:
@@ -297,7 +297,7 @@ protected:
         };
 
         Super::state_ = WatcherState::Running;
-        Worker::execute(std::move(closure));
+        Worker::run(std::move(closure));
     }
 
 public signals:
@@ -437,6 +437,8 @@ public:
     bool waitTillFront(const Func& type) {
         std::unique_lock lock(lock_);
 
+        auto point = std::chrono::steady_clock::now();
+
         auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(kWaitSecondsTime), [&]() {
             return type(hash_);
         });
@@ -469,8 +471,11 @@ public:
 
     template <typename Hash>
     void updateHash(const Hash& hash) {
-        cs::Lock lock(lock_);
-        hash_ = hash(hash_);
+        {
+            cs::Lock lock(lock_);
+            hash_ = hash(hash_);
+        }
+
         conditionalVariable_.notify_all();
     }
 };
