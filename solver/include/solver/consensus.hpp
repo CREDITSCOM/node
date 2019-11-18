@@ -25,6 +25,9 @@ public:
      * activates */
     constexpr static unsigned int PostConsensusTimeout = 60000;
 
+    /** @brief   Maximum round duration when the transaction input is allowed - used to avoid BlackList */
+    constexpr static size_t MaxRoundDuration = 300000;
+
     /** @brief   The minimum trusted nodes to start consensus */
     constexpr static unsigned int MinTrustedNodes = 3;
 
@@ -44,7 +47,7 @@ public:
     constexpr static uint64_t MaxTimeStampDelta = 1000 * 60 * 3;
 
     /** @brief   Min duration (msec) to collect hashes in stage-1 of consensus */
-    constexpr static uint32_t T_min_stage1 = 170;
+    constexpr static uint32_t T_min_stage1 = 500;
 
     /** @brief   Number of rounds to prevent node from consensus participation */
     constexpr static uint32_t GrayListPunishment = 1000;
@@ -72,6 +75,27 @@ public:
 
     /** @brief   Max hashes count to include in stage one data */
     constexpr static size_t MaxStageOneHashes = 100;
+
+    /** @brief   Black list counter - max number of penalty points to get to the black list */
+    constexpr static size_t BlackListCounterMaxValue = 100000;
+
+    /** @brief   Black list counter - amount of penalty points for one mistake */
+    constexpr static size_t BlackListCounterSinglePenalty = 10000;
+
+    /** @brief   Max transaction size */
+    constexpr static size_t MaxTransactionSize = 100 * 1024;
+
+    /** @brief   Max hashes count to include in stage one data */
+    constexpr static size_t MaxStageOneTransactions = 1000;
+
+    /** @brief   Max transaction's size to include in stage one data */
+    constexpr static size_t MaxPreliminaryBlockSize = 1 * 1024 * 1024;
+
+    /** @brief   Max transactions count in smart contract execution result, both new state and emitted ones */
+    constexpr static size_t MaxContractResultTransactions = 100;
+
+    /** @brief   Max transactions in the packet, the sender won't be accused for, if all them are invalid */
+    constexpr static size_t AccusalPacketSize = 10;
 
     /** @brief   Max count of rounds to execute smart contract. After that contract is assumed failed unconditionally */
     constexpr static unsigned int MaxRoundsCancelContract = 100;

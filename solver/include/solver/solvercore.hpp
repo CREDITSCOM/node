@@ -7,6 +7,8 @@
 #include "stage.hpp"
 #include "timeouttracking.hpp"
 
+#include <csnode/itervalidator.hpp>
+
 #include <csdb/pool.hpp>
 #include <csnode/transactionspacket.hpp>
 #include <csnode/roundpackage.hpp>
@@ -26,6 +28,8 @@ class Node;
 namespace cs {
 class WalletsState;
 class SmartContracts;
+class TransactionsPacket;
+class IterValidator;
 }  // namespace cs
 
 // TODO: discuss possibility to switch states after timeout expired, timeouts can be individual but controlled by
@@ -120,22 +124,20 @@ public:
     void resetGrayList() {
         grayList_.clear();
     }
+
+    bool isTransactionsInputAvailable();
+
+    void askTrustedRound(cs::RoundNumber rNum, const cs::ConfidantsKeys& confidants);
     uint64_t lastTimeStamp();
     void uploadNewStates(std::vector<csdb::Transaction> newStates);
     cs::Bytes getRealTrusted();
     size_t trueStagesThree();
     uint8_t currentStage3iteration();
 
+    std::optional<cs::Characteristic> ownValidation(cs::TransactionsPacket& packet, cs::Packets& smartsPackets);
+
     size_t stagesThree();
     bool stateFailed(Result res);
-
-    /// <summary>   Adds a transaction passed to send pool </summary>
-    ///
-    /// <remarks>   Aae, 14.10.2018. </remarks>
-    ///
-    /// <param name="tr">   The transaction </param>
-
-    void send_wallet_transaction(const csdb::Transaction& tr);
 
     cs::SmartContracts& smart_contracts() const {
         return *psmarts;
@@ -341,6 +343,7 @@ private:
     cs::RoundNumber lastGrayUpdated_ = 0;
     RoundPackage justCreatedRoundPackage;
     SentSignatures lastSentSignatures_;
+    std::unique_ptr<IterValidator> pVal_;
 };
 
 }  // namespace cs

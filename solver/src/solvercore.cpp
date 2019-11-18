@@ -3,6 +3,7 @@
 #include <solvercore.hpp>
 #include <states/nostate.hpp>
 
+
 #pragma warning(push)
 #pragma warning(disable : 4267 4244 4100 4245)
 #include <csnode/node.hpp>
@@ -17,6 +18,7 @@
 #include <sstream>
 #include <string>
 #include <list>
+#include <iomanip>
 
 namespace
 {
@@ -90,6 +92,9 @@ SolverCore::SolverCore(Node* pNode, csdb::Address GenesisAddress, csdb::Address 
     auto& bc = pNode->getBlockChain();
     pws = std::make_unique<cs::WalletsState>(bc.getCacheUpdater());
     psmarts = std::make_unique<cs::SmartContracts>(bc, scheduler);
+    if (!pVal_) {
+        pVal_ = std::make_unique<IterValidator>(pcontext->wallets());
+    }
 }
 
 SolverCore::~SolverCore() {
@@ -572,6 +577,22 @@ void SolverCore::removeDeferredBlock(cs::Sequence seq) {
 
 uint8_t SolverCore::subRound() {
     return (pnode->subRound());
+}
+
+std::optional<cs::Characteristic> SolverCore::ownValidation(cs::TransactionsPacket& packet, cs::Packets& smartsPackets) {
+    const std::size_t transactionsCount = packet.transactionsCount();
+
+    cs::Characteristic characteristic;
+    csdebug() << "Before characteristic creation";
+    if (transactionsCount > 0) {
+        characteristic = pVal_->formCharacteristic(*pcontext, packet.transactions(), smartsPackets);
+    }
+    csdebug() << "After characteristic creation";
+    if (characteristic.mask.size() != transactionsCount) {
+        cserror() << log_prefix << ": characteristic mask size is not equal to transactions count in build_vector()";
+        return std::nullopt;
+    }
+    return std::make_optional<cs::Characteristic>(std::move(characteristic));
 }
 
 bool SolverCore::isInGrayList(cs::PublicKey key) {

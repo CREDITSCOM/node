@@ -25,14 +25,7 @@ public:
     TaskPtr(const TaskPtr&) = delete;
     TaskPtr& operator=(const TaskPtr&) = delete;
     TaskPtr& operator=(TaskPtr&&) = delete;
-    /*
-      ~TaskPtr() {
-        if (valid_) {
-          owner_->releaseTask(it_);
-          valid_ = false;
-        }
-      }
-    */
+
     void release() {
         if (valid_) {
             owner_->releaseTask(it_);
@@ -48,8 +41,7 @@ public:
     }
 
 private:
-    TaskPtr() {
-    }
+    TaskPtr() = default;
 
     typename Pacman::TaskIterator it_;
     Pacman* owner_;
@@ -57,21 +49,10 @@ private:
 
     friend Pacman;
 };
-/*
-template<typename Task>
-struct TaskBody {
-  operator Task&() {
-    return *reinterpret_cast<Task *>(data);
-  }
-
-  char data[sizeof(Task)];
-};
-*/
 
 class IPacMan {
 public:
-    IPacMan() {
-    }
+    IPacMan() = default;
 
     struct Task {
         ip::udp::endpoint sender;

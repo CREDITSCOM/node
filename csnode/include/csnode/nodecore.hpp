@@ -24,10 +24,7 @@ struct hash<cs::TransactionsPacketHash> {
 
 namespace cs {
 // table for fast transactions storage
-using TransactionsPacketTable = std::map<TransactionsPacketHash, TransactionsPacket>;  // TODO: check performance of map/unordered_map
-
-// send transactions packet cache for conveyer
-using TransactionPacketSendCache = std::multimap<cs::RoundNumber, TransactionsPacketHash>;
+using TransactionsPacketTable = std::map<TransactionsPacketHash, TransactionsPacket>;   // to be sorted by default
 
 // array of packets
 using TransactionsBlock = std::vector<cs::TransactionsPacket>;

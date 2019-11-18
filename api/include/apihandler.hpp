@@ -37,6 +37,8 @@
 #include <lib/system/process.hpp>
 
 #include "tokens.hpp"
+#include "dumbcv.hpp"
+#include "executormanager.hpp"
 
 #include <tuple>
 #include <any>
@@ -383,6 +385,11 @@ public:
         ServerStartError
     };
 
+    enum class ExecutorState {
+        Launching,
+        Launched
+    };
+
     enum ACCESS_ID_RESERVE { GETTER, START_INDEX };
 
     struct ExecuteTransactionInfo {
@@ -487,32 +494,10 @@ public slots:
     }
 
     void onExecutorStarted();
+    void onExecutorFinished(int code, const std::error_code&);
+    void onExecutorProcessError(const cs::ProcessException& exception);
 
-    void onExecutorFinished(int code, const std::error_code&) {
-        if (requestStop_) {
-            return;
-        }
-
-        if (!executorMessages_.count(code)) {
-            cswarning() << "Executor unknown error";
-        }
-        else {
-            cswarning() << executorMessages_[code];
-        }
-
-        if (code == ExecutorErrorCode::ServerStartError ||
-            code == ExecutorErrorCode::IncorrecJdkVersion) {
-            return;
-        }
-
-        cs::Concurrent::run([this] {
-            runProcess();
-        });
-    }
-
-    void onExecutorProcessError(const cs::ProcessException& exception) {
-        cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
-    }
+    void checkExecutorVersion();
 
 private:
     int commitMin_{};
@@ -527,13 +512,20 @@ private:
     }
 
     void runProcess() {
+        state_ = ExecutorState::Launching;
+
         executorProcess_->terminate();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(cs::ConfigHolder::instance().config()->getApiSettings().executorRunDelay));
 
         executorProcess_->setProgram(cs::ConfigHolder::instance().config()->getApiSettings().executorCmdLine);
         executorProcess_->launch(cs::Process::Options::None);
+
+        state_ = ExecutorState::Launched;
     }
+
+    void runProcessAsync();
+    void checkAnotherExecutor();
 
     struct OriginExecuteResult {
         ExecuteByteCodeResult resp;
@@ -627,6 +619,9 @@ private:
     const int16_t EXECUTOR_VERSION = 3;
 
     std::mutex callExecutorLock_;
+
+    cs::ExecutorManager manager_;
+    ExecutorState state_;
 
     std::map<int, const char*> executorMessages_ = {
         { NoError, "Executor finished with no error code" },
@@ -754,49 +749,7 @@ private:
     ::csstats::AllStats stats_;
 #endif // 0
     executor::Executor& executor_;
-
-    // for answer dumb transactions        
-    class DUMBCV {
-    public:
-        bool addCVInfo(const cs::Signature& signature) {
-            std::lock_guard<std::mutex> lk(dumbMutex);
-            if (const auto& it = mCvInfo_.find(signature); it != mCvInfo_.end())
-                return false;
-            mCvInfo_[signature];
-            return true;
-        }
-
-        void sendCvSignal(const cs::Signature& signature) {
-            std::lock_guard<std::mutex> lk(dumbMutex);
-            if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
-                auto&[cv, condFlg] = it->second;
-                cv.notify_one();
-                condFlg = true;
-            }
-        }
-
-        bool waitCvSignal(const cs::Signature& signature) {
-            bool isTimeOver = false;
-            std::unique_lock lock(dumbMutex);
-            if (auto it = mCvInfo_.find(signature); it != mCvInfo_.end()) {
-                isTimeOver = it->second.cv_.wait_for(lock, std::chrono::seconds(30), [it]() -> bool {
-                    return it->second.condFlg_;
-                });
-
-                mCvInfo_.erase(signature);
-            }
-
-            return isTimeOver;
-        }
-    private:
-        struct CVInfo {
-            std::condition_variable cv_;
-            std::atomic_bool condFlg_{ false };
-        };
-        std::map<cs::Signature, CVInfo> mCvInfo_;
-        std::mutex dumbMutex;
-    } dumbCv_;
-    //
+    cs::DumbCv dumbCv_;
 
     bool isBDLoaded_{ false };
 
@@ -820,9 +773,9 @@ private:
         bool condFlg{false};
     };
 
-    using client_type           = executor::ContractExecutorConcurrentClient;
-    using smartHashStateEntry   = cs::WorkerQueue<HashState>;
-   
+    using client_type = executor::ContractExecutorConcurrentClient;
+    using smartHashStateEntry = cs::WorkerQueue<HashState>;
+
     BlockChain& blockchain_;
     cs::SolverCore& solver_;
 #ifdef USE_DEPRECATED_STATS // MONITOR_NODE
@@ -875,7 +828,7 @@ private:
     cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>> smart_origin;
     cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>> smartLastTrxn_;
 
-    cs::SpinLockable<std::map<cs::Signature, smartHashStateEntry>> hashStateSL;
+    cs::SpinLockable<std::map<cs::Signature, std::shared_ptr<smartHashStateEntry>>> hashStateSL;
 
     cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>> deployedByCreator_;
 

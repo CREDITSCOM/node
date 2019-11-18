@@ -206,11 +206,8 @@ TEST(Signals, SignalToSignalConnection) {
     ASSERT_EQ(isCalled, true);
 }
 
-size_t foo() {
-    static size_t callsCount = 0;
+void foo(std::reference_wrapper<size_t> callsCount) {
     std::cout << "Foo calls count " << ++callsCount << std::endl;
-
-    return callsCount;
 }
 
 TEST(Signals, LambdaAndFunctionConnectionDisconnection) {
@@ -219,14 +216,16 @@ TEST(Signals, LambdaAndFunctionConnectionDisconnection) {
         cs::Signal<void()> signal;
     };
 
+    size_t functionCallsCount = 0;
+    size_t lambdaCallsCount = 0;
+
+    auto binder = std::bind(&foo, std::ref(functionCallsCount));
+
     auto a = std::make_shared<A>();
-    cs::Connector::connect(&(a->signal), &foo);
+    cs::Connector::connect(&(a->signal), binder);
 
-    auto lambda = []() {
-        static size_t callsCount = 0;
-        std::cout << "Lambda calls count " << ++callsCount << std::endl;
-
-        return callsCount;
+    auto lambda = [&]() {
+        std::cout << "Lambda calls count " << ++lambdaCallsCount << std::endl;
     };
 
     cs::Connector::connect(&(a->signal), lambda);
@@ -234,25 +233,25 @@ TEST(Signals, LambdaAndFunctionConnectionDisconnection) {
     emit a->signal();
 
     ASSERT_EQ(cs::Connector::callbacks(&(a->signal)), 2);
-    ASSERT_EQ(foo(), 2);
-    ASSERT_EQ(lambda(), 2);
+    ASSERT_EQ(functionCallsCount, 1);
+    ASSERT_EQ(lambdaCallsCount, 1);
 
-    bool result = cs::Connector::disconnect(&(a->signal), &foo);
+    bool result = cs::Connector::disconnect(&(a->signal), binder);
     ASSERT_EQ(result, true);
 
     emit a->signal();
 
     ASSERT_EQ(cs::Connector::callbacks(&(a->signal)), 1);
-    ASSERT_EQ(foo(), 3);
-    ASSERT_EQ(lambda(), 4);
+    ASSERT_EQ(functionCallsCount, 1);
+    ASSERT_EQ(lambdaCallsCount, 2);
 
-    cs::Connector::connect(&(a->signal), &foo);
+    cs::Connector::connect(&(a->signal), binder);
 
     emit a->signal();
 
     ASSERT_EQ(cs::Connector::callbacks(&(a->signal)), 2);
-    ASSERT_EQ(foo(), 5);
-    ASSERT_EQ(lambda(), 6);
+    ASSERT_EQ(functionCallsCount, 2);
+    ASSERT_EQ(lambdaCallsCount, 3);
 
     result = cs::Connector::disconnect(&(a->signal), lambda);
     ASSERT_EQ(result, true);
@@ -260,16 +259,16 @@ TEST(Signals, LambdaAndFunctionConnectionDisconnection) {
     emit a->signal();
 
     ASSERT_EQ(cs::Connector::callbacks(&(a->signal)), 1);
-    ASSERT_EQ(foo(), 7);
-    ASSERT_EQ(lambda(), 7);
+    ASSERT_EQ(functionCallsCount, 3);
+    ASSERT_EQ(lambdaCallsCount, 3);
 
     cs::Connector::disconnect(&(a->signal));
 
     emit a->signal();
 
     ASSERT_EQ(cs::Connector::callbacks(&(a->signal)), 0);
-    ASSERT_EQ(foo(), 8);
-    ASSERT_EQ(lambda(), 8);
+    ASSERT_EQ(functionCallsCount, 3);
+    ASSERT_EQ(lambdaCallsCount, 3);
 }
 
 TEST(Signals, ConstObjectConnection) {

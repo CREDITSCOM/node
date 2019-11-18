@@ -1,17 +1,14 @@
 #ifndef CONVEYER_HPP
 #define CONVEYER_HPP
 
+#include <memory>
+#include <optional>
+
 #include <csnode/nodecore.hpp>
 #include <csnode/packetqueue.hpp>
 
 #include <lib/system/common.hpp>
 #include <lib/system/signals.hpp>
-
-#include <memory>
-#include <optional>
-
-class Config;
-struct ConveyerData;
 
 namespace csdb {
 class Transaction;
@@ -46,6 +43,8 @@ public:
         MaxPacketsPerRound = 10,
         MaxQueueSize = 1000000
     };
+
+    void setPrivateKey(const cs::PrivateKey& privateKey);
 
     ///
     /// @brief Sets cached conveyer round number for utility.
@@ -86,7 +85,7 @@ public:
     /// @brief Returns pair of transactions packet created in current round and smart contract packets.
     /// @warning Slow-performance method. Thread safe.
     ///
-    std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> createPacket() const;
+    std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> createPacket(cs::RoundNumber round) const;
 
     // round info
 
@@ -288,7 +287,12 @@ public:
     ///
     /// @brief Returns current send cache size
     ///
-    size_t sendCacheCount() const;
+    size_t sendCacheSize() const;
+
+    ///
+    /// @brief Returns current packets table size
+    ///
+    size_t packetsTableSize() const;
 
     // sync, try do not use it :]
     std::unique_lock<cs::SharedMutex> lock() const;
@@ -299,6 +303,7 @@ public:
     /// @return returns true, if hash does not exist at send cache and exists at hash table.
     ///  returns false if hash exists at send cache or does not found at packets table.
     ///
+    [[deprecated]]
     bool addRejectedHashToCache(const cs::TransactionsPacketHash& hash);
 
 public signals:
@@ -312,6 +317,7 @@ public slots:
     void flushTransactions();
 
 protected:
+    void addPacketToMeta(cs::RoundNumber round, cs::TransactionsPacket& packet);
     void changeRound(cs::RoundNumber round);
 
     // searches transactions packet at all conveyer cache

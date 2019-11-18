@@ -123,19 +123,18 @@ namespace cs {
 csdb::UserField SmartContractRef::to_user_field() const {
     cs::Bytes data;
     cs::DataStream stream(data);
-    stream << hash << sequence << transaction;
+    stream << csdb::PoolHash{} /*for compatibility*/ << sequence << transaction;
     return csdb::UserField(stream.convert<std::string>());
 }
 
 void SmartContractRef::from_user_field(const csdb::UserField& fld) {
     std::string data = fld.value<std::string>();
     cs::DataStream stream(data.c_str(), data.size());
-    stream >> hash >> sequence >> transaction;
+    csdb::PoolHash dummy; // for compatibility
+    stream >> dummy >> sequence >> transaction;
     if (!stream.isValid() || stream.isAvailable(1)) {
-        cserror() << "SmartCotractRef: read from malformed user field, abort!";
-        hash = csdb::PoolHash{};
-        sequence = std::numeric_limits<decltype(sequence)>().max();
-        transaction = std::numeric_limits<decltype(transaction)>().max();
+        cserror() << "SmartCotractRef: failed to read from malformed user field";
+        invalidate();
     }
 }
 
@@ -250,6 +249,11 @@ std::string SmartContracts::get_error_message(int8_t code) {
 
 /*static*/
 bool SmartContracts::is_smart_contract(const csdb::Transaction& tr) {
+    return SmartContracts::is_executable(tr) || SmartContracts::is_new_state(tr);
+}
+
+/*static*/
+bool SmartContracts::is_executable(const csdb::Transaction& tr) {
     if (!tr.is_valid()) {
         return false;
     }
@@ -261,15 +265,7 @@ bool SmartContracts::is_smart_contract(const csdb::Transaction& tr) {
             f = tr.user_field(trx_uf::start::Methods);
         }
     }
-    if (f.is_valid()) {
-        return f.type() == csdb::UserField::Type::String;
-    }
-    return SmartContracts::is_new_state(tr);
-}
-
-/*static*/
-bool SmartContracts::is_executable(const csdb::Transaction& tr) {
-    return SmartContracts::is_smart_contract(tr) && !SmartContracts::is_new_state(tr);
+    return (f.is_valid() && f.type() == csdb::UserField::Type::String);
 }
 
 /*static*/
@@ -296,6 +292,9 @@ bool SmartContracts::is_start(const csdb::Transaction& tr) {
 
 /*static*/
 bool SmartContracts::is_new_state(const csdb::Transaction& tr) {
+    if (!tr.is_valid()) {
+        return false;
+    }
     // must contain user field new_state::Value and new_state::RefStart
     using namespace cs::trx_uf;
     // test user_field[RefStart] helps filter out ancient smart contracts:
@@ -420,14 +419,6 @@ std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(con
     return std::nullopt;
 }
 
-bool SmartContracts::is_replenish_contract(const csdb::Transaction& tr) {
-    if (is_smart_contract(tr)) {
-        // must not be deploy/execute/new_state transaction
-        return false;
-    }
-    return in_known_contracts(tr.target());
-}
-
 std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract_impl(const csdb::Transaction& tr) {
     // currently calls to is_***() from this method are prohibited, infinite recursion is possible!
     using namespace trx_uf;
@@ -546,7 +537,7 @@ void SmartContracts::enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_
         cserror() << kLogPrefix << "incorrect trx index in block to enqueue smart contract";
         return;
     }
-    SmartContractRef new_item(block.hash().clone(), block.sequence(), trx_idx);
+    SmartContractRef new_item(block.sequence(), trx_idx);
     csdb::Transaction t = block.transaction(trx_idx);
     csdb::Address abs_addr = absolute_address(t.target());
 
@@ -819,15 +810,16 @@ bool SmartContracts::executionAllowed() {
 }
 
 /*public*/
-bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
+uint32_t SmartContracts::test_violations(const csdb::Transaction& tr) {
     cs::Lock lock(public_access_lock);
 
+    uint32_t result = Violations::None;
+
     // test smart contract as source of transaction
-    // the new_state transaction is unable met here, we are the only one source of new_state
+    bool is_emitted = false;
     csdb::Address abs_addr = absolute_address(tr.source());
     if (in_known_contracts(abs_addr)) {
-        csdebug() << kLogPrefix << "smart contract is not allowed to emit transaction via API, drop it";
-        return true;  // avoid from conveyer sync
+        is_emitted = !SmartContracts::is_new_state(tr);
     }
 
     // test smart contract as target of transaction (is it payable?)
@@ -841,10 +833,49 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
     }
 
     if (is_contract) {
+        bool is_invocation = false;
+
+        // test contract calls contract
+        if (is_emitted) {
+            csdebug() << kLogPrefix << "contract is not allowed call to other contract, drop it";
+            result += Violations::SourceIsContract;
+        }
         // test contract was deployed (and maybe called successfully)
         if (!has_state) {
             cslog() << kLogPrefix << "unable execute not successfully deployed contract, drop transaction";
-            return true;  // block from conveyer sync
+            result += Violations::ContractIsNotDeployed;
+        }
+
+        api::SmartContractInvocation invoke;
+        if (is_executable(tr)) {
+            const csdb::UserField fld = tr.user_field(cs::trx_uf::start::Methods);
+            if (fld.is_valid()) {
+                std::string data = fld.value<std::string>();
+                if (!data.empty()) {
+                    try {
+                        invoke = deserialize<api::SmartContractInvocation>(std::move(data));
+                        is_invocation = true;
+                    }
+                    catch (::apache::thrift::protocol::TProtocolException&) {
+                    }
+                }
+            }
+            if (!is_invocation) {
+                result += Violations::BadInvoke;
+            }
+        }
+        // test against subsequent contract calls
+        if (is_invocation) {
+            if (!invoke.usedContracts.empty()) {
+                result += Violations::SubsequentCall;
+            }
+            else {
+                std::vector<csdb::Address> uses;
+                add_uses_from(abs_addr, invoke.method, uses);
+                if (!uses.empty()) {
+                    result += Violations::SubsequentCall;
+                }
+            }
         }
 
         double amount = tr.amount().to_double();
@@ -852,47 +883,153 @@ bool SmartContracts::capture_transaction(const csdb::Transaction& tr) {
         if (!is_payable(abs_addr)) {
             if (amount > std::numeric_limits<double>::epsilon()) {
                 cslog() << kLogPrefix << "unable replenish balance of contract without payable() feature, drop transaction";
-                return true;  // block from conveyer sync
+                result += Violations::ReplenishNonPayable;
             }
             else /*amount is 0*/ {
                 if (!is_smart_contract(tr)) {
                     // not deploy/execute/new_state transaction as well as smart is not payable
                     cslog() << kLogPrefix << "unable call to payable(), feature is not implemented in contract, drop transaction";
-                    return true;  // block from conveyer sync
+                    result += Violations::ReplenishNonPayable;
                 }
             }
         }
         else /* is payable */ {
             // test if payable() is not directly called
-            if (is_executable(tr)) {
-                const csdb::UserField fld = tr.user_field(cs::trx_uf::start::Methods);
-                if (fld.is_valid()) {
-                    std::string data = fld.value<std::string>();
-                    if (!data.empty()) {
-                        auto invoke = deserialize<api::SmartContractInvocation>(std::move(data));
-                        if (invoke.method == PayableName) {
-                            cslog() << kLogPrefix << "unable call to payable() directly, drop transaction";
-                            return true;  // block from conveyer sync
-                        }
-                    }
+            if (is_invocation) {
+                if (invoke.method == PayableName) {
+                    cslog() << kLogPrefix << "unable call to payable() directly, drop transaction";
+                    result += Violations::DirectCallToPayable;
                 }
-                csdebug() << kLogPrefix << "allow deploy/executable transaction";
             }
             else /* not executable transaction */ {
                 // contract is payable and transaction addresses it, ok then
-                csdebug() << kLogPrefix << "allow transaction to target payable contract";
             }
         }
     }
 
-    if (SmartContracts::is_deploy(tr)) {
-        csdebug() << kLogPrefix << "deploy transaction detected";
+    return result; 
+}
+
+/*static*/
+std::string SmartContracts::violations_message(uint32_t flags) {
+    if (flags == Violations::None) {
+        return "no violations";
     }
-    else if (SmartContracts::is_start(tr)) {
-        csdebug() << kLogPrefix << "start transaction detected";
+    std::ostringstream os;
+    if ((flags & Violations::SourceIsContract) != 0) {
+        os << "Contract is not allowed to emit transaction via API. ";
+    }
+    if ((flags & Violations::ContractIsNotDeployed) != 0) {
+        os << "Contract is not deployed successfully. ";
+    }
+    if ((flags & Violations::ReplenishNonPayable) != 0) {
+        os << "Cannot replenish unpayable contract. ";
+    }
+    if ((flags & Violations::DirectCallToPayable) != 0) {
+        os << "Unable perform direct call to payable(). ";
+    }
+    if ((flags & Violations::BadInvoke) != 0) {
+        os << "Malformed invoke info. ";
+    }
+    if ((flags & Violations::SubsequentCall) != 0) {
+        os << "Unable call contract from other contract. ";
+    }
+    return os.str();
+}
+
+/*static*/
+bool SmartContracts::prevalidate(const BlockChain& bc, const cs::TransactionsPacket& pack) {
+    // count: 0 < count < max
+    const auto total_cnt = pack.transactionsCount();
+    if (total_cnt > Consensus::MaxContractResultTransactions) {
+        csdebug() << kLogPrefix << "too many transactions in execute result, prevalidation failed";
+        return false;
+    }
+    if (total_cnt < 1) {
+        csdebug() << kLogPrefix << "no transactions in execute result, prevalidation failed";
+        return false;
     }
 
-    return false;  // allow pass to conveyer sync
+    // logical rules:
+    // a) strong packet structure, state[0] + {emitted[0][0]..emitted[0][N0]} opt + ... + state[N] + {emitted[N][0]..emitted[N][NN]} opt
+    // b) emitted source == previous new state source
+    // c) source != target in emitted transactions
+    // d) no executions in contract emitted transactions
+    csdb::Address contract_abs_addr;
+    double total_min_fee = 0;
+    size_t i = 0;
+    size_t total_size = 0;
+    for (const auto& t : pack.transactions()) {
+        const auto size = t.to_byte_stream().size();
+        if (size > Consensus::MaxTransactionSize) {
+            csdebug() << kLogPrefix << "exceeded max transaction size, prevalidation failed";
+            return false;
+        }
+        total_size += size;
+        if (size > Consensus::MaxPreliminaryBlockSize) {
+            csdebug() << kLogPrefix << "exceeded max block size, prevalidation failed";
+            return false;
+        }
+
+        if (SmartContracts::is_new_state(t)) {
+            contract_abs_addr = bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey);
+            total_min_fee += cs::fee::getContractStateMinFee().to_double();
+        }
+        else {
+            if (i == 0) {
+                csdebug() << kLogPrefix << "execute result does not start with new state, prevalidation failed";
+                return false;
+            }
+            const csdb::Address src_abs_addr = bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey);
+            if (!(src_abs_addr == contract_abs_addr)) {
+                csdebug() << kLogPrefix << "incorrect source in emitted transaction, prevalidation failed";
+                return false;
+            }
+            const csdb::Address tgt_abs_addr = bc.getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
+            if (src_abs_addr == tgt_abs_addr) {
+                csdebug() << kLogPrefix << "source equeals target in emitted transaction, prevalidation failed";
+                return false;
+            }
+            if (SmartContracts::is_executable(t)) {
+                csdebug() << kLogPrefix << "execute transaction in execute result, prevalidation failed";
+                return false;
+            }
+            total_min_fee += cs::fee::getFee(t).to_double();// getContractStateMinFee().to_double();
+        }
+        ++i;
+    }
+
+    // sufficient max fee in start transaction, assume logical structure has been tested
+    const csdb::Transaction& prim_new_state = pack.transactions().front();
+    if (!SmartContracts::is_new_state(prim_new_state)) {
+        // never should happens
+        return false;
+    }
+    csdb::Transaction start = SmartContracts::get_transaction(bc, prim_new_state);
+    if (!start.is_valid()) {
+        csdebug() << kLogPrefix << "incorrect start transaction is referred by new state, prevalidation failed";
+        return false;
+    }
+    const double avail_fee = start.max_fee().to_double() - start.counted_fee().to_double();
+    if (avail_fee - total_min_fee < std::numeric_limits<double>::epsilon()) {
+        csdebug() << kLogPrefix << "insufficient max fee in start transaction, prevalidation failed";
+        return false;
+    }
+
+    // test initer actual balance
+    //csdb::Address initer_abs_addr = bc.getAddressByType(start.source(), BlockChain::AddressType::PublicKey);
+    //BlockChain::WalletData wallet;
+    //if (!bc.findWalletData(initer_abs_addr, wallet)) {
+    //    csdebug() << kLogPrefix << "incorrect source wallet in start transaction, prevalidation failed";
+    //    return false;
+    //}
+    //if (wallet.balance_.to_double() - total_min_fee < std::numeric_limits<double>::epsilon()) {
+    //    csdebug() << kLogPrefix << "insufficient initer balance to pay min fee, prevalidation failed";
+    //    return false;
+    //}
+
+    // all tests passed
+    return true;
 }
 
 bool SmartContracts::test_executor_availability() {
@@ -1054,24 +1191,40 @@ csdb::Transaction SmartContracts::get_actual_state(const csdb::Transaction& hash
                                     else {
                                         const auto& state = head.states.at(req_abs_addr);
                                         // test actual hash
-                                        cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)state.data(), state.size());
-                                        if (actual_hash == hash) {
-                                            tr_state.add_user_field(new_state::Value, state);
-                                            csdetails() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start
-												<< " has updated, stored hash is OK, new size is " << state.size();
-                                        }
-                                        else {
-											csdebug() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start
-												<< " has updated, stored hash is WRONG: " << cs::Utils::byteStreamToHex(hash.data(), hash.size())
-												<< " (expected " << cs::Utils::byteStreamToHex(actual_hash.data(), actual_hash.size())
-												<< "), new size is " << state.size();
-                                            if (!reading_db) {
-                                                net_request_contract_state(req_abs_addr);
+                                        if (!state.empty()) {
+                                            cs::Hash actual_hash = cscrypto::calculateHash((cs::Byte*)state.data(), state.size());
+                                            if (actual_hash == hash) {
+                                                tr_state.add_user_field(new_state::Value, state);
+                                                csdetails() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start
+                                                    << " has updated, stored hash is OK, new size is " << state.size();
                                             }
                                             else {
-                                                tr_state.add_user_field(new_state::Value, state);
+                                                csdebug() << kLogPrefix << to_base58(req_abs_addr) << " state after " << ref_start
+                                                    << " has updated, stored hash is WRONG: " << cs::Utils::byteStreamToHex(hash.data(), hash.size())
+                                                    << " (expected " << cs::Utils::byteStreamToHex(actual_hash.data(), actual_hash.size())
+                                                    << "), new size is " << state.size();
+                                                if (!reading_db) {
+                                                    net_request_contract_state(req_abs_addr);
+                                                }
+                                                else {
+                                                    // update cache to current state and re-execute all future calls to this contract
+                                                    if (in_known_contracts(req_abs_addr)) {
+                                                        StateItem& item = known_contracts[req_abs_addr];
+                                                        if (!item.ref_cache.is_valid() || item.ref_cache > ref_start) {
+                                                            if (dbcache_update(req_abs_addr, ref_start, state, true /*force_update*/)) {
+                                                                csdebug() << kLogPrefix << to_base58(req_abs_addr) << " state is replaced, all future calls will be re-executed";
+                                                                item.state = state;
+                                                                item.ref_cache = ref_start;
+                                                            }
+                                                            else {
+                                                                cswarning() << kLogPrefix << "failed to replace " << to_base58(req_abs_addr) << " state in cache";
+                                                            }
+                                                        }
+                                                    }
+                                                    tr_state.add_user_field(new_state::Value, state);
+                                                }
                                             }
-										}
+                                        }
                                     }
                                 }
                             }
@@ -1262,7 +1415,6 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                                                     else {
                                                         executed_state = head.states.at(abs_addr);
                                                         executed_transaction = tt;
-                                                        executed_ref.hash = b.hash();
                                                         executed_ref.sequence = b.sequence();
                                                         executed_ref.transaction = tt.id().index();
                                                     }
@@ -1883,8 +2035,8 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             if (execution_result.states.count(primary_abs_addr) == 0) {
                 cswarning() << kLogPrefix << "primary " << data_item.contract_ref << " new state is empty";
                 result.add_user_field(new_state::Value, std::string{});
-                packet.addTransaction(result);
                 set_return_value(result, error::ContractError);
+                packet.addTransaction(result);
             }
             else {
                 const auto& primary_new_state = execution_result.states.at(primary_abs_addr);
@@ -1979,6 +2131,18 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
                             }
                         }
                     }
+                }
+            }
+            // perform just created packet pre-validation
+            if (packet.transactionsCount() > 0) {
+                if (!prevalidate_inner(packet)) {
+                    csdb::Transaction tmp = packet.transactions().front();
+                    cswarning() << kLogPrefix << "packet result prevalidation failed, make " << data_item.contract_ref << " new state is empty";
+                    tmp.add_user_field(new_state::Value, std::string{});
+                    set_return_value(tmp, error::LogicViolation);
+
+                    packet.clear();
+                    packet.addTransaction(tmp);
                 }
             }
         }
@@ -2311,6 +2475,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
 
         // there is only one place to update state in "memory cache" and only after successful dbcache_update()!!!
         item.state = std::move(state_value);
+        item.ref_state = SmartContractRef(t.id());
         // determine it is the result of whether deploy or execute
         if (!replenish) {
             // deploy is execute also
@@ -2684,7 +2849,7 @@ bool SmartContracts::dbcache_update(const BlockChain& blockchain, const csdb::Ad
 
     cs::Bytes data;
     cs::DataStream stream(data);
-    stream << ref_start.sequence << ref_start.transaction << ref_start.hash << state;
+    stream << ref_start.sequence << ref_start.transaction << state;
     return blockchain.updateContractData(abs_addr, data);
 }
 
@@ -2697,8 +2862,16 @@ bool SmartContracts::dbcache_read(const BlockChain& blockchain, const csdb::Addr
         return false;
     }
     cs::DataStream stream(data.data(), data.size());
-    stream >> ref_start.sequence >> ref_start.transaction >> ref_start.hash >> state;
-    return stream.isValid() && !stream.isAvailable(1);
+    stream >> ref_start.sequence >> ref_start.transaction >> state;
+    // compatibility with obsolete format, possible the block hash has been read instead of contract state
+    if (stream.isAvailable(sizeof(size_t)) && state.size() == cscrypto::kHashSize) {
+        stream >> state;
+    }
+    bool ok = (stream.isValid() && !stream.isAvailable(1));
+    if (!ok && !state.empty()) {
+        state.clear();
+    }
+    return ok;
 
 }
 
@@ -2742,7 +2915,7 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
     cs::SmartContractRef ref;
     std::string state;
     cs::DataStream stream(contract_data.data(), contract_data.size());
-    stream >> ref.sequence >> ref.transaction >> ref.hash >> state;
+    stream >> ref.sequence >> ref.transaction >> state;
 
     if (stream.isValid() && !stream.isAvailable(1)) {
 
@@ -2818,6 +2991,22 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
         cswarning() << kLogPrefix << "ignore incompatible net package with " << cs::SmartContracts::to_base58(contract_abs_addr)
             << " state";
     }
+}
+
+bool SmartContracts::prevalidate_inner(const cs::TransactionsPacket& pack) {
+    if (!SmartContracts::prevalidate(bc, pack)) {
+        return false;
+    }
+    // detect contract to contract payments
+    for (const auto& t : pack.transactions()) {
+        if (!SmartContracts::is_new_state(t)) {
+            if (in_known_contracts(t.source()) && in_known_contracts(t.target())) {
+                return false;
+            }
+
+        }
+    }
+    return true;
 }
 
 }  // namespace cs

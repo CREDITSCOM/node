@@ -214,12 +214,16 @@ void SolverCore::gotStageOne(const cs::StageOne& stage) {
     }
 }
 
+bool SolverCore::isTransactionsInputAvailable() {
+    return pnode->isTransactionsInputAvailable();
+}
+
 void SolverCore::gotStageOneRequest(uint8_t requester, uint8_t required) {
     csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-1 of [" << static_cast<int>(required) << "]";
 
     const auto ptr = find_stage1(required);
     if (ptr != nullptr) {
-        pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::FirstStage, requester, ptr->messageBytes);
+        pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::FirstStage, requester, ptr->message);
     }
 }
 
@@ -228,7 +232,7 @@ void SolverCore::gotStageTwoRequest(uint8_t requester, uint8_t required) {
 
     const auto ptr = find_stage2(required);
     if (ptr != nullptr) {
-        pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::SecondStage, requester, ptr->messageBytes);
+        pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::SecondStage, requester, ptr->message);
     }
 }
 
@@ -242,8 +246,8 @@ void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required, uint8
     // const auto ptr = find_stage3(required);
 
     for (auto& it : stageThreeStorage) {
-        if (it.iteration == iteration && it.sender == requester) {
-            pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester, it.messageBytes);
+        if (it.iteration == iteration && it.sender == required) {
+            pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester, it.message);
             return;
         }
     }
@@ -459,7 +463,7 @@ void SolverCore::realTrustedSet(cs::Bytes realTrusted) {
 }
 
 void SolverCore::updateGrayList(cs::RoundNumber round) {
-    csdebug() << __func__;
+    //csdebug() << __func__;
     if (lastGrayUpdated_ >= round) {
         csdebug() << "Gray list will update only if the round number changes";
         return;
@@ -487,14 +491,6 @@ cs::Bytes SolverCore::getRealTrusted() {
 
 size_t SolverCore::stagesThree() {
     return stageThreeStorage.size();
-}
-
-void SolverCore::send_wallet_transaction(const csdb::Transaction& tr) {
-    if (psmarts->capture_transaction(tr)) {
-        // avoid pass to conveyer, psmarts provide special handling
-        return;
-    }
-    cs::Conveyer::instance().addTransaction(tr);
 }
 
 void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round) {
@@ -551,6 +547,17 @@ bool SolverCore::stopNodeRequested() const {
         return pnode->isStopRequested();
     }
     return false;
+}
+
+void SolverCore::askTrustedRound(cs::RoundNumber rNum, const cs::ConfidantsKeys& confidants) {
+    if (pnode->isLastRPStakeFull(rNum)) {
+        csdebug() << "SolverCore: this node has full stake last round Package, the request will not be performed";
+        return;
+    }
+    if (confidants.empty()) {
+        return;
+    }
+    pnode->askConfidantsRound(rNum, confidants);
 }
 
 
