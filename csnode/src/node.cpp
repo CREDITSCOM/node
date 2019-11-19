@@ -3276,9 +3276,6 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
         csdebug() << "NODE> Transaction timer started";
         sendingTimer_.start(cs::TransactionsPacketInterval);
     }
-
-    cs::Bytes b{};
-    reportEvent(b);
 }
 
 void Node::startConsensus() {
