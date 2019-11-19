@@ -48,7 +48,8 @@ enum class NetworkCommand : uint8_t {
     SSNewFriends = 38,
     SSUpdateServer = 39,
     IntroduceConsensus = 40,
-    IntroduceConsensusReply = 41
+    IntroduceConsensusReply = 41,
+    Utility = 42
 };
 
 enum class RegistrationRefuseReasons : uint8_t {
@@ -147,6 +148,7 @@ public:
     cs::Sequence getConnectionLastSequence(const std::size_t number);
 
     Neighbour getNeigbour(const cs::PublicKey& key);
+    bool unMarkNeighbourAsBlackListed(const cs::PublicKey & key);
     bool markNeighbourAsBlackListed(const cs::PublicKey& key);
 
     auto getNeighboursLock() const {

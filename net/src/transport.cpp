@@ -448,6 +448,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
         case NetworkCommand::SSPingWhiteNode:
             gotSSPingWhiteNode(task, node_->getBlockChain().getLastSeq(), node_->getBlockChain().getLastHash());
             break;
+        case NetworkCommand::Utility:  // managing info could be obtained  
+            return node_->getUtilityMessage(task->pack.getMsgData(), task->pack.getMsgSize());
+            break;
         case NetworkCommand::SSLastBlock: {
             long long timeSS{};
             iPackStream_ >> timeSS;
@@ -828,6 +831,18 @@ Neighbour Transport::getNeigbour(const cs::PublicKey& key) {
     }
 
     return Neighbour{};
+}
+
+bool Transport::unMarkNeighbourAsBlackListed(const cs::PublicKey& key) {
+    auto remoteNode = getPackSenderEntry(key);
+    
+    if (remoteNode->isBlackListed()) {
+        remoteNode->setBlackListed(false);
+        csdebug()  << "Remote node BlackList Punishment finished";
+        return true;
+    }
+
+    return true;// neighbour.isValid();
 }
 
 bool Transport::markNeighbourAsBlackListed(const cs::PublicKey& key) {
