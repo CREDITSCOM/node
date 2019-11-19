@@ -507,19 +507,19 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
         if (cs::PacketValidator::instance().validate(task->pack)) {
             transport_->processNetworkTask(task, remoteSender);
         }
+
         return;
     }
-
-
-
 
     // Non-network data
     transport_->sendPackInform(task->pack, remoteSender);
     uint32_t& recCounter = packetMap_.tryStore(task->pack.getHash());
+
     if (!recCounter && task->pack.addressedToMe(transport_->getMyPublicKey())) {
         if (task->pack.isFragmented() || task->pack.isCompressed()) {
             bool newFragmentedMsg = false;
             MessagePtr msg = collector_.getMessage(task->pack, newFragmentedMsg);
+
             if (newFragmentedMsg) {
                 transport_->registerMessage(msg);
             }
@@ -539,10 +539,12 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
     }
 
     bool resend = false;
+
     if (recCounter == 0) {
         if (!task->pack.isBroadcast() && !task->pack.isDirect()) {
             resend = task->pack.getAddressee() != transport_->getMyPublicKey();
-        } else {
+        }
+        else {
             resend = task->pack.isBroadcast();
         }
     }
@@ -550,6 +552,7 @@ inline void Network::processTask(TaskPtr<IPacMan>& task) {
     if (resend) {
         transport_->redirectPacket(task->pack, remoteSender);
     }
+
     ++recCounter;
 }
 

@@ -9,7 +9,7 @@
 #include <memory>
 #include <thread>
 #include <type_traits>
-#include <unordered_map>
+#include <unordered_set>
 
 #include <lib/system/cache.hpp>
 #include <lib/system/common.hpp>
@@ -99,7 +99,7 @@ template <typename T>
 using Future = std::future<T>;
 
 template <typename Result>
-class FutureBase {
+class FutureBase : public std::enable_shared_from_this<FutureBase<Result>> {
     friend class Concurrent;
 
 public:
@@ -241,7 +241,7 @@ protected:
         };
 
         Super::state_ = WatcherState::Running;
-        Worker::execute(std::move(closure));
+        Worker::run(std::move(closure));
     }
 
 public signals:
@@ -297,7 +297,7 @@ protected:
         };
 
         Super::state_ = WatcherState::Running;
-        Worker::execute(std::move(closure));
+        Worker::run(std::move(closure));
     }
 
 public signals:
@@ -335,7 +335,7 @@ public:
         }
 
         // watcher will be removed after lambda called
-        cs::Connector::connect(&watcher->completed, [](typename FutureWatcher<ReturnType>::Id id) {
+        cs::Connector::connect(&watcher->completed, [storage = watcher->shared_from_this()](typename FutureWatcher<ReturnType>::Id id) {
             ExecutionsIterator iter;
 
             {
@@ -346,10 +346,8 @@ public:
             }
 
             if (iter != executions.end()) {
-                cs::Concurrent::run([=]() {
-                    cs::Lock lock(executionsMutex_);
-                    executions.erase(iter);
-                });
+                cs::Lock lock(executionsMutex_);
+                executions.erase(iter);
             }
         });
 
@@ -410,16 +408,15 @@ inline bool operator==(const FutureWatcher<T>& watcher, uint64_t value) {
 }
 
 // for api threading
-template <typename S>
-struct WorkerQueue {
+template <typename T>
+struct WorkerQueue : public std::enable_shared_from_this<WorkerQueue<T>> {
 private:
-    using tids_t = std::list<std::tuple<>>;
-    tids_t tids_;
-    std::unordered_map<std::thread::id, typename tids_t::iterator> tidMap_;
+    using Tid = std::thread::id;
+    std::unordered_set<Tid> tidMap_;
 
-    std::condition_variable_any conditionalVariable_;
-    cs::SpinLock lock_{ATOMIC_FLAG_INIT};
-    S hash_;
+    std::condition_variable conditionalVariable_;
+    std::mutex lock_;
+    T data_;
 
     const unsigned int kWaitSecondsTime{ 30 };
 
@@ -431,16 +428,23 @@ public:
     void getPosition() {
         cs::Lock lock(lock_);
         auto tid = std::this_thread::get_id();
-        tidMap_[tid] = tids_.insert(tids_.end(), std::make_tuple());
+        tidMap_.insert(tid);
     }
 
-    template <typename T>
-    bool waitTillFront(const T& type) {
+    template <typename Func>
+    bool waitTillFront(Func func) {
         std::unique_lock lock(lock_);
-        auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(kWaitSecondsTime), [&]() { return type(hash_); });
-        hash_.condFlg = false;
-        tidMap_.erase(std::this_thread::get_id());
+
+        auto res = conditionalVariable_.wait_for(lock, std::chrono::seconds(kWaitSecondsTime), [&]() {
+            return func(data_);
+        });
+
+        auto tid = std::this_thread::get_id();
+        tidMap_.erase(tid);
+
+        data_.condFlg = false;
         conditionalVariable_.notify_all();
+
         return res;
     }
 
@@ -454,50 +458,21 @@ public:
             return;
         }
 
-        bool needNotifyAll = tit->second == tids_.begin();
-        tids_.erase(tit->second);
-
-        tidMap_.erase(tit);
+        auto needNotifyAll = static_cast<bool>(tidMap_.erase(tid));
 
         if (needNotifyAll) {
             conditionalVariable_.notify_all();
         }
     }
 
-    template <typename Hash>
-    void updateHash(const Hash& hash) {
-        cs::Lock lock(lock_);
-        hash_ = hash(hash_);
+    template <typename Func>
+    void updateHash(Func func) {
+        {
+            cs::Lock lock(lock_);
+            data_ = func(data_);
+        }
+
         conditionalVariable_.notify_all();
-    }
-};
-
-// what is sweet spot?
-struct SweetSpot {
-private:
-    std::condition_variable_any conditionalVariable_;
-    cs::SpinLock lock_{ATOMIC_FLAG_INIT};
-    bool occupied_ = false;
-
-public:
-    inline SweetSpot() noexcept
-    : lock_() {
-    }
-
-    void occupy() {
-        std::unique_lock lock(lock_);
-
-        conditionalVariable_.wait(lock, [this]() {
-            auto res = !occupied_;
-            occupied_ = true;
-            return res;
-        });
-    }
-
-    void leave() {
-        cs::Lock lock(lock_);
-        occupied_ = false;
-        conditionalVariable_.notify_one();
     }
 };
 
@@ -528,9 +503,6 @@ struct SpinLockable {
 private:
     std::mutex mutex_;
     T type_;
-#ifdef API_SPINLOCK
-    __cacheline_aligned std::atomic_flag atomicFlag_ = ATOMIC_FLAG_INIT;
-#endif
 
     friend struct SpinLockedRef<T>;
 };
@@ -542,23 +514,11 @@ private:
 public:
     SpinLockedRef(SpinLockable<T>& lockable)
     : lockable_(&lockable) {
-#ifdef API_SPINLOCK
-        while (this->lockable_->atomicFlag_.test_and_set(std::memory_order_acquire)) {
-            std::this_thread::yield();
-        }
-#else
         lockable_->lock();
-#endif
     }
 
     ~SpinLockedRef() {
-#ifdef API_SPINLOCK
-        if (lockable_) {
-            lockable_->atomicFlag_.clear(std::memory_order_release);
-        }
-#else
         lockable_->unlock();
-#endif
     }
 
     SpinLockedRef(const SpinLockedRef&) = delete;
