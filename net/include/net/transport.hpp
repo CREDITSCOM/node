@@ -148,7 +148,13 @@ public:
     cs::Sequence getConnectionLastSequence(const std::size_t number);
 
     Neighbour getNeigbour(const cs::PublicKey& key);
+
+    // high level blacklisted API
     bool markNeighbourAsBlackListed(const cs::PublicKey& key);
+    bool unmarkNeighbourAsBlackListed(const cs::PublicKey& key);
+    bool isBlackListed(const cs::PublicKey& key) const;
+    size_t blackListSize() const;
+    cs::PublicKeys blackList() const;
 
     auto getNeighboursLock() const {
         return neighbourhood_.getNeighboursLock();
@@ -233,6 +239,9 @@ private:
     TypedAllocator<RemoteNode> remoteNodes_;
 
     FixedHashMap<ip::udp::endpoint, RemoteNodePtr, uint16_t, maxRemoteNodes_> remoteNodesMap_;
+
+    mutable std::mutex remoteMutex_;
+    std::unordered_map<cs::PublicKey, ip::udp::endpoint> remoteBlackList_;
 
     RegionAllocator netPacksAllocator_;
     cs::PublicKey myPublicKey_;
