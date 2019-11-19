@@ -152,6 +152,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
                     tSize = it.to_byte_stream().size();
                     deltaBlockSize += tSize;
                     preliminaryBlockSize += tSize;
+                    csdetails() << name() << ": include transaction " << tSize << " bytes";
                     if (preliminaryBlockSize > Consensus::MaxPreliminaryBlockSize) {
                         finishFlag = true;
                     }
