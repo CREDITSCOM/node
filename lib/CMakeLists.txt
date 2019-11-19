@@ -7,6 +7,7 @@ add_library(lib
   src/lib/system/timer.cpp
   src/lib/system/progressbar.cpp
   src/lib/system/dynamicbuffer.cpp
+  src/lib/system/common.cpp
   include/lib/system/hash.hpp
   include/lib/system/queues.hpp
   include/lib/system/structures.hpp
