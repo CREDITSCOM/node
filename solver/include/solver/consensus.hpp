@@ -76,6 +76,9 @@ public:
     /** @brief   Max hashes count to include in stage one data */
     constexpr static size_t MaxStageOneHashes = 100;
 
+    /** @brief   Max distance of Utility message */
+    constexpr static size_t UtilityMessageRoundInterval = 5;
+
     /** @brief   Black list counter - max number of penalty points to get to the black list */
     constexpr static size_t BlackListCounterMaxValue = 100000;
 

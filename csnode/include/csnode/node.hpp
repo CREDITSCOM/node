@@ -49,6 +49,11 @@ public:
         Writer
     };
 
+    enum Orders {
+        Release,
+        Seal
+    };
+
     enum MessageActions {
         Process,
         Postpone,
@@ -209,6 +214,7 @@ public:
     void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
 
     void initCurrentRP();
+    void getUtilityMessage(const uint8_t * data, const size_t size, const cs::RoundNumber rNum);
     void becomeWriter();
 
     bool isPoolsSyncroStarted();
@@ -317,7 +323,7 @@ private:
     void processSync();
 
     // transport
-    void addToBlackList(const cs::PublicKey& key);
+    void addToBlackList(const cs::PublicKey& key, bool isMarked);
 
     // conveyer
     void processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);

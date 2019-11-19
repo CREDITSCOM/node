@@ -147,6 +147,7 @@ public:
     cs::Sequence getConnectionLastSequence(const std::size_t number);
 
     Neighbour getNeigbour(const cs::PublicKey& key);
+    bool unMarkNeighbourAsBlackListed(const cs::PublicKey & key);
     bool markNeighbourAsBlackListed(const cs::PublicKey& key);
 
     auto getNeighboursLock() const {

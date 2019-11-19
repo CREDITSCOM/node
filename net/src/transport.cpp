@@ -700,6 +700,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
             return node_->getBlockReply(data, size);
         case MsgTypes::BigBang:  // any round (in theory) may be set
             return node_->getBigBang(data, size, rNum);
+        case MsgTypes::Utility:  // managing info could be obtained  
+            return node_->getUtilityMessage(data, size, rNum);
         case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
             return node_->getRoundTableRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::NodeStopRequest:
@@ -828,6 +830,19 @@ Neighbour Transport::getNeigbour(const cs::PublicKey& key) {
     }
 
     return Neighbour{};
+}
+
+bool Transport::unMarkNeighbourAsBlackListed(const cs::PublicKey& key) {
+    auto remoteNode = getPackSenderEntry(key);
+    
+    if (remoteNode->isBlackListed()) {
+        remoteNode->setBlackListed(false);
+        csdebug() << kLogPrefix << "Remote node BlackList Punishment finished";
+        return true;
+        //neighbourhood_.dropConnection(neighbour.connection->id);
+    }
+
+    return true;// neighbour.isValid();
 }
 
 bool Transport::markNeighbourAsBlackListed(const cs::PublicKey& key) {
