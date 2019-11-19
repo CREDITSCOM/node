@@ -1266,7 +1266,7 @@ void Node::addToBlackList(const cs::PublicKey& key, bool isMarked) {
         }
     }
     else {
-        if (transport_->unMarkNeighbourAsBlackListed(key)) {
+        if (transport_->unmarkNeighbourAsBlackListed(key)) {
              cswarning() << "Neigbour " << cs::Utils::byteStreamToHex(key) << " released from network black list";
         }
     }

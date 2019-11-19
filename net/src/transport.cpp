@@ -703,6 +703,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
             return node_->getBlockReply(data, size);
         case MsgTypes::BigBang:  // any round (in theory) may be set
             return node_->getBigBang(data, size, rNum);
+        case MsgTypes::Utility:  // managing info could be obtained  
+            return node_->getUtilityMessage(data, size);
         case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
             return node_->getRoundTableRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::NodeStopRequest:
@@ -833,18 +835,6 @@ Neighbour Transport::getNeigbour(const cs::PublicKey& key) {
     return Neighbour{};
 }
 
-bool Transport::unMarkNeighbourAsBlackListed(const cs::PublicKey& key) {
-    auto remoteNode = getPackSenderEntry(key);
-    
-    if (remoteNode->isBlackListed()) {
-        remoteNode->setBlackListed(false);
-        csdebug()  << "Remote node BlackList Punishment finished";
-        return true;
-    }
-
-    return true;// neighbour.isValid();
-}
-
 bool Transport::markNeighbourAsBlackListed(const cs::PublicKey& key) {
     auto neighbour = getNeigbour(key);
 
@@ -853,9 +843,67 @@ bool Transport::markNeighbourAsBlackListed(const cs::PublicKey& key) {
 
         // do not have bussiness with remote node
         neighbourhood_.dropConnection(neighbour.connection->id);
+
+        {
+            cs::Lock lock(remoteMutex_);
+            remoteBlackList_.emplace(key, neighbour.connection->getOut());
+        }
     }
 
     return neighbour.isValid();
+}
+
+bool Transport::unmarkNeighbourAsBlackListed(const cs::PublicKey& key) {
+    ip::udp::endpoint point;
+
+    {
+        cs::Lock lock(remoteMutex_);
+        auto iter = remoteBlackList_.find(key);
+
+        if (iter == remoteBlackList_.end()) {
+            return false;
+        }
+
+        point = iter->second;
+    }
+
+    auto remoteSender = getPackSenderEntry(point);
+
+    if (!remoteSender) {
+        return false;
+    }
+
+    remoteSender->setBlackListed(false);
+
+    {
+        cs::Lock lock(remoteMutex_);
+        remoteBlackList_.erase(key);
+    }
+
+    return !remoteSender->isBlackListed();
+}
+
+bool Transport::isBlackListed(const cs::PublicKey& key) const {
+    cs::Lock lock(remoteMutex_);
+    return remoteBlackList_.find(key) != remoteBlackList_.end();
+}
+
+size_t Transport::blackListSize() const {
+    cs::Lock lock(remoteMutex_);
+    return remoteBlackList_.size();
+}
+
+cs::PublicKeys Transport::blackList() const {
+    cs::Lock lock(remoteMutex_);
+
+    cs::PublicKeys keys;
+    keys.reserve(remoteBlackList_.size());
+
+    std::for_each(std::begin(remoteBlackList_), std::end(remoteBlackList_), [&](const auto& element) {
+        keys.push_back(element.first);
+    });
+
+    return keys;
 }
 
 bool Transport::isShouldUpdateNeighbours() const {
