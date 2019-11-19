@@ -1065,6 +1065,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
     }
 
     Connection conn;
+    conn.connected = false;
     conn.in = task->sender;
     conn.version = version;
 
