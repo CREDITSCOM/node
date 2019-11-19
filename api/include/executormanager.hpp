@@ -1,3 +1,6 @@
+#ifndef EXECUTORMANAGER_HPP
+#define EXECUTORMANAGER_HPP
+
 #include <string>
 #include <vector>
 #include <optional>
@@ -38,3 +41,5 @@ private:
     const std::string executorName_ = "contract-executor";
 };
 }
+
+#endif // EXECUTORMANAGER_HPP
