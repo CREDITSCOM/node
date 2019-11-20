@@ -4,6 +4,8 @@
 
 #include <lib/system/logger.hpp>
 
+const char* log_prefix = "Event: ";
+
 /*static*/
 std::string Reject::to_string(Reason r) {
     switch (r) {

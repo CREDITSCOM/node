@@ -54,8 +54,6 @@ public:
         RejectContractConsensus
     };
 
-    constexpr static char* log_prefix = "Event: ";
-
     static Id getId(const cs::Bytes& bin_pack);
     //void parse(const cs::Bytes& bin_pack);
 
