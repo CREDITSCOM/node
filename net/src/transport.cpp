@@ -513,9 +513,11 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
     }
 }
 
+// call need checked earlier in calling code
 void Transport::refillNeighbourhood() {
     // TODO: check this algorithm when all list nodes are dead
-    if (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::IpList) {
+    const auto bootstrap = cs::ConfigHolder::instance().config()->getBootstrapType();
+    if (bootstrap == BootstrapType::IpList) {
         for (auto& ep : cs::ConfigHolder::instance().config()->getIpList()) {
             if (!neighbourhood_.canHaveNewConnection()) {
                 cswarning() << "Connections limit reached";
@@ -526,12 +528,10 @@ void Transport::refillNeighbourhood() {
             neighbourhood_.establishConnection(net_->resolve(ep));
         }
     }
-
-    if (requireStartNode()) {
-        // Connect to SS logic
+    else if (bootstrap == BootstrapType::SignalServer) {
+        // both connect to SS and get new neighbours candidates
         ssEp_ = net_->resolve(cs::ConfigHolder::instance().config()->getSignalServerEndpoint());
         cslog() << "Connecting to start node on " << ssEp_;
-
         {
             cs::Lock lock(oLock_);
             formSSConnectPack(myPublicKey_, node_->getBlockChain().uuid());
@@ -919,16 +919,8 @@ bool Transport::isShouldUpdateNeighbours() const {
 }
 
 bool Transport::requireStartNode() {
-    bool req = (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::SignalServer ||
+    return (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::SignalServer ||
             cs::ConfigHolder::instance().config()->getNodeType() == NodeType::Router);
-    if (req) {
-        neighbourhood_.forEachNeighbour([&](ConnectionPtr ptr) {
-            if (ptr->isSignal) {
-                req = false;
-            }
-        });
-    }
-    return req;
 }
 
 bool Transport::isShouldPending(Connection* connection) const {
