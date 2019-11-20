@@ -10,6 +10,7 @@
 #include <csdb/amount.hpp>
 #include <csdb/amount_commission.hpp>
 #include <lib/system/logger.hpp>
+#include <csnode/nodecore.hpp>
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
 #include <walletscache.hpp>
@@ -58,6 +59,7 @@ bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, con
         cslog() << kLogPrefix << __func__ << ": reject new_state transaction, execution fee is not set properly";
         return false;
     }
+
     csdb::Amount feeForExecution(feeField.value<csdb::Amount>());
     if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double())) <
         csdb::Amount(trx.counted_fee().to_double()) + feeForExecution) {
@@ -76,6 +78,12 @@ bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, con
         cslog() << kLogPrefix << __func__ << ": reject new_state transaction, initier is out of funds";
         return false;
     }
+
+    csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegate);
+    if (delegateField.is_valid()) {
+        if()
+    }
+
     return true;
 }
 

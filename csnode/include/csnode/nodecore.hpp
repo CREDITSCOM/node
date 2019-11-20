@@ -118,6 +118,17 @@ struct RoundTableMessage {
     cs::PublicKey sender;
 };
 
+// transactions user fields
+namespace trx_uf {
+    // delegation transaction fields
+    namespace sp { //specific
+        // delegation
+        constexpr csdb::user_field_id_t delegate = 5; // value: 0 - delegation, 1 - withdraw delegation
+        // count of user fields
+        constexpr size_t Count = 1;
+    }
+}
+
 // meta storages
 using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;
 using CharacteristicMetaStorage = cs::MetaStorage<cs::CharacteristicMeta>;
