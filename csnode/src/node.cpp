@@ -231,10 +231,23 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
 
     switch (order) {
         case Orders::Release:
-            addToBlackList(pKey, false);
+            if (pKey == cs::Zero::key) {
+                while (transport_->blackList().size() > 0) {
+                    addToBlackList(transport_->blackList().front(), false);
+                }
+            }
+            else {
+                addToBlackList(pKey, false);
+            }
+
             break;
         case Orders::Seal:
-            addToBlackList(pKey, true);
+            if (pKey == cs::Zero::key) {
+                cswarning() << "Invalid Utility message";
+            }
+            else {
+                addToBlackList(pKey, true);
+            }
             break;
         default:
             cswarning() << "Untranslatable Utility message";
