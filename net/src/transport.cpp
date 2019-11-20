@@ -851,9 +851,67 @@ bool Transport::markNeighbourAsBlackListed(const cs::PublicKey& key) {
 
         // do not have bussiness with remote node
         neighbourhood_.dropConnection(neighbour.connection->id);
+
+        {
+            cs::Lock lock(remoteMutex_);
+            remoteBlackList_.emplace(key, neighbour.connection->getOut());
+        }
     }
 
     return neighbour.isValid();
+}
+
+bool Transport::unmarkNeighbourAsBlackListed(const cs::PublicKey& key) {
+    ip::udp::endpoint point;
+
+    {
+        cs::Lock lock(remoteMutex_);
+        auto iter = remoteBlackList_.find(key);
+
+        if (iter == remoteBlackList_.end()) {
+            return false;
+        }
+
+        point = iter->second;
+    }
+
+    auto remoteSender = getPackSenderEntry(point);
+
+    if (!remoteSender) {
+        return false;
+    }
+
+    remoteSender->setBlackListed(false);
+
+    {
+        cs::Lock lock(remoteMutex_);
+        remoteBlackList_.erase(key);
+    }
+
+    return !remoteSender->isBlackListed();
+}
+
+bool Transport::isBlackListed(const cs::PublicKey& key) const {
+    cs::Lock lock(remoteMutex_);
+    return remoteBlackList_.find(key) != remoteBlackList_.end();
+}
+
+size_t Transport::blackListSize() const {
+    cs::Lock lock(remoteMutex_);
+    return remoteBlackList_.size();
+}
+
+cs::PublicKeys Transport::blackList() const {
+    cs::Lock lock(remoteMutex_);
+
+    cs::PublicKeys keys;
+    keys.reserve(remoteBlackList_.size());
+
+    std::for_each(std::begin(remoteBlackList_), std::end(remoteBlackList_), [&](const auto& element) {
+        keys.push_back(element.first);
+    });
+
+    return keys;
 }
 
 bool Transport::isShouldUpdateNeighbours() const {

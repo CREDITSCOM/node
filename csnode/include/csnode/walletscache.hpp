@@ -17,19 +17,6 @@
 #include <lib/system/common.hpp>
 #include <lib/system/signals.hpp>
 
-namespace std {
-template<>
-class hash<cs::PublicKey> {
-public:
-    size_t operator()(const cs::PublicKey& obj) const {
-        static_assert(sizeof(size_t) < sizeof(cs::PublicKey));
-        size_t res;
-        std::copy(obj.data(), obj.data() + sizeof(res), reinterpret_cast<uint8_t*>(&res));
-        return res;
-    }
-};
-} // namespace std
-
 class BlockChain;
 
 namespace csdb {

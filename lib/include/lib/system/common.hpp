@@ -77,4 +77,13 @@ private:
     std::scoped_lock<T...> lock_;
 };
 }  // namespace cs
+
+namespace std {
+template<>
+class hash<cs::PublicKey> {
+public:
+    size_t operator()(const cs::PublicKey& key) const;
+};
+} // namespace std
+
 #endif  // COMMON_HPP
