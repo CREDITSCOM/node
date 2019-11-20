@@ -213,13 +213,6 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
         cserror() << "NODE> Bad Utility packet format";
         return;
     }
-    cs::Byte order;
-    cs::PublicKey pKey;
-    cs::DataStream stream(msg.data(), msg.size());
-    stream >> rNum;
-    stream >> order;
-    stream >> pKey;
-
 
     //csdebug() << "Message to Verify: " << cs::Utils::byteStreamToHex(trustedToHash);
     const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
@@ -229,7 +222,12 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
         return;
     }
 
-
+    cs::Byte order;
+    cs::PublicKey pKey;
+    cs::DataStream stream(msg.data(), msg.size());
+    stream >> rNum;
+    stream >> order;
+    stream >> pKey;
 
     switch (order) {
         case Orders::Release:
@@ -2776,36 +2774,8 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
         return;
     }
 
-    if (rPackage.roundTable().round == 50) {
-        csdebug() << "NODE> adding node to bl";
-        std::string strAddr = "4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsBPXX4fXef7FuL";
-        std::vector<uint8_t> pub_key;
-        DecodeBase58(strAddr, pub_key);
-        cs::PublicKey pKey;
-        std::memcpy(pKey.data(), pub_key.data(), 32);
-        addToBlackList(pKey, true);
-    }
-
-    if (rPackage.roundTable().round == 100) {
-        csdebug() << "NODE> removing node from bl";
-        std::string strAddr = "4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsBPXX4fXef7FuL";
-        std::vector<uint8_t> pub_key;
-        DecodeBase58(strAddr, pub_key);
-        cs::PublicKey pKey;
-        std::memcpy(pKey.data(), pub_key.data(), 32);
-        addToBlackList(pKey, false);
-    }
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
 	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
-
-    //auto myPublicKey = solver_->getPublicKey();
-
-    //std::string strAddr1 = "4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsBPXX4fXef7FuL";
-    //std::vector<uint8_t> pub_key1;
-    //DecodeBase58(strAddr1, pub_key1);
-    //if (rPackage.roundTable().round % 10 == 0  && std::memcmp(myPublicKey.data(), pub_key1.data(), 32) == 0) {
-    //    createTestTransaction();
-    //}
 
     currentRoundPackage_ = cs::RoundPackage();
     reviewConveyerHashes();
