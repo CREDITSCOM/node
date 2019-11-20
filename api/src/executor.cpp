@@ -199,14 +199,20 @@ bool cs::Executor::isConnected() const {
 void cs::Executor::stop() {
     requestStop_ = true;
 
-    // wake up watching thread if it sleeps
-    notifyError();
+    while (isWatcherRunning_.load(std::memory_order_acquire)) {
+        notifyError(); // wake up watching thread if it sleeps
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
 
     if (executorProcess_) {
         if (executorProcess_->isRunning()) {
             disconnect();
             executorProcess_->terminate();
         }
+    }
+
+    if (manager_.isExecutorProcessRunning()) {
+        manager_.stopExecutorProcess();
     }
 }
 
@@ -726,7 +732,6 @@ void cs::Executor::onExecutorFinished(int code, const std::error_code&) {
     }
 
     notifyError();
-
 }
 
 void cs::Executor::onExecutorProcessError(const cs::ProcessException& exception) {
@@ -806,12 +811,16 @@ cs::Executor::Executor(const cs::ExecutorSettings::Types& types)
     state_ = ExecutorState::Launched;
 
     auto watcher = [this]() {
+        isWatcherRunning_.store(true, std::memory_order_release);
+
         while (!requestStop_) {
             if (isConnected()) {
                 static std::mutex mutex;
                 std::unique_lock lock(mutex);
 
-                cvErrorConnect_.wait_for(lock, std::chrono::seconds(5), [&] { return !isConnected() || requestStop_; });
+                cvErrorConnect_.wait_for(lock, std::chrono::seconds(5), [&] {
+                    return !isConnected() || requestStop_;
+                });
             }
 
             if (requestStop_) {
@@ -828,13 +837,17 @@ cs::Executor::Executor(const cs::ExecutorSettings::Types& types)
                 runProcess();
             }
         }
+
+        isWatcherRunning_.store(false, std::memory_order_release);
     };
 
     cs::Concurrent::run(watcher, cs::ConcurrentPolicy::Thread);
 }
 
 cs::Executor::~Executor() {
-    stop();
+    if (!requestStop_) {
+        stop();
+    }
 }
 
 void cs::Executor::runProcess() {

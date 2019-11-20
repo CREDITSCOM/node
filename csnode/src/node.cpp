@@ -169,14 +169,11 @@ void Node::stop() {
     solver_->finish();
     cswarning() << "[SOLVER STOPPED]";
 
-    blockChain_.close();
-
-    if (api_) {
-        api_->apiExecHandler()->getExecutor().stop();
-        cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
-    }
-
+    blockChain_.close();    
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
+
+    cs::Executor::instance().stop();
+    cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
 
     observer_.stop();
     cswarning() << "[CONFIG OBSERVER STOPPED]";

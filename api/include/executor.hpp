@@ -214,7 +214,6 @@ private:
     ~Executor();
 
     void runProcess();
-    void runProcessAsync();
     void checkAnotherExecutor();
 
     // The explicit_sequence is set for generated accessId ensure having correct sequence attached to it
@@ -262,6 +261,7 @@ private:
     const int16_t EXECUTOR_VERSION = 3;
 
     std::mutex callExecutorLock_;
+    std::atomic<bool> isWatcherRunning_ = { false };
 
     cs::ExecutorManager manager_;
     ExecutorState state_;
