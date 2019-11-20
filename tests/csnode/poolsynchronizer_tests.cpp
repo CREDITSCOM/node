@@ -6,6 +6,7 @@
 
 #include <csnode/node.hpp>
 #include <csnode/blockchain.hpp>
+#include <csnode/configholder.hpp>
 #include <csnode/poolsynchronizer.hpp>
 
 #include <boost/program_options/variables_map.hpp>
