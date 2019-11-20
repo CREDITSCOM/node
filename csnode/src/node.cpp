@@ -928,7 +928,7 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                     cnt += item.second;
                     os << Reject::to_string(item.first) << " (" << item.second << ") ";
                 });
-                csdebug() << EventReport::log_prefix << "rejected " << cnt << "transactions the following reasons: " << os.str();
+                csdebug() << "Event report: rejected " << cnt << "transactions the following reasons: " << os.str();
             }
         }
     }
