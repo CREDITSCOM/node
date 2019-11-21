@@ -83,6 +83,7 @@ const std::string PARAM_NAME_EXECUTOR_CHECK_VERSION_DELAY = "executor_check_vers
 const std::string PARAM_NAME_EXECUTOR_MULTI_INSTANCE = "executor_multi_instance";
 const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MIN = "executor_commit_min";
 const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MAX = "executor_commit_max";
+const std::string PARAM_NAME_JPS_COMMAND_LINE = "jps_command";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
@@ -869,6 +870,10 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     if (data.count(PARAM_NAME_EXECUTOR_CMDLINE)) {
         apiData_.executorCmdLine = data.get<std::string>(PARAM_NAME_EXECUTOR_CMDLINE);
     }
+
+    if (data.count(PARAM_NAME_JPS_COMMAND_LINE)) {
+        apiData_.jpsCmdLine = data.get<std::string>(PARAM_NAME_JPS_COMMAND_LINE);
+    }
 }
 
 void Config::readConveyerData(const boost::property_tree::ptree& config) {
@@ -949,7 +954,8 @@ bool operator==(const ApiData& lhs, const ApiData& rhs) {
            lhs.executorCheckVersionDelay == rhs.executorCheckVersionDelay &&
            lhs.executorMultiInstance == rhs.executorMultiInstance &&
            lhs.executorCommitMin == rhs.executorCommitMin &&
-           lhs.executorCommitMax == rhs.executorCommitMax;
+           lhs.executorCommitMax == rhs.executorCommitMax &&
+           lhs.jpsCmdLine == rhs.jpsCmdLine;
 }
 
 bool operator!=(const ApiData& lhs, const ApiData& rhs) {

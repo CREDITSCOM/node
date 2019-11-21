@@ -4,6 +4,8 @@
 
 #include <lib/system/process.hpp>
 
+#include <csnode/configholder.hpp>
+
 bool cs::ExecutorManager::isExecutorProcessRunning(ProcessId id) const {
     return jpsData().find(std::to_string(id) + executorName_) != std::string::npos;
 }
@@ -36,7 +38,7 @@ bool cs::ExecutorManager::stopExecutorProcess() {
 
 std::string cs::ExecutorManager::jpsData() const {
     std::atomic<bool> finished = false;
-    cs::Process process(jpsName_);
+    cs::Process process(cs::ConfigHolder::instance().config()->getApiSettings().jpsCmdLine);
 
     cs::Connector::connect(&process.finished, [&](auto...) {
         finished.store(true, std::memory_order_release);
