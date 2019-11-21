@@ -549,6 +549,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
     cs::RoundNumber rNum = 0;
     iPackStream_ >> rNum;
 
+    // mark start of node data
     auto trStart = iPackStream_.getCurrentPtr();
 
     uint8_t numConf;
@@ -558,10 +559,11 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
         return false;
     }
 
+    // skip node data
     iPackStream_.safeSkip<cs::PublicKey>(numConf + 1);
 
+    // mark finish of node data
     auto trFinish = iPackStream_.getCurrentPtr();
-    node_->getRoundTableSS(trStart, cs::numeric_cast<size_t>(trFinish - trStart), rNum);
 
     uint8_t numCirc;
     iPackStream_ >> numCirc;
@@ -598,6 +600,9 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
             }
         }
     }
+
+    // let node to handle its data
+    node_->getRoundTableSS(trStart, cs::numeric_cast<size_t>(trFinish - trStart), rNum);
 
     ssStatus_ = SSBootstrapStatus::Complete;
     return true;
