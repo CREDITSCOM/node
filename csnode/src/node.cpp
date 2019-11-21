@@ -918,6 +918,9 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             << ", sender round R-" << WithDelimiters(rNum)
             << ", sender last block #" << WithDelimiters(sender_last_block)
             << ", info size " << bin_pack.size();
+
+        const char* log_prefix = "Event report: ";
+
         const auto event_id = EventReport::getId(bin_pack);
         if (event_id == EventReport::Id::RejectTransactions) {
             const auto resume = EventReport::parseReject(bin_pack);
@@ -928,7 +931,25 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                     cnt += item.second;
                     os << Reject::to_string(item.first) << " (" << item.second << ") ";
                 });
-                csdebug() << "Event report: rejected " << cnt << " transactions the following reasons: " << os.str();
+                csdebug() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os.str();
+            }
+        }
+        else if (event_id == EventReport::Id::AddGrayList || event_id == EventReport::Id::EraseGrayList) {
+            bool added = event_id == EventReport::Id::AddGrayList;
+            cs::PublicKey item;
+            if (EventReport::parseBlackListUpdate(bin_pack, item)) {
+                if (std::equal(item.cbegin(), item.cend(), cs::Zero::key.cbegin())) {
+                    csdebug() << log_prefix << "All items are " << (added ? "added to" : "cleared from")
+                        << " black list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                }
+                else {
+                    csdebug() << log_prefix << cs::Utils::byteStreamToHex(item.data(), item.size())
+                        << (added ? "added to" : "removed from")
+                        << " black list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                }
+            }
+            else {
+                csdebug() << log_prefix << "failed to parse item " << (added ? "added to" : "removed from") << " black list";
             }
         }
     }
@@ -1281,6 +1302,7 @@ void Node::processSync() {
 void Node::addToBlackList(const cs::PublicKey& key) {
     if (transport_->markNeighbourAsBlackListed(key)) {
         cswarning() << "Neigbour " << cs::Utils::byteStreamToHex(key) << " added to network black list";
+        EventReport::sendBlackListUpdate(*this, key, true /*added*/);
     }
 }
 
