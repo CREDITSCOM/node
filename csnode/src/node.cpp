@@ -680,7 +680,7 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
         identic = false;
     }
     if (identic) {
-        for (int i = 0; i < ownMask.size(); ++i) {
+        for (size_t i = 0; i < ownMask.size(); ++i) {
             if (otherMask[i] != ownMask[i]) {
                 identic = false;
                 csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... False";
@@ -1722,7 +1722,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
     istream_.init(data, size);
 
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound != subRound_) {
