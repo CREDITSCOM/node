@@ -3,6 +3,8 @@
 #define NEIGHBOURHOOD_HPP
 
 #include <deque>
+#include <queue>
+#include <list>
 
 #include <boost/asio.hpp>
 
@@ -218,6 +220,9 @@ private:
         bool received = false;
 
         uint32_t attempts = 0;
+        std::chrono::time_point<std::chrono::system_clock> startTPoint;
+        std::chrono::time_point<std::chrono::system_clock> tpoint;
+        cs::Hash mixHash;
     };
 
     bool isNewConnectionAvailable() const;
@@ -250,6 +255,31 @@ private:
     FixedHashMap<cs::Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
     FixedHashMap<cs::Hash, BroadPackInfo, uint32_t, MaxRememberPackets> msgBroads_;
     FixedHashMap<cs::Hash, DirectPackInfo, uint32_t, MaxRememberPackets> msgDirects_;
+
+    class ResendQueue {
+    public:
+        ResendQueue(Neighbourhood *nh)
+        : packetsRef(0, [](const cs::Hash& h) { return getHashIndex<std::size_t, cs::Hash>(h); })
+        , nh(nh) {}
+
+        bool insert(Packet pack, ConnectionPtr conn);
+        void remove(const cs::Hash& hash, Connection* conn);
+        void resend();
+
+    private:
+        void makeMixHash(cs::Hash& hash, uint64_t id) {
+            *reinterpret_cast<uint64_t *>(hash.data()) += id;
+        }
+
+        static constexpr double resendTimeout = 2.; // 2 sec
+        static constexpr double resendPeriod = 0.2; // 0.2 sec
+        std::queue<DirectPackInfo, std::list<DirectPackInfo>> packets;
+        std::unordered_map<cs::Hash, DirectPackInfo *, std::size_t(*)(const cs::Hash&)>
+                packetsRef;
+
+        std::mutex qLock;
+        Neighbourhood* nh;
+    } resqueue;
 };
 
 #endif  // NEIGHBOURHOOD_HPP
