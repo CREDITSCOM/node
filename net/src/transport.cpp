@@ -713,6 +713,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
             return node_->getBigBang(data, size, rNum);
         case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
             return node_->getRoundTableRequest(data, size, rNum, firstPack.getSender());
+        case MsgTypes::RoundPackRequest:
+            return node_->getRoundPackRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::NodeStopRequest:
             return node_->getNodeStopRequest(rNum, data, size);
         case MsgTypes::RoundTable:
@@ -773,8 +775,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
             return node_->getSmartReject(data, size, rNum, firstPack.getSender());
         case MsgTypes::RoundTableReply:
             return node_->getRoundTableReply(data, size, firstPack.getSender());
-        case MsgTypes::RoundPackRequest:
-            return node_->getRoundPackRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::EmptyRoundPack:
             return node_->getEmptyRoundPack(data, size, rNum, firstPack.getSender());
         case MsgTypes::StateRequest:

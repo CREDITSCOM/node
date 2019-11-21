@@ -3024,10 +3024,13 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
     }
     cs::RoundPackage rp = roundPackageCache_.back();
 
-    if (rp.roundTable().round >= rNum) {
+    const auto& cur_table = rp.roundTable();
+    if (cur_table.round >= rNum) {
         if(!rp.roundSignatures().empty()) {
-            ++roundPackRequests_;
-            if (roundPackRequests_ > rp.roundTable().confidants.size() / 2 && roundPackRequests_ <= rp.roundTable().confidants.size() / 2 + 1) {
+            if (cur_table.round == rNum) {
+                ++roundPackRequests_;
+            }
+            if (roundPackRequests_ > cur_table.confidants.size() / 2 && roundPackRequests_ <= cur_table.confidants.size() / 2 + 1) {
                 sendRoundPackageToAll(rp);
             }
             else {
