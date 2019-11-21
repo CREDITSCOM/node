@@ -2786,7 +2786,6 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     }
 
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
-	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
 
     //auto myPublicKey = solver_->getPublicKey();
 
@@ -3241,7 +3240,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     cslog() << s;
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
-    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq()) << ", neighbours = " << transport_->getNeighboursCount();
+    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq()) << ", neighbour nodes = " << transport_->getNeighboursCountWithoutSS();
 
     if (Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 || Transport::cntExtraLargeNotSent > 0) {
         cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments << " / " << Transport::cntExtraLargeNotSent;
@@ -3255,7 +3254,6 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     csdebug() << line2.str();
     csdebug() << " Confidants:";
-
     for (size_t i = 0; i < roundTable.confidants.size(); ++i) {
         auto result = myLevel_ == Level::Confidant && i == myConfidantIndex_;
         auto name = result ? "me" : cs::Utils::byteStreamToHex(roundTable.confidants[i]);
@@ -3264,9 +3262,15 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     }
 
     csdebug() << " Hashes: " << roundTable.hashes.size();
-
     for (size_t j = 0; j < roundTable.hashes.size(); ++j) {
         csdetails() << "[" << j << "] " << cs::Utils::byteStreamToHex(roundTable.hashes[j].toBinary());
+    }
+
+    if (roundTable.hashes.empty()) {
+        cslog() << " Trusted count: " << roundTable.confidants.size() << ", no transactions";
+    }
+    else {
+        cslog() << " Trusted count: " << roundTable.confidants.size() << ", transaction packets: " << roundTable.hashes.size();
     }
 
     csdebug() << line2.str();
