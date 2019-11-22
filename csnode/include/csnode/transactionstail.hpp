@@ -38,6 +38,13 @@ public:
         }
     }
 
+	bool isDuplicated(TransactionId trxId) const {
+		if (!heap_.empty()) {
+			return heap_.contains(trxId);
+		}
+		return false;
+	}
+
     std::string printRange() {
         if (heap_.empty()) {
             return "any";

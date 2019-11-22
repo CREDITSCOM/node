@@ -115,7 +115,7 @@ public:
     bool sendDirectToSock(Packet*, const EndpointData&);
     void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
     void deliverBroadcast(const Packet*, const uint32_t);
-    // returns pair of (sent count, list of unable-to-send items in input list)
+    // returns pair of (sent count, list of unable-to-send items)
     std::pair< uint32_t, std::list<int> > deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
     bool checkConfidant(const cs::PublicKey& key);
 
@@ -123,7 +123,9 @@ public:
     void redirectPacket(const Packet&, RemoteNodePtr&);
     bool shouldSendPacket(const Packet&);
 
+    // call need checked earlier in calling code
     void refillNeighbourhood();
+
     void processPostponed(const cs::RoundNumber);
 
     void sendRegistrationRequest(Connection&);

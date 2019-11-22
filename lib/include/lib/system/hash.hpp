@@ -34,6 +34,11 @@ inline uint32_t getHashIndex(const cs::Hash& hash) {
     return *reinterpret_cast<const uint32_t *>(hash.data());
 }
 
+template <>
+inline std::size_t getHashIndex(const cs::Hash& hash) {
+    return *reinterpret_cast<const std::size_t *>(hash.data());
+}
+
 template<int N>
 uint32_t MurmurHash2(const uint8_t* key) {
   constexpr uint32_t m = 0x5bd1e995;

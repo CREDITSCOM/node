@@ -4,10 +4,12 @@
 #include <csdb/pool.hpp>
 #include <csdb/transaction.hpp>
 #include <csnode/walletsstate.hpp>
+#include <csnode/eventreport.hpp>
 #include <lib/system/common.hpp>
 #include <limits>
 #include <map>
 #include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 namespace cs {
@@ -30,17 +32,18 @@ public:
     TransactionsValidator(WalletsState& walletsState, const Config& config);
 
     void reset(size_t transactionsNum);
-    bool validateTransaction(SolverContext& context, const Transactions& trxs, size_t trxInd);
+    Reject::Reason validateTransaction(SolverContext& context, const Transactions& trxs, size_t trxInd);
     size_t checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded);
     void validateByGraph(SolverContext& context, CharacteristicMask& maskIncluded, const Transactions& trxs);
 
     bool isRejectedSmart(const csdb::Address&) const;
-    auto& getValidNewStates() const {
+	Reject::Reason getRejectReason(const csdb::Address&) const;
+	auto& getValidNewStates() const {
         return validNewStates_;
     }
 
     void clearCaches();
-    void saveNewState(const csdb::Address&, size_t blockIndex, bool valid);
+    void saveNewState(const csdb::Address&, size_t blockIndex, Reject::Reason rejectReason);
 
     size_t getCntRemovedTrxsByGraph() const;
     bool duplicatedNewState(SolverContext&, const csdb::Address&) const;
@@ -52,11 +55,11 @@ private:
     static constexpr csdb::Amount zeroBalance_ = 0.0_c;
 
 private:
-    bool validateTransactionAsSource(SolverContext& context, const Transactions& trxs, size_t trxInd);
-    bool validateNewStateAsSource(SolverContext& context, const csdb::Transaction& trx);
-    bool validateCommonAsSource(SolverContext& context, const Transactions& trxs, size_t trxInd, WalletsState::WalletData& wallState);
+	Reject::Reason validateTransactionAsSource(SolverContext& context, const Transactions& trxs, size_t trxInd);
+	Reject::Reason validateNewStateAsSource(SolverContext& context, const csdb::Transaction& trx);
+	Reject::Reason validateCommonAsSource(SolverContext& context, const Transactions& trxs, size_t trxInd, WalletsState::WalletData& wallState);
 
-    bool validateTransactionAsTarget(const csdb::Transaction& trx);
+	Reject::Reason validateTransactionAsTarget(const csdb::Transaction& trx);
 
     void removeTransactions(SolverContext& context, Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded);
     bool removeTransactions_PositiveOne(SolverContext& context, Node& node, const Transactions& trxs, CharacteristicMask& maskIncluded);
@@ -71,7 +74,7 @@ private:
     WalletsState& walletsState_;
     TrxList trxList_;
     std::map<csdb::Address, csdb::Amount> payableMaxFees_;
-    std::unordered_set<csdb::Address> rejectedNewStates_;
+    std::unordered_map<csdb::Address, Reject::Reason> rejectedNewStates_;
     std::vector<std::pair<size_t, bool>> validNewStates_; // index in block + false if invalidated by smart source trx
     std::unordered_set<csdb::Address> duplicatedNewStates_;
     Stack negativeNodes_;
@@ -85,12 +88,12 @@ inline void TransactionsValidator::clearCaches() {
     duplicatedNewStates_.clear();
 }
 
-inline void TransactionsValidator::saveNewState(const csdb::Address& addr, size_t index, bool valid) {
-    if (!valid) {
-        rejectedNewStates_.insert(addr);
+inline void TransactionsValidator::saveNewState(const csdb::Address& addr, size_t index, Reject::Reason rejectReason) {
+    if (rejectReason != Reject::Reason::None) {
+        rejectedNewStates_[addr] = rejectReason;
     }
     else {
-        validNewStates_.push_back(std::make_pair(index, valid));
+        validNewStates_.push_back(std::make_pair(index, true));
     }
 }
 
@@ -101,5 +104,14 @@ inline size_t TransactionsValidator::getCntRemovedTrxsByGraph() const {
 inline bool TransactionsValidator::isRejectedSmart(const csdb::Address& addr) const {
     return rejectedNewStates_.find(addr) != rejectedNewStates_.end();
 }
+
+inline Reject::Reason TransactionsValidator::getRejectReason(const csdb::Address& addr) const {
+	auto item = rejectedNewStates_.find(addr);
+	if (item != rejectedNewStates_.cend()) {
+		return item->second;
+	}
+	return Reject::Reason::None;
+}
+
 }  // namespace cs
 #endif  // TRANSACTIONS_VALIDATOR_HPP

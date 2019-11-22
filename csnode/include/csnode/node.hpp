@@ -11,7 +11,6 @@
 
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
-
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
@@ -176,6 +175,7 @@ public:
     void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
     void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
     void getBlockAlarm(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
+    void getEventReport(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
     bool checkCharacteristic(cs::RoundPackage& rPackage);
 
@@ -283,6 +283,8 @@ public:
     bool alwaysExecuteContracts() {
         return alwaysExecuteContracts_;
     }
+
+    void reportEvent(const cs::Bytes& bin_pack);
 
 public signals:
     SmartsSignal<cs::StageOneSmarts> gotSmartStageOne;
