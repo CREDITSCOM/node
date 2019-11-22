@@ -9,6 +9,7 @@
 #include <csnode/itervalidator.hpp>
 #include <csnode/transactionspacket.hpp>
 #include <csnode/walletscache.hpp>
+#include <csnode/configholder.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 

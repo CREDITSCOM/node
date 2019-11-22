@@ -90,14 +90,14 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
         cserror() << kLogPrefix << "incorrect reference to start transaction";
         return false;
     }
-    executor::Executor::ExecuteTransactionInfo info{};
+    cs::Executor::ExecuteTransactionInfo info{};
     info.transaction = block.transactions().at(ref.transaction);
     info.sequence = ref.sequence;
     info.feeLimit = csdb::Amount(info.transaction.max_fee().to_double()); // specify limit as SmartContracts::execute() does
-    info.convention = executor::Executor::MethodNameConvention::Default;
+    info.convention = cs::Executor::MethodNameConvention::Default;
     if (!is_smart(info.transaction)) {
         // to specify Payable or PayableLegacy convention call correctly we require access to smarts object
-        info.convention = executor::Executor::MethodNameConvention::PayableLegacy;
+        info.convention = cs::Executor::MethodNameConvention::PayableLegacy;
         // the most frequent fast test
         //auto item = known_contracts.find(absolute_address(transaction.target()));
         //if (item != known_contracts.end()) {

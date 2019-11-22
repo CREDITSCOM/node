@@ -58,8 +58,8 @@ Node::Node(cs::config::Observer& observer)
 
     poolSynchronizer_ = new cs::PoolSynchronizer(transport_, &blockChain_);
 
-    executor::ExecutorSettings::set(cs::makeReference(blockChain_), cs::makeReference(solver_));
-    auto& executor = executor::Executor::getInstance();
+    cs::ExecutorSettings::set(cs::makeReference(blockChain_), cs::makeReference(solver_));
+    auto& executor = cs::Executor::instance();
 
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
 
@@ -70,8 +70,8 @@ Node::Node(cs::config::Observer& observer)
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
-    cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &executor::Executor::onBlockStored);
-    cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &executor::Executor::onReadBlock);
+    cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &cs::Executor::onBlockStored);
+    cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &cs::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
@@ -170,14 +170,11 @@ void Node::stop() {
     solver_->finish();
     cswarning() << "[SOLVER STOPPED]";
 
-    blockChain_.close();
-
-    if (api_) {
-        api_->apiExecHandler()->getExecutor().stop();
-        cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
-    }
-
+    blockChain_.close();    
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
+
+    cs::Executor::instance().stop();
+    cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
 
     observer_.stop();
     cswarning() << "[CONFIG OBSERVER STOPPED]";
