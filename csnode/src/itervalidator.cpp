@@ -44,6 +44,21 @@ Characteristic IterValidator::formCharacteristic(SolverContext& context, Transac
     return characteristic;
 }
 
+void IterValidator::normalizeCharacteristic(Characteristic& inout) const {
+    // transform characteristic to its "canonical" form
+    if (inout.mask.empty()) {
+        return;
+    }
+    std::for_each(inout.mask.begin(), inout.mask.end(), [](cs::Byte& item) {
+        if (item == Reject::Reason::None) {
+            item = 1;
+        }
+        else {
+            item = 0;
+        }
+    });
+}
+
 void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& characteristicMask, const Transactions& transactions) {
     std::vector<SolverContext::RefExecution> rejectList;
     std::set<csdb::Address> firstRejected;
