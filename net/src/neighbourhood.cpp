@@ -222,7 +222,7 @@ void Neighbourhood::checkSilent() {
     static uint32_t refillCount = 0;
 
     bool needRefill = true;
-    std::atomic_bool flagCallRefillNeighbourhood{ false };
+    bool flagCallRefillNeighbourhood{ false };
 
     { // begin of scoped locked block
         cs::ScopedLock lock(mLockFlag_, nLockFlag_);
