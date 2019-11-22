@@ -85,6 +85,7 @@ struct ApiData {
     bool executorMultiInstance = false;
     int executorCommitMin = 1506;   // first commit with support of checking
     int executorCommitMax{-1};      // unlimited range on the right
+    std::string jpsCmdLine = "jps";
 };
 
 struct ConveyerData {

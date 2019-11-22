@@ -73,6 +73,7 @@ public:
     };
 
     enum class ExecutorState {
+        Idle,
         Launching,
         Launched
     };

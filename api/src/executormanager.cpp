@@ -4,6 +4,8 @@
 
 #include <lib/system/process.hpp>
 
+#include <csnode/configholder.hpp>
+
 bool cs::ExecutorManager::isExecutorProcessRunning(ProcessId id) const {
     return jpsData().find(std::to_string(id) + executorName_) != std::string::npos;
 }
@@ -36,29 +38,32 @@ bool cs::ExecutorManager::stopExecutorProcess() {
 
 std::string cs::ExecutorManager::jpsData() const {
     std::atomic<bool> finished = false;
-    cs::Process process(jpsName_);
+    std::atomic<bool> errorOccured = false;
+    cs::Process process(cs::ConfigHolder::instance().config()->getApiSettings().jpsCmdLine);
 
     cs::Connector::connect(&process.finished, [&](auto...) {
         finished.store(true, std::memory_order_release);
     });
 
     cs::Connector::connect(&process.errorOccured, [&](auto...) {
-        finished.store(true, std::memory_order_release);
+        errorOccured.store(true, std::memory_order_release);
     });
 
     process.launch(cs::Process::Options::OutToStream);
-    while (!finished.load(std::memory_order_acquire));
 
-    std::string result;
-
-    while (process.out().good()) {
-        std::string data;
-        process.out() >> data;
-
-        result += data;
+    while (!finished.load(std::memory_order_acquire) &&
+           !errorOccured.load(std::memory_order_acquire)) {
+        std::this_thread::yield();
     }
 
-    return result;
+    cs::Connector::disconnect(&process.finished);
+    cs::Connector::disconnect(&process.errorOccured);
+
+    if (!process.isPipeValid()) {
+        return std::string{};
+    }
+
+    return process.out();
 }
 
 void cs::ExecutorManager::terminate(boost::process::pid_t pid) {
