@@ -336,7 +336,6 @@ static ip::udp::endpoint getIndexingEndpoint(const ip::udp::endpoint& ep) {
 }
 
 ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
-    //csdebug() << "Getting connection with " << ep;
     auto& conn = connections_.tryStore(getIndexingEndpoint(ep));
 
     if (!conn) {
@@ -472,15 +471,14 @@ ConnectionPtr Neighbourhood::addConfidant(const ip::udp::endpoint& ep) {
 }
 
 bool Neighbourhood::updateSignalServer(const ip::udp::endpoint& in) {
-    cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_); // #!
-    
+    cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_);
+
     if (auto itServer = std::find_if(neighbours_.begin(), neighbours_.end(), [](auto const& node) {return node->isSignal; }); itServer != neighbours_.end()) {
         itServer->get()->in = in;
         itServer->get()->specialOut = false;
         itServer->get()->out = {};
         return true;
     }
-    
     return false;
 }
 
@@ -846,7 +844,6 @@ bool Neighbourhood::isNewConnectionAvailable() const {
 
 ConnectionPtr Neighbourhood::getRandomNeighbour() {
     cs::Lock lock(nLockFlag_);
-
     if (neighbours_.size() == 0) {
         return ConnectionPtr();
     }
@@ -873,8 +870,6 @@ bool Neighbourhood::ResendQueue::insert(Packet pack, ConnectionPtr conn) {
     if (res.second) {
         packets.push(info);
         res.first->second = &packets.back();
-        csdebug() << "Insert packet: " << (**conn).id << " " << (**conn).in << " " << cs::Utils::byteStreamToHex(info.mixHash.data(), info.mixHash.size());
-        csdebug() << cs::Utils::byteStreamToHex(pack.getHash().data(), pack.getHash().size());
         return true;
     }
     return false;
@@ -882,7 +877,6 @@ bool Neighbourhood::ResendQueue::insert(Packet pack, ConnectionPtr conn) {
 
 void Neighbourhood::ResendQueue::remove(const cs::Hash& hash, Connection* conn) {
     cs::Lock lock(qLock);
-
     static int count = 0;
 
     cs::Hash mixHash = hash;
@@ -890,11 +884,6 @@ void Neighbourhood::ResendQueue::remove(const cs::Hash& hash, Connection* conn) 
     auto it = packetsRef.find(mixHash);
     if (it != packetsRef.end()) {
         it->second->received = true;
-        csdebug() << "Receive packet: " << conn->in << " " << cs::Utils::byteStreamToHex(mixHash.data(), mixHash.size());
-        csdebug() << cs::Utils::byteStreamToHex(hash.data(), hash.size());
-    } else {
-        csdebug() << "Miss!!!!!!!!!!!!!!" << " " << conn->in << " " << cs::Utils::byteStreamToHex(mixHash.data(), mixHash.size());
-        csdebug() << cs::Utils::byteStreamToHex(hash.data(), hash.size());
     }
 }
 
@@ -909,13 +898,11 @@ void Neighbourhood::ResendQueue::resend() {
             if (diff.count() > resendPeriod) {
                 std::chrono::duration<double> diffAtStart = now - packinfo.startTPoint;
                 if (diffAtStart.count() > resendTimeout) {
-                    csdebug() << "Timeout packet: " << diffAtStart.count();
                     packetsRef.erase(packinfo.mixHash);
                     packets.pop();
                     continue;
                 }
                 if (!packinfo.received) {
-                    csdebug() << "Resend packet: " << diff.count();
                     auto tmp = packinfo;
                     tmp.tpoint = now;
                     packetsRef.erase(packinfo.mixHash);
@@ -925,7 +912,6 @@ void Neighbourhood::ResendQueue::resend() {
                     res.first->second = &packets.back();
                     toSend.push_back(&packets.back());
                 } else {
-                    csdebug() << "Received packet: " << diff.count();
                     packetsRef.erase(packinfo.mixHash);
                     packets.pop();
                 }
