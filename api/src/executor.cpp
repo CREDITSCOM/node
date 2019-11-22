@@ -801,14 +801,13 @@ cs::Executor::Executor(const cs::ExecutorSettings::Types& types)
     checkAnotherExecutor();
     executorProcess_->launch(cs::Process::Options::None);
 
-    while (!executorProcess_->isRunning()) {
-        if (solver_.stopNodeRequested()) {
-            requestStop_ = true;
-            return;
-        }
-    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(cs::ConfigHolder::instance().config()->getApiSettings().executorRunDelay));
+    state_ = executorProcess_->isRunning() ? ExecutorState::Launched : ExecutorState::Idle;
 
-    state_ = ExecutorState::Launched;
+    if (state_ == ExecutorState::Idle) {
+        cswarning() << "Executor can not start, watcher thread would not be created";
+        return;
+    }
 
     auto watcher = [this]() {
         isWatcherRunning_.store(true, std::memory_order_release);
@@ -839,6 +838,7 @@ cs::Executor::Executor(const cs::ExecutorSettings::Types& types)
         }
 
         isWatcherRunning_.store(false, std::memory_order_release);
+        cslog() << "Executor watcher thread finished";
     };
 
     cs::Concurrent::run(watcher, cs::ConcurrentPolicy::Thread);
