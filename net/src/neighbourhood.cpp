@@ -466,7 +466,7 @@ ConnectionPtr Neighbourhood::addConfidant(const ip::udp::endpoint& ep) {
         conn->id = getSecureRandom<Connection::Id>();
     }
 
-    conn->connected = conn->connected = conn->node ? !conn->node->isBlackListed() : false;
+    conn->connected = conn->node ? !conn->node->isBlackListed() : false;
 
     return conn;
 }
