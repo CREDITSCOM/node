@@ -4,11 +4,75 @@
 
 #include <lib/system/process.hpp>
 
-bool cs::ExecutorManager::isExecutorProcessRunning() const {
-    return jpsData().find(executorName_) != std::string::npos;
+#include <csnode/configholder.hpp>
+
+bool cs::ExecutorManager::isExecutorProcessRunning(ProcessId id) const {
+    return jpsData().find(std::to_string(id) + executorName_) != std::string::npos;
 }
 
-std::optional<boost::process::pid_t> cs::ExecutorManager::executorProcessPid() const {
+bool cs::ExecutorManager::isExecutorProcessRunning() const {
+    return executorProcessIds().has_value();
+}
+
+bool cs::ExecutorManager::stopExecutorProcess(ProcessId id) {
+    if (isExecutorProcessRunning(id)) {
+        terminate(id);
+    }
+
+    return !isExecutorProcessRunning(id);
+}
+
+bool cs::ExecutorManager::stopExecutorProcess() {
+    auto pids = executorProcessIds();
+
+    if (!pids.has_value()) {
+        return true;
+    }
+
+    for (auto pid : std::move(pids).value()) {
+        terminate(pid);
+    }
+
+    return isExecutorProcessRunning();
+}
+
+std::string cs::ExecutorManager::jpsData() const {
+    std::atomic<bool> finished = false;
+    std::atomic<bool> errorOccured = false;
+    cs::Process process(cs::ConfigHolder::instance().config()->getApiSettings().jpsCmdLine);
+
+    cs::Connector::connect(&process.finished, [&](auto...) {
+        finished.store(true, std::memory_order_release);
+    });
+
+    cs::Connector::connect(&process.errorOccured, [&](auto...) {
+        errorOccured.store(true, std::memory_order_release);
+    });
+
+    process.launch(cs::Process::Options::OutToStream);
+
+    while (!finished.load(std::memory_order_acquire) &&
+           !errorOccured.load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+    }
+
+    cs::Connector::disconnect(&process.finished);
+    cs::Connector::disconnect(&process.errorOccured);
+
+    if (!process.isPipeValid()) {
+        return std::string{};
+    }
+
+    return process.out();
+}
+
+void cs::ExecutorManager::terminate(boost::process::pid_t pid) {
+    cs::Process process(pid);
+    process.launch(cs::Process::Options::Attach);
+    process.terminate();
+}
+
+std::optional<std::vector<cs::ExecutorManager::ProcessId>> cs::ExecutorManager::executorProcessIds() const {
     auto data = jpsData();
     auto pos = data.find(executorName_);
 
@@ -17,59 +81,20 @@ std::optional<boost::process::pid_t> cs::ExecutorManager::executorProcessPid() c
     }
 
     std::regex regexpr("([0-9]*)" + executorName_);
-    std::smatch match;
 
-    if (!std::regex_search(data, match, regexpr)) {
+    auto begin = std::sregex_iterator(data.begin(), data.end(), regexpr);
+    auto end = std::sregex_iterator();
+
+    if (!std::distance(begin, end)) {
         return std::nullopt;
     }
 
-    try {
-        auto value = std::stoi(match[1]);
-        return std::make_optional(value);
-    }
-    catch (const std::exception&) {
-        return std::nullopt;
-    }
-}
+    std::vector<ProcessId> results;
 
-bool cs::ExecutorManager::stopExecutorProcess() {
-    auto pid = executorProcessPid();
-
-    if (!pid) {
-        return false;
+    for (; begin != end; ++begin) {
+        auto match = *begin;
+        results.push_back(std::stoi(match.str()));
     }
 
-    cs::Process process(pid.value());
-    process.launch(cs::Process::Options::Attach);
-    process.terminate();
-
-    return !isExecutorProcessRunning();
-}
-
-std::string cs::ExecutorManager::jpsData() const {
-    std::atomic<bool> finished = false;
-    cs::Process process(jpsName_);
-
-    cs::Connector::connect(&process.finished, [&](auto...) {
-        finished.store(true, std::memory_order_release);
-    });
-
-    cs::Connector::connect(&process.errorOccured, [&](auto...) {
-        finished.store(true, std::memory_order_release);
-    });
-
-    process.launch(cs::Process::Options::OutToStream);
-
-    while (!finished.load(std::memory_order_acquire));
-
-    std::string result;
-
-    while (process.out().good()) {
-        std::string data;
-        process.out() >> data;
-
-        result += data;
-    }
-
-    return result;
+    return std::make_optional(std::move(results));
 }

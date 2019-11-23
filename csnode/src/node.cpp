@@ -17,6 +17,7 @@
 #include <csnode/blockvalidator.hpp>
 #include <csnode/roundpackage.hpp>
 #include <csnode/configholder.hpp>
+#include <csnode/eventreport.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/progressbar.hpp>
@@ -57,8 +58,8 @@ Node::Node(cs::config::Observer& observer)
 
     poolSynchronizer_ = new cs::PoolSynchronizer(transport_, &blockChain_);
 
-    executor::ExecutorSettings::set(cs::makeReference(blockChain_), cs::makeReference(solver_));
-    auto& executor = executor::Executor::getInstance();
+    cs::ExecutorSettings::set(cs::makeReference(blockChain_), cs::makeReference(solver_));
+    auto& executor = cs::Executor::instance();
 
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
 
@@ -69,8 +70,8 @@ Node::Node(cs::config::Observer& observer)
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
-    cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &executor::Executor::onBlockStored);
-    cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &executor::Executor::onReadBlock);
+    cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &cs::Executor::onBlockStored);
+    cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &cs::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
@@ -169,14 +170,11 @@ void Node::stop() {
     solver_->finish();
     cswarning() << "[SOLVER STOPPED]";
 
-    blockChain_.close();
-
-    if (api_) {
-        api_->apiExecHandler()->getExecutor().stop();
-        cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
-    }
-
+    blockChain_.close();    
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
+
+    cs::Executor::instance().stop();
+    cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
 
     observer_.stop();
     cswarning() << "[CONFIG OBSERVER STOPPED]";
@@ -679,7 +677,7 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
         identic = false;
     }
     if (identic) {
-        for (int i = 0; i < ownMask.size(); ++i) {
+        for (size_t i = 0; i < ownMask.size(); ++i) {
             if (otherMask[i] != ownMask[i]) {
                 identic = false;
                 csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... False";
@@ -872,6 +870,90 @@ void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::
     }
     else {
         csdebug() << "NODE> Got BlockAlarm message from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    }
+}
+
+void Node::reportEvent(const cs::Bytes& bin_pack) {
+    const auto& conf = cs::ConfigHolder::instance().config()->getEventsReportData();
+    if (!conf.on) {
+        return;
+    }
+    cs::Bytes message;
+    cs::DataStream stream(message);
+
+    constexpr uint8_t kEventReportVersion = 0;
+
+    if constexpr (kEventReportVersion == 0) {
+        stream << kEventReportVersion << blockChain_.getLastSeq() << bin_pack;
+    }
+    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+    ostream_.init(BaseFlags::Direct);
+    ostream_ << MsgTypes::EventReport << cs::Conveyer::instance().currentRoundNumber() << sig << message;
+    transport_->sendDirectToSock(ostream_.getPackets(), conf.collector_ep);
+    ostream_.clear();
+    csmeta(csdebug) << "event report -> " << conf.collector_ep.ip << ':' << conf.collector_ep.port;
+}
+
+void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+    istream_.init(data, size);
+    cs::Signature sig;
+    cs::Bytes message;
+    istream_ >> sig >> message;
+    if (!cscrypto::verifySignature(sig, sender, message.data(), message.size())) {
+        csdebug() << "NODE> event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " -  WRONG SIGNATURE!!!";
+        return;
+    }
+
+    cs::DataStream stream(message.data(), message.size());
+    uint8_t report_version = 0;
+    cs::Sequence sender_last_block = 0;
+    cs::Bytes bin_pack;
+    stream >> report_version;
+    if (report_version == 0) {
+        stream >> sender_last_block >> bin_pack;
+        csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+            << ", sender round R-" << WithDelimiters(rNum)
+            << ", sender last block #" << WithDelimiters(sender_last_block)
+            << ", info size " << bin_pack.size();
+
+        const char* log_prefix = "Event report: ";
+
+        const auto event_id = EventReport::getId(bin_pack);
+        if (event_id == EventReport::Id::RejectTransactions) {
+            const auto resume = EventReport::parseReject(bin_pack);
+            if (!resume.empty()) {
+                size_t cnt = 0;
+                std::ostringstream os;
+                std::for_each(resume.cbegin(), resume.cend(), [&](const auto& item) {
+                    cnt += item.second;
+                    os << Reject::to_string(item.first) << " (" << item.second << ") ";
+                });
+                csdebug() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os.str();
+            }
+        }
+        else if (event_id == EventReport::Id::AddGrayList || event_id == EventReport::Id::EraseGrayList) {
+            bool added = event_id == EventReport::Id::AddGrayList;
+            cs::PublicKey item;
+            if (EventReport::parseBlackListUpdate(bin_pack, item)) {
+                if (std::equal(item.cbegin(), item.cend(), cs::Zero::key.cbegin())) {
+                    csdebug() << log_prefix << "All items are " << (added ? "added to" : "cleared from")
+                        << " black list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                }
+                else {
+                    csdebug() << log_prefix << cs::Utils::byteStreamToHex(item.data(), item.size())
+                        << (added ? "added to" : "removed from")
+                        << " black list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                }
+            }
+            else {
+                csdebug() << log_prefix << "failed to parse item " << (added ? "added to" : "removed from") << " black list";
+            }
+        }
+    }
+    else {
+        csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+            << " of incompatible version " << int(report_version)
+            << ", sender round R-" << WithDelimiters(rNum);
     }
 }
 
@@ -1217,6 +1299,7 @@ void Node::processSync() {
 void Node::addToBlackList(const cs::PublicKey& key) {
     if (transport_->markNeighbourAsBlackListed(key)) {
         cswarning() << "Neigbour " << cs::Utils::byteStreamToHex(key) << " added to network black list";
+        EventReport::sendBlackListUpdate(*this, key, true /*added*/);
     }
 }
 
@@ -1314,6 +1397,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         case MsgTypes::StateRequest:
         case MsgTypes::StateReply:
         case MsgTypes::BlockAlarm:
+        case MsgTypes::EventReport:
             return MessageActions::Process;
 
         default:
@@ -1657,7 +1741,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
     istream_.init(data, size);
 
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound != subRound_) {
@@ -2721,7 +2805,6 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     }
 
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
-	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
 
     //auto myPublicKey = solver_->getPublicKey();
 
@@ -2959,10 +3042,13 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
     }
     cs::RoundPackage rp = roundPackageCache_.back();
 
-    if (rp.roundTable().round >= rNum) {
+    const auto& cur_table = rp.roundTable();
+    if (cur_table.round >= rNum) {
         if(!rp.roundSignatures().empty()) {
-            ++roundPackRequests_;
-            if (roundPackRequests_ > rp.roundTable().confidants.size() / 2 && roundPackRequests_ <= rp.roundTable().confidants.size() / 2 + 1) {
+            if (cur_table.round == rNum) {
+                ++roundPackRequests_;
+            }
+            if (roundPackRequests_ > cur_table.confidants.size() / 2 && roundPackRequests_ <= cur_table.confidants.size() / 2 + 1) {
                 sendRoundPackageToAll(rp);
             }
             else {
@@ -3173,7 +3259,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     cslog() << s;
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
-    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq()) << ", neighbours = " << transport_->getNeighboursCount();
+    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq()) << ", neighbour nodes = " << transport_->getNeighboursCountWithoutSS();
 
     if (Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 || Transport::cntExtraLargeNotSent > 0) {
         cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments << " / " << Transport::cntExtraLargeNotSent;
@@ -3187,7 +3273,6 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     csdebug() << line2.str();
     csdebug() << " Confidants:";
-
     for (size_t i = 0; i < roundTable.confidants.size(); ++i) {
         auto result = myLevel_ == Level::Confidant && i == myConfidantIndex_;
         auto name = result ? "me" : cs::Utils::byteStreamToHex(roundTable.confidants[i]);
@@ -3196,9 +3281,15 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     }
 
     csdebug() << " Hashes: " << roundTable.hashes.size();
-
     for (size_t j = 0; j < roundTable.hashes.size(); ++j) {
         csdetails() << "[" << j << "] " << cs::Utils::byteStreamToHex(roundTable.hashes[j].toBinary());
+    }
+
+    if (roundTable.hashes.empty()) {
+        cslog() << " Trusted count: " << roundTable.confidants.size() << ", no transactions";
+    }
+    else {
+        cslog() << " Trusted count: " << roundTable.confidants.size() << ", transaction packets: " << roundTable.hashes.size();
     }
 
     csdebug() << line2.str();

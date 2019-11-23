@@ -27,7 +27,7 @@ using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
 connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
-: executor_(executor::Executor::getInstance())
+: executor_(cs::Executor::instance())
 , api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, executor_))
 , apiexec_handler(make_shared<apiexec::APIEXECHandler>(m_blockchain, *solver, executor_))
 , p_api_processor(make_shared<connector::ApiProcessor>(api_handler))

@@ -13,6 +13,7 @@
 #include <memory>
 #include <optional>
 #include <sstream>
+#include <serializer.hpp>
 
 namespace {
     const char* kLogPrefix = "Smart: ";
@@ -107,7 +108,7 @@ namespace {
 
     // serializes val passed to special transaction user field new_state::RetVal
     inline void set_return_value(csdb::Transaction& new_state_transaction, const ::general::Variant& val) {
-        new_state_transaction.add_user_field(cs::trx_uf::new_state::RetVal, serialize(val));
+        new_state_transaction.add_user_field(cs::trx_uf::new_state::RetVal, cs::Serializer::serialize(val));
     }
 
     inline void set_return_value(csdb::Transaction& new_state_transaction, int8_t val) {
@@ -152,7 +153,7 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
         if (fld.is_valid()) {
             std::string data = fld.value<std::string>();
             if (!data.empty()) {
-                auto invoke = deserialize<api::SmartContractInvocation>(std::move(data));
+                auto invoke = cs::Serializer::deserialize<api::SmartContractInvocation>(std::move(data));
                 if (!invoke.usedContracts.empty()) {
                     for (const auto item : invoke.usedContracts) {
                         if (item.size() == cscrypto::kPublicKeySize) {
@@ -280,7 +281,7 @@ bool SmartContracts::is_deploy(const csdb::Transaction& tr) {
         return false;
     }
 
-    const auto invoke = deserialize<api::SmartContractInvocation>(uf.value<std::string>());
+    const auto invoke = cs::Serializer::deserialize<api::SmartContractInvocation>(uf.value<std::string>());
     // deploy ~ start but method in invoke info is empty
     return invoke.method.empty();
 }
@@ -410,7 +411,7 @@ std::optional<api::SmartContractInvocation> SmartContracts::find_deploy_info(con
                 if (fld.is_valid()) {
                     std::string data = fld.value<std::string>();
                     if (!data.empty()) {
-                        return std::make_optional(deserialize<api::SmartContractInvocation>(std::move(data)));
+                        return std::make_optional(cs::Serializer::deserialize<api::SmartContractInvocation>(std::move(data)));
                     }
                 }
             }
@@ -447,7 +448,7 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract_i
         if (fld.is_valid()) {
             std::string data = fld.value<std::string>();
             if (!data.empty()) {
-                auto invoke = deserialize<api::SmartContractInvocation>(std::move(data));
+                auto invoke = cs::Serializer::deserialize<api::SmartContractInvocation>(std::move(data));
                 if (invoke.method.empty()) {
                     // is deploy
                     return std::make_optional(std::move(invoke));
@@ -853,7 +854,7 @@ uint32_t SmartContracts::test_violations(const csdb::Transaction& tr) {
                 std::string data = fld.value<std::string>();
                 if (!data.empty()) {
                     try {
-                        invoke = deserialize<api::SmartContractInvocation>(std::move(data));
+                        invoke = cs::Serializer::deserialize<api::SmartContractInvocation>(std::move(data));
                         is_invocation = true;
                     }
                     catch (::apache::thrift::protocol::TProtocolException&) {
@@ -1767,29 +1768,29 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
         cslog() << kLogPrefix << "executing " << data.contract_ref << "::" << print_executed_method(transaction);
     }
     // using data.result.newState to pass previous (not yet cached) new state in case of multi-call to conrtract:
-    std::vector<executor::Executor::ExecuteTransactionInfo> smarts;
-    auto& info = smarts.emplace_back(executor::Executor::ExecuteTransactionInfo{});
+    std::vector<cs::Executor::ExecuteTransactionInfo> smarts;
+    auto& info = smarts.emplace_back(cs::Executor::ExecuteTransactionInfo{});
     info.transaction = transaction;
     info.deploy = get_deploy_transaction(data.abs_addr);
     info.sequence = data.contract_ref.sequence;
     // data.executor_fee bring all available fee for future execution:
     info.feeLimit = data.executor_fee;
     data.executor_fee = csdb::Amount(0);
-    info.convention = executor::Executor::MethodNameConvention::Default;
+    info.convention = cs::Executor::MethodNameConvention::Default;
     if (!is_smart(transaction)) {
         // the most frequent fast test
         auto item = known_contracts.find(absolute_address(transaction.target()));
         if (item != known_contracts.end()) {
             StateItem& state = item->second;
             if (state.payable == PayableStatus::Implemented) {
-                info.convention = executor::Executor::MethodNameConvention::PayableLegacy;
+                info.convention = cs::Executor::MethodNameConvention::PayableLegacy;
             }
             else if (state.payable == PayableStatus::ImplementedVer1) {
-                info.convention = executor::Executor::MethodNameConvention::Payable;
+                info.convention = cs::Executor::MethodNameConvention::Payable;
             }
         }
     }
-    std::optional<executor::Executor::ExecuteResult> maybe_result;
+    std::optional<cs::Executor::ExecuteResult> maybe_result;
     if (validationMode) {
         // for now smarts always contains a one item:
         maybe_result = exec_handler_ptr->getExecutor().reexecuteContract(smarts.front(), data.explicit_last_state);
@@ -2508,7 +2509,7 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
             std::string error_message("execution is failed");
             fld = t_state.user_field(new_state::RetVal);
             if (fld.is_valid()) {
-                ::general::Variant var = deserialize <::general::Variant>(fld.value<std::string>());
+                ::general::Variant var = cs::Serializer::deserialize <::general::Variant>(fld.value<std::string>());
                 if (var.__isset.v_byte) {
                     error_message = SmartContracts::get_error_message(var.v_byte);
                 }
