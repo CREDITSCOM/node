@@ -459,6 +459,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
         case NetworkCommand::SSPingWhiteNode:
             gotSSPingWhiteNode(task, node_->getBlockChain().getLastSeq(), node_->getBlockChain().getLastHash());
             break;
+        case NetworkCommand::Utility:  // managing info could be obtained  
+            return node_->getUtilityMessage(task->pack.getMsgData(), task->pack.getMsgSize());
+            break;
         case NetworkCommand::SSLastBlock: {
             long long timeSS{};
             iPackStream_ >> timeSS;
@@ -716,6 +719,8 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
             return node_->getBlockReply(data, size);
         case MsgTypes::BigBang:  // any round (in theory) may be set
             return node_->getBigBang(data, size, rNum);
+        case MsgTypes::Utility:  // managing info could be obtained  
+            return node_->getUtilityMessage(data, size);
         case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
             return node_->getRoundTableRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::RoundPackRequest:
@@ -1078,6 +1083,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
     }
 
     Connection conn;
+    conn.connected = false;
     conn.in = task->sender;
     conn.version = version;
 
