@@ -1080,7 +1080,7 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
         cswarning() << csname() << "Can not send packet hashes to neighbours: no neighbours";
     }
     else {
-        transport_->forEachNeighbour([this, round, &hashes](const cs::PublicKey& neighbour) -> bool {
+        transport_->forEachNeighbour([this, round, &hashes](const cs::PublicKey& neighbour, cs::Sequence, cs::RoundNumber) -> bool {
                                         return sendToNeighbour(neighbour, MsgTypes::TransactionsPacketRequest, round, hashes);
                                      });
     }

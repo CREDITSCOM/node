@@ -332,8 +332,8 @@ void Transport::processPostponed(const cs::RoundNumber rNum) {
     csdebug() << "TRANSPORT> POSTPHONED finished, round " << rNum;
 }
 
-void Transport::forEachNeighbour(std::function<bool(const cs::PublicKey&)> f) {
-    neighbourhood_.forEachNeighbour(f);
+void Transport::forEachNeighbour(Neighbourhood::NeighboursCallback callback) {
+    neighbourhood_.forEachNeighbour(callback);
 }
 
 uint32_t Transport::getNeighboursCount() const {
@@ -351,8 +351,4 @@ uint32_t Transport::getMaxNeighbours() const {
 
 void Transport::onConfigChanged(const Config& /* updated */) {
 //    config_.exchange(updated);
-}
-
-cs::Sequence Transport::getNeighbourLastSequence(const cs::PublicKey& neighbour) const {
-    return neighbourhood_.getNeighbourLastSequence(neighbour);
 }

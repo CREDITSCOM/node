@@ -17,6 +17,9 @@ class Transport;
 
 class Neighbourhood {
 public:
+    using NeighboursCallback =
+        std::function<bool(const cs::PublicKey&, cs::Sequence, cs::RoundNumber)>;
+
     constexpr static uint32_t MaxNeighbours = 16;
     constexpr static uint32_t MinNeighbours = 2;
 
@@ -31,10 +34,9 @@ public:
     void removeSilent();
     void pingNeighbours();
 
-    void forEachNeighbour(std::function<bool(const cs::PublicKey&)>);
+    void forEachNeighbour(NeighboursCallback);
     uint32_t getNeighboursCount() const;
     bool contains(const cs::PublicKey& neighbour) const;
-    cs::Sequence getNeighbourLastSequence(const cs::PublicKey& neighbour) const;
 
 private:
     constexpr static std::chrono::seconds LastSeenTimeout{10};

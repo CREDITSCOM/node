@@ -267,10 +267,10 @@ void Neighbourhood::gotPing(const cs::PublicKey& sender, const Packet& pack) {
     }
 }
 
-void Neighbourhood::forEachNeighbour(std::function<bool(const cs::PublicKey&)> f) {
+void Neighbourhood::forEachNeighbour(NeighboursCallback callback) {
     std::lock_guard<std::mutex> g(neighbourMux_);
     for (auto& n : neighbours_) {
-        if (!f(n.first)) {
+        if (!callback(n.first, n.second.lastSeq, n.second.roundNumber)) {
             break;
         }
     }
@@ -284,13 +284,4 @@ uint32_t Neighbourhood::getNeighboursCount() const {
 bool Neighbourhood::contains(const cs::PublicKey& neighbour) const {
     std::lock_guard<std::mutex> g(neighbourMux_);
     return neighbours_.find(neighbour) != neighbours_.end();
-}
-
-cs::Sequence Neighbourhood::getNeighbourLastSequence(const cs::PublicKey& neighbour) const {
-    std::lock_guard<std::mutex> g(neighbourMux_);
-    auto it = neighbours_.find(neighbour);
-    if (it == neighbours_.end()) {
-        return cs::kWrongSequence;
-    }
-    return it->second.lastSeq;
 }
