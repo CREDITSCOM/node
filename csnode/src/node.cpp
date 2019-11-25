@@ -911,7 +911,7 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
     stream >> report_version;
     if (report_version == 0) {
         stream >> sender_last_block >> bin_pack;
-        csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+        csevent() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
             << ", sender round R-" << WithDelimiters(rNum)
             << ", sender last block #" << WithDelimiters(sender_last_block)
             << ", info size " << bin_pack.size();
@@ -925,12 +925,12 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                     cnt += item.second;
                     os << Reject::to_string(item.first) << " (" << item.second << ") ";
                 });
-                csdebug() << "Event report: rejected " << cnt << "transactions the following reasons: " << os.str();
+                csevent() << "Event report: rejected " << cnt << "transactions the following reasons: " << os.str();
             }
         }
     }
     else {
-        csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+        csevent() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
             << " of incompatible version " << int(report_version)
             << ", sender round R-" << WithDelimiters(rNum);
     }

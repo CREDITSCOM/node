@@ -52,11 +52,11 @@ constexpr bool useLogger<None>() {
     return false;
 }
 
-// Logger with channel "file", to support legacy csfile()
-BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channel_logger_mt<severity_level>, (logging::keywords::channel = "file"))
+BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channel_logger_mt<severity_level>, (logging::keywords::channel = "file"));
+BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(EventLogger, logging::sources::severity_channel_logger_mt<logging::trivial::severity_level>, (logging::keywords::channel = "Event"));
 }  // namespace logger
 
-#define _LOG_SEV(level, ...)               \
+#define LOG_SEV(level, ...)               \
     if (!logger::useLogger<__VA_ARGS__>()) \
         ;                                  \
     else                                   \
@@ -69,20 +69,23 @@ BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channe
         BOOST_LOG_SEV(logger::getLogger<__VA_ARGS__>(), logger::severity_level::trace) << __FILE__ << ":" << __func__ << ":" << __LINE__ << " "
 
 // set Filter="%Severity% >= trace" in config to view this level messages:
-#define csdetails(...) _LOG_SEV(trace, __VA_ARGS__)
+#define csdetails(...) LOG_SEV(trace, __VA_ARGS__)
 
-#define csdebug(...) _LOG_SEV(debug, __VA_ARGS__)
+#define csdebug(...) LOG_SEV(debug, __VA_ARGS__)
 
-#define csinfo(...) _LOG_SEV(info, __VA_ARGS__)
+#define csinfo(...) LOG_SEV(info, __VA_ARGS__)
 
-#define cswarning(...) _LOG_SEV(warning, __VA_ARGS__)
+#define cswarning(...) LOG_SEV(warning, __VA_ARGS__)
 
-#define cserror(...) _LOG_SEV(error, __VA_ARGS__)
+#define cserror(...) LOG_SEV(error, __VA_ARGS__)
 
-#define csfatal(...) _LOG_SEV(fatal, __VA_ARGS__)
+#define csfatal(...) LOG_SEV(fatal, __VA_ARGS__)
 
 // alias
 #define cslog(...) csinfo(__VA_ARGS__)
+
+// event logger
+#define csevent() csdetails(logger::EventLogger)
 
 template <typename N>
 class WithDelimiters
