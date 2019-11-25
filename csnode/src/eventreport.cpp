@@ -98,3 +98,19 @@ EventReport::Id EventReport::getId(const cs::Bytes& bin_pack) {
 //    }
 //}
 
+/*static*/
+void EventReport::sendBlackListUpdate(Node& node, const cs::PublicKey& key, bool added) {
+    cs::Bytes bin_pack;
+    cs::DataStream stream(bin_pack);
+    stream << (added ? Id::AddGrayList : Id::EraseGrayList) << key;
+    node.reportEvent(bin_pack);
+}
+
+/*static*/
+bool EventReport::parseBlackListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key) {
+    cs::DataStream stream(bin_pack.data(), bin_pack.size());
+    if (stream.isAvailable(key.size())) {
+        stream >> key;
+    }
+    return stream.isValid() && stream.isEmpty();
+}

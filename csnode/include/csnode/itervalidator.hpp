@@ -26,7 +26,8 @@ public:
 
     IterValidator(WalletsState& wallets);
     Characteristic formCharacteristic(SolverContext&, Transactions&, Packets& smartsPackets);
-
+    // transform characteristic from "array of reject reasons" to its canonical form of "0 or 1"
+    void normalizeCharacteristic(Characteristic& inout) const;
     class SimpleValidator;
 
 private:

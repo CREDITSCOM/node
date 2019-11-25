@@ -252,14 +252,7 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::Transactio
     }
 
     // transform characteristic to its "canonical" form
-    std::for_each(characteristic.mask.begin(), characteristic.mask.end(), [](cs::Byte& item) {
-        if (item == Reject::Reason::None) {
-            item = 1;
-        }
-        else {
-            item = 0;
-        }
-    });
+    pValidator_->normalizeCharacteristic(characteristic);
 
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     conveyer.setCharacteristic(characteristic, conveyer.currentRoundNumber());
