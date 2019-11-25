@@ -992,17 +992,17 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             cs::PublicKey item;
             if (EventReport::parseBlackListUpdate(bin_pack, item)) {
                 if (std::equal(item.cbegin(), item.cend(), cs::Zero::key.cbegin())) {
-                    csdebug() << log_prefix << '[' << WithDelimiters(rNum) << "] All items are " << (added ? "added to" : "cleared from")
+                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] All items are " << (added ? "added to" : "cleared from")
                         << " black list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
                 else {
-                    csdebug() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(item.data(), item.size())
+                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(item.data(), item.size())
                         << (added ? "added to" : "removed from")
                         << " black list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
             }
             else {
-                csdebug() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << (added ? "added to" : "removed from") << " black list";
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << (added ? "added to" : "removed from") << " black list";
             }
         }
     }
