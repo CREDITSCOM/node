@@ -238,9 +238,6 @@ private:
 
     FixedCircularBuffer<PackSendTask, maxPacksQueue_> sendPacks_;
 
-    mutable std::mutex remoteMutex_;
-    std::unordered_map<cs::PublicKey, ip::udp::endpoint> remoteBlackList_;
-
     TypedAllocator<RemoteNode> remoteNodes_;
 
     FixedHashMap<ip::udp::endpoint, RemoteNodePtr, uint16_t, maxRemoteNodes_> remoteNodesMap_;

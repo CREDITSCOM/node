@@ -197,7 +197,7 @@ void Node::initCurrentRP() {
 }
 
 void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
-    auto& conveyer = cs::Conveyer::instance();
+    //auto& conveyer = cs::Conveyer::instance();
 
     cswarning() << "NODE> Utility message get";
 
