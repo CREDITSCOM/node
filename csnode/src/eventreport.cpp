@@ -61,6 +61,9 @@ void EventReport::sendReject(Node& node, const cs::Bytes& rejected) {
 /*static*/
 std::map<Reject::Reason, uint16_t> EventReport::parseReject(const cs::Bytes& bin_pack) {
     std::map<Reject::Reason, uint16_t> resume;
+    if (bin_pack.empty()) {
+        return resume;
+    }
     cs::DataStream stream(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     stream >> id;
@@ -108,9 +111,17 @@ void EventReport::sendBlackListUpdate(Node& node, const cs::PublicKey& key, bool
 
 /*static*/
 bool EventReport::parseBlackListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key) {
-    cs::DataStream stream(bin_pack.data(), bin_pack.size());
-    if (stream.isAvailable(key.size())) {
-        stream >> key;
+    if (bin_pack.empty()) {
+        return false;
     }
-    return stream.isValid() && stream.isEmpty();
+    cs::DataStream stream(bin_pack.data(), bin_pack.size());
+    Id id = Id::None;
+    stream >> id;
+    if (id == Id::AddGrayList || id == Id::EraseGrayList) {
+        if (stream.isAvailable(key.size())) {
+            stream >> key;
+            return stream.isValid() && stream.isEmpty();
+        }
+    }
+    return false;
 }
