@@ -79,11 +79,6 @@ bool TransactionsValidator::validateNewStateAsSource(SolverContext& context, con
         return false;
     }
 
-    csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegate);
-    if (delegateField.is_valid()) {
-        if()
-    }
-
     return true;
 }
 
@@ -202,6 +197,34 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
         }
         // will be validated by graph
         negativeNodes_.push_back(&wallState);
+    }
+
+
+    //delegation
+    WalletsState::WalletData& targetWallState = walletsState_.getData(trx.target());
+    csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegate);
+    if (delegateField.is_valid()) {
+        switch (delegateField.value<uint64_t>() == 0) {
+        case 0:
+            if (targetWallState.delegated_ > csdb::Amount{ 0 }) {
+                return false;
+            }
+            break;
+        case 1:
+            auto delegats = wallState.delegats_;
+            auto tTarget = trx.target().to_public_key();
+            if (delegats.find(tTarget) == delegats.cend()) {
+                return false;
+            }
+            if (targetWallState.delegated_ != delegats.at(tTarget)) {
+                cslog() << kLogPrefix << __func__ << ": the delegated value has different amounts in wallet caches";
+                return false;
+            }
+            break;
+        default:
+            break;
+        }
+
     }
 
     wallState.trxTail_.push(trx.innerID());
