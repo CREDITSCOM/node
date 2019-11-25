@@ -223,15 +223,10 @@ void Node::initCurrentRP() {
     if (getBlockChain().getLastSeq() == 0) {
         cs::RoundTable rt;
         rt.round = 1;
-        cs::PublicKey pKey = solver_->getPublicKey();
-        for (auto& it : bootstrapKeys_){
-            rt.confidants.push_back(it);
-            if (it == pKey) {
-                initialConfidants_.emplace(it, true);
-            }
-            else {
-                initialConfidants_.emplace(it, false);
-            }
+        for (auto& key : bootstrapKeys_){
+            rt.confidants.push_back(key);
+            initialConfidants_.insert(key);
+
             if (rt.confidants.size() > Consensus::MinTrustedNodes) {
                 break;
             }
@@ -250,43 +245,35 @@ void Node::initCurrentRP() {
 void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
     cslog() << "NODE: new neighbour added " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
             << " last seq " << lastSeq << " last round " << lastRound;
+
     auto& conveyer = cs::Conveyer::instance();
+    auto myRoundNum = conveyer.currentRoundNumber();
     
-    if (conveyer.currentRoundNumber() == 0) {
-        if (lastRound == 0) {
-            cs::PublicKey pKey = solver_->getPublicKey();
-
-            if (initialConfidants_.find(pKey) != initialConfidants_.cend()) {
-                if (initialConfidants_.find(neighbour) != initialConfidants_.cend() && !initialConfidants_.at(neighbour)) {
-                    initialConfidants_.at(neighbour) = true;
-                }
-            }
-            size_t cnt = 0;
-            for (auto& it : initialConfidants_) {
-                if (!it.second) {
-                    break;
-                }
-                else {
-                    ++cnt;
-                }
-            }
-            if (cnt == initialConfidants_.size()) {
-                if (!roundPackageCache_.empty()) {
-                    cs::Conveyer::instance().setRound(roundPackageCache_.back().roundTable().round);
-                    cs::Conveyer::instance().setTable(roundPackageCache_.back().roundTable());
-
-                    onRoundStart(roundPackageCache_.back().roundTable(), false);
-                    reviewConveyerHashes();                
-                }
-
-            }
-            return;
-        }
-    }
-    if (lastRound > conveyer.currentRoundNumber()) {
+    if (lastRound > myRoundNum) {
         roundPackRequest(neighbour, lastRound);
+        return;
     }
 
+    if (myRoundNum != 0) {
+        return;
+    }
+
+    if (initialConfidants_.find(solver_->getPublicKey()) == initialConfidants_.end()) {
+        return;
+    }
+
+    static size_t initTrustedCnt = 1;
+    if (initialConfidants_.find(neighbour) != initialConfidants_.end()) {
+      ++initTrustedCnt;
+    }
+
+    if (initTrustedCnt == initialConfidants_.size() && !roundPackageCache_.empty()) {
+        conveyer.setRound(roundPackageCache_.back().roundTable().round);
+        conveyer.setTable(roundPackageCache_.back().roundTable());
+
+        onRoundStart(roundPackageCache_.back().roundTable(), false);
+        reviewConveyerHashes();
+    }
 }
 
 void Node::neighbourRemoved(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {

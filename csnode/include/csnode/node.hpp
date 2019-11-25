@@ -469,7 +469,7 @@ private:
     long long deltaTimeSS_{};
 
     std::vector<cs::PublicKey> bootstrapKeys_;
-    std::map<cs::PublicKey,bool> initialConfidants_;
+    std::set<cs::PublicKey> initialConfidants_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);
