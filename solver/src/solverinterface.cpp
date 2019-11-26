@@ -82,10 +82,12 @@ void SolverCore::addToGraylist(const cs::PublicKey & sender, uint32_t rounds) {
     if (grayList_.find(sender) == grayList_.cend()) {
         grayList_.emplace(sender, rounds);
         csdebug() << "Node " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " is in gray list now";
+        EventReport::sendGrayListUpdate(*pnode, sender, true /*added*/, rounds);
     }
     else {
         grayList_[sender] += uint16_t(rounds * 2);
         csdebug() << "Node " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " will continue its being in gray list now";
+        EventReport::sendGrayListUpdate(*pnode, sender, true /*added*/, grayList_[sender]);
     }
 }
 
@@ -405,7 +407,7 @@ void SolverCore::addRoundSignature(const cs::StageThree& st3) {
             ++pos;
         }
     }
-    csdebug() << "NODE> pos = " << pos
+    csdebug() << "SolverCore: pos = " << pos
         << ", poolSigsSize = " << lastSentSignatures_.poolSignatures.size()
         << ", rtSigsSize = " << lastSentSignatures_.roundSignatures.size()
         << ", roundSigsSize = " << lastSentSignatures_.trustedConfirmation.size();
@@ -419,7 +421,7 @@ void SolverCore::addRoundSignature(const cs::StageThree& st3) {
     std::copy(st3.roundSignature.cbegin(), st3.roundSignature.cend(), lastSentSignatures_.roundSignatures[pos].begin());
     std::copy(st3.trustedSignature.cbegin(), st3.trustedSignature.cend(), lastSentSignatures_.trustedConfirmation[pos].begin());
 
-    csdebug() << "NODE> Adding signatures of stage3 from T(" << cs::numeric_cast<int>(st3.sender)
+    csdebug() << "SolverCore: Adding signatures of stage3 from T(" << cs::numeric_cast<int>(st3.sender)
         << ") = " << lastSentSignatures_.roundSignatures.size();
 
 }
@@ -465,7 +467,7 @@ void SolverCore::realTrustedSet(cs::Bytes realTrusted) {
 void SolverCore::updateGrayList(cs::RoundNumber round) {
     //csdebug() << __func__;
     if (lastGrayUpdated_ >= round) {
-        csdebug() << "Gray list will update only if the round number changes";
+        csdebug() << "SolverCore: gray list will update only if the round number changes";
         return;
     }
     const uint16_t delta = uint16_t(round - lastGrayUpdated_);
@@ -474,7 +476,8 @@ void SolverCore::updateGrayList(cs::RoundNumber round) {
     auto it = grayList_.begin();
     while (it != grayList_.end()) {
         if (it->second <= delta) {
-            csdebug() << "Node with PK " << cs::Utils::byteStreamToHex(it->first.data(), it->first.size()) << " freed from grayList trap";
+            csdebug() << "SolverCore: remove " << cs::Utils::byteStreamToHex(it->first.data(), it->first.size()) << " from gray list";
+            EventReport::sendGrayListUpdate(*pnode, it->first, false /*removed*/, 1); // for 1 round clear
             it = grayList_.erase(it);
         }
         else {
@@ -485,20 +488,17 @@ void SolverCore::updateGrayList(cs::RoundNumber round) {
 
 }
 
+void SolverCore::resetGrayList() {
+    grayList_.clear();
+    EventReport::sendGrayListUpdate(*pnode, Zero::key, false /*removed*/, 1); // for 1 round clear);
+}
+
 cs::Bytes SolverCore::getRealTrusted() {
     return tempRealTrusted_;
 }
 
 size_t SolverCore::stagesThree() {
     return stageThreeStorage.size();
-}
-
-void SolverCore::send_wallet_transaction(const csdb::Transaction& tr) {
-    if (psmarts->capture_transaction(tr)) {
-        // avoid pass to conveyer, psmarts provide special handling
-        return;
-    }
-    cs::Conveyer::instance().addTransaction(tr);
 }
 
 void SolverCore::gotRoundInfoRequest(const cs::PublicKey& requester, cs::RoundNumber requester_round) {

@@ -101,9 +101,9 @@ void RoundStat::resetLastRoundMs() {
     lastRoundMs_.store(0, std::memory_order_release);
 }
 
-bool RoundStat::isLastRoundTooLong() const {
+bool RoundStat::isCurrentRoundTooLong(size_t long_duration_ms /*= kMaxRoundDelay*/) const {
     auto ms = lastRoundMs();
-    return ms > kMaxRoundDelay;
+    return ms >= long_duration_ms;
 }
 
 void RoundStat::onPingReceived(cs::Sequence, const cs::PublicKey&) {

@@ -24,6 +24,13 @@ add_library(csconnector
     include/profiler/profilereventhandler.hpp
     include/profiler/profiler.hpp
     src/profiler.cpp
+    include/executormanager.hpp
+    src/executormanager.cpp
+    include/dumbcv.hpp
+    src/dumbcv.cpp
+    include/executor.hpp
+    src/executor.cpp
+    include/serializer.hpp
 )
 
 target_link_libraries (csconnector PUBLIC csdb csnode lib csconnector_gen csconnector_executor_gen variant_gen)

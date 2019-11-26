@@ -83,8 +83,10 @@ enum MsgTypes : uint8_t {
     StateRequest,
     StateReply,
     BigBang = 35,
+    Utility = 36,
     EmptyRoundPack,
     BlockAlarm,
+    EventReport,
     NodeStopRequest = 255
 };
 

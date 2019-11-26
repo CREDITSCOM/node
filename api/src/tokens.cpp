@@ -145,22 +145,22 @@ std::string getVariantAs(const general::Variant& var) {
 
 template <typename RetType>
 void executeAndCall(api::APIHandler* p_api, const general::Address& addr, const general::Address& addr_smart, const std::vector<general::ByteCodeObject>& byteCodeObjects,
-	const std::string& state, const std::string& method, const std::vector<general::Variant>& params, const std::function<void(const RetType&)> handler) {
-	executor::ExecuteByteCodeResult result;
+                    const std::string& state, const std::string& method, const std::vector<general::Variant>& params, const std::function<void(const RetType&)> handler) {
+    executor::ExecuteByteCodeResult result;
 
-	if (byteCodeObjects.empty())
-		return;
-	std::vector<executor::MethodHeader> methodHeader;
-	{
-		executor::MethodHeader tmp;
-		tmp.methodName = method;
-		tmp.params = params;
-		methodHeader.push_back(tmp);
-	}
-	p_api->getExecutor().executeByteCode(result, addr, addr_smart, byteCodeObjects, state, methodHeader, true /*isGetter*/, executor::Executor::kUseLastSequence);
+    if (byteCodeObjects.empty())
+        return;
+    std::vector<executor::MethodHeader> methodHeader;
+    {
+        executor::MethodHeader tmp;
+        tmp.methodName = method;
+        tmp.params = params;
+        methodHeader.push_back(tmp);
+    }
+    p_api->getExecutor().executeByteCode(result, addr, addr_smart, byteCodeObjects, state, methodHeader, true /*isGetter*/, cs::Executor::kUseLastSequence);
 
-	if (!result.status.code && !result.results.empty())
-		handler(getVariantAs<RetType>(result.results[0].ret_val));
+    if (!result.status.code && !result.results.empty())
+        handler(getVariantAs<RetType>(result.results[0].ret_val));
 }
 
 void TokensMaster::refreshTokenState(const csdb::Address& token, const std::string& newState, bool checkBalance) {
@@ -220,7 +220,7 @@ void TokensMaster::refreshTokenState(const csdb::Address& token, const std::stri
             holderKeysParams.push_back(std::vector<general::Variant>(1, var));
         }
 
-        api_->getExecutor().executeByteCodeMultiple(result, dpAddr, smartContractBinary, "balanceOf", holderKeysParams, 100, executor::Executor::kUseLastSequence);
+        api_->getExecutor().executeByteCodeMultiple(result, dpAddr, smartContractBinary, "balanceOf", holderKeysParams, 100, cs::Executor::kUseLastSequence);
 
         if (!result.status.code && (result.results.size() == holders.size())) {
             for (uint32_t i = 0; i < holders.size(); ++i) {

@@ -9,6 +9,7 @@
 #include <csnode/itervalidator.hpp>
 #include <csnode/transactionspacket.hpp>
 #include <csnode/walletscache.hpp>
+#include <csnode/configholder.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
@@ -128,6 +129,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
         std::unique_lock<cs::SharedMutex> lock = conveyer.lock();
         size_t trxCounter = 0;
         size_t preliminaryBlockSize = 0;
+        size_t deltaBlockSize = 0;
         const cs::RoundTable& roundTable = conveyer.currentRoundTable();
         bool finishFlag = false;
         bool continueFlag = false;
@@ -138,37 +140,44 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
             if (std::find(hashes.cbegin(), hashes.cend(), element.first) == hashes.cend()) {
                 
                 if (stage.hashesCandidates.size() > Consensus::MaxStageOneHashes) {
-                    break;
+                    finishFlag = true;
                 }
 
                 trxCounter += element.second.transactionsCount();
-                if (trxCounter + element.second.transactionsCount() > Consensus::MaxStageOneTransactions) {
-                    break;
+                if (trxCounter > Consensus::MaxStageOneTransactions) {
+                    finishFlag = true;
                 }
 
+                deltaBlockSize = 0;
                 for (auto& it : element.second.transactions()) {
                     tSize = it.to_byte_stream().size();
+                    deltaBlockSize += tSize;
                     preliminaryBlockSize += tSize;
+                    csdetails() << name() << ": include transaction " << tSize << " bytes";
                     if (preliminaryBlockSize > Consensus::MaxPreliminaryBlockSize) {
                         finishFlag = true;
-                        break;
                     }
                     if (tSize > Consensus::MaxTransactionSize) {
                         continueFlag = true;
-                        break;
                     }
 
                 }
+
                 if (finishFlag) {
+                    trxCounter -= element.second.transactionsCount();
+                    preliminaryBlockSize -= deltaBlockSize;
                     break;
                 }
                 if (continueFlag) {
+                    trxCounter -= element.second.transactionsCount();
+                    preliminaryBlockSize -= deltaBlockSize;
                     continue;
                 }
 
                 stage.hashesCandidates.push_back(element.first);
             }
         }
+        csdebug() << name() << ": transactions: " << trxCounter << ", preliminary block size: " << preliminaryBlockSize;
     }
 
     transactions_checked = true;
@@ -234,6 +243,16 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::Transactio
     if (characteristic.mask.size() != transactionsCount) {
         cserror() << name() << ": characteristic mask size is not equal to transactions count in build_vector()";
     }
+
+    const auto& event_report = cs::ConfigHolder::instance().config()->getEventsReportData();
+    if (event_report.on && event_report.reject_transaction) {
+        if (std::find_if(characteristic.mask.cbegin(), characteristic.mask.cend(), [](const cs::Byte& item) { return item != Reject::Reason::None; }) != characteristic.mask.cend()) {
+            context.send_rejected_report(characteristic.mask);
+        }
+    }
+
+    // transform characteristic to its "canonical" form
+    pValidator_->normalizeCharacteristic(characteristic);
 
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     conveyer.setCharacteristic(characteristic, conveyer.currentRoundNumber());

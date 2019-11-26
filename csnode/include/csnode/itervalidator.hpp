@@ -18,6 +18,7 @@ class AmountCommission;
 namespace cs {
 class SolverContext;
 class WalletsState;
+class SmartContracts;
 
 class IterValidator {
 public:
@@ -25,7 +26,8 @@ public:
 
     IterValidator(WalletsState& wallets);
     Characteristic formCharacteristic(SolverContext&, Transactions&, Packets& smartsPackets);
-
+    // transform characteristic from "array of reject reasons" to its canonical form of "0 or 1"
+    void normalizeCharacteristic(Characteristic& inout) const;
     class SimpleValidator;
 
 private:
@@ -37,7 +39,7 @@ private:
     void checkTransactionsSignatures(SolverContext& context, const Transactions& transactions, Bytes& characteristicMask, Packets& smartsPackets);
     bool checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction);
 
-    bool deployAdditionalCheck(SolverContext& context, size_t trxInd, const csdb::Transaction& transaction);
+	Reject::Reason deployAdditionalCheck(SolverContext& context, size_t trxInd, const csdb::Transaction& transaction);
 
     std::unique_ptr<TransactionsValidator> pTransval_;
     std::set<csdb::Address> smartSourceInvalidSignatures_;
@@ -51,19 +53,21 @@ public:
         kWrongSignature,
         kInsufficientMaxFee,
         kSourceDoesNotExists,
-        kTooLarge
+        kTooLarge,
+        kContractViolation
     };
 
     static std::string getRejectMessage(RejectCode);
 
     /// validates following parameters of transaction:
     /// 1. Signature
-    /// 2. Amount of max fee
+    /// 2. Amount of max fee, including both call to contract and transfer to payable contract
     /// 3. Presence of transaction's source in blockchain
     /// 4. Balance of transaction's source
+    /// 5. 
     ///
     /// New states and smart source transactions will be banned, use full validation.
-    static bool validate(const csdb::Transaction&, const BlockChain&,
+    static bool validate(const csdb::Transaction&, const BlockChain&, SmartContracts&,
                          csdb::AmountCommission* countedFee = nullptr, RejectCode* rc = nullptr);
 };
 }  // namespace cs

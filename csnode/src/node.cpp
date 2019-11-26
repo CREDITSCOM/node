@@ -17,6 +17,7 @@
 #include <csnode/blockvalidator.hpp>
 #include <csnode/roundpackage.hpp>
 #include <csnode/configholder.hpp>
+#include <csnode/eventreport.hpp>
 
 #include <lib/system/logger.hpp>
 #include <lib/system/progressbar.hpp>
@@ -57,8 +58,8 @@ Node::Node(cs::config::Observer& observer)
 
     poolSynchronizer_ = new cs::PoolSynchronizer(transport_, &blockChain_);
 
-    executor::ExecutorSettings::set(cs::makeReference(blockChain_), cs::makeReference(solver_));
-    auto& executor = executor::Executor::getInstance();
+    cs::ExecutorSettings::set(cs::makeReference(blockChain_), cs::makeReference(solver_));
+    auto& executor = cs::Executor::instance();
 
     cs::Connector::connect(&Node::stopRequested, this, &Node::onStopRequested);
 
@@ -69,8 +70,8 @@ Node::Node(cs::config::Observer& observer)
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
-    cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &executor::Executor::onBlockStored);
-    cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &executor::Executor::onReadBlock);
+    cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &cs::Executor::onBlockStored);
+    cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &cs::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
@@ -170,14 +171,11 @@ void Node::stop() {
     solver_->finish();
     cswarning() << "[SOLVER STOPPED]";
 
-    blockChain_.close();
-
-    if (api_) {
-        api_->apiExecHandler()->getExecutor().stop();
-        cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
-    }
-
+    blockChain_.close();    
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
+
+    cs::Executor::instance().stop();
+    cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
 
     observer_.stop();
     cswarning() << "[CONFIG OBSERVER STOPPED]";
@@ -197,6 +195,65 @@ void Node::initCurrentRP() {
         rp.updateRoundTable(rt);
     }
     roundPackageCache_.push_back(rp);
+}
+
+void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
+    //auto& conveyer = cs::Conveyer::instance();
+
+    cswarning() << "NODE> Utility message get";
+
+    istream_.init(data, size);
+    cs::Signature sig;
+    cs::Bytes msg;
+    cs::RoundNumber rNum;
+    istream_ >> msg >> sig ;
+    
+    if (!istream_.good() || !istream_.end()) {
+        cserror() << "NODE> Bad Utility packet format";
+        return;
+    }
+
+    //csdebug() << "Message to Verify: " << cs::Utils::byteStreamToHex(trustedToHash);
+    const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
+    //csdebug() << "SSKey: " << cs::Utils::byteStreamToHex(starter_key.data(), starter_key.size());
+    if (!cscrypto::verifySignature(sig, starter_key, msg.data(), msg.size())) {
+        cswarning() << "The Utility message is incorrect: signature isn't valid";
+        return;
+    }
+
+    cs::Byte order;
+    cs::PublicKey pKey;
+    cs::DataStream stream(msg.data(), msg.size());
+    stream >> rNum;
+    stream >> order;
+    stream >> pKey;
+
+    switch (order) {
+        case Orders::Release:
+            if (pKey == cs::Zero::key) {
+                while (transport_->blackList().size() > 0) {
+                    addToBlackList(transport_->blackList().front(), false);
+                }
+            }
+            else {
+                addToBlackList(pKey, false);
+            }
+
+            break;
+        case Orders::Seal:
+            if (pKey == cs::Zero::key) {
+                cswarning() << "Invalid Utility message";
+            }
+            else {
+                addToBlackList(pKey, true);
+            }
+            break;
+        default:
+            cswarning() << "Untranslatable Utility message";
+            break;
+    }
+
+
 }
 
 void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
@@ -253,7 +310,7 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
     subRound_ = tmp;
     receivedBangs[rNum] = subRound_;
 
-    if (stat_.isLastRoundTooLong()) {
+    if (stat_.isCurrentRoundTooLong()) {
         poolSynchronizer_->syncLastPool();
     }
 
@@ -308,15 +365,12 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 }
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
-    istream_.init(data, size);
-
+    cslog() << "NODE> get SS Round Table #" << rNum;
     if (cs::Conveyer::instance().currentRoundNumber() != 0) {
         csdebug() << "The RoundTable sent by SS doesn't correspond to the current RoundNumber";
         return;
     }
-
-    cslog() << "NODE> get SS Round Table #" << rNum;
-
+    istream_.init(data, size);
     cs::RoundTable roundTable;
 
     if (!readRoundData(roundTable, false)) {
@@ -352,8 +406,9 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
 bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
     std::string verb;
     if (packet.signatures().size() == 1) {
-        if (!packet.verify(sender)) {
-            csdebug() << "NODE> Packet " << packet.hash().toString() << " signature isn't correct";
+        std::string res = packet.verify(sender);
+        if (res.size() > 0) {
+            csdebug() << "NODE> Packet " << packet.hash().toString() << " signatures check result: " << res;
             return false;
         }
         else {
@@ -371,8 +426,9 @@ bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::Publ
                     cs::RoundNumber smartRound = ref.sequence;
                     auto block = getBlockChain().loadBlock(smartRound);
                     if (block.is_valid()) {
-                        if (!packet.verify(block.confidants())) {
-                            csdebug() << "NODE> Packet " << packet.hash().toString() << " signatures aren't correct";
+                        std::string res = packet.verify(block.confidants());
+                        if (res.size() > 0) {
+                            csdebug() << "NODE> Packet " << packet.hash().toString() << " signatures aren't correct: " << res;
                             return false;
                         }
                         else {
@@ -413,7 +469,7 @@ void Node::addToBlackListCounter(const cs::PublicKey& key) {
     else {
         blackListCounter_.at(key) += Consensus::BlackListCounterSinglePenalty;
         if (blackListCounter_.at(key) > Consensus::BlackListCounterMaxValue) {
-            addToBlackList(key);
+            addToBlackList(key, true);
             return;
         }
     }
@@ -446,12 +502,16 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::Pub
     if (packet.signatures().size() == 1) {
         auto& transactions = packet.transactions();
         for (auto& it : transactions) {
-            if (cs::IterValidator::SimpleValidator::validate(it, getBlockChain())) {
+            if (cs::IterValidator::SimpleValidator::validate(it, getBlockChain(), solver_->smart_contracts())) {
                 ++sum;
             }
         }
     }
     else if (packet.signatures().size() > 2) {
+        if (packet.transactions().size() > Consensus::MaxContractResultTransactions) {
+            csdebug() << "NODE> Illegal number of transactions";
+            return false;
+        }
         return true;
     }
     else {
@@ -509,7 +569,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
         processTransactionsPacket(std::move(packet));
     }
     else {
-        addToBlackList(sender);
+        addToBlackList(sender, true);
     }
 }
 
@@ -676,7 +736,7 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
         identic = false;
     }
     if (identic) {
-        for (int i = 0; i < ownMask.size(); ++i) {
+        for (size_t i = 0; i < ownMask.size(); ++i) {
             if (otherMask[i] != ownMask[i]) {
                 identic = false;
                 csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... False";
@@ -736,22 +796,6 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         csmeta(cserror) << ", real trusted mask size: " << realTrustedMaskSize << ", confidants count " << confidantsReference.size() << ", on round " << round;
         return;
     }
-
-    //for (size_t idx = 0; idx < realTrustedMaskSize; ++idx) {
-    //    const auto& key = confidantsReference[idx];
-
-    //    if (rPackage.poolMetaInfo().realTrustedMask[idx] == 0) {
-    //        poolMetaInfo.writerKey = key;
-    //    }
-    //}
-
-    //if (round != 0) {
-    //    auto confirmation = confirmationList_.find(round);
-    //    if (confirmation.has_value()) {
-    //        poolMetaInfo.confirmationMask = confirmation.value().mask;
-    //        poolMetaInfo.confirmations = confirmation.value().signatures;
-    //    }
-    //}
 
     if (!istream_.good()) {
         csmeta(cserror) << "Round info parsing failed, data is corrupted";
@@ -888,6 +932,92 @@ void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::
     }
 }
 
+void Node::reportEvent(const cs::Bytes& bin_pack) {
+    const auto& conf = cs::ConfigHolder::instance().config()->getEventsReportData();
+    if (!conf.on) {
+        return;
+    }
+    cs::Bytes message;
+    cs::DataStream stream(message);
+
+    constexpr uint8_t kEventReportVersion = 0;
+
+    if constexpr (kEventReportVersion == 0) {
+        stream << kEventReportVersion << blockChain_.getLastSeq() << bin_pack;
+    }
+    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+    ostream_.init(BaseFlags::Direct);
+    ostream_ << MsgTypes::EventReport << cs::Conveyer::instance().currentRoundNumber() << sig << message;
+    transport_->sendDirectToSock(ostream_.getPackets(), conf.collector_ep);
+    ostream_.clear();
+    csmeta(csdebug) << "event report -> " << conf.collector_ep.ip << ':' << conf.collector_ep.port;
+}
+
+void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+    istream_.init(data, size);
+    cs::Signature sig;
+    cs::Bytes message;
+    istream_ >> sig >> message;
+    if (!cscrypto::verifySignature(sig, sender, message.data(), message.size())) {
+        csdebug() << "NODE> event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " -  WRONG SIGNATURE!!!";
+        return;
+    }
+
+    cs::DataStream stream(message.data(), message.size());
+    uint8_t report_version = 0;
+    cs::Sequence sender_last_block = 0;
+    cs::Bytes bin_pack;
+    stream >> report_version;
+    if (report_version == 0) {
+        stream >> sender_last_block >> bin_pack;
+        csevent() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+            << ", sender round R-" << WithDelimiters(rNum)
+            << ", sender last block #" << WithDelimiters(sender_last_block)
+            << ", info size " << bin_pack.size();
+
+        const char* log_prefix = "Event report: ";
+
+        const auto event_id = EventReport::getId(bin_pack);
+        if (event_id == EventReport::Id::RejectTransactions) {
+            const auto resume = EventReport::parseReject(bin_pack);
+            if (!resume.empty()) {
+                size_t cnt = 0;
+                std::ostringstream os;
+                std::for_each(resume.cbegin(), resume.cend(), [&](const auto& item) {
+                    cnt += item.second;
+                    os << Reject::to_string(item.first) << " (" << item.second << ") ";
+                });
+                csevent() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os.str();
+            }
+        }
+        else if (event_id == EventReport::Id::AddGrayList || event_id == EventReport::Id::EraseGrayList) {
+            bool added = event_id == EventReport::Id::AddGrayList;
+            std::string list_oper = (added ? "added to" : "cleared from");
+            cs::PublicKey item;
+            uint32_t counter = std::numeric_limits<uint32_t>::max();
+            if (EventReport::parseGrayListUpdate(bin_pack, item, counter)) {
+                std::string list_name = (counter == 0 ? "black" : "gray");
+                if (std::equal(item.cbegin(), item.cend(), cs::Zero::key.cbegin())) {
+                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] All items are " << list_oper
+                        << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                }
+                else {
+                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(item.data(), item.size())
+                        << list_oper << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                }
+            }
+            else {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << list_oper << " black list";
+            }
+        }
+    }
+    else {
+        csevent() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+            << " of incompatible version " << int(report_version)
+            << ", sender round R-" << WithDelimiters(rNum);
+    }
+}
+
 void Node::cleanConfirmationList(cs::RoundNumber rNum) {
     confirmationList_.remove(rNum);
 }
@@ -993,7 +1123,7 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
         cswarning() << "Send transaction packet with empty hash failed";
         return;
     }
-
+    csdebug() << "NODE> Sending transaction's packet with hash: " << cs::Utils::byteStreamToHex(packet.hash().toBinary().data(), packet.hash().size());
     sendToBroadcast(MsgTypes::TransactionPacket, cs::Conveyer::instance().currentRoundNumber(), packet);
 }
 
@@ -1217,17 +1347,28 @@ void Node::reviewConveyerHashes() {
 }
 
 void Node::processSync() {
-    if (stat_.lastRoundMs() > maxPingSynchroDelay_) {
+    const auto last_seq = blockChain_.getLastSeq();
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    if (stat_.isCurrentRoundTooLong(120000) && round < last_seq + cs::PoolSynchronizer::roundDifferentForSync) {
         poolSynchronizer_->syncLastPool();
     }
     else {
-        poolSynchronizer_->sync(cs::Conveyer::instance().currentRoundNumber(), cs::PoolSynchronizer::roundDifferentForSync);
+        poolSynchronizer_->sync(round, cs::PoolSynchronizer::roundDifferentForSync);
     }
 }
 
-void Node::addToBlackList(const cs::PublicKey& key) {
-    if (transport_->markNeighbourAsBlackListed(key)) {
-        cswarning() << "Neigbour " << cs::Utils::byteStreamToHex(key) << " added to network black list";
+void Node::addToBlackList(const cs::PublicKey& key, bool isMarked) {
+    if (isMarked) {
+        if (transport_->markNeighbourAsBlackListed(key)) {
+            cswarning() << "Neigbour " << cs::Utils::byteStreamToHex(key) << " added to network black list";
+            EventReport::sendGrayListUpdate(*this, key, true /*added*/); // the 4th arg is 0 by default
+        }
+    }
+    else {
+        if (transport_->unmarkNeighbourAsBlackListed(key)) {
+             cswarning() << "Neigbour " << cs::Utils::byteStreamToHex(key) << " released from network black list";
+             EventReport::sendGrayListUpdate(*this, key, false /*erased*/); // the 4th arg is 0 by default
+        }
     }
 }
 
@@ -1325,6 +1466,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         case MsgTypes::StateRequest:
         case MsgTypes::StateReply:
         case MsgTypes::BlockAlarm:
+        case MsgTypes::EventReport:
             return MessageActions::Process;
 
         default:
@@ -1346,6 +1488,10 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     // BB: every round (for now) may be handled:
     if (type == MsgTypes::BigBang) {
         return MessageActions::Process;
+    }
+
+    if (type == MsgTypes::Utility) {
+        return (round < rNum + Consensus::UtilityMessageRoundInterval && round + Consensus::UtilityMessageRoundInterval > rNum ) ? MessageActions::Process : MessageActions::Drop;
     }
 
     if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
@@ -1668,7 +1814,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
 
     istream_.init(data, size);
 
-    uint8_t subRound;
+    uint8_t subRound = 0;
     istream_ >> subRound;
 
     if (subRound != subRound_) {
@@ -2052,6 +2198,7 @@ void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::Roun
 
 void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs::StageOneSmarts& stageOneInfo) {
     csmeta(csdebug) << "started";
+
     if (std::find(smartConfidants.cbegin(), smartConfidants.cend(), solver_->getPublicKey()) == smartConfidants.cend()) {
         cswarning() << "NODE> Only confidant nodes can send smart-contract consensus stages";
         return;
@@ -2061,10 +2208,20 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs
                       << "Smart starting Round: " << cs::SmartConsensus::blockPart(stageOneInfo.id) << '.' << cs::SmartConsensus::transactionPart(stageOneInfo.id) << std::endl
                       << "Sender: " << static_cast<int>(stageOneInfo.sender) << std::endl
                       << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
+    //test feature
+    //if (stageOneInfo.sender == 1) {
+    //    cserror() << "Don't send smart stage one to all";
+    //    sendToConfidant(smartConfidants[2], MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
+    //           // payload
+    //           stageOneInfo.message, stageOneInfo.signature);
+    //}
+    //else {
+        sendToList(smartConfidants, stageOneInfo.sender, MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
+            // payload
+            stageOneInfo.message, stageOneInfo.signature);
+    //}
 
-    sendToList(smartConfidants, stageOneInfo.sender, MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
-               // payload
-               stageOneInfo.message, stageOneInfo.signature);
+
     csmeta(csdebug) << "done";
 }
 
@@ -2080,12 +2237,13 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
         cserror() << "Bad Smart Stage One packet format";
         return;
     }
-    // hash of part received message
-    stage.messageHash = cscrypto::calculateHash(stage.message.data(), stage.message.size());
-    if (!cscrypto::verifySignature(stage.signature, sender, stage.messageHash.data(), stage.messageHash.size())) {
-        cswarning() << "NODE> Smart stage One from " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " -  WRONG SIGNATURE!!!";//
+
+    if (stage.signature == cs::Zero::signature) {
+        csdebug() << "NODE> Sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " sent unsigned smart stage One";
         return;
     }
+    // hash of part received message
+    stage.messageHash = cscrypto::calculateHash(stage.message.data(), stage.message.size());
     if (!stage.fillFromBinary()) {
         return;
     }
@@ -2097,8 +2255,6 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
     csmeta(csdebug) << "Sender: " << static_cast<int>(stage.sender) << ", sender key: " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << std::endl
                     << "Smart#: {" << block << '.' << transaction << '}';
     csdebug() << "Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
-
-    csdebug() << "NODE> SmartStage One from T[" << static_cast<int>(stage.sender) << "] is OK!";
 
     if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), stage.id) == activeSmartConsensuses_.cend()) {
         csdebug() << "The SmartConsensus {" << block << '.' << transaction << "} is not active now, storing the stage";
@@ -2148,31 +2304,25 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
     istream_.init(data, size);
 
     cs::StageTwoSmarts stage;
-    cs::Bytes bytes;
-    istream_ >> bytes >> stage.signature;
+    istream_ >> stage.message >> stage.signature;
+
+    if (stage.signature == cs::Zero::signature) {
+        csdebug() << "NODE> Sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " sent unsigned smart stage Two";
+        return;
+    }
 
     if (!istream_.good() || !istream_.end()) {
         cserror() << "NODE> Bad SmartStageTwo packet format";
         return;
     }
 
-    cs::DataStream stream(bytes.data(), bytes.size());
+    cs::DataStream stream(stage.message.data(), stage.message.size());
     stream >> stage.sender;
     stream >> stage.id;
     stream >> stage.signatures;
     stream >> stage.hashes;
 
     csdebug() << "NODE> Read all data from the stream";
-
-    if (!cscrypto::verifySignature(stage.signature, sender, bytes.data(), bytes.size())) {
-        csdebug() << "NODE> Smart Stage Two from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
-        return;
-    }
-
-    csdebug() << "Signature is OK";
-    stage.message = std::move(bytes);
-
-    csmeta(csdetails) << "Signature is OK";
 
     emit gotSmartStageTwo(stage, false);
 }
@@ -2216,40 +2366,37 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
     istream_.init(data, size);
 
     cs::StageThreeSmarts stage;
-    cs::Bytes bytes;
-    istream_ >> bytes >> stage.signature;
+    istream_ >> stage.message >> stage.signature;
+
+    if (stage.signature == cs::Zero::signature) {
+        csdebug() << "NODE> Sender " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " sent unsigned smart stage Three";
+        return;
+    }
 
     if (!istream_.good() || !istream_.end()) {
         cserror() << "NODE> Bad SmartStage Three packet format";
         return;
     }
 
-    cs::DataStream stream(bytes.data(), bytes.size());
+    cs::DataStream stream(stage.message.data(), stage.message.size());
     stream >> stage.sender;
     stream >> stage.writer;
     stream >> stage.id;
     stream >> stage.realTrustedMask;
     stream >> stage.packageSignature;
 
-    if (!cscrypto::verifySignature(stage.signature, sender, bytes.data(), bytes.size())) {
-        csdebug() << "SmartStage Three from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
-        return;
-    }
-
-    stage.message = std::move(bytes);
-
-    csdebug() << "NODE> SmartStage-3 from T[" << static_cast<int>(stage.sender) << "] is OK!";
-
     emit gotSmartStageThree(stage, false);
 }
 
-void Node::smartStageRequest(MsgTypes msgType, uint64_t smartID, const cs::PublicKey& confidant, uint8_t respondent, uint8_t required) {
-    sendToConfidant(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartID, respondent, required);
-    csmeta(csdetails) << "done";
+bool Node::smartStageRequest(MsgTypes msgType, uint64_t smartID, const cs::PublicKey& confidant, uint8_t respondent, uint8_t required) {
+    csmeta(csdebug) << __func__ << "started";
+    const auto res = sendToConfidant(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartID, respondent, required);
+    csmeta(csdebug) << "done";
+    return res;
 }
 
 void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-    csmeta(csdetails) << "started";
+    csmeta(csdebug) << __func__ << "started";
 
     istream_.init(data, size);
 
@@ -2269,10 +2416,10 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
 }
 
 void Node::sendSmartStageReply(const cs::Bytes& message, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey& requester) {
-    csmeta(csdetails) << "started";
+    csmeta(csdebug) << "started";
 
     sendToConfidant(requester, msgType, cs::Conveyer::instance().currentRoundNumber(), message, signature);
-    csmeta(csdetails) << "done";
+    csmeta(csdebug) << "done";
 }
 
 void Node::addSmartConsensus(uint64_t id) {
@@ -2731,16 +2878,6 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     }
 
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
-	csinfo() << "Confidants: " << rPackage.roundTable().confidants.size() << ", Hashes: " << rPackage.roundTable().hashes.size();
-
-    //auto myPublicKey = solver_->getPublicKey();
-
-    //std::string strAddr1 = "4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsBPXX4fXef7FuL";
-    //std::vector<uint8_t> pub_key1;
-    //DecodeBase58(strAddr1, pub_key1);
-    //if (rPackage.roundTable().round % 10 == 0  && std::memcmp(myPublicKey.data(), pub_key1.data(), 32) == 0) {
-    //    createTestTransaction();
-    //}
 
     currentRoundPackage_ = cs::RoundPackage();
     reviewConveyerHashes();
@@ -2969,10 +3106,13 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
     }
     cs::RoundPackage rp = roundPackageCache_.back();
 
-    if (rp.roundTable().round >= rNum) {
+    const auto& cur_table = rp.roundTable();
+    if (cur_table.round >= rNum) {
         if(!rp.roundSignatures().empty()) {
-            ++roundPackRequests_;
-            if (roundPackRequests_ > rp.roundTable().confidants.size() / 2 && roundPackRequests_ <= rp.roundTable().confidants.size() / 2 + 1) {
+            if (cur_table.round == rNum) {
+                ++roundPackRequests_;
+            }
+            if (roundPackRequests_ > cur_table.confidants.size() / 2 && roundPackRequests_ <= cur_table.confidants.size() / 2 + 1) {
                 sendRoundPackageToAll(rp);
             }
             else {
@@ -3183,7 +3323,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     cslog() << s;
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
-    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq()) << ", neighbours = " << transport_->getNeighboursCount();
+    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq()) << ", neighbour nodes = " << transport_->getNeighboursCountWithoutSS();
 
     if (Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 || Transport::cntExtraLargeNotSent > 0) {
         cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments << " / " << Transport::cntExtraLargeNotSent;
@@ -3197,7 +3337,6 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     csdebug() << line2.str();
     csdebug() << " Confidants:";
-
     for (size_t i = 0; i < roundTable.confidants.size(); ++i) {
         auto result = myLevel_ == Level::Confidant && i == myConfidantIndex_;
         auto name = result ? "me" : cs::Utils::byteStreamToHex(roundTable.confidants[i]);
@@ -3206,9 +3345,15 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     }
 
     csdebug() << " Hashes: " << roundTable.hashes.size();
-
     for (size_t j = 0; j < roundTable.hashes.size(); ++j) {
         csdetails() << "[" << j << "] " << cs::Utils::byteStreamToHex(roundTable.hashes[j].toBinary());
+    }
+
+    if (roundTable.hashes.empty()) {
+        cslog() << " Trusted count: " << roundTable.confidants.size() << ", no transactions";
+    }
+    else {
+        cslog() << " Trusted count: " << roundTable.confidants.size() << ", transaction packets: " << roundTable.hashes.size();
     }
 
     csdebug() << line2.str();

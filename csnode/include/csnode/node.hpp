@@ -11,7 +11,6 @@
 
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
-
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
@@ -47,6 +46,11 @@ public:
         Confidant,
         Main,
         Writer
+    };
+
+    enum Orders {
+        Release,
+        Seal
     };
 
     enum MessageActions {
@@ -132,7 +136,7 @@ public:
     void sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::StageThreeSmarts& stageThreeInfo);
     void getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
     void smartStageEmptyReply(uint8_t requesterNumber);
-    void smartStageRequest(MsgTypes msgType, uint64_t smartID, const cs::PublicKey& confidant, uint8_t respondent, uint8_t required);
+    bool smartStageRequest(MsgTypes msgType, uint64_t smartID, const cs::PublicKey& confidant, uint8_t respondent, uint8_t required);
     void getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
     void sendSmartStageReply(const cs::Bytes& message, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey& requester);
 
@@ -176,6 +180,7 @@ public:
     void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
     void getPacketHashesReply(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
     void getBlockAlarm(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
+    void getEventReport(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
     bool checkCharacteristic(cs::RoundPackage& rPackage);
 
@@ -209,6 +214,7 @@ public:
     void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
 
     void initCurrentRP();
+    void getUtilityMessage(const uint8_t* data, const size_t size);
     void becomeWriter();
 
     bool isPoolsSyncroStarted();
@@ -284,6 +290,8 @@ public:
         return alwaysExecuteContracts_;
     }
 
+    void reportEvent(const cs::Bytes& bin_pack);
+
 public signals:
     SmartsSignal<cs::StageOneSmarts> gotSmartStageOne;
     SmartsSignal<cs::StageTwoSmarts> gotSmartStageTwo;
@@ -317,7 +325,7 @@ private:
     void processSync();
 
     // transport
-    void addToBlackList(const cs::PublicKey& key);
+    void addToBlackList(const cs::PublicKey& key, bool isMarked);
 
     // conveyer
     void processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);

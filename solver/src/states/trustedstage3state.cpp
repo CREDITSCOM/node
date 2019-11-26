@@ -483,7 +483,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     std::sort(stakers.begin(), stakers.end(), [](const StakeHolder &a, const StakeHolder &b) { return a.stake > b.stake; });
 
     auto itStake = stakers.begin();
-    int cnt = 0;
+    size_t cnt = 0;
     while (itStake != stakers.end()) {
         if(cnt < max_conf - eLiars) {
             aboveThreshold.emplace_back(itStake->key);
@@ -505,7 +505,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     g.seed(uint32_t(Conveyer::instance().currentRoundNumber()));
     cs::Random::shuffle(belowThreshold.begin(), belowThreshold.end(), g);
     auto itt = belowThreshold.begin();
-    for (int j = 0; j < eLiars; ++j) {
+    for (size_t j = 0; j < eLiars; ++j) {
         aboveThreshold.emplace_back(*itt);
         ++itt;
     }
@@ -513,9 +513,6 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     for (auto& it : hashesElection) {
         if (it.second > cr) {
             next_round_hashes.emplace_back(it.first);
-        }
-        else {
-            cs::Conveyer::instance().addRejectedHashToCache(it.first);
         }
     }
     size_t acceptedPacks = 0;

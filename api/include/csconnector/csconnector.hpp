@@ -70,7 +70,7 @@ public:
     ApiExecHandlerPtr apiExecHandler() const;
 
 private:
-    executor::Executor& executor_;
+    cs::Executor& executor_;
     ApiHandlerPtr api_handler;
     ApiExecHandlerPtr apiexec_handler;
 

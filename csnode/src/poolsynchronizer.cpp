@@ -133,10 +133,6 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 }
 
 void cs::PoolSynchronizer::syncLastPool() {
-    if (isSyncroStarted_) {
-        return;
-    }
-
     auto lastWrittenSequence = blockChain_->getLastSeq();
     ConnectionPtr connection;
 
@@ -157,7 +153,13 @@ void cs::PoolSynchronizer::syncLastPool() {
         return;
     }
 
-    isSyncroStarted_ = true;
+    if (!isSyncroStarted_) {
+        isSyncroStarted_ = true;
+        cs::Connector::connect(&blockChain_->storeBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const csdb::Pool)>(&cs::PoolSynchronizer::onWriteBlock));
+        cs::Connector::connect(&blockChain_->cachedBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const cs::Sequence)>(&cs::PoolSynchronizer::onWriteBlock));
+        cs::Connector::connect(&blockChain_->removeBlockEvent, this, &cs::PoolSynchronizer::onRemoveBlock);
+    }
+
     emit sendRequest(connection, PoolsRequestedSequences { lastWrittenSequence + 1}, 0);
 }
 

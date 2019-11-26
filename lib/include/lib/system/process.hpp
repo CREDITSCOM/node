@@ -5,7 +5,7 @@
 #include <exception>
 #include <string>
 #include <vector>
-#include <iostream>
+#include <memory>
 
 #ifdef _MSC_VER
 #pragma warning(push, 0)
@@ -46,9 +46,11 @@ using ProcessErrorSignal = cs::Signal<void(const cs::ProcessException&)>;
 class Process {
 public:
     enum Options : int {
-        None,
-        NewConsole = 0x02,
-        OutToFile = 0x04,
+        None = 0x00,
+        NewConsole = 0x01,
+        OutToFile = 0x02,
+        OutToStream = 0x04,
+        Attach = 0x08,
         ConsoleAndToFile = NewConsole | OutToFile
     };
 
@@ -56,6 +58,7 @@ public:
 
     template <typename... Args>
     explicit Process(const std::string& program, Args&&... args);
+    explicit Process(boost::process::pid_t pid);
 
     Process(const Process&) = delete;
     Process(Process&&) = delete;
@@ -78,13 +81,17 @@ public:
     // returns current process running state
     bool isRunning() const;
 
+    // returns process all out pipe data
+    std::string out();
+    bool isPipeValid() const;
+
     // waits of process end at blocking mode, better to use finished signal
     void wait();
     void terminate();
 
     void stop();
 
-    void launch(Options options = Options::None);
+    bool launch(Options options = Options::None);
 
 public signals:
     ProcessStartSignal started;
@@ -93,10 +100,12 @@ public signals:
 
 private:
     mutable boost::process::child process_;
+    mutable std::unique_ptr<boost::process::ipstream> pipe_;
 
     std::string program_;
     std::vector<std::string> args_;
     boost::asio::io_context io_;
+    boost::process::pid_t pid_;
 
     std::string file_;
 };
@@ -109,6 +118,10 @@ template <typename... Args>
 inline cs::Process::Process(const std::string& program, Args&&... args)
 : program_(program) {
     setArgs(std::forward<Args>(args)...);
+}
+
+inline cs::Process::Process(boost::process::pid_t pid)
+: pid_(pid) {
 }
 
 inline Process::~Process() noexcept {
@@ -158,6 +171,29 @@ inline bool Process::isRunning() const {
     return false;
 }
 
+inline std::string Process::out() {
+    std::string result;
+
+    if (!pipe_ || isRunning()) {
+        return result;
+    }
+
+    auto& pipe = *(pipe_.get());
+
+    while (pipe_->good()) {
+        std::string data;
+        pipe >> data;
+
+        result += data;
+    }
+
+    return result;
+}
+
+inline bool Process::isPipeValid() const {
+    return static_cast<bool>(pipe_);
+}
+
 inline void Process::wait() {
     try {
         process_.wait();
@@ -189,9 +225,9 @@ inline void Process::stop() {
     }
 }
 
-inline void Process::launch(Process::Options options) {
+inline bool Process::launch(Process::Options options) {
     if (isRunning()) {
-        return;
+        return false;
     }
 
     auto setup = [=]([[maybe_unused]] auto& exec) {
@@ -215,11 +251,20 @@ inline void Process::launch(Process::Options options) {
     };
 
     io_.restart();
+    pipe_.reset();
 
     try {
         if ((options & Options::OutToFile) && !file_.empty()) {
             process_ = boost::process::child(program_, args_, io_, boost::process::std_out > file_, boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
                                              boost::process::extend::on_success = success, boost::process::extend::on_error = error);
+        }
+        else if (options & Options::OutToStream) {
+            pipe_ = std::make_unique<boost::process::ipstream>();
+            process_ = boost::process::child(program_, args_, io_, boost::process::std_out > (*pipe_.get()), boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
+                                             boost::process::extend::on_success = success, boost::process::extend::on_error = error);
+        }
+        else if (options & Options::Attach) {
+            process_ = boost::process::child(pid_);
         }
         else {
             process_ = boost::process::child(program_, args_, io_, boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
@@ -227,12 +272,25 @@ inline void Process::launch(Process::Options options) {
         }
     }
     catch (const std::exception& exception) {
+        pipe_.reset();
         emit errorOccured(cs::ProcessException(exception.what()));
+
+        return false;
+    }
+
+    if (options & Options::Attach) {
+        return true;
     }
 
     try {
         std::thread thread([this] {
-            io_.run();
+            try {
+                io_.run();
+            }
+            catch (const std::exception& exception) {
+                terminate();
+                emit errorOccured(cs::ProcessException(exception.what()));
+            }
         });
 
         thread.detach();
@@ -240,7 +298,11 @@ inline void Process::launch(Process::Options options) {
     catch (const std::exception& exception) {
         terminate();
         emit errorOccured(cs::ProcessException(exception.what()));
+
+        return false;
     }
+
+    return true;
 }
 }
 

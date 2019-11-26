@@ -14,8 +14,6 @@ constexpr std::size_t kPublicKeyLength = cscrypto::kPublicKeySize;
 constexpr std::size_t kPrivateKeyLength = cscrypto::kPrivateKeySize;
 constexpr std::size_t kSignatureLength = cscrypto::kSignatureSize;
 
-constexpr double kMinFee = 0.0001428 * 3.0;
-
 namespace cs {
 // key node type
 using RoundNumber = uint64_t;
@@ -77,4 +75,13 @@ private:
     std::scoped_lock<T...> lock_;
 };
 }  // namespace cs
+
+namespace std {
+template<>
+class hash<cs::PublicKey> {
+public:
+    size_t operator()(const cs::PublicKey& key) const;
+};
+} // namespace std
+
 #endif  // COMMON_HPP

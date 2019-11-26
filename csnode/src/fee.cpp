@@ -8,22 +8,31 @@ namespace cs {
 namespace {
 const size_t kCommonTrSize = 152;
 
-std::array<std::tuple<size_t, double, double>, 14> feeLevels = {
-    std::make_tuple(1024 + 512, 0.008746170242, 0.0004828886573),
-    std::make_tuple(20 * 1024, 0.03546746927, 0.0005862733239),
-    std::make_tuple(50 * 1024, 0.1438276802, 0.001104468428),
-    std::make_tuple(100 * 1024, 1.936458209, 0.009641057723),
-    std::make_tuple(256 * 1024, 5.26383916, 0.3813112299),
-    std::make_tuple(512 * 1024, 38.89480285, 4.874110187),
-    std::make_tuple(768 * 1024, 105.7270358, 19.96925763),
-    std::make_tuple(1024 * 1024, 287.3958802, 103.8255221),
-    std::make_tuple(5 * 1024 * 1024, 781.2229988, 259.834061),
-    std::make_tuple(15 * 1024 * 1024, 2123.584282, 651.3469549),
-    std::make_tuple(50 * 1024 * 1024, 5772.500564, 2309.930666),
-    std::make_tuple(100 * 1024 * 1024, 15691.28339, 5165.460461),
-    std::make_tuple(500 * 1024 * 1024, 42653.3305, 9959.829026),
-    std::make_tuple(1000 * 1024 * 1024, 115943.7732, 115943.7732)
+constexpr std::array<std::tuple<size_t, double, double>, 14> feeLevels = {
+    std::make_tuple(5 * 1024,    0.08745,    0.008745), // this is min fee value
+    std::make_tuple(20 * 1024,   0.17490,    0.034980),
+    std::make_tuple(50 * 1024,   0.43726,    0.139922),
+    std::make_tuple(100 * 1024,  17.90996,   17.90996),
+    std::make_tuple(256 * 1024,  89.54982,   89.54982),
+    std::make_tuple(512 * 1024,  358.19930,  358.19930),
+    std::make_tuple(768 * 1024,  1432.79718, 1432.79718),
+    std::make_tuple(1024 * 1024, 5731.18874, 5731.18874),
+    std::make_tuple(5 * 1024 * 1024,    22924.75494,    22924.75494),
+    std::make_tuple(15 * 1024 * 1024,   91699.01978,    91699.01978),
+    std::make_tuple(50 * 1024 * 1024,   366796.07910,   366796.07910),
+    std::make_tuple(100 * 1024 * 1024,  1467184.31642,  1467184.31642),
+    std::make_tuple(500 * 1024 * 1024,  5868737.26566,  5868737.26566),
+    std::make_tuple(1000 * 1024 * 1024, 23474949.06266, 23474949.06266)
 };
+
+constexpr double minFee() {
+    return std::get<2>(feeLevels[0]);
+}
+
+constexpr double minContractStateFee() {
+    return minFee();
+}
+
 }  // namespace
 
 namespace fee {
@@ -32,7 +41,7 @@ csdb::AmountCommission getFee(const csdb::Transaction& t) {
     size_t size = t.to_byte_stream().size();
 
     if (!SmartContracts::is_smart_contract(t) && size <= kCommonTrSize) {
-        return csdb::AmountCommission(kMinFee);
+        return csdb::AmountCommission(minFee());
     }
 
     for (const auto& level : feeLevels) {
@@ -48,15 +57,18 @@ csdb::AmountCommission getFee(const csdb::Transaction& t) {
     return csdb::AmountCommission(std::get<1>(feeLevels[feeLevels.size() - 1]) * k);
 }
 
-bool estimateMaxFee(const csdb::Transaction& t, csdb::AmountCommission& countedFee) {
+csdb::AmountCommission getContractStateMinFee() {
+    return csdb::AmountCommission(minContractStateFee()); // cheapest new state
+}
+
+bool estimateMaxFee(const csdb::Transaction& t, csdb::AmountCommission& countedFee, SmartContracts& sc) {
     countedFee = getFee(t);
 
-    if (SmartContracts::is_smart_contract(t)) {
-        countedFee = csdb::AmountCommission(countedFee.to_double() +
-                     std::get<2>(feeLevels[0])); // cheapest new state
+    if (SmartContracts::is_executable(t) || sc.is_payable_call(t)) {
+        countedFee = csdb::AmountCommission(countedFee.to_double() + getContractStateMinFee().to_double());
     }
 
-    return csdb::Amount(t.max_fee().to_double()) >= csdb::Amount(countedFee.to_double());
+    return (t.max_fee().to_double() - countedFee.to_double() > std::numeric_limits<double>::epsilon());
 }
 
 void setCountedFees(Transactions& trxs) {
@@ -66,7 +78,7 @@ void setCountedFees(Transactions& trxs) {
 }
 
 csdb::Amount getExecutionFee(long long duration_mcs) {
-    constexpr double FEE_IN_MCS = kMinFee * 0.001 * 0.001; // the cost is based on 1 kMinFee/sec
+    constexpr double FEE_IN_MCS = minContractStateFee() * 0.001 * 0.001; // the cost is based on 1 kMinFee/sec
     return csdb::Amount(static_cast<double>(duration_mcs) * FEE_IN_MCS);
 }
 

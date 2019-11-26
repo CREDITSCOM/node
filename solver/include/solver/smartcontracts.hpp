@@ -47,6 +47,8 @@ namespace cs {
         constexpr int8_t InternalBug = -9; // -9
         // network error while call to executor
         constexpr int8_t ThriftException = -10;
+        // logic violation, execution result breaks the rules
+        constexpr int8_t LogicViolation = -11;
         // error in contract, value is hard-coded in ApiExec module
         constexpr int8_t ContractError = 1;
         // incompatible version
@@ -249,7 +251,7 @@ inline bool operator>(const SmartContractRef& l, const SmartContractRef& r) {
 struct SmartExecutionData {
     SmartContractRef contract_ref;
     csdb::Amount executor_fee;
-    executor::Executor::ExecuteResult result;
+    cs::Executor::ExecuteResult result;
     std::string error;
     std::string explicit_last_state;
     csdb::Address abs_addr;
@@ -260,7 +262,7 @@ struct SmartExecutionData {
         }
         general::Variant ret_val;
         ret_val.__set_v_byte(code);
-        using container_type = decltype(executor::Executor::ExecuteResult::smartsRes);
+        using container_type = decltype(cs::Executor::ExecuteResult::smartsRes);
         using element_type = container_type::value_type;
         decltype(element_type::states) states{};
         decltype(element_type::emittedTransactions) emitted{};
@@ -396,16 +398,38 @@ public:
         }
 
         cs::Lock lock(public_access_lock);
-
         return is_payable_target(t);
     }
 
     bool executionAllowed();
 
     // return true if SmartContracts provide special handling for transaction, so
-    // the transaction is not pass through conveyer
+    // the transaction has not to pass through conveyer
     // method is thread-safe to be called from API thread
-    bool capture_transaction(const csdb::Transaction& t);
+    // upon return, is_rejected signals if transaction is not valid
+    uint32_t test_violations(const csdb::Transaction& t);
+
+    struct Violations {
+        constexpr static uint32_t None = 0;
+        // smart contract is not allowed to emit transaction via API
+        constexpr static uint32_t SourceIsContract = 1;
+        // unable execute not successfully deployed contract
+        constexpr static uint32_t ContractIsNotDeployed = 2;
+        // unable replenish balance of contract without payable() feature
+        constexpr static uint32_t ReplenishNonPayable = 4;
+        // unable call to payable() directly
+        constexpr static uint32_t DirectCallToPayable = 8;
+        // incompatible deploy/execute info
+        constexpr static uint32_t BadInvoke = 16;
+        // unable call contract from other contract method
+        constexpr static uint32_t SubsequentCall = 32;
+    };
+
+    static std::string violations_message(uint32_t flags);
+
+    static bool prevalidate(const BlockChain& bc, const cs::TransactionsPacket& pack);
+
+public:
 
     CallsQueueScheduler& getScheduler();
 
@@ -861,6 +885,7 @@ private:
     // request correct state in network
     void net_request_contract_state(const csdb::Address& abs_addr);
 
+    bool prevalidate_inner(const cs::TransactionsPacket& pack);
 };
 
 }  // namespace cs
