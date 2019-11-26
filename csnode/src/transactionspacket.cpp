@@ -209,25 +209,31 @@ bool TransactionsPacket::sign(const cs::PrivateKey& privateKey) {
     return true;
 }
 
-bool TransactionsPacket::verify(const cs::PublicKey& publicKey) {
+std::string TransactionsPacket::verify(const cs::PublicKey& publicKey) {
+    std::string res;
     if (isHashEmpty()) {
-        return false;
+        res = "No hash of packet";
+        return res;
     }
 
     if (signatures_.size() != 1) {
-        return false;
+        res = "Number of signatures is " + std::to_string(signatures_.size()) + " != 1";
+        return res;
     }
 
-    return cscrypto::verifySignature(signatures_.back().second.data(), publicKey.data(), hash_.toBinary().data(), hash_.toBinary().size());
+    return cscrypto::verifySignature(signatures_.back().second.data(), publicKey.data(), hash_.toBinary().data(), hash_.toBinary().size()) ? res : "Signature isn't valid";
 }
 
-bool TransactionsPacket::verify(const std::vector<cs::PublicKey>& publicKeys) {
+std::string TransactionsPacket::verify(const std::vector<cs::PublicKey>& publicKeys) {
+    std::string res;
     if (isHashEmpty()) {
-        return false;
+        res = "No hash of packet";
+        return res;
     }
 
     if (signatures_.size() < 3) {
-        return false;
+        res = "Number of signatures is " + std::to_string(signatures_.size()) + " < 3";
+        return res;
     }
 
     size_t count = 0;
@@ -239,11 +245,12 @@ bool TransactionsPacket::verify(const std::vector<cs::PublicKey>& publicKeys) {
             }
         }
         else {
-            return false;
+            res = "Signature index doesn't correspond to supplied PublicKey's vector size";
+            return res;
         }
     }
 
-    return count > publicKeys.size() / 2;
+    return count > publicKeys.size() / 2 ? "Not enough valid signatures" : res;
 }
 
 const cs::BlockSignatures& TransactionsPacket::signatures() const noexcept {

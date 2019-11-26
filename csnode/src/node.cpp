@@ -405,8 +405,9 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
 bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
     std::string verb;
     if (packet.signatures().size() == 1) {
-        if (!packet.verify(sender)) {
-            csdebug() << "NODE> Packet " << packet.hash().toString() << " signature isn't correct";
+        std::string res = packet.verify(sender);
+        if (res.size() > 0) {
+            csdebug() << "NODE> Packet " << packet.hash().toString() << " signatures check result: " << res;
             return false;
         }
         else {
@@ -424,8 +425,9 @@ bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::Publ
                     cs::RoundNumber smartRound = ref.sequence;
                     auto block = getBlockChain().loadBlock(smartRound);
                     if (block.is_valid()) {
-                        if (!packet.verify(block.confidants())) {
-                            csdebug() << "NODE> Packet " << packet.hash().toString() << " signatures aren't correct";
+                        std::string res = packet.verify(block.confidants());
+                        if (res.size() > 0) {
+                            csdebug() << "NODE> Packet " << packet.hash().toString() << " signatures aren't correct: " << res;
                             return false;
                         }
                         else {
@@ -992,17 +994,17 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             cs::PublicKey item;
             if (EventReport::parseBlackListUpdate(bin_pack, item)) {
                 if (std::equal(item.cbegin(), item.cend(), cs::Zero::key.cbegin())) {
-                    csdebug() << log_prefix << '[' << WithDelimiters(rNum) << "] All items are " << (added ? "added to" : "cleared from")
+                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] All items are " << (added ? "added to" : "cleared from")
                         << " black list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
                 else {
-                    csdebug() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(item.data(), item.size())
+                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(item.data(), item.size())
                         << (added ? "added to" : "removed from")
                         << " black list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
             }
             else {
-                csdebug() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << (added ? "added to" : "removed from") << " black list";
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << (added ? "added to" : "removed from") << " black list";
             }
         }
     }
