@@ -59,6 +59,10 @@ public:
         api_handler->store_block_slot(pool);
     }
 
+    void onBaseLoaded() {
+        api_handler->baseLoaded();
+    }
+
     void run();
 
     // interface

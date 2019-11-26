@@ -924,6 +924,7 @@ private slots:
     void updateSmartCachesPool(const csdb::Pool& pool);
     void store_block_slot(const csdb::Pool& pool);
     void collect_all_stats_slot(const csdb::Pool& pool);
+    void baseLoaded();
 };
 }  // namespace api
 
