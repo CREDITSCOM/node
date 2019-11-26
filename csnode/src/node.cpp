@@ -102,6 +102,7 @@ bool Node::init() {
 
     cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
+    cs::Connector::connect(&blockChain_.startReadingBlocksEvent(), api_.get(), &csconnector::connector::onBaseLoaded);
 
 #endif  // NODE_API
 
