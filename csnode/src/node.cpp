@@ -1003,7 +1003,7 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                 }
                 else {
                     csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(item.data(), item.size())
-                        << list_oper << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                        << ' ' << list_oper << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
             }
             else {
