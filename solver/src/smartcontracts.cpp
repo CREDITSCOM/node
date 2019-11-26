@@ -2178,6 +2178,19 @@ bool SmartContracts::start_consensus(QueueItem& item) {
             integral_packet.addTransaction(t);
         }
     }
+    // final "integral" validation
+    if (integral_packet.transactionsCount() > 0) {
+        if (!prevalidate_inner(integral_packet)) {
+            csdb::Transaction tmp = integral_packet.transactions().front();
+            cswarning() << kLogPrefix << "final integral packet of " << item.executions.size()
+                << " executions prevalidation failed, make " << FormatRef(item.seq_start) << " empty new state instead";
+            tmp.add_user_field(trx_uf::new_state::Value, std::string{});
+            set_return_value(tmp, error::LogicViolation);
+
+            integral_packet.clear();
+            integral_packet.addTransaction(tmp);
+        }
+    }
     // if re-run consensus
     uint8_t run_counter = 0;
     if (item.pconsensus) {

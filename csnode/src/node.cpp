@@ -508,7 +508,7 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::Pub
     }
     else if (packet.signatures().size() > 2) {
         if (packet.transactions().size() > Consensus::MaxContractResultTransactions) {
-            csdebug() << "NODE> Illegal number of transactions";
+            csdebug() << "NODE> Illegal number of transactions in single packet: " << packet.transactions().size();
             return false;
         }
         return true;
