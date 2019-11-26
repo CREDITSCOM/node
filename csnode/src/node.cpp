@@ -989,20 +989,22 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
         }
         else if (event_id == EventReport::Id::AddGrayList || event_id == EventReport::Id::EraseGrayList) {
             bool added = event_id == EventReport::Id::AddGrayList;
+            std::string list_oper = (added ? "added to" : "cleared from");
             cs::PublicKey item;
-            if (EventReport::parseBlackListUpdate(bin_pack, item)) {
+            uint32_t counter = std::numeric_limits<uint32_t>::max();
+            if (EventReport::parseGrayListUpdate(bin_pack, item, counter)) {
+                std::string list_name = (counter == 0 ? "black" : "gray");
                 if (std::equal(item.cbegin(), item.cend(), cs::Zero::key.cbegin())) {
-                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] All items are " << (added ? "added to" : "cleared from")
-                        << " black list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] All items are " << list_oper
+                        << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
                 else {
                     csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(item.data(), item.size())
-                        << (added ? "added to" : "removed from")
-                        << " black list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                        << list_oper << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
             }
             else {
-                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << (added ? "added to" : "removed from") << " black list";
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << list_oper << " black list";
             }
         }
     }
@@ -1356,13 +1358,13 @@ void Node::addToBlackList(const cs::PublicKey& key, bool isMarked) {
     if (isMarked) {
         if (transport_->markNeighbourAsBlackListed(key)) {
             cswarning() << "Neigbour " << cs::Utils::byteStreamToHex(key) << " added to network black list";
-            EventReport::sendBlackListUpdate(*this, key, true /*added*/);
+            EventReport::sendGrayListUpdate(*this, key, true /*added*/); // the 4th arg is 0 by default
         }
     }
     else {
         if (transport_->unmarkNeighbourAsBlackListed(key)) {
              cswarning() << "Neigbour " << cs::Utils::byteStreamToHex(key) << " released from network black list";
-             EventReport::sendBlackListUpdate(*this, key, true /*erased*/);
+             EventReport::sendGrayListUpdate(*this, key, false /*erased*/); // the 4th arg is 0 by default
         }
     }
 }
