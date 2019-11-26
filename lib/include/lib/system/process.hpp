@@ -280,7 +280,13 @@ inline bool Process::launch(Process::Options options) {
 
     try {
         std::thread thread([this] {
-            io_.run();
+            try {
+                io_.run();
+            }
+            catch (const std::exception& exception) {
+                terminate();
+                emit errorOccured(cs::ProcessException(exception.what()));
+            }
         });
 
         thread.detach();
