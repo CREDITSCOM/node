@@ -61,6 +61,9 @@ void EventReport::sendReject(Node& node, const cs::Bytes& rejected) {
 /*static*/
 std::map<Reject::Reason, uint16_t> EventReport::parseReject(const cs::Bytes& bin_pack) {
     std::map<Reject::Reason, uint16_t> resume;
+    if (bin_pack.empty()) {
+        return resume;
+    }
     cs::DataStream stream(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     stream >> id;
@@ -98,19 +101,39 @@ EventReport::Id EventReport::getId(const cs::Bytes& bin_pack) {
 //    }
 //}
 
+// count_rounds is optional, 0 in case of clear list or add to black list.
 /*static*/
-void EventReport::sendBlackListUpdate(Node& node, const cs::PublicKey& key, bool added) {
+void EventReport::sendGrayListUpdate(Node& node, const cs::PublicKey& key, bool added, uint32_t count_rounds /*= 0*/) {
     cs::Bytes bin_pack;
     cs::DataStream stream(bin_pack);
     stream << (added ? Id::AddGrayList : Id::EraseGrayList) << key;
+    // send zero value is senseless
+    if (count_rounds > 0) {
+        stream << count_rounds;
+    }
     node.reportEvent(bin_pack);
 }
 
 /*static*/
-bool EventReport::parseBlackListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key) {
-    cs::DataStream stream(bin_pack.data(), bin_pack.size());
-    if (stream.isAvailable(key.size())) {
-        stream >> key;
+bool EventReport::parseGrayListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key, uint32_t& counter) {
+    if (bin_pack.empty()) {
+        return false;
     }
-    return stream.isValid() && stream.isEmpty();
+    cs::DataStream stream(bin_pack.data(), bin_pack.size());
+    Id id = Id::None;
+    stream >> id;
+    if (id == Id::AddGrayList || id == Id::EraseGrayList) {
+        if (stream.isAvailable(key.size())) {
+            stream >> key;
+            // only nonzero value is sent
+            if (stream.isAvailable(sizeof(uint32_t))) {
+                stream >> counter;
+            }
+            else {
+                counter = 0;
+            }
+            return stream.isValid() && stream.isEmpty();
+        }
+    }
+    return false;
 }

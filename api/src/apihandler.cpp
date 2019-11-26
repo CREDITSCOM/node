@@ -983,24 +983,25 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
 
 void APIHandler::store_block_slot(const csdb::Pool& pool) {
     updateSmartCachesPool(pool);
-    if(!isBDLoaded_) {
-        isBDLoaded_ = true;
+}
+
+void APIHandler::baseLoaded() {
+    isBDLoaded_ = true;
 #ifdef TOKENS_CACHE   
-        tm_.loadTokenInfo([&](const TokensMap& tokens, const HoldersMap&) {
-            int count{}, i{};
-            size_t tokenSize = tokens.size();
-            cslog() << "tokens are loading(" << tokenSize <<")...";           
-            for (auto& tk : tokens) {
-                if (tokenSize > 100 && !(i++ % (tokenSize / 10)))
-                    cslog() << "loading tokens: " << 10*(count++) << "%";
-                tm_.refreshTokenState(tk.first, cs::SmartContracts::get_contract_state(get_s_blockchain(), tk.first), true);
-            }
-            cslog() << "tokens loaded!";
+    tm_.loadTokenInfo([&](const TokensMap& tokens, const HoldersMap&) {
+        int count{}, i{};
+        size_t tokenSize = tokens.size();
+        cslog() << "tokens are loading(" << tokenSize << ")...";
+        for (auto& tk : tokens) {
+            if (tokenSize > 100 && !(i++ % (tokenSize / 10)))
+                cslog() << "loading tokens: " << 10 * (count++) << "%";
+            tm_.refreshTokenState(tk.first, cs::SmartContracts::get_contract_state(get_s_blockchain(), tk.first), true);
+        }
+        cslog() << "tokens loaded!";
         });
 #endif
-    }
-
 }
+
 
 void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
 #ifdef USE_DEPRECATED_STATS

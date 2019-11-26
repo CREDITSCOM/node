@@ -209,41 +209,45 @@ bool TransactionsPacket::sign(const cs::PrivateKey& privateKey) {
     return true;
 }
 
-bool TransactionsPacket::verify(const cs::PublicKey& publicKey) {
+std::string TransactionsPacket::verify(const cs::PublicKey& publicKey) {
+    std::string res;
     if (isHashEmpty()) {
-        return false;
+        res = "No hash of packet";
+        return res;
     }
 
     if (signatures_.size() != 1) {
-        return false;
+        res = "Number of signatures is " + std::to_string(signatures_.size()) + " != 1";
+        return res;
     }
 
-    return cscrypto::verifySignature(signatures_.back().second.data(), publicKey.data(), hash_.toBinary().data(), hash_.toBinary().size());
+    return cscrypto::verifySignature(signatures_.back().second.data(), publicKey.data(), hash_.toBinary().data(), hash_.toBinary().size()) ? res : "Signature isn't valid";
 }
 
-bool TransactionsPacket::verify(const std::vector<cs::PublicKey>& publicKeys) {
+std::string TransactionsPacket::verify(const std::vector<cs::PublicKey>& publicKeys) {
+    std::string res;
     if (isHashEmpty()) {
-        return false;
+        return "No hash of packet";
     }
 
     if (signatures_.size() < 3) {
-        return false;
+        return "Number of signatures is " + std::to_string(signatures_.size()) + ", < 3";
     }
 
     size_t count = 0;
-
+    size_t total_keys = publicKeys.size();
     for (auto it : signatures_) {
-        if (it.first < publicKeys.size()) {
+        if (it.first < total_keys) {
             if (cscrypto::verifySignature(it.second.data(), publicKeys[it.first].data(), hash_.toBinary().data(), hash_.toBinary().size())) {
                 ++count;
             }
         }
         else {
-            return false;
+            return "Signature index is out of range in supplied PublicKey container";
         }
     }
 
-    return count > publicKeys.size() / 2;
+    return count <= total_keys / 2 ? std::string{ "Not enough valid signatures" } : std::string{};
 }
 
 const cs::BlockSignatures& TransactionsPacket::signatures() const noexcept {

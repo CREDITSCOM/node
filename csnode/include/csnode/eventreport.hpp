@@ -83,17 +83,21 @@ public:
     static std::map<Reject::Reason, uint16_t> parseReject(const cs::Bytes& bin_pack);
 
     /**
-     * Sends a black list update info as composition of node key and operation (add to list or remove from list)
+     * Sends a gray and black list update info as composition of node key and operation (add to list
+     * or remove from list).
      *
      * @author  Alexander Avramenko
      * @date    21.11.2019
      *
-     * @param [in,out]  node    The node service
-     * @param           key     The key of black list item, if blacklist completely cleared must be a Zero::key
-     * @param           added   True if added to list, otherwise false if removed from list
+     * @param [in,out]  node            The node service.
+     * @param           key             The key of gray or black list item, if list is completely
+     *  cleared must be a Zero::key.
+     * @param           added           True if added to list, otherwise false if removed from list.
+     * @param           count_rounds    (Optional) The count rounds to be in list. 0 in case of clear
+     *  list or add to black list.
      */
 
-    static void sendBlackListUpdate(Node& node, const cs::PublicKey& key, bool added);
+    static void sendGrayListUpdate(Node& node, const cs::PublicKey& key, bool added, uint32_t count_rounds = 0);
 
     /**
      * Parse black list update
@@ -101,13 +105,17 @@ public:
      * @author  Alexander Avramenko
      * @date    21.11.2019
      *
-     * @param           bin_pack    The byte array pack, must be a product of sendBlackListUpdate() call on remote node
-     * @param [in,out]  key         The placeholder of parsed result, if black list was completely cleared on remote node, contains Zero::key
+     * @param           bin_pack    The byte array pack, must be a product of sendGrayListUpdate()
+     *  call on remote node.
+     * @param [in,out]  key         The placeholder for parsed result, if black list was completely
+     *  cleared on remote node, contains Zero::key.
+     * @param [in,out]  counter     The placeholder for counter of rounds to be in gray list, being
+     *  in black list is permanent, so contains 0 after method returns.
      *
      * @returns True if it succeeds, false if it fails.
      */
 
-    static bool parseBlackListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key);
+    static bool parseGrayListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key, uint32_t& counter);
 };
 
 #endif // EVENTREPORT_HPP

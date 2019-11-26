@@ -222,7 +222,7 @@ void Neighbourhood::checkSilent() {
     static uint32_t refillCount = 0;
 
     bool needRefill = true;
-    std::atomic_bool flagCallRefillNeighbourhood{ false };
+    bool flagCallRefillNeighbourhood{ false };
 
     { // begin of scoped locked block
         cs::ScopedLock lock(mLockFlag_, nLockFlag_);
@@ -498,6 +498,7 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     conn->node = node;
 
     if (conn->connected) {
+        csdebug() << "Attempt to connect to already connected " << conn->getOut();
         return;
     }
 
@@ -510,6 +511,7 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     }
 
     neighbours_.emplace(neighbours_.end(), conn);
+    csdebug() << "Node " << conn->getOut() << " is added to neighbours";
     chooseNeighbours();
 }
 
