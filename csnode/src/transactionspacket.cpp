@@ -227,30 +227,27 @@ std::string TransactionsPacket::verify(const cs::PublicKey& publicKey) {
 std::string TransactionsPacket::verify(const std::vector<cs::PublicKey>& publicKeys) {
     std::string res;
     if (isHashEmpty()) {
-        res = "No hash of packet";
-        return res;
+        return "No hash of packet";
     }
 
     if (signatures_.size() < 3) {
-        res = "Number of signatures is " + std::to_string(signatures_.size()) + " < 3";
-        return res;
+        return "Number of signatures is " + std::to_string(signatures_.size()) + ", < 3";
     }
 
     size_t count = 0;
-
+    size_t total_keys = publicKeys.size();
     for (auto it : signatures_) {
-        if (it.first < publicKeys.size()) {
+        if (it.first < total_keys) {
             if (cscrypto::verifySignature(it.second.data(), publicKeys[it.first].data(), hash_.toBinary().data(), hash_.toBinary().size())) {
                 ++count;
             }
         }
         else {
-            res = "Signature index doesn't correspond to supplied PublicKey's vector size";
-            return res;
+            return "Signature index is out of range in supplied PublicKey container";
         }
     }
 
-    return count > publicKeys.size() / 2 ? "Not enough valid signatures" : res;
+    return count <= total_keys / 2 ? std::string{ "Not enough valid signatures" } : std::string{};
 }
 
 const cs::BlockSignatures& TransactionsPacket::signatures() const noexcept {
