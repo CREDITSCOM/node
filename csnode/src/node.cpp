@@ -85,6 +85,8 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &cs::Executor::onBlockStored);
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &cs::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
+    cs::Connector::connect(&transport_->neighbourAdded, this, &Node::onNeighbourAdded);
+    cs::Connector::connect(&transport_->neighbourRemoved, this, &Node::onNeighbourRemoved);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
@@ -240,11 +242,11 @@ void Node::initCurrentRP() {
     roundPackageCache_.push_back(rp);
 }
 
-void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
+void Node::onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
     cslog() << "NODE: new neighbour added " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
         << " last seq " << lastSeq << " last round " << lastRound;
 
-    auto & conveyer = cs::Conveyer::instance();
+    auto& conveyer = cs::Conveyer::instance();
     auto myRoundNum = conveyer.currentRoundNumber();
 
     if (lastRound > myRoundNum) {
@@ -274,9 +276,8 @@ void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, 
     }
 }
 
-void Node::neighbourRemoved(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
-    cslog() << "NODE: neighbour removed " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
-        << " last seq " << lastSeq << " last round " << lastRound;
+void Node::onNeighbourRemoved(const cs::PublicKey& neighbour) {
+    cslog() << "NODE: neighbour removed " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size());
 }
 
 void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
