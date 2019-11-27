@@ -2137,7 +2137,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             // perform just created packet pre-validation
             if (packet.transactionsCount() > 0) {
                 if (!prevalidate_inner(packet)) {
-                    csdb::Transaction tmp = packet.transactions().front();
+                    csdb::Transaction tmp = packet.transactions().front().clone();
                     cswarning() << kLogPrefix << "packet result prevalidation failed, make " << data_item.contract_ref << " new state is empty";
                     tmp.add_user_field(new_state::Value, std::string{});
                     set_return_value(tmp, error::LogicViolation);
@@ -2172,25 +2172,34 @@ bool SmartContracts::start_consensus(QueueItem& item) {
     // create (multi-)packet:
     // new_state[0] + [ emitted_list[0] ] + [ susequent_state_list[0] ] + ... + new_state[n-1] + [ emitted_list[n-1] ] + [ subsequent_state_list[n-1] ]
     cs::TransactionsPacket integral_packet;
-    // add all transactions to integral packet
-    for (const auto& e : item.executions) {
-        for (const auto& t : e.result.transactions()) {
-            integral_packet.addTransaction(t);
-        }
-    }
-    // final "integral" validation
-    if (integral_packet.transactionsCount() > 0) {
-        if (!prevalidate_inner(integral_packet)) {
-            csdb::Transaction tmp = integral_packet.transactions().front();
-            cswarning() << kLogPrefix << "final integral packet of " << item.executions.size()
-                << " executions prevalidation failed, make " << FormatRef(item.seq_start) << " empty new state instead";
-            tmp.add_user_field(trx_uf::new_state::Value, std::string{});
-            set_return_value(tmp, error::LogicViolation);
 
-            integral_packet.clear();
-            integral_packet.addTransaction(tmp);
+    // add all transactions to integral packet, perform final integral validation against total count and total content size
+    size_t total_cnt = 0;
+    size_t total_size = 0;
+    for (auto& e : item.executions) {
+        if (e.result.transactionsCount() > 0) {
+            if (total_cnt >= Consensus::MaxContractResultTransactions || total_size >= Consensus::MaxPreliminaryBlockSize) {
+                // some limit has been reached, make remaining executions failed
+                csdb::Transaction tmp = e.result.transactions().front().clone();
+                cswarning() << kLogPrefix << "integral packet result exceeds limitations, make " << e.ref_start << " new state is empty";
+                tmp.add_user_field(trx_uf::new_state::Value, std::string{});
+                set_return_value(tmp, error::LogicViolation);
+                e.result.clear();
+                e.result.addTransaction(tmp);
+                integral_packet.addTransaction(tmp);
+
+            }
+            else {
+                // add all result transactions to integral packet
+                for (const auto& t : e.result.transactions()) {
+                    integral_packet.addTransaction(t);
+                    ++total_cnt;
+                    total_size += t.to_byte_stream().size();
+                }
+            }
         }
     }
+
     // if re-run consensus
     uint8_t run_counter = 0;
     if (item.pconsensus) {
