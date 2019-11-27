@@ -204,23 +204,15 @@ void Node::stop() {
 
 void Node::initCurrentRP() {
     cs::RoundPackage rp;
-    if (getBlockChain().getLastSeq() == 0) {
-        cs::RoundTable rt;
-        rt.round = 1;
-        for (auto& key : initialConfidants_){
-            rt.confidants.push_back(key);
-            if (rt.confidants.size() > Consensus::MinTrustedNodes) {
-                break;
-            }
+    cs::RoundTable rt;
+    rt.round = getBlockChain().getLastSeq() + 1;
+    for (auto& key : initialConfidants_){
+        rt.confidants.push_back(key);
+        if (rt.confidants.size() > Consensus::MinTrustedNodes) {
+            break;
         }
-        rp.updateRoundTable(rt);
     }
-    else {
-        cs::RoundTable rt;
-        rt.round = getBlockChain().getLastSeq();
-        rt.confidants = getBlockChain().getLastBlock().confidants();
-        rp.updateRoundTable(rt);
-    }
+    rp.updateRoundTable(rt);
     roundPackageCache_.push_back(rp);
 }
 
@@ -229,14 +221,9 @@ void Node::onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq
         << " last seq " << lastSeq << " last round " << lastRound;
 
     auto& conveyer = cs::Conveyer::instance();
-    auto myRoundNum = conveyer.currentRoundNumber();
 
-    if (lastRound > myRoundNum) {
+    if (lastRound > conveyer.currentRoundNumber()) {
         roundPackRequest(neighbour, lastRound);
-        return;
-    }
-
-    if (myRoundNum != 0) {
         return;
     }
 
