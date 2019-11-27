@@ -203,9 +203,11 @@ void Transport::checkNeighboursChange() {
         auto& neighbour = neighboursToHandle_.front();
         if (neighbour.added) {
             node_->neighbourAdded(neighbour.key, neighbour.lastSeq, neighbour.lastRound);
+            emit neighbourAdded(neighbour.key, neighbour.lastSeq, neighbour.lastRound);
         }
         else {
             node_->neighbourRemoved(neighbour.key, neighbour.lastSeq, neighbour.lastRound);
+            emit neighbourRemoved(neighbour.key);
         }
         neighboursToHandle_.pop_front();
     }
