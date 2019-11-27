@@ -970,7 +970,7 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
     stream >> report_version;
     if (report_version == 0) {
         stream >> sender_last_block >> bin_pack;
-        csevent() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+        csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
             << ", sender round R-" << WithDelimiters(rNum)
             << ", sender last block #" << WithDelimiters(sender_last_block)
             << ", info size " << bin_pack.size();
@@ -987,27 +987,27 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                     cnt += item.second;
                     os << Reject::to_string(item.first) << " (" << item.second << ") ";
                 });
-                csevent() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os.str();
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] rejected " << cnt << " transactions the following reasons: " << os.str();
             }
         }
         else if (event_id == EventReport::Id::AddGrayList || event_id == EventReport::Id::EraseGrayList) {
             bool added = event_id == EventReport::Id::AddGrayList;
-            std::string list_oper = (added ? "added to" : "cleared from");
+            std::string list_action = (added ? "added to" : "cleared from");
             cs::PublicKey item;
             uint32_t counter = std::numeric_limits<uint32_t>::max();
             if (EventReport::parseGrayListUpdate(bin_pack, item, counter)) {
                 std::string list_name = (counter == 0 ? "black" : "gray");
                 if (std::equal(item.cbegin(), item.cend(), cs::Zero::key.cbegin())) {
-                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] All items are " << list_oper
+                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] all items are " << list_action
                         << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
                 else {
                     csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(item.data(), item.size())
-                        << ' ' << list_oper << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                        << ' ' << list_action << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
             }
             else {
-                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << list_oper << " black list";
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << list_action << " black list";
             }
         }
     }
