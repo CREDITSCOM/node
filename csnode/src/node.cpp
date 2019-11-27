@@ -107,8 +107,11 @@ Node::~Node() {
 }
 
 bool Node::init() {
-    if (!fillBootstrapKeys(*cs::ConfigHolder::instance().config())) {
-        cserror() << "Can't fill bootstrap keys";
+    auto& initConfidants = cs::ConfigHolder::instance().config()->getInitialConfidants();
+    initialConfidants_ = decltype(initialConfidants_)(initConfidants.begin(), initConfidants.end());
+
+    if (initialConfidants_.size() <= Consensus::MinTrustedNodes) {
+        cserror() << "Not enough initial confidants.";
         return false;
     }
 
@@ -169,25 +172,6 @@ bool Node::init() {
     return true;
 }
 
-bool Node::fillBootstrapKeys(const Config& config) {
-    auto& list = config.getIpList();
-    if (list.size() == 0) {
-        return false;
-    }
-
-    std::vector<uint8_t> buf;
-    for (auto& item : list) {
-        if (!DecodeBase58(item.id, buf)) {
-            return false;
-        }
-
-        cs::PublicKey key;
-        std::copy(buf.begin(), buf.end(), key.begin());
-        bootstrapKeys_.push_back(key);
-    }
-    return true;
-}
-
 void Node::setupNextMessageBehaviour() {
     cs::Connector::connect(&transport_->mainThreadIterated, &stat_, &cs::RoundStat::onMainThreadIterated);
     cs::Connector::connect(&cs::Conveyer::instance().roundChanged, &stat_, &cs::RoundStat::onRoundChanged);
@@ -223,10 +207,8 @@ void Node::initCurrentRP() {
     if (getBlockChain().getLastSeq() == 0) {
         cs::RoundTable rt;
         rt.round = 1;
-        for (auto& key : bootstrapKeys_){
+        for (auto& key : initialConfidants_){
             rt.confidants.push_back(key);
-            initialConfidants_.insert(key);
-
             if (rt.confidants.size() > Consensus::MinTrustedNodes) {
                 break;
             }

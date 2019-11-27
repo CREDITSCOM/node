@@ -169,6 +169,10 @@ public:
         return bList_;
     }
 
+    const std::vector<cs::PublicKey>& getInitialConfidants() const {
+        return initialConfidants_;
+    }
+
     const std::string& getPathToDB() const {
         return pathToDb_;
     }
@@ -321,6 +325,7 @@ private:
     EndpointData signalServerEp_;
 
     std::vector<EndpointData> bList_;
+    std::vector<cs::PublicKey> initialConfidants_;
 
     std::string pathToDb_;
 

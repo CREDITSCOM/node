@@ -43,6 +43,7 @@ const std::string BLOCK_NAME_EVENT_REPORTER = "event_report";
 const std::string PARAM_NAME_NODE_TYPE = "node_type";
 const std::string PARAM_NAME_BOOTSTRAP_TYPE = "bootstrap_type";
 const std::string PARAM_NAME_HOSTS_FILENAME = "hosts_filename";
+const std::string PARAM_NAME_INITIAL_TRUSTED = "init_trusted_filename";
 const std::string PARAM_NAME_USE_IPV6 = "ipv6";
 const std::string PARAM_NAME_MIN_NEIGHBOURS = "min_neighbours";
 const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
@@ -765,6 +766,7 @@ Config Config::readFromFile(const std::string& fileName) {
 
         if (result.bType_ == BootstrapType::IpList) {
             const auto hostsFileName = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
+            const auto initTrustedFileName = params.get<std::string>(PARAM_NAME_INITIAL_TRUSTED);
 
             std::string line;
 
@@ -781,6 +783,22 @@ Config Config::readFromFile(const std::string& fileName) {
 
             if (result.bList_.empty()) {
                 throw std::length_error("No hosts specified");
+            }
+
+            hostsFile.close();
+            hostsFile.open(initTrustedFileName);
+
+            cs::Bytes bytes;
+            while (getline(hostsFile, line)) {
+                if (!line.empty() && DecodeBase58(line, bytes)) {
+                    cs::PublicKey key;
+                    std::copy(bytes.begin(), bytes.end(), key.begin());
+                    result.initialConfidants_.push_back(key);
+                }
+            }
+
+            if (result.initialConfidants_.empty()) {
+                throw std::length_error("No initial confidants specified");
             }
         }
 
