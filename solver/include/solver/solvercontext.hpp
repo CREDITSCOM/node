@@ -565,6 +565,8 @@ public:
     using RefExecution = std::pair<cs::Sequence, uint32_t>;
     void send_rejected_smarts(const std::vector<RefExecution>& reject_list);
 
+    void send_rejected_report(const cs::Bytes& rejected_pack);
+
 private:
   SolverCore& core;
 };

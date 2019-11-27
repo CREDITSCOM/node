@@ -251,7 +251,7 @@ inline bool operator>(const SmartContractRef& l, const SmartContractRef& r) {
 struct SmartExecutionData {
     SmartContractRef contract_ref;
     csdb::Amount executor_fee;
-    executor::Executor::ExecuteResult result;
+    cs::Executor::ExecuteResult result;
     std::string error;
     std::string explicit_last_state;
     csdb::Address abs_addr;
@@ -262,7 +262,7 @@ struct SmartExecutionData {
         }
         general::Variant ret_val;
         ret_val.__set_v_byte(code);
-        using container_type = decltype(executor::Executor::ExecuteResult::smartsRes);
+        using container_type = decltype(cs::Executor::ExecuteResult::smartsRes);
         using element_type = container_type::value_type;
         decltype(element_type::states) states{};
         decltype(element_type::emittedTransactions) emitted{};

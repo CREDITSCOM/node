@@ -87,11 +87,49 @@ struct ApiData {
     bool executorMultiInstance = false;
     int executorCommitMin = 1506;   // first commit with support of checking
     int executorCommitMax{-1};      // unlimited range on the right
+    std::string jpsCmdLine = "jps";
 };
 
 struct ConveyerData {
     size_t sendCacheValue = DEFAULT_CONVEYER_SEND_CACHE_VALUE;
     size_t maxResendsSendCache = DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE;
+};
+
+struct EventsReportData {
+    // event reports collector address
+    EndpointData collector_ep;
+
+    // general on/off
+    bool on = false;
+
+    // report filters, only actual if on is true
+    
+    // report every liar in consensus
+    bool consensus_liar = false;
+    // report every silent trusted node in consensus
+    bool consensus_silent = false;
+    // report consensus is not achieved
+    bool consensus_failed = true;
+    // report every liar in smart contracts consensus
+    bool contracts_liar = false;
+    // report every silent trusted node in smart contracts consensus
+    bool contracts_silent = false;
+    // report smart contracts consensus is not achieved
+    bool contracts_failed = true;
+    // report put node into gray list
+    bool add_to_gray_list = true;
+    // report remove node from gray list
+    bool erase_from_gray_list = false;
+    // basic transaction is rejected by final consensus
+    bool reject_transaction = true;
+    // contract-related transaction is rejected just after execution, before consensus started
+    bool reject_contract_execution = true;
+    // contract-related transaction is rejected by final basic consensus
+    bool reject_contract_consensus = true;
+    // invalid block detected by node
+    bool alarm_invalid_block = true;
+    // big bang occurred
+    bool big_bang = false;
 };
 
 class Config {
@@ -238,6 +276,10 @@ public:
 
     void swap(Config& config);
 
+    const EventsReportData& getEventsReportData() const {
+        return eventsReport_;
+    }
+
 private:
     static Config readFromFile(const std::string& fileName);
 
@@ -245,6 +287,7 @@ private:
     void readPoolSynchronizerData(const boost::property_tree::ptree& config);
     void readApiData(const boost::property_tree::ptree& config);
     void readConveyerData(const boost::property_tree::ptree& config);
+    void readEventsReportData(const boost::property_tree::ptree& config);
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
     void showKeys(const std::string& pk58);
@@ -301,6 +344,8 @@ private:
     uint64_t roundElapseTime_ = DEFAULT_ROUND_ELAPSE_TIME;
 
     ConveyerData conveyerData_;
+
+    EventsReportData eventsReport_;
 
     friend bool operator==(const Config&, const Config&);
 };

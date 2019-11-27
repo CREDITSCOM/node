@@ -239,6 +239,8 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
             return node_->getBlockReply(data, size);
         case MsgTypes::BigBang:  // any round (in theory) may be set
             return node_->getBigBang(data, size, rNum);
+        case MsgTypes::Utility:
+            return node_->getUtilityMessage(data, size);
         case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
             return node_->getRoundTableRequest(data, size, rNum, sender);
         case MsgTypes::NodeStopRequest:
@@ -311,6 +313,8 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
             return node_->getStateReply(data, size, rNum, sender);
         case MsgTypes::BlockAlarm:
             return node_->getBlockAlarm(data, size, rNum, sender);
+        case MsgTypes::EventReport:
+            return node_->getEventReport(data, size, rNum, sender);
         default:
             cserror() << "TRANSPORT> Unknown message type " << Packet::messageTypeToString(type) << " pack round " << rNum;
             break;
