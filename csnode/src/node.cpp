@@ -987,7 +987,8 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                     cnt += item.second;
                     os << Reject::to_string(item.first) << " (" << item.second << ") ";
                 });
-                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] rejected " << cnt << " transactions the following reasons: " << os.str();
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] rejected " << cnt << " transactions the following reasons: " << os.str()
+                    << " on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::AddGrayList || event_id == EventReport::Id::EraseGrayList) {
