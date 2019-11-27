@@ -330,7 +330,7 @@ private:
     bool recreateIndex_ = false;
     bool newBlockchainTop_ = false;
     bool autoShutdownEnabled_ = true;
-    bool compatibleVersion_ = true;
+    bool compatibleVersion_ = false;
     uint64_t newBlockchainTopSeq_;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
