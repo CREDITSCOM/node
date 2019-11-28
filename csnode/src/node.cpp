@@ -227,6 +227,10 @@ void Node::onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq
         return;
     }
 
+    if (lastRound < conveyer.currentRoundNumber()) {
+        return;
+    }
+
     if (initialConfidants_.find(solver_->getPublicKey()) == initialConfidants_.end()) {
         return;
     }
