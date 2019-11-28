@@ -26,6 +26,8 @@
 inline volatile std::sig_atomic_t gSignalStatus = 0;
 
 using PingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
+using NeighbourAddedSignal = cs::Signal<void(const cs::PublicKey&, cs::Sequence, cs::RoundNumber)>;
+using NeighbourRemovedSignal = cs::Signal<void(const cs::PublicKey&)>;
 
 class Node;
 
@@ -73,6 +75,8 @@ public:
 public signals:
     PingSignal pingReceived;
     cs::Action mainThreadIterated;
+    NeighbourAddedSignal neighbourAdded;
+    NeighbourRemovedSignal neighbourRemoved;
 
 private:
 // Postpone logic - beg

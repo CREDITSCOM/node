@@ -85,6 +85,8 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &cs::Executor::onBlockStored);
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &cs::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
+    cs::Connector::connect(&transport_->neighbourAdded, this, &Node::onNeighbourAdded);
+    cs::Connector::connect(&transport_->neighbourRemoved, this, &Node::onNeighbourRemoved);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
@@ -105,8 +107,11 @@ Node::~Node() {
 }
 
 bool Node::init() {
-    if (!fillBootstrapKeys(*cs::ConfigHolder::instance().config())) {
-        cserror() << "Can't fill bootstrap keys";
+    auto& initConfidants = cs::ConfigHolder::instance().config()->getInitialConfidants();
+    initialConfidants_ = decltype(initialConfidants_)(initConfidants.begin(), initConfidants.end());
+
+    if (initialConfidants_.size() <= Consensus::MinTrustedNodes) {
+        cserror() << "Not enough initial confidants.";
         return false;
     }
 
@@ -167,25 +172,6 @@ bool Node::init() {
     return true;
 }
 
-bool Node::fillBootstrapKeys(const Config& config) {
-    auto& list = config.getIpList();
-    if (list.size() == 0) {
-        return false;
-    }
-
-    std::vector<uint8_t> buf;
-    for (auto& item : list) {
-        if (!DecodeBase58(item.id, buf)) {
-            return false;
-        }
-
-        cs::PublicKey key;
-        std::copy(buf.begin(), buf.end(), key.begin());
-        bootstrapKeys_.push_back(key);
-    }
-    return true;
-}
-
 void Node::setupNextMessageBehaviour() {
     cs::Connector::connect(&transport_->mainThreadIterated, &stat_, &cs::RoundStat::onMainThreadIterated);
     cs::Connector::connect(&cs::Conveyer::instance().roundChanged, &stat_, &cs::RoundStat::onRoundChanged);
@@ -218,41 +204,26 @@ void Node::stop() {
 
 void Node::initCurrentRP() {
     cs::RoundPackage rp;
-    if (getBlockChain().getLastSeq() == 0) {
-        cs::RoundTable rt;
-        rt.round = 1;
-        for (auto& key : bootstrapKeys_){
-            rt.confidants.push_back(key);
-            initialConfidants_.insert(key);
-
-            if (rt.confidants.size() > Consensus::MinTrustedNodes) {
-                break;
-            }
+    cs::RoundTable rt;
+    rt.round = getBlockChain().getLastSeq() + 1;
+    for (auto& key : initialConfidants_){
+        rt.confidants.push_back(key);
+        if (rt.confidants.size() > Consensus::MinTrustedNodes) {
+            break;
         }
-        rp.updateRoundTable(rt);
     }
-    else {
-        cs::RoundTable rt;
-        rt.round = getBlockChain().getLastSeq();
-        rt.confidants = getBlockChain().getLastBlock().confidants();
-        rp.updateRoundTable(rt);
-    }
+    rp.updateRoundTable(rt);
     roundPackageCache_.push_back(rp);
 }
 
-void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
+void Node::onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
     cslog() << "NODE: new neighbour added " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
         << " last seq " << lastSeq << " last round " << lastRound;
 
-    auto & conveyer = cs::Conveyer::instance();
-    auto myRoundNum = conveyer.currentRoundNumber();
+    auto& conveyer = cs::Conveyer::instance();
 
-    if (lastRound > myRoundNum) {
+    if (lastRound > conveyer.currentRoundNumber()) {
         roundPackRequest(neighbour, lastRound);
-        return;
-    }
-
-    if (myRoundNum != 0) {
         return;
     }
 
@@ -274,9 +245,8 @@ void Node::neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, 
     }
 }
 
-void Node::neighbourRemoved(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
-    cslog() << "NODE: neighbour removed " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
-        << " last seq " << lastSeq << " last round " << lastRound;
+void Node::onNeighbourRemoved(const cs::PublicKey& neighbour) {
+    cslog() << "NODE: neighbour removed " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size());
 }
 
 void Node::getUtilityMessage(const uint8_t* data, const size_t size) {

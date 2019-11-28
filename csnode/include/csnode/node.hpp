@@ -89,8 +89,6 @@ public:
     void getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
 
-    void neighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
-    void neighbourRemoved(const cs::PublicKey& neigbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
     void addToBlackListCounter(const cs::PublicKey& key);
     void updateBlackListCounter();
     // critical is true if network near to be down, all capable trusted node required
@@ -310,6 +308,8 @@ public slots:
     void sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
     void validateBlock(csdb::Pool block, bool* shouldStop);
     void onRoundTimeElapsed();
+    void onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
+    void onNeighbourRemoved(const cs::PublicKey& neighbour);
 
 private:
     bool init();
@@ -330,7 +330,6 @@ private:
     void processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
     void processPacketsReply(cs::Packets&& packets, cs::DataStream& stream, const cs::RoundNumber round);
     void processTransactionsPacket(cs::TransactionsPacket&& packet);
-    bool fillBootstrapKeys(const Config& config);
 
     /// sending interace methods
 
@@ -471,7 +470,6 @@ private:
     cs::Compressor compressor_;
     long long deltaTimeSS_{};
 
-    std::vector<cs::PublicKey> bootstrapKeys_;
     std::set<cs::PublicKey> initialConfidants_;
 };
 
