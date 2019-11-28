@@ -3540,5 +3540,31 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
 }
 
 void Node::onRoundTimeElapsed() {
-    cslog() << "Waiting for next round...";
+    if (initialConfidants_.find(solver_->getPublicKey()) == initialConfidants_.end()) {
+        cslog() << "Waiting for next round...";
+        return;
+    }
+
+    cslog() << "Try to start rounds...";
+
+    size_t cnt = 1;
+    for (auto& conf : initialConfidants_) {
+      if (transport_->hasNeighbour(conf)) {
+        ++cnt;
+      }
+    }
+
+    if (cnt != initialConfidants_.size()) {
+        cslog() << "Cannot start rounds, not enough initial confidants.";
+        return;
+    }
+
+    initCurrentRP();
+    auto& conveyer = cs::Conveyer::instance();
+
+    conveyer.setRound(roundPackageCache_.back().roundTable().round);
+    conveyer.setTable(roundPackageCache_.back().roundTable());
+
+    onRoundStart(roundPackageCache_.back().roundTable(), false);
+    reviewConveyerHashes();
 }
