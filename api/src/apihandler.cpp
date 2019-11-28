@@ -663,10 +663,15 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
 
     auto trxn = makeTransaction(transaction);
     if (transaction.__isset.smartContract) {
-        if (!transaction.smartContract.method.empty()) {
-            // call to contract, not deployment!
-            if (transaction.smartContract.__isset.smartContractDeploy) {
+        if (transaction.smartContract.__isset.smartContractDeploy) {
+            // deploy info provided
+            if (!transaction.smartContract.method.empty()) {
+                // call to contract, must not be with deploy info
                 return std::make_optional("Malformed contract execution, unnecessary info provided (smartContractDeploy)");
+            }
+            if (transaction.smartContract.smartContractDeploy.sourceCode.empty()) {
+                // source code is absent
+                return std::make_optional("Malformed contract deployment, source code is not provided");
             }
         }
         trxn.add_user_field(cs::trx_uf::deploy::Code, cs::Serializer::serialize(transaction.smartContract));

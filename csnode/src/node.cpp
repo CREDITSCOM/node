@@ -509,7 +509,7 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::Pub
     }
     else if (packet.signatures().size() > 2) {
         if (packet.transactions().size() > Consensus::MaxContractResultTransactions) {
-            csdebug() << "NODE> Illegal number of transactions";
+            csdebug() << "NODE> Illegal number of transactions in single packet: " << packet.transactions().size();
             return false;
         }
         return true;
@@ -750,7 +750,11 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
 
     if (!identic) {
         cserror() << "NODE> We probably got the roundPackage with invalid characteristic, can't build block";
-        //sendBlockAlarm(rPackage.poolMetaInfo().sequenceNumber);
+        cs::PublicKey source_node;
+        if (!rPackage.getSender(source_node)) {
+            std::copy(cs::Zero::key.cbegin(), cs::Zero::key.cend(), source_node.begin());
+        }
+        sendBlockAlarm(source_node, rPackage.poolMetaInfo().sequenceNumber);
         return false;
     }
     csdebug() << "NODE> Previous block mask validation finished successfully";
@@ -906,13 +910,18 @@ void Node::createTestTransaction() {
 #endif
 }
 
-void Node::sendBlockAlarm(cs::Sequence seq) {
+void Node::sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq) {
     cs::Bytes message;
     cs::DataStream stream(message);
     stream << seq;
     cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
     sendToBroadcast(MsgTypes::BlockAlarm, seq, sig);
     csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
+    // send event report
+    const auto& conf = cs::ConfigHolder::instance().config()->getEventsReportData();
+    if (conf.alarm_invalid_block) {
+        EventReport::sendInvalidBlockAlarm(*this, source_node, seq);
+    }
 }
 
 void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -970,7 +979,7 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
     stream >> report_version;
     if (report_version == 0) {
         stream >> sender_last_block >> bin_pack;
-        csevent() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+        csdebug() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
             << ", sender round R-" << WithDelimiters(rNum)
             << ", sender last block #" << WithDelimiters(sender_last_block)
             << ", info size " << bin_pack.size();
@@ -987,27 +996,40 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                     cnt += item.second;
                     os << Reject::to_string(item.first) << " (" << item.second << ") ";
                 });
-                csevent() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os.str();
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] rejected " << cnt << " transactions the following reasons: " << os.str()
+                    << " on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::AddGrayList || event_id == EventReport::Id::EraseGrayList) {
             bool added = event_id == EventReport::Id::AddGrayList;
-            std::string list_oper = (added ? "added to" : "cleared from");
+            std::string list_action = (added ? "added to" : "cleared from");
             cs::PublicKey item;
             uint32_t counter = std::numeric_limits<uint32_t>::max();
             if (EventReport::parseGrayListUpdate(bin_pack, item, counter)) {
                 std::string list_name = (counter == 0 ? "black" : "gray");
                 if (std::equal(item.cbegin(), item.cend(), cs::Zero::key.cbegin())) {
-                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] All items are " << list_oper
+                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] all items are " << list_action
                         << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
                 else {
                     csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(item.data(), item.size())
-                        << list_oper << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                        << ' ' << list_action << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
             }
             else {
-                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << list_oper << " black list";
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << list_action << " black list";
+            }
+        }
+        else if (event_id == EventReport::Id::AlarmInvalidBlock) {
+            cs::PublicKey source_node;
+            cs::Sequence invalid_block_seq;
+            if (EventReport::parseInvalidBlockAlarm(bin_pack, source_node, invalid_block_seq)) {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] invalid block from "
+                    << cs::Utils::byteStreamToHex(source_node.data(), source_node.size())
+                    << " is alarmed by " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+            }
+            else {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse invalid block alarm report";
             }
         }
     }
@@ -2720,6 +2742,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         getCharacteristic(rPackage);
     }
 
+    rPackage.setSenderNode(sender);
     bool updateRound = false;
     if (currentRoundPackage_.roundTable().round == 0) {//if normal or trusted  node that got RP has probably received a new RP with not full stake
         if (roundPackageCache_.empty()) {
@@ -3104,15 +3127,16 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
         csdebug() << "NODE> can't send = don't have last RoundPackage filled";
         return;
     }
-    cs::RoundPackage rp = roundPackageCache_.back();
 
-    const auto& cur_table = rp.roundTable();
-    if (cur_table.round >= rNum) {
+    cs::RoundPackage& rp = roundPackageCache_.back();
+    const auto currentTable = rp.roundTable();
+
+    if (currentTable.round >= rNum) {
         if(!rp.roundSignatures().empty()) {
-            if (cur_table.round == rNum) {
+            if (currentTable.round == rNum) {
                 ++roundPackRequests_;
             }
-            if (roundPackRequests_ > cur_table.confidants.size() / 2 && roundPackRequests_ <= cur_table.confidants.size() / 2 + 1) {
+            if (roundPackRequests_ > currentTable.confidants.size() / 2 && roundPackRequests_ <= currentTable.confidants.size() / 2 + 1) {
                 sendRoundPackageToAll(rp);
             }
             else {
@@ -3120,7 +3144,7 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
             }
         }
         else {
-            emptyRoundPackReply(sender);        
+            emptyRoundPackReply(sender);
         }
     }
 }
