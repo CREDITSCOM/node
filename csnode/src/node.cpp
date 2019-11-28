@@ -3103,15 +3103,16 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
         csdebug() << "NODE> can't send = don't have last RoundPackage filled";
         return;
     }
-    cs::RoundPackage rp = roundPackageCache_.back();
 
-    const auto& cur_table = rp.roundTable();
-    if (cur_table.round >= rNum) {
+    cs::RoundPackage& rp = roundPackageCache_.back();
+    const auto currentTable = rp.roundTable();
+
+    if (currentTable.round >= rNum) {
         if(!rp.roundSignatures().empty()) {
-            if (cur_table.round == rNum) {
+            if (currentTable.round == rNum) {
                 ++roundPackRequests_;
             }
-            if (roundPackRequests_ > cur_table.confidants.size() / 2 && roundPackRequests_ <= cur_table.confidants.size() / 2 + 1) {
+            if (roundPackRequests_ > currentTable.confidants.size() / 2 && roundPackRequests_ <= currentTable.confidants.size() / 2 + 1) {
                 sendRoundPackageToAll(rp);
             }
             else {
@@ -3119,7 +3120,7 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
             }
         }
         else {
-            emptyRoundPackReply(sender);        
+            emptyRoundPackReply(sender);
         }
     }
 }
