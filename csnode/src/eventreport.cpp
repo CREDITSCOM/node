@@ -137,3 +137,26 @@ bool EventReport::parseGrayListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& 
     }
     return false;
 }
+
+/*static*/
+void EventReport::sendInvalidBlockAlarm(Node& node, const cs::PublicKey& source, cs::Sequence sequence) {
+    cs::Bytes bin_pack;
+    cs::DataStream out(bin_pack);
+    out << Id::AlarmInvalidBlock << source << sequence;
+    node.reportEvent(bin_pack);
+}
+
+/*static*/
+bool EventReport::parseInvalidBlockAlarm(const cs::Bytes& bin_pack, cs::PublicKey& source, cs::Sequence& sequence) {
+    if (bin_pack.empty()) {
+        return false;
+    }
+    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    Id id = Id::None;
+    in >> id;
+    if (id != Id::AlarmInvalidBlock) {
+        return false;
+    }
+    in >> source >> sequence;
+    return in.isValid() && in.isEmpty();
+}
