@@ -490,7 +490,9 @@ void SolverCore::uploadNewStates([[maybe_unused]] std::vector<csdb::Transaction>
 }
 
 void SolverCore::sendRoundTable() {
-    pnode->sendRoundTable(justCreatedRoundPackage);
+    cs::Bytes bytes;
+    cs::DataStream stream(bytes);
+    pnode->sendRoundTable(justCreatedRoundPackage, stream);
 }
 
 void SolverCore::checkZeroSmartSignatures(csdb::Pool& pool) {

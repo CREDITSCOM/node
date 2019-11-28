@@ -627,6 +627,24 @@ inline DataStream& operator>>(DataStream& stream, csdb::Amount& amount) {
     return stream;
 }
 
+inline DataStream& operator>>(DataStream& stream, CompressedRegion& region) {
+    std::size_t binarySize = 0;
+    stream >> binarySize;
+
+    cs::Bytes bytes;
+    stream >> bytes;
+
+    if (!bytes.empty()) {
+        RegionAllocator allocator;
+        RegionPtr regionPtr = allocator.allocateNext(static_cast<uint32_t>(bytes.size()));
+
+        std::copy(bytes.data(), bytes.data() + bytes.size(), reinterpret_cast<char*>(regionPtr->data()));
+        region = CompressedRegion { std::move(regionPtr), binarySize };
+    }
+
+    return stream;
+}
+
 ///
 /// Writes entities to stream operators
 ///
@@ -649,6 +667,7 @@ inline DataStream& operator<<(DataStream& stream, const cs::Bytes& data) {
 }
 
 inline DataStream& operator<<(DataStream& stream, const CompressedRegion& data) {
+    stream << data.binarySize();
     stream << cs::Bytes(data.data(), data.data() + data.size());
     return stream;
 }

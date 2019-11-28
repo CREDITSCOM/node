@@ -17,7 +17,6 @@
 
 #include "blockchain.hpp"
 #include "confirmationlist.hpp"
-#include "packstream.hpp"
 #include "roundstat.hpp"
 
 class Transport;
@@ -100,7 +99,7 @@ public:
     // SOLVER3 methods
     void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
     void setCurrentRP(const cs::RoundPackage& rp);
-    void performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& sender, bool updateRound);
+    void performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& sender, cs::DataStream& stream, bool updateRound);
     bool isTransactionsInputAvailable();
     void clearRPCache(cs::RoundNumber rNum);
     void sendHash(cs::RoundNumber round);
@@ -174,7 +173,7 @@ public:
 
     // called by solver, review required:
     bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
-    void sendRoundTable(cs::RoundPackage& rPackage);
+    void sendRoundTable(cs::RoundPackage& rPackage, cs::DataStream& stream);
     bool gotSSMessageVerify(const cs::Signature& sign, const cs::Byte* data, const size_t size);
 
     // transaction's pack syncro
@@ -184,8 +183,7 @@ public:
     void getEventReport(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
     bool checkCharacteristic(cs::RoundPackage& rPackage);
-
-    void getCharacteristic(cs::RoundPackage& rPackage);
+    void getCharacteristic(cs::RoundPackage& rPackage, cs::DataStream& stream);
 
     void createTestTransaction();
 
@@ -320,7 +318,7 @@ private:
     bool sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);
 
-    bool readRoundData(cs::RoundTable& roundTable, bool bang);
+    bool readRoundData(cs::RoundTable& roundTable, cs::DataStream& stream, bool bang);
     void reviewConveyerHashes();
 
     void processSync();
@@ -330,7 +328,7 @@ private:
 
     // conveyer
     void processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
-    void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
+    void processPacketsReply(cs::Packets&& packets, cs::DataStream& stream, const cs::RoundNumber round);
     void processTransactionsPacket(cs::TransactionsPacket&& packet);
     bool fillBootstrapKeys(const Config& config);
 
@@ -402,9 +400,6 @@ private:
     static const uint32_t packetRequestStep_ = 450;
     static const size_t maxPacketRequestSize_ = 1000;
     static const int64_t maxPingSynchroDelay_ = 30000;
-
-    // serialization/deserialization entities
-    cs::IPackStream istream_;
 
     cs::PoolSynchronizer* poolSynchronizer_;
 

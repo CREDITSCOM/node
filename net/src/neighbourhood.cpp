@@ -270,18 +270,38 @@ void Neighbourhood::gotPing(const cs::PublicKey& sender, const Packet& pack) {
 void Neighbourhood::forEachNeighbour(NeighboursCallback callback) {
     std::lock_guard<std::mutex> g(neighbourMux_);
     for (auto& n : neighbours_) {
-        if (!callback(n.first, n.second.lastSeq, n.second.roundNumber)) {
-            break;
-        }
+        callback(n.first, n.second.lastSeq, n.second.roundNumber);
     }
 }
 
 uint32_t Neighbourhood::getNeighboursCount() const {
     std::lock_guard<std::mutex> g(neighbourMux_);
-    return neighbours_.size();
+    return static_cast<uint32_t>(neighbours_.size());
 }
 
 bool Neighbourhood::contains(const cs::PublicKey& neighbour) const {
     std::lock_guard<std::mutex> g(neighbourMux_);
     return neighbours_.find(neighbour) != neighbours_.end();
+}
+
+std::optional<cs::PublicKey> Neighbourhood::getNeighbour(size_t index) const {
+    std::lock_guard<std::mutex> lock(neighbourMux_);
+
+    if (index >= neighbours_.size()) {
+        return std::nullopt;
+    }
+
+    cs::PublicKey key{};
+    size_t i = 0;
+
+    std::for_each(neighbours_.begin(), neighbours_.end(), [&](const auto& element) {
+        if (index == i) {
+            key = element.first;
+            return;
+        }
+
+        ++i;
+    });
+
+    return std::make_optional(key);
 }

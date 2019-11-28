@@ -7,7 +7,6 @@
 #include <cscrypto/cscrypto.hpp>
 #include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
-#include <csnode/packstream.hpp>
 #include <lib/system/structures.hpp>
 #include <lib/system/utils.hpp>
 
@@ -348,11 +347,11 @@ bool Transport::hasNeighbour(const cs::PublicKey& neighbour) const {
     return neighbourhood_.contains(neighbour);
 }
 
+std::optional<cs::PublicKey> Transport::getNeighbour(size_t index) const {
+    return neighbourhood_.getNeighbour(index);
+}
+
 uint32_t Transport::getMaxNeighbours() const {
 //    return config_->getMaxNeighbours();
     return Neighbourhood::MaxNeighbours;
-}
-
-void Transport::onConfigChanged(const Config& /* updated */) {
-//    config_.exchange(updated);
 }

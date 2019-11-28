@@ -39,7 +39,6 @@ add_library(csnode
   include/csnode/blockchain.hpp
   include/csnode/cyclicbuffer.hpp
   include/csnode/node.hpp
-  include/csnode/packstream.hpp
   include/csnode/datastream.hpp
   include/csnode/nodecore.hpp
   include/csnode/conveyer.hpp

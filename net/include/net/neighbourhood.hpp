@@ -7,6 +7,7 @@
 #include <map>
 #include <mutex>
 #include <set>
+#include <optional>
 
 #include <lib/system/common.hpp>
 #include <networkcommands.hpp>
@@ -17,8 +18,7 @@ class Transport;
 
 class Neighbourhood {
 public:
-    using NeighboursCallback =
-        std::function<bool(const cs::PublicKey&, cs::Sequence, cs::RoundNumber)>;
+    using NeighboursCallback = std::function<void(const cs::PublicKey&, cs::Sequence, cs::RoundNumber)>;
 
     constexpr static uint32_t MaxNeighbours = 16;
     constexpr static uint32_t MinNeighbours = 2;
@@ -37,6 +37,7 @@ public:
     void forEachNeighbour(NeighboursCallback);
     uint32_t getNeighboursCount() const;
     bool contains(const cs::PublicKey& neighbour) const;
+    std::optional<cs::PublicKey> getNeighbour(size_t index) const;
 
 private:
     constexpr static std::chrono::seconds LastSeenTimeout{10};

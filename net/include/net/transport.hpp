@@ -10,8 +10,10 @@
 #include <thread>
 #include <unordered_set>
 #include <vector>
+#include <optional>
 
 #include <config.hpp>
+
 #include <lib/system/common.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
@@ -33,7 +35,7 @@ public:
     static void stop() { Transport::gSignalStatus = 1; }
 
     explicit Transport(const Config& config, Node* node);
-    ~Transport() {}
+    ~Transport() override = default;
 
     void run();
     bool isGood() const { return good_; }
@@ -53,6 +55,7 @@ public:
     uint32_t getMaxNeighbours() const;
     void forEachNeighbour(Neighbourhood::NeighboursCallback);
     bool hasNeighbour(const cs::PublicKey&) const;
+    std::optional<cs::PublicKey> getNeighbour(size_t index) const;
 
     // @TODO remove, used in Node
     void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}
@@ -70,9 +73,6 @@ public:
 public signals:
     PingSignal pingReceived;
     cs::Action mainThreadIterated;
-
-public slots:
-    void onConfigChanged(const Config& updated);
 
 private:
 // Postpone logic - beg
