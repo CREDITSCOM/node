@@ -403,10 +403,17 @@ public:
 
     bool executionAllowed();
 
-    // return true if SmartContracts provide special handling for transaction, so
-    // the transaction has not to pass through conveyer
-    // method is thread-safe to be called from API thread
-    // upon return, is_rejected signals if transaction is not valid
+    /**
+     * Tests contract-related transaction against possible violations of contract rules
+     *
+     * @author  Alexander Avramenko
+     * @date    28.11.2019
+     *
+     * @param   t   A csdb::Transaction to process.
+     *
+     * @returns An uint32_t value, one of Violations member constants
+     */
+
     uint32_t test_violations(const csdb::Transaction& t);
 
     struct Violations {
@@ -423,6 +430,8 @@ public:
         constexpr static uint32_t BadInvoke = 16;
         // unable call contract from other contract method
         constexpr static uint32_t SubsequentCall = 32;
+        // malformed contract execution
+        constexpr static uint32_t MalformedCall = 64;
     };
 
     static std::string violations_message(uint32_t flags);

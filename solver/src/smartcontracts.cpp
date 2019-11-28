@@ -849,7 +849,13 @@ uint32_t SmartContracts::test_violations(const csdb::Transaction& tr) {
 
         api::SmartContractInvocation invoke;
         if (is_executable(tr)) {
-            const csdb::UserField fld = tr.user_field(cs::trx_uf::start::Methods);
+            csdb::UserField fld = tr.user_field(trx_uf::start::Methods);
+            if constexpr (trx_uf::deploy::Code != trx_uf::start::Methods) {
+                // in case of user field number in call to contract other then deploy contract
+                if (!fld.is_valid) {
+                    fld = tr.user_field(trx_uf::deploy::Code);
+                }
+            }
             if (fld.is_valid()) {
                 std::string data = fld.value<std::string>();
                 if (!data.empty()) {
@@ -875,6 +881,17 @@ uint32_t SmartContracts::test_violations(const csdb::Transaction& tr) {
                 add_uses_from(abs_addr, invoke.method, uses);
                 if (!uses.empty()) {
                     result += Violations::SubsequentCall;
+                }
+            }
+            if (invoke.__isset.smartContractDeploy) {
+                // deploy contract
+                if (!invoke.method.empty()) {
+                    // must not combine call info with deploy info
+                    result += Violations::MalformedCall;
+                }
+                if (invoke.smartContractDeploy.sourceCode.empty()) {
+                    // source code is absent in deploy info
+                    result += Violations::MalformedCall;
                 }
             }
         }
@@ -934,6 +951,9 @@ std::string SmartContracts::violations_message(uint32_t flags) {
     }
     if ((flags & Violations::SubsequentCall) != 0) {
         os << "Unable call contract from other contract. ";
+    }
+    if ((flags & Violations::MalformedCall) != 0) {
+        os << "Malformed contract execution info";
     }
     return os.str();
 }
