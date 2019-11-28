@@ -3114,23 +3114,27 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
         csdebug() << "NODE> can't send = don't have last RoundPackage filled";
         return;
     }
-    cs::RoundPackage rp = roundPackageCache_.back();
 
-    const auto& cur_table = rp.roundTable();
-    if (cur_table.round >= rNum) {
-        if(!rp.roundSignatures().empty()) {
-            if (std::find(rp.roundTable().confidants.cbegin(), rp.roundTable().confidants.cend(), sender) != rp.roundTable().confidants.cend()) {
+    cs::RoundPackage& roundPackage = roundPackageCache_.back();
+    const auto table = roundPackage.roundTable();
+
+    if (table.round >= rNum) {
+        if (!roundPackage.roundSignatures().empty()) {
+            auto iter = std::find(std::cbegin(table.confidants), std::cend(table.confidants), sender);
+
+            if (iter != table.confidants.cend()) {
                 ++roundPackRequests_;
             }
-            if (roundPackRequests_ > cur_table.confidants.size() / 2 && roundPackRequests_ <= cur_table.confidants.size() / 2 + 1) {
-                sendRoundPackageToAll(rp);
+
+            if (roundPackRequests_ > table.confidants.size() / 2 && roundPackRequests_ <= table.confidants.size() / 2 + 1) {
+                sendRoundPackageToAll(roundPackage);
             }
             else {
                 roundPackReply(sender);
             }
         }
         else {
-            emptyRoundPackReply(sender);        
+            emptyRoundPackReply(sender);
         }
     }
 }
