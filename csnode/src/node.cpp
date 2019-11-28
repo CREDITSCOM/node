@@ -750,7 +750,11 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
 
     if (!identic) {
         cserror() << "NODE> We probably got the roundPackage with invalid characteristic, can't build block";
-        //sendBlockAlarm(rPackage.poolMetaInfo().sequenceNumber);
+        cs::PublicKey source_node;
+        if (!rPackage.getSender(source_node)) {
+            std::copy(cs::Zero::key.cbegin(), cs::Zero::key.cend(), source_node.begin());
+        }
+        sendBlockAlarm(source_node, rPackage.poolMetaInfo().sequenceNumber);
         return false;
     }
     csdebug() << "NODE> Previous block mask validation finished successfully";
@@ -906,13 +910,18 @@ void Node::createTestTransaction() {
 #endif
 }
 
-void Node::sendBlockAlarm(cs::Sequence seq) {
+void Node::sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq) {
     cs::Bytes message;
     cs::DataStream stream(message);
     stream << seq;
     cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
     sendToBroadcast(MsgTypes::BlockAlarm, seq, sig);
     csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
+    // send event report
+    const auto& conf = cs::ConfigHolder::instance().config()->getEventsReportData();
+    if (conf.alarm_invalid_block) {
+        EventReport::sendInvalidBlockAlarm(*this, source_node, seq);
+    }
 }
 
 void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -1009,6 +1018,18 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             }
             else {
                 csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << list_action << " black list";
+            }
+        }
+        else if (event_id == EventReport::Id::AlarmInvalidBlock) {
+            cs::PublicKey source_node;
+            cs::Sequence invalid_block_seq;
+            if (EventReport::parseInvalidBlockAlarm(bin_pack, source_node, invalid_block_seq)) {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] invalid block from "
+                    << cs::Utils::byteStreamToHex(source_node.data(), source_node.size())
+                    << " is alarmed by " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+            }
+            else {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse invalid block alarm report";
             }
         }
     }
@@ -2721,6 +2742,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         getCharacteristic(rPackage);
     }
 
+    rPackage.setSenderNode(sender);
     bool updateRound = false;
     if (currentRoundPackage_.roundTable().round == 0) {//if normal or trusted  node that got RP has probably received a new RP with not full stake
         if (roundPackageCache_.empty()) {

@@ -188,7 +188,7 @@ public:
 
     void createTestTransaction();
 
-    void sendBlockAlarm(cs::Sequence seq);
+    void sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq);
 
     void cleanConfirmationList(cs::RoundNumber rNum);
 

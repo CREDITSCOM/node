@@ -116,6 +116,35 @@ public:
      */
 
     static bool parseGrayListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key, uint32_t& counter);
+
+    /**
+     * Sends an invalid block alarm report
+     *
+     * @author  Alexander Avramenko
+     * @date    28.11.2019
+     *
+     * @param [in,out]  node        The node.
+     * @param           sequence    The sequence of invalid block
+     * @param           source      Source node of the invalid block
+     */
+
+    static void sendInvalidBlockAlarm(Node& node, const cs::PublicKey& source, cs::Sequence sequence);
+
+    /**
+     * Parse invalid block alarm report
+     *
+     * @author  Alexander Avramenko
+     * @date    28.11.2019
+     *
+     * @param           bin_pack    he byte array pack, must be a product of sendInvalidBlockAlarm()
+     *  call on remote node
+     * @param [in,out]  source      placeholder for the key of the source node of the invalid block
+     * @param [in,out]  sequence    placeholder for the sequence of invalid block
+     *
+     * @returns True if it succeeds, false if it fails. If OK both placeholders contains data
+     */
+
+    static bool parseInvalidBlockAlarm(const cs::Bytes& bin_pack, cs::PublicKey& source, cs::Sequence& sequence);
 };
 
 #endif // EVENTREPORT_HPP
