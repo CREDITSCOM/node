@@ -812,6 +812,8 @@ bool SmartContracts::executionAllowed() {
 
 /*public*/
 uint32_t SmartContracts::test_violations(const csdb::Transaction& tr) {
+    cs::Sequence last_block_seq = bc.getLastSeq();
+
     cs::Lock lock(public_access_lock);
 
     uint32_t result = Violations::None;
@@ -843,8 +845,23 @@ uint32_t SmartContracts::test_violations(const csdb::Transaction& tr) {
         }
         // test contract was deployed (and maybe called successfully)
         if (!has_state) {
-            cslog() << kLogPrefix << "unable execute not successfully deployed contract, drop transaction";
-            result += Violations::ContractIsNotDeployed;
+            // test possible uncompleted deploy
+            bool violation_confirmed = false;
+            if (it->second.ref_deploy.is_valid() && it->second.ref_state.is_valid() && it->second.ref_state.sequence <= last_block_seq) {
+                // deploy has finished with empty contract state
+                violation_confirmed = true;
+            }
+            else if (it->second.deploy.is_valid()) {
+                cs::Sequence deploy_seq = it->second.deploy.id().pool_seq();
+                if ((last_block_seq > deploy_seq) && (last_block_seq - deploy_seq > Consensus::MaxRoundsCancelContract)) {
+                    // deploy timeout confirmed
+                    violation_confirmed = true;
+                }
+            }
+            if (violation_confirmed) {
+                cslog() << kLogPrefix << "unable execute not successfully deployed contract, drop transaction";
+                result += Violations::ContractIsNotDeployed;
+            }
         }
 
         api::SmartContractInvocation invoke;
@@ -852,7 +869,7 @@ uint32_t SmartContracts::test_violations(const csdb::Transaction& tr) {
             csdb::UserField fld = tr.user_field(trx_uf::start::Methods);
             if constexpr (trx_uf::deploy::Code != trx_uf::start::Methods) {
                 // in case of user field number in call to contract other then deploy contract
-                if (!fld.is_valid) {
+                if (!fld.is_valid()) {
                     fld = tr.user_field(trx_uf::deploy::Code);
                 }
             }
@@ -925,7 +942,7 @@ uint32_t SmartContracts::test_violations(const csdb::Transaction& tr) {
         }
     }
 
-    return result; 
+    return result;
 }
 
 /*static*/
