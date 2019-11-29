@@ -206,6 +206,7 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
     cs::Signature sig;
     cs::Bytes msg;
     cs::RoundNumber rNum;
+    istream_.skip<uint8_t>();
     istream_ >> msg >> sig ;
     
     if (!istream_.good() || !istream_.end()) {
