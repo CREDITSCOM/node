@@ -95,7 +95,7 @@ public:
      *            for future use and will be recorded on time
      */
 
-    bool storeBlock(csdb::Pool& pool, bool bySync);
+    bool storeBlock(csdb::Pool& pool, bool bySync, bool skipConfirmations = false);
 
     /**
      * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool);
