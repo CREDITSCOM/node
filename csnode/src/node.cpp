@@ -167,8 +167,6 @@ bool Node::init() {
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
 
-    initCurrentRP();
-
     return true;
 }
 
@@ -219,34 +217,6 @@ void Node::initCurrentRP() {
 void Node::onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
     cslog() << "NODE: new neighbour added " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
         << " last seq " << lastSeq << " last round " << lastRound;
-
-    auto& conveyer = cs::Conveyer::instance();
-
-    if (lastRound > conveyer.currentRoundNumber()) {
-        roundPackRequest(neighbour, lastRound);
-        return;
-    }
-
-    if (lastRound < conveyer.currentRoundNumber()) {
-        return;
-    }
-
-    if (initialConfidants_.find(solver_->getPublicKey()) == initialConfidants_.end()) {
-        return;
-    }
-
-    static size_t initTrustedCnt = 1;
-    if (initialConfidants_.find(neighbour) != initialConfidants_.end()) {
-        ++initTrustedCnt;
-    }
-
-    if (initTrustedCnt == initialConfidants_.size() && !roundPackageCache_.empty()) {
-        conveyer.setRound(roundPackageCache_.back().roundTable().round);
-        conveyer.setTable(roundPackageCache_.back().roundTable());
-
-        onRoundStart(roundPackageCache_.back().roundTable(), false);
-        reviewConveyerHashes();
-    }
 }
 
 void Node::onNeighbourRemoved(const cs::PublicKey& neighbour) {
@@ -3564,6 +3534,11 @@ void Node::onRoundTimeElapsed() {
     }
 
     initCurrentRP();
+    if (roundPackageCache_.empty()) {
+        cslog() << "Cannot start rounds, round package cache is empty.";
+        return;
+    }
+
     auto& conveyer = cs::Conveyer::instance();
 
     conveyer.setRound(roundPackageCache_.back().roundTable().round);
