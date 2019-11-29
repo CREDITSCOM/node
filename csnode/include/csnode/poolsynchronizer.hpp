@@ -92,7 +92,7 @@ private:
 
     class NeighboursSetElemet {
     public:
-        explicit NeighboursSetElemet(uint8_t neighbourIndex, const cs::PublicKey& publicKey, uint8_t blockPoolsCount)
+        explicit NeighboursSetElemet(uint8_t neighbourIndex, const cs::PublicKey& publicKey, cs::Sequence blockPoolsCount)
         : neighbourIndex_(neighbourIndex)
         , key_(publicKey)
         , roundCounter_(0) {
