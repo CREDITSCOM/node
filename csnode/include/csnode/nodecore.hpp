@@ -72,7 +72,7 @@ struct Characteristic {
 };
 
 struct RoundTable {
-    cs::Bytes toBinary();
+    cs::Bytes toBinary() const;
     RoundNumber round = 0;
     ConfidantsKeys confidants;
     PacketsHashes hashes;
