@@ -217,6 +217,11 @@ void Node::initCurrentRP() {
 void Node::onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
     cslog() << "NODE: new neighbour added " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
         << " last seq " << lastSeq << " last round " << lastRound;
+
+    if (lastRound > cs::Conveyer::instance().currentRoundNumber()) {
+        roundPackRequest(neighbour, lastRound);
+        return;
+    }
 }
 
 void Node::onNeighbourRemoved(const cs::PublicKey& neighbour) {
