@@ -599,7 +599,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
         return;
     }
     
-    if (/* @TODO broadcast sender may differ - verifyPacketSignatures(packet, sender) && */ verifyPacketTransactions(packet, sender)) {
+    if (verifyPacketSignatures(packet, sender) && verifyPacketTransactions(packet, sender)) {
         processTransactionsPacket(std::move(packet));
     }
     else {
