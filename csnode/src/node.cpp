@@ -3348,7 +3348,19 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     cslog() << s;
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
-    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq()) << ", neighbour nodes = " << transport_->getNeighboursCountWithoutSS();
+    std::string starter_status;
+    {
+        ConnectionPtr p = transport_->getConnectionByKey(cs::PacketValidator::instance().getStarterKey());
+        if (p && p->isSignal) {
+            starter_status = (p->connected ? "connected" : "disconnected");
+        }
+        else {
+            starter_status = "unreachable";
+        }
+    }
+    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq())
+        << ", neighbour nodes = " << transport_->getNeighboursCountWithoutSS()
+        << ", starter is " << starter_status;
 
     if (Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 || Transport::cntExtraLargeNotSent > 0) {
         cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments << " / " << Transport::cntExtraLargeNotSent;
