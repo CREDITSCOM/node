@@ -663,10 +663,15 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
 
     auto trxn = makeTransaction(transaction);
     if (transaction.__isset.smartContract) {
-        if (!transaction.smartContract.method.empty()) {
-            // call to contract, not deployment!
-            if (transaction.smartContract.__isset.smartContractDeploy) {
+        if (transaction.smartContract.__isset.smartContractDeploy) {
+            // deploy info provided
+            if (!transaction.smartContract.method.empty()) {
+                // call to contract, must not be with deploy info
                 return std::make_optional("Malformed contract execution, unnecessary info provided (smartContractDeploy)");
+            }
+            if (transaction.smartContract.smartContractDeploy.sourceCode.empty()) {
+                // source code is absent
+                return std::make_optional("Malformed contract deployment, source code is not provided");
             }
         }
         trxn.add_user_field(cs::trx_uf::deploy::Code, cs::Serializer::serialize(transaction.smartContract));
@@ -985,21 +990,29 @@ void APIHandler::store_block_slot(const csdb::Pool& pool) {
     updateSmartCachesPool(pool);
 }
 
-void APIHandler::baseLoaded() {
-    isBDLoaded_ = true;
+void APIHandler::baseLoaded(const csdb::Pool& pool) {
+    if (maxReadSequence && pool.sequence() == maxReadSequence) {
+        isBDLoaded_ = true;
 #ifdef TOKENS_CACHE   
-    tm_.loadTokenInfo([&](const TokensMap& tokens, const HoldersMap&) {
-        int count{}, i{};
-        size_t tokenSize = tokens.size();
-        cslog() << "tokens are loading(" << tokenSize << ")...";
-        for (auto& tk : tokens) {
-            if (tokenSize > 100 && !(i++ % (tokenSize / 10)))
-                cslog() << "loading tokens: " << 10 * (count++) << "%";
-            tm_.refreshTokenState(tk.first, cs::SmartContracts::get_contract_state(get_s_blockchain(), tk.first), true);
-        }
-        cslog() << "tokens loaded!";
-        });
+        tm_.loadTokenInfo([&](const TokensMap& tokens, const HoldersMap&) {
+            int count{}, i{};
+            size_t tokenSize = tokens.size();
+            cslog() << "tokens are loading(" << tokenSize << ")...";
+            for (auto& tk : tokens) {
+                if (tokenSize > 100 && !(i++ % (tokenSize / 10)))
+                    cslog() << "loading tokens: " << 10 * (count++) << "%";
+                tm_.refreshTokenState(tk.first, cs::SmartContracts::get_contract_state(get_s_blockchain(), tk.first), true);
+            }
+            cslog() << "tokens loaded!";
+            });
 #endif
+    }
+}
+
+void APIHandler::maxBlocksCount(cs::Sequence lastBlockNum) {
+    if (!lastBlockNum)
+        isBDLoaded_ = true;
+    maxReadSequence = lastBlockNum;
 }
 
 

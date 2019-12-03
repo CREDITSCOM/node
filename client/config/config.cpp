@@ -32,6 +32,7 @@ const NodeVersion NODE_VERSION = 441;
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
+const std::string BLOCK_NAME_START_NODE = "start_node";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
 const std::string BLOCK_NAME_HOST_OUTPUT = "host_output";
 const std::string BLOCK_NAME_HOST_ADDRESS = "host_address";
@@ -113,7 +114,11 @@ const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
 
 const std::map<std::string, NodeType> NODE_TYPES_MAP = {{"client", NodeType::Client}, {"router", NodeType::Router}};
-const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"signal_server", BootstrapType::SignalServer}, {"list", BootstrapType::IpList}};
+const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {
+    {"signal_server", BootstrapType::SignalServer},
+    {"list", BootstrapType::IpList},
+    {"start_node", BootstrapType::SignalServer}
+};
 
 static const size_t DEFAULT_NODE_KEY_ID = 0;
 static const double kTimeoutSeconds = 5;
@@ -752,7 +757,12 @@ Config Config::readFromFile(const std::string& fileName) {
         result.bType_ = getFromMap(params.get<std::string>(PARAM_NAME_BOOTSTRAP_TYPE), BOOTSTRAP_TYPES_MAP);
 
         if (result.bType_ == BootstrapType::SignalServer || result.nType_ == NodeType::Router) {
-            result.signalServerEp_ = readEndpoint(config, BLOCK_NAME_SIGNAL_SERVER);
+            try {
+                result.signalServerEp_ = readEndpoint(config, BLOCK_NAME_START_NODE);
+            }
+            catch (std::exception&) {
+                result.signalServerEp_ = readEndpoint(config, BLOCK_NAME_SIGNAL_SERVER);
+            }
         }
 
         if (result.bType_ == BootstrapType::IpList) {
