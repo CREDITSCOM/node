@@ -3531,15 +3531,31 @@ void Node::onRoundTimeElapsed() {
 
     cslog() << "Try to start rounds...";
 
-    size_t cnt = 1;
-    for (auto& conf : initialConfidants_) {
-      if (transport_->hasNeighbour(conf)) {
-        ++cnt;
-      }
+    size_t initConfConnected = 1;
+    size_t initConfSameBlock = 1;
+
+    auto callback = [&initConfConnected, &initConfSameBlock, this]
+                    (const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber) {
+                        if (initialConfidants_.find(neighbour) == initialConfidants_.end()) {
+                            return;
+                        }
+                        ++initConfConnected;
+
+                        if (lastSeq == blockChain_.getLastSeq()) {
+                            ++initConfSameBlock;
+                        }
+                    };
+
+    transport_->forEachNeighbour(std::move(callback));
+
+    if (initConfConnected != initialConfidants_.size()) {
+        cslog() << "Cannot start rounds, not enough initial confidants connected.";
+        return;
     }
 
-    if (cnt != initialConfidants_.size()) {
-        cslog() << "Cannot start rounds, not enough initial confidants.";
+    if (initConfSameBlock != initConfConnected) {
+        cslog() << "Cannot start rounds, not enough initial confidants with same last sequence. "
+                << "Wait for syncro finished...";
         return;
     }
 
