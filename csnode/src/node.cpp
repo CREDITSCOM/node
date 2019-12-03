@@ -167,6 +167,7 @@ bool Node::init() {
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
 
+    initCurrentRP();
     return true;
 }
 
