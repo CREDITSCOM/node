@@ -1033,6 +1033,38 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                 csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse invalid block alarm report";
             }
         }
+        else if (event_id == EventReport::Id::ConsensusSilent || event_id == EventReport::Id::ConsensusLiar) {
+            cs::PublicKey problem_node;
+            std::string problem_name = (event_id == EventReport::ConsensusSilent ? "silent" : "liar");
+            if (EventReport::parseConsensusProblem(bin_pack, problem_node) != EventReport::Id::None) {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(problem_node.data(), problem_node.size())
+                    << " is reported as " << problem_name << " by " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+                    << " in round consensus";
+            }
+            else {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse invalid round consensus " << problem_name << " report";
+            }
+        }
+        else if (event_id == EventReport::Id::ConsensusFailed) {
+            csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] round consensus failure is reported by "
+                << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+        }
+        else if (event_id == EventReport::Id::ContractsSilent || event_id == EventReport::Id::ContractsLiar) {
+            cs::PublicKey problem_node;
+            std::string problem_name = (event_id == EventReport::ContractsSilent ? "silent" : "liar");
+            if (EventReport::parseConsensusProblem(bin_pack, problem_node) != EventReport::Id::None) {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(problem_node.data(), problem_node.size())
+                    << " is reported as " << problem_name << " by " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+                    << " in contract consensus";
+            }
+            else {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse invalid contract consensus " << problem_name << " report";
+            }
+        }
+        else if (event_id == EventReport::Id::ContractsFailed) {
+            csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] contract consensus failure is reported by "
+                << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+        }
     }
     else {
         csevent() << "NODE> Got event report from " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
