@@ -1055,7 +1055,7 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
     return true;
 }
 
-bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
+bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync, bool skipConfirmations /*= false*/) {
     const auto lastSequence = getLastSeq();
     const auto poolSequence = pool.sequence();
     csdebug() << csfunc() << "last #" << lastSequence << ", pool #" << poolSequence;
@@ -1067,8 +1067,10 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         return true;
     }
 
-    if ((pool.numberConfirmations() == 0 || pool.roundConfirmations().size() == 0) && pool.sequence() > 1) {
-        return false;
+    if (!skipConfirmations) {
+        if ((pool.numberConfirmations() == 0 || pool.roundConfirmations().size() == 0) && pool.sequence() > 1) {
+            return false;
+        }
     }
 
     if (poolSequence == lastSequence) {

@@ -109,7 +109,9 @@ Transport::Transport(const Config& config, Node* node)
 : config_(createNetConfig(config, good_))
 , node_(node)
 , neighbourhood_(this, node_)
-, host_(config_, static_cast<HostEventHandler&>(*this)) {}
+, host_(config_, static_cast<HostEventHandler&>(*this)) {
+    cs::Connector::connect(&neighbourhood_.neighbourPingReceived, &pingReceived);
+}
 
 void Transport::run() {
     host_.Run();

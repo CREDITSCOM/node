@@ -8,6 +8,7 @@
 #include <set>
 #include <optional>
 
+#include <lib/system/signals.hpp>
 #include <networkcommands.hpp>
 #include <packet.hpp>
 
@@ -19,6 +20,7 @@ class Transport;
 class Neighbourhood {
 public:
     using NeighboursCallback = std::function<void(const cs::PublicKey&, cs::Sequence, cs::RoundNumber)>;
+    using NeighbourPingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
     constexpr static uint32_t kMaxNeighbours = 16;
     constexpr static uint32_t kMinNeighbours = 2;
@@ -37,6 +39,9 @@ public:
     void forEachNeighbour(NeighboursCallback);
     uint32_t getNeighboursCount() const;
     bool contains(const cs::PublicKey& neighbour) const;
+
+public signals:
+    NeighbourPingSignal neighbourPingReceived;
 
 private:
     static std::string parseRefusalReason(RegistrationRefuseReasons reason);

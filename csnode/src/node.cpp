@@ -168,6 +168,7 @@ bool Node::init() {
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
 
+    initCurrentRP();
     return true;
 }
 
@@ -224,6 +225,11 @@ void Node::initCurrentRP() {
 void Node::onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
     cslog() << "NODE: new neighbour added " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size())
         << " last seq " << lastSeq << " last round " << lastRound;
+
+    if (lastRound > cs::Conveyer::instance().currentRoundNumber()) {
+        roundPackRequest(neighbour, lastRound);
+        return;
+    }
 }
 
 void Node::onNeighbourRemoved(const cs::PublicKey& neighbour) {
@@ -601,7 +607,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
         return;
     }
     
-    if (/* @TODO broadcast sender may differ - verifyPacketSignatures(packet, sender) && */ verifyPacketTransactions(packet, sender)) {
+    if (verifyPacketSignatures(packet, sender) && verifyPacketTransactions(packet, sender)) {
         processTransactionsPacket(std::move(packet));
     }
     else {
@@ -1462,6 +1468,10 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
 void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
     static std::chrono::milliseconds delta{ 0 };
+    static std::pair<cs::PublicKey, cs::Sequence> neighbourWithMaxSeq{};
+    if (neighbourWithMaxSeq.second < sequence) {
+        neighbourWithMaxSeq = std::make_pair(sender, sequence);
+    }
 
     auto now = std::chrono::steady_clock::now();
     delta += std::chrono::duration_cast<std::chrono::milliseconds>(now - point);
@@ -1469,13 +1479,13 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     if (maxPingSynchroDelay_ <= delta.count()) {
         auto lastSequence = blockChain_.getLastSeq();
 
-        if (lastSequence < sequence) {
+        if (lastSequence < neighbourWithMaxSeq.second) {
             delta = std::chrono::milliseconds(0);
             cswarning() << "Local max block " << WithDelimiters(lastSequence) << " is lower than remote one "
                 << WithDelimiters(sequence) << ", trying to request round table";
 
             CallsQueue::instance().insert([=] {
-                roundPackRequest(sender, sequence);
+                roundPackRequest(neighbourWithMaxSeq.first, neighbourWithMaxSeq.second);
             });
         }
     }
@@ -3528,15 +3538,31 @@ void Node::onRoundTimeElapsed() {
 
     cslog() << "Try to start rounds...";
 
-    size_t count = 1;
-    for (auto& conf : initialConfidants_) {
-        if (transport_->hasNeighbour(conf)) {
-            ++count;
-        }
+    size_t initConfConnected = 1;
+    size_t initConfSameBlock = 1;
+
+    auto callback = [&initConfConnected, &initConfSameBlock, this]
+                    (const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber) {
+                        if (initialConfidants_.find(neighbour) == initialConfidants_.end()) {
+                            return;
+                        }
+                        ++initConfConnected;
+
+                        if (lastSeq == blockChain_.getLastSeq()) {
+                            ++initConfSameBlock;
+                        }
+                    };
+
+    transport_->forEachNeighbour(std::move(callback));
+
+    if (initConfConnected != initialConfidants_.size()) {
+        cslog() << "Cannot start rounds, not enough initial confidants connected.";
+        return;
     }
 
-    if (count != initialConfidants_.size()) {
-        cslog() << "Cannot start rounds, not enough initial confidants.";
+    if (initConfSameBlock != initConfConnected) {
+        cslog() << "Cannot start rounds, not enough initial confidants with same last sequence. "
+                << "Wait for syncro finished...";
         return;
     }
 

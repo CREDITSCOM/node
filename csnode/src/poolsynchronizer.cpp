@@ -173,8 +173,8 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
             cserror() << "PoolSyncronizer> No signatures in pool #" << pool.sequence();
             continue;
         }
-
-        if (blockChain_->storeBlock(pool, true /*by_sync*/)) {
+        //TODO: temp switch off testing confirmations in block received by sync; until fix blocks assembled by init trusted on network restart (issue CP-47)
+        if (blockChain_->storeBlock(pool, true /*by_sync*/, true)) {
             blockChain_->testCachedBlocks();
             lastWrittenSequence = blockChain_->getLastSeq();
         }
