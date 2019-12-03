@@ -10,6 +10,7 @@
 #include <optional>
 
 #include <lib/system/common.hpp>
+#include <lib/system/signals.hpp>
 #include <networkcommands.hpp>
 #include <packet.hpp>
 
@@ -19,6 +20,7 @@ class Transport;
 class Neighbourhood {
 public:
     using NeighboursCallback = std::function<void(const cs::PublicKey&, cs::Sequence, cs::RoundNumber)>;
+    using NeighbourPingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
     constexpr static uint32_t MaxNeighbours = 16;
     constexpr static uint32_t MinNeighbours = 2;
@@ -38,6 +40,9 @@ public:
     uint32_t getNeighboursCount() const;
     bool contains(const cs::PublicKey& neighbour) const;
     std::optional<cs::PublicKey> getNeighbour(size_t index) const;
+
+public signals:
+    NeighbourPingSignal neighbourPingReceived;
 
 private:
     constexpr static std::chrono::seconds LastSeenTimeout{10};
