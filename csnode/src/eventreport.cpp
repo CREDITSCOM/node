@@ -185,9 +185,6 @@ EventReport::Id EventReport::parseConsensusProblem(const cs::Bytes& bin_pack, cs
     case Id::ConsensusFailed:
     case Id::ConsensusLiar:
     case Id::ConsensusSilent:
-    case Id::ContractsFailed:
-    case Id::ContractsLiar:
-    case Id::ContractsSilent:
         in >> problem_source;
         if (in.isValid() && in.isEmpty()) {
             return id;
@@ -198,3 +195,37 @@ EventReport::Id EventReport::parseConsensusProblem(const cs::Bytes& bin_pack, cs
     }
     return Id::None;
 }
+
+/*static*/
+void EventReport::sendContractsProblem(Node& node, Id problem_id, const cs::PublicKey& problem_source, const ContractConsensusId& consensus_id) {
+    constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize
+        + sizeof(consensus_id.round) + sizeof(consensus_id.transaction) + sizeof(consensus_id.iteration);
+    cs::Bytes bin_pack(len);
+    cs::DataStream out(bin_pack);
+    out << problem_id << problem_source << consensus_id.round << consensus_id.transaction << consensus_id.iteration;
+    node.reportEvent(bin_pack);
+}
+
+/*static*/
+EventReport::Id EventReport::parseContractsProblem(const cs::Bytes& bin_pack, cs::PublicKey& problem_source, ContractConsensusId& consensus_id) {
+    if (bin_pack.empty()) {
+        return Id::None;
+    }
+    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    Id id = Id::None;
+    in >> id;
+    switch (id) {
+    case Id::ContractsFailed:
+    case Id::ContractsLiar:
+    case Id::ContractsSilent:
+        in >> problem_source >> consensus_id.round >> consensus_id.transaction >> consensus_id.iteration;
+        if (in.isValid() && in.isEmpty()) {
+            return id;
+        }
+        break;
+    default:
+        break;
+    }
+    return Id::None;
+}
+

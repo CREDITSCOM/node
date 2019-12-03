@@ -115,6 +115,10 @@ private:
     void init_zero(cs::StageOneSmarts& stage);
     void init_zero(cs::StageTwoSmarts& stage);
 
+    void report_silent(size_t node_index);
+    void report_liar(size_t node_index);
+    void report_failure();
+
     CallsQueueScheduler::CallTag timer_tag_{CallsQueueScheduler::no_tag};
     CallsQueueScheduler::CallTag timer_tag() {
         if (timer_tag_ == CallsQueueScheduler::no_tag) {

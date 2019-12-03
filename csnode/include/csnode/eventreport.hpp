@@ -35,6 +35,12 @@ struct Reject {
     static std::string to_string(Reason r);
 };
 
+struct ContractConsensusId {
+    cs::RoundNumber round;
+    uint32_t transaction;
+    uint32_t iteration;
+};
+
 class EventReport {
 public:
     enum Id : uint8_t {
@@ -158,16 +164,16 @@ public:
         sendConsensusProblem(node, Id::ConsensusFailed, problem_source);
     }
 
-    static inline void sendContractsSilent(Node& node, const cs::PublicKey& problem_source) {
-        sendConsensusProblem(node, Id::ContractsSilent, problem_source);
+    static inline void sendContractsSilent(Node& node, const cs::PublicKey& problem_source, const ContractConsensusId& consensus_id) {
+        sendContractsProblem(node, Id::ContractsSilent, problem_source, consensus_id);
     }
 
-    static inline void sendContractsLiar(Node& node, const cs::PublicKey& problem_source) {
-        sendConsensusProblem(node, Id::ContractsLiar, problem_source);
+    static inline void sendContractsLiar(Node& node, const cs::PublicKey& problem_source, const ContractConsensusId& consensus_id) {
+        sendContractsProblem(node, Id::ContractsLiar, problem_source, consensus_id);
     }
 
-    static inline void sendContractsFailed(Node& node, const cs::PublicKey& problem_source) {
-        sendConsensusProblem(node, Id::ContractsFailed, problem_source);
+    static inline void sendContractsFailed(Node& node, const cs::PublicKey& problem_source, const ContractConsensusId& consensus_id) {
+        sendContractsProblem(node, Id::ContractsFailed, problem_source, consensus_id);
     }
 
     /**
@@ -176,8 +182,7 @@ public:
      * @author  Alexander Avramenko
      * @date    03.12.2019
      *
-     * @param           bin_pack        The byte array pack, must be a product of
-     *  sendConsensusProblem()
+     * @param           bin_pack        The byte array pack, must be a product of sendConsensusProblem()
      *  call on remote node.
      * @param [in,out]  problem_source  The placeholder for the problem source key.
      *
@@ -186,9 +191,25 @@ public:
 
     static Id parseConsensusProblem(const cs::Bytes& bin_pack, cs::PublicKey& problem_source);
 
+    /**
+     * Parse contracts problem
+     *
+     * @author  Alexander Avramenko
+     * @date    03.12.2019
+     *
+     * @param           bin_pack        The byte array pack, must be a product of sendContractsProblem()
+     * @param [in,out]  problem_source  The placeholder for the problem source.
+     * @param [in,out]  consensus_id    The placeholder for the identifier of consensus.
+     *
+     * @returns An ID.
+     */
+
+    static Id parseContractsProblem(const cs::Bytes& bin_pack, cs::PublicKey& problem_source, ContractConsensusId& consensus_id);
+
 private:
 
     static void sendConsensusProblem(Node& node, Id problem_id, const cs::PublicKey& problem_source);
+    static void sendContractsProblem(Node& node, Id problem_id, const cs::PublicKey& problem_source, const ContractConsensusId& consensus_id);
 
 };
 
