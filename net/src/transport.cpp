@@ -5,8 +5,10 @@
 #include <thread>
 
 #include <cscrypto/cscrypto.hpp>
+
 #include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
+
 #include <lib/system/structures.hpp>
 #include <lib/system/utils.hpp>
 
@@ -171,12 +173,14 @@ void Transport::sendBroadcast(Packet&& pack) {
 }
 
 void Transport::processorRoutine() {
-    while (true) {
+    while (!node_->isStopRequested()) {
         CallsQueue::instance().callAll();
 
-        std::unique_lock lk(inboxMux_);
-        newPacketsReceived_.wait_for(lk, std::chrono::milliseconds{50},
-                                    [this]() { return !inboxQueue_.empty(); });
+        std::unique_lock lock(inboxMux_);
+        newPacketsReceived_.wait_for(lock, std::chrono::milliseconds{50}, [this]() {
+            return !inboxQueue_.empty();
+        });
+
         checkNeighboursChange();
 
         while (!inboxQueue_.empty()) {
@@ -197,7 +201,7 @@ void Transport::processorRoutine() {
 }
 
 void Transport::checkNeighboursChange() {
-    std::lock_guard<std::mutex> g(neighboursMux_);
+    std::lock_guard<std::mutex> lock(neighboursMux_);
     while (!neighboursToHandle_.empty()) {
         auto& neighbour = neighboursToHandle_.front();
         if (neighbour.added) {
@@ -330,8 +334,7 @@ void Transport::processPostponed(const cs::RoundNumber rNum) {
         dispatchNodeMessage(p.sender, p.pack.getType(), rNum, p.pack.getMsgData(), p.pack.getMsgSize());
     }
 
-    postponed_ = decltype(postponed_)(postponed_.upper_bound(rNum), postponed_.end());
-
+    postponed_.erase(postponed_.begin(), postponed_.upper_bound(rNum));
     csdebug() << "TRANSPORT> POSTPHONED finished, round " << rNum;
 }
 
@@ -347,11 +350,6 @@ bool Transport::hasNeighbour(const cs::PublicKey& neighbour) const {
     return neighbourhood_.contains(neighbour);
 }
 
-std::optional<cs::PublicKey> Transport::getNeighbour(size_t index) const {
-    return neighbourhood_.getNeighbour(index);
-}
-
 uint32_t Transport::getMaxNeighbours() const {
-//    return config_->getMaxNeighbours();
-    return Neighbourhood::MaxNeighbours;
+    return Neighbourhood::kMaxNeighbours;
 }

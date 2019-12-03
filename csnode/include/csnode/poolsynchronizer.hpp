@@ -48,6 +48,11 @@ private slots:
     void onWriteBlock(const cs::Sequence sequence);
     void onRemoveBlock(const csdb::Pool& pool);
 
+public slots:
+    void onPingReceived(cs::Sequence sequence, const cs::PublicKey& publicKey);
+    void onNeighbourAdded(const cs::PublicKey& publicKey, cs::Sequence sequence);
+    void onNeighbourRemoved(const cs::PublicKey& publicKey);
+
 private:
     enum class CounterType;
     enum class SequenceRemovalAccuracy;
@@ -66,16 +71,11 @@ private:
 
     void removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
 
-    void refreshNeighbours();
-
     bool isLastRequest() const;
 
     bool isAvailableRequest(const cs::PoolSynchronizer::NeighboursSetElemet& nh) const;
 
     void synchroFinished();
-
-    cs::PublicKey getConnection(const NeighboursSetElemet& neighbour) const;
-
     void printNeighbours(const std::string& funcName) const;
 
 private:
@@ -92,9 +92,14 @@ private:
 
     class NeighboursSetElemet {
     public:
-        explicit NeighboursSetElemet(uint8_t neighbourIndex, const cs::PublicKey& publicKey, cs::Sequence blockPoolsCount)
-        : neighbourIndex_(neighbourIndex)
-        , key_(publicKey)
+        NeighboursSetElemet() = default;
+
+        explicit NeighboursSetElemet(const cs::PublicKey& publicKey)
+        : key_(publicKey) {
+        }
+
+        explicit NeighboursSetElemet(const cs::PublicKey& publicKey, cs::Sequence blockPoolsCount)
+        : key_(publicKey)
         , roundCounter_(0) {
             sequences_.reserve(blockPoolsCount);
         }
@@ -151,24 +156,24 @@ private:
         inline void resetRoundCounter() {
             roundCounter_ = 0;
         }
-        inline void setIndex(const uint8_t num) {
-            neighbourIndex_ = num;
-        }
         inline void setPublicKey(const cs::PublicKey& publicKey) {
             key_ = publicKey;
         }
-
-        inline uint8_t index() const {
-            return neighbourIndex_;
+        inline void setMaxSequence(cs::Sequence sequence) {
+            maxSequence_ = sequence;
         }
+
         inline const cs::PublicKey& publicKey() const {
             return key_;
         }
-        inline const PoolsRequestedSequences& sequences() const {
+        inline const PoolsRequestedSequences& sequences() const{
             return sequences_;
         }
         inline cs::RoundNumber roundCounter() const {
             return roundCounter_;
+        }
+        inline cs::Sequence maxSequence() const {
+            return maxSequence_;
         }
 
         inline void increaseRoundCounter() {
@@ -178,15 +183,23 @@ private:
         }
 
         bool operator<(const NeighboursSetElemet& other) const {
-            if (sequences_.empty() || other.sequences_.empty()) {
-                return sequences_.size() > other.sequences_.size();
-            }
+            return maxSequence_ < other.maxSequence_;
+        }
 
-            return sequences_.front() < other.sequences_.front();
+        bool operator>(const NeighboursSetElemet& other) const {
+            return !((*this) < other);
+        }
+
+        bool operator==(const NeighboursSetElemet& other) const {
+            return key_ == other.key_;
+        }
+
+        bool operator!=(const NeighboursSetElemet& other) const {
+            return !((*this) == other);
         }
 
         friend std::ostream& operator<<(std::ostream& os, const NeighboursSetElemet& el) {
-            os << "idx: " << cs::numeric_cast<int>(el.neighbourIndex_) << ", seqs:";
+            os << "seqs:";
 
             if (el.sequences_.empty()) {
                 os << " empty";
@@ -203,10 +216,10 @@ private:
         }
 
     private:
-        uint8_t neighbourIndex_;             // neighbour number
+        cs::Sequence maxSequence_ = 0;
         cs::PublicKey key_;                  // neighbour public key
         PoolsRequestedSequences sequences_;  // requested sequence
-        cs::RoundNumber roundCounter_;
+        cs::RoundNumber roundCounter_ = 0;
     };
 
 private:
@@ -220,7 +233,6 @@ private:
     // [value] =  packet counter
     // value: increase each new round
     std::map<cs::Sequence, cs::RoundNumber> requestedSequences_;
-
     std::vector<NeighboursSetElemet> neighbours_;
 
     cs::Timer timer_;

@@ -90,6 +90,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
+    initPoolSynchronizer();
     setupNextMessageBehaviour();
 
     alwaysExecuteContracts_ = cs::ConfigHolder::instance().config()->alwaysExecuteContracts();
@@ -168,6 +169,12 @@ bool Node::init() {
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
 
     return true;
+}
+
+void Node::initPoolSynchronizer() {
+    cs::Connector::connect(&transport_->pingReceived, poolSynchronizer_, &cs::PoolSynchronizer::onPingReceived);
+    cs::Connector::connect(&transport_->neighbourAdded, poolSynchronizer_, &cs::PoolSynchronizer::onNeighbourAdded);
+    cs::Connector::connect(&transport_->neighbourRemoved, poolSynchronizer_, &cs::PoolSynchronizer::onNeighbourRemoved);
 }
 
 void Node::setupNextMessageBehaviour() {
@@ -3090,7 +3097,7 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
     }
 
     cs::RoundPackage& roundPackage = roundPackageCache_.back();
-    const auto table = roundPackage.roundTable();
+    const auto& table = roundPackage.roundTable();
 
     if (table.round >= rNum) {
         if (!roundPackage.roundSignatures().empty()) {
@@ -3521,19 +3528,20 @@ void Node::onRoundTimeElapsed() {
 
     cslog() << "Try to start rounds...";
 
-    size_t cnt = 1;
+    size_t count = 1;
     for (auto& conf : initialConfidants_) {
-      if (transport_->hasNeighbour(conf)) {
-        ++cnt;
-      }
+        if (transport_->hasNeighbour(conf)) {
+            ++count;
+        }
     }
 
-    if (cnt != initialConfidants_.size()) {
+    if (count != initialConfidants_.size()) {
         cslog() << "Cannot start rounds, not enough initial confidants.";
         return;
     }
 
     initCurrentRP();
+
     if (roundPackageCache_.empty()) {
         cslog() << "Cannot start rounds, round package cache is empty.";
         return;

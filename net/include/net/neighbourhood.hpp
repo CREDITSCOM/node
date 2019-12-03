@@ -1,4 +1,3 @@
-/* Send blaming letters to @yrtimd */
 #ifndef NEIGHBOURHOOD_HPP
 #define NEIGHBOURHOOD_HPP
 
@@ -9,9 +8,10 @@
 #include <set>
 #include <optional>
 
-#include <lib/system/common.hpp>
 #include <networkcommands.hpp>
 #include <packet.hpp>
+
+#include <lib/system/common.hpp>
 
 class Node;
 class Transport;
@@ -20,8 +20,8 @@ class Neighbourhood {
 public:
     using NeighboursCallback = std::function<void(const cs::PublicKey&, cs::Sequence, cs::RoundNumber)>;
 
-    constexpr static uint32_t MaxNeighbours = 16;
-    constexpr static uint32_t MinNeighbours = 2;
+    constexpr static uint32_t kMaxNeighbours = 16;
+    constexpr static uint32_t kMinNeighbours = 2;
 
     constexpr static std::chrono::seconds kPingInterval{2};
 
@@ -37,10 +37,14 @@ public:
     void forEachNeighbour(NeighboursCallback);
     uint32_t getNeighboursCount() const;
     bool contains(const cs::PublicKey& neighbour) const;
-    std::optional<cs::PublicKey> getNeighbour(size_t index) const;
 
 private:
-    constexpr static std::chrono::seconds LastSeenTimeout{10};
+    static std::string parseRefusalReason(RegistrationRefuseReasons reason);
+
+    template<class... Args>
+    static Packet formPacket(BaseFlags flags, NetworkCommand cmd, Args&&... args);
+
+    constexpr static std::chrono::seconds kLastSeenTimeout{10};
 
     struct PeerInfo {
         cs::Version nodeVersion = 0;
@@ -64,7 +68,7 @@ private:
     Transport* transport_;
     Node* node_;
 
-    mutable std::mutex neighbourMux_;
+    mutable std::mutex neighbourMutex_;
     std::map<cs::PublicKey, PeerInfo> neighbours_;
 
     const uint64_t uuid_;
