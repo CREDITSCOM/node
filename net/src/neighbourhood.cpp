@@ -212,28 +212,36 @@ void Neighbourhood::sendPingPack(const cs::PublicKey& receiver) {
 
 void Neighbourhood::gotPing(const cs::PublicKey& sender, const Packet& pack) {
     cs::Sequence sequence = 0;
+
     {
-        std::lock_guard<std::mutex> g(neighbourMux_);
+        std::lock_guard lock(neighbourMutex_);
         auto neighbour = neighbours_.find(sender);
+
         if (neighbour != neighbours_.end() && neighbour->second.nodeVersion) {
             auto now = std::chrono::steady_clock::now();
             PeerInfo& info = neighbour->second;
-            if (std::chrono::duration_cast<std::chrono::seconds>(now - info.lastSeen) > LastSeenTimeout) {
+
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - info.lastSeen) > kLastSeenTimeout) {
                 sendRegistrationRefusal(sender, RegistrationRefuseReasons::Timeout);
+
                 if (info.connectionEstablished) {
                     transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, false);
                 }
+
                 neighbours_.erase(neighbour);
                 return;
             }
 
             info.lastSeen = now;
+
             cs::DataStream stream(pack.getMsgData(), pack.getMsgSize());
             stream >> info.lastSeq;
             stream >> info.roundNumber;
+
             sequence = info.lastSeq;
         }
     }
+
     if (sequence) {
         emit neighbourPingReceived(sequence, sender);
     }
