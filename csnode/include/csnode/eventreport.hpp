@@ -150,7 +150,7 @@ public:
         sendConsensusProblem(node, Id::ConsensusSilent, problem_source);
     }
 
-    static inline void sendConsensusLisr(Node& node, const cs::PublicKey& problem_source) {
+    static inline void sendConsensusLiar(Node& node, const cs::PublicKey& problem_source) {
         sendConsensusProblem(node, Id::ConsensusLiar, problem_source);
     }
 
@@ -162,7 +162,7 @@ public:
         sendConsensusProblem(node, Id::ContractsSilent, problem_source);
     }
 
-    static inline void sendContractsLisr(Node& node, const cs::PublicKey& problem_source) {
+    static inline void sendContractsLiar(Node& node, const cs::PublicKey& problem_source) {
         sendConsensusProblem(node, Id::ContractsLiar, problem_source);
     }
 
@@ -171,16 +171,17 @@ public:
     }
 
     /**
-     * Parse consensus problem data, 
+     * Parse consensus problem data,
      *
      * @author  Alexander Avramenko
      * @date    03.12.2019
      *
-     * @param           bin_pack        The byte array pack, must be a product of sendConsensusProblem()
+     * @param           bin_pack        The byte array pack, must be a product of
+     *  sendConsensusProblem()
      *  call on remote node.
      * @param [in,out]  problem_source  The placeholder for the problem source key.
      *
-     * @returns A problem Id or Id::None if parse failed
+     * @returns A problem Id or Id::None if parse failed.
      */
 
     static Id parseConsensusProblem(const cs::Bytes& bin_pack, cs::PublicKey& problem_source);
