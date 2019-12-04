@@ -1763,7 +1763,7 @@ uint32_t Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const c
                 << ", msgType: " << Packet::messageTypeToString(msgType);
 
     transport_->sendMulticast(formPacket(BaseFlags::Compressed, msgType, round, args...), listMembers);
-    return listMembers.size(); // @TODO rewrite this logic consider tcp
+    return (uint32_t) listMembers.size(); // @TODO rewrite this logic consider tcp
 }
 
 template <class... Args>
