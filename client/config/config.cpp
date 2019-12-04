@@ -772,7 +772,13 @@ Config Config::readFromFile(const std::string& fileName) {
 
             std::ifstream hostsFile;
             hostsFile.exceptions(std::ifstream::failbit);
-            hostsFile.open(hostsFileName);
+            try {
+                hostsFile.open(hostsFileName);
+            }
+            catch (std::ios_base::failure& fail) {
+                cserror() << "failed to open file " << hostsFileName;
+                throw fail;
+            }
             hostsFile.exceptions(std::ifstream::goodbit);
 
             while (getline(hostsFile, line)) {
