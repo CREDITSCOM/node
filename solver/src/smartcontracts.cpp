@@ -2282,7 +2282,7 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                     if (it_state != known_contracts.cend()) {
                         const SmartContractRef& last_success_exe = it_state->second.ref_execute;
                         if (last_success_exe.sequence == sequence) {
-                            executions.remove_if([=](uint16_t n) { return n <= last_success_exe.transaction; });
+                            executions.remove_if([=](uint32_t n) { return n <= last_success_exe.transaction; });
                         }
                     }
                     cnt_ignored -= executions.size();
