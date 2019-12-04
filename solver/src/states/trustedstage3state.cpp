@@ -79,7 +79,7 @@ void TrustedStage3State::on(SolverContext& context) {
     //  - create fake stages-2 from outbound nodes and force to next state
 
     SolverContext* pctx = &context;
-    auto dt = 2 * Consensus::T_stage_request;
+    auto dt = 2 * Consensus::TimeStageRequest;
     csdebug() << name() << ": start track timeout " << 0 << " ms of stages-2 received";
     timeout_request_stage.start(context.scheduler(), 0,  // no timeout
                                 // timeout #1 handler:

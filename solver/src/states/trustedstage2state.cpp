@@ -52,7 +52,7 @@ void TrustedStage2State::on(SolverContext& context) {
 
     SolverContext* pctx = &context;
 
-    auto dt = Consensus::T_stage_request;
+    auto dt = Consensus::TimeStageRequest;
     // increase dt in case of large trx amount:
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     const cs::Characteristic * characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
