@@ -167,7 +167,7 @@ bool Node::init() {
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
 
-    initCurrentRP();
+    initDefaultRP();
     return true;
 }
 
@@ -201,13 +201,13 @@ void Node::stop() {
     cswarning() << "[CONFIG OBSERVER STOPPED]";
 }
 
-void Node::initCurrentRP() {
+void Node::initDefaultRP() {
     cs::RoundPackage rp;
     cs::RoundTable rt;
     rt.round = getBlockChain().getLastSeq() + 1;
     for (auto& key : initialConfidants_){
         rt.confidants.push_back(key);
-        if (rt.confidants.size() > Consensus::MinTrustedNodes) {
+        if (rt.confidants.size() >= Consensus::MinTrustedNodes) {
             break;
         }
     }
@@ -3524,8 +3524,15 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
 }
 
 void Node::onRoundTimeElapsed() {
+    
+    solver_->resetGrayList();
+
     if (initialConfidants_.find(solver_->getPublicKey()) == initialConfidants_.end()) {
         cslog() << "Waiting for next round...";
+        initDefaultRP();
+        // if we have correct last block, we pretend to next trusted role
+        // otherwise remote nodes will drop our hash
+        sendHash(blockChain_.getLastSeq() + 1);
         return;
     }
 
@@ -3559,7 +3566,7 @@ void Node::onRoundTimeElapsed() {
         return;
     }
 
-    initCurrentRP();
+    initDefaultRP();
     if (roundPackageCache_.empty()) {
         cslog() << "Cannot start rounds, round package cache is empty.";
         return;

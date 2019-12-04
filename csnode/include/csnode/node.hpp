@@ -210,7 +210,14 @@ public:
     // syncro send functions
     void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
 
-    void initCurrentRP();
+    /**
+     * Initializes the default round package as containing the default round table (default trusted nodes)
+     *
+     * @author  Alexander Avramenko
+     * @date    04.12.2019
+     */
+
+    void initDefaultRP();
     void getUtilityMessage(const uint8_t* data, const size_t size);
     void becomeWriter();
 
