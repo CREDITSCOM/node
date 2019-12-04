@@ -62,7 +62,6 @@ const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
 
 const std::string PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK = "one_reply_block";
-const std::string PARAM_NAME_POOL_SYNC_FAST_MODE = "fast_mode";
 const std::string PARAM_NAME_POOL_SYNC_POOLS_COUNT = "block_pools_count";
 const std::string PARAM_NAME_POOL_SYNC_ROUND_COUNT = "request_repeat_round_count";
 const std::string PARAM_NAME_POOL_SYNC_PACKET_COUNT = "neighbour_packets_count";
@@ -876,7 +875,6 @@ void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config)
     const boost::property_tree::ptree& data = config.get_child(block);
 
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK, poolSyncData_.oneReplyBlock);
-    checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_FAST_MODE, poolSyncData_.isFastMode);
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_POOLS_COUNT, poolSyncData_.blockPoolsCount);
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_ROUND_COUNT, poolSyncData_.requestRepeatRoundCount);
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_PACKET_COUNT, poolSyncData_.neighbourPacketsCount);
@@ -993,7 +991,6 @@ bool operator!=(const EndpointData& lhs, const EndpointData& rhs) {
 
 bool operator==(const PoolSyncData& lhs, const PoolSyncData& rhs) {
     return lhs.oneReplyBlock == rhs.oneReplyBlock &&
-           lhs.isFastMode == rhs.isFastMode &&
            lhs.blockPoolsCount == rhs.blockPoolsCount &&
            lhs.requestRepeatRoundCount && rhs.requestRepeatRoundCount &&
            lhs.neighbourPacketsCount && rhs.neighbourPacketsCount &&

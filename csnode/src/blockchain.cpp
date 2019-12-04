@@ -1090,15 +1090,15 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync, bool skipConfirmation
 
     if (poolSequence == lastSequence + 1) {
         if (pool.previous_hash() != getLastHash()) {
-			csdebug() << "BLOCKCHAIN> new pool\'s prev. hash does not equal to current last hash";
+            csdebug() << "BLOCKCHAIN> new pool\'s prev. hash does not equal to current last hash";
             if (getLastHash().is_empty()) {
                 cserror() << "BLOCKCHAIN> own last hash is empty";
             }
             if (pool.previous_hash().is_empty()) {
                 cserror() << "BLOCKCHAIN> new pool\'s prev. hash is empty, don\'t write it, do not any harm to our blockchain";
-				return false;
+                return false;
             }
-			csdebug() <<  "BLOCKCHAIN> remove own last block and cancel store operation";
+            csdebug() <<  "BLOCKCHAIN> remove own last block and cancel store operation";
             removeLastBlock();
             return false;
         }
@@ -1123,7 +1123,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync, bool skipConfirmation
             csdebug() << "BLOCKCHAIN> block #" << poolSequence << " has recorded to chain successfully";
             // unable to call because stack overflow in case of huge written blocks amount possible:
             // testCachedBlocks();
-			blocksToBeRemoved_ = 1;
+            blocksToBeRemoved_ = 1;
             return true;
         }
 

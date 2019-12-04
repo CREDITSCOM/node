@@ -19,7 +19,6 @@ cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockCh
     const uint8_t hl = 25;
     const uint8_t vl = 6;
     csmeta(csdebug) << "Pool sync data : \n"
-                    << std::setw(hl) << "Fast mode:        " << std::setw(vl) << cs::ConfigHolder::instance().config()->getPoolSyncSettings().isFastMode << "\n"
                     << std::setw(hl) << "One reply block:  " << std::setw(vl) << cs::ConfigHolder::instance().config()->getPoolSyncSettings().oneReplyBlock << "\n"
                     << std::setw(hl) << "Block pools:      " << std::setw(vl) << static_cast<int>(cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount) << "\n"
                     << std::setw(hl) << "Request round:    " << std::setw(vl) << static_cast<int>(cs::ConfigHolder::instance().config()->getPoolSyncSettings().requestRepeatRoundCount) << "\n"
@@ -38,9 +37,11 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 
     if (lastWrittenSequence >= roundNum) {
         const bool isFinished = showSyncronizationProgress(lastWrittenSequence);
+
         if (isFinished) {
             synchroFinished();
         }
+
         return;
     }
 
@@ -95,6 +96,7 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 
     if (!isSyncroStarted_) {
         isSyncroStarted_ = true;
+
         cs::Connector::connect(&blockChain_->storeBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const csdb::Pool)>(&cs::PoolSynchronizer::onWriteBlock));
         cs::Connector::connect(&blockChain_->cachedBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const cs::Sequence)>(&cs::PoolSynchronizer::onWriteBlock));
         cs::Connector::connect(&blockChain_->removeBlockEvent, this, &cs::PoolSynchronizer::onRemoveBlock);
@@ -128,18 +130,12 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 }
 
 void cs::PoolSynchronizer::syncLastPool() {
-    auto lastWrittenSequence = blockChain_->getLastSeq();
-    cs::PublicKey target{};
-
-    transport_->forEachNeighbour([&](const cs::PublicKey& key, cs::Sequence sequence, cs::RoundNumber) {
-        if (sequence > lastWrittenSequence) {
-            target = key;
-        }
-    });
-
-    if (target == cs::PublicKey{}) {
+    if (neighbours_.empty()) {
         return;
     }
+
+    auto lastWrittenSequence = blockChain_->getLastSeq();
+    cs::PublicKey target = neighbours_.front().publicKey();
 
     if (!isSyncroStarted_) {
         isSyncroStarted_ = true;
@@ -162,9 +158,6 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
     for (auto& pool : poolsBlock) {
         const auto sequence = pool.sequence();
 
-        // sequence will be removed after block appears in chain
-        //removeExistingSequence(sequence, SequenceRemovalAccuracy::EXACT);
-
         if (lastWrittenSequence > sequence) {
             continue;
         }
@@ -173,6 +166,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
             cserror() << "PoolSyncronizer> No signatures in pool #" << pool.sequence();
             continue;
         }
+
         //TODO: temp switch off testing confirmations in block received by sync; until fix blocks assembled by init trusted on network restart (issue CP-47)
         if (blockChain_->storeBlock(pool, true /*by_sync*/, true)) {
             blockChain_->testCachedBlocks();
@@ -182,6 +176,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
 
     if (oldCachedBlocksSize != blockChain_->getCachedBlocksSize() || oldLastWrittenSequence != lastWrittenSequence) {
         const bool isFinished = showSyncronizationProgress(lastWrittenSequence);
+
         if (isFinished) {
             synchroFinished();
         }
@@ -198,6 +193,7 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     for (const auto& el : requestedSequences_) {
         csmeta(csdetails) << "Requested sequence: " << el.first << "(" << el.second << ")";
     }
+
     if (requestedSequences_.empty()) {
         csmeta(csdetails) << "Requested sequence size: 0";
     }
@@ -235,15 +231,6 @@ bool cs::PoolSynchronizer::isOneBlockReply() const {
     return cs::ConfigHolder::instance().config()->getPoolSyncSettings().oneReplyBlock;
 }
 
-bool cs::PoolSynchronizer::isFastMode() const {
-    if (!isSyncroStarted_ || !cs::ConfigHolder::instance().config()->getPoolSyncSettings().isFastMode) {
-        return false;
-    }
-
-    const cs::Sequence sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSeq() - blockChain_->getCachedBlocksSize();
-    return sum > static_cast<cs::Sequence>(cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount * 3);  // roundDifferentForSync_
-}
-
 //
 // Slots
 //
@@ -254,16 +241,6 @@ void cs::PoolSynchronizer::onTimeOut() {
     }
 
     bool isAvailable = false;
-
-    if (isFastMode()) {
-        static uint8_t fastCounter = 0;
-        ++fastCounter;
-        if (fastCounter > 20) {
-            fastCounter = 0;
-            csmeta(csdetails) << "OnTimeOut Fast: " << cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency * 20;
-            isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::ROUND);
-        }
-    }
 
     if (!isAvailable) {
         csmeta(csdetails) << "OnTimeOut: " << cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency;
@@ -658,9 +635,7 @@ void cs::PoolSynchronizer::synchroFinished() {
     }
 
     isSyncroStarted_ = false;
-
     requestedSequences_.clear();
-    neighbours_.clear();
 
     csmeta(csdebug) << "Synchro finished";
 }

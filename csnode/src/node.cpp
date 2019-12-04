@@ -1508,16 +1508,6 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         return MessageActions::Drop;
     }
 
-    if (poolSynchronizer_->isFastMode()) {
-        if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
-            // which round would not be on the remote we may require the requested block or get block request
-            return MessageActions::Process;
-        }
-        else {
-            return MessageActions::Drop;
-        }
-    }
-
     // always process this types
     switch (type) {
         case MsgTypes::FirstSmartStage:

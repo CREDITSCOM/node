@@ -33,8 +33,6 @@ public:
 
     bool isOneBlockReply() const;
 
-    bool isFastMode() const;
-
     static const cs::RoundNumber roundDifferentForSync = cs::values::kDefaultMetaStorageMaxSize;
 
 public signals:

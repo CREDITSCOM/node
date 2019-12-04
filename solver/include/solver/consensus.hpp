@@ -52,8 +52,8 @@ public:
     /** @brief   Number of rounds to prevent node from consensus participation */
     constexpr static uint32_t GrayListPunishment = 1000;
 
-	/** @brief   Number of node working rounds to start checking roundPackage ctreating speed */
-	constexpr static uint64_t SpeedCheckRound = 1000;
+    /** @brief   Number of node working rounds to start checking roundPackage ctreating speed */
+    constexpr static uint64_t SpeedCheckRound = 1000;
 
     /** @brief   Max duration (msec) of the whole round (SolverCore on the 1st round) */
     constexpr static uint32_t T_round = 2000;
