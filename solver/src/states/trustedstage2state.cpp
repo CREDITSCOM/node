@@ -42,53 +42,54 @@ void TrustedStage2State::on(SolverContext& context) {
         }
     }
 
-    // 3 subsequent timeouts:
-    //  - request stages-1 from origins
-    //  - request stages-1 from anyone
-    //  - create fake stages-1 from outbound nodes and force to next state
+    if (context.is_round_duration_limited()) {
+        // 3 subsequent timeouts:
+        //  - request stages-1 from origins
+        //  - request stages-1 from anyone
+        //  - create fake stages-1 from outbound nodes and force to next state
 
-    constexpr size_t TimerBaseId = 20;
-    csunused(TimerBaseId);
+        constexpr size_t TimerBaseId = 20;
+        csunused(TimerBaseId);
 
-    SolverContext* pctx = &context;
-
-    auto dt = Consensus::T_stage_request;
-    // increase dt in case of large trx amount:
-    cs::Conveyer& conveyer = cs::Conveyer::instance();
-    const cs::Characteristic * characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
-    if (characteristic != nullptr) {
-        // count of transactions seen in build_vector on stage-1
-        size_t cnt_trx = characteristic->mask.size();
-        if (cnt_trx > dt) {
-            dt = uint32_t(cnt_trx); // 1 msec/transaction, 5K trx => 5 sec timeout
+        SolverContext* pctx = &context;
+        auto dt = Consensus::T_stage_request;
+        // increase dt in case of large trx amount:
+        cs::Conveyer& conveyer = cs::Conveyer::instance();
+        const cs::Characteristic* characteristic = conveyer.characteristic(conveyer.currentRoundNumber());
+        if (characteristic != nullptr) {
+            // count of transactions seen in build_vector on stage-1
+            size_t cnt_trx = characteristic->mask.size();
+            if (cnt_trx > dt) {
+                dt = uint32_t(cnt_trx); // 1 msec/transaction, 5K trx => 5 sec timeout
+            }
         }
+        csdebug() << name() << ": start track timeout " << 0 << " ms of stages-1 received";
+        timeout_request_stage.start(context.scheduler(), 0,
+            // timeout #1 handler:
+            [pctx, this, dt]() {
+                csdebug() << name() << ": (now) skip direct requests for absent stages-1";
+                // request_stages(*pctx);
+                // start subsequent track timeout for "wide" request
+                csdebug() << name() << ": start subsequent track timeout " << dt << " ms to request neighbors about stages-1";
+                timeout_request_neighbors.start(pctx->scheduler(), dt,
+                    // timeout #2 handler:
+                    [pctx, this, dt]() {
+                        csdebug() << name() << ": timeout for requested stages is expired, make requests to neighbors";
+                        request_stages_neighbors(*pctx);
+                        // timeout #3 handler
+                        csdebug() << name() << ": start subsequent track timeout " << dt << " ms to mark silent nodes";
+                        timeout_force_transition.start(
+                            pctx->scheduler(), dt,
+                            [pctx, this, dt]() {
+                                csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
+                                mark_outbound_nodes(*pctx);
+                            },
+                            true /*replace if exists*/, TIMER_BASE_ID + 3);
+                    },
+                    true /*replace if exists*/, TIMER_BASE_ID + 2);
+            },
+            true /*replace if exists*/, TIMER_BASE_ID + 1);
     }
-    csdebug() << name() << ": start track timeout " << 0 << " ms of stages-1 received";
-    timeout_request_stage.start(context.scheduler(), 0,
-                                // timeout #1 handler:
-                                [pctx, this, dt]() {
-                                    csdebug() << name() << ": (now) skip direct requests for absent stages-1";
-                                    // request_stages(*pctx);
-                                    // start subsequent track timeout for "wide" request
-                                    csdebug() << name() << ": start subsequent track timeout " << dt << " ms to request neighbors about stages-1";
-                                    timeout_request_neighbors.start(pctx->scheduler(), dt,
-                                                                    // timeout #2 handler:
-                                                                    [pctx, this, dt]() {
-                                                                        csdebug() << name() << ": timeout for requested stages is expired, make requests to neighbors";
-                                                                        request_stages_neighbors(*pctx);
-                                                                        // timeout #3 handler
-                                                                        csdebug() << name() << ": start subsequent track timeout " << dt << " ms to mark silent nodes";
-                                                                        timeout_force_transition.start(
-                                                                            pctx->scheduler(), dt,
-                                                                            [pctx, this, dt]() {
-                                                                                csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
-                                                                                mark_outbound_nodes(*pctx);
-                                                                            },
-                                                                            true /*replace if exists*/, TIMER_BASE_ID + 3);
-                                                                    },
-                                                                    true /*replace if exists*/, TIMER_BASE_ID + 2);
-                                },
-                                true /*replace if exists*/, TIMER_BASE_ID + 1);
 }
 
 void TrustedStage2State::off(SolverContext& /*context*/) {

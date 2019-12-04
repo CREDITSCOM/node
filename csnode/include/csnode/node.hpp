@@ -211,13 +211,19 @@ public:
     void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
 
     /**
-     * Initializes the default round package as containing the default round table (default trusted nodes)
+     * Initializes the default round package as containing the default round table (default trusted
+     * nodes)
      *
      * @author  Alexander Avramenko
      * @date    04.12.2019
+     *
+     * @param   confidants  The actual confidants set.
      */
 
-    void initDefaultRP();
+    void initDefaultRP(const std::set<cs::PublicKey>& confidants);
+    bool isCurrentRPDefault() const {
+        return isDefaultRoundTable_;
+    }
     void getUtilityMessage(const uint8_t* data, const size_t size);
     void becomeWriter();
 
@@ -478,6 +484,7 @@ private:
     long long deltaTimeSS_{};
 
     std::set<cs::PublicKey> initialConfidants_;
+    bool isDefaultRoundTable_ = false;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

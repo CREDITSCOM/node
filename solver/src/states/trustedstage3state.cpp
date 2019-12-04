@@ -73,40 +73,42 @@ void TrustedStage3State::on(SolverContext& context) {
         }
     }
 
-    // 3 subsequent timeouts:
-    //  - request stages-2 from origins
-    //  - request stages-2 from anyone
-    //  - create fake stages-2 from outbound nodes and force to next state
+    if (context.is_round_duration_limited()) {
+        // 3 subsequent timeouts:
+        //  - request stages-2 from origins
+        //  - request stages-2 from anyone
+        //  - create fake stages-2 from outbound nodes and force to next state
 
-    SolverContext* pctx = &context;
-    auto dt = 2 * Consensus::T_stage_request;
-    csdebug() << name() << ": start track timeout " << 0 << " ms of stages-2 received";
-    timeout_request_stage.start(context.scheduler(), 0,  // no timeout
-                                // timeout #1 handler:
-                                [pctx, this, dt]() {
-                                    csdebug() << name() << ": (now) skip direct requests for absent stages-2";
-                                    // request_stages(*pctx);
-                                    // start subsequent track timeout for "wide" request
-                                    csdebug() << name() << ": start subsequent track timeout " << dt << " ms to request neighbors about stages-2";
-                                    timeout_request_neighbors.start(pctx->scheduler(), dt,
-                                                                    // timeout #2 handler:
-                                                                    [pctx, this, dt]() {
-                                                                        csdebug() << name() << ": timeout for transition is expired, make requests to neighbors";
-                                                                        request_stages_neighbors(*pctx);
-                                                                        cs::RoundNumber rnum = cs::Conveyer::instance().currentRoundNumber();
-                                                                        // timeout #3 handler
-                                                                        csdebug() << name() << ": start subsequent track timeout " << dt << " ms to mark silent nodes";
-                                                                        timeout_force_transition.start(
-                                                                            pctx->scheduler(), dt,
-                                                                            [pctx, this, rnum, dt]() {
-                                                                                csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
-                                                                                mark_outbound_nodes(*pctx, rnum);
-                                                                            },
-                                                                            true /*replace if exists*/, TIMER_BASE_ID + 3);
-                                                                    },
-                                                                    true /*replace if exists*/, TIMER_BASE_ID + 2);
-                                },
-                                true /*replace if exists*/, TIMER_BASE_ID + 1);
+        SolverContext* pctx = &context;
+        auto dt = 2 * Consensus::T_stage_request;
+        csdebug() << name() << ": start track timeout " << 0 << " ms of stages-2 received";
+        timeout_request_stage.start(context.scheduler(), 0,  // no timeout
+                                    // timeout #1 handler:
+            [pctx, this, dt]() {
+                csdebug() << name() << ": (now) skip direct requests for absent stages-2";
+                // request_stages(*pctx);
+                // start subsequent track timeout for "wide" request
+                csdebug() << name() << ": start subsequent track timeout " << dt << " ms to request neighbors about stages-2";
+                timeout_request_neighbors.start(pctx->scheduler(), dt,
+                    // timeout #2 handler:
+                    [pctx, this, dt]() {
+                        csdebug() << name() << ": timeout for transition is expired, make requests to neighbors";
+                        request_stages_neighbors(*pctx);
+                        cs::RoundNumber rnum = cs::Conveyer::instance().currentRoundNumber();
+                        // timeout #3 handler
+                        csdebug() << name() << ": start subsequent track timeout " << dt << " ms to mark silent nodes";
+                        timeout_force_transition.start(
+                            pctx->scheduler(), dt,
+                            [pctx, this, rnum, dt]() {
+                                csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
+                                mark_outbound_nodes(*pctx, rnum);
+                            },
+                            true /*replace if exists*/, TIMER_BASE_ID + 3);
+                    },
+                    true /*replace if exists*/, TIMER_BASE_ID + 2);
+            },
+            true /*replace if exists*/, TIMER_BASE_ID + 1);
+    }
 }
 
 void TrustedStage3State::off(SolverContext& /*context*/) {

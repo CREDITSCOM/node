@@ -567,6 +567,8 @@ public:
 
     void send_rejected_report(const cs::Bytes& rejected_pack);
 
+    bool is_round_duration_limited() const;
+
 private:
   SolverCore& core;
 };
