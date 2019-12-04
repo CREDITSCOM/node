@@ -90,6 +90,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
+    initPoolSynchronizer();
     setupNextMessageBehaviour();
 
     alwaysExecuteContracts_ = cs::ConfigHolder::instance().config()->alwaysExecuteContracts();
@@ -169,6 +170,12 @@ bool Node::init() {
 
     initDefaultRP(initialConfidants_);
     return true;
+}
+
+void Node::initPoolSynchronizer() {
+    cs::Connector::connect(&transport_->pingReceived, poolSynchronizer_, &cs::PoolSynchronizer::onPingReceived);
+    cs::Connector::connect(&transport_->neighbourAdded, poolSynchronizer_, &cs::PoolSynchronizer::onNeighbourAdded);
+    cs::Connector::connect(&transport_->neighbourRemoved, poolSynchronizer_, &cs::PoolSynchronizer::onNeighbourRemoved);
 }
 
 void Node::setupNextMessageBehaviour() {
@@ -1501,16 +1508,6 @@ void Node::sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequeste
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type, const cs::PublicKey sender) {
     if (!good_) {
         return MessageActions::Drop;
-    }
-
-    if (poolSynchronizer_->isFastMode()) {
-        if (type == MsgTypes::BlockRequest || type == MsgTypes::RequestedBlock) {
-            // which round would not be on the remote we may require the requested block or get block request
-            return MessageActions::Process;
-        }
-        else {
-            return MessageActions::Drop;
-        }
     }
 
     // always process this types
@@ -3106,7 +3103,7 @@ void Node::getRoundPackRequest(const uint8_t* data, const size_t size, cs::Round
     }
 
     cs::RoundPackage& roundPackage = roundPackageCache_.back();
-    const auto table = roundPackage.roundTable();
+    const auto& table = roundPackage.roundTable();
 
     if (table.round >= rNum) {
         if (!roundPackage.roundSignatures().empty()) {

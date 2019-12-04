@@ -41,7 +41,7 @@ public:
     size_t lastRoundMs() const;
 
     void resetLastRoundMs();
-    bool isCurrentRoundTooLong(size_t long_duration_ms = kMaxRoundDelay) const;
+    bool isCurrentRoundTooLong(size_t longDurationMs = kMaxRoundDelay) const;
 
 public slots:
     void onPingReceived(cs::Sequence, const cs::PublicKey&);
@@ -72,7 +72,6 @@ private:
 
     // round time elapsing calcualtion and sync
     std::mutex roundElapseMutex_;
-    uint64_t roundElapseSetting_;
     std::chrono::steady_clock::time_point roundElapseTimePoint_;
 };
 

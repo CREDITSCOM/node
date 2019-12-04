@@ -57,7 +57,6 @@ public:
     uint32_t getMaxNeighbours() const;
     void forEachNeighbour(Neighbourhood::NeighboursCallback);
     bool hasNeighbour(const cs::PublicKey&) const;
-    std::optional<cs::PublicKey> getNeighbour(size_t index) const;
 
     // @TODO remove, used in Node
     void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}

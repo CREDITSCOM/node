@@ -16,7 +16,6 @@ RoundStat::RoundStat()
 , nodeStartRound_(0)
 , startSkipRounds_(2)
 , lastRoundMs_(0)
-, roundElapseSetting_(cs::ConfigHolder::instance().config()->roundElapseTime())
 , roundElapseTimePoint_(std::chrono::steady_clock::now()) {
 }
 
@@ -101,9 +100,9 @@ void RoundStat::resetLastRoundMs() {
     lastRoundMs_.store(0, std::memory_order_release);
 }
 
-bool RoundStat::isCurrentRoundTooLong(size_t long_duration_ms /*= kMaxRoundDelay*/) const {
+bool RoundStat::isCurrentRoundTooLong(size_t longDurationMs) const {
     auto ms = lastRoundMs();
-    return ms >= long_duration_ms;
+    return ms >= longDurationMs;
 }
 
 void RoundStat::onPingReceived(cs::Sequence, const cs::PublicKey&) {
@@ -128,7 +127,7 @@ void RoundStat::onMainThreadIterated() {
     {
         cs::Lock lock(roundElapseMutex_);
         point = roundElapseTimePoint_;
-        limit = roundElapseSetting_;
+        limit = cs::ConfigHolder::instance().config()->roundElapseTime();
     }
 
     auto duration = std::chrono::steady_clock::now() - point;

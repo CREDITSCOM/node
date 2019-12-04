@@ -62,7 +62,6 @@ const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
 
 const std::string PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK = "one_reply_block";
-const std::string PARAM_NAME_POOL_SYNC_FAST_MODE = "fast_mode";
 const std::string PARAM_NAME_POOL_SYNC_POOLS_COUNT = "block_pools_count";
 const std::string PARAM_NAME_POOL_SYNC_ROUND_COUNT = "request_repeat_round_count";
 const std::string PARAM_NAME_POOL_SYNC_PACKET_COUNT = "neighbour_packets_count";
@@ -284,7 +283,7 @@ static bool readPasswordFromCin(T& mem) {
     GetConsoleMode(hIn, &con_mode);
     SetConsoleMode(hIn, con_mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT));
 
-    while (ReadConsoleA(hIn, &ch, 1, &dwRead, NULL) && ch != RETURN) {
+    while (ReadConsoleA(hIn, &ch, 1, &dwRead, nullptr) && ch != RETURN) {
 #else
     const char BACKSPACE = 127;
     const char RETURN = 10;
@@ -461,7 +460,7 @@ void Config::showKeys(const std::string& pk58) {
     std::cout << "Seconds left:" << std::endl;
     std::clock_t start = std::clock();
     while (secondsPassed < kTimeoutSeconds) {
-        secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
+        secondsPassed = static_cast<double>(std::clock() - start) / CLOCKS_PER_SEC;
         if (prevSec < secondsPassed) {
             std::cout << static_cast<int>(kTimeoutSeconds - secondsPassed) << "\r" << std::flush;
             prevSec = secondsPassed + 1;
@@ -489,11 +488,13 @@ void Config::changePasswordOption(const std::string& pathToSk) {
     double prevSec = 0;
     std::clock_t start = std::clock();
     while (secondsPassed < kTimeoutSeconds) {
-        secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
+        secondsPassed = static_cast<double>(std::clock() - start) / CLOCKS_PER_SEC;
+
         if (prevSec < secondsPassed) {
             std::cout << static_cast<int>(kTimeoutSeconds - secondsPassed) << "\r" << std::flush;
             prevSec = secondsPassed + 1;
         }
+
         if (_kbhit()) {
             if (_getch() == 'p') {
                 std::cout << "Encrypting the private key file with new password..." << std::endl;
@@ -880,7 +881,6 @@ void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config)
     const boost::property_tree::ptree& data = config.get_child(block);
 
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK, poolSyncData_.oneReplyBlock);
-    checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_FAST_MODE, poolSyncData_.isFastMode);
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_POOLS_COUNT, poolSyncData_.blockPoolsCount);
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_ROUND_COUNT, poolSyncData_.requestRepeatRoundCount);
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_PACKET_COUNT, poolSyncData_.neighbourPacketsCount);
@@ -968,13 +968,13 @@ void Config::readEventsReportData(const boost::property_tree::ptree& config) {
 template <typename T>
 bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value) {
     if (data.count(param)) {
-        const int readValue = std::is_same_v<T, bool> ? data.get<bool>(param) : data.get<int>(param);
-        const auto max = static_cast<int>(cs::getMax(value));
-        const auto min = static_cast<int>(cs::getMin(value));
+        const auto readValue = std::is_same_v<T, bool> ? data.get<bool>(param) : data.get<T>(param);
+        const auto max = static_cast<T>(cs::getMax(value));
+        const auto min = static_cast<T>(cs::getMin(value));
 
         if (readValue > max || readValue < min) {
-            std::cout << "[warning] Config.ini> Please, check the block: [" << block << "], so that param: [" << param << "],  will be: [" << cs::numeric_cast<int>(min) << ", "
-                      << cs::numeric_cast<int>(max) << "]" << std::endl;
+            std::cout << "[warning] Config.ini> Please, check the block: [" << block << "], so that param: [" << param << "],  will be: [" << cs::numeric_cast<T>(min) << ", "
+                      << cs::numeric_cast<T>(max) << "]" << std::endl;
             return false;
         }
 
@@ -997,7 +997,6 @@ bool operator!=(const EndpointData& lhs, const EndpointData& rhs) {
 
 bool operator==(const PoolSyncData& lhs, const PoolSyncData& rhs) {
     return lhs.oneReplyBlock == rhs.oneReplyBlock &&
-           lhs.isFastMode == rhs.isFastMode &&
            lhs.blockPoolsCount == rhs.blockPoolsCount &&
            lhs.requestRepeatRoundCount && rhs.requestRepeatRoundCount &&
            lhs.neighbourPacketsCount && rhs.neighbourPacketsCount &&

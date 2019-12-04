@@ -34,12 +34,12 @@ std::size_t std::hash<cs::TransactionsPacketHash>::operator()(const cs::Transact
     return hash;
 }
 
-cs::Bytes cs::RoundTable::toBinary(){
+cs::Bytes cs::RoundTable::toBinary() const {
     cs::Bytes bytes;
-    cs::DataStream tth(bytes);
+    cs::DataStream stream(bytes);
 
-    tth << round;
-    tth << confidants;
+    stream << round;
+    stream << confidants;
 
     return bytes;
 }

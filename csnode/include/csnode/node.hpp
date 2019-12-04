@@ -326,6 +326,7 @@ public slots:
 
 private:
     bool init();
+    void initPoolSynchronizer();
     void setupNextMessageBehaviour();
 
     bool sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);

@@ -3,6 +3,7 @@
 #include <regex>
 
 #include <lib/system/process.hpp>
+#include <lib/system/concurrent.hpp>
 
 #include <csnode/configholder.hpp>
 
@@ -68,20 +69,20 @@ std::string cs::ExecutorManager::jpsData() const {
 
 void cs::ExecutorManager::terminate(boost::process::pid_t pid) {
 #ifdef __linux__
-    cs::Process process("kill -9 " + std::to_string(pid));
-    process.launch();
-    process.wait();
+    std::shared_ptr<cs::Process> process = std::make_shared<cs::Process>("kill -9 " + std::to_string(pid));
 #else
-    cs::Process process(pid);
+    std::shared_ptr<cs::Process> process = std::make_shared<cs::Process>("taskkill /PID " + std::to_string(pid) + " /F");
+#endif
+    cs::Connector::connect(&process->errorOccured, [=](const auto& exeception) {
+        cs::Concurrent::run([storage = process] {
+            storage->terminate();
+        });
 
-    cs::Connector::connect(&process.errorOccured, [&](const cs::ProcessException& exception) {
-        cslog() << "Manager pid attach exception " << exception.what();
+        cserror() << "Executor manager terminate by pid error " << exeception.what();
     });
 
-    if (process.launch(cs::Process::Options::Attach)) {
-        process.terminate();
-    }
-#endif
+    process->launch();
+    process->wait();
 }
 
 std::optional<std::vector<cs::ExecutorManager::ProcessId>> cs::ExecutorManager::executorProcessIds() const {

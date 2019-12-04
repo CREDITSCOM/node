@@ -6,46 +6,11 @@
 #include <csnode/node.hpp>
 #include <transport.hpp>
 
-namespace {
-std::string parseRefusalReason(RegistrationRefuseReasons reason) {
-    std::string reasonInfo;
-
-    switch (reason) {
-        case RegistrationRefuseReasons::BadClientVersion:
-            reasonInfo = "incompatible node version";
-            break;
-        case RegistrationRefuseReasons::IncompatibleBlockchain:
-            reasonInfo = "incompatible blockchain version";
-            break;
-        case RegistrationRefuseReasons::LimitReached:
-            reasonInfo = "maximum connections limit on remote node is reached";
-            break;
-        case RegistrationRefuseReasons::Timeout:
-            reasonInfo = "timeout";
-            break;
-        default: {
-            std::ostringstream os;
-            os << "reason code " << static_cast<int>(reason);
-            reasonInfo = os.str();
-        }
-    }
-
-    return reasonInfo;
-}
-
-template<class... Args>
-Packet formPacket(BaseFlags flags, NetworkCommand cmd, Args&&... args) {
-    cs::Bytes packetBytes;
-    cs::DataStream stream(packetBytes);
-    stream << flags;
-    stream << cmd;
-    (void)(stream << ... << std::forward<Args>(args));
-    return Packet(std::move(packetBytes));
-}
-} // namespace
-
 Neighbourhood::Neighbourhood(Transport* transport, Node* node)
-    : transport_(transport), node_(node), uuid_(node_->getBlockChain().uuid()) {}
+: transport_(transport)
+, node_(node)
+, uuid_(node_->getBlockChain().uuid()) {
+}
 
 void Neighbourhood::processNeighbourMessage(const cs::PublicKey& sender, const Packet& pack) {
     switch (pack.getNetworkCommand()) {
@@ -73,8 +38,8 @@ void Neighbourhood::processNeighbourMessage(const cs::PublicKey& sender, const P
 
 void Neighbourhood::newPeerDiscovered(const cs::PublicKey& peer) {
     {
-        std::lock_guard<std::mutex> g(neighbourMux_);
-        if (neighbours_.size() >= MaxNeighbours) {
+        std::lock_guard<std::mutex> lock(neighbourMutex_);
+        if (neighbours_.size() >= kMaxNeighbours) {
             return;
         }
 
@@ -91,7 +56,7 @@ void Neighbourhood::newPeerDiscovered(const cs::PublicKey& peer) {
 }
 
 void Neighbourhood::peerDisconnected(const cs::PublicKey& peer) {
-    std::lock_guard<std::mutex> g(neighbourMux_);
+    std::lock_guard<std::mutex> lock(neighbourMutex_);
     if (neighbours_.find(peer) != neighbours_.end()) {
         neighbours_.erase(peer);
     }
@@ -101,9 +66,9 @@ void Neighbourhood::removeSilent() {
     using namespace std::chrono;
     auto now = steady_clock::now();
 
-    std::lock_guard<std::mutex> g(neighbourMux_);
+    std::lock_guard<std::mutex> lock(neighbourMutex_);
     for (auto it = neighbours_.begin(); it != neighbours_.end();) {
-        if (duration_cast<seconds>(now - it->second.lastSeen) > LastSeenTimeout) {
+        if (duration_cast<seconds>(now - it->second.lastSeen) > kLastSeenTimeout) {
             sendRegistrationRefusal(it->first, RegistrationRefuseReasons::Timeout);
             if (it->second.connectionEstablished) {
                 transport_->onNeighboursChanged(it->first, it->second.lastSeq, it->second.roundNumber, false);
@@ -117,7 +82,7 @@ void Neighbourhood::removeSilent() {
 }
 
 void Neighbourhood::pingNeighbours() {
-    std::lock_guard<std::mutex> g(neighbourMux_);
+    std::lock_guard<std::mutex> lock(neighbourMutex_);
     for (auto& n : neighbours_) {
         sendPingPack(n.first);
     }
@@ -133,8 +98,8 @@ void Neighbourhood::sendRegistrationRequest(const cs::PublicKey& receiver) {
 }
 
 void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Packet& pack) {
-    std::lock_guard<std::mutex> g(neighbourMux_);
-    if (neighbours_.size() >= MaxNeighbours) {
+    std::lock_guard<std::mutex> lock(neighbourMutex_);
+    if (neighbours_.size() >= kMaxNeighbours) {
         sendRegistrationRefusal(sender, RegistrationRefuseReasons::LimitReached);
         return;
     }
@@ -178,7 +143,7 @@ void Neighbourhood::sendRegistrationConfirmation(const cs::PublicKey& receiver) 
 }
 
 void Neighbourhood::gotRegistrationConfirmation(const cs::PublicKey& sender, const Packet& pack) {
-    std::lock_guard<std::mutex> g(neighbourMux_);
+    std::lock_guard<std::mutex> lock(neighbourMutex_);
 
     auto neighbour = neighbours_.find(sender); // got registration request or send it
     if (neighbour != neighbours_.end()) {
@@ -186,7 +151,7 @@ void Neighbourhood::gotRegistrationConfirmation(const cs::PublicKey& sender, con
         auto now = std::chrono::steady_clock::now();
 
         // check timeout
-        if (std::chrono::duration_cast<std::chrono::seconds>(now - info.lastSeen) > LastSeenTimeout) {
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - info.lastSeen) > kLastSeenTimeout) {
             sendRegistrationRefusal(sender, RegistrationRefuseReasons::Timeout);
             if (info.connectionEstablished) {
                 transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, false);
@@ -228,7 +193,7 @@ void Neighbourhood::gotRegistrationRefusal(const cs::PublicKey& sender, const Pa
     cslog() << "Registration to " << EncodeBase58(sender.data(), sender.data() + sender.size())
             << " refused: " << parseRefusalReason(reason);
 
-    std::lock_guard<std::mutex> g(neighbourMux_);
+    std::lock_guard<std::mutex> lock(neighbourMutex_);
     auto it = neighbours_.find(sender);
     if (it != neighbours_.end()) {
         if (it->second.connectionEstablished) {
@@ -247,68 +212,90 @@ void Neighbourhood::sendPingPack(const cs::PublicKey& receiver) {
 
 void Neighbourhood::gotPing(const cs::PublicKey& sender, const Packet& pack) {
     cs::Sequence sequence = 0;
+
     {
-        std::lock_guard<std::mutex> g(neighbourMux_);
+        std::lock_guard lock(neighbourMutex_);
         auto neighbour = neighbours_.find(sender);
+
         if (neighbour != neighbours_.end() && neighbour->second.nodeVersion) {
             auto now = std::chrono::steady_clock::now();
             PeerInfo& info = neighbour->second;
-            if (std::chrono::duration_cast<std::chrono::seconds>(now - info.lastSeen) > LastSeenTimeout) {
+
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - info.lastSeen) > kLastSeenTimeout) {
                 sendRegistrationRefusal(sender, RegistrationRefuseReasons::Timeout);
+
                 if (info.connectionEstablished) {
                     transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, false);
                 }
+
                 neighbours_.erase(neighbour);
                 return;
             }
 
             info.lastSeen = now;
+
             cs::DataStream stream(pack.getMsgData(), pack.getMsgSize());
             stream >> info.lastSeq;
             stream >> info.roundNumber;
+
             sequence = info.lastSeq;
         }
     }
+
     if (sequence) {
         emit neighbourPingReceived(sequence, sender);
     }
 }
 
 void Neighbourhood::forEachNeighbour(NeighboursCallback callback) {
-    std::lock_guard<std::mutex> g(neighbourMux_);
+    std::lock_guard<std::mutex> lock(neighbourMutex_);
     for (auto& n : neighbours_) {
         callback(n.first, n.second.lastSeq, n.second.roundNumber);
     }
 }
 
 uint32_t Neighbourhood::getNeighboursCount() const {
-    std::lock_guard<std::mutex> g(neighbourMux_);
+    std::lock_guard<std::mutex> lock(neighbourMutex_);
     return static_cast<uint32_t>(neighbours_.size());
 }
 
 bool Neighbourhood::contains(const cs::PublicKey& neighbour) const {
-    std::lock_guard<std::mutex> g(neighbourMux_);
+    std::lock_guard<std::mutex> lock(neighbourMutex_);
     return neighbours_.find(neighbour) != neighbours_.end();
 }
 
-std::optional<cs::PublicKey> Neighbourhood::getNeighbour(size_t index) const {
-    std::lock_guard<std::mutex> lock(neighbourMux_);
+std::string Neighbourhood::parseRefusalReason(RegistrationRefuseReasons reason) {
+    std::string reasonInfo;
 
-    if (index >= neighbours_.size()) {
-        return std::nullopt;
+    switch (reason) {
+        case RegistrationRefuseReasons::BadClientVersion:
+            reasonInfo = "incompatible node version";
+            break;
+        case RegistrationRefuseReasons::IncompatibleBlockchain:
+            reasonInfo = "incompatible blockchain version";
+            break;
+        case RegistrationRefuseReasons::LimitReached:
+            reasonInfo = "maximum connections limit on remote node is reached";
+            break;
+        case RegistrationRefuseReasons::Timeout:
+            reasonInfo = "timeout";
+            break;
+        default: {
+            std::ostringstream os;
+            os << "reason code " << static_cast<int>(reason);
+            reasonInfo = os.str();
+        }
     }
 
-    cs::PublicKey key{};
-    size_t i = 0;
+    return reasonInfo;
+}
 
-    std::for_each(neighbours_.begin(), neighbours_.end(), [&](const auto& element) {
-        if (index == i) {
-            key = element.first;
-            return;
-        }
-
-        ++i;
-    });
-
-    return std::make_optional(key);
+template<class... Args>
+Packet Neighbourhood::formPacket(BaseFlags flags, NetworkCommand cmd, Args&&... args) {
+    cs::Bytes packetBytes;
+    cs::DataStream stream(packetBytes);
+    stream << flags;
+    stream << cmd;
+    (void)(stream << ... << std::forward<Args>(args));
+    return Packet(std::move(packetBytes));
 }

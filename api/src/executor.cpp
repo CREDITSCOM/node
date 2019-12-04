@@ -751,7 +751,7 @@ void cs::Executor::checkExecutorVersion() {
     connect();
     getExecutorBuildVersion(_return);
 
-    cserror() << "start contract executor error code " << int(_return.status.code) << ": " << _return.status.message;
+    cslog() << "Start contract executor, code " << int(_return.status.code) << ": " << _return.status.message;
 
     result = _return.commitNumber < commitMin_ || (_return.commitNumber > commitMax_ && commitMax_ != -1);
     csdebug() << "[executorInfo]: commitNumber: " << _return.commitNumber << ", commitHash: " << _return.commitHash;
