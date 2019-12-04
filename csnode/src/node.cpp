@@ -207,9 +207,10 @@ void Node::initDefaultRP() {
     rt.round = getBlockChain().getLastSeq() + 1;
     for (auto& key : initialConfidants_){
         rt.confidants.push_back(key);
-        if (rt.confidants.size() >= Consensus::MinTrustedNodes) {
-            break;
-        }
+        // fill from initialConfidants_ with complete list:
+        //if (rt.confidants.size() >= Consensus::MinTrustedNodes) {
+            // no break;
+        //}
     }
     rp.updateRoundTable(rt);
     roundPackageCache_.push_back(rp);
@@ -3526,10 +3527,12 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
 void Node::onRoundTimeElapsed() {
     
     solver_->resetGrayList();
+    initDefaultRP();
 
     if (initialConfidants_.find(solver_->getPublicKey()) == initialConfidants_.end()) {
         cslog() << "Waiting for next round...";
-        initDefaultRP();
+        myLevel_ = Level::Normal;
+        myConfidantIndex_ = cs::ConfidantConsts::InvalidConfidantIndex;
         // if we have correct last block, we pretend to next trusted role
         // otherwise remote nodes will drop our hash
         sendHash(blockChain_.getLastSeq() + 1);
@@ -3539,34 +3542,43 @@ void Node::onRoundTimeElapsed() {
     cslog() << "Try to start rounds...";
 
     size_t initConfConnected = 1;
-    size_t initConfSameBlock = 1;
-
-    auto callback = [&initConfConnected, &initConfSameBlock, this]
+    size_t initConfMaxBlock = 1;
+    cs::Sequence maxLocalBlock = blockChain_.getLastSeq();
+    cs::Sequence maxGlobalBlock = maxLocalBlock;
+    auto callback = [&initConfConnected, &initConfMaxBlock, &maxGlobalBlock, this]
                     (const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber) {
                         if (initialConfidants_.find(neighbour) == initialConfidants_.end()) {
                             return;
                         }
                         ++initConfConnected;
 
-                        if (lastSeq == blockChain_.getLastSeq()) {
-                            ++initConfSameBlock;
+                        if (lastSeq > maxGlobalBlock) {
+                            initConfMaxBlock = 1;
+                            maxGlobalBlock = lastSeq;
+                        }
+                        else if (lastSeq == maxGlobalBlock) {
+                            ++initConfMaxBlock;
                         }
                     };
 
     transport_->forEachNeighbour(std::move(callback));
 
-    if (initConfConnected != initialConfidants_.size()) {
+    if (initConfConnected < Consensus::MinTrustedNodes) {
         cslog() << "Cannot start rounds, not enough initial confidants connected.";
         return;
     }
 
-    if (initConfSameBlock != initConfConnected) {
+    if (initConfMaxBlock < Consensus::MinTrustedNodes) {
         cslog() << "Cannot start rounds, not enough initial confidants with same last sequence. "
                 << "Wait for syncro finished...";
         return;
     }
 
-    initDefaultRP();
+    if (maxGlobalBlock != maxLocalBlock) {
+        cslog() << "Should not start rounds, local block " << maxLocalBlock << ", global block " << maxGlobalBlock;
+        return;
+    }
+
     if (roundPackageCache_.empty()) {
         cslog() << "Cannot start rounds, round package cache is empty.";
         return;
