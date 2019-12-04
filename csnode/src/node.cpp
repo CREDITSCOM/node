@@ -168,7 +168,7 @@ bool Node::init() {
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
 
-    initCurrentRP();
+    initDefaultRP(initialConfidants_);
     return true;
 }
 
@@ -208,18 +208,20 @@ void Node::stop() {
     cswarning() << "[CONFIG OBSERVER STOPPED]";
 }
 
-void Node::initCurrentRP() {
+void Node::initDefaultRP(const std::set<cs::PublicKey>& confidants) {
     cs::RoundPackage rp;
     cs::RoundTable rt;
     rt.round = getBlockChain().getLastSeq() + 1;
-    for (auto& key : initialConfidants_){
+    for (auto& key : confidants){
         rt.confidants.push_back(key);
-        if (rt.confidants.size() > Consensus::MinTrustedNodes) {
-            break;
-        }
+        // fill from initialConfidants_ with complete list:
+        //if (rt.confidants.size() >= Consensus::MinTrustedNodes) {
+            // no break;
+        //}
     }
     rp.updateRoundTable(rt);
     roundPackageCache_.push_back(rp);
+    isDefaultRoundTable_ = true;
 }
 
 void Node::onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
@@ -1761,7 +1763,7 @@ uint32_t Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const c
                 << ", msgType: " << Packet::messageTypeToString(msgType);
 
     transport_->sendMulticast(formPacket(BaseFlags::Compressed, msgType, round, args...), listMembers);
-    return listMembers.size(); // @TODO rewrite this logic consider tcp
+    return static_cast<uint32_t>(listMembers.size()); // @TODO rewrite this logic consider tcp
 }
 
 template <class... Args>
@@ -2817,6 +2819,10 @@ void Node::setCurrentRP(const cs::RoundPackage& rp) {
 
 void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& /*sender*/, cs::DataStream& stream, bool updateRound) {
     csdebug() << __func__;
+
+    // got round package in any way, reset default round table flag
+    isDefaultRoundTable_ = false;
+
     confirmationList_.add(rPackage.roundTable().round, false, rPackage.roundTable().confidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.trustedSignatures());
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     cs::Bytes realTrusted = rPackage.poolMetaInfo().realTrustedMask;
@@ -3521,53 +3527,78 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
 }
 
 void Node::onRoundTimeElapsed() {
+    solver_->resetGrayList();
     if (initialConfidants_.find(solver_->getPublicKey()) == initialConfidants_.end()) {
         cslog() << "Waiting for next round...";
+        myLevel_ = Level::Normal;
+        myConfidantIndex_ = cs::ConfidantConsts::InvalidConfidantIndex;
+        initDefaultRP(initialConfidants_);
+        // if we have correct last block, we pretend to next trusted role
+        // otherwise remote nodes will drop our hash
+        sendHash(blockChain_.getLastSeq() + 1);
         return;
     }
 
     cslog() << "Try to start rounds...";
 
+    std::set<cs::PublicKey> actualConfidants;
+    actualConfidants.insert(solver_->getPublicKey());
     size_t initConfConnected = 1;
-    size_t initConfSameBlock = 1;
-
-    auto callback = [&initConfConnected, &initConfSameBlock, this]
+    size_t initConfMaxBlock = 1;
+    cs::Sequence maxLocalBlock = blockChain_.getLastSeq();
+    cs::Sequence maxGlobalBlock = maxLocalBlock;
+    auto callback = [&initConfConnected, &initConfMaxBlock, &maxGlobalBlock, &actualConfidants, this]
                     (const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber) {
-                        if (initialConfidants_.find(neighbour) == initialConfidants_.end()) {
+                        const auto it = initialConfidants_.find(neighbour);
+                        if (it == initialConfidants_.end()) {
                             return;
                         }
+                        actualConfidants.insert(*it);
                         ++initConfConnected;
 
-                        if (lastSeq == blockChain_.getLastSeq()) {
-                            ++initConfSameBlock;
+                        if (lastSeq > maxGlobalBlock) {
+                            initConfMaxBlock = 1;
+                            maxGlobalBlock = lastSeq;
+                        }
+                        else if (lastSeq == maxGlobalBlock) {
+                            ++initConfMaxBlock;
                         }
                     };
 
     transport_->forEachNeighbour(std::move(callback));
 
-    if (initConfConnected != initialConfidants_.size()) {
+    if (initConfConnected < Consensus::MinTrustedNodes) {
         cslog() << "Cannot start rounds, not enough initial confidants connected.";
         return;
     }
 
-    if (initConfSameBlock != initConfConnected) {
+    if (initConfMaxBlock < Consensus::MinTrustedNodes) {
         cslog() << "Cannot start rounds, not enough initial confidants with same last sequence. "
                 << "Wait for syncro finished...";
         return;
     }
 
-    initCurrentRP();
+    if (maxGlobalBlock != maxLocalBlock) {
+        cslog() << "Should not start rounds, local block " << maxLocalBlock << ", global block " << maxGlobalBlock;
+        return;
+    }
 
     if (roundPackageCache_.empty()) {
         cslog() << "Cannot start rounds, round package cache is empty.";
         return;
     }
 
+    initDefaultRP(actualConfidants);
+
+    // do not increment, only "mark" default round start
+    subRound_ = 1;
+
     auto& conveyer = cs::Conveyer::instance();
 
-    conveyer.setRound(roundPackageCache_.back().roundTable().round);
-    conveyer.setTable(roundPackageCache_.back().roundTable());
+    conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
+    //conveyer.setRound(roundPackageCache_.back().roundTable().round);
+    //conveyer.setTable(roundPackageCache_.back().roundTable());
 
-    onRoundStart(roundPackageCache_.back().roundTable(), false);
+    onRoundStart(roundPackageCache_.back().roundTable(), true);
     reviewConveyerHashes();
 }

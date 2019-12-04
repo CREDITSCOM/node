@@ -250,4 +250,8 @@ void SolverContext::send_rejected_report(const cs::Bytes& rejected_pack) {
     EventReport::sendReject(*core.pnode, rejected_pack);
 }
 
+bool SolverContext::is_round_duration_limited() const {
+    return !core.pnode->isCurrentRPDefault();
+}
+
 }  // namespace cs
