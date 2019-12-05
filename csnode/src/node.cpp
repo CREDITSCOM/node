@@ -409,15 +409,13 @@ void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNum
 
 void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
     cslog() << "NODE> get SS Round Table #" << rNum;
-    if (cs::Conveyer::instance().currentRoundNumber() != 0) {
-        csdebug() << "The RoundTable sent by SS doesn't correspond to the current RoundNumber";
-        return;
-    }
 
     cs::DataStream stream(data, size);
     cs::RoundTable roundTable;
-
-    if (!readRoundData(roundTable, stream, false)) {
+    cs::Bytes bin;
+    stream >> bin;
+    cs::DataStream in(bin.data(), bin.size());
+    if (!readRoundData(roundTable, in, false)) {
         cserror() << "NODE> read round data from SS failed, continue without round table";
     }
 
@@ -430,19 +428,20 @@ void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::Rou
 
     // update new round data from SS
     // TODO: fix sub round
-    subRound_ = 0;
+    //subRound_ = 0;
     roundTable.round = rNum;
 
-    cs::Conveyer::instance().setRound(rNum);
-    cs::Conveyer::instance().setTable(roundTable);
+    cs::Conveyer::instance().updateRoundTable(rNum, roundTable);
+    //cs::Conveyer::instance().setRound(rNum);
+    //cs::Conveyer::instance().setTable(roundTable);
 
     // "normal" start
-    if (roundTable.round == 1) {
+    //if (roundTable.round == 1) {
         onRoundStart(roundTable, false);
         reviewConveyerHashes();
 
-        return;
-    }
+    //   return;
+    //}
 
     poolSynchronizer_->sync(rNum);
 }
@@ -1551,7 +1550,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     }
 
     // BB: every round (for now) may be handled:
-    if (type == MsgTypes::BigBang) {
+    if (type == MsgTypes::BigBang || type == MsgTypes::RoundTableSS) {
         return MessageActions::Process;
     }
 
@@ -1625,7 +1624,6 @@ void Node::updateConfigFromFile() {
 }
 
 inline bool Node::readRoundData(cs::RoundTable& roundTable, cs::DataStream& stream, bool bang) {
-    cs::PublicKey mainNode;
 
     uint8_t confSize = 0;
     stream >> confSize;
@@ -1639,8 +1637,6 @@ inline bool Node::readRoundData(cs::RoundTable& roundTable, cs::DataStream& stre
 
     cs::ConfidantsKeys confidants;
     confidants.reserve(confSize);
-
-    stream >> mainNode;
 
     // TODO Fix confidants array getting (From SS)
     for (int i = 0; i < confSize; ++i) {
@@ -3598,12 +3594,25 @@ void Node::onRoundTimeElapsed() {
     // do not increment, only "mark" default round start
     subRound_ = 1;
 
-    auto& conveyer = cs::Conveyer::instance();
+    if (*actualConfidants.cbegin() == solver_->getPublicKey()) {
+        // send rtss
+        
+        cs::Bytes bin;
+        cs::DataStream out(bin);
+        out << uint8_t(actualConfidants.size());
+        for (const auto& item : actualConfidants) {
+            out << item;
+        }
 
-    conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
-    //conveyer.setRound(roundPackageCache_.back().roundTable().round);
-    //conveyer.setTable(roundPackageCache_.back().roundTable());
+        sendToConfidants(MsgTypes::RoundTableSS, roundPackageCache_.back().roundTable().round, bin);
 
-    onRoundStart(roundPackageCache_.back().roundTable(), true);
-    reviewConveyerHashes();
+        auto& conveyer = cs::Conveyer::instance();
+
+        conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
+        //conveyer.setRound(roundPackageCache_.back().roundTable().round);
+        //conveyer.setTable(roundPackageCache_.back().roundTable());
+
+        onRoundStart(roundPackageCache_.back().roundTable(), true);
+        reviewConveyerHashes();
+    }
 }
