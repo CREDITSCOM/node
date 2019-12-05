@@ -1484,7 +1484,7 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
         if (lastSequence < neighbourWithMaxSeq.second) {
             delta = std::chrono::milliseconds(0);
             cswarning() << "Local max block " << WithDelimiters(lastSequence) << " is lower than remote one "
-                << WithDelimiters(sequence) << ", trying to request round table";
+                << WithDelimiters(neighbourWithMaxSeq.second) << ", trying to request round table";
 
             CallsQueue::instance().insert([=] {
                 roundPackRequest(neighbourWithMaxSeq.first, neighbourWithMaxSeq.second);
