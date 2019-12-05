@@ -82,6 +82,7 @@ public:
     std::string getSenderText(const cs::PublicKey& sender);
 
     // incoming requests processing
+    void getBootstrapTable(const uint8_t* data, const size_t size, const cs::RoundNumber);
     bool verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender);
     bool verifyPacketTransactions(cs::TransactionsPacket packet, const cs::PublicKey& sender);
     void getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);

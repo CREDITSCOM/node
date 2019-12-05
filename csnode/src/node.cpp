@@ -300,41 +300,46 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
 }
 
 
-void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
+void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
     cslog() << "NODE> get SS Round Table #" << rNum;
 
-    cs::DataStream stream(data, size);
+    cs::DataStream in(data, size);
     cs::RoundTable roundTable;
     cs::Bytes bin;
-    stream >> bin;
-    cs::DataStream in(bin.data(), bin.size());
-    if (!readRoundData(roundTable, in, false)) {
-        cserror() << "NODE> read round data from SS failed, continue without round table";
+    in >> bin;
+    cs::DataStream stream(bin.data(), bin.size());
+
+    uint8_t confSize = 0;
+    stream >> confSize;
+    csdebug() << "NODE> Number of confidants :" << cs::numeric_cast<int>(confSize);
+    if (confSize < Consensus::MinTrustedNodes || confSize > Consensus::MaxTrustedNodes) {
+        cswarning() << "Bad confidants num";
+        return;
     }
+    cs::ConfidantsKeys confidants;
+    confidants.reserve(confSize);
+    for (int i = 0; i < confSize; ++i) {
+        cs::PublicKey key;
+        stream >> key;
+        confidants.push_back(std::move(key));
+    }
+    if (!stream.isValid() || confidants.size() < confSize) {
+        cswarning() << "Bad round table format, ignoring";
+        return;
+    }
+    roundTable.confidants = std::move(confidants);
+    roundTable.hashes.clear();
 
     cs::Sequence lastSequence = blockChain_.getLastSeq();
-
     if (lastSequence >= rNum) {
         csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
         blockChain_.setBlocksToBeRemoved(lastSequence - rNum + 1);
     }
 
-    // update new round data from SS
-    // TODO: fix sub round
-    //subRound_ = 0;
     roundTable.round = rNum;
-
     cs::Conveyer::instance().updateRoundTable(rNum, roundTable);
-    //cs::Conveyer::instance().setRound(rNum);
-    //cs::Conveyer::instance().setTable(roundTable);
-
-    // "normal" start
-    //if (roundTable.round == 1) {
-        onRoundStart(roundTable, false);
-        reviewConveyerHashes();
-
-    //   return;
-    //}
+    onRoundStart(roundTable, false);
+    reviewConveyerHashes();
 
     poolSynchronizer_->sync(rNum);
 }
@@ -1437,7 +1442,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
     }
 
     // BB: every round (for now) may be handled:
-    if (type == MsgTypes::RoundTableSS) {
+    if (type == MsgTypes::BootstrapTable) {
         return MessageActions::Process;
     }
 
@@ -1507,64 +1512,6 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
 
 void Node::updateConfigFromFile() {
     observer_.notify();
-}
-
-inline bool Node::readRoundData(cs::RoundTable& roundTable, cs::DataStream& stream, bool bang) {
-
-    uint8_t confSize = 0;
-    stream >> confSize;
-
-    csdebug() << "NODE> Number of confidants :" << cs::numeric_cast<int>(confSize);
-
-    if (confSize < Consensus::MinTrustedNodes || confSize > Consensus::MaxTrustedNodes) {
-        cswarning() << "Bad confidants num";
-        return false;
-    }
-
-    cs::ConfidantsKeys confidants;
-    confidants.reserve(confSize);
-
-    // TODO Fix confidants array getting (From SS)
-    for (int i = 0; i < confSize; ++i) {
-        cs::PublicKey key;
-        stream >> key;
-
-        confidants.push_back(std::move(key));
-    }
-    if (bang) {
-        cs::Signature sig;
-        stream >> sig;
-
-        cs::Bytes trustedToHash;
-        cs::DataStream tth(trustedToHash);
-        tth << roundTable.round;
-        tth << confidants;
-        csdebug() << "Message to Sign: " << cs::Utils::byteStreamToHex(trustedToHash);
-        // cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
-        const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
-        csdebug() << "SSKey: " << cs::Utils::byteStreamToHex(starter_key.data(), starter_key.size());
-        if (!cscrypto::verifySignature(sig, starter_key, trustedToHash.data(), trustedToHash.size())) {
-            cswarning() << "The BIGBANG message is incorrect: signature isn't valid";
-            return false;
-        }
-        cs::Bytes confMask;
-        cs::Signatures signatures;
-        signatures.push_back(sig);
-        confMask.push_back(0);
-        // confirmationList_.remove(roundTable.round);
-        confirmationList_.add(roundTable.round, bang, confidants, confMask, signatures);
-    }
-
-    if (!stream.isValid() || confidants.size() < confSize) {
-        cswarning() << "Bad round table format, ignoring";
-        return false;
-    }
-
-    roundTable.confidants = std::move(confidants);
-    // roundTable.general = mainNode;
-    roundTable.hashes.clear();
-
-    return true;
 }
 
 static const char* nodeLevelToString(Node::Level nodeLevel) {
@@ -3486,7 +3433,7 @@ void Node::onRoundTimeElapsed() {
             out << item;
         }
 
-        sendToConfidants(MsgTypes::RoundTableSS, roundPackageCache_.back().roundTable().round, bin);
+        sendToConfidants(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bin);
 
         auto& conveyer = cs::Conveyer::instance();
 

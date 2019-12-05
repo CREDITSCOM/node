@@ -250,6 +250,8 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
             return node_->getNodeStopRequest(rNum, data, size);
         case MsgTypes::RoundTable:
             return node_->getRoundTable(data, size, rNum, sender);
+        case MsgTypes::BootstrapTable:
+            return node_->getBootstrapTable(data, size, rNum);
         default:
             break;
     }
