@@ -776,6 +776,7 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
     }
     auto otherMask = rPackage.poolMetaInfo().characteristic.mask;
     bool identic = true;
+    cs::Bytes checkMask;
     csdebug() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(ownMask.data(), ownMask.size())
         << " and received: " << cs::Utils::byteStreamToHex(otherMask.data(), otherMask.size());
     //TODO: this code is to be refactored - may cause some problems
@@ -787,17 +788,32 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
         for (size_t i = 0; i < ownMask.size(); ++i) {
             if (otherMask[i] != ownMask[i]) {
                 identic = false;
-                csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... False";
+                checkMask.push_back(1);
+                //csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... False";
                 break;
             }
             else {
-                csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... Ok";
+                checkMask.push_back(0);
+                //csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... Ok";
             }
         }
     }
 
     if (!identic) {
-        cserror() << "NODE> We probably got the roundPackage with invalid characteristic, can't build block";
+        std::string badChecks;
+        int badChecksCounter = 0;
+        for (int i = 0; i < checkMask.size(); ++i) {
+            if (checkMask[i] != 0) {
+                if (badChecks.size() > 0) {
+                    badChecks += ", ";
+                }
+                badChecks += std::to_string(i);
+                ++badChecksCounter;
+            }
+        }
+        cserror() << "NODE> We probably got the roundPackage with invalid characteristic. " << badChecksCounter
+            << "; transaction(s): " << badChecks << " (is)were not checked properly. Can't build block";
+
         //sendBlockAlarm(rPackage.poolMetaInfo().sequenceNumber);
         return false;
     }
@@ -1324,14 +1340,18 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 }
 
 void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packetNum) {
-    for (const auto& pool : poolsBlock) {
-        csdebug() << "NODE> Send block reply. Sequence: " << pool.sequence();
+    if (poolsBlock.empty()) {
+        return;
     }
 
-    csdebug() << "Node> Sending blocks with signatures:";
+    for (const auto& pool : poolsBlock) {
+        csdetails() << "NODE> Send block reply. Sequence: " << pool.sequence();
+    }
+    
+    csdebug() << "Node> Sending " << poolsBlock.size() << " blocks with signatures from " << poolsBlock.front().sequence() << " to " << poolsBlock.back().sequence();
 
     for (const auto& it : poolsBlock) {
-        csdebug() << "#" << it.sequence() << " signs = " << it.signatures().size();
+        csdetails() << "#" << it.sequence() << " signs = " << it.signatures().size();
     }
 
     auto region = compressor_.compress(poolsBlock);
