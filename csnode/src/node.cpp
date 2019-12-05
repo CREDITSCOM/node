@@ -1470,9 +1470,10 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
 void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
     static std::chrono::milliseconds delta{ 0 };
-    static std::pair<cs::PublicKey, cs::Sequence> neighbourWithMaxSeq{};
-    if (neighbourWithMaxSeq.second < sequence) {
-        neighbourWithMaxSeq = std::make_pair(sender, sequence);
+    static std::pair<cs::PublicKey, cs::Sequence> maxSequenceNeighbour{};
+
+    if (maxSequenceNeighbour.second < sequence) {
+        maxSequenceNeighbour = std::make_pair(sender, sequence);
     }
 
     auto now = std::chrono::steady_clock::now();
@@ -1481,13 +1482,13 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     if (maxPingSynchroDelay_ <= delta.count()) {
         auto lastSequence = blockChain_.getLastSeq();
 
-        if (lastSequence < neighbourWithMaxSeq.second) {
+        if (lastSequence < maxSequenceNeighbour.second) {
             delta = std::chrono::milliseconds(0);
             cswarning() << "Local max block " << WithDelimiters(lastSequence) << " is lower than remote one "
-                << WithDelimiters(neighbourWithMaxSeq.second) << ", trying to request round table";
+                << WithDelimiters(maxSequenceNeighbour.second) << ", trying to request round table";
 
             CallsQueue::instance().insert([=] {
-                roundPackRequest(neighbourWithMaxSeq.first, neighbourWithMaxSeq.second);
+                roundPackRequest(maxSequenceNeighbour.first, maxSequenceNeighbour.second);
             });
         }
     }
