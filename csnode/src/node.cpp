@@ -1123,8 +1123,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
         return;
     }
 
-    const bool isOneBlockReply = poolSynchronizer_->isOneBlockReply();
-    const std::size_t reserveSize = isOneBlockReply ? 1 : sequences.size();
+    const std::size_t reserveSize = sequences.size();
 
     cs::PoolsBlock poolsBlock;
     poolsBlock.reserve(reserveSize);
@@ -1139,19 +1138,13 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 
         if (pool.is_valid()) {
             poolsBlock.push_back(std::move(pool));
-
-            if (isOneBlockReply) {
-                sendReply();
-            }
         }
         else {
             csmeta(cslog) << "unable to load block " << sequence << " from blockchain";
         }
     }
 
-    if (!isOneBlockReply) {
-        sendReply();
-    }
+    sendReply();
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {

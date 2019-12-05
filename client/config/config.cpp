@@ -57,10 +57,7 @@ const std::string PARAM_NAME_ID = "id";
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
 
-const std::string PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK = "one_reply_block";
 const std::string PARAM_NAME_POOL_SYNC_POOLS_COUNT = "block_pools_count";
-const std::string PARAM_NAME_POOL_SYNC_ROUND_COUNT = "request_repeat_round_count";
-const std::string PARAM_NAME_POOL_SYNC_PACKET_COUNT = "neighbour_packets_count";
 const std::string PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ = "sequences_verification_frequency";
 
 const std::string PARAM_NAME_API_PORT = "port";
@@ -864,10 +861,7 @@ void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config)
 
     const boost::property_tree::ptree& data = config.get_child(block);
 
-    checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK, poolSyncData_.oneReplyBlock);
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_POOLS_COUNT, poolSyncData_.blockPoolsCount);
-    checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_ROUND_COUNT, poolSyncData_.requestRepeatRoundCount);
-    checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_PACKET_COUNT, poolSyncData_.neighbourPacketsCount);
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ, poolSyncData_.sequencesVerificationFrequency);
 }
 
@@ -979,10 +973,7 @@ bool operator!=(const EndpointData& lhs, const EndpointData& rhs) {
 }
 
 bool operator==(const PoolSyncData& lhs, const PoolSyncData& rhs) {
-    return lhs.oneReplyBlock == rhs.oneReplyBlock &&
-           lhs.blockPoolsCount == rhs.blockPoolsCount &&
-           lhs.requestRepeatRoundCount && rhs.requestRepeatRoundCount &&
-           lhs.neighbourPacketsCount && rhs.neighbourPacketsCount &&
+    return lhs.blockPoolsCount == rhs.blockPoolsCount &&
            lhs.sequencesVerificationFrequency && rhs.sequencesVerificationFrequency;
 }
 
