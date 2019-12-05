@@ -888,7 +888,7 @@ void cs::Executor::deleteAccessId(const general::AccessID& accessId) {
 
 std::optional<cs::Executor::OriginExecuteResult> cs::Executor::execute(const std::string& address, const executor::SmartContractBinary& smartContractBinary,
                                                                        std::vector<executor::MethodHeader>& methodHeader, bool isGetter, cs::Sequence explicitSequence) {
-    constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
+    const uint64_t EXECUTION_TIME = Consensus::TimeSmartContract;
     OriginExecuteResult originExecuteRes{};
 
     if (!isConnected()) {

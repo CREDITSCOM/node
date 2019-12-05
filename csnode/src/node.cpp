@@ -1489,7 +1489,7 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
         if (lastSequence < neighbourWithMaxSeq.second) {
             delta = std::chrono::milliseconds(0);
             cswarning() << "Local max block " << WithDelimiters(lastSequence) << " is lower than remote one "
-                << WithDelimiters(sequence) << ", trying to request round table";
+                << WithDelimiters(neighbourWithMaxSeq.second) << ", trying to request round table";
 
             CallsQueue::instance().insert([=] {
                 roundPackRequest(neighbourWithMaxSeq.first, neighbourWithMaxSeq.second);
@@ -1768,7 +1768,7 @@ uint32_t Node::sendToList(const std::vector<cs::PublicKey>& listMembers, const c
                 << ", msgType: " << Packet::messageTypeToString(msgType);
 
     transport_->sendMulticast(formPacket(BaseFlags::Compressed, msgType, round, args...), listMembers);
-    return (uint32_t) listMembers.size(); // @TODO rewrite this logic consider tcp
+    return static_cast<uint32_t>(listMembers.size()); // @TODO rewrite this logic consider tcp
 }
 
 template <class... Args>

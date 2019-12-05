@@ -33,7 +33,7 @@ void TrustedStage1State::on(SolverContext& context) {
     min_time_expired = false;
 
     SolverContext* pctx = &context;
-    auto dt = Consensus::T_min_stage1;
+    auto dt = Consensus::TimeMinStage1;
     csdebug() << name() << ": start track min time " << dt << " ms to get hashes";
 
     cs::Timer::singleShot(dt, cs::RunPolicy::CallQueuePolicy, [this, pctx]() {
