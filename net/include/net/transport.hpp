@@ -58,9 +58,6 @@ public:
     void forEachNeighbour(Neighbourhood::NeighboursCallback);
     bool hasNeighbour(const cs::PublicKey&) const;
 
-    // @TODO remove, used in Node
-    void sendSSIntroduceConsensus(const std::vector<cs::PublicKey>&) {}
-
     // HostEventHandler
     void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
     void OnNodeDiscovered(const net::NodeId&) override;

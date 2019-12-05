@@ -299,154 +299,6 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
 
 }
 
-void Node::getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
-    auto& conveyer = cs::Conveyer::instance();
-
-    cswarning() << "-----------------------------------------------------------";
-    cswarning() << "NODE> BigBang #" << rNum << ": last written #" << blockChain_.getLastSeq() << ", current #" << conveyer.currentRoundNumber();
-    cswarning() << "-----------------------------------------------------------";
-
-    cs::DataStream stream(data, size);
-
-    uint8_t tmp = 0;
-    stream >> tmp;
-
-    if (tmp <= receivedBangs[rNum] && !(tmp < Consensus::MaxSubroundDelta && receivedBangs[rNum] > std::numeric_limits<uint8_t>::max() - Consensus::MaxSubroundDelta)) {
-        cswarning() << "Old Big Bang received: " << rNum << "." << static_cast<int>(tmp) << " is <= " << rNum << "." << static_cast<int>(receivedBangs[rNum]);
-        return;
-    }
-
-    // cache
-    auto cachedRound = conveyer.currentRoundNumber();
-
-    cs::Hash lastBlockHash;
-    stream >> lastBlockHash;
-       
-    cs::RoundTable globalTable;
-    globalTable.round = rNum;
-
-    // not uses both subRound_ and recdBangs[], so can be called here:
-    if (!readRoundData(globalTable, stream,true)) {
-        cserror() << className() << " read round data from SS failed";
-        return;
-    }
-
-    if (stream.isAvailable(sizeof(long long))) {
-        long long timeSS = 0;
-        stream >> timeSS;
-        auto seconds = timePassedSinceBB(timeSS);
-        constexpr long long MaxBigBangAge_sec = 180;
-        if (seconds > MaxBigBangAge_sec) {
-            cslog() << "Elder Big Bang received of " << WithDelimiters(seconds) << " seconds age, ignore";
-            return;
-        }
-        else {
-            cslog() << "Big Bang received of " << WithDelimiters(seconds) << " seconds age, accept";
-        }
-    }
-    else {
-        cswarning() << "Deprecated Big Bang received of unknown age, ignore";
-        return;
-    }
-
-    // update round data
-    subRound_ = tmp;
-    receivedBangs[rNum] = subRound_;
-
-    if (stat_.isCurrentRoundTooLong()) {
-        poolSynchronizer_->syncLastPool();
-    }
-
-    solver_->resetGrayList();
-    roundPackageCache_.clear();
-
-    // this evil code sould be removed after examination
-    cs::Sequence countRemoved = 0;
-    cs::Sequence lastSequence = blockChain_.getLastSeq();
-
-    while (lastSequence >= rNum) {
-        if (countRemoved == 0) {
-            // the 1st time
-            csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
-            blockChain_.setBlocksToBeRemoved(lastSequence - rNum  + 1);
-        }
-
-        blockChain_.removeLastBlock();
-        cs::RoundNumber tmp_seq = blockChain_.getLastSeq();
-
-        if (lastSequence == tmp_seq) {
-            csdebug() << "NODE> cancel remove blocks operation (last removal is failed)";
-            break;
-        }
-
-        ++countRemoved;
-        lastSequence = tmp_seq;
-    }
-
-    if (countRemoved > 0) {
-        csdebug() << "NODE> " << countRemoved << " block(s) was removed";
-    }
-
-    // resend all this round data available
-    csdebug() << "NODE> resend last block hash after BigBang";
-
-    // do not pass further the hashes from unsuccessful round
-    csmeta(csdebug) << "Get BigBang globalTable.hashes: " << globalTable.hashes.size();
-
-    conveyer.updateRoundTable(cachedRound, globalTable);
-    onRoundStart(globalTable, false);
-
-    poolSynchronizer_->sync(globalTable.round, cs::PoolSynchronizer::roundDifferentForSync, true);
-
-    if (conveyer.isSyncCompleted()) {
-        startConsensus();
-    }
-    else {
-        cswarning() << "NODE> non empty required hashes after BB detected";
-        sendPacketHashesRequest(conveyer.currentNeededHashes(), conveyer.currentRoundNumber(), startPacketRequestPoint_);
-    }
-}
-
-void Node::getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
-    cslog() << "NODE> get SS Round Table #" << rNum;
-    if (cs::Conveyer::instance().currentRoundNumber() != 0) {
-        csdebug() << "The RoundTable sent by SS doesn't correspond to the current RoundNumber";
-        return;
-    }
-
-    cs::DataStream stream(data, size);
-    cs::RoundTable roundTable;
-
-    if (!readRoundData(roundTable, stream, false)) {
-        cserror() << "NODE> read round data from SS failed, continue without round table";
-    }
-
-    cs::Sequence lastSequence = blockChain_.getLastSeq();
-
-    if (lastSequence >= rNum) {
-        csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
-        blockChain_.setBlocksToBeRemoved(lastSequence - rNum + 1);
-    }
-
-    // update new round data from SS
-    // TODO: fix sub round
-    subRound_ = 0;
-    roundTable.round = rNum;
-
-    cs::Conveyer::instance().setRound(rNum);
-    cs::Conveyer::instance().setTable(roundTable);
-
-    // "normal" start
-    if (roundTable.round == 1) {
-        onRoundStart(roundTable, false);
-        reviewConveyerHashes();
-
-        return;
-    }
-
-    poolSynchronizer_->sync(rNum);
-}
-
 bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
     std::string verb;
     if (packet.signatures().size() == 1) {
@@ -898,7 +750,10 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage, cs::DataStream& stream)
     auto tmpPool = solver_->getDeferredBlock().clone();
     if (tmpPool.is_valid() && tmpPool.sequence() == round) {
         auto tmp2 = rPackage.poolSignatures();
-        tmpPool.add_user_field(0, rPackage.poolMetaInfo().timestamp);
+        BlockChain::setTimestamp(tmpPool, rPackage.poolMetaInfo().timestamp);
+        if (isBootstrapRound()) {
+            BlockChain::setBootstrap(tmpPool, true);
+        }
         tmpPool.add_number_trusted(static_cast<uint8_t>(rPackage.poolMetaInfo().realTrustedMask.size()));
         tmpPool.add_real_trusted(cs::Utils::maskToBits(rPackage.poolMetaInfo().realTrustedMask));
         tmpPool.set_signatures(tmp2);
@@ -924,7 +779,9 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage, cs::DataStream& stream)
             }
         }
     }
-
+    if (isBootstrapRound()) {
+        BlockChain::setBootstrap(pool.value(), true);
+    }
     if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
         cserror() << "NODE> failed to store block in BlockChain";
     }
@@ -1282,8 +1139,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
         return;
     }
 
-    const bool isOneBlockReply = poolSynchronizer_->isOneBlockReply();
-    const std::size_t reserveSize = isOneBlockReply ? 1 : sequences.size();
+    const std::size_t reserveSize = sequences.size();
 
     cs::PoolsBlock poolsBlock;
     poolsBlock.reserve(reserveSize);
@@ -1298,19 +1154,13 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 
         if (pool.is_valid()) {
             poolsBlock.push_back(std::move(pool));
-
-            if (isOneBlockReply) {
-                sendReply();
-            }
         }
         else {
             csmeta(cslog) << "unable to load block " << sequence << " from blockchain";
         }
     }
 
-    if (!isOneBlockReply) {
-        sendReply();
-    }
+    sendReply();
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
@@ -1490,9 +1340,10 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
 void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
     static std::chrono::milliseconds delta{ 0 };
-    static std::pair<cs::PublicKey, cs::Sequence> neighbourWithMaxSeq{};
-    if (neighbourWithMaxSeq.second < sequence) {
-        neighbourWithMaxSeq = std::make_pair(sender, sequence);
+    static std::pair<cs::PublicKey, cs::Sequence> maxSequenceNeighbour{};
+
+    if (maxSequenceNeighbour.second < sequence) {
+        maxSequenceNeighbour = std::make_pair(sender, sequence);
     }
 
     auto now = std::chrono::steady_clock::now();
@@ -1501,13 +1352,13 @@ void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
     if (maxPingSynchroDelay_ <= delta.count()) {
         auto lastSequence = blockChain_.getLastSeq();
 
-        if (lastSequence < neighbourWithMaxSeq.second) {
+        if (lastSequence < maxSequenceNeighbour.second) {
             delta = std::chrono::milliseconds(0);
             cswarning() << "Local max block " << WithDelimiters(lastSequence) << " is lower than remote one "
-                << WithDelimiters(neighbourWithMaxSeq.second) << ", trying to request round table";
+                << WithDelimiters(maxSequenceNeighbour.second) << ", trying to request round table";
 
             CallsQueue::instance().insert([=] {
-                roundPackRequest(neighbourWithMaxSeq.first, neighbourWithMaxSeq.second);
+                roundPackRequest(maxSequenceNeighbour.first, maxSequenceNeighbour.second);
             });
         }
     }
@@ -1565,11 +1416,6 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         return MessageActions::Drop;
     }
 
-    // BB: every round (for now) may be handled:
-    if (type == MsgTypes::BigBang) {
-        return MessageActions::Process;
-    }
-
     if (type == MsgTypes::Utility) {
         return (round < rNum + Consensus::UtilityMessageRoundInterval && round + Consensus::UtilityMessageRoundInterval > rNum ) ? MessageActions::Process : MessageActions::Drop;
     }
@@ -1624,7 +1470,6 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
                 // not on the very start
                 cswarning() << "NODE> detect round lag (global " << rNum << ", local " << round << ")";
                 roundPackRequest(sender, rNum);
-                // TODO: roundTableRequest(cs::PublicKey respondent);
             }
 
             return MessageActions::Drop;
@@ -1637,67 +1482,6 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
 
 void Node::updateConfigFromFile() {
     observer_.notify();
-}
-
-inline bool Node::readRoundData(cs::RoundTable& roundTable, cs::DataStream& stream, bool bang) {
-    cs::PublicKey mainNode;
-
-    uint8_t confSize = 0;
-    stream >> confSize;
-
-    csdebug() << "NODE> Number of confidants :" << cs::numeric_cast<int>(confSize);
-
-    if (confSize < Consensus::MinTrustedNodes || confSize > Consensus::MaxTrustedNodes) {
-        cswarning() << "Bad confidants num";
-        return false;
-    }
-
-    cs::ConfidantsKeys confidants;
-    confidants.reserve(confSize);
-
-    stream >> mainNode;
-
-    // TODO Fix confidants array getting (From SS)
-    for (int i = 0; i < confSize; ++i) {
-        cs::PublicKey key;
-        stream >> key;
-
-        confidants.push_back(std::move(key));
-    }
-    if (bang) {
-        cs::Signature sig;
-        stream >> sig;
-
-        cs::Bytes trustedToHash;
-        cs::DataStream tth(trustedToHash);
-        tth << roundTable.round;
-        tth << confidants;
-        csdebug() << "Message to Sign: " << cs::Utils::byteStreamToHex(trustedToHash);
-        // cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
-        const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
-        csdebug() << "SSKey: " << cs::Utils::byteStreamToHex(starter_key.data(), starter_key.size());
-        if (!cscrypto::verifySignature(sig, starter_key, trustedToHash.data(), trustedToHash.size())) {
-            cswarning() << "The BIGBANG message is incorrect: signature isn't valid";
-            return false;
-        }
-        cs::Bytes confMask;
-        cs::Signatures signatures;
-        signatures.push_back(sig);
-        confMask.push_back(0);
-        // confirmationList_.remove(roundTable.round);
-        confirmationList_.add(roundTable.round, bang, confidants, confMask, signatures);
-    }
-
-    if (!stream.isValid() || confidants.size() < confSize) {
-        cswarning() << "Bad round table format, ignoring";
-        return false;
-    }
-
-    roundTable.confidants = std::move(confidants);
-    // roundTable.general = mainNode;
-    roundTable.hashes.clear();
-
-    return true;
 }
 
 static const char* nodeLevelToString(Node::Level nodeLevel) {
@@ -2154,10 +1938,6 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
     sendToConfidant(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
 
     csmeta(csdetails) << "done";
-}
-
-void Node::sendConfidants(const std::vector<cs::PublicKey>& keys) {
-    transport_->sendSSIntroduceConsensus(keys);
 }
 
 void Node::sendSmartReject(const std::vector<RefExecution>& rejectList) {

@@ -95,7 +95,7 @@ public:
      *            for future use and will be recorded on time
      */
 
-    bool storeBlock(csdb::Pool& pool, bool bySync, bool skipConfirmations = false);
+    bool storeBlock(csdb::Pool& pool, bool bySync);
 
     /**
      * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool);
@@ -139,6 +139,13 @@ public:
     bool updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom);
     bool deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool);
     cs::Sequence getLastSeq() const;
+
+    static inline const csdb::user_field_id_t kFieldTimestamp = 0;
+    static inline const csdb::user_field_id_t kFieldServiceInfo = 1;
+
+    static void setTimestamp(csdb::Pool& block, const std::string& timestamp);
+    static void setBootstrap(csdb::Pool& block, bool is_bootstrap);
+    static bool isBootstrap(const csdb::Pool& block);
 
     const cs::MultiWallets& multiWallets() const;
 

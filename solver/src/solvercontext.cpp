@@ -120,10 +120,6 @@ void SolverContext::spawn_next_round(cs::StageThree& st3) {
         return;
     }
 
-    if (st3.writer == st3.sender) {
-        core.pnode->sendConfidants(core.trusted_candidates);
-    }
-
     std::string tStamp;
 
     if (st3.writer != InvalidConfidantIndex) {
@@ -251,7 +247,7 @@ void SolverContext::send_rejected_report(const cs::Bytes& rejected_pack) {
 }
 
 bool SolverContext::is_round_duration_limited() const {
-    return !core.pnode->isCurrentRPDefault();
+    return !core.pnode->isBootstrapRound();
 }
 
 }  // namespace cs

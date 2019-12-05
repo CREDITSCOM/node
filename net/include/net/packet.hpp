@@ -6,10 +6,12 @@
 #include <vector>
 
 #include <cscrypto/cscrypto.hpp>
+
 #include <lib/system/common.hpp>
 #include <lib/system/hash.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+
 #include <networkcommands.hpp>
 
 enum BaseFlags : uint8_t {
@@ -21,7 +23,6 @@ enum BaseFlags : uint8_t {
 };
 
 enum MsgTypes : uint8_t {
-    RoundTableSS,
     Transactions,
     FirstTransaction,
     NewBlock,
@@ -53,7 +54,6 @@ enum MsgTypes : uint8_t {
     RoundPackRequest,
     StateRequest,
     StateReply,
-    BigBang = 35,
     Utility,
     EmptyRoundPack,
     BlockAlarm,

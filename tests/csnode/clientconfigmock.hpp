@@ -18,7 +18,6 @@ public:
   MOCK_CONST_METHOD0(getSignalServerEndpoint, const EndpointData&());
 
   MOCK_CONST_METHOD0(getBootstrapType, BootstrapType());
-  MOCK_CONST_METHOD0(getNodeType, NodeType());
   MOCK_CONST_METHOD0(getIpList, const std::vector<EndpointData>&());
 
   MOCK_CONST_METHOD0(getMyPublicKey, const cs::PublicKey&());
