@@ -609,7 +609,8 @@ bool cs::PoolSynchronizer::isAvailableRequest(const cs::PoolSynchronizer::Neighb
     const auto value = nh.roundCounter();
 
     if (value != 0) {
-        return ((value % cs::ConfigHolder::instance().config()->getPoolSyncSettings().requestRepeatRoundCount) == 0);
+        auto repeatRequestCount = cs::ConfigHolder::instance().config()->getPoolSyncSettings().requestRepeatRoundCount;
+        return  repeatRequestCount != 0 ? ((value % repeatRequestCount) == 0) : (value == 0);
     }
 
     return false;
