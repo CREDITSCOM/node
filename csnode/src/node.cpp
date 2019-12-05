@@ -882,7 +882,10 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage, cs::DataStream& stream)
     auto tmpPool = solver_->getDeferredBlock().clone();
     if (tmpPool.is_valid() && tmpPool.sequence() == round) {
         auto tmp2 = rPackage.poolSignatures();
-        tmpPool.add_user_field(0, rPackage.poolMetaInfo().timestamp);
+        BlockChain::setTimestamp(tmpPool, rPackage.poolMetaInfo().timestamp);
+        if (isBootstrapRound()) {
+            BlockChain::setBootstrap(tmpPool, true);
+        }
         tmpPool.add_number_trusted(static_cast<uint8_t>(rPackage.poolMetaInfo().realTrustedMask.size()));
         tmpPool.add_real_trusted(cs::Utils::maskToBits(rPackage.poolMetaInfo().realTrustedMask));
         tmpPool.set_signatures(tmp2);
@@ -908,7 +911,9 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage, cs::DataStream& stream)
             }
         }
     }
-
+    if (isBootstrapRound()) {
+        BlockChain::setBootstrap(pool.value(), true);
+    }
     if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
         cserror() << "NODE> failed to store block in BlockChain";
     }

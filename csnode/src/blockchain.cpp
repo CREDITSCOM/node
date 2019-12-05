@@ -486,7 +486,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
             csdebug() << cs::Utils::byteStreamToHex(it.data(), it.size());
         }
         // <-delete
-        if (confMask.size() > 1) {
+        if (!BlockChain::isBootstrap(pool) && confMask.size() > 1) {
             if (!NodeUtils::checkGroupSignature(lastConfidants, confMask, sigs, trustedHash)) {
                 csdebug() << "           The Confidants confirmations are not OK";
                 return false;
@@ -496,7 +496,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
             }
         }
         else {
-            // TODO: add SS PKey to the prevConfidants
+            // TODO: add SS or bootstrap confidants PKey to the prevConfidants
         }
     }
 
@@ -1009,7 +1009,7 @@ bool BlockChain::updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& p
     for (auto& it : poolFrom.transactions()) {
         tmpPool.add_transaction(it);
     }
-    tmpPool.add_user_field(0, rPackage.poolMetaInfo().timestamp);
+    BlockChain::setTimestamp(tmpPool, rPackage.poolMetaInfo().timestamp);
     for (auto& it : poolFrom.smartSignatures()) {
         tmpPool.add_smart_signature(it);
     }
@@ -1031,6 +1031,69 @@ bool BlockChain::updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& p
     }
 
     return deferredBlockExchange(rPackage, tmpPool);
+}
+
+/*static*/
+void BlockChain::setTimestamp(csdb::Pool& block, const std::string& timestamp) {
+    block.add_user_field(BlockChain::kFieldTimestamp, timestamp);
+}
+
+// user field "kFieldServiceInfo": [0] - info version, [1] - block flag, == 1 if boostrap block
+
+/*static*/
+void BlockChain::setBootstrap(csdb::Pool& block, bool is_bootstrap) {
+    if (is_bootstrap) {
+        std::string info;
+        if (block.user_field_ids().count(BlockChain::kFieldServiceInfo) > 0) {
+            info = block.user_field(BlockChain::kFieldServiceInfo).value<std::string>();
+        }
+        if (info.size() >= 2) {
+            if (info[1] == '\001') {
+                // already set
+                csdetails() << "BlockChain: block #" << block.sequence() << " bootstrap flag has already set";
+                return;
+            }
+        }
+        else {
+            info.resize(2);
+        }
+        info[1] = '\001'; // boostrap block
+        block.add_user_field(BlockChain::kFieldServiceInfo, info);
+        csdebug() << "BlockChain: set block #" << block.sequence() << " bootstrap flag";
+    }
+    else {
+        // clear bootstrap flag if set, otherwise ignore
+        if (block.user_field_ids().count(BlockChain::kFieldServiceInfo) > 0) {
+            std::string info = block.user_field(BlockChain::kFieldServiceInfo).value<std::string>();
+            if (info.size() >= 2) {
+                if (info[1] == '\000') {
+                    // already unset
+                    csdetails() << "BlockChain: block #" << block.sequence() << " bootstrap flag has already unset";
+                    return;
+                }
+                info[1] = '\000'; // non-boostrap block
+                block.add_user_field(BlockChain::kFieldServiceInfo, info);
+                csdebug() << "BlockChain: clear block #" << block.sequence() << " bootstrap flag";
+            }
+            else {
+                cserror() << "BlockChain: unable to parse block service info, incompatible version";
+            }
+        }
+    }
+}
+
+/*static*/
+bool BlockChain::isBootstrap(const csdb::Pool& block) {
+    if (block.user_field_ids().count(BlockChain::kFieldServiceInfo) > 0) {
+        std::string s = block.user_field(BlockChain::kFieldServiceInfo).value<std::string>();
+        if (s.size() >= 2 && s[0] == 0) {
+            return s[1] == 1;
+        }
+        else {
+            csdebug() << "BlockChain: unable to parse block service info, incompatible version";
+        }
+    }
+    return false;
 }
 
 bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool) {
@@ -1055,7 +1118,7 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
     return true;
 }
 
-bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync, bool skipConfirmations /*= false*/) {
+bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     const auto lastSequence = getLastSeq();
     const auto poolSequence = pool.sequence();
     csdebug() << csfunc() << "last #" << lastSequence << ", pool #" << poolSequence;
@@ -1067,7 +1130,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync, bool skipConfirmation
         return true;
     }
 
-    if (!skipConfirmations) {
+    if (!BlockChain::isBootstrap(pool)) {
         if ((pool.numberConfirmations() == 0 || pool.roundConfirmations().size() == 0) && pool.sequence() > 1) {
             return false;
         }

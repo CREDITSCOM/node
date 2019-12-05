@@ -64,7 +64,7 @@ const cs::PublicKey& SolverCore::getWriterPublicKey() const {
     return Zero::key;
 }
 
-bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
+bool SolverCore::checkNodeStake(const cs::PublicKey& sender) {
     if (cs::Conveyer::instance().currentRoundNumber() < Consensus::StartingDPOS) {
         csdebug() << "The DPOS doesn't work unless the roundNumber is less than " << Consensus::StartingDPOS;
         return true;
@@ -99,7 +99,7 @@ void SolverCore::gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize
     }
 
     // DPOS check start -> comment if unnecessary
-    if (!checkNodeCache(sHash.sender)) {
+    if (!checkNodeStake(sHash.sender)) {
         csdebug() << "The sender's cash value is too low -> Don't allowed to be a confidant";
         return;
     }
@@ -109,8 +109,13 @@ void SolverCore::gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize
         csdebug() << "Stake value is lower than that in this node, trow this hash";
     }
     auto rNum = cs::Conveyer::instance().currentRoundNumber();
-    auto it = std::find_if(recv_hash.cbegin(), recv_hash.cend(), [sHash, rNum](const cs::StageHash& sh)
-    { return ((sHash.sender == sh.sender) && (sHash.realTrustedSize > sh.realTrustedSize) && (sHash.round == rNum)); });
+    bool isBootstrap = pnode->isBootstrapRound();
+    auto it = std::find_if(
+        recv_hash.cbegin(), recv_hash.cend(), 
+        [sHash, rNum, isBootstrap](const cs::StageHash& sh) {
+            return ((sHash.sender == sh.sender) && (isBootstrap || sHash.realTrustedSize > sh.realTrustedSize) && (sHash.round == rNum));
+        }
+    );
     if (it != recv_hash.cend()) {
         recv_hash.erase(it);
     }

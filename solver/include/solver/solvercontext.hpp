@@ -299,8 +299,8 @@ public:
         return core.getRealTrusted();
     }
 
-    bool checkNodeCache(cs::PublicKey sender) const {
-        return core.checkNodeCache(sender);
+    bool checkNodeStake(cs::PublicKey sender) const {
+        return core.checkNodeStake(sender);
     }
 
     size_t stagesThree() const {

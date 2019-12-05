@@ -251,7 +251,7 @@ void SolverContext::send_rejected_report(const cs::Bytes& rejected_pack) {
 }
 
 bool SolverContext::is_round_duration_limited() const {
-    return !core.pnode->isCurrentRPDefault();
+    return !core.pnode->isBootstrapRound();
 }
 
 }  // namespace cs
