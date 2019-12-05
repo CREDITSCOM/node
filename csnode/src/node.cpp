@@ -2137,10 +2137,6 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
     csmeta(csdetails) << "done";
 }
 
-void Node::sendConfidants(const std::vector<cs::PublicKey>& keys) {
-    transport_->sendSSIntroduceConsensus(keys);
-}
-
 void Node::sendSmartReject(const std::vector<RefExecution>& rejectList) {
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send smart Reject messages";
