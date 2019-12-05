@@ -120,10 +120,6 @@ void SolverContext::spawn_next_round(cs::StageThree& st3) {
         return;
     }
 
-    if (st3.writer == st3.sender) {
-        core.pnode->sendConfidants(core.trusted_candidates);
-    }
-
     std::string tStamp;
 
     if (st3.writer != InvalidConfidantIndex) {

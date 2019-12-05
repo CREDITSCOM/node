@@ -242,8 +242,6 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
             return node_->getBlockRequest(data, size, sender);
         case MsgTypes::RequestedBlock:
             return node_->getBlockReply(data, size);
-        case MsgTypes::BigBang:  // any round (in theory) may be set
-            return node_->getBigBang(data, size, rNum);
         case MsgTypes::Utility:
             return node_->getUtilityMessage(data, size);
         case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
@@ -252,8 +250,6 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
             return node_->getNodeStopRequest(rNum, data, size);
         case MsgTypes::RoundTable:
             return node_->getRoundTable(data, size, rNum, sender);
-        case MsgTypes::RoundTableSS:
-            return node_->getRoundTableSS(data, size, rNum);
         default:
             break;
     }

@@ -20,7 +20,7 @@ class PoolSynchronizer {
 public:
     explicit PoolSynchronizer(Transport* transport, BlockChain* blockChain);
 
-    void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = roundDifferentForSync, bool isBigBand = false);
+    void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = roundDifferentForSync);
     void syncLastPool();
 
     // syncro get functions
@@ -31,8 +31,6 @@ public:
 
     bool isSyncroStarted() const;
 
-    bool isOneBlockReply() const;
-
     static const cs::RoundNumber roundDifferentForSync = cs::values::kDefaultMetaStorageMaxSize;
 
 public signals:
@@ -40,7 +38,6 @@ public signals:
 
 private slots:
     void onTimeOut();
-    void onRoundSimulation();
 
     void onWriteBlock(const csdb::Pool pool);
     void onWriteBlock(const cs::Sequence sequence);
@@ -71,14 +68,11 @@ private:
 
     bool isLastRequest() const;
 
-    bool isAvailableRequest(const cs::PoolSynchronizer::NeighboursSetElemet& nh) const;
-
     void synchroFinished();
     void printNeighbours(const std::string& funcName) const;
 
 private:
     enum class CounterType {
-        ROUND,
         TIMER
     };
 
@@ -234,7 +228,6 @@ private:
     std::vector<NeighboursSetElemet> neighbours_;
 
     cs::Timer timer_;
-    cs::Timer roundSimulation_;
 
     friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType);
     friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::SequenceRemovalAccuracy);
@@ -242,9 +235,6 @@ private:
 
 inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::CounterType type) {
     switch (type) {
-        case PoolSynchronizer::CounterType::ROUND:
-            os << "ROUND";
-            break;
         case PoolSynchronizer::CounterType::TIMER:
             os << "TIMER";
             break;

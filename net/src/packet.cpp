@@ -4,8 +4,6 @@
 
 const char* Packet::messageTypeToString(MsgTypes messageType) {
     switch (messageType) {
-        case RoundTableSS:
-            return "RoundTableSS";
         case Transactions:
             return "Transactions";
         case FirstTransaction:
@@ -60,8 +58,6 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
             return "SmartThirdStageRequest";
         case HashReply:
             return "HashReply";
-        case BigBang:
-            return "BigBang";
         case NodeStopRequest:
             return "NodeStopRequest";
         case RejectedContracts:

@@ -82,8 +82,6 @@ public:
     std::string getSenderText(const cs::PublicKey& sender);
 
     // incoming requests processing
-    void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum);
-    void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
     bool verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender);
     bool verifyPacketTransactions(cs::TransactionsPacket packet, const cs::PublicKey& sender);
     void getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
@@ -124,7 +122,6 @@ public:
     void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, uint8_t iteration);
     void getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
     void sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester, cs::Bytes& message);
-    void sendConfidants(const std::vector<cs::PublicKey>&);
 
     // smart-contracts consensus communicatioin
     void sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs::StageOneSmarts& stageOneInfo);
@@ -332,7 +329,6 @@ private:
     bool sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);
 
-    bool readRoundData(cs::RoundTable& roundTable, cs::DataStream& stream, bool bang);
     void reviewConveyerHashes();
 
     void processSync();

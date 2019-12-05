@@ -35,8 +35,6 @@ const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
 const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;             // rounds
 const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
 
-[[maybe_unused]]
-const uint8_t DELTA_ROUNDS_VERIFY_NEW_SERVER = 100;
 using Port = short unsigned;
 
 struct EndpointData {
@@ -49,22 +47,13 @@ struct EndpointData {
     static EndpointData fromString(const std::string&);
 };
 
-enum NodeType {
-    Client,
-    Router
-};
-
 enum BootstrapType {
-    SignalServer,
     IpList
 };
 
 struct PoolSyncData {
-    bool oneReplyBlock = true;                      // true: sendBlockRequest one pool at a time. false: equal to number of pools requested.
-    cs::Sequence blockPoolsCount = 25;              // max block count in one request: cannot be 0
-    uint8_t requestRepeatRoundCount = 20;           // round count for repeat request : 0-never
-    uint8_t neighbourPacketsCount = 10;             // packet count for connect another neighbor : 0-never
-    uint16_t sequencesVerificationFrequency = 350;  // sequences received verification frequency : 0-never; 1-once per round: other- in ms;
+    cs::Sequence blockPoolsCount = 25;               // max block count in one request: cannot be 0
+    uint16_t sequencesVerificationFrequency = 350;   // sequences received verification frequency : 0-never; 1-once per round: other- in ms;
 };
 
 struct ApiData {
@@ -127,8 +116,6 @@ struct EventsReportData {
     bool reject_contract_consensus = true;
     // invalid block detected by node
     bool alarm_invalid_block = true;
-    // big bang occurred
-    bool big_bang = false;
 };
 
 class Config {
@@ -144,26 +131,14 @@ public:
 
     static Config read(po::variables_map&);
     
-    template<typename T, typename ... Ts, typename = cs::IsConvertToString<T, Ts...>>
-    static bool replaceBlock(T&& blockName, Ts&& ... newLines);
-
     const EndpointData& getInputEndpoint() const {
         return inputEp_;
     }
+
     const EndpointData& getOutputEndpoint() const {
         return outputEp_;
     }
 
-    const EndpointData& getSignalServerEndpoint() const {
-        return signalServerEp_;
-    }
-
-    BootstrapType getBootstrapType() const {
-        return bType_;
-    }
-    NodeType getNodeType() const {
-        return nType_;
-    }
     const std::vector<EndpointData>& getIpList() const {
         return bList_;
     }
@@ -183,6 +158,7 @@ public:
     bool useIPv6() const {
         return ipv6_;
     }
+
     bool hasTwoSockets() const {
         return twoSockets_;
     }
@@ -194,6 +170,7 @@ public:
     uint32_t getMaxNeighbours() const {
         return maxNeighbours_;
     }
+
     uint64_t getConnectionBandwidth() const {
         return connectionBandwidth_;
     }
@@ -201,6 +178,7 @@ public:
     bool isSymmetric() const {
         return symmetric_;
     }
+
     const EndpointData& getAddressEndpoint() const {
         return hostAddressEp_;
     }
@@ -228,6 +206,7 @@ public:
     const cs::PublicKey& getMyPublicKey() const {
         return publicKey_;
     }
+
     const cs::PrivateKey& getMyPrivateKey() const {
         return privateKey_;
     }
@@ -308,7 +287,6 @@ private:
 
     EndpointData outputEp_;
 
-    NodeType nType_ = NodeType::Client;
     NodeVersion minCompatibleVersion_ = NODE_VERSION;
 
     bool ipv6_ = false;
@@ -318,10 +296,8 @@ private:
     uint64_t connectionBandwidth_ = DEFAULT_CONNECTION_BANDWIDTH;
 
     bool symmetric_ = false;
-    EndpointData hostAddressEp_;
 
-    BootstrapType bType_ = SignalServer;
-    EndpointData signalServerEp_;
+    EndpointData hostAddressEp_;
 
     std::vector<EndpointData> bList_;
     std::vector<cs::PublicKey> initialConfidants_;
@@ -369,44 +345,5 @@ bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs);
 
 bool operator==(const Config& lhs, const Config& rhs);
 bool operator!=(const Config& lhs, const Config& rhs);
-
-
-template<typename T, typename ... Ts, typename>
-bool Config::replaceBlock(T&& blockName, Ts&& ... newLines) {
-    std::ifstream in(DEFAULT_PATH_TO_CONFIG, std::ios::in);
-
-    if (!in) {
-        cswarning() << "Couldn't read config file " << DEFAULT_PATH_TO_CONFIG;
-        return false;
-    }
-
-    std::string newConfig = cs::Utils::readAllFileData(in);
-
-    const std::string fullBlockName = "[" + std::string(blockName) + "]";
-    const std::string fullReplaceString = fullBlockName + "\n" + ((std::string(newLines) + "\n") + ...) + "\n";
-
-    if (const auto startPos = newConfig.find(fullBlockName); startPos != std::string::npos) {
-        const auto tmpPos = newConfig.find("[", startPos + 1);
-        const auto endPos = (tmpPos != std::string::npos ? tmpPos - 1 : newConfig.size());
-        newConfig.replace(startPos, endPos, fullReplaceString);
-    }
-    else {
-        newConfig += fullReplaceString;
-    }
-
-    in.close();
-
-    std::ofstream out(DEFAULT_PATH_TO_CONFIG, std::ios::out | std::ios::trunc);
-
-    if (!out) {
-        cswarning() << "Couldn't read config file " << DEFAULT_PATH_TO_CONFIG;
-        return false;
-    }
-
-    out << newConfig.data();
-    out.close();
-
-    return true;
-}
 
 #endif  // CONFIG_HPP
