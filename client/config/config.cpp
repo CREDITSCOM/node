@@ -1,4 +1,3 @@
-/* Send blaming letters to @yrtimd */
 #include <iostream>
 #include <regex>
 #include <stdexcept>
@@ -31,7 +30,6 @@
 const NodeVersion NODE_VERSION = 441;
 
 const std::string BLOCK_NAME_PARAMS = "params";
-const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
 const std::string BLOCK_NAME_HOST_OUTPUT = "host_output";
 const std::string BLOCK_NAME_HOST_ADDRESS = "host_address";
@@ -40,8 +38,6 @@ const std::string BLOCK_NAME_API = "api";
 const std::string BLOCK_NAME_CONVEYER = "conveyer";
 const std::string BLOCK_NAME_EVENT_REPORTER = "event_report";
 
-const std::string PARAM_NAME_NODE_TYPE = "node_type";
-const std::string PARAM_NAME_BOOTSTRAP_TYPE = "bootstrap_type";
 const std::string PARAM_NAME_HOSTS_FILENAME = "hosts_filename";
 const std::string PARAM_NAME_INITIAL_TRUSTED = "init_trusted_filename";
 const std::string PARAM_NAME_USE_IPV6 = "ipv6";
@@ -99,7 +95,6 @@ const std::string PARAM_NAME_EVENTS_REJECT_TRANSACTION = "reject_transaction";
 const std::string PARAM_NAME_EVENTS_REJECT_CONTRACT_EXECUTION = "reject_contract_execution";
 const std::string PARAM_NAME_EVENTS_REJECT_CONTRACT_CONSENSUS = "reject_contract_consensus";
 const std::string PARAM_NAME_EVENTS_ALARM_INVALID_BLOCK = "alarm_invalid_block";
-const std::string PARAM_NAME_EVENTS_BIG_BANG = "big_bang";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
@@ -114,8 +109,7 @@ const std::string ARG_NAME_TRAVERSE_NAT = "traverse-nat";
 const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
 
-const std::map<std::string, NodeType> NODE_TYPES_MAP = {{"client", NodeType::Client}, {"router", NodeType::Router}};
-const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"signal_server", BootstrapType::SignalServer}, {"list", BootstrapType::IpList}};
+const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"list", BootstrapType::IpList}};
 
 static const size_t DEFAULT_NODE_KEY_ID = 0;
 static const double kTimeoutSeconds = 5;
@@ -749,8 +743,6 @@ Config Config::readFromFile(const std::string& fileName) {
         result.observerWaitTime_ = params.count(PARAM_NAME_OBSERVER_WAIT_TIME) ? params.get<uint64_t>(PARAM_NAME_OBSERVER_WAIT_TIME) : DEFAULT_OBSERVER_WAIT_TIME;
         result.roundElapseTime_ = params.count(PARAM_NAME_ROUND_ELAPSE_TIME) ? params.get<uint64_t>(PARAM_NAME_ROUND_ELAPSE_TIME) : DEFAULT_ROUND_ELAPSE_TIME;
 
-        result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE), NODE_TYPES_MAP);
-
         if (config.count(BLOCK_NAME_HOST_ADDRESS)) {
             result.hostAddressEp_ = readEndpoint(config, BLOCK_NAME_HOST_ADDRESS);
             result.symmetric_ = false;
@@ -759,54 +751,46 @@ Config Config::readFromFile(const std::string& fileName) {
             result.symmetric_ = true;
         }
 
-        result.bType_ = getFromMap(params.get<std::string>(PARAM_NAME_BOOTSTRAP_TYPE), BOOTSTRAP_TYPES_MAP);
+        const auto hostsFileName = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
+        const auto initTrustedFileName = params.get<std::string>(PARAM_NAME_INITIAL_TRUSTED);
 
-        if (result.bType_ == BootstrapType::SignalServer || result.nType_ == NodeType::Router) {
-            result.signalServerEp_ = readEndpoint(config, BLOCK_NAME_SIGNAL_SERVER);
+        std::string line;
+
+        std::ifstream hostsFile;
+        hostsFile.exceptions(std::ifstream::failbit);
+        try {
+            hostsFile.open(hostsFileName);
+        }
+        catch (std::ios_base::failure& fail) {
+            cserror() << "failed to open file " << hostsFileName;
+            throw fail;
+        }
+        hostsFile.exceptions(std::ifstream::goodbit);
+
+        while (getline(hostsFile, line)) {
+            if (!line.empty()) {
+                result.bList_.push_back(EndpointData::fromString(line));
+            }
         }
 
-        if (result.bType_ == BootstrapType::IpList) {
-            const auto hostsFileName = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
-            const auto initTrustedFileName = params.get<std::string>(PARAM_NAME_INITIAL_TRUSTED);
+        if (result.bList_.empty()) {
+            throw std::length_error("No hosts specified");
+        }
 
-            std::string line;
+        hostsFile.close();
+        hostsFile.open(initTrustedFileName);
 
-            std::ifstream hostsFile;
-            hostsFile.exceptions(std::ifstream::failbit);
-            try {
-                hostsFile.open(hostsFileName);
+        cs::Bytes bytes;
+        while (getline(hostsFile, line)) {
+            if (!line.empty() && DecodeBase58(line, bytes)) {
+                cs::PublicKey key;
+                std::copy(bytes.begin(), bytes.end(), key.begin());
+                result.initialConfidants_.push_back(key);
             }
-            catch (std::ios_base::failure& fail) {
-                cserror() << "failed to open file " << hostsFileName;
-                throw fail;
-            }
-            hostsFile.exceptions(std::ifstream::goodbit);
+        }
 
-            while (getline(hostsFile, line)) {
-                if (!line.empty()) {
-                    result.bList_.push_back(EndpointData::fromString(line));
-                }
-            }
-
-            if (result.bList_.empty()) {
-                throw std::length_error("No hosts specified");
-            }
-
-            hostsFile.close();
-            hostsFile.open(initTrustedFileName);
-
-            cs::Bytes bytes;
-            while (getline(hostsFile, line)) {
-                if (!line.empty() && DecodeBase58(line, bytes)) {
-                    cs::PublicKey key;
-                    std::copy(bytes.begin(), bytes.end(), key.begin());
-                    result.initialConfidants_.push_back(key);
-                }
-            }
-
-            if (result.initialConfidants_.empty()) {
-                throw std::length_error("No initial confidants specified");
-            }
+        if (result.initialConfidants_.empty()) {
+            throw std::length_error("No initial confidants specified");
         }
 
         if (params.count(PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS) > 0) {
@@ -962,7 +946,6 @@ void Config::readEventsReportData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_REJECT_CONTRACT_EXECUTION, eventsReport_.reject_contract_execution);
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_REJECT_CONTRACT_CONSENSUS, eventsReport_.reject_contract_consensus);
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_ALARM_INVALID_BLOCK, eventsReport_.alarm_invalid_block);
-    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_BIG_BANG, eventsReport_.big_bang);
 }
 
 template <typename T>
@@ -1069,15 +1052,12 @@ bool operator==(const Config& lhs, const Config& rhs) {
         lhs.inputEp_ == rhs.inputEp_ &&
         lhs.twoSockets_ == rhs.twoSockets_ &&
         lhs.outputEp_ == rhs.outputEp_ &&
-        lhs.nType_ == rhs.nType_ &&
         lhs.ipv6_ == rhs.ipv6_ &&
         lhs.minNeighbours_ == rhs.minNeighbours_ &&
         lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
         lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
         lhs.symmetric_ == rhs.symmetric_ &&
         lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
-        lhs.bType_ == rhs.bType_ &&
-        lhs.signalServerEp_ == rhs.signalServerEp_ &&
         lhs.bList_ == rhs.bList_ &&
         lhs.pathToDb_ == rhs.pathToDb_ &&
         lhs.publicKey_ == rhs.publicKey_ &&

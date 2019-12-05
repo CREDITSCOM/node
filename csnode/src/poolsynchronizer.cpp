@@ -26,7 +26,7 @@ cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockCh
                     << std::setw(hl) << "Polling frequency:" << std::setw(vl) << cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency;
 }
 
-void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber difference, bool isBigBand) {
+void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber difference) {
     if (transport_->getNeighboursCount() == 0) {
         csmeta(csdebug) << "Cannot start sync (no neighbours). Needed sequence: " << roundNum
                         << ",   Requested pools block size:" << cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
@@ -83,14 +83,8 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 
     // already synchro start
     if (isSyncroStarted_ && !useTimer) {
-        // no BigBang, but no use timer
-        if (!isBigBand && timer_.isRunning()) {
+        if (timer_.isRunning()) {
             timer_.stop();
-        }
-
-        // BigBang received
-        if (isBigBand && !timer_.isRunning()) {
-            timer_.start(delay, Timer::Type::Standard, RunPolicy::CallQueuePolicy);
         }
     }
 
@@ -103,7 +97,7 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 
         sendBlockRequest();
 
-        if (isBigBand || useTimer) {
+        if (useTimer) {
             timer_.start(delay, Timer::Type::Standard, RunPolicy::CallQueuePolicy);
         }
 

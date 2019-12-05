@@ -82,8 +82,6 @@ public:
     std::string getSenderText(const cs::PublicKey& sender);
 
     // incoming requests processing
-    void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum);
-    void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
     bool verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender);
     bool verifyPacketTransactions(cs::TransactionsPacket packet, const cs::PublicKey& sender);
     void getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
@@ -331,7 +329,6 @@ private:
     bool sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);
 
-    bool readRoundData(cs::RoundTable& roundTable, cs::DataStream& stream, bool bang);
     void reviewConveyerHashes();
 
     void processSync();

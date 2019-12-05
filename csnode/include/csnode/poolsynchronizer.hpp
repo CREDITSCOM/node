@@ -20,7 +20,7 @@ class PoolSynchronizer {
 public:
     explicit PoolSynchronizer(Transport* transport, BlockChain* blockChain);
 
-    void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = roundDifferentForSync, bool isBigBand = false);
+    void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = roundDifferentForSync);
     void syncLastPool();
 
     // syncro get functions
