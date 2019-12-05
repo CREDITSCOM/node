@@ -227,7 +227,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
                 if (tCandSize > 0) {
                     for (size_t outer = 0; outer < tCandSize - 1; outer++) {
                         // DPOS check start -> comment if unnecessary
-                        if (!context.checkNodeCache(ptrStage1->trustedCandidates.at(outer))) {
+                        if (!context.checkNodeStake(ptrStage1->trustedCandidates.at(outer))) {
                             cslog() << name() << ": [" << static_cast<int>(it.sender) << "] marked as untrusted (low-value candidates)";
                             context.mark_untrusted(it.sender);
                             break;

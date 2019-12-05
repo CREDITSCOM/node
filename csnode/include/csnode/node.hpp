@@ -218,7 +218,7 @@ public:
      */
 
     void initDefaultRP(const std::set<cs::PublicKey>& confidants);
-    bool isCurrentRPDefault() const {
+    bool isBootstrapRound() const {
         return isDefaultRoundTable_;
     }
     void getUtilityMessage(const uint8_t* data, const size_t size);
