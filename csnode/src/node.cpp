@@ -299,6 +299,51 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
 
 }
 
+
+void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
+    cslog() << "NODE> get SS Round Table #" << rNum;
+
+    cs::DataStream in(data, size);
+    cs::RoundTable roundTable;
+    cs::Bytes bin;
+    in >> bin;
+    cs::DataStream stream(bin.data(), bin.size());
+
+    uint8_t confSize = 0;
+    stream >> confSize;
+    csdebug() << "NODE> Number of confidants :" << cs::numeric_cast<int>(confSize);
+    if (confSize < Consensus::MinTrustedNodes || confSize > Consensus::MaxTrustedNodes) {
+        cswarning() << "Bad confidants num";
+        return;
+    }
+    cs::ConfidantsKeys confidants;
+    confidants.reserve(confSize);
+    for (int i = 0; i < confSize; ++i) {
+        cs::PublicKey key;
+        stream >> key;
+        confidants.push_back(std::move(key));
+    }
+    if (!stream.isValid() || confidants.size() < confSize) {
+        cswarning() << "Bad round table format, ignoring";
+        return;
+    }
+    roundTable.confidants = std::move(confidants);
+    roundTable.hashes.clear();
+
+    cs::Sequence lastSequence = blockChain_.getLastSeq();
+    if (lastSequence >= rNum) {
+        csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
+        blockChain_.setBlocksToBeRemoved(lastSequence - rNum + 1);
+    }
+
+    roundTable.round = rNum;
+    cs::Conveyer::instance().updateRoundTable(rNum, roundTable);
+    onRoundStart(roundTable, false);
+    reviewConveyerHashes();
+
+    poolSynchronizer_->sync(rNum);
+}
+
 bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
     std::string verb;
     if (packet.signatures().size() == 1) {
@@ -1414,6 +1459,11 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
 
         // TODO: detect absence of proper current round info (round may be set by SS or BB)
         return MessageActions::Drop;
+    }
+
+    // BB: every round (for now) may be handled:
+    if (type == MsgTypes::BootstrapTable) {
+        return MessageActions::Process;
     }
 
     if (type == MsgTypes::Utility) {
@@ -3393,12 +3443,25 @@ void Node::onRoundTimeElapsed() {
     // do not increment, only "mark" default round start
     subRound_ = 1;
 
-    auto& conveyer = cs::Conveyer::instance();
+    if (*actualConfidants.cbegin() == solver_->getPublicKey()) {
+        // send rtss
+        
+        cs::Bytes bin;
+        cs::DataStream out(bin);
+        out << uint8_t(actualConfidants.size());
+        for (const auto& item : actualConfidants) {
+            out << item;
+        }
 
-    conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
-    //conveyer.setRound(roundPackageCache_.back().roundTable().round);
-    //conveyer.setTable(roundPackageCache_.back().roundTable());
+        sendToConfidants(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bin);
 
-    onRoundStart(roundPackageCache_.back().roundTable(), true);
-    reviewConveyerHashes();
+        auto& conveyer = cs::Conveyer::instance();
+
+        conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
+        //conveyer.setRound(roundPackageCache_.back().roundTable().round);
+        //conveyer.setTable(roundPackageCache_.back().roundTable());
+
+        onRoundStart(roundPackageCache_.back().roundTable(), true);
+        reviewConveyerHashes();
+    }
 }

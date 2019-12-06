@@ -23,6 +23,7 @@ enum BaseFlags : uint8_t {
 };
 
 enum MsgTypes : uint8_t {
+    BootstrapTable,
     Transactions,
     FirstTransaction,
     NewBlock,
