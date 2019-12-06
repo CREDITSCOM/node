@@ -15,7 +15,7 @@ PacketValidator& PacketValidator::instance() {
 }
 
 bool PacketValidator::validate(const Packet& pack) {
-    bool result = (pack.isHeaderValid() && (pack.getHeadersLength() < pack.size()));
+    bool result = pack.isHeaderValid();
     if (!result) {
         cswarning() << "Net: packet " << pack << " is not validated";
     }

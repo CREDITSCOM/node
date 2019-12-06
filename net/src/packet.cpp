@@ -78,7 +78,7 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
 }
 
 bool Packet::isHeaderValid() const {
-    if (size() <= getHeadersLength()) {
+    if (size() < getHeadersLength()) {
         cserror() << "Packet size (" << size() << ") <= header length (" << getHeadersLength()
                   << ")" << (isNetwork() ? ", network" : "")
                   << ", type " << Packet::messageTypeToString(getType())
