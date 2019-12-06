@@ -919,10 +919,7 @@ void Node::sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq) {
     sendToBroadcast(MsgTypes::BlockAlarm, seq, sig);
     csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
     // send event report
-    const auto& conf = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (conf.alarm_invalid_block) {
-        EventReport::sendInvalidBlockAlarm(*this, source_node, seq);
-    }
+    EventReport::sendInvalidBlockAlarm(*this, source_node, seq);
 }
 
 void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -985,7 +982,9 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             << ", sender last block #" << WithDelimiters(sender_last_block)
             << ", info size " << bin_pack.size();
 
-        const char* log_prefix = "Event report: ";
+        std::ostringstream os;
+        os << "Event report: " << '[' << WithDelimiters(rNum) << "] ";
+        std::string log_prefix = os.str();
 
         const auto event_id = EventReport::getId(bin_pack);
         if (event_id == EventReport::Id::RejectTransactions) {
@@ -997,57 +996,58 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                     cnt += item.second;
                     os << Reject::to_string(item.first) << " (" << item.second << ") ";
                 });
-                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] rejected " << cnt << " transactions the following reasons: " << os.str()
+                csevent() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os.str()
                     << " on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
-        else if (event_id == EventReport::Id::AddGrayList || event_id == EventReport::Id::EraseGrayList) {
-            bool added = event_id == EventReport::Id::AddGrayList;
+        else if (event_id == EventReport::Id::AddToList || event_id == EventReport::Id::EraseFromList) {
+            bool added = event_id == EventReport::Id::AddToList;
             std::string list_action = (added ? "added to" : "cleared from");
             cs::PublicKey item;
             uint32_t counter = std::numeric_limits<uint32_t>::max();
-            if (EventReport::parseGrayListUpdate(bin_pack, item, counter)) {
-                std::string list_name = (counter == 0 ? "black" : "gray");
+            bool is_black = false;
+            if (EventReport::parseListUpdate(bin_pack, item, counter, is_black)) {
+                std::string list_name = (is_black ? "black" : "gray");
                 if (std::equal(item.cbegin(), item.cend(), cs::Zero::key.cbegin())) {
-                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] all items are " << list_action
-                        << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                    csevent() << log_prefix << "all items are " << list_action << ' ' << list_name << " list on "
+                        << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
                 else {
-                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(item.data(), item.size())
-                        << ' ' << list_action << ' ' << list_name << " list on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+                    csevent() << log_prefix << cs::Utils::byteStreamToHex(item.data(), item.size())
+                        << ' ' << list_action << ' ' << list_name << " list on "
+                        << cs::Utils::byteStreamToHex(sender.data(), sender.size());
                 }
             }
             else {
-                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse item " << list_action << " black list";
+                csevent() << log_prefix << "failed to parse item " << list_action << " black list";
             }
         }
         else if (event_id == EventReport::Id::AlarmInvalidBlock) {
             cs::PublicKey source_node;
             cs::Sequence invalid_block_seq;
             if (EventReport::parseInvalidBlockAlarm(bin_pack, source_node, invalid_block_seq)) {
-                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] invalid block from "
+                csevent() << log_prefix << "invalid block from "
                     << cs::Utils::byteStreamToHex(source_node.data(), source_node.size())
                     << " is alarmed by " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
             else {
-                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse invalid block alarm report";
+                csevent() << log_prefix << "failed to parse invalid block alarm report";
             }
         }
         else if (event_id == EventReport::Id::ConsensusSilent || event_id == EventReport::Id::ConsensusLiar) {
             cs::PublicKey problem_node;
             std::string problem_name = (event_id == EventReport::ConsensusSilent ? "silent" : "liar");
             if (EventReport::parseConsensusProblem(bin_pack, problem_node) != EventReport::Id::None) {
-                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(problem_node.data(), problem_node.size())
+                csevent() << log_prefix << cs::Utils::byteStreamToHex(problem_node.data(), problem_node.size())
                     << " is reported as " << problem_name << " by " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
                     << " in round consensus";
             }
             else {
-                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse invalid round consensus " << problem_name << " report";
+                csevent() << log_prefix << "failed to parse invalid round consensus " << problem_name << " report";
             }
         }
         else if (event_id == EventReport::Id::ConsensusFailed) {
-            csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] round consensus failure is reported by "
-                << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+            csevent() << log_prefix << "round consensus failure is reported by " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
         }
         else if (event_id == EventReport::Id::ContractsSilent || event_id == EventReport::Id::ContractsLiar || event_id == EventReport::Id::ContractsFailed) {
             cs::PublicKey problem_node;
@@ -1064,19 +1064,32 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             }
             if (EventReport::parseContractsProblem(bin_pack, problem_node, consensus_id) != EventReport::Id::None) {
                 if (event_id != EventReport::Id::ContractsFailed) {
-                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(problem_node.data(), problem_node.size())
+                    csevent() << log_prefix << cs::Utils::byteStreamToHex(problem_node.data(), problem_node.size())
                         << " is reported as " << problem_name << " by " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
                         << " in contract consensus {" << consensus_id.round << '.' << consensus_id.transaction << '.' << consensus_id.iteration << '}';
                 }
                 else {
-                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(problem_node.data(), problem_node.size())
+                    csevent() << log_prefix << cs::Utils::byteStreamToHex(problem_node.data(), problem_node.size())
                         << " is reported failure in contract consensus {"
                         << consensus_id.round << '.' << consensus_id.transaction << '.' << consensus_id.iteration << '}';
                 }
             }
             else {
-                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse invalid contract consensus " << problem_name << " report";
+                csevent() << log_prefix << "failed to parse invalid contract consensus " << problem_name << " report";
             }
+        }
+        else if (event_id == EventReport::Id::RejectContractExecution) {
+            cs::SmartContractRef ref;
+            Reject::Reason reason;
+            if (EventReport::parseRejectContractExecution(bin_pack, ref, reason)) {
+                csevent() << log_prefix << "execution of " << ref << " is rejected, " << Reject::to_string(reason);
+            }
+            else {
+                csevent() << log_prefix << "failed to parse invalid contract execution reject";
+            }
+        }
+        else if (event_id == EventReport::Id::Bootstrap) {
+            csevent() << log_prefix << "bootsrap round";
         }
     }
     else {
@@ -1429,13 +1442,13 @@ void Node::addToBlackList(const cs::PublicKey& key, bool isMarked) {
     if (isMarked) {
         if (transport_->markNeighbourAsBlackListed(key)) {
             cswarning() << "Neigbour " << cs::Utils::byteStreamToHex(key) << " added to network black list";
-            EventReport::sendGrayListUpdate(*this, key, true /*added*/); // the 4th arg is 0 by default
+            EventReport::sendBlackListUpdate(*this, key, true /*added*/);
         }
     }
     else {
         if (transport_->unmarkNeighbourAsBlackListed(key)) {
              cswarning() << "Neigbour " << cs::Utils::byteStreamToHex(key) << " released from network black list";
-             EventReport::sendGrayListUpdate(*this, key, false /*erased*/); // the 4th arg is 0 by default
+             EventReport::sendBlackListUpdate(*this, key, false /*erased*/);
         }
     }
 }

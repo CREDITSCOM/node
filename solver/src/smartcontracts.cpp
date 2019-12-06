@@ -7,6 +7,7 @@
 #include <csdb/currency.hpp>
 #include <csnode/datastream.hpp>
 #include <csnode/transactionsiterator.hpp>
+#include <csnode/eventreport.hpp>
 #include <lib/system/logger.hpp>
 #include <csnode/fee.hpp>
 #include <functional>
@@ -976,16 +977,16 @@ std::string SmartContracts::violations_message(uint32_t flags) {
 }
 
 /*static*/
-bool SmartContracts::prevalidate(const BlockChain& bc, const cs::TransactionsPacket& pack) {
+Reject::Reason SmartContracts::prevalidate(const BlockChain& bc, const cs::TransactionsPacket& pack) {
     // count: 0 < count < max
     const auto total_cnt = pack.transactionsCount();
     if (total_cnt > Consensus::MaxContractResultTransactions) {
         csdebug() << kLogPrefix << "too many transactions in execute result, prevalidation failed";
-        return false;
+        return Reject::Reason::LimitExceeded;
     }
     if (total_cnt < 1) {
         csdebug() << kLogPrefix << "no transactions in execute result, prevalidation failed";
-        return false;
+        return Reject::Reason::MalformedTransaction;
     }
 
     // logical rules:
@@ -1001,12 +1002,12 @@ bool SmartContracts::prevalidate(const BlockChain& bc, const cs::TransactionsPac
         const auto size = t.to_byte_stream().size();
         if (size > Consensus::MaxTransactionSize) {
             csdebug() << kLogPrefix << "exceeded max transaction size, prevalidation failed";
-            return false;
+            return Reject::Reason::LimitExceeded;
         }
         total_size += size;
         if (size > Consensus::MaxPreliminaryBlockSize) {
             csdebug() << kLogPrefix << "exceeded max block size, prevalidation failed";
-            return false;
+            return Reject::Reason::LimitExceeded;
         }
 
         if (SmartContracts::is_new_state(t)) {
@@ -1016,21 +1017,21 @@ bool SmartContracts::prevalidate(const BlockChain& bc, const cs::TransactionsPac
         else {
             if (i == 0) {
                 csdebug() << kLogPrefix << "execute result does not start with new state, prevalidation failed";
-                return false;
+                return Reject::Reason::MalformedTransaction;
             }
             const csdb::Address src_abs_addr = bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey);
             if (!(src_abs_addr == contract_abs_addr)) {
                 csdebug() << kLogPrefix << "incorrect source in emitted transaction, prevalidation failed";
-                return false;
+                return Reject::Reason::MalformedContractAddress;
             }
             const csdb::Address tgt_abs_addr = bc.getAddressByType(t.target(), BlockChain::AddressType::PublicKey);
             if (src_abs_addr == tgt_abs_addr) {
-                csdebug() << kLogPrefix << "source equeals target in emitted transaction, prevalidation failed";
-                return false;
+                csdebug() << kLogPrefix << "source equals target in emitted transaction, prevalidation failed";
+                return Reject::Reason::MalformedTransaction;
             }
             if (SmartContracts::is_executable(t)) {
                 csdebug() << kLogPrefix << "execute transaction in execute result, prevalidation failed";
-                return false;
+                return Reject::Reason::MalformedTransaction;
             }
             total_min_fee += cs::fee::getFee(t).to_double();// getContractStateMinFee().to_double();
         }
@@ -1041,17 +1042,17 @@ bool SmartContracts::prevalidate(const BlockChain& bc, const cs::TransactionsPac
     const csdb::Transaction& prim_new_state = pack.transactions().front();
     if (!SmartContracts::is_new_state(prim_new_state)) {
         // never should happens
-        return false;
+        return Reject::Reason::MalformedTransaction;
     }
     csdb::Transaction start = SmartContracts::get_transaction(bc, prim_new_state);
     if (!start.is_valid()) {
         csdebug() << kLogPrefix << "incorrect start transaction is referred by new state, prevalidation failed";
-        return false;
+        return Reject::Reason::MalformedTransaction;
     }
     const double avail_fee = start.max_fee().to_double() - start.counted_fee().to_double();
     if (avail_fee - total_min_fee < std::numeric_limits<double>::epsilon()) {
         csdebug() << kLogPrefix << "insufficient max fee in start transaction, prevalidation failed";
-        return false;
+        return Reject::Reason::InsufficientMaxFee;
     }
 
     // test initer actual balance
@@ -1067,7 +1068,7 @@ bool SmartContracts::prevalidate(const BlockChain& bc, const cs::TransactionsPac
     //}
 
     // all tests passed
-    return true;
+    return Reject::Reason::None;
 }
 
 bool SmartContracts::test_executor_availability() {
@@ -2173,12 +2174,13 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             }
             // perform just created packet pre-validation
             if (packet.transactionsCount() > 0) {
-                if (!prevalidate_inner(packet)) {
+                const auto reject = prevalidate_inner(packet);
+                if (reject != Reject::Reason::None) {
                     csdb::Transaction tmp = packet.transactions().front().clone();
                     cswarning() << kLogPrefix << "packet result prevalidation failed, make " << data_item.contract_ref << " new state is empty";
                     tmp.add_user_field(new_state::Value, std::string{});
                     set_return_value(tmp, error::LogicViolation);
-
+                    EventReport::sendRejectContractExecution(*pnode, data_item.contract_ref, reject);
                     packet.clear();
                     packet.addTransaction(tmp);
                 }
@@ -2224,7 +2226,7 @@ bool SmartContracts::start_consensus(QueueItem& item) {
                 e.result.clear();
                 e.result.addTransaction(tmp);
                 integral_packet.addTransaction(tmp);
-
+                EventReport::sendRejectContractExecution(*pnode, e.ref_start, Reject::Reason::LimitExceeded);
             }
             else {
                 // add all result transactions to integral packet
@@ -3053,20 +3055,21 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
     }
 }
 
-bool SmartContracts::prevalidate_inner(const cs::TransactionsPacket& pack) {
-    if (!SmartContracts::prevalidate(bc, pack)) {
-        return false;
+Reject::Reason SmartContracts::prevalidate_inner(const cs::TransactionsPacket& pack) {
+    const auto reject = SmartContracts::prevalidate(bc, pack);
+    if (reject != Reject::Reason::None) {
+        return reject;
     }
     // detect contract to contract payments
     for (const auto& t : pack.transactions()) {
         if (!SmartContracts::is_new_state(t)) {
             if (in_known_contracts(t.source()) && in_known_contracts(t.target())) {
-                return false;
+                return Reject::Reason::MalformedTransaction;
             }
 
         }
     }
-    return true;
+    return Reject::Reason::None;
 }
 
 }  // namespace cs
