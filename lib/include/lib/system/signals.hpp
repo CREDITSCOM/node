@@ -32,8 +32,8 @@ public:
 }  // namespace cshelper
 
 class IConnectable {
-public:
-    virtual ~IConnectable() {
+protected:
+    ~IConnectable() {
         for (auto signal : signals_) {
             if (signal != nullptr) {
                 cshelper::ConnectorForwarder::disconnect(signal, this);
