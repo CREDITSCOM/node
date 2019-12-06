@@ -206,6 +206,7 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
     cs::Signature sig;
     cs::Bytes msg;
     cs::RoundNumber rNum;
+    istream_.skip<uint8_t>();
     istream_ >> msg >> sig ;
     
     if (!istream_.good() || !istream_.end()) {
@@ -1030,6 +1031,51 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             }
             else {
                 csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse invalid block alarm report";
+            }
+        }
+        else if (event_id == EventReport::Id::ConsensusSilent || event_id == EventReport::Id::ConsensusLiar) {
+            cs::PublicKey problem_node;
+            std::string problem_name = (event_id == EventReport::ConsensusSilent ? "silent" : "liar");
+            if (EventReport::parseConsensusProblem(bin_pack, problem_node) != EventReport::Id::None) {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(problem_node.data(), problem_node.size())
+                    << " is reported as " << problem_name << " by " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+                    << " in round consensus";
+            }
+            else {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse invalid round consensus " << problem_name << " report";
+            }
+        }
+        else if (event_id == EventReport::Id::ConsensusFailed) {
+            csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] round consensus failure is reported by "
+                << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+        }
+        else if (event_id == EventReport::Id::ContractsSilent || event_id == EventReport::Id::ContractsLiar || event_id == EventReport::Id::ContractsFailed) {
+            cs::PublicKey problem_node;
+            ContractConsensusId consensus_id;
+            std::string problem_name;
+            if (event_id == EventReport::ContractsSilent) {
+                problem_name = "silent";
+            }
+            else if (event_id == EventReport::ContractsSilent) {
+                problem_name = "liar";
+            }
+            else {
+                problem_name = "failure";
+            }
+            if (EventReport::parseContractsProblem(bin_pack, problem_node, consensus_id) != EventReport::Id::None) {
+                if (event_id != EventReport::Id::ContractsFailed) {
+                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(problem_node.data(), problem_node.size())
+                        << " is reported as " << problem_name << " by " << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+                        << " in contract consensus {" << consensus_id.round << '.' << consensus_id.transaction << '.' << consensus_id.iteration << '}';
+                }
+                else {
+                    csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] " << cs::Utils::byteStreamToHex(problem_node.data(), problem_node.size())
+                        << " is reported failure in contract consensus {"
+                        << consensus_id.round << '.' << consensus_id.transaction << '.' << consensus_id.iteration << '}';
+                }
+            }
+            else {
+                csevent() << log_prefix << '[' << WithDelimiters(rNum) << "] failed to parse invalid contract consensus " << problem_name << " report";
             }
         }
     }
@@ -3347,7 +3393,19 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     cslog() << s;
     csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
-    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq()) << ", neighbour nodes = " << transport_->getNeighboursCountWithoutSS();
+    std::string starter_status;
+    {
+        ConnectionPtr p = transport_->getConnectionByKey(cs::PacketValidator::instance().getStarterKey());
+        if (p && p->isSignal) {
+            starter_status = (p->connected ? "connected" : "disconnected");
+        }
+        else {
+            starter_status = "unreachable";
+        }
+    }
+    cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq())
+        << ", neighbour nodes = " << transport_->getNeighboursCountWithoutSS()
+        << ", starter is " << starter_status;
 
     if (Transport::cntCorruptedFragments > 0 || Transport::cntDirtyAllocs > 0 || Transport::cntExtraLargeNotSent > 0) {
         cslog() << " ! " << Transport::cntDirtyAllocs << " / " << Transport::cntCorruptedFragments << " / " << Transport::cntExtraLargeNotSent;

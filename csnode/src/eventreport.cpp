@@ -104,7 +104,9 @@ EventReport::Id EventReport::getId(const cs::Bytes& bin_pack) {
 // count_rounds is optional, 0 in case of clear list or add to black list.
 /*static*/
 void EventReport::sendGrayListUpdate(Node& node, const cs::PublicKey& key, bool added, uint32_t count_rounds /*= 0*/) {
+    constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize + sizeof(count_rounds);
     cs::Bytes bin_pack;
+    bin_pack.reserve(len);
     cs::DataStream stream(bin_pack);
     stream << (added ? Id::AddGrayList : Id::EraseGrayList) << key;
     // send zero value is senseless
@@ -140,7 +142,8 @@ bool EventReport::parseGrayListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& 
 
 /*static*/
 void EventReport::sendInvalidBlockAlarm(Node& node, const cs::PublicKey& source, cs::Sequence sequence) {
-    cs::Bytes bin_pack;
+    constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize + sizeof(sequence);
+    cs::Bytes bin_pack(len);
     cs::DataStream out(bin_pack);
     out << Id::AlarmInvalidBlock << source << sequence;
     node.reportEvent(bin_pack);
@@ -160,3 +163,69 @@ bool EventReport::parseInvalidBlockAlarm(const cs::Bytes& bin_pack, cs::PublicKe
     in >> source >> sequence;
     return in.isValid() && in.isEmpty();
 }
+
+/*static*/
+void EventReport::sendConsensusProblem(Node& node, Id problem_id, const cs::PublicKey& problem_source) {
+    constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize;
+    cs::Bytes bin_pack(len);
+    cs::DataStream out(bin_pack);
+    out << problem_id << problem_source;
+    node.reportEvent(bin_pack);
+}
+
+/*static*/
+EventReport::Id EventReport::parseConsensusProblem(const cs::Bytes& bin_pack, cs::PublicKey& problem_source) {
+    if (bin_pack.empty()) {
+        return Id::None;
+    }
+    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    Id id = Id::None;
+    in >> id;
+    switch(id) {
+    case Id::ConsensusFailed:
+    case Id::ConsensusLiar:
+    case Id::ConsensusSilent:
+        in >> problem_source;
+        if (in.isValid() && in.isEmpty()) {
+            return id;
+        }
+        break;
+    default:
+        break;
+    }
+    return Id::None;
+}
+
+/*static*/
+void EventReport::sendContractsProblem(Node& node, Id problem_id, const cs::PublicKey& problem_source, const ContractConsensusId& consensus_id) {
+    constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize
+        + sizeof(consensus_id.round) + sizeof(consensus_id.transaction) + sizeof(consensus_id.iteration);
+    cs::Bytes bin_pack(len);
+    cs::DataStream out(bin_pack);
+    out << problem_id << problem_source << consensus_id.round << consensus_id.transaction << consensus_id.iteration;
+    node.reportEvent(bin_pack);
+}
+
+/*static*/
+EventReport::Id EventReport::parseContractsProblem(const cs::Bytes& bin_pack, cs::PublicKey& problem_source, ContractConsensusId& consensus_id) {
+    if (bin_pack.empty()) {
+        return Id::None;
+    }
+    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    Id id = Id::None;
+    in >> id;
+    switch (id) {
+    case Id::ContractsFailed:
+    case Id::ContractsLiar:
+    case Id::ContractsSilent:
+        in >> problem_source >> consensus_id.round >> consensus_id.transaction >> consensus_id.iteration;
+        if (in.isValid() && in.isEmpty()) {
+            return id;
+        }
+        break;
+    default:
+        break;
+    }
+    return Id::None;
+}
+
