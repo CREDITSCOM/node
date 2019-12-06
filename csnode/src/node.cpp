@@ -211,16 +211,16 @@ void Node::stop() {
 void Node::initDefaultRP(const std::set<cs::PublicKey>& confidants) {
     cs::RoundPackage rp;
     cs::RoundTable rt;
+
     rt.round = getBlockChain().getLastSeq() + 1;
-    for (auto& key : confidants){
+
+    for (auto& key : confidants) {
         rt.confidants.push_back(key);
-        // fill from initialConfidants_ with complete list:
-        //if (rt.confidants.size() >= Consensus::MinTrustedNodes) {
-            // no break;
-        //}
     }
+
     rp.updateRoundTable(rt);
     roundPackageCache_.push_back(rp);
+
     isDefaultRoundTable_ = true;
 }
 
@@ -239,8 +239,6 @@ void Node::onNeighbourRemoved(const cs::PublicKey& neighbour) {
 }
 
 void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
-    //auto& conveyer = cs::Conveyer::instance();
-
     cswarning() << "NODE> Utility message get";
 
     cs::DataStream stream(data, size);
@@ -254,9 +252,8 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
         return;
     }
 
-    //csdebug() << "Message to Verify: " << cs::Utils::byteStreamToHex(trustedToHash);
     const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
-    //csdebug() << "SSKey: " << cs::Utils::byteStreamToHex(starter_key.data(), starter_key.size());
+
     if (!cscrypto::verifySignature(sig, starter_key, msg.data(), msg.size())) {
         cswarning() << "The Utility message is incorrect: signature isn't valid";
         return;
@@ -295,13 +292,10 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
             cswarning() << "Untranslatable Utility message";
             break;
     }
-
-
 }
 
-
 void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
-    cslog() << "NODE> get SS Round Table #" << rNum;
+    cslog() << "NODE> get Boot strap Round Table #" << rNum;
 
     cs::DataStream in(data, size);
     cs::RoundTable roundTable;
@@ -312,31 +306,38 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
     uint8_t confSize = 0;
     stream >> confSize;
     csdebug() << "NODE> Number of confidants :" << cs::numeric_cast<int>(confSize);
+
     if (confSize < Consensus::MinTrustedNodes || confSize > Consensus::MaxTrustedNodes) {
         cswarning() << "Bad confidants num";
         return;
     }
+
     cs::ConfidantsKeys confidants;
     confidants.reserve(confSize);
+
     for (int i = 0; i < confSize; ++i) {
         cs::PublicKey key;
         stream >> key;
         confidants.push_back(std::move(key));
     }
+
     if (!stream.isValid() || confidants.size() < confSize) {
         cswarning() << "Bad round table format, ignoring";
         return;
     }
+
     roundTable.confidants = std::move(confidants);
     roundTable.hashes.clear();
 
     cs::Sequence lastSequence = blockChain_.getLastSeq();
+
     if (lastSequence >= rNum) {
         csdebug() << "NODE> remove " << lastSequence - rNum + 1 << " block(s) required (rNum = " << rNum << ", last_seq = " << lastSequence << ")";
         blockChain_.setBlocksToBeRemoved(lastSequence - rNum + 1);
     }
 
     roundTable.round = rNum;
+
     cs::Conveyer::instance().updateRoundTable(rNum, roundTable);
     onRoundStart(roundTable, false);
     reviewConveyerHashes();
