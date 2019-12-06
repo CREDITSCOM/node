@@ -62,7 +62,7 @@ void cs::Executor::executeByteCodeMultiple(executor::ExecuteByteCodeMultipleResu
         return;
     }
 
-    const auto accessId = generateAccessId(sequence);
+    const auto accessId = generateAccessId(sequence, BlockChain::getAddressFromKey(invokedContract.contractAddress));
     ++execCount_;
 
     try {
@@ -698,6 +698,15 @@ csdb::Transaction cs::Executor::loadTransactionApi(const csdb::TransactionID& id
     return blockchain_.loadTransaction(id);
 }
 
+uint64_t cs::Executor::getTimeSmartContract(general::AccessID accessId) {
+    std::lock_guard lock(mutex_);
+    if (auto itExecuteSmart = executableSmartAddress_.find(accessId); itExecuteSmart != executableSmartAddress_.end()) {
+        if (auto itExecuteSmart = executableSmartAddress_.find(accessId); itExecuteSmart != executableSmartAddress_.end())
+            return solver_.smart_contracts().get_contract_deploy(itExecuteSmart->second).get_time();
+    }
+    return 0;
+}
+
 void cs::Executor::onBlockStored(const csdb::Pool& pool) {
     stateUpdate(pool);
 }
@@ -869,10 +878,12 @@ void cs::Executor::checkAnotherExecutor() {
     }
 }
 
-uint64_t cs::Executor::generateAccessId(cs::Sequence explicitSequence) {
+uint64_t cs::Executor::generateAccessId(cs::Sequence explicitSequence, const csdb::Address& smartAddress) {
     std::lock_guard lock(mutex_);
     ++lastAccessId_;
     accessSequence_[lastAccessId_] = (explicitSequence != kUseLastSequence ? explicitSequence : blockchain_.getLastSeq());
+
+    executableSmartAddress_[lastAccessId_] = smartAddress;
 
     return static_cast<uint64_t>(lastAccessId_);
 }
@@ -884,6 +895,7 @@ uint64_t cs::Executor::getFutureAccessId() {
 void cs::Executor::deleteAccessId(const general::AccessID& accessId) {
     std::lock_guard lock(mutex_);
     accessSequence_.erase(accessId);
+    executableSmartAddress_.erase(accessId);
 }
 
 std::optional<cs::Executor::OriginExecuteResult> cs::Executor::execute(const std::string& address, const executor::SmartContractBinary& smartContractBinary,
@@ -899,7 +911,7 @@ std::optional<cs::Executor::OriginExecuteResult> cs::Executor::execute(const std
     uint64_t accessId{};
 
     if (!isGetter) {
-        accessId = generateAccessId(explicitSequence);
+        accessId = generateAccessId(explicitSequence, BlockChain::getAddressFromKey(smartContractBinary.contractAddress));
     }
 
     ++execCount_;

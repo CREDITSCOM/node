@@ -195,6 +195,8 @@ public:
 
     csdb::Transaction loadTransactionApi(const csdb::TransactionID& id) const;
 
+    uint64_t getTimeSmartContract(general::AccessID accessId);
+
 public slots:
     void onBlockStored(const csdb::Pool& pool);
     void onReadBlock(const csdb::Pool& block);
@@ -218,7 +220,7 @@ private:
     void checkAnotherExecutor();
 
     // The explicit_sequence is set for generated accessId ensure having correct sequence attached to it
-    uint64_t generateAccessId(cs::Sequence explicitSequence);
+    uint64_t generateAccessId(cs::Sequence explicitSequence, const csdb::Address& smartAddress);
     uint64_t getFutureAccessId();
     void deleteAccessId(const general::AccessID& accessId);
 
@@ -247,6 +249,7 @@ private:
 
     general::AccessID lastAccessId_{};
     std::map<general::AccessID, cs::Sequence> accessSequence_;
+    std::map<general::AccessID, csdb::Address> executableSmartAddress_;
     std::map<csdb::Address, csdb::TransactionID> deployTrxns_;
     std::map<csdb::Address, std::string> lastState_;
     std::map<csdb::Address, std::unordered_map<cs::Sequence, std::string>> cacheLastStates_;
