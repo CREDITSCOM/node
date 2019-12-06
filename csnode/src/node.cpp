@@ -326,6 +326,8 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
         return;
     }
 
+    subRound_ = 1;
+
     roundTable.confidants = std::move(confidants);
     roundTable.hashes.clear();
 
@@ -1335,9 +1337,10 @@ void Node::reviewConveyerHashes() {
 }
 
 void Node::processSync() {
-    const auto last_seq = blockChain_.getLastSeq();
+    const auto lastSequence = blockChain_.getLastSeq();
     const auto round = cs::Conveyer::instance().currentRoundNumber();
-    if (stat_.isCurrentRoundTooLong(120000) && round < last_seq + cs::PoolSynchronizer::roundDifferentForSync) {
+
+    if (stat_.isCurrentRoundTooLong(kLastPoolSynchroDelay_) && round < lastSequence + cs::PoolSynchronizer::roundDifferentForSync) {
         poolSynchronizer_->syncLastPool();
     }
     else {
@@ -3391,10 +3394,10 @@ void Node::onRoundTimeElapsed() {
             out << item;
         }
 
-        sendConfidants(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bin);
-
         auto& conveyer = cs::Conveyer::instance();
         conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
+
+        sendConfidants(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bin);
 
         onRoundStart(roundPackageCache_.back().roundTable(), true);
         reviewConveyerHashes();
