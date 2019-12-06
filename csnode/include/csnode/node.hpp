@@ -266,20 +266,6 @@ public:
         return solver_;
     }
 
-    void setDeltaTimeSS(long long timeSS) {
-        auto curTime = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        deltaTimeSS_ = curTime - timeSS;
-    }
-
-    long long getDeltaTimeSS() const {
-        return deltaTimeSS_;
-    }
-
-    long long timePassedSinceBB(long long receiveTime) {
-        auto curTime = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        return curTime - (receiveTime + getDeltaTimeSS());
-    }
-
 #ifdef NODE_API
     csconnector::connector* getConnector() {
         return api_.get();
@@ -344,34 +330,18 @@ private:
 
     /// sending interace methods
 
-    // sends to specific target through all the network, not having its direct address
     template <typename... Args>
-    void sendToTargetBroadcast(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // to neighbor or not at all
-    template <typename... Args>
-    bool sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    template <class... Args>
-    bool sendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // to confidants, returns actual sent count
-    template <class... Args>
-    uint32_t sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // to confidants, returns actual sent count
-    template <class... Args>
-    uint32_t sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    template <class... Args>
-    bool sendToConfidant(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // broadcast
-    template <class... Args>
-    void sendToBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    void sendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     template <typename... Args>
-    void sendToBroadcastImpl(BaseFlags, const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+    void sendDirect(const cs::PublicKeys& keys, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+    template <class... Args>
+    void sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+    // to current confidants list
+    template <class... Args>
+    void sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     // TODO: C++ 17 static inline?
     static const csdb::Address genesisAddress_;
@@ -479,7 +449,6 @@ private:
 
     cs::config::Observer& observer_;
     cs::Compressor compressor_;
-    long long deltaTimeSS_{};
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isDefaultRoundTable_ = false;
