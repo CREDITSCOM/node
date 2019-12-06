@@ -86,12 +86,12 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 
     // already synchro start
     if (isSyncroStarted_ && !useTimer) {
-        // no BigBang, but no use timer
+        // no Bootstrap, but no use timer
         if (!isBigBand && timer_.isRunning()) {
             timer_.stop();
         }
 
-        // BigBang received
+        // Bootstrap received
         if (isBigBand && !timer_.isRunning()) {
             timer_.start(delay, Timer::Type::Standard, RunPolicy::CallQueuePolicy);
         }

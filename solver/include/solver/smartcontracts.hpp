@@ -436,7 +436,7 @@ public:
 
     static std::string violations_message(uint32_t flags);
 
-    static bool prevalidate(const BlockChain& bc, const cs::TransactionsPacket& pack);
+    static Reject::Reason prevalidate(const BlockChain& bc, const cs::TransactionsPacket& pack);
 
 public:
 
@@ -894,7 +894,7 @@ private:
     // request correct state in network
     void net_request_contract_state(const csdb::Address& abs_addr);
 
-    bool prevalidate_inner(const cs::TransactionsPacket& pack);
+    Reject::Reason prevalidate_inner(const cs::TransactionsPacket& pack);
 };
 
 }  // namespace cs

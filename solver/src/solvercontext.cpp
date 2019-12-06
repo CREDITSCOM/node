@@ -247,7 +247,7 @@ void SolverContext::next_trusted_candidates(const std::vector<cs::PublicKey>& no
 }
 
 void SolverContext::send_rejected_report(const cs::Bytes& rejected_pack) {
-    EventReport::sendReject(*core.pnode, rejected_pack);
+    EventReport::sendRejectTransactions(*core.pnode, rejected_pack);
 }
 
 void SolverContext::send_silent_report(const cs::PublicKey& silent_key) {
