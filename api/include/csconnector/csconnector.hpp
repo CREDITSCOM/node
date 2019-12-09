@@ -52,11 +52,16 @@ public:
 #ifdef MONITOR_NODE
             api_handler->collect_all_stats_slot(pool);
 #endif
+            api_handler->baseLoaded(pool);
         }
     }
 
     void onStoreBlock(const csdb::Pool& pool) {
         api_handler->store_block_slot(pool);
+    }
+
+    void onMaxBlocksCount(cs::Sequence lastBlockNum) {
+        api_handler->maxBlocksCount(lastBlockNum);
     }
 
     void run();

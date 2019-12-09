@@ -193,4 +193,20 @@ void RoundPackage::refillToSign() {
 
     messageSize_ = binaryRepresentation_.size();
 }
+
+void RoundPackage::setSenderNode(const cs::PublicKey& sender) {
+    sender_ = std::make_shared<cs::PublicKey>(sender);
+}
+
+bool RoundPackage::getSender(cs::PublicKey& sender) const {
+    if (!sender_) {
+        return false;
+    }
+    if (sender_->size() != sender.size()) {
+        return false;
+    }
+    std::copy(sender_->cbegin(), sender_->cend(), sender.begin());
+    return true;
+}
+
 }  // namespace cs

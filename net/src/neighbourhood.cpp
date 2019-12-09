@@ -6,6 +6,7 @@
 
 #include "neighbourhood.hpp"
 #include "transport.hpp"
+#include "packetvalidator.hpp"
 
 #include <cscrypto/cscrypto.hpp>
 #include <csnode/blockchain.hpp>
@@ -452,6 +453,8 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
     }
 
     conn->isSignal = true;
+    // validator have already stored the key: regpack -> validator -> transport (calls to this method)
+    conn->key = cs::PacketValidator::instance().getStarterKey();
     connectNode(node, conn);
 }
 

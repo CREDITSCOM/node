@@ -52,8 +52,8 @@ constexpr bool useLogger<None>() {
     return false;
 }
 
-BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channel_logger_mt<severity_level>, (logging::keywords::channel = "file"));
-BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(EventLogger, logging::sources::severity_channel_logger_mt<logging::trivial::severity_level>, (logging::keywords::channel = "Event"));
+BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channel_logger_mt<severity_level>, (logging::keywords::channel = "file"))
+BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(EventLogger, logging::sources::severity_channel_logger_mt<logging::trivial::severity_level>, (logging::keywords::channel = "Event"))
 }  // namespace logger
 
 #define LOG_SEV(level, ...)               \

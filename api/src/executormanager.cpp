@@ -67,9 +67,21 @@ std::string cs::ExecutorManager::jpsData() const {
 }
 
 void cs::ExecutorManager::terminate(boost::process::pid_t pid) {
+#ifdef __linux__
+    cs::Process process("kill -9 " + std::to_string(pid));
+    process.launch();
+    process.wait();
+#else
     cs::Process process(pid);
-    process.launch(cs::Process::Options::Attach);
-    process.terminate();
+
+    cs::Connector::connect(&process.errorOccured, [&](const cs::ProcessException& exception) {
+        cslog() << "Manager pid attach exception " << exception.what();
+    });
+
+    if (process.launch(cs::Process::Options::Attach)) {
+        process.terminate();
+    }
+#endif
 }
 
 std::optional<std::vector<cs::ExecutorManager::ProcessId>> cs::ExecutorManager::executorProcessIds() const {

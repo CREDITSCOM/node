@@ -20,7 +20,7 @@ using NodeVersion = cs::Version;
 extern const NodeVersion NODE_VERSION;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
-const std::string DEFAULT_PATH_TO_DB = "test_db";
+const std::string DEFAULT_PATH_TO_DB = "db";
 const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
 
 const std::string DEFAULT_PATH_TO_PUBLIC_KEY = "NodePublic.txt";
@@ -330,7 +330,7 @@ private:
     bool recreateIndex_ = false;
     bool newBlockchainTop_ = false;
     bool autoShutdownEnabled_ = true;
-    bool compatibleVersion_ = true;
+    bool compatibleVersion_ = false;
     uint64_t newBlockchainTopSeq_;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
