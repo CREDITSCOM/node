@@ -477,7 +477,7 @@ void SolverCore::updateGrayList(cs::RoundNumber round) {
     while (it != grayList_.end()) {
         if (it->second <= delta) {
             csdebug() << "SolverCore: remove " << cs::Utils::byteStreamToHex(it->first.data(), it->first.size()) << " from gray list";
-            EventReport::sendGrayListUpdate(*pnode, it->first, false /*removed*/, 1); // for 1 round clear
+            EventReport::sendGrayListUpdate(*pnode, it->first, false /*removed*/); // for 1 round clear, the 4th arg is defaulted to 1
             it = grayList_.erase(it);
         }
         else {
@@ -490,7 +490,7 @@ void SolverCore::updateGrayList(cs::RoundNumber round) {
 
 void SolverCore::resetGrayList() {
     grayList_.clear();
-    EventReport::sendGrayListUpdate(*pnode, Zero::key, false /*removed*/, 1); // for 1 round clear);
+    EventReport::sendGrayListUpdate(*pnode, Zero::key, false /*removed*/); // for 1 round clear, 1 is default
 }
 
 cs::Bytes SolverCore::getRealTrusted() {
