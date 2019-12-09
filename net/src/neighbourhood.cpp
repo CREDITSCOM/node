@@ -64,25 +64,6 @@ void Neighbourhood::peerDisconnected(const cs::PublicKey& peer) {
     }
 }
 
-void Neighbourhood::removeSilent() {
-    using namespace std::chrono;
-    auto now = steady_clock::now();
-
-    std::lock_guard<std::mutex> lock(neighbourMutex_);
-    for (auto it = neighbours_.begin(); it != neighbours_.end();) {
-        if (duration_cast<seconds>(now - it->second.lastSeen) > kLastSeenTimeout) {
-            sendRegistrationRefusal(it->first, RegistrationRefuseReasons::Timeout);
-            if (it->second.connectionEstablished) {
-                transport_->onNeighboursChanged(it->first, it->second.lastSeq, it->second.roundNumber, false);
-            }
-            it = neighbours_.erase(it);
-        }
-        else {
-            ++it;
-        }
-    }
-}
-
 void Neighbourhood::pingNeighbours() {
     std::lock_guard<std::mutex> lock(neighbourMutex_);
     for (auto& n : neighbours_) {
@@ -152,17 +133,6 @@ void Neighbourhood::gotRegistrationConfirmation(const cs::PublicKey& sender, con
         PeerInfo& info = neighbour->second;
         auto now = std::chrono::steady_clock::now();
 
-        // check timeout
-        if (std::chrono::duration_cast<std::chrono::seconds>(now - info.lastSeen) > kLastSeenTimeout) {
-            sendRegistrationRefusal(sender, RegistrationRefuseReasons::Timeout);
-            if (info.connectionEstablished) {
-                transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, false);
-            }
-
-            neighbours_.erase(neighbour);
-            return;
-        }
-
         info.lastSeen = now;
         if (info.connectionEstablished) {
             return;
@@ -223,17 +193,6 @@ void Neighbourhood::gotPing(const cs::PublicKey& sender, const Packet& pack) {
             auto now = std::chrono::steady_clock::now();
             PeerInfo& info = neighbour->second;
 
-            if (std::chrono::duration_cast<std::chrono::seconds>(now - info.lastSeen) > kLastSeenTimeout) {
-                sendRegistrationRefusal(sender, RegistrationRefuseReasons::Timeout);
-
-                if (info.connectionEstablished) {
-                    transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, false);
-                }
-
-                neighbours_.erase(neighbour);
-                return;
-            }
-
             info.lastSeen = now;
 
             cs::DataStream stream(pack.getMsgData(), pack.getMsgSize());
@@ -278,9 +237,6 @@ std::string Neighbourhood::parseRefusalReason(RegistrationRefuseReasons reason) 
             break;
         case RegistrationRefuseReasons::LimitReached:
             reasonInfo = "maximum connections limit on remote node is reached";
-            break;
-        case RegistrationRefuseReasons::Timeout:
-            reasonInfo = "timeout";
             break;
         default: {
             std::ostringstream os;

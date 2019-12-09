@@ -49,8 +49,6 @@ private:
     template<class... Args>
     static Packet formPacket(BaseFlags flags, NetworkCommand cmd, Args&&... args);
 
-    constexpr static std::chrono::seconds kLastSeenTimeout{10};
-
     struct PeerInfo {
         cs::Version nodeVersion = 0;
         uint64_t uuid = 0;

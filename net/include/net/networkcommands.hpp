@@ -16,7 +16,6 @@ enum class RegistrationRefuseReasons : uint8_t {
     Unspecified,
     LimitReached,
     BadClientVersion,
-    Timeout,
     BadResponse,
     IncompatibleBlockchain
 };
