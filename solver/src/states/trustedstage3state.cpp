@@ -476,7 +476,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     for (auto& it : candidatesElection) {
         BlockChain::WalletData wData;
         context.blockchain().findWalletData(csdb::Address::from_public_key(it.first), wData);
-        csdb::Amount st = wData.balance_;
+        csdb::Amount st = wData.balance_ + wData.delegated_;
         stakers.emplace_back(it.first, st);
     }
 

@@ -181,7 +181,7 @@ public:
 
     void getCharacteristic(cs::RoundPackage& rPackage);
 
-    void createTestTransaction();
+    void createTestTransaction(int tType);
 
     void sendBlockAlarm(cs::Sequence seq);
 

@@ -882,6 +882,35 @@ bool BlockChain::checkForConsistency(csdb::Pool& pool) {
 
 }
 
+void  BlockChain::printWalletCaches() {
+    std::string res;
+    res += ":\n#.     Public Key:                                                    Balance:                    Delegated:\n";
+    int counter = 0;
+    iterateOverWallets([&res, &counter](const cs::PublicKey& addr, const cs::WalletsCache::WalletData& wd) {
+        ++counter;
+        res += std::to_string(counter) + ". " + cs::Utils::byteStreamToHex(addr.data(), addr.size()) + "   ";
+        auto am = wd.balance_.to_string();
+        res += am;
+        for (int k = am.size(); k < 28; ++k) {
+            res += " ";
+        }
+        res += wd.delegated_.to_string() + "\n";
+        if (!wd.delegats_.empty()) {
+            int delCounter = 0;
+            res += "    Delegats(" + std::to_string(wd.delegats_.size()) + "):" + "\n";
+            for (auto& it : wd.delegats_) {
+                ++delCounter;
+                res += "        " + std::to_string(counter) + "." + std::to_string(delCounter) + " " + cs::Utils::byteStreamToHex(it.first.data(), it.first.size());
+                res += "    " + it.second.to_string() + "\n";
+
+            }
+        }
+        return true;
+
+    });
+    csdebug() << res;
+}
+
 std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrusted) {
     const auto last_seq = getLastSeq();
     const auto pool_seq = pool.sequence();
@@ -932,6 +961,8 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
                   << ", see block info above";
         csdebug() << "----------------------------------------------------------------------------------";
     }
+
+    printWalletCaches();
 
     {
         cs::Lock lock(dbLock_);

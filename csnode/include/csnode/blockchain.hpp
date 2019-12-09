@@ -258,6 +258,8 @@ public:
 
     void setBlocksToBeRemoved(cs::Sequence number);
 
+    void printWalletCaches();
+
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);
     void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>); 
