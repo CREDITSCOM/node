@@ -28,7 +28,7 @@ cs::Byte RoundPackage::subRound() {
 }
 
 bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::Byte subRound) {
-    csdebug() << "rPackage-binary: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
+    csdetails() << "rPackage-binary: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
     cs::DataStream roundStream(bytes.data(), bytes.size());
     cs::ConfidantsKeys confidants;
     roundTable_.round = rNum;
