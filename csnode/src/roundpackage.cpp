@@ -28,7 +28,7 @@ cs::Byte RoundPackage::subRound() {
 }
 
 bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::Byte subRound) {
-    csdebug() << "rPackage-binary: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
+    csdetails() << "rPackage-binary: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
     cs::DataStream roundStream(bytes.data(), bytes.size());
     cs::ConfidantsKeys confidants;
     roundTable_.round = rNum;
@@ -193,4 +193,20 @@ void RoundPackage::refillToSign() {
 
     messageSize_ = binaryRepresentation_.size();
 }
+
+void RoundPackage::setSenderNode(const cs::PublicKey& sender) {
+    sender_ = std::make_shared<cs::PublicKey>(sender);
+}
+
+bool RoundPackage::getSender(cs::PublicKey& sender) const {
+    if (!sender_) {
+        return false;
+    }
+    if (sender_->size() != sender.size()) {
+        return false;
+    }
+    std::copy(sender_->cbegin(), sender_->cend(), sender.begin());
+    return true;
+}
+
 }  // namespace cs

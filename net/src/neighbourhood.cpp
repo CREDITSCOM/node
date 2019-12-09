@@ -6,9 +6,11 @@
 
 #include "neighbourhood.hpp"
 #include "transport.hpp"
+#include "packetvalidator.hpp"
 
 #include <cscrypto/cscrypto.hpp>
 #include <csnode/blockchain.hpp>
+#include <csnode/configholder.hpp>
 #include <lib/system/random.hpp>
 
 namespace {
@@ -41,7 +43,8 @@ Neighbourhood::Neighbourhood(Transport* net)
 : transport_(net)
 , connectionsAllocator_(MaxConnections + 1)
 , nLockFlag_()
-, mLockFlag_() {
+, mLockFlag_()
+, resqueue(this) {
 }
 
 void Neighbourhood::chooseNeighbours() {
@@ -60,7 +63,9 @@ void Neighbourhood::chooseNeighbours() {
     size_t redirectNumber = 0;
 
     if (redirectLimit) {
-        redirectNumber = std::max(kNeighborsRedirectMin, neighbours_.size() / 3 + 1);
+        redirectNumber = std::max(kNeighborsRedirectMin,
+            static_cast<size_t>(
+                neighbours_.size() * cs::ConfigHolder::instance().config()->getBroadcastCoefficient()) + 1);
 
         if (redirectNumber > neighbours_.size()) {
             redirectNumber = neighbours_.size();
@@ -115,9 +120,10 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp, bool separate) {
             }
 
             auto& dp = msgDirects_.tryStore(bp.pack.getHash());
-
             dp.pack = bp.pack;
             dp.receiver = nb;
+
+            resqueue.insert(bp.pack, nb);
 
             if (!nb->isSignal || send_to_ss) {
                 if (separate) {
@@ -166,6 +172,8 @@ void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
             bp.pack = *pack;
             bp.receiver = nb;
 
+            resqueue.insert(*pack, nb);
+
             transport_->sendDirect(pack, **nb);
         }
     }
@@ -185,6 +193,7 @@ void Neighbourhood::sendByConfidant(const Packet* pack, ConnectionPtr conn) {
 
     bp.pack = *pack;
     bp.receiver = conn;
+    resqueue.insert(*pack, conn);
 
     transport_->sendDirect(pack, **conn);
 }
@@ -217,7 +226,7 @@ void Neighbourhood::checkSilent() {
     static uint32_t refillCount = 0;
 
     bool needRefill = true;
-    std::atomic_bool flagCallRefillNeighbourhood{ false };
+    bool flagCallRefillNeighbourhood{ false };
 
     { // begin of scoped locked block
         cs::ScopedLock lock(mLockFlag_, nLockFlag_);
@@ -274,35 +283,29 @@ void Neighbourhood::checkSilent() {
     } // end of scoped locked block
 
     if (flagCallRefillNeighbourhood) {
-        transport_->refillNeighbourhood();
+        checkNeighbours();
     }
 }
 
 void Neighbourhood::checkNeighbours() {
     bool refill_required = false;
-
-    if (transport_->requireStartNode()) {
-        bool starter_found = false;
-
-        cs::Lock lock(nLockFlag_);
-        for (const auto& nb : neighbours_) {
-            if (nb->isSignal) {
-                starter_found = true;
-                if (!nb->connected) {
-                    refill_required = true;
-                    break;
-                }
-            }
-        }
-        if (!starter_found) {
-            refill_required = true;
-        }
-    }
-
     if (transport_->isShouldUpdateNeighbours()) {
         refill_required = true;
     }
-
+    else {
+        if (transport_->requireStartNode()) {
+            bool starter_found = false;
+            forEachNeighbour([&](ConnectionPtr ptr) {
+                if (ptr->isSignal) {
+                    starter_found = true;
+                    refill_required = !ptr->connected;
+                }
+            });
+            if (!starter_found) {
+                refill_required = true;
+            }
+        }
+    }
     if (refill_required) {
         transport_->refillNeighbourhood();
     }
@@ -337,7 +340,6 @@ static ip::udp::endpoint getIndexingEndpoint(const ip::udp::endpoint& ep) {
 }
 
 ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
-    //csdebug() << "Getting connection with " << ep;
     auto& conn = connections_.tryStore(getIndexingEndpoint(ep));
 
     if (!conn) {
@@ -454,6 +456,8 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
     }
 
     conn->isSignal = true;
+    // validator have already stored the key: regpack -> validator -> transport (calls to this method)
+    conn->key = cs::PacketValidator::instance().getStarterKey();
     connectNode(node, conn);
 }
 
@@ -467,21 +471,20 @@ ConnectionPtr Neighbourhood::addConfidant(const ip::udp::endpoint& ep) {
         conn->id = getSecureRandom<Connection::Id>();
     }
 
-    conn->connected = true;
+    conn->connected = conn->node ? !conn->node->isBlackListed() : false;
 
     return conn;
 }
 
 bool Neighbourhood::updateSignalServer(const ip::udp::endpoint& in) {
-    cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_); // #!
-    
+    cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_);
+
     if (auto itServer = std::find_if(neighbours_.begin(), neighbours_.end(), [](auto const& node) {return node->isSignal; }); itServer != neighbours_.end()) {
         itServer->get()->in = in;
         itServer->get()->specialOut = false;
         itServer->get()->out = {};
         return true;
     }
-    
     return false;
 }
 
@@ -501,6 +504,7 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     conn->node = node;
 
     if (conn->connected) {
+        csdebug() << "Attempt to connect to already connected " << conn->getOut();
         return;
     }
 
@@ -513,6 +517,7 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     }
 
     neighbours_.emplace(neighbours_.end(), conn);
+    csdebug() << "Node " << conn->getOut() << " is added to neighbours";
     chooseNeighbours();
 }
 
@@ -671,6 +676,8 @@ void Neighbourhood::neighbourHasPacket(RemoteNodePtr node, const cs::Hash& hash)
 
     auto& dp = msgDirects_.tryStore(hash);
     dp.received = true;
+    resqueue.remove(hash, conn);
+    resqueue.resend();
 }
 
 void Neighbourhood::neighbourSentPacket(RemoteNodePtr node, const cs::Hash& hash) {
@@ -756,22 +763,7 @@ bool Neighbourhood::isPingDone() {
 
 void Neighbourhood::resendPackets() {
     cs::Lock lock(nLockFlag_);
-    uint32_t cnt1 = 0;
-
-    for (auto& bp : msgBroads_) {
-        if (!bp.data.pack) {
-            continue;
-        }
-
-        if (!dispatch(bp.data)) {
-            bp.data.pack = Packet();
-        }
-        else {
-            ++cnt1;
-        }
-
-        bp.data.sentLastTime = false;
-    }
+    resqueue.resend();
 }
 
 ConnectionPtr Neighbourhood::getConnection(const RemoteNodePtr node) {
@@ -851,6 +843,7 @@ void Neighbourhood::registerDirect(const Packet* packPtr, ConnectionPtr conn) {
     auto& bp = msgDirects_.tryStore(packPtr->getHash());
     bp.pack = *packPtr;
     bp.receiver = conn;
+    resqueue.insert(*packPtr, conn);
 }
 
 bool Neighbourhood::isNewConnectionAvailable() const {
@@ -859,7 +852,6 @@ bool Neighbourhood::isNewConnectionAvailable() const {
 
 ConnectionPtr Neighbourhood::getRandomNeighbour() {
     cs::Lock lock(nLockFlag_);
-
     if (neighbours_.size() == 0) {
         return ConnectionPtr();
     }
@@ -868,4 +860,75 @@ ConnectionPtr Neighbourhood::getRandomNeighbour() {
     const int randomNumber = cs::Random::generateValue<int>(0, static_cast<int>(neighbourCount));
 
     return *(neighbours_.begin() + randomNumber);
+}
+
+bool Neighbourhood::ResendQueue::insert(Packet pack, ConnectionPtr conn) {
+    cs::Lock lock(qLock);
+
+    static int count = 0;
+
+    DirectPackInfo info;
+    info.pack = pack;
+    info.receiver = conn;
+    info.startTPoint = std::chrono::system_clock::now();
+    info.tpoint = info.startTPoint;
+    info.mixHash = pack.getHash();
+    makeMixHash(info.mixHash, (**conn).id);
+    auto res = packetsRef.insert(std::make_pair(info.mixHash, nullptr));
+    if (res.second) {
+        packets.push(info);
+        res.first->second = &packets.back();
+        return true;
+    }
+    return false;
+}
+
+void Neighbourhood::ResendQueue::remove(const cs::Hash& hash, Connection* conn) {
+    cs::Lock lock(qLock);
+    static int count = 0;
+
+    cs::Hash mixHash = hash;
+    makeMixHash(mixHash, conn->id);
+    auto it = packetsRef.find(mixHash);
+    if (it != packetsRef.end()) {
+        it->second->received = true;
+    }
+}
+
+void Neighbourhood::ResendQueue::resend() {
+    std::vector<DirectPackInfo *> toSend;
+    {
+        cs::Lock lock(qLock);
+        auto now = std::chrono::system_clock::now();
+        while (!packets.empty()) {
+            auto& packinfo = packets.front();
+            std::chrono::duration<double> diff = now - packinfo.tpoint;
+            if (diff.count() > resendPeriod) {
+                std::chrono::duration<double> diffAtStart = now - packinfo.startTPoint;
+                if (diffAtStart.count() > resendTimeout) {
+                    packetsRef.erase(packinfo.mixHash);
+                    packets.pop();
+                    continue;
+                }
+                if (!packinfo.received) {
+                    auto tmp = packinfo;
+                    tmp.tpoint = now;
+                    packetsRef.erase(packinfo.mixHash);
+                    packets.pop();
+                    auto res = packetsRef.insert(std::make_pair(tmp.mixHash, nullptr));
+                    packets.push(tmp);
+                    res.first->second = &packets.back();
+                    toSend.push_back(&packets.back());
+                } else {
+                    packetsRef.erase(packinfo.mixHash);
+                    packets.pop();
+                }
+                continue;
+            }
+            break;
+        }
+    }
+    for (auto out: toSend) {
+        nh->transport_->sendDirect(&out->pack, **out->receiver);
+    }
 }

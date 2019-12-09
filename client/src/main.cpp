@@ -20,6 +20,9 @@
 #include <observer.hpp>
 #include <version.hpp>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 // diagnostic output
 #if defined(_MSC_VER)
 #if defined(MONITOR_NODE)
@@ -139,7 +142,7 @@ int main(int argc, char* argv[]) {
 #ifdef WIN32
     if (!SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
         std::cout << "\nERROR: Could not set control handler" << std::flush;
-        return 1;
+        return EXIT_FAILURE;
     }
 #else
     installSignalHandler();
@@ -150,16 +153,24 @@ int main(int argc, char* argv[]) {
 #endif
     std::ios_base::sync_with_stdio(false);
 
+    const char* argHelp = "help";
+    const char* argVersion = "version";
+    const char* argDBPath = "db-path";
+    const char* argSeed = "seed";
+    const char* argDumpKeys = "dumpkeys";
+    const char* argSetBCTop = "set-bc-top";
+    const char* kDeprecatedDBPath = "test_db";
+
     using namespace boost::program_options;
     options_description desc("Allowed options");
     desc.add_options()
-        ("help", "produce this message")
+        (argHelp, "produce this message")
         ("recreate-index", "recreate index.db")
-        ("seed", "enter with seed instead of keys")
-        ("set-bc-top", po::value<uint64_t>(), "all blocks in blockchain with higher sequence will be removed")
+        (argSeed, "enter with seed instead of keys")
+        (argSetBCTop, po::value<uint64_t>(), "all blocks in blockchain with higher sequence will be removed")
         ("disable-auto-shutdown", "node will be prohibited to shutdown in case of fatal errors")
-        ("version", "show node version")
-        ("db-path", po::value<std::string>(), "path to DB (default: \"test_db/\")")
+        (argVersion, "show node version")
+        (argDBPath, po::value<std::string>(), "path to DB (default: \"db/\")")
         ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")")
         ("public-key-file", po::value<std::string>(), "path to public key file (default: \"NodePublic.txt\")")
         ("private-key-file", po::value<std::string>(), "path to private key file (default: \"NodePrivate.txt\")")
@@ -174,25 +185,26 @@ int main(int argc, char* argv[]) {
     catch (unknown_option& e) {
         cserror() << e.what();
         cslog() << desc;
-        return 1;
+        return EXIT_FAILURE;
     }
     catch (invalid_command_line_syntax& e) {
         cserror() << e.what();
         cslog() << desc;
-        return 1;
+        return EXIT_FAILURE;
     }
     catch (...) {
         cserror() << "Couldn't parse the arguments";
         cslog() << desc;
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    if (vm.count("help")) {
+    if (vm.count(argHelp) > 0) {
         cslog() << desc;
-        return 0;
+        return EXIT_SUCCESS;
     }
 
-    if (vm.count("version")) {
+    // in case of version option print info and exit
+    if (vm.count(argVersion) > 0) {
         cslog() << "Node version is " << Config::getNodeVersion();
 #ifdef MONITOR_NODE
         cslog() << "Monitor version";
@@ -204,7 +216,20 @@ int main(int argc, char* argv[]) {
         cslog() << "Build SHA1: " << client::Version::GIT_SHA1;
         cslog() << "Date: " << client::Version::GIT_DATE;
         cslog() << "Subject: " << client::Version::GIT_COMMIT_SUBJECT;
-        return 0;
+        return EXIT_SUCCESS;
+    }
+
+    // test db directory, exit if user did not rename old kDeprecatedDBPath and expect to use it as default one
+    if (vm.count(argDBPath) == 0) {
+        // arg is not set, so default dir is not "db_test"
+        struct stat info;
+        if (stat(kDeprecatedDBPath, &info) == 0) {
+            if (info.st_mode & S_IFDIR) {
+                cslog() << "Deprecated blockchain path \'" << kDeprecatedDBPath
+                    << "\' is in current directory. Please rename it to \'db\' to use it as default storage, or rename to any other not to use at all, then restart your node again";
+                return EXIT_FAILURE;
+            }
+        } 
     }
 
     if (!cscrypto::cryptoInit()) {
@@ -218,24 +243,23 @@ int main(int argc, char* argv[]) {
         panic();
     }
 
-    if (vm.count("seed") == 0) {
+    if (vm.count(argSeed) == 0) {
         if (!config.readKeys(vm)) {
-            return false;
+            return EXIT_FAILURE;
         }
     }
     else {
         if (!config.enterWithSeed()) {
-            return false;
+            return EXIT_FAILURE;
         }
     }
 
-
-    if (vm.count("dumpkeys")) {
-        auto fName = vm["dumpkeys"].as<std::string>();
+    if (vm.count(argDumpKeys) > 0) {
+        auto fName = vm[argDumpKeys].as<std::string>();
         if (fName.size() > 0) {
             config.dumpJSONKeys(fName);
             cslog() << "Keys dumped to " << fName;
-            return 0;
+            return EXIT_SUCCESS;
         }
     }
 
@@ -251,7 +275,7 @@ int main(int argc, char* argv[]) {
         panic();
     }
 
-    if (vm.count("set-bc-top")) {
+    if (vm.count(argSetBCTop) > 0) {
         node.stop();
         logger::cleanup();
         std::_Exit(EXIT_SUCCESS);

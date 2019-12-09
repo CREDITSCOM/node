@@ -295,6 +295,7 @@ Result TrustedStage3State::finalizeStageThree(SolverContext& context) {
     }
     else {
         cslog() << "\tconsensus failed: waiting for BigBang";
+        context.send_consensus_failed_report();
         return Result::Failure;
     }
     csdebug() << "Starting new collection of stage 3 because a part of nodes didn't respond correct";
@@ -364,10 +365,16 @@ bool TrustedStage3State::pool_solution_analysis(SolverContext& context) {
             context.mark_untrusted(it.sender);
             stage.realTrustedMask.at(it.sender) = cs::ConfidantConsts::InvalidConfidantIndex;
 
-            bool is_lost = (std::equal(it.hash.cbegin(), it.hash.cend(), Zero::hash.cbegin()));
+            bool is_lost = std::equal(it.hash.cbegin(), it.hash.cend(), Zero::hash.cbegin());
             csdebug() << "[" << static_cast<int>(it.sender) << "] IS "
                       << ((is_lost && stage.realTrustedMask.at(it.sender) == cs::ConfidantConsts::InvalidConfidantIndex) ? "LOST" : "LIAR") << " with hash "
                       << cs::Utils::byteStreamToHex(it.hash);
+            if (is_lost) {
+                context.send_silent_report(cs::Conveyer::instance().confidantByIndex(it.sender));
+            }
+            else {
+                context.send_liar_report(cs::Conveyer::instance().confidantByIndex(it.sender));
+            }
         }
     }
 
@@ -483,7 +490,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     std::sort(stakers.begin(), stakers.end(), [](const StakeHolder &a, const StakeHolder &b) { return a.stake > b.stake; });
 
     auto itStake = stakers.begin();
-    int cnt = 0;
+    size_t cnt = 0;
     while (itStake != stakers.end()) {
         if(cnt < max_conf - eLiars) {
             aboveThreshold.emplace_back(itStake->key);
@@ -505,7 +512,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     g.seed(uint32_t(Conveyer::instance().currentRoundNumber()));
     cs::Random::shuffle(belowThreshold.begin(), belowThreshold.end(), g);
     auto itt = belowThreshold.begin();
-    for (int j = 0; j < eLiars; ++j) {
+    for (size_t j = 0; j < eLiars; ++j) {
         aboveThreshold.emplace_back(*itt);
         ++itt;
     }

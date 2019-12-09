@@ -5,7 +5,7 @@
 #include <exception>
 #include <string>
 #include <vector>
-#include <iostream>
+#include <memory>
 
 #ifdef _MSC_VER
 #pragma warning(push, 0)
@@ -81,8 +81,9 @@ public:
     // returns current process running state
     bool isRunning() const;
 
-    // returns process out pipe
-    boost::process::ipstream& out();
+    // returns process all out pipe data
+    std::string out();
+    bool isPipeValid() const;
 
     // waits of process end at blocking mode, better to use finished signal
     void wait();
@@ -90,7 +91,7 @@ public:
 
     void stop();
 
-    void launch(Options options = Options::None);
+    bool launch(Options options = Options::None);
 
 public signals:
     ProcessStartSignal started;
@@ -99,7 +100,7 @@ public signals:
 
 private:
     mutable boost::process::child process_;
-    mutable boost::process::ipstream out_;
+    mutable std::unique_ptr<boost::process::ipstream> pipe_;
 
     std::string program_;
     std::vector<std::string> args_;
@@ -170,8 +171,27 @@ inline bool Process::isRunning() const {
     return false;
 }
 
-inline boost::process::ipstream& Process::out() {
-    return out_;
+inline std::string Process::out() {
+    std::string result;
+
+    if (!pipe_ || isRunning()) {
+        return result;
+    }
+
+    auto& pipe = *(pipe_.get());
+
+    while (pipe_->good()) {
+        std::string data;
+        pipe >> data;
+
+        result += data;
+    }
+
+    return result;
+}
+
+inline bool Process::isPipeValid() const {
+    return static_cast<bool>(pipe_);
 }
 
 inline void Process::wait() {
@@ -188,7 +208,6 @@ inline void Process::terminate() {
     try {
         io_.stop();
         process_.terminate();
-        out_.clear();
     }
     catch (const std::exception& exception) {
         emit errorOccured(cs::ProcessException(exception.what()));
@@ -206,9 +225,9 @@ inline void Process::stop() {
     }
 }
 
-inline void Process::launch(Process::Options options) {
+inline bool Process::launch(Process::Options options) {
     if (isRunning()) {
-        return;
+        return false;
     }
 
     auto setup = [=]([[maybe_unused]] auto& exec) {
@@ -232,7 +251,7 @@ inline void Process::launch(Process::Options options) {
     };
 
     io_.restart();
-    out_.clear();
+    pipe_.reset();
 
     try {
         if ((options & Options::OutToFile) && !file_.empty()) {
@@ -240,7 +259,8 @@ inline void Process::launch(Process::Options options) {
                                              boost::process::extend::on_success = success, boost::process::extend::on_error = error);
         }
         else if (options & Options::OutToStream) {
-            process_ = boost::process::child(program_, args_, io_, boost::process::std_out > out_, boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
+            pipe_ = std::make_unique<boost::process::ipstream>();
+            process_ = boost::process::child(program_, args_, io_, boost::process::std_out > (*pipe_.get()), boost::process::on_exit = exit, boost::process::extend::on_setup = setup,
                                              boost::process::extend::on_success = success, boost::process::extend::on_error = error);
         }
         else if (options & Options::Attach) {
@@ -252,12 +272,25 @@ inline void Process::launch(Process::Options options) {
         }
     }
     catch (const std::exception& exception) {
+        pipe_.reset();
         emit errorOccured(cs::ProcessException(exception.what()));
+
+        return false;
+    }
+
+    if (options & Options::Attach) {
+        return true;
     }
 
     try {
         std::thread thread([this] {
-            io_.run();
+            try {
+                io_.run();
+            }
+            catch (const std::exception& exception) {
+                terminate();
+                emit errorOccured(cs::ProcessException(exception.what()));
+            }
         });
 
         thread.detach();
@@ -265,7 +298,11 @@ inline void Process::launch(Process::Options options) {
     catch (const std::exception& exception) {
         terminate();
         emit errorOccured(cs::ProcessException(exception.what()));
+
+        return false;
     }
+
+    return true;
 }
 }
 

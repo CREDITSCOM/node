@@ -9,6 +9,7 @@
 #include <csnode/itervalidator.hpp>
 #include <csnode/transactionspacket.hpp>
 #include <csnode/walletscache.hpp>
+#include <csnode/configholder.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 
@@ -242,6 +243,13 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::Transactio
     if (characteristic.mask.size() != transactionsCount) {
         cserror() << name() << ": characteristic mask size is not equal to transactions count in build_vector()";
     }
+
+    if (std::find_if(characteristic.mask.cbegin(), characteristic.mask.cend(), [](const cs::Byte& item) { return item != Reject::Reason::None; }) != characteristic.mask.cend()) {
+        context.send_rejected_report(characteristic.mask);
+    }
+
+    // transform characteristic to its "canonical" form
+    pValidator_->normalizeCharacteristic(characteristic);
 
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     conveyer.setCharacteristic(characteristic, conveyer.currentRoundNumber());

@@ -28,6 +28,9 @@ add_library(csconnector
     src/executormanager.cpp
     include/dumbcv.hpp
     src/dumbcv.cpp
+    include/executor.hpp
+    src/executor.cpp
+    include/serializer.hpp
 )
 
 target_link_libraries (csconnector PUBLIC csdb csnode lib csconnector_gen csconnector_executor_gen variant_gen)

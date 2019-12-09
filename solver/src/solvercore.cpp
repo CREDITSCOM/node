@@ -586,6 +586,7 @@ std::optional<cs::Characteristic> SolverCore::ownValidation(cs::TransactionsPack
     csdebug() << "Before characteristic creation";
     if (transactionsCount > 0) {
         characteristic = pVal_->formCharacteristic(*pcontext, packet.transactions(), smartsPackets);
+        pVal_->normalizeCharacteristic(characteristic);
     }
     csdebug() << "After characteristic creation";
     if (characteristic.mask.size() != transactionsCount) {

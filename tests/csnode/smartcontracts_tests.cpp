@@ -6,6 +6,7 @@
 #include <csdb/transaction.hpp>
 #include <apihandler.hpp>
 #include <base58.h>
+#include <serializer.hpp>
 //#include "networkmock.hpp"
 //#include "nodemock.hpp"
 //#include "solvermock.hpp"
@@ -31,13 +32,13 @@ TEST(SmartContract, basic_checks) {
     api::SmartContractInvocation api_deploy_invoke;
     api_deploy_invoke.__set_smartContractDeploy(api_deploy_data);
     csdb::Transaction t_deploy = t.clone();
-    t_deploy.add_user_field(trx_uf::deploy::Code, serialize(api_deploy_invoke));
+    t_deploy.add_user_field(trx_uf::deploy::Code, cs::Serializer::serialize(api_deploy_invoke));
 
     // call (start)
     api::SmartContractInvocation api_call_invoke;
     api_call_invoke.__set_method("method");
     csdb::Transaction t_start = t.clone();
-    t_start.add_user_field(trx_uf::start::Methods, serialize(api_call_invoke));
+    t_start.add_user_field(trx_uf::start::Methods, cs::Serializer::serialize(api_call_invoke));
 
     // new state
     csdb::Transaction t_state = t.clone();

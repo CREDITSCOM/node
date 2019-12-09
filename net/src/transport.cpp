@@ -459,6 +459,9 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
         case NetworkCommand::SSPingWhiteNode:
             gotSSPingWhiteNode(task, node_->getBlockChain().getLastSeq(), node_->getBlockChain().getLastHash());
             break;
+        case NetworkCommand::Utility:  // managing info could be obtained  
+            return node_->getUtilityMessage(task->pack.getMsgData(), task->pack.getMsgSize());
+            break;
         case NetworkCommand::SSLastBlock: {
             long long timeSS{};
             iPackStream_ >> timeSS;
@@ -513,9 +516,11 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
     }
 }
 
+// call need checked earlier in calling code
 void Transport::refillNeighbourhood() {
     // TODO: check this algorithm when all list nodes are dead
-    if (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::IpList) {
+    const auto bootstrap = cs::ConfigHolder::instance().config()->getBootstrapType();
+    if (bootstrap == BootstrapType::IpList) {
         for (auto& ep : cs::ConfigHolder::instance().config()->getIpList()) {
             if (!neighbourhood_.canHaveNewConnection()) {
                 cswarning() << "Connections limit reached";
@@ -526,12 +531,10 @@ void Transport::refillNeighbourhood() {
             neighbourhood_.establishConnection(net_->resolve(ep));
         }
     }
-
-    if (requireStartNode()) {
-        // Connect to SS logic
+    else if (bootstrap == BootstrapType::SignalServer) {
+        // both connect to SS and get new neighbours candidates
         ssEp_ = net_->resolve(cs::ConfigHolder::instance().config()->getSignalServerEndpoint());
         cslog() << "Connecting to start node on " << ssEp_;
-
         {
             cs::Lock lock(oLock_);
             formSSConnectPack(myPublicKey_, node_->getBlockChain().uuid());
@@ -549,6 +552,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
     cs::RoundNumber rNum = 0;
     iPackStream_ >> rNum;
 
+    // mark start of node data
     auto trStart = iPackStream_.getCurrentPtr();
 
     uint8_t numConf;
@@ -558,10 +562,11 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
         return false;
     }
 
+    // skip node data
     iPackStream_.safeSkip<cs::PublicKey>(numConf + 1);
 
+    // mark finish of node data
     auto trFinish = iPackStream_.getCurrentPtr();
-    node_->getRoundTableSS(trStart, cs::numeric_cast<size_t>(trFinish - trStart), rNum);
 
     uint8_t numCirc;
     iPackStream_ >> numCirc;
@@ -598,6 +603,9 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
             }
         }
     }
+
+    // let node to handle its data
+    node_->getRoundTableSS(trStart, cs::numeric_cast<size_t>(trFinish - trStart), rNum);
 
     ssStatus_ = SSBootstrapStatus::Complete;
     return true;
@@ -711,8 +719,12 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
             return node_->getBlockReply(data, size);
         case MsgTypes::BigBang:  // any round (in theory) may be set
             return node_->getBigBang(data, size, rNum);
+        case MsgTypes::Utility:  // managing info could be obtained  
+            return node_->getUtilityMessage(data, size);
         case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
             return node_->getRoundTableRequest(data, size, rNum, firstPack.getSender());
+        case MsgTypes::RoundPackRequest:
+            return node_->getRoundPackRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::NodeStopRequest:
             return node_->getNodeStopRequest(rNum, data, size);
         case MsgTypes::RoundTable:
@@ -773,8 +785,6 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
             return node_->getSmartReject(data, size, rNum, firstPack.getSender());
         case MsgTypes::RoundTableReply:
             return node_->getRoundTableReply(data, size, firstPack.getSender());
-        case MsgTypes::RoundPackRequest:
-            return node_->getRoundPackRequest(data, size, rNum, firstPack.getSender());
         case MsgTypes::EmptyRoundPack:
             return node_->getEmptyRoundPack(data, size, rNum, firstPack.getSender());
         case MsgTypes::StateRequest:
@@ -784,8 +794,7 @@ void Transport::dispatchNodeMessage(const MsgTypes type, const cs::RoundNumber r
         case MsgTypes::BlockAlarm:
             return node_->getBlockAlarm(data, size, rNum, firstPack.getSender());
         case MsgTypes::EventReport:
-            csdebug() << "TRANSPORT> get event report message";
-            break;
+            return node_->getEventReport(data, size, rNum, firstPack.getSender());
         default:
             cserror() << "TRANSPORT> Unknown message type " << Packet::messageTypeToString(type) << " pack round " << rNum;
             break;
@@ -852,9 +861,67 @@ bool Transport::markNeighbourAsBlackListed(const cs::PublicKey& key) {
 
         // do not have bussiness with remote node
         neighbourhood_.dropConnection(neighbour.connection->id);
+
+        {
+            cs::Lock lock(remoteMutex_);
+            remoteBlackList_.emplace(key, neighbour.connection->getOut());
+        }
     }
 
     return neighbour.isValid();
+}
+
+bool Transport::unmarkNeighbourAsBlackListed(const cs::PublicKey& key) {
+    ip::udp::endpoint point;
+
+    {
+        cs::Lock lock(remoteMutex_);
+        auto iter = remoteBlackList_.find(key);
+
+        if (iter == remoteBlackList_.end()) {
+            return false;
+        }
+
+        point = iter->second;
+    }
+
+    auto remoteSender = getPackSenderEntry(point);
+
+    if (!remoteSender) {
+        return false;
+    }
+
+    remoteSender->setBlackListed(false);
+
+    {
+        cs::Lock lock(remoteMutex_);
+        remoteBlackList_.erase(key);
+    }
+
+    return !remoteSender->isBlackListed();
+}
+
+bool Transport::isBlackListed(const cs::PublicKey& key) const {
+    cs::Lock lock(remoteMutex_);
+    return remoteBlackList_.find(key) != remoteBlackList_.end();
+}
+
+size_t Transport::blackListSize() const {
+    cs::Lock lock(remoteMutex_);
+    return remoteBlackList_.size();
+}
+
+cs::PublicKeys Transport::blackList() const {
+    cs::Lock lock(remoteMutex_);
+
+    cs::PublicKeys keys;
+    keys.reserve(remoteBlackList_.size());
+
+    std::for_each(std::begin(remoteBlackList_), std::end(remoteBlackList_), [&](const auto& element) {
+        keys.push_back(element.first);
+    });
+
+    return keys;
 }
 
 bool Transport::isShouldUpdateNeighbours() const {
@@ -862,16 +929,8 @@ bool Transport::isShouldUpdateNeighbours() const {
 }
 
 bool Transport::requireStartNode() {
-    bool req = (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::SignalServer ||
+    return (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::SignalServer ||
             cs::ConfigHolder::instance().config()->getNodeType() == NodeType::Router);
-    if (req) {
-        neighbourhood_.forEachNeighbour([&](ConnectionPtr ptr) {
-            if (ptr->isSignal) {
-                req = false;
-            }
-        });
-    }
-    return req;
 }
 
 bool Transport::isShouldPending(Connection* connection) const {
@@ -1024,6 +1083,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
     }
 
     Connection conn;
+    conn.connected = false;
     conn.in = task->sender;
     conn.version = version;
 

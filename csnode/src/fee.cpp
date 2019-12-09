@@ -8,8 +8,8 @@ namespace cs {
 namespace {
 const size_t kCommonTrSize = 152;
 
-std::array<std::tuple<size_t, double, double>, 14> feeLevels = {
-    std::make_tuple(5 * 1024,    0.08745,    0.008745),
+constexpr std::array<std::tuple<size_t, double, double>, 14> feeLevels = {
+    std::make_tuple(5 * 1024,    0.08745,    0.008745), // this is min fee value
     std::make_tuple(20 * 1024,   0.17490,    0.034980),
     std::make_tuple(50 * 1024,   0.43726,    0.139922),
     std::make_tuple(100 * 1024,  17.90996,   17.90996),
@@ -24,6 +24,15 @@ std::array<std::tuple<size_t, double, double>, 14> feeLevels = {
     std::make_tuple(500 * 1024 * 1024,  5868737.26566,  5868737.26566),
     std::make_tuple(1000 * 1024 * 1024, 23474949.06266, 23474949.06266)
 };
+
+constexpr double minFee() {
+    return std::get<2>(feeLevels[0]);
+}
+
+constexpr double minContractStateFee() {
+    return minFee();
+}
+
 }  // namespace
 
 namespace fee {
@@ -32,7 +41,7 @@ csdb::AmountCommission getFee(const csdb::Transaction& t) {
     size_t size = t.to_byte_stream().size();
 
     if (!SmartContracts::is_smart_contract(t) && size <= kCommonTrSize) {
-        return csdb::AmountCommission(kMinFee);
+        return csdb::AmountCommission(minFee());
     }
 
     for (const auto& level : feeLevels) {
@@ -49,7 +58,7 @@ csdb::AmountCommission getFee(const csdb::Transaction& t) {
 }
 
 csdb::AmountCommission getContractStateMinFee() {
-    return csdb::AmountCommission(std::get<2>(feeLevels[0])); // cheapest new state
+    return csdb::AmountCommission(minContractStateFee()); // cheapest new state
 }
 
 bool estimateMaxFee(const csdb::Transaction& t, csdb::AmountCommission& countedFee, SmartContracts& sc) {
@@ -69,7 +78,7 @@ void setCountedFees(Transactions& trxs) {
 }
 
 csdb::Amount getExecutionFee(long long duration_mcs) {
-    constexpr double FEE_IN_MCS = kMinFee * 0.001 * 0.001; // the cost is based on 1 kMinFee/sec
+    constexpr double FEE_IN_MCS = minContractStateFee() * 0.001 * 0.001; // the cost is based on 1 kMinFee/sec
     return csdb::Amount(static_cast<double>(duration_mcs) * FEE_IN_MCS);
 }
 
