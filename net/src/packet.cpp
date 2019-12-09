@@ -102,10 +102,22 @@ std::ostream& operator<<(std::ostream& os, const Packet& packet) {
     }
 
     std::string flags = "Packet:\n Flags:";
-    if (packet.isNetwork()) flags += " network";
-    if (packet.isCompressed()) flags += " compressed";
-    if (packet.isEncrypted()) flags += " encrypted";
-    if (packet.isSigned()) flags += " signed";
+
+    if (packet.isNetwork()) {
+        flags += " network";
+    }
+
+    if (packet.isCompressed()) {
+        flags += " compressed";
+    }
+
+    if (packet.isEncrypted()) {
+        flags += " encrypted";
+    }
+
+    if (packet.isSigned()) {
+        flags += " signed";
+    }
 
     return os << flags << std::endl;
 }
