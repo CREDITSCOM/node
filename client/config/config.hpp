@@ -31,7 +31,7 @@ const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::kMaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
-const uint32_t DEFAULT_STORE_BLOCK_ELAPSE_TIME = DEFAULT_ROUND_ELAPSE_TIME; // ms
+const uint32_t DEFAULT_STORE_BLOCK_ELAPSE_TIME = 1000 * 40; // ms
 
 const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;             // rounds
 const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
