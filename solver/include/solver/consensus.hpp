@@ -29,7 +29,7 @@ public:
     const static size_t MaxRoundDuration;
 
     /** @brief   The minimum trusted nodes to start consensus */
-    const static unsigned int MinTrustedNodes = 3;
+    const static unsigned int MinTrustedNodes = 4;
 
     /** @brief   The maximum trusted nodes to take part in consensus */
     const static unsigned int MaxTrustedNodes = 25;

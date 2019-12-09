@@ -200,8 +200,8 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
         if (std::find(stage.trustedCandidates.cbegin(), stage.trustedCandidates.cend(), sender) == stage.trustedCandidates.cend()) {
             stage.trustedCandidates.push_back(sender);
         }
-        //TODO: print hashMask string
-        if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes) {
+        // candidates does not include own hash, so (MinTrustedNodes - 1) will be enough to proceed next stage
+        if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes - 1) {
             if (likeMineHashes >= cs::Conveyer::instance().confidantsCount() / 2) {
                 enough_hashes = true;
                 bool other_conditions = transactions_checked && min_time_expired;
