@@ -123,7 +123,7 @@ namespace trx_uf {
     // delegation transaction fields
     namespace sp { //specific
         // delegation
-        constexpr csdb::user_field_id_t delegate = 5; // value: 0 - delegation, 1 - withdraw delegation
+        constexpr csdb::user_field_id_t delegated = 5; // value: 0 - delegation, 1 - withdraw delegation
         // count of user fields
         constexpr size_t Count = 1;
     }

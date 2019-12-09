@@ -2444,7 +2444,8 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
         uint64_t currentTimeStamp;
         [[maybe_unused]] uint64_t rpTimeStamp;
         try {
-            lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+            std::string lTS = getBlockChain().getLastTimeStamp();
+            lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
         }
         catch (...) {
             csdebug() << __func__ << ": last block Timestamp was announced as zero";
@@ -2806,7 +2807,8 @@ void Node::sendHash(cs::RoundNumber round) {
     uint64_t currentTimeStamp = 0;
 
     try {
-        lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+        std::string lTS = getBlockChain().getLastTimeStamp();
+        lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
         currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
     }
     catch (const std::exception& exception) {
@@ -2883,7 +2885,8 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     uint64_t currentTimeStamp = 0;
 
     try {
-        lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+        std::string lTS = getBlockChain().getLastTimeStamp();
+        lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
         currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
     }
     catch (const std::exception& exception) {

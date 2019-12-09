@@ -295,6 +295,11 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
     if (!rc && !bc.findWalletData(t.source(), wallet)) {
         rc = kSourceDoesNotExists;
     }
+    //csdb::UserField fld;
+    //fld = tr.user_field(trx_uf::sp::delegated);
+    //if (fld.is_valid()) {
+    //value<uint64_t> ()
+    //}
 
     if (!rc && wallet.balance_ < (t.amount() + t.max_fee().to_double())) {
         rc = kInsufficientBalance;

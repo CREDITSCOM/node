@@ -149,7 +149,14 @@ bool TransactionsValidator::validateCommonAsSource(SolverContext& context, const
                 newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
             }
             else {
-                newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
+                //calculate balance only if transaction isn't de-delegate
+                csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegated);
+                if (delegateField.is_valid() && delegateField.value<uint64_t>() == 2) {
+                    newBalance = wallState.balance_ - csdb::Amount(trx.counted_fee().to_double());
+                }
+                else {
+                    newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
+                }
             }
         }
     }
@@ -199,33 +206,24 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
         negativeNodes_.push_back(&wallState);
     }
 
-
-    //delegation
-    WalletsState::WalletData& targetWallState = walletsState_.getData(trx.target());
-    csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegate);
-    if (delegateField.is_valid()) {
-        switch (delegateField.value<uint64_t>() == 0) {
-        case 0:
-            if (targetWallState.delegated_ > csdb::Amount{ 0 }) {
+    csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegated);
+    if (delegateField.is_valid() && delegateField.value<uint64_t>() == 2) {
+        WalletsState::WalletData& wallTargetState = walletsState_.getData(trx.target());
+        auto targetPKey = trx.target().public_key();
+        if (wallState.delegats_.find(targetPKey) != wallState.delegats_.end()) {
+            if (wallTargetState.delegated_ != wallState.delegats_.at(targetPKey)) {
+                cserror() << kLogPrefix << "different values in sources and targets delegated records";
                 return false;
             }
-            break;
-        case 1:
-            auto delegats = wallState.delegats_;
-            auto tTarget = trx.target().to_public_key();
-            if (delegats.find(tTarget) == delegats.cend()) {
-                return false;
-            }
-            if (targetWallState.delegated_ != delegats.at(tTarget)) {
-                cslog() << kLogPrefix << __func__ << ": the delegated value has different amounts in wallet caches";
-                return false;
-            }
-            break;
-        default:
-            break;
         }
-
+        else {
+            csdetails() << kLogPrefix << "sender of transaction[" << trxInd << "] didn't delegated resouces to selected target";
+            return false;
+        }
+        
     }
+
+
 
     wallState.trxTail_.push(trx.innerID());
     csdetails() << kLogPrefix << "innerID of " << cs::SmartContracts::to_base58(context.blockchain(), trx.source()) << " <- " << trx.innerID();
@@ -237,7 +235,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
 
 bool TransactionsValidator::validateTransactionAsTarget(const csdb::Transaction& trx) {
     WalletsState::WalletData& wallState = walletsState_.getData(trx.target());
-
+    //TODO insert delegated check code here
     wallState.balance_ = wallState.balance_ + trx.amount();
 
     return true;
