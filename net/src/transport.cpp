@@ -105,7 +105,6 @@ void Transport::run() {
     while (Transport::gSignalStatus == 0) {
         pollSignalFlag();
 
-        neighbourhood_.removeSilent();
         neighbourhood_.pingNeighbours();
 
         emit mainThreadIterated();
