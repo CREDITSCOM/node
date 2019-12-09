@@ -57,8 +57,10 @@ void Neighbourhood::newPeerDiscovered(const cs::PublicKey& peer) {
 
 void Neighbourhood::peerDisconnected(const cs::PublicKey& peer) {
     std::lock_guard<std::mutex> lock(neighbourMutex_);
-    if (neighbours_.find(peer) != neighbours_.end()) {
-        neighbours_.erase(peer);
+    auto it = neighbours_.find(peer);
+    if (it != neighbours_.end()) {
+        transport_->onNeighboursChanged(it->first, it->second.lastSeq, it->second.roundNumber, false);
+        neighbours_.erase(it);
     }
 }
 
