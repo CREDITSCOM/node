@@ -84,14 +84,18 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &cs::Executor::onBlockStored);
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &cs::Executor::onReadBlock);
+
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->neighbourAdded, this, &Node::onNeighbourAdded);
     cs::Connector::connect(&transport_->neighbourRemoved, this, &Node::onNeighbourRemoved);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
+    cs::Connector::connect(&transport_->mainThreadIterated, &stat_, &cs::RoundStat::onMainThreadIterated);
+
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     initPoolSynchronizer();
     setupNextMessageBehaviour();
+    setupPoolSynchronizerBehaviour();
 
     alwaysExecuteContracts_ = cs::ConfigHolder::instance().config()->alwaysExecuteContracts();
     good_ = init();
@@ -179,9 +183,13 @@ void Node::initPoolSynchronizer() {
 }
 
 void Node::setupNextMessageBehaviour() {
-    cs::Connector::connect(&transport_->mainThreadIterated, &stat_, &cs::RoundStat::onMainThreadIterated);
     cs::Connector::connect(&cs::Conveyer::instance().roundChanged, &stat_, &cs::RoundStat::onRoundChanged);
     cs::Connector::connect(&stat_.roundTimeElapsed, this, &Node::onRoundTimeElapsed);
+}
+
+void Node::setupPoolSynchronizerBehaviour() {
+    cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onBlockStored);
+    cs::Connector::connect(&stat_.storeBlockTimeElapsed, poolSynchronizer_, &cs::PoolSynchronizer::onStoreBlockTimeElapsed);
 }
 
 void Node::run() {

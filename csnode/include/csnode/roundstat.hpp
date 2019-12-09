@@ -14,7 +14,6 @@
 class Config;
 
 namespace cs {
-constexpr size_t kMaxStoredDurations = 1000;
 constexpr size_t kMaxRoundDelay = 30000;
 
 class RoundStat {
@@ -46,12 +45,17 @@ public:
 public slots:
     void onPingReceived(cs::Sequence, const cs::PublicKey&);
     void onRoundChanged();
+    void onBlockStored();
     void onMainThreadIterated();
 
 public signals:
     cs::Action roundTimeElapsed;
+    cs::Action storeBlockTimeElapsed;
 
 private:
+    void checkRoundElapse();
+    void checkStoreBlockElapse();
+
     // amount of transactions received (to verify or not or to ignore)
     size_t totalReceivedTransactions_;
 
@@ -70,9 +74,10 @@ private:
 
     std::atomic<size_t> lastRoundMs_;
 
-    // round time elapsing calcualtion and sync
-    std::mutex roundElapseMutex_;
+    // round time elapsing calcualtion, store block elapsing and sync
+    std::mutex statsElapseMutex_;
     std::chrono::steady_clock::time_point roundElapseTimePoint_;
+    std::chrono::steady_clock::time_point storeBlockElapseTimePoint_;
 };
 
 }  // namespace cs

@@ -16,7 +16,8 @@ RoundStat::RoundStat()
 , nodeStartRound_(0)
 , startSkipRounds_(2)
 , lastRoundMs_(0)
-, roundElapseTimePoint_(std::chrono::steady_clock::now()) {
+, roundElapseTimePoint_(std::chrono::steady_clock::now())
+, storeBlockElapseTimePoint_(std::chrono::steady_clock::now()) {
 }
 
 void RoundStat::onRoundStart(RoundNumber round, bool skipLogs) {
@@ -116,16 +117,26 @@ void RoundStat::onPingReceived(cs::Sequence, const cs::PublicKey&) {
 }
 
 void RoundStat::onRoundChanged() {
-    cs::Lock lock(roundElapseMutex_);
+    cs::Lock lock(statsElapseMutex_);
     roundElapseTimePoint_ = std::chrono::steady_clock::now();
 }
 
+void RoundStat::onBlockStored() {
+    cs::Lock lock(statsElapseMutex_);
+    storeBlockElapseTimePoint_ = std::chrono::steady_clock::now();
+}
+
 void RoundStat::onMainThreadIterated() {
+    checkRoundElapse();
+    checkStoreBlockElapse();
+}
+
+void RoundStat::checkRoundElapse() {
     std::chrono::steady_clock::time_point point;
     uint64_t limit = 0;
 
     {
-        cs::Lock lock(roundElapseMutex_);
+        cs::Lock lock(statsElapseMutex_);
         point = roundElapseTimePoint_;
         limit = cs::ConfigHolder::instance().config()->roundElapseTime();
     }
@@ -141,9 +152,34 @@ void RoundStat::onMainThreadIterated() {
 
     {
         // reset time point to tick next time after limit
-        cs::Lock lock(roundElapseMutex_);
+        cs::Lock lock(statsElapseMutex_);
         roundElapseTimePoint_ = std::chrono::steady_clock::now();
     }
 }
 
+void RoundStat::checkStoreBlockElapse() {
+    std::chrono::steady_clock::time_point point;
+    uint64_t limit = 0;
+
+    {
+        cs::Lock lock(statsElapseMutex_);
+        point = storeBlockElapseTimePoint_;
+        limit = cs::ConfigHolder::instance().config()->storeBlockElapseTime();
+    }
+
+    auto duration = std::chrono::steady_clock::now() - point;
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+
+    if (limit > static_cast<uint64_t>(ms)) {
+        return;
+    }
+
+    emit storeBlockTimeElapsed();
+
+    {
+        // reset time point to tick next time after limit
+        cs::Lock lock(statsElapseMutex_);
+        storeBlockElapseTimePoint_ = std::chrono::steady_clock::now();
+    }
+}
 }  // namespace cs
