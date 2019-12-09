@@ -7,7 +7,8 @@
 
 #include <csnode/conveyer.hpp>
 
-// you may add special packet validation to type
+// you may add special packet validation to special type
+// it may be network command type or node type messages
 
 namespace cs {
 constexpr static cs::RoundNumber packetTypeRoundTimeout(const MsgTypes type) {
@@ -32,6 +33,18 @@ bool PacketValidator::validate(const Packet& packet) {
         return false;
     }
 
+    if (packet.isNetwork()) {
+        return validateNetworkPacket(packet);
+    }
+
+    return validateNodePacket(packet);
+}
+
+bool PacketValidator::validateNetworkPacket(const Packet&) {
+    return true;
+}
+
+bool PacketValidator::validateNodePacket(const Packet& packet) {
     auto round = packet.getRoundNum();
     auto messageType = packet.getType();
     auto size = packet.size();
