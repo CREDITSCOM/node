@@ -2831,7 +2831,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
 
 void Node::roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round) {
     csdebug() << "NODE> send request for round info #" << round;
-    sendDirect(respondent, MsgTypes::RoundPackRequest, round, round);
+    sendDirect(respondent, MsgTypes::RoundPackRequest, round);
 }
 
 void Node::askConfidantsRound(cs::RoundNumber round, const cs::ConfidantsKeys& confidants) {
@@ -2841,7 +2841,7 @@ void Node::askConfidantsRound(cs::RoundNumber round, const cs::ConfidantsKeys& c
         return;
     }
 
-    sendDirect(confidants, MsgTypes::RoundPackRequest, round, round);
+    sendDirect(confidants, MsgTypes::RoundPackRequest, round);
     cslog() << "NODE> unable to request round info #" << round;
 }
 
