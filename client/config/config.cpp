@@ -46,6 +46,7 @@ const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
 const std::string PARAM_NAME_ROUND_ELAPSE_TIME = "round_elapse_time";
+const std::string PARAM_NAME_STORE_BLOCK_ELAPSE_TIME = "store_block_elapse_time";
 const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
 const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
 const std::string PARAM_NAME_COMPATIBLE_VERSION = "compatible_version";
@@ -739,6 +740,7 @@ Config Config::readFromFile(const std::string& fileName) {
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
         result.observerWaitTime_ = params.count(PARAM_NAME_OBSERVER_WAIT_TIME) ? params.get<uint64_t>(PARAM_NAME_OBSERVER_WAIT_TIME) : DEFAULT_OBSERVER_WAIT_TIME;
         result.roundElapseTime_ = params.count(PARAM_NAME_ROUND_ELAPSE_TIME) ? params.get<uint64_t>(PARAM_NAME_ROUND_ELAPSE_TIME) : DEFAULT_ROUND_ELAPSE_TIME;
+        result.storeBlockElapseTime_ = params.count(PARAM_NAME_STORE_BLOCK_ELAPSE_TIME) ? params.get<uint64_t>(PARAM_NAME_STORE_BLOCK_ELAPSE_TIME) : DEFAULT_STORE_BLOCK_ELAPSE_TIME;
 
         if (config.count(BLOCK_NAME_HOST_ADDRESS)) {
             result.hostAddressEp_ = readEndpoint(config, BLOCK_NAME_HOST_ADDRESS);
@@ -1060,6 +1062,7 @@ bool operator==(const Config& lhs, const Config& rhs) {
         lhs.recreateIndex_ == rhs.recreateIndex_ &&
         lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
         lhs.roundElapseTime_ == rhs.roundElapseTime_ &&
+        lhs.storeBlockElapseTime_ == rhs.storeBlockElapseTime_ &&
         lhs.conveyerData_ == rhs.conveyerData_ &&
         lhs.minCompatibleVersion_ == rhs.minCompatibleVersion_ &&
         lhs.eventsReport_ == rhs.eventsReport_;

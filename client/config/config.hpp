@@ -31,6 +31,7 @@ const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::kMaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
+const uint32_t DEFAULT_STORE_BLOCK_ELAPSE_TIME = 1000 * 40; // ms
 
 const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;             // rounds
 const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
@@ -249,6 +250,10 @@ public:
         return roundElapseTime_;
     }
 
+    uint64_t storeBlockElapseTime() const {
+        return storeBlockElapseTime_;
+    }
+
     bool readKeys(const po::variables_map& vm);
     bool enterWithSeed();
 
@@ -322,6 +327,7 @@ private:
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
     uint64_t roundElapseTime_ = DEFAULT_ROUND_ELAPSE_TIME;
+    uint64_t storeBlockElapseTime_ = DEFAULT_STORE_BLOCK_ELAPSE_TIME;
 
     ConveyerData conveyerData_;
 

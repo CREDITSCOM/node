@@ -1,23 +1,17 @@
 #ifndef PACKETVALIDATOR_HPP
 #define PACKETVALIDATOR_HPP
 
-#include <net/transport.hpp>
+class Packet;
 
 namespace cs {
+// validates all network packets
 class PacketValidator {
 public:
-    static PacketValidator& instance();
-
-    bool validate(const Packet& pack);
-
-    const cs::PublicKey& getStarterKey() const {
-        return starterKey_;
-    }
+    static bool validate(const Packet& packet);
 
 private:
-    cs::PublicKey starterKey_;
-
-    PacketValidator();
+    static bool validateNetworkPacket(const Packet& packet);
+    static bool validateNodePacket(const Packet& packet);
 };
 }  // namespace cs
 

@@ -77,7 +77,7 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
     if (!isSyncroStarted_) {
         isSyncroStarted_ = true;
 
-        cs::Connector::connect(&blockChain_->storeBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const csdb::Pool)>(&cs::PoolSynchronizer::onWriteBlock));
+        cs::Connector::connect(&blockChain_->storeBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const csdb::Pool&)>(&cs::PoolSynchronizer::onWriteBlock));
         cs::Connector::connect(&blockChain_->cachedBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const cs::Sequence)>(&cs::PoolSynchronizer::onWriteBlock));
         cs::Connector::connect(&blockChain_->removeBlockEvent, this, &cs::PoolSynchronizer::onRemoveBlock);
 
@@ -97,7 +97,7 @@ void cs::PoolSynchronizer::syncLastPool() {
 
     if (!isSyncroStarted_) {
         isSyncroStarted_ = true;
-        cs::Connector::connect(&blockChain_->storeBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const csdb::Pool)>(&cs::PoolSynchronizer::onWriteBlock));
+        cs::Connector::connect(&blockChain_->storeBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const csdb::Pool&)>(&cs::PoolSynchronizer::onWriteBlock));
         cs::Connector::connect(&blockChain_->cachedBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const cs::Sequence)>(&cs::PoolSynchronizer::onWriteBlock));
         cs::Connector::connect(&blockChain_->removeBlockEvent, this, &cs::PoolSynchronizer::onRemoveBlock);
     }
@@ -217,7 +217,7 @@ void cs::PoolSynchronizer::onTimeOut() {
     }
 }
 
-void cs::PoolSynchronizer::onWriteBlock(const csdb::Pool pool) {
+void cs::PoolSynchronizer::onWriteBlock(const csdb::Pool& pool) {
     onWriteBlock(pool.sequence());
 }
 
@@ -243,6 +243,12 @@ void cs::PoolSynchronizer::onRemoveBlock(const csdb::Pool& pool) {
     }
     else {
         removeExistingSequence(removedSequence, SequenceRemovalAccuracy::EXACT);
+    }
+}
+
+void cs::PoolSynchronizer::onStoreBlockTimeElapsed() {
+    if (isSyncroStarted()) {
+        synchroFinished();
     }
 }
 
@@ -490,10 +496,6 @@ void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence, c
 
     for (auto& neighbour : neighbours_) {
         success |= neighbour.removeSequnce(sequence, accuracy);
-
-        if (neighbour.sequences().empty()) {
-            neighbour.resetRoundCounter();
-        }
     }
 
     if (success) {
@@ -532,7 +534,7 @@ bool cs::PoolSynchronizer::isLastRequest() const {
 }
 
 void cs::PoolSynchronizer::synchroFinished() {
-    cs::Connector::disconnect(&blockChain_->storeBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const csdb::Pool)>(&cs::PoolSynchronizer::onWriteBlock));
+    cs::Connector::disconnect(&blockChain_->storeBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const csdb::Pool&)>(&cs::PoolSynchronizer::onWriteBlock));
     cs::Connector::disconnect(&blockChain_->cachedBlockEvent, this, static_cast<void (PoolSynchronizer::*)(const cs::Sequence)>(&cs::PoolSynchronizer::onWriteBlock));
     cs::Connector::disconnect(&blockChain_->removeBlockEvent, this, &cs::PoolSynchronizer::onRemoveBlock);
 

@@ -39,11 +39,12 @@ public signals:
 private slots:
     void onTimeOut();
 
-    void onWriteBlock(const csdb::Pool pool);
+    void onWriteBlock(const csdb::Pool& pool);
     void onWriteBlock(const cs::Sequence sequence);
     void onRemoveBlock(const csdb::Pool& pool);
 
 public slots:
+    void onStoreBlockTimeElapsed();
     void onPingReceived(cs::Sequence sequence, const cs::PublicKey& publicKey);
     void onNeighbourAdded(const cs::PublicKey& publicKey, cs::Sequence sequence);
     void onNeighbourRemoved(const cs::PublicKey& publicKey);
@@ -91,8 +92,7 @@ private:
         }
 
         explicit NeighboursSetElemet(const cs::PublicKey& publicKey, cs::Sequence blockPoolsCount)
-        : key_(publicKey)
-        , roundCounter_(0) {
+        : key_(publicKey) {
             sequences_.reserve(blockPoolsCount);
         }
 
@@ -140,13 +140,9 @@ private:
         }
         inline void reset() {
             resetSequences();
-            resetRoundCounter();
         }
         inline void resetSequences() {
             sequences_.clear();
-        }
-        inline void resetRoundCounter() {
-            roundCounter_ = 0;
         }
         inline void setPublicKey(const cs::PublicKey& publicKey) {
             key_ = publicKey;
@@ -161,17 +157,8 @@ private:
         inline const PoolsRequestedSequences& sequences() const{
             return sequences_;
         }
-        inline cs::RoundNumber roundCounter() const {
-            return roundCounter_;
-        }
         inline cs::Sequence maxSequence() const {
             return maxSequence_;
-        }
-
-        inline void increaseRoundCounter() {
-            if (!sequences_.empty()) {
-                ++roundCounter_;
-            }
         }
 
         bool operator<(const NeighboursSetElemet& other) const {
@@ -202,8 +189,6 @@ private:
                 }
             }
 
-            os << ", round counter: " << el.roundCounter_;
-
             return os;
         }
 
@@ -211,7 +196,6 @@ private:
         cs::Sequence maxSequence_ = 0;
         cs::PublicKey key_;                  // neighbour public key
         PoolsRequestedSequences sequences_;  // requested sequence
-        cs::RoundNumber roundCounter_ = 0;
     };
 
 private:

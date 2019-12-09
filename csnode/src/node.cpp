@@ -84,14 +84,18 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &cs::Executor::onBlockStored);
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &cs::Executor::onReadBlock);
+
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->neighbourAdded, this, &Node::onNeighbourAdded);
     cs::Connector::connect(&transport_->neighbourRemoved, this, &Node::onNeighbourRemoved);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
+    cs::Connector::connect(&transport_->mainThreadIterated, &stat_, &cs::RoundStat::onMainThreadIterated);
+
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
 
     initPoolSynchronizer();
     setupNextMessageBehaviour();
+    setupPoolSynchronizerBehaviour();
 
     alwaysExecuteContracts_ = cs::ConfigHolder::instance().config()->alwaysExecuteContracts();
     good_ = init();
@@ -179,9 +183,13 @@ void Node::initPoolSynchronizer() {
 }
 
 void Node::setupNextMessageBehaviour() {
-    cs::Connector::connect(&transport_->mainThreadIterated, &stat_, &cs::RoundStat::onMainThreadIterated);
     cs::Connector::connect(&cs::Conveyer::instance().roundChanged, &stat_, &cs::RoundStat::onRoundChanged);
     cs::Connector::connect(&stat_.roundTimeElapsed, this, &Node::onRoundTimeElapsed);
+}
+
+void Node::setupPoolSynchronizerBehaviour() {
+    cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onBlockStored);
+    cs::Connector::connect(&stat_.storeBlockTimeElapsed, poolSynchronizer_, &cs::PoolSynchronizer::onStoreBlockTimeElapsed);
 }
 
 void Node::run() {
@@ -249,13 +257,6 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
     
     if (!stream.isValid() || !stream.isEmpty()) {
         cserror() << "NODE> Bad Utility packet format";
-        return;
-    }
-
-    const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
-
-    if (!cscrypto::verifySignature(sig, starter_key, msg.data(), msg.size())) {
-        cswarning() << "The Utility message is incorrect: signature isn't valid";
         return;
     }
 
@@ -539,13 +540,6 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
     cs::Bytes message;
     cs::DataStream roundStream(message);
     roundStream << round << version;
-
-    const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
-
-    if (!cscrypto::verifySignature(sig, starter_key, message.data(), message.size())) {
-        cswarning() << "NODE> Get incorrect stoprequest signature, possible attack";
-        return;
-    }
 
     cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
 
@@ -2329,17 +2323,6 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage, cs::DataStream& stream) {
     performRoundPackage(rPackage, solver_->getPublicKey(), stream, false);
 }
 
-bool Node::gotSSMessageVerify(const cs::Signature & sign, const cs::Byte* data, const size_t size) {
-    if (const auto & starter_key = cs::PacketValidator::instance().getStarterKey(); !cscrypto::verifySignature(sign, starter_key, data, size)) {
-        cswarning() << "SS message is incorrect: signature isn't valid";
-        csdebug() << "SSKey: " << cs::Utils::byteStreamToHex(starter_key.data(), starter_key.size());
-        csdebug() << "Message to Sign: " << cs::Utils::byteStreamToHex(data, size);
-        return false;
-    }
-
-    return true;
-}
-
 bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants) {
     csdebug() << "NODE> PoolSigs Amnt = " << rPackage.poolSignatures().size()
         << ", TrustedSigs Amnt = " << rPackage.trustedSignatures().size()
@@ -2856,7 +2839,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
 
 void Node::roundPackRequest(const cs::PublicKey& respondent, cs::RoundNumber round) {
     csdebug() << "NODE> send request for round info #" << round;
-    sendDirect(respondent, MsgTypes::RoundPackRequest, round, round);
+    sendDirect(respondent, MsgTypes::RoundPackRequest, round);
 }
 
 void Node::askConfidantsRound(cs::RoundNumber round, const cs::ConfidantsKeys& confidants) {
@@ -2866,7 +2849,7 @@ void Node::askConfidantsRound(cs::RoundNumber round, const cs::ConfidantsKeys& c
         return;
     }
 
-    sendDirect(confidants, MsgTypes::RoundPackRequest, round, round);
+    sendDirect(confidants, MsgTypes::RoundPackRequest, round);
     cslog() << "NODE> unable to request round info #" << round;
 }
 
