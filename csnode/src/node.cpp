@@ -115,8 +115,8 @@ bool Node::init() {
     auto& initConfidants = cs::ConfigHolder::instance().config()->getInitialConfidants();
     initialConfidants_ = decltype(initialConfidants_)(initConfidants.begin(), initConfidants.end());
 
-    if (initialConfidants_.size() <= Consensus::MinTrustedNodes) {
-        cserror() << "Not enough initial confidants.";
+    if (initialConfidants_.size() < Consensus::MinTrustedNodes) {
+        cserror() << "Not enough initial confidants, min " << Consensus::MinTrustedNodes;
         return false;
     }
 
@@ -3295,8 +3295,8 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
 
 void Node::onRoundTimeElapsed() {
     solver_->resetGrayList();
-
-    if (initialConfidants_.find(solver_->getPublicKey()) == initialConfidants_.end()) {
+    const cs::PublicKey& own_key = solver_->getPublicKey();
+    if (initialConfidants_.find(own_key) == initialConfidants_.end()) {
         cslog() << "Waiting for next round...";
 
         myLevel_ = Level::Normal;
@@ -3306,58 +3306,50 @@ void Node::onRoundTimeElapsed() {
 
         // if we have correct last block, we pretend to next trusted role
         // otherwise remote nodes will drop our hash
-        sendHash(blockChain_.getLastSeq() + 1);
+        //sendHash(blockChain_.getLastSeq() + 1);
         return;
     }
 
-    cslog() << "Try to start rounds...";
+    cslog() << "Gathering info to start round...";
 
     std::set<cs::PublicKey> actualConfidants;
-    actualConfidants.insert(solver_->getPublicKey());
+    actualConfidants.insert(own_key);
 
-    size_t initConfConnected = 1;
-    size_t initConfMaxBlock = 1;
-    cs::Sequence maxLocalBlock = blockChain_.getLastSeq();
+    const cs::Sequence maxLocalBlock = blockChain_.getLastSeq();
     cs::Sequence maxGlobalBlock = maxLocalBlock;
 
-    auto callback = [&initConfConnected, &initConfMaxBlock, &maxGlobalBlock, &actualConfidants, this]
+    auto callback = [&maxGlobalBlock, &actualConfidants, this]
                     (const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber) {
                         const auto it = initialConfidants_.find(neighbour);
                         if (it == initialConfidants_.end()) {
                             return;
                         }
-                        actualConfidants.insert(*it);
-                        ++initConfConnected;
-
                         if (lastSeq > maxGlobalBlock) {
-                            initConfMaxBlock = 1;
                             maxGlobalBlock = lastSeq;
+                            actualConfidants.clear();
+                            actualConfidants.insert(*it);
                         }
                         else if (lastSeq == maxGlobalBlock) {
-                            ++initConfMaxBlock;
+                            actualConfidants.insert(*it);
                         }
                     };
 
     transport_->forEachNeighbour(std::move(callback));
 
-    if (initConfConnected < Consensus::MinTrustedNodes) {
-        cslog() << "Cannot start rounds, not enough initial confidants connected.";
+    if (actualConfidants.size() < Consensus::MinTrustedNodes) {
+        cslog() << "Not enough confidants with max sequence " << maxGlobalBlock
+            << " (" << actualConfidants.size() << ", min " << Consensus::MinTrustedNodes
+            << " required). Wait until syncro finished or more bootstrap nodes to start...";
         return;
     }
 
-    if (initConfMaxBlock < Consensus::MinTrustedNodes) {
-        cslog() << "Cannot start rounds, not enough initial confidants with same last sequence. "
-                << "Wait for syncro finished...";
-        return;
-    }
-
-    if (maxGlobalBlock != maxLocalBlock) {
+    if (actualConfidants.find(own_key) == actualConfidants.cend()) {
         cslog() << "Should not start rounds, local block " << maxLocalBlock << ", global block " << maxGlobalBlock;
         return;
     }
 
     if (roundPackageCache_.empty()) {
-        cslog() << "Cannot start rounds, round package cache is empty.";
+        cserror() << "Cannot start rounds, round package cache is empty.";
         return;
     }
 
@@ -3366,9 +3358,17 @@ void Node::onRoundTimeElapsed() {
     // do not increment, only "mark" default round start
     subRound_ = 1;
 
-    if (*actualConfidants.cbegin() == solver_->getPublicKey()) {
-        // send rtss
-        
+    cslog() << "NODE> Bootstrap available nodes [" << actualConfidants.size() << "]:";
+    for (const auto& item : actualConfidants) {
+        const auto beg = item.data();
+        const auto end = beg + item.size();
+        cslog() << "NODE> " << " - " << EncodeBase58(beg, end) << (item == own_key ? " (me)" : "");
+    }
+
+    if (*actualConfidants.cbegin() == own_key) {
+
+        cslog() << "Starting round...";
+
         cs::Bytes bin;
         cs::DataStream out(bin);
         out << uint8_t(actualConfidants.size());
@@ -3380,9 +3380,14 @@ void Node::onRoundTimeElapsed() {
         auto& conveyer = cs::Conveyer::instance();
         conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
 
-        sendConfidants(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bin);
+        sendBroadcast(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bin);
 
         onRoundStart(roundPackageCache_.back().roundTable(), true);
         reviewConveyerHashes();
+    }
+    else {
+        const auto beg = actualConfidants.cbegin()->data();
+        const auto end = beg + actualConfidants.cbegin()->size();
+        cslog() << "Wait for " << EncodeBase58(beg, end) << " to start round...";
     }
 }
