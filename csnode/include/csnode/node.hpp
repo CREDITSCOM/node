@@ -170,7 +170,6 @@ public:
     // called by solver, review required:
     bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
     void sendRoundTable(cs::RoundPackage& rPackage, cs::DataStream& stream);
-    bool gotSSMessageVerify(const cs::Signature& sign, const cs::Byte* data, const size_t size);
 
     // transaction's pack syncro
     void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);

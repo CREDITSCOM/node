@@ -86,22 +86,6 @@ void pollSignalFlag() {
     }
 }
 
-constexpr cs::RoundNumber getRoundTimeout(const MsgTypes type) {
-    switch (type) {
-        case MsgTypes::FirstSmartStage:
-        case MsgTypes::SecondSmartStage:
-        case MsgTypes::ThirdSmartStage:
-        case MsgTypes::RejectedContracts:
-            return 100;
-        case MsgTypes::TransactionPacket:
-        case MsgTypes::TransactionsPacketRequest:
-        case MsgTypes::TransactionsPacketReply:
-            return cs::Conveyer::MetaCapacity;
-        default:
-            return 5;
-    }
-}
-
 // Extern function dfined in main.cpp to poll and handle signal status.
 extern void pollSignalFlag();
 
@@ -175,11 +159,13 @@ void Transport::sendBroadcast(Packet&& pack) {
 }
 
 void Transport::processorRoutine() {
+    constexpr size_t kRoutineWaitTimeMs = 50;
+
     while (!node_->isStopRequested()) {
         CallsQueue::instance().callAll();
 
         std::unique_lock lock(inboxMux_);
-        newPacketsReceived_.wait_for(lock, std::chrono::milliseconds{50}, [this]() {
+        newPacketsReceived_.wait_for(lock, std::chrono::milliseconds{kRoutineWaitTimeMs}, [this]() {
             return !inboxQueue_.empty();
         });
 
@@ -190,13 +176,8 @@ void Transport::processorRoutine() {
             cs::PublicKey sender(inboxQueue_.front().first);
             inboxQueue_.pop_front();
 
-            if (cs::PacketValidator::instance().validate(pack)) {
-                if (pack.isNetwork()) {
-                    neighbourhood_.processNeighbourMessage(sender, pack);
-                }
-                else {
-                    processNodeMessage(sender, pack);
-                }
+            if (cs::PacketValidator::validate(pack)) {
+                pack.isNetwork() ? neighbourhood_.processNeighbourMessage(sender, pack) : processNodeMessage(sender, pack);
             }
         }
     }
@@ -231,12 +212,16 @@ void Transport::processNodeMessage(const cs::PublicKey& sender, const Packet& pa
 }
 
 void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes type, const cs::RoundNumber rNum, const uint8_t* data, size_t size) {
-    if (size == 0) {
-        cserror() << "Bad packet size, why is it zero?";
-        return;
+    // add special logs here
+    switch (type) {
+        case MsgTypes::ThirdSmartStage:
+            csdebug() << "+++++++++++++++++++  ThirdSmartStage arrived +++++++++++++++++++++";
+            break;
+        default:
+            break;
     }
 
-    // never cut packets
+    // call handlers
     switch (type) {
         case MsgTypes::BlockRequest:
             return node_->getBlockRequest(data, size, sender);
@@ -244,30 +229,14 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
             return node_->getBlockReply(data, size);
         case MsgTypes::Utility:
             return node_->getUtilityMessage(data, size);
-        case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
-            return node_->getRoundTableRequest(data, size, rNum, sender);
         case MsgTypes::NodeStopRequest:
             return node_->getNodeStopRequest(rNum, data, size);
         case MsgTypes::RoundTable:
             return node_->getRoundTable(data, size, rNum, sender);
         case MsgTypes::BootstrapTable:
             return node_->getBootstrapTable(data, size, rNum);
-        default:
-            break;
-    }
-
-    // cut slow packs
-    if ((rNum + getRoundTimeout(type)) < cs::Conveyer::instance().currentRoundNumber()) {
-        csdebug() << "TRANSPORT> Ignore old packs, round " << rNum << ", type " << Packet::messageTypeToString(type);
-        return;
-    }
-
-    if (type == MsgTypes::ThirdSmartStage) {
-        csdebug() << "+++++++++++++++++++  ThirdSmartStage arrived +++++++++++++++++++++";
-    }
-
-    // packets which transport may cut
-    switch (type) {
+        case MsgTypes::RoundTableRequest:
+            return node_->getRoundTableRequest(data, size, rNum, sender);
         case MsgTypes::BlockHash:
             return node_->getHash(data, size, rNum, sender);
         case MsgTypes::HashReply:
@@ -319,7 +288,6 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
         case MsgTypes::EventReport:
             return node_->getEventReport(data, size, rNum, sender);
         default:
-            cserror() << "TRANSPORT> Unknown message type " << Packet::messageTypeToString(type) << " pack round " << rNum;
             break;
     }
 }

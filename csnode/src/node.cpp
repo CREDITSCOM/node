@@ -252,13 +252,6 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
         return;
     }
 
-    const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
-
-    if (!cscrypto::verifySignature(sig, starter_key, msg.data(), msg.size())) {
-        cswarning() << "The Utility message is incorrect: signature isn't valid";
-        return;
-    }
-
     cs::Byte order;
     cs::PublicKey pKey;
     cs::DataStream bytes(msg.data(), msg.size());
@@ -539,13 +532,6 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
     cs::Bytes message;
     cs::DataStream roundStream(message);
     roundStream << round << version;
-
-    const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
-
-    if (!cscrypto::verifySignature(sig, starter_key, message.data(), message.size())) {
-        cswarning() << "NODE> Get incorrect stoprequest signature, possible attack";
-        return;
-    }
 
     cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
 
@@ -2327,17 +2313,6 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage, cs::DataStream& stream) {
     csdebug() << "Hashes count: " << rPackage.roundTable().hashes.size();
 
     performRoundPackage(rPackage, solver_->getPublicKey(), stream, false);
-}
-
-bool Node::gotSSMessageVerify(const cs::Signature & sign, const cs::Byte* data, const size_t size) {
-    if (const auto & starter_key = cs::PacketValidator::instance().getStarterKey(); !cscrypto::verifySignature(sign, starter_key, data, size)) {
-        cswarning() << "SS message is incorrect: signature isn't valid";
-        csdebug() << "SSKey: " << cs::Utils::byteStreamToHex(starter_key.data(), starter_key.size());
-        csdebug() << "Message to Sign: " << cs::Utils::byteStreamToHex(data, size);
-        return false;
-    }
-
-    return true;
 }
 
 bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants) {
