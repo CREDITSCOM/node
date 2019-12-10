@@ -711,7 +711,7 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
             return false;
         }
         // bindings
-        auto&&[packet, smartPackets] = std::move(data).value();
+        auto&& [packet, smartPackets] = std::move(data).value();
         csdebug() << "NODE> Packet size: " << packet.transactionsCount() << ", smartPackets: " << smartPackets.size();
         auto myMask = solver_->ownValidation(packet, smartPackets);
         csdebug() << "NODE> Characteristic calculated from the very transactions";
@@ -729,7 +729,8 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
     }
     auto otherMask = rPackage.poolMetaInfo().characteristic.mask;
     bool identic = true;
-    csdebug() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(ownMask.data(), ownMask.size())
+    cs::Bytes checkMask;
+    csdetails() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(ownMask.data(), ownMask.size())
         << " and received: " << cs::Utils::byteStreamToHex(otherMask.data(), otherMask.size());
     //TODO: this code is to be refactored - may cause some problems
     if (otherMask.size() != ownMask.size()) {
@@ -740,17 +741,32 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
         for (size_t i = 0; i < ownMask.size(); ++i) {
             if (otherMask[i] != ownMask[i]) {
                 identic = false;
-                csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... False";
+                checkMask.push_back(1);
+                //csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... False";
                 break;
             }
             else {
-                csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... Ok";
+                checkMask.push_back(0);
+                //csdebug() << "NODE> Comparing own value " << static_cast<int>(ownMask[i]) << " versus " << static_cast<int>(otherMask[i]) << " ... Ok";
             }
         }
     }
 
     if (!identic) {
-        cserror() << "NODE> We probably got the roundPackage with invalid characteristic, can't build block";
+        std::string badChecks;
+        int badChecksCounter = 0;
+        for (int i = 0; i < checkMask.size(); ++i) {
+            if (checkMask[i] != 0) {
+                if (badChecks.size() > 0) {
+                    badChecks += ", ";
+                }
+                badChecks += std::to_string(i);
+                ++badChecksCounter;
+            }
+        }
+        cserror() << "NODE> We probably got the roundPackage with invalid characteristic. " << badChecksCounter
+            << "; transaction(s): " << badChecks << " (is)were not checked properly. Can't build block";
+
         cs::PublicKey source_node;
         if (!rPackage.getSender(source_node)) {
             std::copy(cs::Zero::key.cbegin(), cs::Zero::key.cend(), source_node.begin());

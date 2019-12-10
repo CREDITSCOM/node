@@ -220,13 +220,13 @@ private:
     void checkAnotherExecutor();
 
     // The explicit_sequence is set for generated accessId ensure having correct sequence attached to it
-    uint64_t generateAccessId(cs::Sequence explicitSequence, const csdb::Address& smartAddress);
+    uint64_t generateAccessId(cs::Sequence explicitSequence, uint64_t time = 0);
     uint64_t getFutureAccessId();
     void deleteAccessId(const general::AccessID& accessId);
 
     // explicit sequence sets the sequence for accessId attached to execution
     std::optional<OriginExecuteResult> execute(const std::string& address, const executor::SmartContractBinary& smartContractBinary,
-        std::vector<executor::MethodHeader>& methodHeader, bool isGetter, cs::Sequence explicitSequence);
+        std::vector<executor::MethodHeader>& methodHeader, bool isGetter, cs::Sequence explicitSequence, uint64_t time = 0);
 
     bool connect();
     void disconnect();
@@ -249,7 +249,8 @@ private:
 
     general::AccessID lastAccessId_{};
     std::map<general::AccessID, cs::Sequence> accessSequence_;
-    std::map<general::AccessID, csdb::Address> executableSmartAddress_;
+    std::map<general::AccessID, uint64_t> executeTrxnsTime;
+
     std::map<csdb::Address, csdb::TransactionID> deployTrxns_;
     std::map<csdb::Address, std::string> lastState_;
     std::map<csdb::Address, std::unordered_map<cs::Sequence, std::string>> cacheLastStates_;
@@ -262,7 +263,7 @@ private:
     mutable std::condition_variable cvErrorConnect_;
     std::atomic_bool requestStop_{ false };
 
-    const int16_t EXECUTOR_VERSION = 3;
+    const int16_t EXECUTOR_VERSION = 4;
 
     std::mutex callExecutorLock_;
     std::atomic<bool> isWatcherRunning_ = { false };
