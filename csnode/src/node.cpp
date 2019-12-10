@@ -172,7 +172,7 @@ bool Node::init() {
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
 
-    initDefaultRP(initialConfidants_);
+    initBootstrapRP(initialConfidants_);
     return true;
 }
 
@@ -216,7 +216,7 @@ void Node::stop() {
     cswarning() << "[CONFIG OBSERVER STOPPED]";
 }
 
-void Node::initDefaultRP(const std::set<cs::PublicKey>& confidants) {
+void Node::initBootstrapRP(const std::set<cs::PublicKey>& confidants) {
     cs::RoundPackage rp;
     cs::RoundTable rt;
 
@@ -228,8 +228,6 @@ void Node::initDefaultRP(const std::set<cs::PublicKey>& confidants) {
 
     rp.updateRoundTable(rt);
     roundPackageCache_.push_back(rp);
-
-    isDefaultRoundTable_ = true;
 }
 
 void Node::onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound) {
@@ -328,6 +326,10 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
     }
 
     subRound_ = 1;
+    if (!isBootstrapRound_) {
+        isBootstrapRound_ = true;
+        cslog() << "NODE> Bootstrap on";
+    }
 
     roundTable.confidants = std::move(confidants);
     roundTable.hashes.clear();
@@ -2545,35 +2547,39 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     cs::Signatures poolSignatures;
     cs::PublicKeys confidants;
 
-    if (rPackage.roundTable().round > 2/* && confirmationList_.size() > 0*/) { //Here we have problems when the trusted have the first block and the others do not!!!
-        auto conf = confirmationList_.find(rPackage.roundTable().round - 1/*getBlockChain().getLastSeq() + 1*/);
-        if (!conf.has_value()) {
-            csdebug() << "Can't find confirmation - leave getRoundPackage()";
-            confirmationList_.add(rPackage.roundTable().round, false, rPackage.roundTable().confidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.trustedSignatures());
-            //return;
-        }
-        else {
-            confidants = conf.value().confidants;
-        }
-        if (confidants.empty()) {
-            csdb::Pool tmp = getBlockChain().loadBlock(rPackage.roundTable().round - 1);
-            if (tmp.confidants().empty()) {
-                csdebug() << "Can't find public keys - leave getRoundPackage()";
-                return;
-            } 
+    if (!isBootstrapRound()) {
+        if (rPackage.roundTable().round > 2/* && confirmationList_.size() > 0*/) { //Here we have problems when the trusted have the first block and the others do not!!!
+            auto conf = confirmationList_.find(rPackage.roundTable().round - 1/*getBlockChain().getLastSeq() + 1*/);
+            if (!conf.has_value()) {
+                csdebug() << "Can't find confirmation - leave getRoundPackage()";
+                confirmationList_.add(rPackage.roundTable().round, false, rPackage.roundTable().confidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.trustedSignatures());
+                //return;
+            }
             else {
-                confidants = tmp.confidants();
+                confidants = conf.value().confidants;
+            }
+            if (confidants.empty()) {
+                csdb::Pool tmp = getBlockChain().loadBlock(rPackage.roundTable().round - 1);
+                if (tmp.confidants().empty()) {
+                    csdebug() << "Can't find public keys - leave getRoundPackage()";
+                    return;
+                }
+                else {
+                    confidants = tmp.confidants();
+                }
+            }
+
+            if (!receivingSignatures(rPackage, confidants) && storedRound == getBlockChain().getLastSeq()) {
+                return;
             }
         }
-
-        if (!receivingSignatures(rPackage, confidants) && storedRound == getBlockChain().getLastSeq()) {
-            return;
+        else {
+            csdebug() << "No confirmations in the list";
         }
     }
     else {
-        csdebug() << "No confirmations in the list";
+        csdebug() << "NODE> bootstrap round, so not any confirmation available";
     }
-
     currentRoundTableMessage_.round = rPackage.roundTable().round;
     currentRoundTableMessage_.sender = sender;
     currentRoundTableMessage_.message = cs::Bytes(data, data + size);
@@ -2588,8 +2594,6 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     csdebug() << __func__;
 
     // got round package in any way, reset default round table flag
-    isDefaultRoundTable_ = false;
-
     confirmationList_.add(rPackage.roundTable().round, false, rPackage.roundTable().confidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.trustedSignatures());
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     cs::Bytes realTrusted = rPackage.poolMetaInfo().realTrustedMask;
@@ -2637,6 +2641,11 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     currentRoundPackage_ = cs::RoundPackage();
     reviewConveyerHashes();
 
+    if (isBootstrapRound_) {
+        isBootstrapRound_ = false;
+        cslog() << "NODE> Bootstrap off";
+    }
+
     csmeta(csdetails) << "done\n";
 }
 
@@ -2667,7 +2676,6 @@ bool Node::isTransactionsInputAvailable() {
         return false;
     }
 }
-
 
 void Node::clearRPCache(cs::RoundNumber rNum) {
     bool flagg = true;
@@ -3302,7 +3310,7 @@ void Node::onRoundTimeElapsed() {
         myLevel_ = Level::Normal;
         myConfidantIndex_ = cs::ConfidantConsts::InvalidConfidantIndex;
 
-        initDefaultRP(initialConfidants_);
+        initBootstrapRP(initialConfidants_);
 
         // if we have correct last block, we pretend to next trusted role
         // otherwise remote nodes will drop our hash
@@ -3353,7 +3361,7 @@ void Node::onRoundTimeElapsed() {
         return;
     }
 
-    initDefaultRP(actualConfidants);
+    initBootstrapRP(actualConfidants);
 
     // do not increment, only "mark" default round start
     subRound_ = 1;
@@ -3374,13 +3382,17 @@ void Node::onRoundTimeElapsed() {
         out << uint8_t(actualConfidants.size());
 
         for (const auto& item : actualConfidants) {
-            out << item;
+            out << item; 
         }
 
         auto& conveyer = cs::Conveyer::instance();
         conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
 
         sendBroadcast(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bin);
+        if (!isBootstrapRound_) {
+            isBootstrapRound_ = true;
+            cslog() << "NODE> Bootstrap on, sending bootstrap table";
+        }
 
         onRoundStart(roundPackageCache_.back().roundTable(), true);
         reviewConveyerHashes();

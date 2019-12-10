@@ -261,6 +261,9 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
                 sx2 += x * x;
                 ++N;
             }
+            else {
+                csdebug() << tStamp;
+            }
         }
     }
 

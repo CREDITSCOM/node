@@ -217,9 +217,9 @@ public:
      * @param   confidants  The actual confidants set.
      */
 
-    void initDefaultRP(const std::set<cs::PublicKey>& confidants);
+    void initBootstrapRP(const std::set<cs::PublicKey>& confidants);
     bool isBootstrapRound() const {
-        return isDefaultRoundTable_;
+        return isBootstrapRound_;
     }
     void getUtilityMessage(const uint8_t* data, const size_t size);
     void becomeWriter();
@@ -453,7 +453,7 @@ private:
     cs::Compressor compressor_;
 
     std::set<cs::PublicKey> initialConfidants_;
-    bool isDefaultRoundTable_ = false;
+    bool isBootstrapRound_ = false;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);
