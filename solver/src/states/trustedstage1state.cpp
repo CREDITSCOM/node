@@ -244,11 +244,8 @@ cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::Transactio
         cserror() << name() << ": characteristic mask size is not equal to transactions count in build_vector()";
     }
 
-    const auto& event_report = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (event_report.on && event_report.reject_transaction) {
-        if (std::find_if(characteristic.mask.cbegin(), characteristic.mask.cend(), [](const cs::Byte& item) { return item != Reject::Reason::None; }) != characteristic.mask.cend()) {
-            context.send_rejected_report(characteristic.mask);
-        }
+    if (std::find_if(characteristic.mask.cbegin(), characteristic.mask.cend(), [](const cs::Byte& item) { return item != Reject::Reason::None; }) != characteristic.mask.cend()) {
+        context.send_rejected_report(characteristic.mask);
     }
 
     // transform characteristic to its "canonical" form

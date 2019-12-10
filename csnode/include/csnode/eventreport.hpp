@@ -9,6 +9,11 @@
 
 class Node;
 
+namespace cs
+{
+    struct SmartContractRef;
+}
+
 struct Reject {
     enum Reason : uint8_t {
         None = 0,
@@ -29,7 +34,9 @@ struct Reject {
         ContractClosed,
         NewStateOutOfFee,
         EmittedOutOfFee,
-        CompleteReject
+        CompleteReject,
+
+        LimitExceeded
     };
 
     static std::string to_string(Reason r);
@@ -46,18 +53,17 @@ public:
     enum Id : uint8_t {
         None = 0,
         AlarmInvalidBlock,
-        BigBang,
+        Bootstrap,
         ConsensusLiar,
         ConsensusSilent,
         ConsensusFailed,
         ContractsLiar,
         ContractsSilent,
         ContractsFailed,
-        AddGrayList,
-        EraseGrayList,
+        AddToList,
+        EraseFromList,
         RejectTransactions,
-        RejectContractExecution,
-        RejectContractConsensus
+        RejectContractExecution
     };
 
     static Id getId(const cs::Bytes& bin_pack);
@@ -73,7 +79,9 @@ public:
      * @param           rejected    The byte array with reason to reject every transaction
      */
 
-    static void sendReject(Node& node, const cs::Bytes& rejected);
+    static void sendRejectTransactions(Node& node, const cs::Bytes& rejected);
+
+    static void sendRejectContractExecution(Node& node, const cs::SmartContractRef& ref, Reject::Reason reason);
 
     /**
      * Parse reject info byte packet as a map <reason, count>, where every reject reason is supplied with count of transactions
@@ -88,8 +96,10 @@ public:
 
     static std::map<Reject::Reason, uint16_t> parseReject(const cs::Bytes& bin_pack);
 
+    static bool parseRejectContractExecution(const cs::Bytes& bin_pack, cs::SmartContractRef& ref, Reject::Reason& reason);
+
     /**
-     * Sends a gray and black list update info as composition of node key and operation (add to list
+     * Sends a gray list update info as composition of node key and operation (add to list
      * or remove from list).
      *
      * @author  Alexander Avramenko
@@ -99,11 +109,27 @@ public:
      * @param           key             The key of gray or black list item, if list is completely
      *  cleared must be a Zero::key.
      * @param           added           True if added to list, otherwise false if removed from list.
-     * @param           count_rounds    (Optional) The count rounds to be in list. 0 in case of clear
+     * @param           count_rounds    The count rounds to be in list. 1 in case of clear, only 1 round is guaranteed
      *  list or add to black list.
      */
 
-    static void sendGrayListUpdate(Node& node, const cs::PublicKey& key, bool added, uint32_t count_rounds = 0);
+    static void sendGrayListUpdate(Node& node, const cs::PublicKey& key, bool added, uint32_t count_rounds = 1);
+
+    /**
+     * Sends black list update info as composition of node key and operation (add to list
+     * or remove from list).
+     *
+     * @author  Alexander Avramenko
+     * @date    21.11.2019
+     *
+     * @param [in,out]  node            The node service.
+     * @param           key             The key of gray or black list item, if list is completely
+     *  cleared must be a Zero::key.
+     * @param           added           True if added to list, otherwise false if removed from list.
+     *  list or add to black list.
+     */
+
+    static void sendBlackListUpdate(Node& node, const cs::PublicKey& key, bool added);
 
     /**
      * Parse black list update
@@ -117,11 +143,12 @@ public:
      *  cleared on remote node, contains Zero::key.
      * @param [in,out]  counter     The placeholder for counter of rounds to be in gray list, being
      *  in black list is permanent, so contains 0 after method returns.
+     * @param [in,out]  is_black    True if target list is black, false if it is gray.
      *
      * @returns True if it succeeds, false if it fails.
      */
 
-    static bool parseGrayListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key, uint32_t& counter);
+    static bool parseListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key, uint32_t& counter, bool& is_black);
 
     /**
      * Sends an invalid block alarm report
@@ -208,6 +235,7 @@ public:
 
 private:
 
+    static void sendListUpdate(Node& node, const cs::PublicKey& key, bool added, uint32_t count_rounds);
     static void sendConsensusProblem(Node& node, Id problem_id, const cs::PublicKey& problem_source);
     static void sendContractsProblem(Node& node, Id problem_id, const cs::PublicKey& problem_source, const ContractConsensusId& consensus_id);
 
