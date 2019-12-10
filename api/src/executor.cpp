@@ -62,7 +62,7 @@ void cs::Executor::executeByteCodeMultiple(executor::ExecuteByteCodeMultipleResu
         return;
     }
 
-    const auto accessId = generateAccessId(sequence, BlockChain::getAddressFromKey(invokedContract.contractAddress));
+    const auto accessId = generateAccessId(sequence);
     ++execCount_;
 
     try {
@@ -434,7 +434,7 @@ std::optional<cs::Executor::ExecuteResult> cs::Executor::executeTransaction(cons
         methodHeaders.push_back(header);
     }
 
-    const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeaders, false /*isGetter*/, smarts[0].sequence /*sequence*/);
+    const auto optOriginRes = execute(smartSource.to_api_addr(), smartContractBinary, methodHeaders, false /*isGetter*/, smarts[0].sequence /*sequence*/, headTransaction.get_time());
 
     for (const auto& smart : smarts) {
         if (!isdeploy) {
@@ -699,11 +699,9 @@ csdb::Transaction cs::Executor::loadTransactionApi(const csdb::TransactionID& id
 }
 
 uint64_t cs::Executor::getTimeSmartContract(general::AccessID accessId) {
-    std::lock_guard lock(mutex_);
-    if (auto itExecuteSmart = executableSmartAddress_.find(accessId); itExecuteSmart != executableSmartAddress_.end()) {
-        if (auto itExecuteSmart = executableSmartAddress_.find(accessId); itExecuteSmart != executableSmartAddress_.end())
-            return solver_.smart_contracts().get_contract_deploy(itExecuteSmart->second).get_time();
-    }
+    std::lock_guard lock(mutex_);   
+    if (auto it = executeTrxnsTime.find(accessId); it != executeTrxnsTime.end()) 
+        return it->second;
     return 0;
 }
 
@@ -878,12 +876,13 @@ void cs::Executor::checkAnotherExecutor() {
     }
 }
 
-uint64_t cs::Executor::generateAccessId(cs::Sequence explicitSequence, const csdb::Address& smartAddress) {
+uint64_t cs::Executor::generateAccessId(cs::Sequence explicitSequence, uint64_t time) {
     std::lock_guard lock(mutex_);
     ++lastAccessId_;
     accessSequence_[lastAccessId_] = (explicitSequence != kUseLastSequence ? explicitSequence : blockchain_.getLastSeq());
 
-    executableSmartAddress_[lastAccessId_] = smartAddress;
+    if(time)
+        executeTrxnsTime[lastAccessId_] = time;
 
     return static_cast<uint64_t>(lastAccessId_);
 }
@@ -895,11 +894,11 @@ uint64_t cs::Executor::getFutureAccessId() {
 void cs::Executor::deleteAccessId(const general::AccessID& accessId) {
     std::lock_guard lock(mutex_);
     accessSequence_.erase(accessId);
-    executableSmartAddress_.erase(accessId);
+    executeTrxnsTime.erase(accessId);
 }
 
 std::optional<cs::Executor::OriginExecuteResult> cs::Executor::execute(const std::string& address, const executor::SmartContractBinary& smartContractBinary,
-                                                                       std::vector<executor::MethodHeader>& methodHeader, bool isGetter, cs::Sequence explicitSequence) {
+                                                                       std::vector<executor::MethodHeader>& methodHeader, bool isGetter, cs::Sequence explicitSequence, uint64_t time) {
     constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
     OriginExecuteResult originExecuteRes{};
 
@@ -911,7 +910,7 @@ std::optional<cs::Executor::OriginExecuteResult> cs::Executor::execute(const std
     uint64_t accessId{};
 
     if (!isGetter) {
-        accessId = generateAccessId(explicitSequence, BlockChain::getAddressFromKey(smartContractBinary.contractAddress));
+        accessId = generateAccessId(explicitSequence, time);
     }
 
     ++execCount_;
