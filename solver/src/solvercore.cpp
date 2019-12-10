@@ -271,8 +271,8 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
     while (isDrop) {
         if (N == 0) {
             csdebug() << "There is no nodes with valid TimeStamp";
-            int N0 = 0;
-            int sx0 = 0;
+            int64_t N0 = 0;
+            int64_t sx0 = 0;
             for (auto& it : stageOneStorage) {
                 int64_t tStamp;
                 try {
@@ -283,7 +283,7 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
                     continue;
                 }
                 ++N0;
-                sx0 += static_cast<int>(tStamp);
+                sx0 += static_cast<int64_t>(tStamp);
             }
 
             if (N0 > 0) {
