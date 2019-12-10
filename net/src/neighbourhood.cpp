@@ -8,9 +8,7 @@
 
 Neighbourhood::Neighbourhood(Transport* transport, Node* node)
 : transport_(transport)
-, node_(node)
-, uuid_(node_->getBlockChain().uuid()) {
-}
+, node_(node) {}
 
 void Neighbourhood::processNeighbourMessage(const cs::PublicKey& sender, const Packet& pack) {
     switch (pack.getNetworkCommand()) {
@@ -75,7 +73,7 @@ void Neighbourhood::sendRegistrationRequest(const cs::PublicKey& receiver) {
     transport_->sendDirect(formPacket(BaseFlags::NetworkMsg,
                                       NetworkCommand::Registration,
                                       NODE_VERSION,
-                                      uuid_,
+                                      node_->getBlockChain().uuid(),
                                       node_->getBlockChain().getLastSeq(),
                                       cs::Conveyer::instance().currentRoundNumber()), receiver);
 }
@@ -102,7 +100,8 @@ void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Pa
     }
 
     stream >> info.uuid;
-    if (info.uuid != uuid_) {
+    auto myUuid = node_->getBlockChain().uuid();
+    if (myUuid && info.uuid && info.uuid != myUuid) {
         sendRegistrationRefusal(sender, RegistrationRefuseReasons::IncompatibleBlockchain);
         return;
     }
@@ -121,6 +120,8 @@ void Neighbourhood::gotRegistrationRequest(const cs::PublicKey& sender, const Pa
 void Neighbourhood::sendRegistrationConfirmation(const cs::PublicKey& receiver) {
     transport_->sendDirect(formPacket(BaseFlags::NetworkMsg,
                                       NetworkCommand::RegistrationConfirmed,
+                                      NODE_VERSION,
+                                      node_->getBlockChain().uuid(),
                                       node_->getBlockChain().getLastSeq(),
                                       cs::Conveyer::instance().currentRoundNumber()), receiver);
 }
@@ -139,15 +140,25 @@ void Neighbourhood::gotRegistrationConfirmation(const cs::PublicKey& sender, con
         }
 
         cs::DataStream stream(pack.getMsgData(), pack.getMsgSize());
+        stream >> info.nodeVersion;
+        if (info.nodeVersion != NODE_VERSION) {
+            sendRegistrationRefusal(sender, RegistrationRefuseReasons::BadClientVersion);
+            neighbours_.erase(neighbour);
+            return;
+        }
+
+        stream >> info.uuid;
+        auto myUuid = node_->getBlockChain().uuid();
+        if (myUuid && info.uuid && info.uuid != myUuid) {
+            sendRegistrationRefusal(sender, RegistrationRefuseReasons::IncompatibleBlockchain);
+            neighbours_.erase(neighbour);
+            return;
+        }
+
         stream >> info.lastSeq;
         stream >> info.roundNumber;
         info.connectionEstablished = true;
         transport_->onNeighboursChanged(sender, info.lastSeq, info.roundNumber, true);
-
-        if (!info.nodeVersion) { // case we have no info about peer yet
-            info.nodeVersion = NODE_VERSION;
-            info.uuid = uuid_;
-        }
     }
 }
 

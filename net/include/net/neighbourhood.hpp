@@ -73,7 +73,5 @@ private:
 
     mutable std::mutex neighbourMutex_;
     std::map<cs::PublicKey, PeerInfo> neighbours_;
-
-    const uint64_t uuid_;
 };
 #endif  // NEIGHBOURHOOD_HPP
