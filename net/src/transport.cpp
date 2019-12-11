@@ -1156,6 +1156,13 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, Remote
     }
 
     neighbourhood_.gotConfirmation(myCId, realCId, task->sender, key, sender);
+    if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
+        EndpointData epd;
+        epd.ip = task->sender.address();
+        epd.ipSpecified = true;
+        epd.port = task->sender.port();
+        storeAddress(key, epd);
+    }
     return true;
 }
 
