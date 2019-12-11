@@ -16,11 +16,6 @@
 #include <lib/system/structures.hpp>
 #include <lib/system/utils.hpp>
 
-namespace cs::csval {
-const constexpr std::size_t v4Size = 4;
-const constexpr std::size_t v6Size = 16;
-}  // namespace cs::csval
-
 namespace cs {
 ///
 /// The Data stream class represents an entity that controls data from any char array.
@@ -55,62 +50,6 @@ public:
     ///
     explicit DataStream(cs::Bytes& storage)
     : bytes_(&storage) {
-    }
-
-    ///
-    /// Try to get enpoint from data.
-    ///
-    /// @return Returns current end point from data.
-    /// If data stream can not return valid enpoint then returns empty enpoint.
-    ///
-    boost::asio::ip::udp::endpoint parseEndpoint() {
-        boost::asio::ip::udp::endpoint point;
-
-        if (!isAvailable(sizeof(char))) {
-            badState();
-            return point;
-        }
-
-        char flags = *(data_ + index_);
-        char v6 = flags & 1;
-        char addressFlag = (flags >> 1) & 1;
-        char portFlag = (flags >> 2) & 1;
-
-        ++index_;
-
-        std::size_t size = 0;
-
-        if (addressFlag) {
-            size += (v6) ? csval::v6Size : csval::v4Size;
-        }
-
-        if (portFlag) {
-            size += sizeof(uint16_t);
-        }
-
-        if (!isAvailable(size)) {
-            badState();
-            return point;
-        }
-
-        boost::asio::ip::address address;
-
-        if ((index_ + size) <= dataSize_) {
-            if (addressFlag) {
-                address = v6 ? boost::asio::ip::address(createAddress<boost::asio::ip::address_v6>()) : boost::asio::ip::address(createAddress<boost::asio::ip::address_v4>());
-            }
-
-            uint16_t port = 0;
-
-            if (portFlag) {
-                port = *(reinterpret_cast<uint16_t*>(data_ + index_));
-                index_ += sizeof(uint16_t);
-            }
-
-            point = boost::asio::ip::udp::endpoint(address, port);
-        }
-
-        return point;
     }
 
     ///
@@ -284,31 +223,6 @@ public:
         }
 
         return Status::Read;
-    }
-
-    ///
-    /// Adds enpoint to stream.
-    ///
-    /// @param enpoint Boost enpoint.
-    ///
-    void addEndpoint(const boost::asio::ip::udp::endpoint& endpoint) {
-        if (!bytes_) {
-            return;
-        }
-
-        char v6 = endpoint.address().is_v6();
-        bytes_->push_back(static_cast<cs::Byte>((v6 | 6)));
-
-        if (v6) {
-            boost::asio::ip::address_v6::bytes_type bytes = endpoint.address().to_v6().to_bytes();
-            addArray(bytes);
-        }
-        else {
-            boost::asio::ip::address_v4::bytes_type bytes = endpoint.address().to_v4().to_bytes();
-            addArray(bytes);
-        }
-
-        addValue(endpoint.port());
     }
 
     ///
@@ -492,14 +406,6 @@ private:
     }
 };
 
-///
-/// Get entities from stream operators
-///
-inline DataStream& operator>>(DataStream& stream, boost::asio::ip::udp::endpoint& endPoint) {
-    endPoint = stream.parseEndpoint();
-    return stream;
-}
-
 template <typename T, std::size_t size>
 inline DataStream& operator>>(DataStream& stream, std::array<T, size>& array) {
     array = stream.template parseArray<T, size>();
@@ -669,11 +575,6 @@ inline DataStream& operator<<(DataStream& stream, const cs::Bytes& data) {
 inline DataStream& operator<<(DataStream& stream, const CompressedRegion& data) {
     stream << data.binarySize();
     stream << cs::Bytes(data.data(), data.data() + data.size());
-    return stream;
-}
-
-inline DataStream& operator<<(DataStream& stream, const boost::asio::ip::udp::endpoint& endpoint) {
-    stream.addEndpoint(endpoint);
     return stream;
 }
 
