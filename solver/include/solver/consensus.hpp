@@ -38,7 +38,7 @@ public:
     constexpr static csdb::Amount MinStakeValue = csdb::Amount{50000};
 
     /** @brief   The minimum stake to be delegated to another node */
-    constexpr static csdb::Amount MinStakeDelegated = csdb::Amount{ 50000 };
+    constexpr static csdb::Amount MinStakeDelegated = csdb::Amount{ 5 };
 
     /** @brief   The round when DPOS starts working */
     constexpr static uint64_t StartingDPOS = 10'000ULL;

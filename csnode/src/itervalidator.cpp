@@ -295,11 +295,32 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
     if (!rc && !bc.findWalletData(t.source(), wallet)) {
         rc = kSourceDoesNotExists;
     }
-    //csdb::UserField fld;
-    //fld = tr.user_field(trx_uf::sp::delegated);
-    //if (fld.is_valid()) {
-    //value<uint64_t> ()
-    //}
+
+    csdb::UserField fld;
+    fld = t.user_field(trx_uf::sp::delegated);
+    bool notCheck = false;
+    if (fld.is_valid()) {
+        notCheck = true;
+        auto flagg = fld.value<uint64_t>();;
+        switch(flagg) {
+            case trx_uf::sp::dele::gate:
+                if (!rc) {
+
+                }
+                break;
+            case trx_uf::sp::dele::gated_withdraw:
+                if (!rc) {
+
+                }
+                break;
+            default:
+                if (!rc) {
+
+                }
+                break;
+
+        }
+    }
 
     if (!rc && wallet.balance_ < (t.amount() + t.max_fee().to_double())) {
         rc = kInsufficientBalance;
@@ -309,7 +330,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
         rc = kTooLarge;
     }
 
-    if (!rc && !t.verify_signature(bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey).public_key())) {
+    if (!rc && (notCheck || !t.verify_signature(bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey).public_key()))) {
         rc = kWrongSignature;
     }
 

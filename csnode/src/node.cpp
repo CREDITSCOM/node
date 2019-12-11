@@ -818,7 +818,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
 }
 
 void Node::createTestTransaction(int tType) {
-#if 1
+#if 0
     csdb::Transaction transaction;
 
     std::string strAddr1 = "HYNKVYEC5pKAAgoJ56WdvbuzJBpjZtGBvpSMBeVd555S";
@@ -842,11 +842,15 @@ void Node::createTestTransaction(int tType) {
     transaction.set_amount(csdb::Amount(10, 0));
     transaction.set_max_fee(csdb::AmountCommission(1.0));
     transaction.add_user_field(5, tType);
+    transaction.add_user_field(6, "abcde");
     transaction.set_counted_fee(csdb::AmountCommission(0.0));
     cs::TransactionsPacket transactionPack;    
     for (size_t i = 0; i < 1; ++i) {
         transaction.set_innerID((tType-1)*2000);
         auto for_sig = transaction.to_byte_stream_for_sig();
+        auto t1 = transaction.to_byte_stream();
+        csdebug() << "Transaction for sig: " << cs::Utils::byteStreamToHex(for_sig.data(), for_sig.size());
+        csdebug() << "Transaction: " << cs::Utils::byteStreamToHex(t1.data(), t1.size());
         cs::Signature sig = cscrypto::generateSignature(pKey2, for_sig.data(), for_sig.size());
         transaction.set_signature(sig);
         transactionPack.addTransaction(transaction);
@@ -2736,18 +2740,18 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
 
     //auto myPublicKey = solver_->getPublicKey();
 
-    std::string strAddr1 = "4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsBPXX4fXef7FuL";
-    std::vector<uint8_t> pub_key1;
-    DecodeBase58(strAddr1, pub_key1);
-    if (rPackage.roundTable().round == 110  && std::memcmp(solver_->getPublicKey().data(), pub_key1.data(), 32) == 0) {
-        csdebug() << "Trying to send delegate transaction";
-        createTestTransaction(1);
-    }
+    //std::string strAddr1 = "4tEQbQPYZq1bZ8Tn9DpCXYUgPgEgcqsBPXX4fXef7FuL";
+    //std::vector<uint8_t> pub_key1;
+    //DecodeBase58(strAddr1, pub_key1);
+    //if (rPackage.roundTable().round == 10  && std::memcmp(solver_->getPublicKey().data(), pub_key1.data(), 32) == 0) {
+    //    csdebug() << "Trying to send delegate transaction";
+    //    createTestTransaction(1);
+    //}
 
-    if (rPackage.roundTable().round == 120 && std::memcmp(solver_->getPublicKey().data(), pub_key1.data(), 32) == 0) {
-        csdebug() << "Trying to send de-delegate transaction";
-        createTestTransaction(2);
-    }
+    //if (rPackage.roundTable().round == 20 && std::memcmp(solver_->getPublicKey().data(), pub_key1.data(), 32) == 0) {
+    //    csdebug() << "Trying to send de-delegate transaction";
+    //    createTestTransaction(2);
+    //}
 
     currentRoundPackage_ = cs::RoundPackage();
     reviewConveyerHashes();
