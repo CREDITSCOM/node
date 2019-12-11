@@ -300,7 +300,7 @@ private slots:
 public slots:
     void processTimer();
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
-    void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
+    void onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
     void validateBlock(csdb::Pool block, bool* shouldStop);
     void onRoundTimeElapsed();
@@ -380,7 +380,6 @@ private:
     // ms timeout
     static const uint32_t packetRequestStep_ = 450;
     static const size_t maxPacketRequestSize_ = 1000;
-    static const int64_t maxPingSynchroDelay_ = 30000;
     static const size_t kLastPoolSynchroDelay_ = 30000;
 
     cs::PoolSynchronizer* poolSynchronizer_;

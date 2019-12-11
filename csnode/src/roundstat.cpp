@@ -116,14 +116,35 @@ void RoundStat::onPingReceived(cs::Sequence, const cs::PublicKey&) {
     point = now;
 }
 
+void RoundStat::checkPing(cs::Sequence sequence, const PublicKey& key) {
+    static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
+    static std::pair<cs::PublicKey, cs::Sequence> maxSequenceNeighbour{};
+
+    if (maxSequenceNeighbour.second < sequence) {
+        maxSequenceNeighbour = std::make_pair(key, sequence);
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    checkPingDelta_ += std::chrono::duration_cast<std::chrono::milliseconds>(now - point);
+
+    if (RoundStat::kMaxPingSynchroDelay <= checkPingDelta_.count()) {
+        checkPingDelta_ = std::chrono::milliseconds(0);
+        emit pingChecked(maxSequenceNeighbour.second, maxSequenceNeighbour.first);
+    }
+}
+
 void RoundStat::onRoundChanged() {
     cs::Lock lock(statsElapseMutex_);
     roundElapseTimePoint_ = std::chrono::steady_clock::now();
 }
 
 void RoundStat::onBlockStored() {
-    cs::Lock lock(statsElapseMutex_);
-    storeBlockElapseTimePoint_ = std::chrono::steady_clock::now();
+    {
+        cs::Lock lock(statsElapseMutex_);
+        storeBlockElapseTimePoint_ = std::chrono::steady_clock::now();
+    }
+
+    checkPingDelta_ = std::chrono::milliseconds(0);
 }
 
 void RoundStat::onMainThreadIterated() {
@@ -177,7 +198,6 @@ void RoundStat::checkStoreBlockElapse() {
     emit storeBlockTimeElapsed();
 
     {
-        // reset time point to tick next time after limit
         cs::Lock lock(statsElapseMutex_);
         storeBlockElapseTimePoint_ = std::chrono::steady_clock::now();
     }

@@ -16,6 +16,8 @@ class Config;
 namespace cs {
 constexpr size_t kMaxRoundDelay = 30000;
 
+using PingCheckSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
+
 class RoundStat {
 public:
     RoundStat();
@@ -44,6 +46,8 @@ public:
 
 public slots:
     void onPingReceived(cs::Sequence, const cs::PublicKey&);
+    void checkPing(cs::Sequence sequence, const cs::PublicKey& key);
+
     void onRoundChanged();
     void onBlockStored();
     void onMainThreadIterated();
@@ -51,10 +55,13 @@ public slots:
 public signals:
     cs::Action roundTimeElapsed;
     cs::Action storeBlockTimeElapsed;
+    PingCheckSignal pingChecked;
 
 private:
     void checkRoundElapse();
     void checkStoreBlockElapse();
+
+    static const int64_t kMaxPingSynchroDelay = 30000;
 
     // amount of transactions received (to verify or not or to ignore)
     size_t totalReceivedTransactions_;
@@ -78,6 +85,8 @@ private:
     std::mutex statsElapseMutex_;
     std::chrono::steady_clock::time_point roundElapseTimePoint_;
     std::chrono::steady_clock::time_point storeBlockElapseTimePoint_;
+
+    std::chrono::milliseconds checkPingDelta_{0};
 };
 
 }  // namespace cs
