@@ -114,6 +114,10 @@ bool Node::init() {
     auto& initConfidants = cs::ConfigHolder::instance().config()->getInitialConfidants();
     initialConfidants_ = decltype(initialConfidants_)(initConfidants.begin(), initConfidants.end());
 
+    if (initialConfidants_.find(solver_->getPublicKey()) == initialConfidants_.end()) {
+        transport_->setPermanentNeighbours(initConfidants);
+    }
+
     if (initialConfidants_.size() < Consensus::MinTrustedNodes) {
         cserror() << "Not enough initial confidants, min " << Consensus::MinTrustedNodes;
         return false;
@@ -700,7 +704,7 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
     if (!identic) {
         std::string badChecks;
         int badChecksCounter = 0;
-        for (int i = 0; i < checkMask.size(); ++i) {
+        for (size_t i = 0; i < checkMask.size(); ++i) {
             if (checkMask[i] != 0) {
                 if (badChecks.size() > 0) {
                     badChecks += ", ";

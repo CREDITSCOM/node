@@ -1,12 +1,10 @@
 #ifndef NEIGHBOURHOOD_HPP
 #define NEIGHBOURHOOD_HPP
 
-#include <chrono>
 #include <functional>
-#include <map>
 #include <mutex>
-#include <set>
-#include <optional>
+#include <unordered_map>
+#include <unordered_set>
 
 #include <lib/system/signals.hpp>
 #include <networkcommands.hpp>
@@ -23,17 +21,18 @@ public:
     using NeighbourPingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
     constexpr static uint32_t kMaxNeighbours = 16;
-    constexpr static uint32_t kMinNeighbours = 2;
+    constexpr static uint32_t kMinNeighbours = 1;
 
     constexpr static std::chrono::seconds kPingInterval{2};
 
     Neighbourhood(Transport*, Node*);
+
+    void setPermanentNeighbours(const std::vector<cs::PublicKey>&);
     
     void processNeighbourMessage(const cs::PublicKey& sender, const Packet&);
     void newPeerDiscovered(const cs::PublicKey&);
     void peerDisconnected(const cs::PublicKey&);
 
-    void removeSilent();
     void pingNeighbours();
 
     void forEachNeighbour(NeighboursCallback);
@@ -44,8 +43,6 @@ public signals:
     NeighbourPingSignal neighbourPingReceived;
 
 private:
-    static std::string parseRefusalReason(RegistrationRefuseReasons reason);
-
     template<class... Args>
     static Packet formPacket(BaseFlags flags, NetworkCommand cmd, Args&&... args);
 
@@ -54,24 +51,38 @@ private:
         uint64_t uuid = 0;
         cs::Sequence lastSeq = 0;
         cs::RoundNumber roundNumber = 0;
-        bool connectionEstablished = false;
-        std::chrono::time_point<std::chrono::steady_clock> lastSeen;
+        bool permanent = false;
     };
 
-    void sendRegistrationRequest(const cs::PublicKey& receiver);
-    void sendRegistrationConfirmation(const cs::PublicKey& receiver);
-    void sendRegistrationRefusal(const cs::PublicKey& reciever, const RegistrationRefuseReasons reason);
-    void sendPingPack(const cs::PublicKey& receiver);
+    void sendVersionRequest(const cs::PublicKey& receiver);
+    void sendVersionReply(const cs::PublicKey& receiver);
+    void sendPing(const cs::PublicKey& receiver);
+    void sendPong(const cs::PublicKey& receiver);
 
-    void gotRegistrationRequest(const cs::PublicKey& sender, const Packet&);
-    void gotRegistrationConfirmation(const cs::PublicKey& sender, const Packet&);
-    void gotRegistrationRefusal(const cs::PublicKey& sender, const Packet&);
-    void gotPing(const cs::PublicKey&, const Packet&);
+    void gotVersionReply(const cs::PublicKey&, const Packet&);
+    void gotPong(const cs::PublicKey&, const Packet&);
+
+    bool isLimitReached() const;
+    bool isCompatible(const PeerInfo&) const;
+    bool isPermanent(const cs::PublicKey&) const;
+
+    void addToCompatiblePool(const cs::PublicKey&);
+    void removeFromCompatiblePool(const cs::PublicKey&);
+    void addFromCompatiblePool();
+
+    void tryToAddNew(const cs::PublicKey&, const PeerInfo&);
+    bool remove(const cs::PublicKey&);
 
     Transport* transport_;
     Node* node_;
 
     mutable std::mutex neighbourMutex_;
-    std::map<cs::PublicKey, PeerInfo> neighbours_;
+    std::unordered_map<cs::PublicKey, PeerInfo> neighbours_;
+
+    mutable std::mutex peersMux_;
+    std::unordered_set<cs::PublicKey> compatiblePeers_;
+
+    mutable std::mutex permNeighbourMux_;
+    std::unordered_set<cs::PublicKey> permanentNeighbours_;
 };
 #endif  // NEIGHBOURHOOD_HPP

@@ -5,19 +5,10 @@
 
 enum class NetworkCommand : uint8_t {
     Error = 1,
-    Registration = 2,
-    RegistrationConfirmed,
-    RegistrationRefused,
+    VersionRequest,
+    VersionReply,
     Ping,
-    BlockSyncRequest
-};
-
-enum class RegistrationRefuseReasons : uint8_t {
-    Unspecified,
-    LimitReached,
-    BadClientVersion,
-    BadResponse,
-    IncompatibleBlockchain
+    Pong
 };
 
 const char* networkCommandToString(NetworkCommand command);
