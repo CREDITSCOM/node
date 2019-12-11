@@ -1139,6 +1139,14 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         return false;
     }
 
+    if (!std::equal(conn.key.cbegin(), conn.key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
+        EndpointData epd;
+        epd.ip = conn.getOut().address();
+        epd.ipSpecified = true;
+        epd.port = conn.getOut().port();
+        storeAddress(conn.key, epd);
+    }
+
     neighbourhood_.gotRegistration(std::move(conn), sender);
     return true;
 }
