@@ -1716,6 +1716,7 @@ bool Transport::gotSSIntroduceConsensusReply()
 
     uint8_t numCirc{ 0 };
     iPackStream_ >> numCirc;
+    csdebug() << "Total confidants count " << uint32_t(numCirc) << ':';
 
     for (uint8_t i = 0; i < numCirc; ++i) {
         EndpointData ep;
@@ -1725,8 +1726,10 @@ bool Transport::gotSSIntroduceConsensusReply()
         iPackStream_ >> key >> ep.ip >> ep.port;
 
         if (!iPackStream_.good()) {
+            csdebug() << "Packet with confidants is broken";
             return false;
         }
+        csdebug() << '[' << i << "] " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " - " << ep.ip << ':' << ep.port;
 
         if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
             storeAddress(key, ep);
