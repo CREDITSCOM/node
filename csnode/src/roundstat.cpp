@@ -131,6 +131,8 @@ void RoundStat::checkPing(cs::Sequence sequence, const PublicKey& key) {
         checkPingDelta_ = std::chrono::milliseconds(0);
         emit pingChecked(maxSequenceNeighbour.second, maxSequenceNeighbour.first);
     }
+
+    point = now;
 }
 
 void RoundStat::onRoundChanged() {
