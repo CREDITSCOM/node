@@ -1729,7 +1729,7 @@ bool Transport::gotSSIntroduceConsensusReply()
             csdebug() << "Packet with confidants is broken";
             return false;
         }
-        csdebug() << '[' << i << "] " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " - " << ep.ip << ':' << ep.port;
+        csdebug() << '[' << uint32_t(i) << "] " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " - " << ep.ip << ':' << ep.port;
 
         if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
             storeAddress(key, ep);
