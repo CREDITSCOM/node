@@ -4,9 +4,9 @@
 
 const char* Packet::messageTypeToString(MsgTypes messageType) {
     switch (messageType) {
-    case BootstrapTable:
-        return "BootstrapTable";
-    case Transactions:
+        case BootstrapTable:
+            return "BootstrapTable";
+        case Transactions:
             return "Transactions";
         case FirstTransaction:
             return "FirstTransaction";
@@ -109,10 +109,6 @@ std::ostream& operator<<(std::ostream& os, const Packet& packet) {
 
     if (packet.isCompressed()) {
         flags += " compressed";
-    }
-
-    if (packet.isEncrypted()) {
-        flags += " encrypted";
     }
 
     if (packet.isSigned()) {
