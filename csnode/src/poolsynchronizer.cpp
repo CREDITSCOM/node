@@ -157,7 +157,7 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     }
 
     // remove unnecessary sequences
-    removeExistingSequence(blockChain_->getLastSeq(), SequenceRemovalAccuracy::LOWER_BOUND);
+    removeExistingSequence(blockChain_->getLastSeq(), SequenceRemovalAccuracy::LowerBound);
 
     bool success = false;
 
@@ -198,7 +198,7 @@ void cs::PoolSynchronizer::onTimeOut() {
 
     if (!isAvailable) {
         csmeta(csdetails) << "OnTimeOut: " << cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency;
-        isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::TIMER);
+        isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::Timer);
     }
 
     if (isAvailable) {
@@ -222,7 +222,7 @@ void cs::PoolSynchronizer::onWriteBlock(const csdb::Pool& pool) {
 }
 
 void cs::PoolSynchronizer::onWriteBlock(const cs::Sequence sequence) {
-    removeExistingSequence(sequence, SequenceRemovalAccuracy::EXACT);
+    removeExistingSequence(sequence, SequenceRemovalAccuracy::Exact);
 }
 
 void cs::PoolSynchronizer::onRemoveBlock(const csdb::Pool& pool) {
@@ -242,7 +242,7 @@ void cs::PoolSynchronizer::onRemoveBlock(const csdb::Pool& pool) {
         iter->addSequences(removedSequence);
     }
     else {
-        removeExistingSequence(removedSequence, SequenceRemovalAccuracy::EXACT);
+        removeExistingSequence(removedSequence, SequenceRemovalAccuracy::Exact);
     }
 }
 
@@ -253,7 +253,7 @@ void cs::PoolSynchronizer::onStoreBlockTimeElapsed() {
 }
 
 void cs::PoolSynchronizer::onPingReceived(cs::Sequence sequence, const cs::PublicKey& publicKey) {
-    NeighboursSetElemet neighbour(publicKey);
+    Neighbour neighbour(publicKey);
 
     auto addable = isAddableNeighbour(sequence);
     auto exists = isNeighbourExists(neighbour);
@@ -274,14 +274,14 @@ void cs::PoolSynchronizer::onNeighbourAdded(const cs::PublicKey& publicKey, cs::
         return;
     }
 
-    NeighboursSetElemet neighbour(publicKey);
+    Neighbour neighbour(publicKey);
     neighbour.setMaxSequence(sequence);
 
     addNeighbour(neighbour);
 }
 
 void cs::PoolSynchronizer::onNeighbourRemoved(const cs::PublicKey& publicKey) {
-    NeighboursSetElemet neighbour(publicKey);
+    Neighbour neighbour(publicKey);
 
     auto iter = std::find(std::begin(neighbours_), std::end(neighbours_), neighbour);
 
@@ -345,7 +345,7 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType counterType) {
     bool isNeedRequest = false;
 
     switch (counterType) {
-        case CounterType::TIMER:
+        case CounterType::Timer:
             for (auto& neighbour : neighbours_) {
                 isNeedRequest = neighbour.sequences().empty();
 
@@ -361,7 +361,7 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType counterType) {
     return isNeedRequest;
 }
 
-void cs::PoolSynchronizer::sendBlock(const NeighboursSetElemet& neighbour) {
+void cs::PoolSynchronizer::sendBlock(const Neighbour& neighbour) {
     std::size_t packet = 0;
     const auto& sequences = neighbour.sequences();
 
@@ -379,7 +379,7 @@ void cs::PoolSynchronizer::sendBlock(const NeighboursSetElemet& neighbour) {
     emit sendRequest(neighbour.publicKey(), sequences, packet);
 }
 
-bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
+bool cs::PoolSynchronizer::getNeededSequences(Neighbour& neighbour) {
     const bool isLastPacket = isLastRequest();
     if (isLastPacket && !requestedSequences_.empty()) {
         csmeta(csdetails) << "Is last packet: requested sequences: [" << requestedSequences_.begin()->first << ", " << requestedSequences_.rbegin()->first << "]";
@@ -420,7 +420,7 @@ bool cs::PoolSynchronizer::getNeededSequences(NeighboursSetElemet& neighbour) {
         csmeta(csdetails) << "From needed help: " << sequence;
 
         auto needyNeighbour = std::find_if(neighbours_.begin(), neighbours_.end(),
-                                           [sequence](const NeighboursSetElemet& el) { return (!el.sequences().empty() && el.sequences().front() == sequence); });
+                                           [sequence](const Neighbour& el) { return (!el.sequences().empty() && el.sequences().front() == sequence); });
 
         if (needyNeighbour == neighbours_.end()) {
             csmeta(cserror) << "Needy neighbour is not valid";
@@ -513,17 +513,17 @@ void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, c
 
     if (!requestedSequences_.empty()) {
         switch (accuracy) {
-            case SequenceRemovalAccuracy::EXACT: {
+            case SequenceRemovalAccuracy::Exact: {
                 auto it = requestedSequences_.find(sequence);
                 if (it != requestedSequences_.end()) {
                     requestedSequences_.erase(it);
                 }
                 break;
             }
-            case SequenceRemovalAccuracy::LOWER_BOUND:
+            case SequenceRemovalAccuracy::LowerBound:
                 requestedSequences_.erase(requestedSequences_.begin(), requestedSequences_.upper_bound(sequence));
                 break;
-            case SequenceRemovalAccuracy::UPPER_BOUND:
+            case SequenceRemovalAccuracy::UpperBound:
                 requestedSequences_.erase(requestedSequences_.lower_bound(sequence), requestedSequences_.end());
                 break;
         }
@@ -541,23 +541,32 @@ bool cs::PoolSynchronizer::isAddableNeighbour(cs::Sequence sequence) const {
 }
 
 bool cs::PoolSynchronizer::isNeighbourExists(const cs::PublicKey& key) const {
-    NeighboursSetElemet neighbour(key);
+    Neighbour neighbour(key);
     return isNeighbourExists(neighbour);
 }
 
-bool cs::PoolSynchronizer::isNeighbourExists(const NeighboursSetElemet& neighbour) const {
+bool cs::PoolSynchronizer::isNeighbourExists(const Neighbour& neighbour) const {
     auto iter = std::find(std::begin(neighbours_), std::end(neighbours_), neighbour);
     return iter != std::end(neighbours_);
 }
 
-cs::PoolSynchronizer::NeighboursSetElemet& cs::PoolSynchronizer::addNeighbour(const NeighboursSetElemet& neighbour) {
-    auto lower = std::lower_bound(std::begin(neighbours_), std::end(neighbours_), neighbour, std::greater<NeighboursSetElemet>{});
-    auto iter = neighbours_.insert(lower, neighbour);
+cs::PoolSynchronizer::Neighbour& cs::PoolSynchronizer::addNeighbour(const cs::PublicKey& key) {
+    Neighbour neighbour(key);
+    return addNeighbour(neighbour);
+}
 
+cs::PoolSynchronizer::Neighbour& cs::PoolSynchronizer::addNeighbour(const Neighbour& neighbour) {
+    auto lower = std::lower_bound(std::begin(neighbours_), std::end(neighbours_), neighbour, std::greater<Neighbour>{});
+    auto iter = neighbours_.insert(lower, neighbour);
     return *iter;
 }
 
-cs::PoolSynchronizer::NeighboursSetElemet& cs::PoolSynchronizer::getNeighbour(const cs::PoolSynchronizer::NeighboursSetElemet& neighbour) {
+cs::PoolSynchronizer::Neighbour& cs::PoolSynchronizer::getNeighbour(const cs::PublicKey& key) {
+    Neighbour neighbour(key);
+    return getNeighbour(neighbour);
+}
+
+cs::PoolSynchronizer::Neighbour& cs::PoolSynchronizer::getNeighbour(const cs::PoolSynchronizer::Neighbour& neighbour) {
     return *(std::find(std::begin(neighbours_), std::end(neighbours_), neighbour));
 }
 
