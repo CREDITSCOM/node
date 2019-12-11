@@ -3329,6 +3329,7 @@ void Node::onRoundTimeElapsed() {
                     };
 
     transport_->forEachNeighbour(std::move(callback));
+    initBootstrapRP(actualConfidants);
 
     if (actualConfidants.size() < Consensus::MinTrustedNodes) {
         cslog() << "Not enough confidants with max sequence " << maxGlobalBlock
@@ -3346,8 +3347,6 @@ void Node::onRoundTimeElapsed() {
         cserror() << "Cannot start rounds, round package cache is empty.";
         return;
     }
-
-    initBootstrapRP(actualConfidants);
 
     // do not increment, only "mark" default round start
     subRound_ = 1;

@@ -255,27 +255,29 @@ void cs::PoolSynchronizer::onStoreBlockTimeElapsed() {
 void cs::PoolSynchronizer::onPingReceived(cs::Sequence sequence, const cs::PublicKey& publicKey) {
     NeighboursSetElemet neighbour(publicKey);
 
-    auto iter = std::find(std::begin(neighbours_), std::end(neighbours_), neighbour);
+    auto addable = isAddableNeighbour(sequence);
+    auto exists = isNeighbourExists(neighbour);
 
-    if (iter == std::end(neighbours_)) {
-        auto lower = std::lower_bound(std::begin(neighbours_), std::end(neighbours_), neighbour, std::greater<NeighboursSetElemet>{});
-        iter = neighbours_.insert(lower, neighbour);
+    if (exists && addable) {
+        getNeighbour(neighbour).setMaxSequence(sequence);
     }
-
-    iter->setMaxSequence(sequence);
+    else if (exists && !addable) {
+        onNeighbourRemoved(publicKey);
+    }
+    else {
+        addNeighbour(neighbour).setMaxSequence(sequence);
+    }
 }
 
 void cs::PoolSynchronizer::onNeighbourAdded(const cs::PublicKey& publicKey, cs::Sequence sequence) {
-    NeighboursSetElemet neighbour(publicKey);
-
-    if (auto iter = std::find(std::begin(neighbours_), std::end(neighbours_), neighbour); iter != std::end(neighbours_)) {
+    if (!isAddableNeighbour(sequence)) {
         return;
     }
 
+    NeighboursSetElemet neighbour(publicKey);
     neighbour.setMaxSequence(sequence);
 
-    auto iter = std::lower_bound(std::begin(neighbours_), std::end(neighbours_), neighbour, std::greater<NeighboursSetElemet>{});
-    neighbours_.insert(iter, std::move(neighbour));
+    addNeighbour(neighbour);
 }
 
 void cs::PoolSynchronizer::onNeighbourRemoved(const cs::PublicKey& publicKey) {
@@ -531,6 +533,32 @@ void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, c
 bool cs::PoolSynchronizer::isLastRequest() const {
     const auto sum = cs::Conveyer::instance().currentRoundNumber() - blockChain_->getLastSeq() - blockChain_->getCachedBlocksSize();
     return sum <= cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
+}
+
+bool cs::PoolSynchronizer::isAddableNeighbour(cs::Sequence sequence) const {
+    auto lastWrittenSequence = blockChain_->getLastSeq();
+    return sequence > lastWrittenSequence;
+}
+
+bool cs::PoolSynchronizer::isNeighbourExists(const cs::PublicKey& key) const {
+    NeighboursSetElemet neighbour(key);
+    return isNeighbourExists(neighbour);
+}
+
+bool cs::PoolSynchronizer::isNeighbourExists(const NeighboursSetElemet& neighbour) const {
+    auto iter = std::find(std::begin(neighbours_), std::end(neighbours_), neighbour);
+    return iter != std::end(neighbours_);
+}
+
+cs::PoolSynchronizer::NeighboursSetElemet& cs::PoolSynchronizer::addNeighbour(const NeighboursSetElemet& neighbour) {
+    auto lower = std::lower_bound(std::begin(neighbours_), std::end(neighbours_), neighbour, std::greater<NeighboursSetElemet>{});
+    auto iter = neighbours_.insert(lower, neighbour);
+
+    return *iter;
+}
+
+cs::PoolSynchronizer::NeighboursSetElemet& cs::PoolSynchronizer::getNeighbour(const cs::PoolSynchronizer::NeighboursSetElemet& neighbour) {
+    return *(std::find(std::begin(neighbours_), std::end(neighbours_), neighbour));
 }
 
 void cs::PoolSynchronizer::synchroFinished() {

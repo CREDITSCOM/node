@@ -69,6 +69,13 @@ private:
 
     bool isLastRequest() const;
 
+    // neighbours private interfaces
+    bool isAddableNeighbour(cs::Sequence sequence) const;
+    bool isNeighbourExists(const cs::PublicKey& key) const;
+    bool isNeighbourExists(const NeighboursSetElemet& neighbour) const;
+    NeighboursSetElemet& addNeighbour(const NeighboursSetElemet& neighbour);
+    NeighboursSetElemet& getNeighbour(const NeighboursSetElemet& element);
+
     void synchroFinished();
     void printNeighbours(const std::string& funcName) const;
 
