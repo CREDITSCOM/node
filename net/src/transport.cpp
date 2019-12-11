@@ -121,18 +121,10 @@ void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data)
 }
 
 void Transport::OnNodeDiscovered(const net::NodeId& id) {
-    {
-        std::lock_guard g(peersMux_);
-        knownPeers_.insert(id);
-    }
     neighbourhood_.newPeerDiscovered(toPublicKey(id));
 }
 
 void Transport::OnNodeRemoved(const net::NodeId& id) {
-    {
-        std::lock_guard g(peersMux_);
-        knownPeers_.erase(id);
-    }
     neighbourhood_.peerDisconnected(toPublicKey(id));
 }
 
@@ -303,6 +295,10 @@ void Transport::processPostponed(const cs::RoundNumber rNum) {
 
     postponed_.erase(postponed_.begin(), postponed_.upper_bound(rNum));
     csdebug() << "TRANSPORT> POSTPHONED finished, round " << rNum;
+}
+
+void Transport::setPermanentNeighbours(const std::vector<cs::PublicKey>& neighbours) {
+    neighbourhood_.setPermanentNeighbours(neighbours);
 }
 
 void Transport::forEachNeighbour(Neighbourhood::NeighboursCallback callback) {

@@ -2,16 +2,16 @@
 
 const char* networkCommandToString(NetworkCommand command) {
     switch (command) {
-    case NetworkCommand::Registration:
-        return "Registration";
-    case NetworkCommand::RegistrationConfirmed:
-        return "RegistrationConfirmed";
-    case NetworkCommand::RegistrationRefused:
-        return "RegistrationRefused";
+    case NetworkCommand::Error:
+        return "Error";
+    case NetworkCommand::VersionRequest:
+        return "VersionRequest";
+    case NetworkCommand::VersionReply:
+        return "VersionReply";
     case NetworkCommand::Ping:
         return "Ping";
-    case NetworkCommand::BlockSyncRequest:
-        return "BlockSyncRequest";
+    case NetworkCommand::Pong:
+        return "Pong";
     default:
         return "Unknown";
     }

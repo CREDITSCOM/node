@@ -53,6 +53,7 @@ public:
     void revertBan(const cs::PublicKey&) {}
 
     // neighbours interface
+    void setPermanentNeighbours(const std::vector<cs::PublicKey>&);
     uint32_t getNeighboursCount() const;
     uint32_t getMaxNeighbours() const;
     void forEachNeighbour(Neighbourhood::NeighboursCallback);
@@ -99,9 +100,6 @@ private:
     std::condition_variable newPacketsReceived_;
     std::mutex inboxMux_;
     std::list<std::pair<cs::PublicKey, Packet>> inboxQueue_;
-
-    std::mutex peersMux_;
-    std::unordered_set<net::NodeId> knownPeers_;
 
     Neighbourhood neighbourhood_;
     std::thread processorThread_;
