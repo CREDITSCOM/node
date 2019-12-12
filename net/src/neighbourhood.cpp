@@ -94,6 +94,7 @@ void Neighbourhood::gotVersionReply(const cs::PublicKey& sender, const Packet& p
 
 void Neighbourhood::gotPong(const cs::PublicKey& sender, const Packet& pack) {
     cs::Sequence sequence = 0;
+    bool result = false;
 
     {
         std::lock_guard lock(neighbourMutex_);
@@ -107,10 +108,11 @@ void Neighbourhood::gotPong(const cs::PublicKey& sender, const Packet& pack) {
             stream >> info.roundNumber;
 
             sequence = info.lastSeq;
+            result = true;
         }
     }
 
-    if (sequence) {
+    if (result) {
         emit neighbourPingReceived(sequence, sender);
     }
 }
