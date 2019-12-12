@@ -23,7 +23,7 @@ cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockCh
 }
 
 void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber difference) {
-    if (transport_->getNeighboursCount() == 0) {
+    if (neighbours_.empty()) {
         csmeta(csdebug) << "Cannot start sync (no neighbours). Needed sequence: " << roundNum
                         << ",   Requested pools block size:" << cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
         return;
@@ -264,13 +264,13 @@ void cs::PoolSynchronizer::onPingReceived(cs::Sequence sequence, const cs::Publi
     else if (exists && !addable) {
         onNeighbourRemoved(publicKey);
     }
-    else {
+    else if (!exists && addable) {
         addNeighbour(neighbour).setMaxSequence(sequence);
     }
 }
 
 void cs::PoolSynchronizer::onNeighbourAdded(const cs::PublicKey& publicKey, cs::Sequence sequence) {
-    if (!isAddableNeighbour(sequence)) {
+    if (!isAddableNeighbour(sequence) || isNeighbourExists(publicKey)) {
         return;
     }
 
@@ -318,9 +318,11 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const cs::Sequence lastWri
     const std::size_t cachedBlocksSize = blockChain_->getCachedBlocksSize();
     const float last = float(lastWrittenSequence + cachedBlocksSize);
     const float global = float(globalSequence - 1);
+
     if (global < last) {
         return false;
     }
+
     const float maxValue = 100.0f;
     const uint32_t syncStatus = static_cast<uint32_t>(std::min(((last / global) * maxValue), maxValue));
     const uint32_t remaining = static_cast<uint32_t>(global - last);
@@ -381,6 +383,7 @@ void cs::PoolSynchronizer::sendBlock(const Neighbour& neighbour) {
 
 bool cs::PoolSynchronizer::getNeededSequences(Neighbour& neighbour) {
     const bool isLastPacket = isLastRequest();
+
     if (isLastPacket && !requestedSequences_.empty()) {
         csmeta(csdetails) << "Is last packet: requested sequences: [" << requestedSequences_.begin()->first << ", " << requestedSequences_.rbegin()->first << "]";
         neighbour.reset();
@@ -403,7 +406,6 @@ bool cs::PoolSynchronizer::getNeededSequences(Neighbour& neighbour) {
     }
 
     const cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
-
     cs::Sequence sequence = lastWrittenSequence;
 
     auto isNeededHelpIt = requestedSequences_.end();
@@ -419,8 +421,9 @@ bool cs::PoolSynchronizer::getNeededSequences(Neighbour& neighbour) {
 
         csmeta(csdetails) << "From needed help: " << sequence;
 
-        auto needyNeighbour = std::find_if(neighbours_.begin(), neighbours_.end(),
-                                           [sequence](const Neighbour& el) { return (!el.sequences().empty() && el.sequences().front() == sequence); });
+        auto needyNeighbour = std::find_if(neighbours_.begin(), neighbours_.end(), [sequence](const Neighbour& el) {
+            return (!el.sequences().empty() && el.sequences().front() == sequence);
+        });
 
         if (needyNeighbour == neighbours_.end()) {
             csmeta(cserror) << "Needy neighbour is not valid";
@@ -435,6 +438,7 @@ bool cs::PoolSynchronizer::getNeededSequences(Neighbour& neighbour) {
             for (const auto& seq : neighbour.sequences()) {
                 requestedSequences_.erase(seq);
             }
+
             neighbour.reset();
         }
 
@@ -501,7 +505,6 @@ void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence, c
     }
 
     if (success) {
-        std::sort(neighbours_.begin(), neighbours_.end());
         csmeta(csdetails) << "Remove success sequence: " << sequence;
         printNeighbours("Check seq:");
     }
@@ -537,7 +540,7 @@ bool cs::PoolSynchronizer::isLastRequest() const {
 
 bool cs::PoolSynchronizer::isAddableNeighbour(cs::Sequence sequence) const {
     auto lastWrittenSequence = blockChain_->getLastSeq();
-    return sequence > lastWrittenSequence;
+    return (sequence > lastWrittenSequence) && (sequence >= neighboursMaxSequence());
 }
 
 bool cs::PoolSynchronizer::isNeighbourExists(const cs::PublicKey& key) const {
@@ -567,7 +570,16 @@ cs::PoolSynchronizer::Neighbour& cs::PoolSynchronizer::getNeighbour(const cs::Pu
 }
 
 cs::PoolSynchronizer::Neighbour& cs::PoolSynchronizer::getNeighbour(const cs::PoolSynchronizer::Neighbour& neighbour) {
-    return *(std::find(std::begin(neighbours_), std::end(neighbours_), neighbour));
+    auto iter = std::find(std::begin(neighbours_), std::end(neighbours_), neighbour);
+    return *iter;
+}
+
+cs::Sequence cs::PoolSynchronizer::neighboursMaxSequence() const {
+    if (neighbours_.empty()) {
+        return cs::Sequence{0};
+    }
+
+    return neighbours_.front().maxSequence();
 }
 
 void cs::PoolSynchronizer::synchroFinished() {

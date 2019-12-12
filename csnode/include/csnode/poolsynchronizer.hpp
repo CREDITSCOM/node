@@ -77,6 +77,7 @@ private:
     Neighbour& addNeighbour(const Neighbour& neighbour);
     Neighbour& getNeighbour(const cs::PublicKey& key);
     Neighbour& getNeighbour(const Neighbour& element);
+    cs::Sequence neighboursMaxSequence() const;
 
     void synchroFinished();
     void printNeighbours(const std::string& funcName) const;
@@ -163,7 +164,7 @@ private:
         inline const cs::PublicKey& publicKey() const {
             return key_;
         }
-        inline const PoolsRequestedSequences& sequences() const{
+        inline const PoolsRequestedSequences& sequences() const {
             return sequences_;
         }
         inline cs::Sequence maxSequence() const {
