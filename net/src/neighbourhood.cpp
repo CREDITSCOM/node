@@ -175,10 +175,6 @@ void Neighbourhood::removeFromCompatiblePool(const cs::PublicKey& peer) {
 
 void Neighbourhood::addFromCompatiblePool() {
     std::lock_guard lock(peersMux_);
-    if (!compatiblePeers_.size()) {
-        return;
-    }
-
     for (auto& n : compatiblePeers_) {
         sendVersionRequest(n);
     }
