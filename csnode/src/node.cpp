@@ -85,7 +85,6 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &cs::Executor::onBlockStored);
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &cs::Executor::onReadBlock);
 
-    cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->neighbourAdded, this, &Node::onNeighbourAdded);
     cs::Connector::connect(&transport_->neighbourRemoved, this, &Node::onNeighbourRemoved);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
@@ -171,6 +170,9 @@ bool Node::init() {
 
     cs::Conveyer::instance().setPrivateKey(solver_->getPrivateKey());
     std::cout << "Initialization finished\n";
+
+    cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::checkPing);
+    cs::Connector::connect(&stat_.pingChecked, this, &Node::onPingChecked);
 
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
@@ -1384,33 +1386,17 @@ void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
     CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
 }
 
-void Node::onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender) {
-    static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
-    static std::chrono::milliseconds delta{ 0 };
-    static std::pair<cs::PublicKey, cs::Sequence> maxSequenceNeighbour{};
+void Node::onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender) {
+    auto lastSequence = blockChain_.getLastSeq();
 
-    if (maxSequenceNeighbour.second < sequence) {
-        maxSequenceNeighbour = std::make_pair(sender, sequence);
+    if (lastSequence < sequence) {
+        cswarning() << "Local max block " << WithDelimiters(lastSequence) << " is lower than remote one " << WithDelimiters(sequence)
+                    << ", trying to request round table";
+
+        CallsQueue::instance().insert([=] {
+            roundPackRequest(sender, sequence);
+        });
     }
-
-    auto now = std::chrono::steady_clock::now();
-    delta += std::chrono::duration_cast<std::chrono::milliseconds>(now - point);
-
-    if (maxPingSynchroDelay_ <= delta.count()) {
-        auto lastSequence = blockChain_.getLastSeq();
-
-        if (lastSequence < maxSequenceNeighbour.second) {
-            delta = std::chrono::milliseconds(0);
-            cswarning() << "Local max block " << WithDelimiters(lastSequence) << " is lower than remote one "
-                << WithDelimiters(maxSequenceNeighbour.second) << ", trying to request round table";
-
-            CallsQueue::instance().insert([=] {
-                roundPackRequest(maxSequenceNeighbour.first, maxSequenceNeighbour.second);
-            });
-        }
-    }
-
-    point = now;
 }
 
 void Node::sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences, std::size_t packetNum) {
@@ -3347,6 +3333,7 @@ void Node::onRoundTimeElapsed() {
                     };
 
     transport_->forEachNeighbour(std::move(callback));
+    initBootstrapRP(actualConfidants);
 
     if (actualConfidants.size() < Consensus::MinTrustedNodes) {
         cslog() << "Not enough confidants with max sequence " << maxGlobalBlock
@@ -3364,8 +3351,6 @@ void Node::onRoundTimeElapsed() {
         cserror() << "Cannot start rounds, round package cache is empty.";
         return;
     }
-
-    initBootstrapRP(actualConfidants);
 
     // do not increment, only "mark" default round start
     subRound_ = 1;

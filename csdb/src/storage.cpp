@@ -400,19 +400,20 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
 
     if (opt.newBlockchainTop != cs::kWrongSequence) {
         auto seqToRemove = static_cast<uint32_t>(opt.newBlockchainTop + 1);
-		auto seqLast = seqToRemove;
+        auto seqLast = seqToRemove;
         {
-		    Database::IteratorPtr it = d->db->new_iterator();
-		    it->seek_to_last();
-		    if (it->is_valid()) {
-			    auto key = it->key();
-			    if (key != std::numeric_limits<uint32_t>::max()) {
-				    seqLast = key;
-			    }
-		    }
+            Database::IteratorPtr it = d->db->new_iterator();
+            it->seek_to_last();
+            if (it->is_valid()) {
+                auto key = it->key();
+                if (key != std::numeric_limits<uint32_t>::max()) {
+                    seqLast = key;
+                }
+            }
         }
 
-		cslog() << "start remove " << seqLast - seqToRemove + 1 << " blocks: " << seqToRemove << " .. " << seqLast;
+        auto blocksCount = (seqLast >= seqToRemove) ? (seqLast - seqToRemove + 1) : 0;
+        cslog() << "start remove " << blocksCount << " blocks: " << seqToRemove << " .. " << seqLast;
 
         while (seqToRemove <= seqLast) {
             cs::Bytes poolBinary;
@@ -421,29 +422,30 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
             }
             auto hash = csdb::Pool::hash_from_binary(std::move(poolBinary));
             if (hash.is_empty()) {
-				// try remove another way, using next block's previous hash
-				cs::Bytes next_block_bytes;
-				const uint32_t next_seq = uint32_t(seqToRemove);
-				if (!d->db->get(next_seq, &next_block_bytes)) {
-					// cannot, sorry
-					return false;
-				}
-				size_t dummy = 0;
-				auto next_pool = csdb::Pool::meta_from_binary(std::move(next_block_bytes), dummy);
-				if (!next_pool.is_valid()) {
-					// cannot, sorry
-					return false;
-				}
-				if (!d->db->remove(next_pool.previous_hash().to_binary())) {
-					// cannot repair, sorry
-					return false;
-				}
+                // try remove another way, using next block's previous hash
+                cs::Bytes next_block_bytes;
+                const uint32_t next_seq = uint32_t(seqToRemove);
+                if (!d->db->get(next_seq, &next_block_bytes)) {
+                    // cannot, sorry
+                    return false;
+                }
+                size_t dummy = 0;
+                auto next_pool = csdb::Pool::meta_from_binary(std::move(next_block_bytes), dummy);
+                if (!next_pool.is_valid()) {
+                    // cannot, sorry
+                    return false;
+                }
+                if (!d->db->remove(next_pool.previous_hash().to_binary())) {
+                    // cannot repair, sorry
+                    return false;
+                }
                 continue;
             }
             if (!d->db->remove(hash.to_binary())) {
                 break;
             }
-			cslog() << "block " << seqToRemove - 1 << " is removed";
+
+            cslog() << "block " << seqToRemove - 1 << " is removed";
         }
 
         return true;

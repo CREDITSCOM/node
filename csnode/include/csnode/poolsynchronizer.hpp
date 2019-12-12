@@ -52,16 +52,16 @@ public slots:
 private:
     enum class CounterType;
     enum class SequenceRemovalAccuracy;
-    class NeighboursSetElemet;
+    class Neighbour;
 
     // pool sync progress
     bool showSyncronizationProgress(const cs::Sequence lastWrittenSequence) const;
 
     bool checkActivity(const CounterType counterType);
 
-    void sendBlock(const NeighboursSetElemet& neighbour);
+    void sendBlock(const Neighbour& neighbour);
 
-    bool getNeededSequences(NeighboursSetElemet& neighbour);
+    bool getNeededSequences(Neighbour& neighbour);
 
     void checkNeighbourSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
 
@@ -69,29 +69,39 @@ private:
 
     bool isLastRequest() const;
 
+    // neighbours private interfaces
+    bool isAddableNeighbour(cs::Sequence sequence) const;
+    bool isNeighbourExists(const cs::PublicKey& key) const;
+    bool isNeighbourExists(const Neighbour& neighbour) const;
+    Neighbour& addNeighbour(const cs::PublicKey& key);
+    Neighbour& addNeighbour(const Neighbour& neighbour);
+    Neighbour& getNeighbour(const cs::PublicKey& key);
+    Neighbour& getNeighbour(const Neighbour& element);
+    cs::Sequence neighboursMaxSequence() const;
+
     void synchroFinished();
     void printNeighbours(const std::string& funcName) const;
 
 private:
     enum class CounterType {
-        TIMER
+        Timer
     };
 
     enum class SequenceRemovalAccuracy {
-        EXACT,
-        LOWER_BOUND,
-        UPPER_BOUND
+        Exact,
+        LowerBound,
+        UpperBound
     };
 
-    class NeighboursSetElemet {
+    class Neighbour {
     public:
-        NeighboursSetElemet() = default;
+        Neighbour() = default;
 
-        explicit NeighboursSetElemet(const cs::PublicKey& publicKey)
+        explicit Neighbour(const cs::PublicKey& publicKey)
         : key_(publicKey) {
         }
 
-        explicit NeighboursSetElemet(const cs::PublicKey& publicKey, cs::Sequence blockPoolsCount)
+        explicit Neighbour(const cs::PublicKey& publicKey, cs::Sequence blockPoolsCount)
         : key_(publicKey) {
             sequences_.reserve(blockPoolsCount);
         }
@@ -104,7 +114,7 @@ private:
             bool success = false;
 
             switch (accuracy) {
-                case SequenceRemovalAccuracy::EXACT: {
+                case SequenceRemovalAccuracy::Exact: {
                     auto it = std::find(sequences_.begin(), sequences_.end(), sequence);
                     if (it != sequences_.end()) {
                         sequences_.erase(it);
@@ -112,7 +122,7 @@ private:
                     }
                     break;
                 }
-                case SequenceRemovalAccuracy::LOWER_BOUND: {
+                case SequenceRemovalAccuracy::LowerBound: {
                     auto it = std::upper_bound(sequences_.begin(), sequences_.end(), sequence);
                     if (it != sequences_.begin()) {
                         sequences_.erase(sequences_.begin(), it);
@@ -120,7 +130,7 @@ private:
                     }
                     break;
                 }
-                case SequenceRemovalAccuracy::UPPER_BOUND: {
+                case SequenceRemovalAccuracy::UpperBound: {
                     auto it = std::lower_bound(sequences_.begin(), sequences_.end(), sequence);
                     if (it != sequences_.end()) {
                         sequences_.erase(it, sequences_.end());
@@ -154,30 +164,30 @@ private:
         inline const cs::PublicKey& publicKey() const {
             return key_;
         }
-        inline const PoolsRequestedSequences& sequences() const{
+        inline const PoolsRequestedSequences& sequences() const {
             return sequences_;
         }
         inline cs::Sequence maxSequence() const {
             return maxSequence_;
         }
 
-        bool operator<(const NeighboursSetElemet& other) const {
+        bool operator<(const Neighbour& other) const {
             return maxSequence_ < other.maxSequence_;
         }
 
-        bool operator>(const NeighboursSetElemet& other) const {
+        bool operator>(const Neighbour& other) const {
             return !((*this) < other);
         }
 
-        bool operator==(const NeighboursSetElemet& other) const {
+        bool operator==(const Neighbour& other) const {
             return key_ == other.key_;
         }
 
-        bool operator!=(const NeighboursSetElemet& other) const {
+        bool operator!=(const Neighbour& other) const {
             return !((*this) == other);
         }
 
-        friend std::ostream& operator<<(std::ostream& os, const NeighboursSetElemet& el) {
+        friend std::ostream& operator<<(std::ostream& os, const Neighbour& el) {
             os << "seqs:";
 
             if (el.sequences_.empty()) {
@@ -209,7 +219,7 @@ private:
     // [value] =  packet counter
     // value: increase each new round
     std::map<cs::Sequence, cs::RoundNumber> requestedSequences_;
-    std::vector<NeighboursSetElemet> neighbours_;
+    std::vector<Neighbour> neighbours_;
 
     cs::Timer timer_;
 
@@ -219,8 +229,8 @@ private:
 
 inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::CounterType type) {
     switch (type) {
-        case PoolSynchronizer::CounterType::TIMER:
-            os << "TIMER";
+        case PoolSynchronizer::CounterType::Timer:
+            os << "Timer";
             break;
     }
 
@@ -229,14 +239,14 @@ inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::Counte
 
 inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::SequenceRemovalAccuracy type) {
     switch (type) {
-        case PoolSynchronizer::SequenceRemovalAccuracy::EXACT:
-            os << "EXACT";
+        case PoolSynchronizer::SequenceRemovalAccuracy::Exact:
+            os << "Exact";
             break;
-        case PoolSynchronizer::SequenceRemovalAccuracy::LOWER_BOUND:
-            os << "LOWER_BOUND";
+        case PoolSynchronizer::SequenceRemovalAccuracy::LowerBound:
+            os << "LowerBound";
             break;
-        case PoolSynchronizer::SequenceRemovalAccuracy::UPPER_BOUND:
-            os << "UPPER_BOUND";
+        case PoolSynchronizer::SequenceRemovalAccuracy::UpperBound:
+            os << "UpperBound";
             break;
     }
 

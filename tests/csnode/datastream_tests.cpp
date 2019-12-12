@@ -58,48 +58,6 @@ TEST(DataStream, MustGetZeroFilledStdArrayIfRequestedMoreThanAvailable) {
     }
 }
 
-TEST(DataStream, EndPointWithIp4AndPortIsCorrectlyWritrenToStream) {
-    cs::Bytes bytes;
-    cs::DataStream stream(bytes);
-    boost::asio::ip::udp::endpoint endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 80);
-    stream.addEndpoint(endpoint);
-    const char encoded[7] = {0x06, 0x7f, 0x00, 0x00, 0x01, 0x50, 0x00};
-    ASSERT_EQ(stream.size(), 7);
-    ASSERT_TRUE(0 == memcmp(encoded, stream.data(), sizeof encoded));
-}
-
-TEST(DataStream, EndPointWithIp4AndPortIsCorrectlyReadFromStream) {
-    char data[] = {0x06, 0x7f, 0x00, 0x00, 0x01, 0x50, 0x00};
-    cs::DataStream stream(data, sizeof data);
-    boost::asio::ip::udp::endpoint endpoint = stream.parseEndpoint();
-    ASSERT_EQ(endpoint.address(), boost::asio::ip::address::from_string("127.0.0.1"));
-    ASSERT_EQ(endpoint.port(), 80);
-}
-
-TEST(DataStream, EmptyEndPointIsCorrectlyReadFromStream) {
-    char data[] = {0x00};
-    cs::DataStream stream(data, sizeof data);
-    boost::asio::ip::udp::endpoint endpoint = stream.parseEndpoint();
-    ASSERT_EQ(endpoint.address(), boost::asio::ip::address());
-    ASSERT_EQ(endpoint.port(), 0);
-}
-
-TEST(DataStream, EndPointWithOnlyIp4IsCorrectlyReadFromStream) {
-    char data[] = {0x02, 0x7f, 0x00, 0x00, 0x01, 0x00};
-    cs::DataStream stream(data, sizeof data);
-    boost::asio::ip::udp::endpoint endpoint = stream.parseEndpoint();
-    ASSERT_EQ(endpoint.address(), boost::asio::ip::address::from_string("127.0.0.1"));
-    ASSERT_EQ(endpoint.port(), 0);
-}
-
-TEST(DataStream, EndPointWithOnlyPortIsCorrectlyReadFromStream) {
-    char data[] = {0x04, 0x7f, 0x00};
-    cs::DataStream stream(data, sizeof data);
-    boost::asio::ip::udp::endpoint endpoint = stream.parseEndpoint();
-    ASSERT_EQ(endpoint.address(), boost::asio::ip::address());
-    ASSERT_EQ(endpoint.port(), 127);
-}
-
 TEST(DataStream, Int32ValueIsCorrectylyReadFromStream) {
     char data[] = {0x78, 0x56, 0x34, 0x12};
     cs::DataStream stream(data, sizeof data);

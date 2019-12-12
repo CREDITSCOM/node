@@ -18,8 +18,7 @@ enum BaseFlags : uint8_t {
     Clear = 0,
     NetworkMsg = 1,
     Compressed = 1 << 1,
-    Encrypted = 1 << 2,
-    Signed = 1 << 3
+    Signed = 1 << 2
 };
 
 enum MsgTypes : uint8_t {
@@ -89,10 +88,6 @@ public:
 
     bool isCompressed() const {
         return checkFlag(BaseFlags::Compressed);
-    }
-
-    bool isEncrypted() const {
-        return checkFlag(BaseFlags::Encrypted);
     }
 
     bool isSigned() const {
