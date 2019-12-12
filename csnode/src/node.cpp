@@ -624,6 +624,20 @@ bool Node::canBeTrusted(bool critical) {
         return false;
     }
 
+    {
+        ConnectionPtr p = transport_->getConnectionByKey(cs::PacketValidator::instance().getStarterKey());
+        if (p && p->isSignal) {
+            if (!p->connected) {
+                // strater is not connected, how to get partners in consensus?
+                return false;
+            }
+        }
+        else {
+            // starter unreachable, how to get partners?
+            return false;
+        }
+    }
+
     if (!critical) {
         if (Consensus::DisableTrustedRequestNextRound) {
             // ignore flag after bigbang
