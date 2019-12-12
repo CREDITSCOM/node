@@ -1017,12 +1017,12 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             const auto resume = EventReport::parseReject(bin_pack);
             if (!resume.empty()) {
                 size_t cnt = 0;
-                std::ostringstream os;
+                std::ostringstream os2;
                 std::for_each(resume.cbegin(), resume.cend(), [&](const auto& item) {
                     cnt += item.second;
-                    os << Reject::to_string(item.first) << " (" << item.second << ") ";
+                    os2 << Reject::to_string(item.first) << " (" << item.second << ") ";
                 });
-                csevent() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os.str()
+                csevent() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os2.str()
                     << " on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
