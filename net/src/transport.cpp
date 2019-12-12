@@ -1710,9 +1710,9 @@ bool Transport::isOwnNodeTrusted() const {
 bool Transport::gotSSIntroduceConsensusReply()
 {
     csdebug() << "Get confidants from start node";
-    if (ssStatus_ != SSBootstrapStatus::Complete) {
-        return false;
-    }
+    //if (ssStatus_ != SSBootstrapStatus::Complete) {
+    //    return false;
+    //}
 
     uint8_t numCirc{ 0 };
     iPackStream_ >> numCirc;
