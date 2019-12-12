@@ -123,8 +123,6 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp, bool separate) {
             dp.pack = bp.pack;
             dp.receiver = nb;
 
-            resqueue.insert(bp.pack, nb);
-
             if (!nb->isSignal || send_to_ss) {
                 if (separate) {
                     sent = transport_->sendDirectToSock(&(bp.pack), **nb) || sent;
@@ -172,8 +170,6 @@ void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
             bp.pack = *pack;
             bp.receiver = nb;
 
-            resqueue.insert(*pack, nb);
-
             transport_->sendDirect(pack, **nb);
         }
     }
@@ -193,7 +189,6 @@ void Neighbourhood::sendByConfidant(const Packet* pack, ConnectionPtr conn) {
 
     bp.pack = *pack;
     bp.receiver = conn;
-    resqueue.insert(*pack, conn);
 
     transport_->sendDirect(pack, **conn);
 }
@@ -676,8 +671,6 @@ void Neighbourhood::neighbourHasPacket(RemoteNodePtr node, const cs::Hash& hash)
 
     auto& dp = msgDirects_.tryStore(hash);
     dp.received = true;
-    resqueue.remove(hash, conn);
-    resqueue.resend();
 }
 
 void Neighbourhood::neighbourSentPacket(RemoteNodePtr node, const cs::Hash& hash) {
@@ -763,7 +756,16 @@ bool Neighbourhood::isPingDone() {
 
 void Neighbourhood::resendPackets() {
     cs::Lock lock(nLockFlag_);
-    resqueue.resend();
+    for (auto& bp : msgBroads_) {
+        if (!bp.data.pack) {
+            continue;
+        }
+
+        if (!dispatch(bp.data)) {
+            bp.data.pack = Packet();
+        }
+        bp.data.sentLastTime = false;
+    }
 }
 
 ConnectionPtr Neighbourhood::getConnection(const RemoteNodePtr node) {
@@ -843,7 +845,6 @@ void Neighbourhood::registerDirect(const Packet* packPtr, ConnectionPtr conn) {
     auto& bp = msgDirects_.tryStore(packPtr->getHash());
     bp.pack = *packPtr;
     bp.receiver = conn;
-    resqueue.insert(*packPtr, conn);
 }
 
 bool Neighbourhood::isNewConnectionAvailable() const {
