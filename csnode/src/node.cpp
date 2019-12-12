@@ -115,7 +115,7 @@ bool Node::init() {
     auto& initConfidants = cs::ConfigHolder::instance().config()->getInitialConfidants();
     initialConfidants_ = decltype(initialConfidants_)(initConfidants.begin(), initConfidants.end());
 
-    if (initialConfidants_.find(solver_->getPublicKey()) == initialConfidants_.end()) {
+    if (initialConfidants_.find(solver_->getPublicKey()) != initialConfidants_.end()) {
         transport_->setPermanentNeighbours(initConfidants);
     }
 
