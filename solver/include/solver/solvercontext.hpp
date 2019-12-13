@@ -345,6 +345,7 @@ public:
             cs::StageOne fake;
             init_zero(fake);
             fake.sender = from;
+            fake.toBytes();
             core.gotStageOne(fake);
         }
     }
@@ -355,6 +356,7 @@ public:
             cs::StageTwo fake;
             init_zero(fake);
             fake.sender = from;
+            fake.toBytes();
             core.gotStageTwo(fake);
         }
     }
@@ -364,6 +366,7 @@ public:
             cs::StageThree fake;
             fake.sender = from;
             fake.iteration = core.getCurrentStage3Iteration();
+            fake.toBytes();
             core.gotStageThree(fake, false);
         }
     }
