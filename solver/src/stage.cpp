@@ -86,8 +86,8 @@ namespace cs {
         stream << hashesCandidates;
         stream << roundTimeStamp;
 
-        csdebug() << "Stage one Message R-" << cs::Conveyer::instance().currentRoundNumber() << "[" << static_cast<int>(sender)
-            << "]: " << cs::Utils::byteStreamToHex(message.data(), message.size());
+        //csdebug() << "Stage one Message R-" << cs::Conveyer::instance().currentRoundNumber() << "[" << static_cast<int>(sender)
+        //    << "]: " << cs::Utils::byteStreamToHex(message.data(), message.size());
     }
 
 

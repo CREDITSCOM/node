@@ -1235,13 +1235,13 @@ void BlockChain::testCachedBlocks() {
         }
     }
 
+    size_t cnt_stored = 0;
+    cs::Sequence fromSeq = lastSeq;
     while (!cachedBlocks_.empty()) {
         auto firstBlockInCache = cachedBlocks_.begin();
 
         if ((*firstBlockInCache).first == lastSeq) {
-            cslog() << "BLOCKCHAIN> store block #" << WithDelimiters(lastSeq) << " from cache";
             // retrieve and use block if it is exactly what we need:
-
             auto data = (*firstBlockInCache).second;
             const bool ok = storeBlock(data.pool, data.by_sync);
             cachedBlocks_.erase(firstBlockInCache);
@@ -1249,13 +1249,26 @@ void BlockChain::testCachedBlocks() {
                 cserror() << "BLOCKCHAIN> Failed to record cached block to chain, drop it & wait to request again";
                 break;
             }
+            ++cnt_stored;
+            if (cnt_stored >= 1000) {
+                cslog() << "BLOCKCHAIN> stored " << WithDelimiters(cnt_stored)
+                    << " blocks " << WithDelimiters(fromSeq) << " .. " << WithDelimiters(fromSeq + cnt_stored) << " from cache";
+                cnt_stored = 0;
+                fromSeq = lastSeq + 1;
+            }
             ++lastSeq;
         }
         else {
             // stop processing, we have not got required block in cache yet
-            csdebug() << "BLOCKCHAIN> Stop store block from cache. Next blocks in cache #" << (*firstBlockInCache).first;
+            csdebug() << "BLOCKCHAIN> Stop store blocks from cache. Next blocks in cache #" << (*firstBlockInCache).first;
             break;
         }
+    }
+    if (cnt_stored > 0) {
+        cslog() << "BLOCKCHAIN> stored " << WithDelimiters(cnt_stored)
+            << " blocks " << WithDelimiters(fromSeq) << " .. " << WithDelimiters(fromSeq + cnt_stored) << " from cache";
+        cnt_stored = 0;
+        fromSeq = lastSeq + 1;
     }
 }
 

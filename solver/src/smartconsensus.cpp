@@ -278,11 +278,13 @@ void SmartConsensus::addSmartStageOne(cs::StageOneSmarts& stage, bool send) {
         if (stage.signature == Zero::signature) {
             cswarning() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
             << " Smart stage One from ST[" << static_cast<int>(stage.sender) << "]  -  marked as silent by this node";
+            report_silent(stage.sender);
         }
         else {
             if (!cscrypto::verifySignature(stage.signature, smartConfidants_.at(stage.sender), stage.messageHash.data(), stage.messageHash.size())) {
                 cswarning() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
                 << " Smart stage One from ST[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";//
+                report_liar(stage.sender);
                 return;
             }
         }
@@ -340,11 +342,13 @@ void SmartConsensus::addSmartStageTwo(cs::StageTwoSmarts& stage, bool send) {
         if (stage.signature == Zero::signature) {
             cswarning() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
             << " Smart stage Two from ST[" << static_cast<int>(stage.sender) << "]  -  marked as silent";
+            report_silent(stage.sender);
         }
         else {
             if (!cscrypto::verifySignature(stage.signature, smartConfidants_.at(stage.sender), stage.message.data(), stage.message.size())) {
                 cswarning() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
                 << " Smart stage Two from ST[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";//
+                report_liar(stage.sender);
                 return;
             }
         }
@@ -409,11 +413,13 @@ void SmartConsensus::processStages() {
             ++(smartUntrusted.at(st.sender));
             st3.realTrustedMask.at(st.sender) = cs::ConfidantConsts::InvalidConfidantIndex;
             cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (different fee-vector size)";
+            report_liar(st.sender);
         }
         else if (st.fees.size() != currentSmartsNumber) {
             ++(smartUntrusted.at(st.sender));
             st3.realTrustedMask.at(st.sender) = cs::ConfidantConsts::LiarIndex;
             cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (different fee-vector size)";
+            report_liar(st.sender);
         }
         if (st.hash != hash_t) {
             ++(smartUntrusted.at(st.sender));
@@ -424,12 +430,13 @@ void SmartConsensus::processStages() {
                 else {
                     cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (silent - sent fake stage to all)";
                 }
-
+                report_silent(st.sender);
             }
             else {
                 csdebug() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "], hash is different: "
                     << cs::Utils::byteStreamToHex(st.hash.data(), st.hash.size()) << " - is marked as untrusted";
                 st3.realTrustedMask.at(st.sender) = cs::ConfidantConsts::LiarIndex;
+                report_liar(st.sender);
             }
         }
         else {
@@ -461,19 +468,23 @@ void SmartConsensus::processStages() {
                     ++(smartUntrusted.at(i));
                     if (st.hashes[i] == Zero::hash) {
                         cslog() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted (zero hash) - possibly silent";
+                        report_silent(i);
                     }
                     else {
                         csdebug() << kLogPrefix << "Confidant [" << i << "] is marked as untrusted, hash is wrong: "
                             << cs::Utils::byteStreamToHex(st.hashes[i].data(), st.hashes[i].size());
+                        report_liar(i);
                     }
                 }
                 else {
                     ++(smartUntrusted.at(st.sender));
                     if (st.signatures[i] == Zero::signature) {
                         cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong signature - made another node silent without reasking the stage)";
+                        report_silent(st.sender);
                     } 
                     else {
                         cslog() << kLogPrefix << "Confidant [" << static_cast<int>(st.sender) << "] is marked as untrusted (wrong signature)";
+                        report_liar(st.sender);
                     }
 
                 }
@@ -501,6 +512,7 @@ void SmartConsensus::processStages() {
         else {
             cslog() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
             << " smart consensus CAN'T be achieved, to low confidants in each fraction";
+            report_failure();
         }
 
         return;
@@ -1130,6 +1142,27 @@ void SmartConsensus::sendFakeStageTwo(Node* pnode, cs::PublicKeys confidants, cs
     fake.hashes.resize(cnt, zHash);
     fake.signatures.resize(cnt, zSignature);
     pnode->sendSmartStageTwo(confidants, fake);
+}
+
+void SmartConsensus::report_silent(size_t node_index) {
+    if (node_index < smartConfidants_.size()) {
+        EventReport::sendContractsSilent(*pnode_, smartConfidants_.at(node_index),
+            ContractConsensusId{ smartRoundNumber_, smartTransaction_, runCounter_ });
+    }
+}
+
+void SmartConsensus::report_liar(size_t node_index) {
+    if (node_index < smartConfidants_.size()) {
+        EventReport::sendContractsLiar(*pnode_, smartConfidants_.at(node_index),
+            ContractConsensusId{ smartRoundNumber_, smartTransaction_, runCounter_ });
+    }
+}
+
+void SmartConsensus::report_failure() {
+    if (ownSmartsConfNum_ < smartConfidants_.size()) {
+        EventReport::sendContractsFailed(*pnode_, smartConfidants_.at(ownSmartsConfNum_),
+            ContractConsensusId{ smartRoundNumber_, smartTransaction_, runCounter_ });
+    }
 }
 
 }  // namespace cs
