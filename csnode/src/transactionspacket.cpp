@@ -236,10 +236,14 @@ std::string TransactionsPacket::verify(const std::vector<cs::PublicKey>& publicK
 
     size_t count = 0;
     size_t total_keys = publicKeys.size();
+    std::string badSignatures;
     for (auto it : signatures_) {
         if (it.first < total_keys) {
             if (cscrypto::verifySignature(it.second.data(), publicKeys[it.first].data(), hash_.toBinary().data(), hash_.toBinary().size())) {
                 ++count;
+            }
+            else {
+                badSignatures += std::to_string(static_cast<int>(it.first)) + ", ";
             }
         }
         else {
@@ -247,7 +251,7 @@ std::string TransactionsPacket::verify(const std::vector<cs::PublicKey>& publicK
         }
     }
 
-    return count <= total_keys / 2 ? std::string{ "Not enough valid signatures" } : std::string{};
+    return count <= total_keys / 2 ? std::string{ "Not enough valid signatures: " } + std::to_string(signatures_.size()) + badSignatures : std::string{};
 }
 
 const cs::BlockSignatures& TransactionsPacket::signatures() const noexcept {

@@ -122,6 +122,8 @@ public:
     void updateGrayList(cs::RoundNumber round);
     bool isInGrayList(cs::PublicKey key);
     void resetGrayList();
+    bool isBlackListed(const cs::PublicKey pKey);
+
 
     bool isTransactionsInputAvailable();
 
@@ -342,6 +344,7 @@ private:
     RoundPackage justCreatedRoundPackage;
     SentSignatures lastSentSignatures_;
     std::unique_ptr<IterValidator> pVal_;
+    std::string kLogPrefix_;
 };
 
 }  // namespace cs

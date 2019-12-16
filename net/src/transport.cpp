@@ -373,7 +373,7 @@ std::pair< uint32_t, std::list<int> > Transport::deliverConfidants(const Packet*
     {
         cs::Lock lock(aLock_);
         for (const auto& pkey: list) {
-            if (i != except) {
+            if (i != except && !isBlackListed(pkey)) {
                 auto res = addresses_.find(pkey);
                 if (res == addresses_.end()) {
                     result.second.push_back(i);
