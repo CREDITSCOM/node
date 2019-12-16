@@ -1071,7 +1071,7 @@ bool operator==(const Config& lhs, const Config& rhs) {
         lhs.ipv6_ == rhs.ipv6_ &&
         lhs.minNeighbours_ == rhs.minNeighbours_ &&
         lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
-        lhs.agressiveNeighboursLimitation_ == rhs.agressiveNeighboursLimitation_ &&
+        lhs.restrictNeighbours_ == rhs.restrictNeighbours_ &&
         lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
         lhs.symmetric_ == rhs.symmetric_ &&
         lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
