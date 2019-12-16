@@ -2066,13 +2066,9 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
         return;
     }
-    if (cs::Conveyer::instance().currentRoundNumber() % 10 == 0 && stageThreeInfo.sender == 1) {
-    }
-    else {
-        // TODO: think how to improve this code
-        sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, stageThreeInfo.message);
 
-    }
+    // TODO: think how to improve this code
+    sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, stageThreeInfo.message);
 
     // cach stage three
     csmeta(csdetails) << "bytes size " << stageThreeInfo.message.size();
