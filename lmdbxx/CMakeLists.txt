@@ -4,6 +4,9 @@ project(lmdbxx)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+configure_msvc_flags()
 
 add_subdirectory(lmdb)
 
@@ -17,5 +20,3 @@ target_include_directories(${PROJECT_NAME} PUBLIC "./"
                                                   ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include)
 
 target_link_libraries(${PROJECT_NAME} lmdb lib)
-
-configure_msvc_flags()
