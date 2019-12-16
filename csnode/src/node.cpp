@@ -459,7 +459,9 @@ bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::Publ
         cswarning() << "NODE> Usually packets can't have " << packet.signatures().size() << " signatures";
         return false;
     }
-    csdebug() << "NODE> Packet " << packet.hash().toString() << " signature" << verb;
+    if (verb.size() > 10) {
+        csdebug() << "NODE> Packet " << packet.hash().toString() << " signature" << verb;
+    }
     return true;
 }
 
@@ -1666,6 +1668,10 @@ void Node::updateConfigFromFile() {
     observer_.notify();
 }
 
+bool Node::isBlackListed(const cs::PublicKey pKey) {
+    return transport_->isBlackListed(pKey);
+}
+
 inline bool Node::readRoundData(cs::RoundTable& roundTable, bool bang) {
     cs::PublicKey mainNode;
 
@@ -1965,17 +1971,18 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     }
 
     const cs::PublicKey& confidant = conveyer.confidantByIndex(stage.sender);
-    csdebug() << "StageMessage[" << static_cast<int>(stage.sender) <<"]: " << cs::Utils::byteStreamToHex(stage.message.data(), stage.message.size());
+    csdebug() << kLogPrefix_ << "StageOne Message[" << static_cast<int>(stage.sender) <<"]: " << cs::Utils::byteStreamToHex(stage.message.data(), stage.message.size());
     if (!cscrypto::verifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
-        cswarning() << "NODE> Stage-1 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+        cswarning() << kLogPrefix_ << "StageOne from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!! Message: " 
+            << cs::Utils::byteStreamToHex(stage.message.data(), stage.message.size());
         return;
     }
 
     if (confidant != sender) {
-        csmeta(csdebug) << "Stage-1 of " << getSenderText(confidant) << " sent by " << getSenderText(sender);
+        csmeta(csdebug) << kLogPrefix_ << "StageOne of " << getSenderText(confidant) << " sent by " << getSenderText(sender);
     }
     else {
-        csmeta(csdebug) << "Stage-1 of T[" << static_cast<int>(stage.sender) << "], sender key ok";
+        csmeta(csdebug) << kLogPrefix_ << "StageOne of T[" << static_cast<int>(stage.sender) << "], sender key ok";
     }
 
     csdetails() << csname() << "Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
@@ -2001,11 +2008,11 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     csmeta(csdetails);
 
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
-        csdebug() << "NODE> ignore stage-2 as no confidant";
+        csdebug() << kLogPrefix_ << "Ignore StageTwo as no confidant";
         return;
     }
 
-    csdebug() << "NODE> getting stage-2 from " << getSenderText(sender);
+    csdebug() << kLogPrefix_ << "Getting StageTwo from " << getSenderText(sender);
 
     istream_.init(data, size);
 
@@ -2013,7 +2020,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     istream_ >> subRound;
 
     if (subRound != subRound_) {
-        cswarning() << "NODE> ignore stage-2 with subround #" << static_cast<int>(subRound) << ", required #" << static_cast<int>(subRound_);
+        cswarning() << kLogPrefix_ << "Ignore StageTwo with subround #" << static_cast<int>(subRound) << ", required #" << static_cast<int>(subRound_);
         return;
     }
 
@@ -2024,7 +2031,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     istream_ >> bytes;
 
     if (!istream_.good() || !istream_.end()) {
-        cserror() << "NODE> Bad stage-2 packet format";
+        cserror() << kLogPrefix_ << "Bad StageTwo packet format";
         return;
     }
 
@@ -2040,14 +2047,15 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     }
 
     if (!cscrypto::verifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
-        csdebug() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+        csdebug() << kLogPrefix_ << "StageTwo [" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!! Message: " 
+            << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
         return;
     }
 
     csmeta(csdetails) << "Signature is OK";
     stage.message = std::move(bytes);
 
-    csdebug() << "NODE> stage-2 [" << static_cast<int>(stage.sender) << "] is OK!";
+    csdebug() << kLogPrefix_ << "StageTwo [" << static_cast<int>(stage.sender) << "] is OK!";
     solver_->gotStageTwo(stage);
 }
 
@@ -2058,9 +2066,13 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
         return;
     }
+    if (cs::Conveyer::instance().currentRoundNumber() % 10 == 0 && stageThreeInfo.sender == 1) {
+    }
+    else {
+        // TODO: think how to improve this code
+        sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, stageThreeInfo.message);
 
-    // TODO: think how to improve this code
-    sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, stageThreeInfo.message);
+    }
 
     // cach stage three
     csmeta(csdetails) << "bytes size " << stageThreeInfo.message.size();
@@ -2126,13 +2138,15 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
     }
 
     if (!cscrypto::verifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
-        cswarning() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!!";
+        cswarning() << kLogPrefix_ << "stageThree from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!! Message: " 
+            << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
+        return;
         return;
     }
 
     stage.message = std::move(bytes);
 
-    csdebug() << "NODE> stage-3 from T[" << static_cast<int>(stage.sender) << "] - preliminary check ... passed!";
+    csdebug() << kLogPrefix_ << "stageThree from T[" << static_cast<int>(stage.sender) << "] - preliminary check ... passed!";
 
     solver_->gotStageThree(std::move(stage), (stageThreeSent_ ? 2 : 0));
 }
@@ -2144,7 +2158,7 @@ void Node::adjustStageThreeStorage() {
 void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, uint8_t iteration) {
     csdebug() << __func__;
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
-        cswarning() << "NODE> Only confidant nodes can request consensus stages";
+        cswarning() << kLogPrefix_ << "Only confidant nodes can request consensus stages";
         return;
     }
 
@@ -2154,7 +2168,7 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, 
     case MsgTypes::ThirdStageRequest:
         break;
     default:
-        csdebug() << "NODE: illegal call to method, ignore";
+        csdebug() << kLogPrefix_ << "Illegal call to method: stageRequest(), ignore";
         return;
     }
 
@@ -2186,7 +2200,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
     istream_ >> subRound;
 
     if (subRound != subRound_) {
-        cswarning() << "NODE> We got Stage-2 for the Node with SUBROUND, we don't have";
+        cswarning() << kLogPrefix_ << "We got StageRequest for the Node with SUBROUND, we don't have";
         return;
     }
 
@@ -2202,7 +2216,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
     }
 
     if (!istream_.good() || !istream_.end()) {
-        cserror() << "Bad StageRequest packet format";
+        cserror() << kLogPrefix_ << "Bad StageRequest packet format";
         return;
     }
 
@@ -2236,7 +2250,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
     csmeta(csdetails) << "started";
 
     if (myLevel_ != Level::Confidant) {
-        cswarning() << "NODE> Only confidant nodes can send consensus stages";
+        cswarning() << kLogPrefix_ << "Only confidant nodes can send consensus stages";
         return;
     }
 
@@ -3398,6 +3412,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     stageThreeSent_ = false;
     roundPackRequests_ = 0;
     lastBlockRemoved_ = false;
+    kLogPrefix_ = "R-" + std::to_string(roundTable.round) + " NODE> ";
     constexpr int padWidth = 30;
 
     badHashReplyCounter_.clear();

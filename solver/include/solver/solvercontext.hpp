@@ -386,6 +386,10 @@ public:
         return 0;
     }
 
+    bool isBlackListed(cs::PublicKey pKey) {
+        return core.isBlackListed(pKey);
+    }
+
     /**
      * @fn  uint32_t SolverContext::subRound() const;
      *
