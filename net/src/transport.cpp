@@ -1038,11 +1038,6 @@ void Transport::sendRegistrationRequest(Connection& conn) {
         return;
     }
 
-    if (neighbourhood_.getNeighboursCountWithoutSS() >= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
-        cslog() << "Connections limit has reached, ignore registration request to " << conn.getOut();
-        return;
-    }
-
     cslog() << "Sending registration request to " << (conn.specialOut ? conn.out : conn.in);
 
     cs::Lock lock(oLock_);

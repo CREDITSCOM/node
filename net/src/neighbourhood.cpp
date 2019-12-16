@@ -202,7 +202,7 @@ void Neighbourhood::checkPending(const uint32_t) {
     cs::Lock lock(mLockFlag_);
     for (auto conn = connections_.begin(); conn != connections_.end(); ++conn) {
         // Attempt to reconnect if the connection hasn't been established yet
-        if (!(**conn)->connected && (**conn)->attempts < MaxConnectAttempts) {
+        if (!(**conn)->connected && (**conn)->attempts < MaxConnectAttempts && !enoughConnections()) {
             if (transport_->isShouldPending(***conn)) {
                 transport_->sendRegistrationRequest(****conn);
             }
@@ -347,6 +347,12 @@ ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
 
 void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
     cs::Lock lock(mLockFlag_);
+
+    if (enoughConnections()) {
+        cslog() << "Connections limit has reached, ignore request connection to " << ep;
+        return;
+    }
+
     auto conn = getConnection(ep);
 
     if (!conn->id) {
@@ -592,13 +598,17 @@ bool Neighbourhood::validateConnectionId(RemoteNodePtr node, const Connection::I
 
     if (!realPtr) {
         if (nConn) {
+            if (enoughConnections()) {
+                cswarning() << "Connections limit has reached, ignore ping from " << ep;
+                return false;
+            }
+
             cswarning() << "[NET] got ping from " << ep << " but the remote node is bound to " << nConn->getOut();
             transport_->sendRegistrationRequest(*nConn);
             nConn->lastSeq = lastSeq;
         }
         else {
             cswarning() << "[NET] got ping from " << ep << " but no connection bound, sending refusal";
-
             Connection conn;
             conn.id = id;
             conn.in = ep;
@@ -609,6 +619,11 @@ bool Neighbourhood::validateConnectionId(RemoteNodePtr node, const Connection::I
         result = !result;
     }
     else if (realPtr->get() != nConn) {
+        if (enoughConnections()) {
+            cswarning() << "Connection limit has reached, ignore ping from " << ep;
+            return false;
+        }
+
         if (nConn) {
             cswarning() << "[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut() << " but the remote node is bound to " << nConn->getOut();
             transport_->sendRegistrationRequest(*nConn);
@@ -634,9 +649,28 @@ void Neighbourhood::gotRefusal(const Connection::Id& id) {
     cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
     auto realPtr = findInMap(id, connections_);
 
+    if (enoughConnections()) {
+        return;
+    }
+
     if (realPtr) {
         transport_->sendRegistrationRequest(***realPtr);
     }
+}
+
+// thread unsafe, must work under locks
+bool Neighbourhood::enoughConnections() const {
+    const uint32_t conn_limit = cs::ConfigHolder::instance().config()->getMaxNeighbours();
+    uint32_t count = 0;
+    for (auto& nb : neighbours_) {
+        if (!nb->isSignal) {
+            ++count;
+            if (count >= conn_limit) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void Neighbourhood::gotBadPing(Connection::Id id) {

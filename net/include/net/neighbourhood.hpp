@@ -234,6 +234,8 @@ private:
     void connectNode(RemoteNodePtr, ConnectionPtr);
     void disconnectNode(ConnectionPtr*);
 
+    bool enoughConnections() const;
+
     Transport* transport_;
 
     TypedAllocator<Connection> connectionsAllocator_;
