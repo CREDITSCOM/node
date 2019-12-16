@@ -1038,6 +1038,11 @@ void Transport::sendRegistrationRequest(Connection& conn) {
         return;
     }
 
+    if (neighbourhood_.getNeighboursCountWithoutSS() >= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
+        cslog() << "Connections limit has reached, ignore registration request to " << conn.getOut();
+        return;
+    }
+
     cslog() << "Sending registration request to " << (conn.specialOut ? conn.out : conn.in);
 
     cs::Lock lock(oLock_);
@@ -1146,6 +1151,12 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         epd.ipSpecified = true;
         epd.port = conn.getOut().port();
         storeAddress(conn.key, epd);
+    }
+
+    if (neighbourhood_.getNeighboursCountWithoutSS() >= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
+        cslog() << "Connections limit has reached, ignore registration request from " << conn.getOut();
+        sendRegistrationRefusal(conn, RegistrationRefuseReasons::LimitReached);
+        return true;
     }
 
     neighbourhood_.gotRegistration(std::move(conn), sender);
