@@ -31,6 +31,7 @@ const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::MaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
+const double DEFAULT_BROADCAST_FILLING = 100 / 3.; // 33.3%
 
 const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;             // rounds
 const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
@@ -142,7 +143,7 @@ public:
     Config& operator=(Config&&) = default;
 
     static Config read(po::variables_map&);
-    
+
     template<typename T, typename ... Ts, typename = cs::IsConvertToString<T, Ts...>>
     static bool replaceBlock(T&& blockName, Ts&& ... newLines);
 
@@ -261,6 +262,10 @@ public:
         return roundElapseTime_;
     }
 
+    double getBroadcastCoefficient() const {
+        return broadcastCoefficient_;
+    }
+
     bool readKeys(const po::variables_map& vm);
     bool enterWithSeed();
 
@@ -307,6 +312,7 @@ private:
     uint32_t minNeighbours_ = DEFAULT_MIN_NEIGHBOURS;
     uint32_t maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS;
     uint64_t connectionBandwidth_ = DEFAULT_CONNECTION_BANDWIDTH;
+    double broadcastCoefficient_ = DEFAULT_BROADCAST_FILLING / 100;
 
     bool symmetric_ = false;
     EndpointData hostAddressEp_;

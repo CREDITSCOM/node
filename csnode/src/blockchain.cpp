@@ -185,7 +185,12 @@ std::string BlockChain::getLastTimeStamp() const {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
     if (deferredBlock_.is_valid()) {
-        return deferredBlock_.user_field(0).value<std::string>();
+        if (deferredBlock_.user_field_ids().count(0) > 0) {
+            return deferredBlock_.user_field(0).value<std::string>();
+        }
+        else {
+            return std::string("0");
+        }
     }
     else {
         return getLastBlock().user_field(0).value<std::string>();

@@ -182,6 +182,7 @@ private:
         std::string retVal{};
         bool isOld{false};
         bool condFlg{false};
+        csdb::TransactionID id{};
     };
 
     using client_type = executor::ContractExecutorConcurrentClient;

@@ -647,6 +647,10 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
         return;
     }
 
+    auto newTransactionId = dumbCv_.getTransactionId();
+    _return.id.poolSeq = newTransactionId.pool_seq();
+    _return.id.index = newTransactionId.index();
+
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
 
@@ -805,6 +809,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     cs::Conveyer::instance().addTransaction(send_transaction);
 
     cs::Hash hashState;
+    csdb::TransactionID newTransactionId{};
 
     if (deploy) {
         auto resWait = hashStateEntry->waitTillFront([&](HashState& ss) {
@@ -815,6 +820,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             }
 
             ss.condFlg = false;
+            newTransactionId = ss.id;
             return true;
         });
 
@@ -843,6 +849,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             hashState   = ss.hash;
             retVal      = ss.retVal;
             ss.condFlg  = false;
+            newTransactionId = ss.id;
 
             return true;
         });
@@ -867,6 +874,9 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
             _return.__set_smart_contract_result(cs::Serializer::deserialize<::general::Variant>(std::move(retVal)));
         }
     }
+
+    _return.id.poolSeq = newTransactionId.pool_seq();
+    _return.id.index = newTransactionId.index();
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
 }
@@ -1200,6 +1210,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                         res.retVal = trxn.user_field(cs::trx_uf::new_state::RetVal).template value<std::string>();
                         res.isOld = (res.hash == oldHash.hash);
                         res.condFlg = true;
+                        res.id = trxn.id();
                         return res;
                     });
                     csdebug() << "[API]: sended signal, state trx: " << trxn.id().pool_seq() << '.' << trxn.id().index()
@@ -1288,6 +1299,7 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
             updateSmartCachesTransaction(trx, pool.sequence());
         }
         else { // if dumb transaction
+            dumbCv_.setTransactionId(trx.id());
             dumbCv_.sendCvSignal(trx.signature());
         }
     }

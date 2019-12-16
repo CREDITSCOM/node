@@ -10,6 +10,7 @@
 
 #include <cscrypto/cscrypto.hpp>
 #include <csnode/blockchain.hpp>
+#include <csnode/configholder.hpp>
 #include <lib/system/random.hpp>
 
 namespace {
@@ -62,7 +63,9 @@ void Neighbourhood::chooseNeighbours() {
     size_t redirectNumber = 0;
 
     if (redirectLimit) {
-        redirectNumber = std::max(kNeighborsRedirectMin, neighbours_.size() / 3 + 1);
+        redirectNumber = std::max(kNeighborsRedirectMin,
+            static_cast<size_t>(
+                neighbours_.size() * cs::ConfigHolder::instance().config()->getBroadcastCoefficient()) + 1);
 
         if (redirectNumber > neighbours_.size()) {
             redirectNumber = neighbours_.size();
