@@ -34,7 +34,7 @@ net::Config createNetConfig(Config config, bool& good) {
     good = true;
 
     auto& ep = config.getInputEndpoint();
-    result.listen_address = !ep.ip.empty() ? ep.ip : net::kLocalHost;
+    result.listen_address = !ep.ip.empty() ? ep.ip : net::kAllInterfaces;
     result.listen_port = ep.port ? ep.port : net::kDefaultPort;
     result.traverse_nat = config.traverseNAT();
 

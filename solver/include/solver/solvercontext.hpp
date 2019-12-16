@@ -567,6 +567,10 @@ public:
 
     void send_rejected_report(const cs::Bytes& rejected_pack);
 
+    void send_silent_report(const cs::PublicKey& silent_key);
+    void send_liar_report(const cs::PublicKey& liar_key);
+    void send_consensus_failed_report();
+
     bool is_round_duration_limited() const;
 
 private:

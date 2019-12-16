@@ -52,6 +52,7 @@ public:
     void SmartContractGet(SmartContractGetResult& _return, const general::AccessID accessId, const general::Address& address) override;
     void WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) override;
     void PoolGet(PoolGetResult& _return, const int64_t sequence) override;
+    void GetDateTime(GetDateTimeResult& _return, const general::AccessID accessId) override;
 
     cs::Executor& getExecutor() const {
         return executor_;
@@ -283,10 +284,14 @@ private:
     std::condition_variable_any newBlockCv_;
     std::mutex dbLock_;
 
+    cs::Sequence maxReadSequence{};
+
 private slots:
     void updateSmartCachesPool(const csdb::Pool& pool);
     void store_block_slot(const csdb::Pool& pool);
     void collect_all_stats_slot(const csdb::Pool& pool);
+    void baseLoaded(const csdb::Pool& pool);
+    void maxBlocksCount(cs::Sequence lastBlockNum);
 };
 }  // namespace api
 

@@ -278,6 +278,10 @@ inline bool Process::launch(Process::Options options) {
         return false;
     }
 
+    if (options & Options::Attach) {
+        return true;
+    }
+
     try {
         std::thread thread([this] {
             try {

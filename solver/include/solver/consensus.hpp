@@ -104,7 +104,7 @@ public:
     const static unsigned int MaxRoundsCancelContract;
 
     /** @brief The maximum count of rounds to store in chain new_state transaction. If contract still is "in the executor" timeout is fixed.
-     * After that 5 rounds (MaxRoundsCancelContract - MaxRoundsExecuteContract) remains to complete consensus and put timeout new_state
+     * After that, 90 rounds (MaxRoundsCancelContract - MaxRoundsExecuteContract) still remains to complete consensus and put empty new_state
      * into chain, otherwise  contract is assumed failed unconditionally
      */
     const static unsigned int MaxRoundsExecuteContract;

@@ -36,6 +36,15 @@ public:
         return subRound_;
     }
 
+    // store sender key with round package
+    void setSenderNode(const cs::PublicKey& sender);
+    
+    bool hasSender() const {
+        return bool(sender_);
+    }
+
+    bool getSender(cs::PublicKey& sender) const;
+
 private:
     std::string name() {
         return "RoundPackage> ";
@@ -56,6 +65,8 @@ private:
     size_t messageSize_ = 0;
     cs::Byte iteration_ = 0U;
     cs::Byte subRound_ = 0U;
+
+    std::shared_ptr<cs::PublicKey> sender_;
 };
 }  // namespace cs
 

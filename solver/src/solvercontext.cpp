@@ -243,7 +243,19 @@ void SolverContext::next_trusted_candidates(const std::vector<cs::PublicKey>& no
 }
 
 void SolverContext::send_rejected_report(const cs::Bytes& rejected_pack) {
-    EventReport::sendReject(*core.pnode, rejected_pack);
+    EventReport::sendRejectTransactions(*core.pnode, rejected_pack);
+}
+
+void SolverContext::send_silent_report(const cs::PublicKey& silent_key) {
+    EventReport::sendConsensusSilent(*core.pnode, silent_key);
+}
+
+void SolverContext::send_liar_report(const cs::PublicKey& liar_key) {
+    EventReport::sendConsensusLiar(*core.pnode, liar_key);
+}
+
+void SolverContext::send_consensus_failed_report() {
+    EventReport::sendConsensusFailed(*core.pnode, core.getPublicKey());
 }
 
 bool SolverContext::is_round_duration_limited() const {
