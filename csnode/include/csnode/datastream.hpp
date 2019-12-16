@@ -379,18 +379,6 @@ private:
     // main storage
     cs::Bytes* bytes_ = nullptr;
 
-    // creates template address
-    template <typename T>
-    T createAddress() {
-        typename T::bytes_type bytes;
-
-        for (std::size_t i = 0; i < bytes.size(); ++i, ++index_) {
-            bytes[i] = static_cast<unsigned char>(data_[index_]);
-        }
-
-        return T(bytes);
-    }
-
     void badState() {
         state_ = false;
     }
