@@ -190,6 +190,11 @@ public:
     uint32_t getMaxNeighbours() const {
         return maxNeighbours_;
     }
+
+    bool restrictNeighbours() const {
+        return restrictNeighbours_;
+    }
+
     uint64_t getConnectionBandwidth() const {
         return connectionBandwidth_;
     }
@@ -311,6 +316,7 @@ private:
 
     uint32_t minNeighbours_ = DEFAULT_MIN_NEIGHBOURS;
     uint32_t maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS;
+    bool restrictNeighbours_ = false;
     uint64_t connectionBandwidth_ = DEFAULT_CONNECTION_BANDWIDTH;
     double broadcastCoefficient_ = DEFAULT_BROADCAST_FILLING / 100;
 

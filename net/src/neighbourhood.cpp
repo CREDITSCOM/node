@@ -735,16 +735,19 @@ void Neighbourhood::redirectByNeighbours(const Packet* pack) {
 }
 
 void Neighbourhood::pingNeighbours() {
-    //const uint32_t max_cnt = cs::ConfigHolder::instance().config()->getMaxNeighbours();
+    const uint32_t max_cnt = cs::ConfigHolder::instance().config()->getMaxNeighbours();
+    const bool limit_cnt_ping = cs::ConfigHolder::instance().config()->restrictNeighbours();
 
     cs::Lock lock(nLockFlag_);
 
-    //uint32_t cnt_ping = 0;
+    uint32_t cnt_ping = 0;
     for (auto& nb : neighbours_) {
-        //if (++cnt_ping > max_cnt) {
-        //    cslog() << "Connections limit " << max_cnt << " has reached, ignore the rest neighbours";
-        //    break;
-        //}
+        if (limit_cnt_ping) {
+            if (++cnt_ping > max_cnt) {
+                cslog() << "Connections limit " << max_cnt << " has reached, ignore the rest neighbours";
+                break;
+            }
+        }
         transport_->sendPingPack(**nb);
     }
 }

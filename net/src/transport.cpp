@@ -1648,18 +1648,13 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
     return true;
 }
 
-// Turn on testing blockchain ID in PING packets to prevent nodes from confuse alien ones
-#define PING_WITH_BCHID
-
 void Transport::sendPingPack(const Connection& conn) {
     cs::Sequence seq = node_->getBlockChain().getLastSeq();
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
     oPackStream_ << NetworkCommand::Ping << conn.id << seq << myPublicKey_;
 
-#if defined(PING_WITH_BCHID)
     oPackStream_ << node_->getBlockChain().uuid();
-#endif
 
     if (!cs::ConfigHolder::instance().config()->isCompatibleVersion()) {
         oPackStream_ << NODE_VERSION;
@@ -1676,7 +1671,6 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     cs::PublicKey publicKey;
     iPackStream_ >> id >> lastSeq >> publicKey;
 
-#if defined(PING_WITH_BCHID)
     uint64_t remoteUuid = 0;
     iPackStream_ >> remoteUuid;
 
@@ -1687,7 +1681,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
             return false;   // remote is incompatible
         }
     }
-#endif
+
     if (!cs::ConfigHolder::instance().config()->isCompatibleVersion() && iPackStream_.end()) {
         neighbourhood_.gotBadPing(id);
         return false;
