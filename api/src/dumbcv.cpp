@@ -35,3 +35,11 @@ bool cs::DumbCv::waitCvSignal(const cs::Signature& signature) {
 
     return isTimeOver;
 }
+
+void cs::DumbCv::setTransactionId(const csdb::TransactionID& id) {
+    id_ = id;
+}
+
+csdb::TransactionID cs::DumbCv::getTransactionId() const {
+    return id_;
+}
