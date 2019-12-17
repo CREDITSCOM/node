@@ -524,7 +524,7 @@ void Transport::refillNeighbourhood() {
     if (bootstrap == BootstrapType::IpList) {
         for (auto& ep : cs::ConfigHolder::instance().config()->getIpList()) {
             if (!neighbourhood_.canHaveNewConnection()) {
-                cswarning() << "Connections limit reached";
+                cswarning() << "Connections limit has reached";
                 break;
             }
 
@@ -600,6 +600,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
             }
 
             if (!neighbourhood_.canHaveNewConnection()) {
+                // static buffers size exceeded
                 break;
             }
         }
@@ -1148,7 +1149,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         storeAddress(conn.key, epd);
     }
 
-    if (neighbourhood_.getNeighboursCountWithoutSS() >= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
+    if (!neighbourhood_.canAddNeighbour()) {
         cslog() << "Connections limit has reached, ignore registration request from " << conn.getOut();
         sendRegistrationRefusal(conn, RegistrationRefuseReasons::LimitReached);
         return true;
@@ -1359,7 +1360,6 @@ bool Transport::gotSSNewFriends()
         return false;
     }
 
-    uint32_t ctr = neighbourhood_.size();
     uint8_t numCirc{ 0 };
     iPackStream_ >> numCirc;
 
@@ -1374,10 +1374,8 @@ bool Transport::gotSSNewFriends()
             return false;
         }
 
-        ++ctr;
-
         if (key != cs::ConfigHolder::instance().config()->getMyPublicKey()) {
-            if (ctr <= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
+            if (neighbourhood_.canAddNeighbour()) {
                 neighbourhood_.establishConnection(net_->resolve(ep));
             }
             storeAddress(key, ep);

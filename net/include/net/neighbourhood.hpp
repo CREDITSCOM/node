@@ -202,6 +202,8 @@ public:
 
     void registerDirect(const Packet*, ConnectionPtr);
 
+    bool canAddNeighbour() const;
+
 private:
     struct BroadPackInfo {
         Packet pack;

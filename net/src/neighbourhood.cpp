@@ -47,6 +47,7 @@ Neighbourhood::Neighbourhood(Transport* net)
 , resqueue(this) {
 }
 
+// must work under nLockFlag_
 void Neighbourhood::chooseNeighbours() {
     static bool redirectLimit = false;
     static auto startTime = std::chrono::high_resolution_clock::now();
@@ -199,10 +200,18 @@ bool Neighbourhood::canHaveNewConnection() {
 }
 
 void Neighbourhood::checkPending(const uint32_t) {
+
+    {
+        cs::Lock lock(nLockFlag_);
+        if (enoughConnections()) {
+            return;
+        }
+    }
+
     cs::Lock lock(mLockFlag_);
     for (auto conn = connections_.begin(); conn != connections_.end(); ++conn) {
         // Attempt to reconnect if the connection hasn't been established yet
-        if (!(**conn)->connected && (**conn)->attempts < MaxConnectAttempts && !enoughConnections()) {
+        if (!(**conn)->connected && (**conn)->attempts < MaxConnectAttempts) {
             if (transport_->isShouldPending(***conn)) {
                 transport_->sendRegistrationRequest(****conn);
             }
@@ -512,12 +521,12 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     conn->connected = true;
     conn->attempts = 0;
 
-    if (!isNewConnectionAvailable()) {
+    if (enoughConnections()) {
         cswarning() << "Can not add neighbour, neighbours size is equal to max possible neighbours";
         return;
     }
-
-    neighbours_.emplace(neighbours_.end(), conn);
+    // to provide some rotation in neighbours_ add to begin, restrict at the end of:
+    neighbours_.emplace(neighbours_.cbegin(), conn);
     csdebug() << "Node " << conn->getOut() << " is added to neighbours";
     chooseNeighbours();
 }
@@ -658,9 +667,9 @@ void Neighbourhood::gotRefusal(const Connection::Id& id) {
     }
 }
 
-// thread unsafe, must work under locks
+// thread unsafe, must work under nLockFlag_
 bool Neighbourhood::enoughConnections() const {
-    const uint32_t conn_limit = cs::ConfigHolder::instance().config()->getMaxNeighbours();
+    const uint32_t conn_limit = std::min(cs::ConfigHolder::instance().config()->getMaxNeighbours(), MaxNeighbours);
     uint32_t count = 0;
     for (auto& nb : neighbours_) {
         if (!nb->isSignal) {
@@ -671,6 +680,11 @@ bool Neighbourhood::enoughConnections() const {
         }
     }
     return false;
+}
+
+bool Neighbourhood::canAddNeighbour() const {
+    cs::Lock lock(nLockFlag_);
+    return !enoughConnections();
 }
 
 void Neighbourhood::gotBadPing(Connection::Id id) {
@@ -777,9 +791,13 @@ void Neighbourhood::pingNeighbours() {
     uint32_t cnt_ping = 0;
     for (auto& nb : neighbours_) {
         if (limit_cnt_ping) {
-            if (++cnt_ping > max_cnt) {
-                cslog() << "Connections limit " << max_cnt << " has reached, ignore the rest neighbours";
-                break;
+            // stop ping on max neighbours count, then connection will close automatically, ending items will be restricted such a way
+            if (!nb->isSignal) {
+                ++cnt_ping;
+                if (cnt_ping > max_cnt) {
+                    cslog() << "Connections limit " << max_cnt << " has reached, ignore the rest neighbours";
+                    break;
+                }
             }
         }
         transport_->sendPingPack(**nb);
