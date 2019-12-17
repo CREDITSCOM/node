@@ -1198,6 +1198,8 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
     switch (reason) {
     case RegistrationRefuseReasons::BadClientVersion:
     case RegistrationRefuseReasons::BlackListed:
+    case RegistrationRefuseReasons::LimitReached:
+    case RegistrationRefuseReasons::IncompatibleBlockchain:
         neighbourhood_.dropConnection(id);
         break;
 
