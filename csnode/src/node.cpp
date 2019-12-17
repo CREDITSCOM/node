@@ -705,7 +705,7 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
     if (!identic) {
         std::string badChecks;
         int badChecksCounter = 0;
-        for (int i = 0; i < checkMask.size(); ++i) {
+        for (size_t i = 0; i < checkMask.size(); ++i) {
             if (checkMask[i] != 0) {
                 if (badChecks.size() > 0) {
                     badChecks += ", ";
