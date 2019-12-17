@@ -735,8 +735,9 @@ Config Config::readFromFile(const std::string& fileName) {
         result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) : DEFAULT_MAX_NEIGHBOURS;
         result.restrictNeighbours_ = params.count(PARAM_NAME_RESTRICT_NEIGHBOURS) ? params.get<bool>(PARAM_NAME_RESTRICT_NEIGHBOURS) : false;
 
-        if (result.maxNeighbours_ > DEFAULT_MAX_NEIGHBOURS) {
-            result.maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS; // see neighbourhood.hpp, some containers are of static size
+        if (result.maxNeighbours_ > Neighbourhood::MaxNeighbours) {
+            // see neighbourhood.hpp, some containers are of static size
+            result.maxNeighbours_ = Neighbourhood::MaxNeighbours;
         }
 
         if (params.count(PARAM_NAME_COMPATIBLE_VERSION)) {
