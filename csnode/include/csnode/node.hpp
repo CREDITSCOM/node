@@ -180,8 +180,6 @@ public:
     bool checkCharacteristic(cs::RoundPackage& rPackage);
     void getCharacteristic(cs::RoundPackage& rPackage, cs::DataStream& stream);
 
-    void createTestTransaction();
-
     void sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq);
 
     void cleanConfirmationList(cs::RoundNumber rNum);

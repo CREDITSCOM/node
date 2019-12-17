@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <csignal>
 #include <numeric>
+#include <random>
 #include <sstream>
 
 #include <solver/consensus.hpp>
@@ -331,8 +332,8 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
         cswarning() << "Bad round table format, ignoring";
         return;
     }
-
     subRound_ = 1;
+
     if (!isBootstrapRound_) {
         isBootstrapRound_ = true;
         cslog() << "NODE> Bootstrap on";
@@ -847,39 +848,6 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage, cs::DataStream& stream)
     }
 
     csmeta(csdetails) << "done";
-}
-
-void Node::createTestTransaction() {
-#if 0
-    csdb::Transaction transaction;
-
-    std::string strAddr1 = "G2GeLfwjg6XuvoWnZ7ssx9EPkEBqbYL3mw3fusgpzoBk";
-    std::string strAddr2 = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
-
-    std::vector<uint8_t> pub_key1;
-    DecodeBase58(strAddr1, pub_key1);   
-    std::vector<uint8_t> pub_key2;
-    DecodeBase58(strAddr2, pub_key2);
-
-    csdb::Address test_address1 = csdb::Address::from_public_key(pub_key1);
-    csdb::Address test_address2 = csdb::Address::from_public_key(pub_key2);
-    transaction.set_target(test_address1);
-    transaction.set_source(test_address2);
-    transaction.set_currency(csdb::Currency(1));
-    transaction.set_amount(csdb::Amount(1, 0));
-    transaction.set_max_fee(csdb::AmountCommission(0.0));
-    transaction.set_counted_fee(csdb::AmountCommission(0.0));
-    cs::TransactionsPacket transactionPack;    
-    for (size_t i = 0; i < 9; ++i) {
-        transaction.set_innerID(i);
-        transactionPack.addTransaction(transaction);
-    }
-
-    transactionPack.makeHash();
-
-    cs::Conveyer::instance().addSeparatePacket(transactionPack);
-    csmeta(csdebug) << "NODE> Sending bad transaction's packet to all";
-#endif
 }
 
 void Node::sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq) {
@@ -3456,6 +3424,10 @@ void Node::onRoundTimeElapsed() {
         for (const auto& item : actualConfidants) {
             out << item; 
         }
+
+        // when we try to start rounds several times, we will not send duplicates
+        auto random = std::random_device{}();
+        out << random;
 
         auto& conveyer = cs::Conveyer::instance();
         conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
