@@ -664,56 +664,61 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
         }
         cTransaction.add_user_field(cs::trx_uf::deploy::Code, serialize(transaction.smartContract));
     }
-    else if (!transaction.userFields.empty()) {
+    else {
         if (!transaction.userFields.empty()) {
-            cs::DataStream stream(transaction.userFields.data(), transaction.userFields.size());
-            cs::Byte flagg;
+            size_t s = transaction.userFields.size();
+            if (s != 0) {
+                cs::Bytes msg;
+                msg.resize(s);
+                std::copy(transaction.userFields.data(), transaction.userFields.data() + s, msg.data());
+                cs::DataStream stream(msg.data(), msg.size());
+                cs::Byte flagg;
+                stream >> flagg;
+                if (flagg) {
+                    cTransaction.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
+                }
+                else {
+                    uint8_t cnt;
+                    stream >> cnt;
+                    while (cnt > 0) {
+                        uint32_t uf_id;
+                        cs::Byte uf_type;
+                        cs::Bytes data;
+                        size_t iValue;
+                        std::string sValue;
+                        int32_t aInteger;
+                        uint64_t aFraction;
+                        stream >> uf_id >> uf_type;
 
-            stream >> flagg;
-            if (flagg) {
-                cTransaction.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
-            }
-            else {
-                uint8_t cnt;
-                stream >> cnt;
-                while (cnt > 0) {
-                    uint32_t uf_id;
-                    cs::Byte uf_type;
-                    cs::Bytes data;
-                    size_t iValue;
-                    std::string sValue;
-                    int32_t aInteger;
-                    uint64_t aFraction;
-                    stream >> uf_id >> uf_type;
+                        switch (uf_type) {
+                        case csdb::UserField::Type::Unknown:
+                            data.clear();
+                            stream >> data;
+                            cTransaction.add_user_field(uf_id, transaction.userFields);
+                            break;
+                        case csdb::UserField::Type::Integer:
+                            iValue = 0;
+                            stream >> iValue;
+                            cTransaction.add_user_field(uf_id, iValue);
+                            break;
+                        case csdb::UserField::Type::String:
+                            sValue.clear();
+                            stream >> sValue;
+                            cTransaction.add_user_field(uf_id, sValue);
+                            break;
+                        case csdb::UserField::Type::Amount:
+                            aInteger = 0;
+                            aFraction = 0;
+                            stream >> aInteger >> aFraction;
+                            cTransaction.add_user_field(uf_id, csdb::Amount{ aInteger, aFraction });
+                            break;
+                        default:
+                            //TODO: add code here to aviod unknownUserfields in transactions
+                            break;
+                        }
 
-                    switch (uf_type) {
-                    case csdb::UserField::Type::Unknown:
-                        data.clear();
-                        stream >> data;
-                        cTransaction.add_user_field(uf_id, transaction.userFields);
-                        break;
-                    case csdb::UserField::Type::Integer:
-                        iValue = 0;
-                        stream >> iValue;
-                        cTransaction.add_user_field(uf_id, transaction.userFields);
-                        break;
-                    case csdb::UserField::Type::String:
-                        sValue.clear();
-                        stream >> sValue;
-                        cTransaction.add_user_field(uf_id, sValue);
-                        break;
-                    case csdb::UserField::Type::Amount:
-                        aInteger = 0;
-                        aFraction = 0;
-                        stream >> aInteger >> aFraction;
-                        cTransaction.add_user_field(uf_id, csdb::Amount{ aInteger, aFraction });
-                        break;
-                    default:
-                        //TODO: add code here to aviod unknownUserfields in transactions
-                        break;
+                        --cnt;
                     }
-
-                    --cnt;
                 }
             }
         }
