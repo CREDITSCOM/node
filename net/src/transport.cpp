@@ -58,7 +58,7 @@ static std::string parseRefusalReason(RegistrationRefuseReasons reason) {
         reasonInfo = "incompatible blockchain version";
         break;
     case RegistrationRefuseReasons::LimitReached:
-        reasonInfo = "maximum connections limit on remote node is reached";
+        reasonInfo = "maximum connections limit has reached";
         break;
     case RegistrationRefuseReasons::BlackListed:
         reasonInfo = "remote node marked you as blacklisted";
