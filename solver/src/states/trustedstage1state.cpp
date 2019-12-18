@@ -135,6 +135,9 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
         bool continueFlag = false;
         size_t tSize = 0;
         for (const auto& element : conveyer.transactionsPacketTable()) {
+            if (conveyer.currentRoundNumber() + 2 >= element.second.expiredRound()) {
+                continue;
+            }
             const cs::PacketsHashes& hashes = roundTable.hashes;
             continueFlag = false;
             if (std::find(hashes.cbegin(), hashes.cend(), element.first) == hashes.cend()) {
