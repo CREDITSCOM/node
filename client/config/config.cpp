@@ -919,7 +919,7 @@ void Config::readConveyerData(const boost::property_tree::ptree& config) {
         return;
     }
 
-    const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_API);
+    const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_CONVEYER);
 
     checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_SEND_CACHE, conveyerData_.sendCacheValue);
     checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE, conveyerData_.maxResendsSendCache);
@@ -959,13 +959,13 @@ void Config::readEventsReportData(const boost::property_tree::ptree& config) {
 template <typename T>
 bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value) {
     if (data.count(param)) {
-        const int readValue = std::is_same_v<T, bool> ? data.get<bool>(param) : data.get<int>(param);
-        const auto max = static_cast<int>(cs::getMax(value));
-        const auto min = static_cast<int>(cs::getMin(value));
+        const auto readValue = std::is_same_v<T, bool> ? data.get<bool>(param) : data.get<T>(param);
+        const auto max = static_cast<T>(cs::getMax(value));
+        const auto min = static_cast<T>(cs::getMin(value));
 
         if (readValue > max || readValue < min) {
-            std::cout << "[warning] Config.ini> Please, check the block: [" << block << "], so that param: [" << param << "],  will be: [" << cs::numeric_cast<int>(min) << ", "
-                      << cs::numeric_cast<int>(max) << "]" << std::endl;
+            std::cout << "[warning] Config.ini> Please, check the block: [" << block << "], so that param: [" << param << "],  will be: [" << cs::numeric_cast<T>(min) << ", "
+                      << cs::numeric_cast<T>(max) << "]" << std::endl;
             return false;
         }
 

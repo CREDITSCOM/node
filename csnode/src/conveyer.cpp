@@ -719,6 +719,11 @@ void cs::ConveyerBase::flushTransactions() {
 
     for (auto& packet : packets) {
         if ((packet.transactionsCount() != 0u)) {
+            // set max round for no setupped packets
+            if (!packet.expiredRound()) {
+                packet.setExpiredRound(round + cs::ConfigHolder::instance().config()->conveyerData().maxPacketLifeTime);
+            }
+
             if (packet.isHashEmpty()) {
                 if (!packet.makeHash()) {
                     cserror() << csname() << "Transaction packet hashing failed";
@@ -731,11 +736,6 @@ void cs::ConveyerBase::flushTransactions() {
                     cswarning() << "Can not sign unsigned transaction packet, drop";
                     break;
                 }
-            }
-
-            // set max round for no setupped packets
-            if (!packet.expiredRound()) {
-                packet.setExpiredRound(round + cs::ConfigHolder::instance().config()->conveyerData().maxPacketLifeTime);
             }
 
             emit packetFlushed(packet);
