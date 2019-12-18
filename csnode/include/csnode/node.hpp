@@ -226,6 +226,8 @@ public:
 
     void updateConfigFromFile();
 
+    bool isBlackListed(const cs::PublicKey pKey);
+
     const cs::PublicKey& getNodeIdKey() const {
         return nodeIdKey_;
     }
@@ -486,6 +488,8 @@ private:
 
     cs::config::Observer& observer_;
     cs::Compressor compressor_;
+
+    std::string kLogPrefix_;
 
     long long deltaTimeSS_{};
 };

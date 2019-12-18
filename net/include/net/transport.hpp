@@ -162,7 +162,6 @@ public:
         return neighbourhood_.getNeighboursLock();
     }
 
-    bool isShouldUpdateNeighbours() const;
     bool isShouldPending(Connection* connection) const;
 
     // thread safe negihbours methods

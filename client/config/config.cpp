@@ -28,7 +28,7 @@
 #include <unistd.h>
 #endif
 
-const NodeVersion NODE_VERSION = 441;
+const NodeVersion NODE_VERSION = 442;
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
@@ -47,6 +47,7 @@ const std::string PARAM_NAME_HOSTS_FILENAME = "hosts_filename";
 const std::string PARAM_NAME_USE_IPV6 = "ipv6";
 const std::string PARAM_NAME_MIN_NEIGHBOURS = "min_neighbours";
 const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
+const std::string PARAM_NAME_RESTRICT_NEIGHBOURS = "restrict_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
 const std::string PARAM_NAME_ROUND_ELAPSE_TIME = "round_elapse_time";
@@ -733,9 +734,11 @@ Config Config::readFromFile(const std::string& fileName) {
 
         result.minNeighbours_ = params.count(PARAM_NAME_MIN_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MIN_NEIGHBOURS) : DEFAULT_MIN_NEIGHBOURS;
         result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) : DEFAULT_MAX_NEIGHBOURS;
+        result.restrictNeighbours_ = params.count(PARAM_NAME_RESTRICT_NEIGHBOURS) ? params.get<bool>(PARAM_NAME_RESTRICT_NEIGHBOURS) : false;
 
-        if (result.maxNeighbours_ > DEFAULT_MAX_NEIGHBOURS) {
-            result.maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS; // see neighbourhood.hpp, some containers are of static size
+        if (result.maxNeighbours_ > Neighbourhood::MaxNeighbours) {
+            // see neighbourhood.hpp, some containers are of static size
+            result.maxNeighbours_ = Neighbourhood::MaxNeighbours;
         }
 
         if (params.count(PARAM_NAME_COMPATIBLE_VERSION)) {
@@ -1072,6 +1075,7 @@ bool operator==(const Config& lhs, const Config& rhs) {
         lhs.ipv6_ == rhs.ipv6_ &&
         lhs.minNeighbours_ == rhs.minNeighbours_ &&
         lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
+        lhs.restrictNeighbours_ == rhs.restrictNeighbours_ &&
         lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
         lhs.symmetric_ == rhs.symmetric_ &&
         lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
