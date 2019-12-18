@@ -53,7 +53,11 @@ public:
         kInsufficientMaxFee,
         kSourceDoesNotExists,
         kTooLarge,
-        kContractViolation
+        kContractViolation,
+        kTransactionProhibited,
+        kNoDelegate,
+        kDifferentDelegatedAmount,
+        kAmountTooLow
     };
 
     static std::string getRejectMessage(RejectCode);

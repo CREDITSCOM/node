@@ -403,13 +403,14 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
             if (ufld.is_valid()) {
                 if (ufld.value<uint64_t>() == 1) {
                     wallData.balance_ -= tr.amount();
-                    wallData.delegats_.emplace(tr.target().public_key(), tr.amount());
+                    wallData.delegats_.emplace(toPublicKey(tr.target()), tr.amount());
                 }
                 else if (ufld.value<uint64_t>() == 2) {
                     wallData.balance_ += tr.amount();
-                    auto it = wallData.delegats_.find(tr.target().public_key());
+                    auto tKey = toPublicKey(tr.target());
+                    auto it = wallData.delegats_.find(tKey);
                     if (it != wallData.delegats_.end()) {
-                        wallData.delegats_.erase(tr.target().public_key());
+                        wallData.delegats_.erase(tKey);
                     }
                     else {
                         cserror() << "WalletCache: no such delegats in sources list 1";
@@ -440,9 +441,10 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
             if (ufld.is_valid()) {
                 if (ufld.value<uint64_t>() == 1) {
                     wallData.balance_ += tr.amount();
-                    auto it = wallData.delegats_.find(tr.target().public_key());
+                    auto tKey = toPublicKey(tr.target());
+                    auto it = wallData.delegats_.find(tKey);
                     if (it != wallData.delegats_.end()) {
-                        wallData.delegats_.erase(tr.target().public_key());
+                        wallData.delegats_.erase(tKey);
                     }
                     else {
                         cserror() << "WalletCache: no such delegats in sources list 2";
@@ -450,7 +452,8 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                 }
                 else if (ufld.value<uint64_t>() == 2) {
                     wallData.balance_ -= tr.amount();
-                    wallData.delegats_.emplace(tr.target().public_key(), tr.amount());
+                    auto tKey = toPublicKey(tr.target());
+                    wallData.delegats_.emplace(tKey, tr.amount());
                 }
                 else {
                     cserror() << "WalletCache: error as source in delegations 2";

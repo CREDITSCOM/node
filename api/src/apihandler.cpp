@@ -685,9 +685,9 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
                         cs::Byte uf_type;
                         cs::Bytes data;
                         size_t iValue;
-                        std::string sValue;
                         int32_t aInteger;
                         uint64_t aFraction;
+                        std::string sValue;
                         stream >> uf_id >> uf_type;
 
                         switch (uf_type) {
@@ -702,8 +702,11 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
                             cTransaction.add_user_field(uf_id, iValue);
                             break;
                         case csdb::UserField::Type::String:
+                            uint32_t sSize;
+                            stream >> sSize;
                             sValue.clear();
-                            stream >> sValue;
+                            sValue += std::string{ stream.data(), sSize };
+                            stream.skip(sSize);
                             cTransaction.add_user_field(uf_id, sValue);
                             break;
                         case csdb::UserField::Type::Amount:
@@ -737,7 +740,8 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
         auto msg = " Node is not syncronized or last round duration is too long.";
         return msg;
     }
-
+    auto bb = cTransaction.to_byte_stream_for_sig();
+    auto st = cs::Utils::byteStreamToHex(bb.data(), bb.size());
     cs::IterValidator::SimpleValidator::RejectCode err;
     csdb::AmountCommission countedFee;
     if (!cs::IterValidator::SimpleValidator::validate(cTransaction, blockchain_, solver_.smart_contracts(), &countedFee, &err)) {

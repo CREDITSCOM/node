@@ -197,7 +197,7 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
     }
 
     if (wallState.balance_ < zeroBalance_ && !SmartContracts::is_new_state(trx)) {
-        csdetails() << kLogPrefix << "transaction[" << trxInd << "] results to potentially negative balance " << wallState.balance_.to_double();
+        csdebug() << kLogPrefix << "transaction[" << trxInd << "] results to potentially negative balance " << wallState.balance_.to_double();
         // will be checked in rejected smarts
         if (context.smart_contracts().is_known_smart_contract(trx.source())) {
             return false;
@@ -205,25 +205,44 @@ bool TransactionsValidator::validateTransactionAsSource(SolverContext& context, 
         // will be validated by graph
         negativeNodes_.push_back(&wallState);
     }
-
     csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegated);
-    if (delegateField.is_valid() && delegateField.value<uint64_t>() == 2) {
+    if (delegateField.is_valid()) {
+        if (trx.amount() < Consensus::MinStakeDelegated) {
+            csdetails() << kLogPrefix << "The delegated amount is too low";
+            return false;
+        }
         WalletsState::WalletData& wallTargetState = walletsState_.getData(trx.target());
-        auto targetPKey = trx.target().public_key();
-        if (wallState.delegats_.find(targetPKey) != wallState.delegats_.end()) {
-            if (wallTargetState.delegated_ != wallState.delegats_.at(targetPKey)) {
-                cserror() << kLogPrefix << "different values in sources and targets delegated records";
+        auto tKey = trx.target().is_public_key() ? trx.target().public_key() : context.blockchain().getCacheUpdater().toPublicKey(trx.target());
+        auto it = wallState.delegats_.find(tKey);
+        if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gate) {
+            if (wallTargetState.delegated_ > csdb::Amount{ 0 }) {
+                csdetails() << kLogPrefix << "Can't delegate to the account that was already delegated";
                 return false;
             }
         }
+        else if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gated_withdraw) {
+            if (it == wallState.delegats_.end()) {
+                csdetails() << kLogPrefix << "No such delegate in account state";
+                return false;
+            }
+            else {
+                if (wallTargetState.delegated_ != wallState.delegats_[tKey]) {
+                    cserror() << kLogPrefix << "The sum of delegation is not properly set to the sender and target accounts";
+                    return false;
+                }
+                else {
+                    if (wallTargetState.delegated_ != trx.amount()) {
+                        csdetails() << kLogPrefix << "The sum of delegation isn't equal the transaction amount";
+                        return false;
+                    }
+                }
+            }
+        }
         else {
-            csdetails() << kLogPrefix << "sender of transaction[" << trxInd << "] didn't delegated resouces to selected target";
+            csdetails() << kLogPrefix << "not specified transaction field";
             return false;
         }
-        
     }
-
-
 
     wallState.trxTail_.push(trx.innerID());
     csdetails() << kLogPrefix << "innerID of " << cs::SmartContracts::to_base58(context.blockchain(), trx.source()) << " <- " << trx.innerID();
