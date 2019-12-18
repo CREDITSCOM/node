@@ -926,10 +926,6 @@ cs::PublicKeys Transport::blackList() const {
     return keys;
 }
 
-bool Transport::isShouldUpdateNeighbours() const {
-    return neighbourhood_.getNeighboursCountWithoutSS() < cs::ConfigHolder::instance().config()->getMinNeighbours();
-}
-
 bool Transport::requireStartNode() {
     return (cs::ConfigHolder::instance().config()->getBootstrapType() == BootstrapType::SignalServer ||
             cs::ConfigHolder::instance().config()->getNodeType() == NodeType::Router);

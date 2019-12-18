@@ -293,18 +293,36 @@ void Neighbourhood::checkSilent() {
 
 void Neighbourhood::checkNeighbours() {
     bool refill_required = false;
-    if (transport_->isShouldUpdateNeighbours()) {
+    if (getNeighboursCountWithoutSS() < cs::ConfigHolder::instance().config()->getMinNeighbours()) {
         refill_required = true;
     }
     else {
         if (transport_->requireStartNode()) {
+            // look-up starter & count neighbours
             bool starter_found = false;
+            // -1 to provide some "rotation" getting free slot
+            const uint32_t reqSlotsAvail = 1;
+            uint32_t max_cnt_nb = cs::ConfigHolder::instance().config()->getMaxNeighbours() - reqSlotsAvail;
+            uint32_t cnt_nb = 0;
+            std::list<Connection::Id> to_drop; // if cnt_nb >= max_neighbours, store extra neighbours to drop them at the end
             forEachNeighbour([&](ConnectionPtr ptr) {
                 if (ptr->isSignal) {
                     starter_found = true;
                     refill_required = !ptr->connected;
                 }
+                else {
+                    if (++cnt_nb > max_cnt_nb) {
+                        to_drop.push_back(ptr->id);
+                    }
+                }
             });
+            if (!to_drop.empty()) {
+                // drop ending connections to restrict total count
+                cslog() << "Drop " << to_drop.size() << " connections to provide " << reqSlotsAvail << " available slot(s)";
+                for (const auto& id : to_drop) {
+                    dropConnection(id);
+                }
+            }
             if (!starter_found) {
                 refill_required = true;
             }
