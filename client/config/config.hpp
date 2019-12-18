@@ -35,6 +35,7 @@ const double DEFAULT_BROADCAST_FILLING = 100 / 3.; // 33.3%
 
 const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;             // rounds
 const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
+const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 20;          // rounds
 
 [[maybe_unused]]
 const uint8_t DELTA_ROUNDS_VERIFY_NEW_SERVER = 100;
@@ -92,6 +93,7 @@ struct ApiData {
 struct ConveyerData {
     size_t sendCacheValue = DEFAULT_CONVEYER_SEND_CACHE_VALUE;
     size_t maxResendsSendCache = DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE;
+    size_t maxPacketLifeTime = DEFAULT_CONVEYER_MAX_PACKET_LIFETIME;
 };
 
 struct EventsReportData {

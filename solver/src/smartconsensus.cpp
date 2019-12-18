@@ -756,7 +756,7 @@ void SmartConsensus::sendFinalTransactionSet() {
 
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " adding separate package with "
         << finalSmartTransactionPack_.signatures().size() << " signatures";
-    conv.addSeparatePacket(finalSmartTransactionPack_);
+    conv.addContractPacket(finalSmartTransactionPack_);
 
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " ==============================================> SEND RESULT TO CONVEYER, packet hash "

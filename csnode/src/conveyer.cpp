@@ -9,6 +9,7 @@
 #include <csnode/datastream.hpp>
 #include <csnode/sendcachedata.hpp>
 
+#include <solver/consensus.hpp>
 #include <solver/smartcontracts.hpp>
 
 #include <lib/system/hash.hpp>
@@ -72,6 +73,7 @@ cs::ConveyerBase::ConveyerBase() {
     pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
 
     std::call_once(::onceFlag, &::setup, this);
+    cs::Connector::connect(&roundChanged, this, &cs::Conveyer::onRoundChanged);
 }
 
 void cs::ConveyerBase::setPrivateKey(const cs::PrivateKey& privateKey) {
@@ -112,12 +114,14 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
     }
 }
 
-void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
+void cs::ConveyerBase::addContractPacket(cs::TransactionsPacket& packet) {
     cs::TransactionsPacketHash hash = packet.hash();
     csdebug() << csname() << "Add separate transactions packet to conveyer, transactions " << packet.transactionsCount();
     cs::Lock lock(sharedMutex_);
 
     if (auto iterator = pimpl_->packetsTable.find(hash); iterator == pimpl_->packetsTable.end()) {
+        packet.setExpiredRound(currentRoundNumber() + Consensus::MaxRoundsCancelContract);
+
         // add current packet
         pimpl_->packetQueue.push(packet);
     }
@@ -127,6 +131,14 @@ void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
 }
 
 void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packet) {
+    auto round = currentRoundNumber();
+
+    if (round > packet.expiredRound()) {
+        csdebug() << csname() << "Ignore expired packet, expired round: " << packet.expiredRound() << ", current round " <<
+                     round << "hash " << packet.hash().toString();
+        return;
+    }
+
     cs::TransactionsPacketHash hash = packet.hash();
     cs::Lock lock(sharedMutex_);
 
@@ -721,6 +733,11 @@ void cs::ConveyerBase::flushTransactions() {
                 }
             }
 
+            // set max round for no setupped packets
+            if (!packet.expiredRound()) {
+                packet.setExpiredRound(round + cs::ConfigHolder::instance().config()->conveyerData().maxPacketLifeTime);
+            }
+
             emit packetFlushed(packet);
 
             addPacketToMeta(round, packet);
@@ -728,6 +745,37 @@ void cs::ConveyerBase::flushTransactions() {
     }
 
     checkSendCache();
+}
+
+void cs::ConveyerBase::onRoundChanged(cs::RoundNumber round) {
+    cs::Packets expiredPackets;
+
+    {
+        cs::SharedLock lock(sharedMutex_);
+
+        for (const auto& element : pimpl_->packetsTable) {
+            if (element.second.expiredRound() < round) {
+                expiredPackets.push_back(element.second);
+            }
+        }
+    }
+
+    if (expiredPackets.empty()) {
+        return;
+    }
+
+    {
+        cs::Lock lock(sharedMutex_);
+
+        for (const auto& packet : expiredPackets) {
+            const auto& hash = packet.hash();
+
+            pimpl_->packetsTable.erase(hash);
+            removeHashFromSendCache(hash);
+
+            emit packetExpired(packet);
+        }
+    }
 }
 
 void cs::ConveyerBase::addPacketToMeta(cs::RoundNumber round, cs::TransactionsPacket& packet) {

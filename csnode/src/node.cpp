@@ -918,7 +918,7 @@ void Node::createTestTransaction() {
 
     transactionPack.makeHash();
 
-    cs::Conveyer::instance().addSeparatePacket(transactionPack);
+    cs::Conveyer::instance().addContractPacket(transactionPack);
     csmeta(csdebug) << "NODE> Sending bad transaction's packet to all";
 #endif
 }
@@ -2961,7 +2961,6 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
 
     // create pool by previous round, then change conveyer state.
     getCharacteristic(rPackage);
-
 
     try {
         lastRoundPackageTime_ = std::stoull(cs::Utils::currentTimestamp());
