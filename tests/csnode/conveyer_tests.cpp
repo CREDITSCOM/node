@@ -293,8 +293,7 @@ TEST(Conveyer, TestSendCache) {
     ASSERT_EQ(counter, 2);
 
     // try to resend
-    const cs::RoundNumber testRound = 100;
-
+    const cs::RoundNumber testRound = 15;
     conveyer.setRound(testRound);
 
     // add new ones
@@ -332,6 +331,11 @@ TEST(Conveyer, TestSendCache) {
     ASSERT_EQ(counter, 5);
     ASSERT_EQ(conveyer.sendCacheSize(), 1);
     ASSERT_EQ(pool->transactions().size(), 3);
+
+    //after round changed all expired packets should be removed from table and send cache
+    conveyer.setRound(100);
+
+    ASSERT_EQ(conveyer.sendCacheSize(), 0);
 }
 
 TEST(Conveyer, TestRoundChangeSignal) {
@@ -369,6 +373,7 @@ static Config setupConfigToTestMaxResends() {
     ConveyerData conveyerData;
     conveyerData.maxResendsSendCache = cs::Random::generateValue<size_t>(10, 30);
     conveyerData.sendCacheValue = cs::Random::generateValue<size_t>(10, 30);
+    conveyerData.maxPacketLifeTime = conveyerData.maxResendsSendCache * conveyerData.sendCacheValue;
 
     return Config { conveyerData };
 }
@@ -436,6 +441,7 @@ static Config setupConfigToTestZeroMaxResends() {
     ConveyerData conveyerData;
     conveyerData.maxResendsSendCache = 0;
     conveyerData.sendCacheValue = cs::Random::generateValue<size_t>(10, 30);
+    conveyerData.maxPacketLifeTime = conveyerData.sendCacheValue * 100;
 
     return Config { conveyerData };
 }
@@ -482,4 +488,33 @@ TEST(Conveyer, TestMaxResendCountZero) {
 
     ASSERT_EQ(conveyer.sendCacheSize(), 1);
     ASSERT_EQ(conveyer.packetsTableSize(), 1);
+}
+
+TEST(Conveyer, TestExpiredPackets) {
+    size_t count = 0;
+
+    ConveyerTest conveyer{};
+    conveyer.setPrivateKey(generatePrivateKey());
+    conveyer.setRound(0);
+
+    cs::Connector::connect(&conveyer.packetExpired, [&](const auto&) {
+        count++;
+    });
+
+    auto packet = CreateTestPacket(40);
+
+    for (const auto& transaction : packet.transactions()) {
+        conveyer.addTransaction(transaction);
+    }
+
+    conveyer.flushTransactions();
+
+    ASSERT_EQ(conveyer.sendCacheSize(), 1);
+
+    // all packets should be expired
+    conveyer.setRound(cs::ConfigHolder::instance().config()->conveyerData().maxPacketLifeTime + 1);
+
+    ASSERT_EQ(conveyer.packetsTableSize(), 0);
+    ASSERT_EQ(conveyer.sendCacheSize(), 0);
+    ASSERT_EQ(count, 1);
 }
