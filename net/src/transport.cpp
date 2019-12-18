@@ -58,7 +58,7 @@ static std::string parseRefusalReason(RegistrationRefuseReasons reason) {
         reasonInfo = "incompatible blockchain version";
         break;
     case RegistrationRefuseReasons::LimitReached:
-        reasonInfo = "maximum connections limit on remote node is reached";
+        reasonInfo = "maximum connections limit has reached";
         break;
     case RegistrationRefuseReasons::BlackListed:
         reasonInfo = "remote node marked you as blacklisted";
@@ -297,6 +297,7 @@ void Transport::deliverDirect(const Packet* pack, const uint32_t size, Connectio
         for (auto ptr = pack; ptr != packEnd; ++ptr) {
             neighbourhood_.registerDirect(ptr, conn);
             sendDirect(ptr, **conn);
+            sendDirect(ptr, **conn);
         }
     }
 }
@@ -373,7 +374,7 @@ std::pair< uint32_t, std::list<int> > Transport::deliverConfidants(const Packet*
     {
         cs::Lock lock(aLock_);
         for (const auto& pkey: list) {
-            if (i != except) {
+            if (i != except && !isBlackListed(pkey)) {
                 auto res = addresses_.find(pkey);
                 if (res == addresses_.end()) {
                     result.second.push_back(i);
@@ -523,7 +524,7 @@ void Transport::refillNeighbourhood() {
     if (bootstrap == BootstrapType::IpList) {
         for (auto& ep : cs::ConfigHolder::instance().config()->getIpList()) {
             if (!neighbourhood_.canHaveNewConnection()) {
-                cswarning() << "Connections limit reached";
+                cswarning() << "Connections limit has reached";
                 break;
             }
 
@@ -599,6 +600,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
             }
 
             if (!neighbourhood_.canHaveNewConnection()) {
+                // static buffers size exceeded
                 break;
             }
         }
@@ -1139,6 +1141,20 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         return false;
     }
 
+    if (!std::equal(conn.key.cbegin(), conn.key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
+        EndpointData epd;
+        epd.ip = conn.getOut().address();
+        epd.ipSpecified = true;
+        epd.port = conn.getOut().port();
+        storeAddress(conn.key, epd);
+    }
+
+    if (!neighbourhood_.canAddNeighbour()) {
+        cslog() << "Connections limit has reached, ignore registration request from " << conn.getOut();
+        sendRegistrationRefusal(conn, RegistrationRefuseReasons::LimitReached);
+        return true;
+    }
+
     neighbourhood_.gotRegistration(std::move(conn), sender);
     return true;
 }
@@ -1156,6 +1172,13 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, Remote
     }
 
     neighbourhood_.gotConfirmation(myCId, realCId, task->sender, key, sender);
+    if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
+        EndpointData epd;
+        epd.ip = task->sender.address();
+        epd.ipSpecified = true;
+        epd.port = task->sender.port();
+        storeAddress(key, epd);
+    }
     return true;
 }
 
@@ -1176,6 +1199,8 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
     switch (reason) {
     case RegistrationRefuseReasons::BadClientVersion:
     case RegistrationRefuseReasons::BlackListed:
+    case RegistrationRefuseReasons::LimitReached:
+    case RegistrationRefuseReasons::IncompatibleBlockchain:
         neighbourhood_.dropConnection(id);
         break;
 
@@ -1335,7 +1360,6 @@ bool Transport::gotSSNewFriends()
         return false;
     }
 
-    uint32_t ctr = neighbourhood_.size();
     uint8_t numCirc{ 0 };
     iPackStream_ >> numCirc;
 
@@ -1350,10 +1374,8 @@ bool Transport::gotSSNewFriends()
             return false;
         }
 
-        ++ctr;
-
         if (key != cs::ConfigHolder::instance().config()->getMyPublicKey()) {
-            if (ctr <= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
+            if (neighbourhood_.canAddNeighbour()) {
                 neighbourhood_.establishConnection(net_->resolve(ep));
             }
             storeAddress(key, ep);
@@ -1621,18 +1643,13 @@ bool Transport::gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr& sender) {
     return true;
 }
 
-// Turn on testing blockchain ID in PING packets to prevent nodes from confuse alien ones
-#define PING_WITH_BCHID
-
 void Transport::sendPingPack(const Connection& conn) {
     cs::Sequence seq = node_->getBlockChain().getLastSeq();
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
     oPackStream_ << NetworkCommand::Ping << conn.id << seq << myPublicKey_;
 
-#if defined(PING_WITH_BCHID)
     oPackStream_ << node_->getBlockChain().uuid();
-#endif
 
     if (!cs::ConfigHolder::instance().config()->isCompatibleVersion()) {
         oPackStream_ << NODE_VERSION;
@@ -1649,7 +1666,6 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
     cs::PublicKey publicKey;
     iPackStream_ >> id >> lastSeq >> publicKey;
 
-#if defined(PING_WITH_BCHID)
     uint64_t remoteUuid = 0;
     iPackStream_ >> remoteUuid;
 
@@ -1660,7 +1676,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
             return false;   // remote is incompatible
         }
     }
-#endif
+
     if (!cs::ConfigHolder::instance().config()->isCompatibleVersion() && iPackStream_.end()) {
         neighbourhood_.gotBadPing(id);
         return false;
@@ -1695,12 +1711,13 @@ bool Transport::isOwnNodeTrusted() const {
 bool Transport::gotSSIntroduceConsensusReply()
 {
     csdebug() << "Get confidants from start node";
-    if (ssStatus_ != SSBootstrapStatus::Complete) {
-        return false;
-    }
+    //if (ssStatus_ != SSBootstrapStatus::Complete) {
+    //    return false;
+    //}
 
     uint8_t numCirc{ 0 };
     iPackStream_ >> numCirc;
+    csdebug() << "Total confidants count " << uint32_t(numCirc) << ':';
 
     for (uint8_t i = 0; i < numCirc; ++i) {
         EndpointData ep;
@@ -1710,8 +1727,10 @@ bool Transport::gotSSIntroduceConsensusReply()
         iPackStream_ >> key >> ep.ip >> ep.port;
 
         if (!iPackStream_.good()) {
+            csdebug() << "Packet with confidants is broken";
             return false;
         }
+        csdebug() << '[' << uint32_t(i) << "] " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " - " << ep.ip << ':' << ep.port;
 
         if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
             storeAddress(key, ep);

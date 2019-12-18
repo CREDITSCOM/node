@@ -808,7 +808,7 @@ void SmartConsensus::gotSmartStageRequest(uint8_t msgType, uint64_t smartID, uin
                 }
                 else {
                     pnode_->sendSmartStageReply(smartStageTwoStorage_.at(requiredNumber).message, smartStageTwoStorage_.at(requiredNumber).signature,
-                                                MsgTypes::FirstSmartStage, requester);
+                                                MsgTypes::SecondSmartStage, requester);
                 }
             }
             break;
@@ -819,7 +819,7 @@ void SmartConsensus::gotSmartStageRequest(uint8_t msgType, uint64_t smartID, uin
                 }
                 else {
                     pnode_->sendSmartStageReply(smartStageThreeStorage_.at(requiredNumber).message, smartStageThreeStorage_.at(requiredNumber).signature,
-                                                MsgTypes::FirstSmartStage, requester);
+                                                MsgTypes::ThirdSmartStage, requester);
                 }
             }
             break;

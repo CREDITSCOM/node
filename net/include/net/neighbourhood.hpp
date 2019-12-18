@@ -202,6 +202,8 @@ public:
 
     void registerDirect(const Packet*, ConnectionPtr);
 
+    bool canAddNeighbour() const;
+
 private:
     struct BroadPackInfo {
         Packet pack;
@@ -233,6 +235,8 @@ private:
 
     void connectNode(RemoteNodePtr, ConnectionPtr);
     void disconnectNode(ConnectionPtr*);
+
+    bool enoughConnections() const;
 
     Transport* transport_;
 
