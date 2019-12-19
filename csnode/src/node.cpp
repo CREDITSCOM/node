@@ -75,7 +75,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
-    cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
+    //cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
 
     setupNextMessageBehaviour();
 
@@ -960,7 +960,7 @@ void Node::createTestTransaction(int tType) {
     cs::Conveyer::instance().addContractPacket(transactionPack);
     csmeta(csdebug) << "NODE> Sending bad transaction's packet to all";
 #else
-    csunused(tType)
+    csunused(tType);
 #endif
 }
 
