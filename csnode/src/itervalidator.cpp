@@ -290,7 +290,7 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
         case kNoDelegate:
             return "No such delegate in your list";
         case kDifferentDelegatedAmount:
-            return "This account has another delefation amount from your account";
+            return "This account has another delegation amount from your account";
         case kAmountTooLow:
             return "The amount of thansaction is too low";
         default :

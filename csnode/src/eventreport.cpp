@@ -37,6 +37,16 @@ std::string Reject::to_string(Reason r) {
         return "CompleteReject";
     case LimitExceeded:
         return "LimitExceeded";
+    case AmountTooLow:
+        return "AmountTooLow";
+    case AlreadyDelegated:
+        return "AlreadyDelegated";
+    case IncorrectTarget:
+        return "IncorrectTarget";
+    case MalformedDelegation:
+        return "MalformedDelegation";
+    case IncorrectSum:
+        return "IncorrectSum";
     default:
         break;
     }

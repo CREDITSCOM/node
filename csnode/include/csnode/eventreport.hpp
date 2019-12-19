@@ -36,7 +36,15 @@ struct Reject {
         EmittedOutOfFee,
         CompleteReject,
 
-        LimitExceeded
+        LimitExceeded,
+
+        // delegation related
+        
+        AmountTooLow,
+        AlreadyDelegated,
+        IncorrectTarget,
+        MalformedDelegation,
+        IncorrectSum,
     };
 
     static std::string to_string(Reason r);

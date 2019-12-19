@@ -220,7 +220,7 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
     if (delegateField.is_valid()) {
         if (trx.amount() < Consensus::MinStakeDelegated) {
             csdetails() << kLogPrefix << "The delegated amount is too low";
-            return false;
+            return Reject::Reason::AmountTooLow;
         }
         WalletsState::WalletData& wallTargetState = walletsState_.getData(trx.target());
         auto tKey = trx.target().is_public_key() ? trx.target().public_key() : context.blockchain().getCacheUpdater().toPublicKey(trx.target());
@@ -228,30 +228,30 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
         if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gate) {
             if (wallTargetState.delegated_ > csdb::Amount{ 0 }) {
                 csdetails() << kLogPrefix << "Can't delegate to the account that was already delegated";
-                return false;
+                return Reject::Reason::AlreadyDelegated;
             }
         }
         else if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gated_withdraw) {
             if (it == wallState.delegats_.end()) {
                 csdetails() << kLogPrefix << "No such delegate in account state";
-                return false;
+                return Reject::Reason::IncorrectTarget;
             }
             else {
                 if (wallTargetState.delegated_ != wallState.delegats_[tKey]) {
                     cserror() << kLogPrefix << "The sum of delegation is not properly set to the sender and target accounts";
-                    return false;
+                    return Reject::Reason::MalformedDelegation;
                 }
                 else {
                     if (wallTargetState.delegated_ != trx.amount()) {
                         csdetails() << kLogPrefix << "The sum of delegation isn't equal the transaction amount";
-                        return false;
+                        return Reject::Reason::IncorrectSum;
                     }
                 }
             }
         }
         else {
             csdetails() << kLogPrefix << "not specified transaction field";
-            return false;
+            return Reject::Reason::MalformedTransaction;
         }
     }
 

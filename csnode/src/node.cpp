@@ -959,6 +959,8 @@ void Node::createTestTransaction(int tType) {
 
     cs::Conveyer::instance().addContractPacket(transactionPack);
     csmeta(csdebug) << "NODE> Sending bad transaction's packet to all";
+#else
+    csunused(tType)
 #endif
 }
 
