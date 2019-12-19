@@ -49,8 +49,9 @@ public:
     void sendMulticast(Packet&&, const std::vector<cs::PublicKey>&);
     void sendBroadcast(Packet&&);
 
-    void ban(const cs::PublicKey&) {}
-    void revertBan(const cs::PublicKey&) {}
+    void ban(const cs::PublicKey&);
+    void revertBan(const cs::PublicKey&);
+    void clearBanList();
 
     // neighbours interface
     void setPermanentNeighbours(const std::vector<cs::PublicKey>&);
