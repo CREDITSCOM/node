@@ -111,7 +111,8 @@ TransactionsPacket::TransactionsPacket(TransactionsPacket&& packet)
 : hash_(std::move(packet.hash_))
 , transactions_(std::move(packet.transactions_))
 , stateTransactions_(std::move(packet.stateTransactions_))
-, signatures_(std::move(packet.signatures_)) {
+, signatures_(std::move(packet.signatures_))
+, expiredRound_(packet.expiredRound_) {
     packet.hash_ = TransactionsPacketHash();
     packet.transactions_.clear();
 }
@@ -125,6 +126,7 @@ TransactionsPacket& TransactionsPacket::operator=(const TransactionsPacket& pack
     transactions_ = packet.transactions_;
     signatures_ = packet.signatures_;
     stateTransactions_ = packet.stateTransactions_;
+    expiredRound_ = packet.expiredRound_;
 
     return *this;
 }
