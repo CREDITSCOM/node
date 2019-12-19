@@ -242,9 +242,13 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
     }
 
     for (auto& state : validNewStates_) {
+        if (!state.second) {
+            continue;
+        }
         csdb::Transaction initTransaction = SmartContracts::get_transaction(context.blockchain(), trxs[state.first]);
+        const csdb::Address contract_abs_addr = smarts.absolute_address(initTransaction.target());
         auto it = std::find_if(rejectedSmarts.cbegin(), rejectedSmarts.cend(),
-                               [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == smarts.absolute_address(initTransaction.target())); });
+                               [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == contract_abs_addr); });
         if (it != rejectedSmarts.end()) {
             WalletsState::WalletData& wallState = walletsState_.getData(it->first.source());
             wallState.balance_ += initTransaction.amount();
@@ -253,6 +257,7 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
             }
             else {
                 state.second = false;
+                saveNewState(contract_abs_addr, state.first, Reject::Reason::NegativeResult);
             }
         }
     }

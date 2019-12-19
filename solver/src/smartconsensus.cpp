@@ -717,6 +717,7 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
             csdebug() << kLogPrefix << "contract state is too large, size is " << state_size << "b, not included in package";
         }
     }
+    finalSmartTransactionPack_.setExpiredRound(cs::Conveyer::instance().currentRoundNumber() + Consensus::MaxRoundsCancelContract);
     finalSmartTransactionPack_.makeHash();
 }
 

@@ -120,8 +120,6 @@ void cs::ConveyerBase::addContractPacket(cs::TransactionsPacket& packet) {
     cs::Lock lock(sharedMutex_);
 
     if (auto iterator = pimpl_->packetsTable.find(hash); iterator == pimpl_->packetsTable.end()) {
-        packet.setExpiredRound(currentRoundNumber() + Consensus::MaxRoundsCancelContract);
-
         // add current packet
         pimpl_->packetQueue.push(packet);
     }
