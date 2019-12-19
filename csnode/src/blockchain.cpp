@@ -967,7 +967,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         csdebug() << "----------------------------------------------------------------------------------";
     }
 
-    printWalletCaches();
+    //printWalletCaches();
 
     {
         cs::Lock lock(dbLock_);
