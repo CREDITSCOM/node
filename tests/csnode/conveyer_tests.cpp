@@ -293,7 +293,7 @@ TEST(Conveyer, TestSendCache) {
     ASSERT_EQ(counter, 2);
 
     // try to resend
-    const cs::RoundNumber testRound = 15;
+    const cs::RoundNumber testRound = DEFAULT_CONVEYER_SEND_CACHE_VALUE + 1;
     conveyer.setRound(testRound);
 
     // add new ones

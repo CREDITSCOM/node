@@ -33,9 +33,9 @@ const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
 const double DEFAULT_BROADCAST_FILLING = 100 / 3.; // 33.3%
 
-const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;             // rounds
 const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
-const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 20;          // rounds
+const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 10;          // rounds
+const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = (DEFAULT_CONVEYER_MAX_PACKET_LIFETIME/2 > 10) ? 10 : DEFAULT_CONVEYER_MAX_PACKET_LIFETIME/2;              // rounds
 
 [[maybe_unused]]
 const uint8_t DELTA_ROUNDS_VERIFY_NEW_SERVER = 100;
