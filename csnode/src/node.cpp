@@ -148,6 +148,8 @@ bool Node::init() {
 
     initCurrentRP();
 
+    EventReport::sendRunningStatus(*this, Running::Status::Run);
+
     return true;
 }
 
@@ -163,6 +165,9 @@ void Node::run() {
 }
 
 void Node::stop() {
+
+    EventReport::sendRunningStatus(*this, Running::Status::Stop);
+
     good_ = false;
 
     transport_->stop();
@@ -1027,7 +1032,7 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                 std::for_each(resume.cbegin(), resume.cend(), [&](const auto& item) {
                     cnt += item.second;
                     os_rej << Reject::to_string(item.first) << " (" << item.second << ") ";
-                });
+                    });
                 csevent() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os_rej.str()
                     << " on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
@@ -1051,7 +1056,8 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                 }
             }
             else {
-                csevent() << log_prefix << "failed to parse item " << list_action << " black list";
+                csevent() << log_prefix << "failed to parse item " << list_action << " black list from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::AlarmInvalidBlock) {
@@ -1063,7 +1069,8 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                     << " is alarmed by " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
             else {
-                csevent() << log_prefix << "failed to parse invalid block alarm report";
+                csevent() << log_prefix << "failed to parse invalid block alarm report from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::ConsensusSilent || event_id == EventReport::Id::ConsensusLiar) {
@@ -1075,7 +1082,8 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                     << " in round consensus";
             }
             else {
-                csevent() << log_prefix << "failed to parse invalid round consensus " << problem_name << " report";
+                csevent() << log_prefix << "failed to parse invalid round consensus " << problem_name << " report from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::ConsensusFailed) {
@@ -1107,21 +1115,35 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                 }
             }
             else {
-                csevent() << log_prefix << "failed to parse invalid contract consensus " << problem_name << " report";
+                csevent() << log_prefix << "failed to parse invalid contract consensus " << problem_name << " report from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::RejectContractExecution) {
             cs::SmartContractRef ref;
             Reject::Reason reason;
             if (EventReport::parseRejectContractExecution(bin_pack, ref, reason)) {
-                csevent() << log_prefix << "execution of " << ref << " is rejected, " << Reject::to_string(reason);
+                csevent() << log_prefix << "execution of " << ref << " is rejected by "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << ", " << Reject::to_string(reason);
             }
             else {
-                csevent() << log_prefix << "failed to parse invalid contract execution reject";
+                csevent() << log_prefix << "failed to parse invalid contract execution reject from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::Bootstrap) {
-            csevent() << log_prefix << "bootsrap round";
+            csevent() << log_prefix << "bootsrap round on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+        }
+        else if (event_id == EventReport::RunningStatus) {
+            Running::Status status;
+            if (EventReport::parseRunningStatus(bin_pack, status)) {
+                csevent() << log_prefix << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+                    << " updated status to " << Running::to_string(status);
+            }
+            else {
+                csevent() << log_prefix << "failed to parse invalid running status from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+            }
         }
     }
     else {
