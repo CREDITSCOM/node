@@ -33,8 +33,7 @@ const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
 const uint32_t DEFAULT_STORE_BLOCK_ELAPSE_TIME = 1000 * 40; // ms
 
-const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;             // rounds
-const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
+const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 10; // rounds
 
 using Port = short unsigned;
 
@@ -80,8 +79,7 @@ struct ApiData {
 };
 
 struct ConveyerData {
-    size_t sendCacheValue = DEFAULT_CONVEYER_SEND_CACHE_VALUE;
-    size_t maxResendsSendCache = DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE;
+    size_t maxPacketLifeTime = DEFAULT_CONVEYER_MAX_PACKET_LIFETIME;
 };
 
 struct EventsReportData {

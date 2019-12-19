@@ -6,11 +6,10 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include <lib/system/signals.hpp>
 #include <networkcommands.hpp>
 #include <packet.hpp>
 
-#include <lib/system/common.hpp>
+#include <lib/system/signals.hpp>
 
 class Node;
 class Transport;

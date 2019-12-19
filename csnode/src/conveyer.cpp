@@ -33,9 +33,6 @@ struct cs::ConveyerBase::Impl {
     // current round transactions packets storage
     cs::TransactionsPacketTable packetsTable;
 
-    // cached sended transactions packets
-    cs::TransactionPacketSendCache sendPacketsCache;
-
     // main conveyer meta data
     cs::ConveyerMetaStorage metaStorage;
 
@@ -72,6 +69,7 @@ cs::ConveyerBase::ConveyerBase() {
     pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
 
     std::call_once(::onceFlag, &::setup, this);
+    cs::Connector::connect(&roundChanged, this, &cs::Conveyer::onRoundChanged);
 }
 
 void cs::ConveyerBase::setPrivateKey(const cs::PrivateKey& privateKey) {
@@ -112,7 +110,7 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
     }
 }
 
-void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
+void cs::ConveyerBase::addContractPacket(cs::TransactionsPacket& packet) {
     cs::TransactionsPacketHash hash = packet.hash();
     csdebug() << csname() << "Add separate transactions packet to conveyer, transactions " << packet.transactionsCount();
     cs::Lock lock(sharedMutex_);
@@ -127,6 +125,14 @@ void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
 }
 
 void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packet) {
+    auto round = currentRoundNumber();
+
+    if (round > packet.expiredRound()) {
+        csdebug() << csname() << "Ignore expired packet, expired round: " << packet.expiredRound() << ", current round " <<
+                     round << "hash " << packet.hash().toString();
+        return;
+    }
+
     cs::TransactionsPacketHash hash = packet.hash();
     cs::Lock lock(sharedMutex_);
 
@@ -252,7 +258,7 @@ void cs::ConveyerBase::setTable(const RoundTable& table) {
         }
     }
 
-    csmeta(csdebug) << "done, current table size " << pimpl_->packetsTable.size() << ", send cache size " << pimpl_->sendPacketsCache.size();
+    csmeta(csdebug) << "done, current table size " << pimpl_->packetsTable.size();
 }
 
 const cs::RoundTable& cs::ConveyerBase::currentRoundTable() const {
@@ -660,11 +666,6 @@ size_t cs::ConveyerBase::packetQueueTransactionsCount() const {
     return count;
 }
 
-size_t cs::ConveyerBase::sendCacheSize() const {
-    cs::SharedLock lock(sharedMutex_);
-    return pimpl_->sendPacketsCache.size();
-}
-
 size_t cs::ConveyerBase::packetsTableSize() const {
     cs::SharedLock lock(sharedMutex_);
     return pimpl_->packetsTable.size();
@@ -672,31 +673,6 @@ size_t cs::ConveyerBase::packetsTableSize() const {
 
 std::unique_lock<cs::SharedMutex> cs::ConveyerBase::lock() const {
     return std::unique_lock<cs::SharedMutex>(sharedMutex_);
-}
-
-bool cs::ConveyerBase::addRejectedHashToCache(const cs::TransactionsPacketHash& hash) {
-    cs::Lock lock(sharedMutex_);
-
-    if (isHashAtSendCache(hash)) {
-        return false;
-    }
-
-    // look all meta storage
-    auto possiblePacket = findPacketAtMeta(hash);
-
-    if (!possiblePacket.has_value()) {
-        return false;
-    }
-
-    auto packet = std::move(possiblePacket).value();
-
-    pimpl_->sendPacketsCache.emplace(currentRoundNumber(), hash);
-
-    if (!pimpl_->packetsTable.count(hash)) {
-        pimpl_->packetsTable.emplace(hash, std::move(packet));
-    }
-
-    return true;
 }
 
 void cs::ConveyerBase::flushTransactions() {
@@ -707,6 +683,11 @@ void cs::ConveyerBase::flushTransactions() {
 
     for (auto& packet : packets) {
         if ((packet.transactionsCount() != 0u)) {
+            // set max round for no setupped packets
+            if (!packet.expiredRound()) {
+                packet.setExpiredRound(round + cs::ConfigHolder::instance().config()->conveyerData().maxPacketLifeTime);
+            }
+
             if (packet.isHashEmpty()) {
                 if (!packet.makeHash()) {
                     cserror() << csname() << "Transaction packet hashing failed";
@@ -723,19 +704,43 @@ void cs::ConveyerBase::flushTransactions() {
 
             emit packetFlushed(packet);
 
-            addPacketToMeta(round, packet);
+            addPacketToMeta(packet);
+        }
+    }
+}
+
+void cs::ConveyerBase::onRoundChanged(cs::RoundNumber round) {
+    cs::Packets expiredPackets;
+
+    {
+        cs::SharedLock lock(sharedMutex_);
+
+        for (const auto& element : pimpl_->packetsTable) {
+            if (element.second.expiredRound() < round) {
+                expiredPackets.push_back(element.second);
+            }
         }
     }
 
-    checkSendCache();
+    if (expiredPackets.empty()) {
+        return;
+    }
+
+    {
+        cs::Lock lock(sharedMutex_);
+
+        for (const auto& packet : expiredPackets) {
+            const auto& hash = packet.hash();
+
+            pimpl_->packetsTable.erase(hash);
+
+            emit packetExpired(packet);
+        }
+    }
 }
 
-void cs::ConveyerBase::addPacketToMeta(cs::RoundNumber round, cs::TransactionsPacket& packet) {
+void cs::ConveyerBase::addPacketToMeta(cs::TransactionsPacket& packet) {
     auto hash = packet.hash();
-
-    if (!isHashAtSendCache(hash)) {
-        pimpl_->sendPacketsCache.emplace(round, cs::SendCacheData { hash });
-    }
 
     if (!isPacketAtCache(packet)) {
         pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
@@ -775,8 +780,6 @@ void cs::ConveyerBase::removeHashesFromTable(const cs::PacketsHashes& hashes) {
     for (const auto& hash : hashes) {
         csdetails() << csname() << " remove hash " << hash.toString();
         pimpl_->packetsTable.erase(hash);
-
-        removeHashFromSendCache(hash);
     }
 }
 
@@ -811,118 +814,6 @@ bool cs::ConveyerBase::isPacketAtCache(const cs::TransactionsPacket& packet) {
     }
 
     return false;
-}
-
-bool cs::ConveyerBase::isHashAtSendCache(cs::RoundNumber round, const cs::TransactionsPacketHash& hash) {
-    auto [begin, end] = pimpl_->sendPacketsCache.equal_range(round);
-
-    for (; begin != end; ++begin) {
-        if (begin->second.hash() == hash) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool cs::ConveyerBase::isHashAtSendCache(const cs::TransactionsPacketHash& hash) {
-    for (const auto& pair : pimpl_->sendPacketsCache) {
-        if (pair.second.hash() == hash) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-void cs::ConveyerBase::checkSendCache() {
-    if (pimpl_->sendPacketsCache.empty()) {
-        return;
-    }
-
-    auto round = currentRoundNumber();
-    auto sendCacheValue = cs::ConfigHolder::instance().config()->conveyerData().sendCacheValue;
-    auto maxResends = cs::ConfigHolder::instance().config()->conveyerData().maxResendsSendCache;
-
-    if (round < sendCacheValue) {
-        return;
-    }
-
-    auto delta = round - sendCacheValue;
-
-    if (round < delta) {
-        return;
-    }
-
-    auto iterator = pimpl_->sendPacketsCache.upper_bound(delta);
-
-    std::vector<cs::SendCacheData> hashesToSend;
-    PacketsHashes notFoundHashes;
-    PacketsHashes hashesToRemove;
-
-    // add all hashes that should be resend or to remove
-    for (auto iter = pimpl_->sendPacketsCache.begin(); iter != iterator; ++iter) {
-        ((iter->second.count() < maxResends) || (maxResends == 0)) ?
-            hashesToSend.push_back(iter->second) : hashesToRemove.push_back(iter->second.hash());
-    }
-
-    // first, remove this hashes, they sended too much
-    if (!hashesToRemove.empty()) {
-        std::for_each(std::begin(hashesToRemove), std::end(hashesToRemove), [this](const auto& hash) {
-            pimpl_->packetsTable.erase(hash);
-        });
-    }
-
-    // return if all hashes is empty.
-    // cuz if iterator is end() then all elements will be removed from send packets cache.
-    if (hashesToSend.empty() && hashesToRemove.empty()) {
-        return;
-    }
-
-    // send it
-    for (const auto& element : hashesToSend) {
-        auto iter = pimpl_->packetsTable.find(element.hash());
-
-        if (iter != pimpl_->packetsTable.end()) {
-            iter->second.makeHash();
-
-            emit packetFlushed(iter->second);
-        }
-        else {
-            notFoundHashes.push_back(element.hash());
-        }
-    }
-
-    // remove from current hash
-    pimpl_->sendPacketsCache.erase(pimpl_->sendPacketsCache.begin(), iterator);
-
-    // add with new round key this hashes
-    for (const auto& element : hashesToSend) {
-        auto iter = std::find(notFoundHashes.begin(), notFoundHashes.end(), element.hash());
-
-        // if not found at broken hashes, add it again
-        if (iter == notFoundHashes.end()) {
-            pimpl_->sendPacketsCache.emplace(round, cs::SendCacheData { element.hash(), element.count() + 1 } );
-        }
-    }
-}
-
-void cs::ConveyerBase::removeHashFromSendCache(const cs::TransactionsPacketHash& hash) {
-    auto begin = pimpl_->sendPacketsCache.begin();
-    auto end = pimpl_->sendPacketsCache.end();
-    auto iter = end;
-
-    for (; begin != end; ++begin) {
-        if (begin->second.hash() == hash) {
-            iter = begin;
-            break;
-        }
-    }
-
-    if (iter != end) {
-        csdetails() << csname() << "remove hash from send cache " << iter->second.hash().toString();
-        pimpl_->sendPacketsCache.erase(iter);
-    }
 }
 
 cs::Conveyer& cs::Conveyer::instance() {

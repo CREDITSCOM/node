@@ -161,6 +161,10 @@ size_t TransactionsPacket::transactionsCount() const noexcept {
     return transactions_.size();
 }
 
+cs::RoundNumber TransactionsPacket::expiredRound() const noexcept {
+    return expiredRound_;
+}
+
 bool TransactionsPacket::addTransaction(const csdb::Transaction& transaction) {
     if (!transaction.is_valid() || !isHashEmpty()) {
         return false;
@@ -190,6 +194,10 @@ bool TransactionsPacket::addSignature(const cs::Byte index, const cs::Signature&
 
     signatures_.push_back(std::make_pair(index, signature));
     return true;
+}
+
+void TransactionsPacket::setExpiredRound(RoundNumber round) {
+    expiredRound_ = round;
 }
 
 bool TransactionsPacket::sign(const cs::PrivateKey& privateKey) {
@@ -279,6 +287,8 @@ bool TransactionsPacket::isSmart() const {
 //
 
 void TransactionsPacket::put(::csdb::priv::obstream& os, Serialization options) const {
+    os.put(expiredRound_);
+
     if (options & Serialization::Transactions) {
         os.put(transactions_.size());
 
@@ -306,6 +316,13 @@ void TransactionsPacket::put(::csdb::priv::obstream& os, Serialization options) 
 }
 
 bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
+    cs::RoundNumber round = 0;
+
+    if (!is.get(round)) {
+        return false;
+    }
+
+    expiredRound_ = round;
     std::size_t transactionsCount = 0;
 
     if (!is.get(transactionsCount)) {

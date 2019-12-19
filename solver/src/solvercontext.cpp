@@ -259,7 +259,7 @@ void SolverContext::send_consensus_failed_report() {
 }
 
 bool SolverContext::is_round_duration_limited() const {
-    return !core.pnode->isBootstrapRound();
+    return true; // !core.pnode->isBootstrapRound();
 }
 
 }  // namespace cs

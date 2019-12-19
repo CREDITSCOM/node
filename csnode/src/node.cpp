@@ -1425,7 +1425,7 @@ void Node::processTimer() {
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     const auto round = conveyer.currentRoundNumber();
 
-    if (myLevel_ == Level::Writer || round <= cs::TransactionsFlushRound) {
+    if (round <= cs::TransactionsFlushRound) {
         return;
     }
 

@@ -717,6 +717,8 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
             csdebug() << kLogPrefix << "contract state is too large, size is " << state_size << "b, not included in package";
         }
     }
+
+    finalSmartTransactionPack_.setExpiredRound(cs::Conveyer::instance().currentRoundNumber() + Consensus::MaxRoundsCancelContract);
     finalSmartTransactionPack_.makeHash();
 }
 
@@ -756,7 +758,7 @@ void SmartConsensus::sendFinalTransactionSet() {
 
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " adding separate package with "
         << finalSmartTransactionPack_.signatures().size() << " signatures";
-    conv.addSeparatePacket(finalSmartTransactionPack_);
+    conv.addContractPacket(finalSmartTransactionPack_);
 
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " ==============================================> SEND RESULT TO CONVEYER, packet hash "

@@ -51,8 +51,7 @@ const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contract
 const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
 const std::string PARAM_NAME_COMPATIBLE_VERSION = "compatible_version";
 
-const std::string PARAM_NAME_CONVEYER_SEND_CACHE = "send_cache_value";
-const std::string PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE = "max_resends_send_cache";
+const std::string PARAM_NAME_CONVEYER_MAX_PACKET_LIFETIME = "max_packet_life_time";
 
 const std::string PARAM_NAME_ID = "id";
 const std::string PARAM_NAME_IP = "ip";
@@ -909,10 +908,9 @@ void Config::readConveyerData(const boost::property_tree::ptree& config) {
         return;
     }
 
-    const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_API);
+    const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_CONVEYER);
 
-    checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_SEND_CACHE, conveyerData_.sendCacheValue);
-    checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE, conveyerData_.maxResendsSendCache);
+    checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_MAX_PACKET_LIFETIME, conveyerData_.maxPacketLifeTime);
 }
 
 void Config::readEventsReportData(const boost::property_tree::ptree& config) {
@@ -920,7 +918,9 @@ void Config::readEventsReportData(const boost::property_tree::ptree& config) {
         eventsReport_.on = false;
         return;
     }
+
     eventsReport_.on = false;
+
     try {
         eventsReport_.collector_ep = readEndpoint(config, BLOCK_NAME_EVENT_REPORTER);
         eventsReport_.on = true;
@@ -1010,8 +1010,7 @@ bool operator!=(const ApiData& lhs, const ApiData& rhs) {
 }
 
 bool operator==(const ConveyerData& lhs, const ConveyerData& rhs) {
-    return lhs.sendCacheValue == rhs.sendCacheValue &&
-           lhs.maxResendsSendCache == rhs.maxResendsSendCache;
+    return lhs.maxPacketLifeTime == rhs.maxPacketLifeTime;
 }
 
 bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs) {
