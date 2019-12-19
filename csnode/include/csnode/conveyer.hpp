@@ -199,30 +199,6 @@ public:
     ///
     bool isSyncCompleted(cs::RoundNumber round) const;
 
-    // writer notifications
-
-    ///
-    /// @brief Returns confidants notifications to writer.
-    ///
-    const cs::Notifications& notifications() const;
-
-    ///
-    /// @brief Adds writer notification in bytes representation.
-    /// @param bytes Received from network notification bytes.
-    ///
-    void addNotification(const cs::Bytes& bytes);
-
-    ///
-    /// @brief Returns count of needed writer notifications.
-    ///
-    std::size_t neededNotificationsCount() const;
-
-    ///
-    /// @brief Returns current notifications check of needed count.
-    /// @param state Check state of notifications.
-    ///
-    bool isEnoughNotifications(NotificationState state) const;
-
     // characteristic meta
 
     ///

@@ -206,8 +206,6 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundNumber cachedRound, const cs::R
             --cachedRound;
         }
 
-        changeRound(table.round);
-
         if (pimpl_->metaStorage.contains(table.round)) {
             cserror() << csname() << "Round table updation failed";
         }
@@ -378,47 +376,6 @@ bool cs::ConveyerBase::isSyncCompleted(cs::RoundNumber round) const {
     }
 
     return meta->neededHashes.empty();
-}
-
-const cs::Notifications& cs::ConveyerBase::notifications() const {
-    return pimpl_->validMeta()->notifications;
-}
-
-void cs::ConveyerBase::addNotification(const cs::Bytes& bytes) {
-    cs::ConveyerMeta* meta = pimpl_->metaStorage.get(currentRoundNumber());
-
-    if (meta != nullptr) {
-        csdebug() << csname() << "Writer notification added";
-        meta->notifications.push_back(bytes);
-    }
-}
-
-std::size_t cs::ConveyerBase::neededNotificationsCount() const {
-    cs::ConveyerMeta* meta = pimpl_->metaStorage.get(pimpl_->currentRound);
-
-    // TODO: check if +1 is correct
-    if (meta) {
-        return (meta->roundTable.confidants.size() / 2) + 1;
-    }
-
-    csdebug() << csname() << "No notifications at current round";
-    return 0;
-}
-
-bool cs::ConveyerBase::isEnoughNotifications(cs::ConveyerBase::NotificationState state) const {
-    cs::SharedLock lock(sharedMutex_);
-
-    const std::size_t neededConfidantsCount = neededNotificationsCount();
-    const std::size_t notificationsCount = notifications().size();
-
-    cslog() << csname() << "Current notifications count - " << notificationsCount;
-    cslog() << csname() << "Needed confidans count - " << neededConfidantsCount;
-
-    if (state == NotificationState::Equal) {
-        return notificationsCount == neededConfidantsCount;
-    }
-
-    return notificationsCount >= neededConfidantsCount;
 }
 
 void cs::ConveyerBase::addCharacteristicMeta(RoundNumber round, CharacteristicMeta&& characteristic) {
