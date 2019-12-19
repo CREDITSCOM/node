@@ -42,6 +42,8 @@ public:
 
     struct WalletData {
         csdb::Amount balance_;
+        csdb::Amount delegated_;
+        std::map<cs::PublicKey, csdb::Amount> delegats_; 
         TransactionsTail trxTail_;
         uint64_t transNum_ = 0;
         csdb::TransactionID lastTransaction_;

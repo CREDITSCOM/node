@@ -75,6 +75,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
+    cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
 
     setupNextMessageBehaviour();
 
@@ -666,7 +667,7 @@ bool Node::canBeTrusted(bool critical) {
         return false;
     }
 
-    if (wData.balance_ < Consensus::MinStakeValue) {
+    if (wData.balance_ + wData.delegated_ < Consensus::MinStakeValue) {
         return false;
     }
 
@@ -915,29 +916,42 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     csmeta(csdetails) << "done";
 }
 
-void Node::createTestTransaction() {
+void Node::createTestTransaction(int tType) {
 #if 0
     csdb::Transaction transaction;
 
-    std::string strAddr1 = "G2GeLfwjg6XuvoWnZ7ssx9EPkEBqbYL3mw3fusgpzoBk";
-    std::string strAddr2 = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
+    std::string strAddr1 = "HYNKVYEC5pKAAgoJ56WdvbuzJBpjZtGBvpSMBeVd555S";
+    std::string strAddr2 = "G2GeLfwjg6XuvoWnZ7ssx9EPkEBqbYL3mw3fusgpzoBk";
+    std::string priv2 = "63emSYN4iwKsj9FyyZ1rzMSiGpJXtLZgArLAQz9VzTMB2i2GpnJoxREYU75K3sfEgdNnyUoyVXSQAtXUaBySXd2N";
 
     std::vector<uint8_t> pub_key1;
     DecodeBase58(strAddr1, pub_key1);   
     std::vector<uint8_t> pub_key2;
     DecodeBase58(strAddr2, pub_key2);
 
+    std::vector<uint8_t> priv_key2;
+    DecodeBase58(priv2, priv_key2);
+    cscrypto::PrivateKey pKey2 = cscrypto::PrivateKey::readFromBytes(priv_key2);
+
     csdb::Address test_address1 = csdb::Address::from_public_key(pub_key1);
     csdb::Address test_address2 = csdb::Address::from_public_key(pub_key2);
     transaction.set_target(test_address1);
     transaction.set_source(test_address2);
     transaction.set_currency(csdb::Currency(1));
-    transaction.set_amount(csdb::Amount(1, 0));
-    transaction.set_max_fee(csdb::AmountCommission(0.0));
+    transaction.set_amount(csdb::Amount(10, 0));
+    transaction.set_max_fee(csdb::AmountCommission(1.0));
+    transaction.add_user_field(5, tType);
+    transaction.add_user_field(6, "abcde");
     transaction.set_counted_fee(csdb::AmountCommission(0.0));
     cs::TransactionsPacket transactionPack;    
-    for (size_t i = 0; i < 9; ++i) {
-        transaction.set_innerID(i);
+    for (size_t i = 0; i < 1; ++i) {
+        transaction.set_innerID((tType-1)*2000);
+        auto for_sig = transaction.to_byte_stream_for_sig();
+        auto t1 = transaction.to_byte_stream();
+        csdebug() << "Transaction for sig: " << cs::Utils::byteStreamToHex(for_sig.data(), for_sig.size());
+        csdebug() << "Transaction: " << cs::Utils::byteStreamToHex(t1.data(), t1.size());
+        cs::Signature sig = cscrypto::generateSignature(pKey2, for_sig.data(), for_sig.size());
+        transaction.set_signature(sig);
         transactionPack.addTransaction(transaction);
     }
 
@@ -2743,7 +2757,8 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
         uint64_t currentTimeStamp;
         [[maybe_unused]] uint64_t rpTimeStamp;
         try {
-            lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+            std::string lTS = getBlockChain().getLastTimeStamp();
+            lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
         }
         catch (...) {
             csdebug() << __func__ << ": last block Timestamp was announced as zero";
@@ -3095,7 +3110,8 @@ void Node::sendHash(cs::RoundNumber round) {
     uint64_t currentTimeStamp = 0;
 
     try {
-        lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+        std::string lTS = getBlockChain().getLastTimeStamp();
+        lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
         currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
     }
     catch (const std::exception& exception) {
@@ -3172,7 +3188,8 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     uint64_t currentTimeStamp = 0;
 
     try {
-        lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+        std::string lTS = getBlockChain().getLastTimeStamp();
+        lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
         currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
     }
     catch (const std::exception& exception) {
@@ -3677,6 +3694,20 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
             /*| cs::BlockValidator::ValidationLevel::smartStates*/
             /*| cs::BlockValidator::ValidationLevel::accountBalance*/,
         cs::BlockValidator::SeverityLevel::onlyFatalErrors)) {
+        *shouldStop = true;
+        return;
+    }
+}
+
+void Node::deepBlockValidation(csdb::Pool block, bool* shouldStop) {
+    if (!blockValidator_->validateBlock(block,
+        cs::BlockValidator::ValidationLevel::hashIntergrity
+        /*| cs::BlockValidator::ValidationLevel::blockSignatures*/
+        | cs::BlockValidator::ValidationLevel::smartSignatures
+        /*| cs::BlockValidator::ValidationLevel::balances*/
+        /*| cs::BlockValidator::ValidationLevel::smartStates*/
+        /*| cs::BlockValidator::ValidationLevel::accountBalance*/,
+        cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
         *shouldStop = true;
         return;
     }

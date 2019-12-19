@@ -271,10 +271,10 @@ private:
     void run();
 
     ::csdb::Transaction makeTransaction(const ::api::Transaction&);
-    void dumb_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
-    void smart_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
+    void dumb_transaction_flow(api::TransactionFlowResult& _return, const csdb::Transaction& tr);
+    void smart_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&, csdb::Transaction& send_transaction);
 
-    std::optional<std::string> checkTransaction(const ::api::Transaction&);
+    std::optional<std::string> checkTransaction(const ::api::Transaction&, csdb::Transaction& cTransaction);
 
     TokensMaster tm_;
 

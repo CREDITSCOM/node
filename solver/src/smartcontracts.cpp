@@ -3072,5 +3072,78 @@ Reject::Reason SmartContracts::prevalidate_inner(const cs::TransactionsPacket& p
     return Reject::Reason::None;
 }
 
+std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const std::vector<csdb::Transaction>& trxs) {
+    Packets res;
+    cs::TransactionsPacket pack;
+    SmartContractRef currentRef;
+    SmartContractRef newRef;
+    csdb::Address zeroSource = csdb::Address::from_public_key(cs::Zero::key);
+    csdb::Address currentSource = zeroSource;
+    size_t counter = 0;
+    for (auto& it : trxs) {
+        ++counter;
+        if (SmartContracts::is_new_state(it)) {
+
+            csdb::UserField fld;
+            fld = it.user_field(trx_uf::new_state::RefStart);
+            if (fld.is_valid()) {
+                SmartContractRef ref(fld);
+                if (ref.is_valid()) {
+                    newRef = ref;
+                }
+                else {
+                    break;
+                }
+            }
+
+            if (!currentRef.is_valid() && it.source() != zeroSource) {
+                currentRef = newRef;
+                currentSource = it.source();
+                pack.addTransaction(it);
+                continue;
+            }
+            else {
+                if (it.source() == currentSource || newRef == currentRef) {
+                    if (it.source() != currentSource) {
+                        currentSource = it.source();
+                    }
+                    pack.addTransaction(it);
+                    continue;
+                }
+                else {
+                    currentRef = newRef;
+                    currentSource = it.source();
+                    pack.makeHash();
+                    res.push_back(pack);
+                    pack = TransactionsPacket();
+                    pack.addTransaction(it);
+                    continue;
+                }
+            }
+
+        }
+        if (it.source() == currentSource && it.source() != zeroSource) {
+            pack.addTransaction(it);
+            continue;
+        }
+        else {
+            if (pack.transactionsCount() > 0) {
+                pack.makeHash();
+                res.push_back(pack);
+                pack = TransactionsPacket();
+            }
+            currentRef = SmartContractRef{};
+            currentSource = zeroSource;
+        }
+
+    }
+
+    if (pack.transactionsCount() > 0) {
+        pack.makeHash();
+        res.push_back(pack);
+    }
+    return res;
+}
+
 }  // namespace cs
 

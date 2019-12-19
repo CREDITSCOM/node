@@ -625,12 +625,8 @@ std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
     return std::string({' '}) + cs::Utils::byteStreamToHex(bs.data(), bs.length());
 }
 
-void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
-    auto tr = makeTransaction(transaction);
-
-    if (!transaction.userFields.empty()) {
-        tr.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
-    }
+void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, const csdb::Transaction& tr) {
+    //auto tr = makeTransaction(transaction);
 
     // remember dumb transaction 
     if (!dumbCv_.addCVInfo(tr.signature())) {
@@ -660,12 +656,12 @@ std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type, std::ost
     return s;
 }
 
-std::optional<std::string> APIHandler::checkTransaction(const Transaction& transaction) {
+std::optional<std::string> APIHandler::checkTransaction(const Transaction& transaction, csdb::Transaction& cTransaction) {
     if (transaction.__isset.smartContract && transaction.smartContract.forgetNewState) {
         return std::nullopt;
     }
 
-    auto trxn = makeTransaction(transaction);
+    cTransaction = makeTransaction(transaction);
     if (transaction.__isset.smartContract) {
         if (transaction.smartContract.__isset.smartContractDeploy) {
             // deploy info provided
@@ -683,6 +679,68 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
     else if (!transaction.userFields.empty()) {
         trxn.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
     }
+    else {
+        if (!transaction.userFields.empty()) {
+            size_t s = transaction.userFields.size();
+            if (s != 0) {
+                cs::Bytes msg;
+                msg.resize(s);
+                std::copy(transaction.userFields.data(), transaction.userFields.data() + s, msg.data());
+                cs::DataStream stream(msg.data(), msg.size());
+                cs::Byte flagg;
+                stream >> flagg;
+                if (flagg) {
+                    cTransaction.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
+                }
+                else {
+                    uint8_t cnt;
+                    stream >> cnt;
+                    while (cnt > 0) {
+                        uint32_t uf_id;
+                        cs::Byte uf_type;
+                        cs::Bytes data;
+                        size_t iValue;
+                        int32_t aInteger;
+                        uint64_t aFraction;
+                        std::string sValue;
+                        stream >> uf_id >> uf_type;
+
+                        switch (uf_type) {
+                        case csdb::UserField::Type::Unknown:
+                            data.clear();
+                            stream >> data;
+                            cTransaction.add_user_field(uf_id, transaction.userFields);
+                            break;
+                        case csdb::UserField::Type::Integer:
+                            iValue = 0;
+                            stream >> iValue;
+                            cTransaction.add_user_field(uf_id, iValue);
+                            break;
+                        case csdb::UserField::Type::String:
+                            uint32_t sSize;
+                            stream >> sSize;
+                            sValue.clear();
+                            sValue += std::string{ stream.data(), sSize };
+                            stream.skip(sSize);
+                            cTransaction.add_user_field(uf_id, sValue);
+                            break;
+                        case csdb::UserField::Type::Amount:
+                            aInteger = 0;
+                            aFraction = 0;
+                            stream >> aInteger >> aFraction;
+                            cTransaction.add_user_field(uf_id, csdb::Amount{ aInteger, aFraction });
+                            break;
+                        default:
+                            //TODO: add code here to aviod unknownUserfields in transactions
+                            break;
+                        }
+
+                        --cnt;
+                    }
+                }
+            }
+        }
+    }
 
     // for payable
     if (transaction.__isset.usedContracts && !transaction.usedContracts.empty() && !transaction.__isset.smartContract) {
@@ -690,19 +748,20 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
         for (auto& addr : transaction.usedContracts) {
             uf += addr;
         }
-        trxn.add_user_field(cs::trx_uf::ordinary::UsedContracts, uf);
+        cTransaction.add_user_field(cs::trx_uf::ordinary::UsedContracts, uf);
     }
 
     if (!solver_.isTransactionsInputAvailable()) {
         auto msg = " Node is not syncronized or last round duration is too long.";
         return msg;
     }
-
+    auto bb = cTransaction.to_byte_stream_for_sig();
+    auto st = cs::Utils::byteStreamToHex(bb.data(), bb.size());
     cs::IterValidator::SimpleValidator::RejectCode err;
     csdb::AmountCommission countedFee;
-    if (!cs::IterValidator::SimpleValidator::validate(trxn, blockchain_, solver_.smart_contracts(), &countedFee, &err)) {
+    if (!cs::IterValidator::SimpleValidator::validate(cTransaction, blockchain_, solver_.smart_contracts(), &countedFee, &err)) {
         if (err == cs::IterValidator::SimpleValidator::kContractViolation) {
-            std::string s = cs::SmartContracts::violations_message(solver_.smart_contracts().test_violations(trxn));
+            std::string s = cs::SmartContracts::violations_message(solver_.smart_contracts().test_violations(cTransaction));
             if (!s.empty()) {
                 return std::make_optional(s);
             }
@@ -717,9 +776,9 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
     return std::nullopt;
 }
 
-void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction) {
+void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction, csdb::Transaction& send_transaction) {
     auto input_smart = transaction.__isset.smartContract ? transaction.smartContract : SmartContractInvocation{};
-    auto send_transaction = makeTransaction(transaction);
+    //auto send_transaction = makeTransaction(transaction);
     const auto smart_addr = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
     bool deploy = transaction.__isset.smartContract ? is_smart_deploy(input_smart) : false;
 
@@ -883,18 +942,17 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
 
 void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction) {
     _return.roundNum = static_cast<int32_t>(cs::Conveyer::instance().currentRoundTable().round); // possible overflow
-
-    if (auto errInfo = checkTransaction(transaction); errInfo.has_value()) {
+    csdb::Transaction transactionToSend;
+    if (auto errInfo = checkTransaction(transaction, transactionToSend); errInfo.has_value()) {
         _return.status.code = int8_t(ERROR_CODE);
         _return.status.message  = errInfo.value();
         return;
     }
 
-    auto dbTransaction = makeTransaction(transaction);
-    if(!transaction.__isset.smartContract && !solver_.smart_contracts().is_payable_call(dbTransaction))
-        dumb_transaction_flow(_return, transaction);
+    if(!transaction.__isset.smartContract && !solver_.smart_contracts().is_payable_call(transactionToSend))
+        dumb_transaction_flow(_return, transactionToSend);
     else
-        smart_transaction_flow(_return, transaction);
+        smart_transaction_flow(_return, transaction, transactionToSend);
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {

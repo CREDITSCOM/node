@@ -8,6 +8,7 @@
 #include <lib/system/concurrent.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
+#include <csnode/transactionspacket.hpp>
 
 #include <csnode/node.hpp>  // introduce csconnector::connector::ApiExecHandlerPtr at least
 
@@ -348,6 +349,9 @@ public:
     static std::string get_contract_state(const BlockChain& storage, const csdb::Address& abs_addr);
 
     static std::string to_base58(const BlockChain& storage, const csdb::Address& addr);
+
+    static std::vector<cs::TransactionsPacket> grepNewStatesPacks(const std::vector<csdb::Transaction>& trxs);
+
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);

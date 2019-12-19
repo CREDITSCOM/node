@@ -285,6 +285,14 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
             return "Transaction's source doesn't exist in blockchain.";
         case kContractViolation:
             return "Contract execution violations detected";
+        case kTransactionProhibited:
+            return "Transaction of such type is prohibited for this account or target account";
+        case kNoDelegate:
+            return "No such delegate in your list";
+        case kDifferentDelegatedAmount:
+            return "This account has another delefation amount from your account";
+        case kAmountTooLow:
+            return "The amount of thansaction is too low";
         default :
             return "Unknown reject reason.";
     }
@@ -294,6 +302,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
     RejectCode rc = kAllCorrect;
 
     BlockChain::WalletData wallet;
+    BlockChain::WalletData tWallet;
     csdb::AmountCommission countedFee;
 
     if (!fee::estimateMaxFee(t, countedFee, sc)) {
@@ -310,6 +319,58 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
 
     if (!rc && !bc.findWalletData(t.source(), wallet)) {
         rc = kSourceDoesNotExists;
+    }
+
+    csdb::UserField fld;
+    fld = t.user_field(trx_uf::sp::delegated);
+    bool notCheck = false;
+    if (fld.is_valid()) {
+        if (t.amount() < Consensus::MinStakeDelegated) {
+            rc = kAmountTooLow;
+        }
+        auto flagg = fld.value<uint64_t>();
+        switch(flagg) {
+            case trx_uf::sp::dele::gate:
+                
+                if (!rc) {
+                    if (bc.findWalletData(t.target(), tWallet)) {
+                        if (tWallet.delegated_ > csdb::Amount{ 0 }) {
+                            rc = kTransactionProhibited;
+                        }
+                    }
+                }
+                break;
+            case trx_uf::sp::dele::gated_withdraw:
+                if (!rc) {
+                    if (bc.findWalletData(t.target(), tWallet)) {
+                        auto tKey = bc.getCacheUpdater().toPublicKey(t.target());
+                        auto it = wallet.delegats_.find(tKey);
+                        if (it == wallet.delegats_.end()) {
+                            rc = kNoDelegate;
+                        }
+                        else {
+                            if (tWallet.delegated_ != wallet.delegats_[tKey]) {
+                                rc = kNoDelegate;
+                            }
+                            else {
+                                if (tWallet.delegated_ != t.amount()) {
+                                    rc = kDifferentDelegatedAmount;
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        rc = kNoDelegate;
+                    }
+                }
+                break;
+            default:
+                if (!rc) {
+                    notCheck = true;
+                }
+                break;
+
+        }
     }
 
     if (!rc && wallet.balance_ < (t.amount() + t.max_fee().to_double())) {
