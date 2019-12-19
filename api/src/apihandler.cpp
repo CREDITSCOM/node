@@ -2294,3 +2294,11 @@ void apiexec::APIEXECHandler::PoolGet(PoolGetResult& _return, const int64_t sequ
     std::copy(poolBin.begin(), poolBin.end(), std::back_inserter(_return.pool));
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
+
+void apiexec::APIEXECHandler::GetDateTime(GetDateTimeResult& _return, const general::AccessID accessId) {
+    _return.timestamp = executor_.getTimeSmartContract(accessId);
+    if(_return.timestamp)
+        SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+    else
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE);
+}
