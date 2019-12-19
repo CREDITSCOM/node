@@ -28,7 +28,7 @@
 #include <unistd.h>
 #endif
 
-const NodeVersion NODE_VERSION = 442;
+const NodeVersion NODE_VERSION = 445;
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
