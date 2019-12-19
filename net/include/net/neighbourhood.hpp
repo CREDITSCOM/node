@@ -136,11 +136,11 @@ struct Neighbour {
 
 class Neighbourhood {
 public:
-    const static uint32_t MinConnections = 1;
-    const static uint32_t MaxConnections = 1024;
-    const static uint32_t MaxNeighbours = 256;
-    const static uint32_t MinNeighbours = 3;
-    const static uint32_t MaxConnectAttempts = 64;
+    const static inline uint32_t MinConnections = 1;
+    const static inline uint32_t MaxConnections = 1024;
+    const static inline uint32_t MaxNeighbours = 256;
+    const static inline uint32_t MinNeighbours = 3;
+    const static inline uint32_t MaxConnectAttempts = 64;
 
     explicit Neighbourhood(Transport*);
 

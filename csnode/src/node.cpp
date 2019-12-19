@@ -746,7 +746,7 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
     auto otherMask = rPackage.poolMetaInfo().characteristic.mask;
     bool identic = true;
     cs::Bytes checkMask;
-    csdebug() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(ownMask.data(), ownMask.size())
+    csdetails() << "NODE> Starting comparing characteristics: our: " << cs::Utils::byteStreamToHex(ownMask.data(), ownMask.size())
         << " and received: " << cs::Utils::byteStreamToHex(otherMask.data(), otherMask.size());
     //TODO: this code is to be refactored - may cause some problems
     if (otherMask.size() != ownMask.size()) {
@@ -783,7 +783,11 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
         cserror() << "NODE> We probably got the roundPackage with invalid characteristic. " << badChecksCounter
             << "; transaction(s): " << badChecks << " (is)were not checked properly. Can't build block";
 
-        //sendBlockAlarm(rPackage.poolMetaInfo().sequenceNumber);
+        cs::PublicKey source_node;
+        if (!rPackage.getSender(source_node)) {
+            std::copy(cs::Zero::key.cbegin(), cs::Zero::key.cend(), source_node.begin());
+        }
+        sendBlockAlarm(source_node, rPackage.poolMetaInfo().sequenceNumber);
         return false;
     }
     csdebug() << "NODE> Previous block mask validation finished successfully";
@@ -1019,12 +1023,12 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             const auto resume = EventReport::parseReject(bin_pack);
             if (!resume.empty()) {
                 size_t cnt = 0;
-                std::ostringstream os2;
+                std::ostringstream os_rej;
                 std::for_each(resume.cbegin(), resume.cend(), [&](const auto& item) {
                     cnt += item.second;
-                    os2 << Reject::to_string(item.first) << " (" << item.second << ") ";
+                    os_rej << Reject::to_string(item.first) << " (" << item.second << ") ";
                 });
-                csevent() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os2.str()
+                csevent() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os_rej.str()
                     << " on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }

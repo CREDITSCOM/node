@@ -225,10 +225,8 @@ Reject::Reason TransactionsValidator::validateTransactionAsTarget(const csdb::Tr
 }
 
 size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded) {
-    using rejectedSmart = std::pair<csdb::Transaction, size_t>;
     auto& smarts = context.smart_contracts();
-    std::vector<csdb::Transaction> newStates;
-    std::vector<rejectedSmart> rejectedSmarts;
+    RejectedSmarts rejectedSmarts;
     size_t maskSize = maskIncluded.size();
     size_t i = 0;
     size_t restoredCounter = 0;
@@ -240,21 +238,26 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
                 rejectedSmarts.push_back(std::make_pair(t, i));
             }
         }
-        else if (i < maskSize && SmartContracts::is_new_state(t) && *(maskIncluded.cbegin() + i) == Reject::Reason::None) {
-            newStates.push_back(t);
-        }
         ++i;
     }
 
-    for (const auto& state : newStates) {
-        csdb::Transaction initTransaction = SmartContracts::get_transaction(context.blockchain(), state);
+    for (auto& state : validNewStates_) {
+        if (!state.second) {
+            continue;
+        }
+        csdb::Transaction initTransaction = SmartContracts::get_transaction(context.blockchain(), trxs[state.first]);
+        const csdb::Address contract_abs_addr = smarts.absolute_address(initTransaction.target());
         auto it = std::find_if(rejectedSmarts.cbegin(), rejectedSmarts.cend(),
-                               [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == smarts.absolute_address(initTransaction.target())); });
+                               [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == contract_abs_addr); });
         if (it != rejectedSmarts.end()) {
             WalletsState::WalletData& wallState = walletsState_.getData(it->first.source());
             wallState.balance_ += initTransaction.amount();
             if (wallState.balance_ >= zeroBalance_) {
                 restoredCounter += makeSmartsValid(context, rejectedSmarts, it->first.source(), maskIncluded);
+            }
+            else {
+                state.second = false;
+                saveNewState(contract_abs_addr, state.first, Reject::Reason::NegativeResult);
             }
         }
     }

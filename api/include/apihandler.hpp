@@ -52,6 +52,7 @@ public:
     void SmartContractGet(SmartContractGetResult& _return, const general::AccessID accessId, const general::Address& address) override;
     void WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) override;
     void PoolGet(PoolGetResult& _return, const int64_t sequence) override;
+    void GetDateTime(GetDateTimeResult& _return, const general::AccessID accessId) override;
 
     cs::Executor& getExecutor() const {
         return executor_;
