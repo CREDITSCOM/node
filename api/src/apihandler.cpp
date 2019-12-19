@@ -674,10 +674,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
                 return std::make_optional("Malformed contract deployment, source code is not provided");
             }
         }
-        trxn.add_user_field(cs::trx_uf::deploy::Code, cs::Serializer::serialize(transaction.smartContract));
-    }
-    else if (!transaction.userFields.empty()) {
-        trxn.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
+        cTransaction.add_user_field(cs::trx_uf::deploy::Code, cs::Serializer::serialize(transaction.smartContract));
     }
     else {
         if (!transaction.userFields.empty()) {
