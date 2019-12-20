@@ -271,8 +271,8 @@ private:
     void run();
 
     ::csdb::Transaction makeTransaction(const ::api::Transaction&);
-    void dumbTransactionFlow(api::TransactionFlowResult& _return, const ::api::Transaction&);
-    void smartTransactionFlow(api::TransactionFlowResult& _return, const ::api::Transaction&);
+    void dumbTransactionFlow(api::TransactionFlowResult& _return, const csdb::Transaction& tr);
+    void smartTransactionFlow(api::TransactionFlowResult& _return, const ::api::Transaction&, csdb::Transaction& send_transaction);
 
     std::optional<std::string> checkTransaction(const ::api::Transaction&, csdb::Transaction& cTransaction);
 
