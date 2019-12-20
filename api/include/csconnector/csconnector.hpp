@@ -28,6 +28,10 @@
 #include <profiler/profilereventhandler.hpp>
 #endif
 
+namespace cs {
+class TransactionsPacket;
+}
+
 namespace csconnector {
 class connector {
 public:
@@ -64,6 +68,10 @@ public:
         api_handler->maxBlocksCount(lastBlockNum);
     }
 
+public slots:
+    void onPacketExpired(const cs::TransactionsPacket& packet);
+
+public:
     void run();
 
     // interface

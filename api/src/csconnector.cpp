@@ -16,6 +16,7 @@
 #include "csconnector/csconnector.hpp"
 
 #include <csnode/configholder.hpp>
+#include <csnode/transactionspacket.hpp>
 
 namespace csconnector {
 
@@ -127,6 +128,10 @@ connector::~connector() {
         ajax_thread.join();
     }
 #endif
+}
+
+void connector::onPacketExpired(const cs::TransactionsPacket& packet) {
+    api_handler->onPacketExpired(packet);
 }
 
 connector::ApiHandlerPtr connector::apiHandler() const {
