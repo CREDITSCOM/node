@@ -138,6 +138,18 @@ void Transport::sendDirect(Packet&& pack, const cs::PublicKey& receiver) {
     host_.SendDirect(toNodeId(receiver), pack.moveData());
 }
 
+void Transport::ban(const cs::PublicKey& key) {
+    host_.Ban(toNodeId(key));
+}
+
+void Transport::revertBan(const cs::PublicKey& key) {
+    host_.Unban(toNodeId(key));
+}
+
+void Transport::clearBanList() {
+    host_.ClearBanList();
+}
+
 void Transport::sendMulticast(Packet&& pack, const std::vector<cs::PublicKey>& receivers) {
     for (auto& receiver : receivers) {
         auto ptr = reinterpret_cast<const uint8_t*>(pack.data());
