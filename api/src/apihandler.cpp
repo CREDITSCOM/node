@@ -620,7 +620,7 @@ csdb::Transaction APIHandler::makeTransaction(const Transaction& transaction) {
     return send_transaction;
 }
 
-std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
+std::string getDelimitedTransactionSigHex(const csdb::Transaction& tr) {
     auto bs = fromByteArray(tr.to_byte_stream_for_sig());
     return std::string({' '}) + cs::Utils::byteStreamToHex(bs.data(), bs.length());
 }
@@ -637,10 +637,20 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
 
     cs::Conveyer::instance().addTransaction(tr);
 
-    // wait for transaction in blockchain  
-    if (!dumbCv_.waitCvSignal(tr.signature())) {
-        SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
-        return;
+    // wait for transaction in blockchain
+    cs::DumbCv::Condition condition = dumbCv_.waitCvSignal(tr.signature());
+
+    switch (condition) {
+    case cs::DumbCv::Condition::Success:
+        SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, getDelimitedTransactionSigHex(tr));
+        break;
+
+    case cs::DumbCv::Condition::Expired:
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is expired");
+        break;
+
+    default:
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Wrong Node behaviour");
     }
 
     auto newTransactionId = dumbCv_.getTransactionId();
@@ -942,7 +952,7 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
     csdb::Transaction transactionToSend;
     if (auto errInfo = checkTransaction(transaction, transactionToSend); errInfo.has_value()) {
         _return.status.code = int8_t(ERROR_CODE);
-        _return.status.message  = errInfo.value();
+        _return.status.message = errInfo.value();
         return;
     }
 
@@ -1075,11 +1085,29 @@ void APIHandler::baseLoaded(const csdb::Pool& pool) {
 }
 
 void APIHandler::maxBlocksCount(cs::Sequence lastBlockNum) {
-    if (!lastBlockNum)
+    if (!lastBlockNum) {
         isBDLoaded_ = true;
+    }
+
     maxReadSequence = lastBlockNum;
 }
 
+void APIHandler::onPacketExpired(const cs::TransactionsPacket& packet) {
+    const auto& transactions = packet.transactions();
+
+    if (transactions.empty()) {
+        return;
+    }
+
+    for (const auto& transaction : transactions) {
+        if (is_smart(transaction) || is_smart_state(transaction) || solver_.smart_contracts().is_payable_call(transaction)) {
+            // do nothing
+        }
+        else { // if dumb transaction
+            dumbCv_.sendCvSignal(transaction.signature(), cs::DumbCv::Condition::Expired);
+        }
+    }
+}
 
 void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
 #ifdef USE_DEPRECATED_STATS
