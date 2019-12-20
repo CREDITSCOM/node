@@ -10,6 +10,7 @@
 #include <csdb/amount.hpp>
 #include <csdb/amount_commission.hpp>
 #include <lib/system/logger.hpp>
+#include <csnode/nodecore.hpp>
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
 #include <walletscache.hpp>
@@ -59,6 +60,7 @@ Reject::Reason TransactionsValidator::validateNewStateAsSource(SolverContext& co
         cslog() << kLogPrefix << __func__ << ": reject new_state transaction, execution fee is not set properly";
         return Reject::Reason::MalformedTransaction;
     }
+
     csdb::Amount feeForExecution(feeField.value<csdb::Amount>());
     if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double())) <
         csdb::Amount(trx.counted_fee().to_double()) + feeForExecution) {
@@ -147,7 +149,14 @@ Reject::Reason TransactionsValidator::validateCommonAsSource(SolverContext& cont
                 newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
             }
             else {
-                newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
+                //calculate balance only if transaction isn't de-delegate
+                csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegated);
+                if (delegateField.is_valid() && delegateField.value<uint64_t>() == 2) {
+                    newBalance = wallState.balance_ - csdb::Amount(trx.counted_fee().to_double());
+                }
+                else {
+                    newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
+                }
             }
         }
     }
@@ -199,13 +208,51 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
 	}
 
     if (wallState.balance_ < zeroBalance_ && !SmartContracts::is_new_state(trx)) {
-        csdetails() << kLogPrefix << "transaction[" << trxInd << "] results to potentially negative balance " << wallState.balance_.to_double();
+        csdebug() << kLogPrefix << "transaction[" << trxInd << "] results to potentially negative balance " << wallState.balance_.to_double();
         // will be checked in rejected smarts
         if (context.smart_contracts().is_known_smart_contract(trx.source())) {
             return Reject::Reason::NegativeResult;
         }
         // will be validated by graph
         negativeNodes_.push_back(&wallState);
+    }
+    csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegated);
+    if (delegateField.is_valid()) {
+        if (trx.amount() < Consensus::MinStakeDelegated) {
+            csdetails() << kLogPrefix << "The delegated amount is too low";
+            return Reject::Reason::AmountTooLow;
+        }
+        WalletsState::WalletData& wallTargetState = walletsState_.getData(trx.target());
+        auto tKey = trx.target().is_public_key() ? trx.target().public_key() : context.blockchain().getCacheUpdater().toPublicKey(trx.target());
+        auto it = wallState.delegats_.find(tKey);
+        if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gate) {
+            if (wallTargetState.delegated_ > csdb::Amount{ 0 }) {
+                csdetails() << kLogPrefix << "Can't delegate to the account that was already delegated";
+                return Reject::Reason::AlreadyDelegated;
+            }
+        }
+        else if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gated_withdraw) {
+            if (it == wallState.delegats_.end()) {
+                csdetails() << kLogPrefix << "No such delegate in account state";
+                return Reject::Reason::IncorrectTarget;
+            }
+            else {
+                if (wallTargetState.delegated_ != wallState.delegats_[tKey]) {
+                    cserror() << kLogPrefix << "The sum of delegation is not properly set to the sender and target accounts";
+                    return Reject::Reason::MalformedDelegation;
+                }
+                else {
+                    if (wallTargetState.delegated_ != trx.amount()) {
+                        csdetails() << kLogPrefix << "The sum of delegation isn't equal the transaction amount";
+                        return Reject::Reason::IncorrectSum;
+                    }
+                }
+            }
+        }
+        else {
+            csdetails() << kLogPrefix << "not specified transaction field";
+            return Reject::Reason::MalformedTransaction;
+        }
     }
 
     wallState.trxTail_.push(trx.innerID());
@@ -218,7 +265,7 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
 
 Reject::Reason TransactionsValidator::validateTransactionAsTarget(const csdb::Transaction& trx) {
     WalletsState::WalletData& wallState = walletsState_.getData(trx.target());
-
+    //TODO insert delegated check code here
     wallState.balance_ = wallState.balance_ + trx.amount();
 
     return Reject::Reason::None;

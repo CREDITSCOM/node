@@ -271,10 +271,10 @@ private:
     void run();
 
     ::csdb::Transaction makeTransaction(const ::api::Transaction&);
-    void dumb_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
-    void smart_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
+    void dumbTransactionFlow(api::TransactionFlowResult& _return, const csdb::Transaction& tr);
+    void smartTransactionFlow(api::TransactionFlowResult& _return, const ::api::Transaction&, csdb::Transaction& send_transaction);
 
-    std::optional<std::string> checkTransaction(const ::api::Transaction&);
+    std::optional<std::string> checkTransaction(const ::api::Transaction&, csdb::Transaction& cTransaction);
 
     TokensMaster tm_;
 
@@ -293,6 +293,7 @@ private slots:
     void collect_all_stats_slot(const csdb::Pool& pool);
     void baseLoaded(const csdb::Pool& pool);
     void maxBlocksCount(cs::Sequence lastBlockNum);
+    void onPacketExpired(const cs::TransactionsPacket& packet);
 };
 }  // namespace api
 

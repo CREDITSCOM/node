@@ -75,6 +75,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
+    //cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
 
     setupNextMessageBehaviour();
 
@@ -103,6 +104,7 @@ bool Node::init() {
     cs::Connector::connect(&blockChain_.readBlockEvent(), api_.get(), &csconnector::connector::onReadFromDB);
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
     cs::Connector::connect(&blockChain_.startReadingBlocksEvent(), api_.get(), &csconnector::connector::onMaxBlocksCount);
+    cs::Connector::connect(&cs::Conveyer::instance().packetExpired, api_.get(), &csconnector::connector::onPacketExpired);
 
 #endif  // NODE_API
 
@@ -148,6 +150,8 @@ bool Node::init() {
 
     initCurrentRP();
 
+    EventReport::sendRunningStatus(*this, Running::Status::Run);
+
     return true;
 }
 
@@ -163,6 +167,9 @@ void Node::run() {
 }
 
 void Node::stop() {
+
+    EventReport::sendRunningStatus(*this, Running::Status::Stop);
+
     good_ = false;
 
     transport_->stop();
@@ -661,7 +668,7 @@ bool Node::canBeTrusted(bool critical) {
         return false;
     }
 
-    if (wData.balance_ < Consensus::MinStakeValue) {
+    if (wData.balance_ + wData.delegated_ < Consensus::MinStakeValue) {
         return false;
     }
 
@@ -910,29 +917,42 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     csmeta(csdetails) << "done";
 }
 
-void Node::createTestTransaction() {
+void Node::createTestTransaction(int tType) {
 #if 0
     csdb::Transaction transaction;
 
-    std::string strAddr1 = "G2GeLfwjg6XuvoWnZ7ssx9EPkEBqbYL3mw3fusgpzoBk";
-    std::string strAddr2 = "5B3YXqDTcWQFGAqEJQJP3Bg1ZK8FFtHtgCiFLT5VAxpe";
+    std::string strAddr1 = "HYNKVYEC5pKAAgoJ56WdvbuzJBpjZtGBvpSMBeVd555S";
+    std::string strAddr2 = "G2GeLfwjg6XuvoWnZ7ssx9EPkEBqbYL3mw3fusgpzoBk";
+    std::string priv2 = "63emSYN4iwKsj9FyyZ1rzMSiGpJXtLZgArLAQz9VzTMB2i2GpnJoxREYU75K3sfEgdNnyUoyVXSQAtXUaBySXd2N";
 
     std::vector<uint8_t> pub_key1;
     DecodeBase58(strAddr1, pub_key1);   
     std::vector<uint8_t> pub_key2;
     DecodeBase58(strAddr2, pub_key2);
 
+    std::vector<uint8_t> priv_key2;
+    DecodeBase58(priv2, priv_key2);
+    cscrypto::PrivateKey pKey2 = cscrypto::PrivateKey::readFromBytes(priv_key2);
+
     csdb::Address test_address1 = csdb::Address::from_public_key(pub_key1);
     csdb::Address test_address2 = csdb::Address::from_public_key(pub_key2);
     transaction.set_target(test_address1);
     transaction.set_source(test_address2);
     transaction.set_currency(csdb::Currency(1));
-    transaction.set_amount(csdb::Amount(1, 0));
-    transaction.set_max_fee(csdb::AmountCommission(0.0));
+    transaction.set_amount(csdb::Amount(10, 0));
+    transaction.set_max_fee(csdb::AmountCommission(1.0));
+    transaction.add_user_field(5, tType);
+    transaction.add_user_field(6, "abcde");
     transaction.set_counted_fee(csdb::AmountCommission(0.0));
     cs::TransactionsPacket transactionPack;    
-    for (size_t i = 0; i < 9; ++i) {
-        transaction.set_innerID(i);
+    for (size_t i = 0; i < 1; ++i) {
+        transaction.set_innerID((tType-1)*2000);
+        auto for_sig = transaction.to_byte_stream_for_sig();
+        auto t1 = transaction.to_byte_stream();
+        csdebug() << "Transaction for sig: " << cs::Utils::byteStreamToHex(for_sig.data(), for_sig.size());
+        csdebug() << "Transaction: " << cs::Utils::byteStreamToHex(t1.data(), t1.size());
+        cs::Signature sig = cscrypto::generateSignature(pKey2, for_sig.data(), for_sig.size());
+        transaction.set_signature(sig);
         transactionPack.addTransaction(transaction);
     }
 
@@ -940,6 +960,8 @@ void Node::createTestTransaction() {
 
     cs::Conveyer::instance().addContractPacket(transactionPack);
     csmeta(csdebug) << "NODE> Sending bad transaction's packet to all";
+#else
+    csunused(tType);
 #endif
 }
 
@@ -1027,7 +1049,7 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                 std::for_each(resume.cbegin(), resume.cend(), [&](const auto& item) {
                     cnt += item.second;
                     os_rej << Reject::to_string(item.first) << " (" << item.second << ") ";
-                });
+                    });
                 csevent() << log_prefix << "rejected " << cnt << " transactions the following reasons: " << os_rej.str()
                     << " on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
@@ -1051,7 +1073,8 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                 }
             }
             else {
-                csevent() << log_prefix << "failed to parse item " << list_action << " black list";
+                csevent() << log_prefix << "failed to parse item " << list_action << " black list from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::AlarmInvalidBlock) {
@@ -1063,7 +1086,8 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                     << " is alarmed by " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
             else {
-                csevent() << log_prefix << "failed to parse invalid block alarm report";
+                csevent() << log_prefix << "failed to parse invalid block alarm report from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::ConsensusSilent || event_id == EventReport::Id::ConsensusLiar) {
@@ -1075,7 +1099,8 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                     << " in round consensus";
             }
             else {
-                csevent() << log_prefix << "failed to parse invalid round consensus " << problem_name << " report";
+                csevent() << log_prefix << "failed to parse invalid round consensus " << problem_name << " report from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::ConsensusFailed) {
@@ -1107,21 +1132,35 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
                 }
             }
             else {
-                csevent() << log_prefix << "failed to parse invalid contract consensus " << problem_name << " report";
+                csevent() << log_prefix << "failed to parse invalid contract consensus " << problem_name << " report from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::RejectContractExecution) {
             cs::SmartContractRef ref;
             Reject::Reason reason;
             if (EventReport::parseRejectContractExecution(bin_pack, ref, reason)) {
-                csevent() << log_prefix << "execution of " << ref << " is rejected, " << Reject::to_string(reason);
+                csevent() << log_prefix << "execution of " << ref << " is rejected by "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << ", " << Reject::to_string(reason);
             }
             else {
-                csevent() << log_prefix << "failed to parse invalid contract execution reject";
+                csevent() << log_prefix << "failed to parse invalid contract execution reject from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
             }
         }
         else if (event_id == EventReport::Id::Bootstrap) {
-            csevent() << log_prefix << "bootsrap round";
+            csevent() << log_prefix << "bootsrap round on " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+        }
+        else if (event_id == EventReport::RunningStatus) {
+            Running::Status status;
+            if (EventReport::parseRunningStatus(bin_pack, status)) {
+                csevent() << log_prefix << cs::Utils::byteStreamToHex(sender.data(), sender.size())
+                    << " updated status to " << Running::to_string(status);
+            }
+            else {
+                csevent() << log_prefix << "failed to parse invalid running status from "
+                    << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+            }
         }
     }
     else {
@@ -2721,7 +2760,8 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
         uint64_t currentTimeStamp;
         [[maybe_unused]] uint64_t rpTimeStamp;
         try {
-            lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+            std::string lTS = getBlockChain().getLastTimeStamp();
+            lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
         }
         catch (...) {
             csdebug() << __func__ << ": last block Timestamp was announced as zero";
@@ -3073,7 +3113,8 @@ void Node::sendHash(cs::RoundNumber round) {
     uint64_t currentTimeStamp = 0;
 
     try {
-        lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+        std::string lTS = getBlockChain().getLastTimeStamp();
+        lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
         currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
     }
     catch (const std::exception& exception) {
@@ -3150,7 +3191,8 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     uint64_t currentTimeStamp = 0;
 
     try {
-        lastTimeStamp = std::stoull(getBlockChain().getLastTimeStamp());
+        std::string lTS = getBlockChain().getLastTimeStamp();
+        lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
         currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
     }
     catch (const std::exception& exception) {
@@ -3655,6 +3697,20 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
             /*| cs::BlockValidator::ValidationLevel::smartStates*/
             /*| cs::BlockValidator::ValidationLevel::accountBalance*/,
         cs::BlockValidator::SeverityLevel::onlyFatalErrors)) {
+        *shouldStop = true;
+        return;
+    }
+}
+
+void Node::deepBlockValidation(csdb::Pool block, bool* shouldStop) {
+    if (!blockValidator_->validateBlock(block,
+        cs::BlockValidator::ValidationLevel::hashIntergrity
+        /*| cs::BlockValidator::ValidationLevel::blockSignatures*/
+        | cs::BlockValidator::ValidationLevel::smartSignatures
+        /*| cs::BlockValidator::ValidationLevel::balances*/
+        /*| cs::BlockValidator::ValidationLevel::smartStates*/
+        /*| cs::BlockValidator::ValidationLevel::accountBalance*/,
+        cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
         *shouldStop = true;
         return;
     }

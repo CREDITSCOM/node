@@ -758,17 +758,22 @@ void cs::Executor::checkExecutorVersion() {
     connect();
     getExecutorBuildVersion(_return);
 
-    cserror() << "start contract executor error code " << int(_return.status.code) << ": " << _return.status.message;
+    if (_return.status.code != 0) {
+        cserror() << "Start contract executor error code " << int(_return.status.code) << ": " << _return.status.message;
+    }
+    else {
+        cslog() << "Start contract executor: " << _return.status.message << ". Executor build number " << _return.commitNumber;
+    }
 
     result = _return.commitNumber < commitMin_ || (_return.commitNumber > commitMax_ && commitMax_ != -1);
     csdebug() << "[executorInfo]: commitNumber: " << _return.commitNumber << ", commitHash: " << _return.commitHash;
 
     if (result) {
         if (commitMax_ != -1) {
-            cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. " << commitMax_ << ")";
+            cserror() << "Executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. " << commitMax_ << ")";
         }
         else {
-            cserror() << "executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. any)";
+            cserror() << "Executor commit number: " << _return.commitNumber << " is out of range (" << commitMin_ << " .. any)";
         }
 
         auto terminate = [this] {

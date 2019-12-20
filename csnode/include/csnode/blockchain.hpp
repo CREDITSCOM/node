@@ -35,6 +35,8 @@ class Fee;
 class TransactionsIndex;
 class TransactionsPacket;
 
+/** @brief   The synchronized block signal emits when block is trying to be stored */
+using TryToStoreBlockSignal = cs::Signal<void(const csdb::Pool&, bool*)>;
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
 using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 
@@ -190,6 +192,9 @@ public signals:
     /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
     cs::StoreBlockSignal storeBlockEvent;
 
+    /** @brief The event storing synchronized block. Raised when the next incoming block is trying to be stored into chain */
+    cs::TryToStoreBlockSignal tryToStoreBlockEvent;
+
     /** @brief The cached block event. Raised when the next block is flushed to storage */
     cs::ChangeBlockSignal cachedBlockEvent;
 
@@ -252,6 +257,8 @@ public:
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
 
     void setBlocksToBeRemoved(cs::Sequence number);
+
+    void printWalletCaches();
 
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);
