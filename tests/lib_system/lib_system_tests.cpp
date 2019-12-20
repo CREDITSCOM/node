@@ -588,7 +588,7 @@ TEST(LockFreeChanger, BaseUsage) {
 
     const size_t maxCycles = 10000;
     const size_t writersCount = std::thread::hardware_concurrency();
-    const size_t readersCount = std::thread::hardware_concurrency();
+    const size_t readersCount = writersCount;
 
     std::atomic<bool> isExecute = { true };
 
