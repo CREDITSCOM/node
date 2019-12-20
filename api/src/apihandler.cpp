@@ -620,12 +620,12 @@ csdb::Transaction APIHandler::makeTransaction(const Transaction& transaction) {
     return send_transaction;
 }
 
-std::string get_delimited_transaction_sighex(const csdb::Transaction& tr) {
+std::string getDelimitedTransactionSigHex(const csdb::Transaction& tr) {
     auto bs = fromByteArray(tr.to_byte_stream_for_sig());
     return std::string({' '}) + cs::Utils::byteStreamToHex(bs.data(), bs.length());
 }
 
-void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, const csdb::Transaction& tr) {
+void APIHandler::dumbTransactionFlow(api::TransactionFlowResult& _return, const csdb::Transaction& tr) {
     //auto tr = makeTransaction(transaction);
 
     // remember dumb transaction 
@@ -637,17 +637,26 @@ void APIHandler::dumb_transaction_flow(api::TransactionFlowResult& _return, cons
 
     cs::Conveyer::instance().addTransaction(tr);
 
-    // wait for transaction in blockchain  
-    if (!dumbCv_.waitCvSignal(tr.signature())) {
-        SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
-        return;
+    // wait for transaction in blockchain
+    cs::DumbCv::Condition condition = dumbCv_.waitCvSignal(tr.signature());
+
+    switch (condition) {
+    case cs::DumbCv::Condition::Success: {
+            auto newTransactionId = dumbCv_.getTransactionId();
+            _return.id.poolSeq = static_cast<int64_t>(newTransactionId.pool_seq());
+            _return.id.index = static_cast<int32_t>(newTransactionId.index());
+
+            SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, getDelimitedTransactionSigHex(tr));
+        }
+        break;
+
+    case cs::DumbCv::Condition::Expired:
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is expired");
+        break;
+
+    default:
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Wrong Node behaviour");
     }
-
-    auto newTransactionId = dumbCv_.getTransactionId();
-    _return.id.poolSeq = newTransactionId.pool_seq();
-    _return.id.index = newTransactionId.index();
-
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(tr));
 }
 
 template <typename T>
@@ -773,7 +782,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
     return std::nullopt;
 }
 
-void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, const Transaction& transaction, csdb::Transaction& send_transaction) {
+void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction, csdb::Transaction& send_transaction) {
     auto input_smart = transaction.__isset.smartContract ? transaction.smartContract : SmartContractInvocation{};
     //auto send_transaction = makeTransaction(transaction);
     const auto smart_addr = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
@@ -934,7 +943,7 @@ void APIHandler::smart_transaction_flow(api::TransactionFlowResult& _return, con
     _return.id.poolSeq = newTransactionId.pool_seq();
     _return.id.index = newTransactionId.index();
 
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, get_delimited_transaction_sighex(send_transaction));
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, getDelimitedTransactionSigHex(send_transaction));
 }
 
 void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction) {
@@ -942,14 +951,14 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
     csdb::Transaction transactionToSend;
     if (auto errInfo = checkTransaction(transaction, transactionToSend); errInfo.has_value()) {
         _return.status.code = int8_t(ERROR_CODE);
-        _return.status.message  = errInfo.value();
+        _return.status.message = errInfo.value();
         return;
     }
 
     if(!transaction.__isset.smartContract && !solver_.smart_contracts().is_payable_call(transactionToSend))
-        dumb_transaction_flow(_return, transactionToSend);
+        dumbTransactionFlow(_return, transactionToSend);
     else
-        smart_transaction_flow(_return, transaction, transactionToSend);
+        smartTransactionFlow(_return, transaction, transactionToSend);
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
@@ -1075,11 +1084,29 @@ void APIHandler::baseLoaded(const csdb::Pool& pool) {
 }
 
 void APIHandler::maxBlocksCount(cs::Sequence lastBlockNum) {
-    if (!lastBlockNum)
+    if (!lastBlockNum) {
         isBDLoaded_ = true;
+    }
+
     maxReadSequence = lastBlockNum;
 }
 
+void APIHandler::onPacketExpired(const cs::TransactionsPacket& packet) {
+    const auto& transactions = packet.transactions();
+
+    if (transactions.empty()) {
+        return;
+    }
+
+    for (const auto& transaction : transactions) {
+        if (is_smart(transaction) || is_smart_state(transaction) || solver_.smart_contracts().is_payable_call(transaction)) {
+            // do nothing
+        }
+        else { // if dumb transaction
+            dumbCv_.sendCvSignal(transaction.signature(), cs::DumbCv::Condition::Expired);
+        }
+    }
+}
 
 void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {
 #ifdef USE_DEPRECATED_STATS
@@ -1355,7 +1382,7 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
         }
         else { // if dumb transaction
             dumbCv_.setTransactionId(trx.id());
-            dumbCv_.sendCvSignal(trx.signature());
+            dumbCv_.sendCvSignal(trx.signature(), cs::DumbCv::Condition::Success);
         }
     }
 }
