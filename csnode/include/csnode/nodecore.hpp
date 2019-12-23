@@ -52,7 +52,7 @@ enum NodeConsts : uint32_t {
 
 enum ConveyerConsts : uint32_t {
     TransactionsFlushRound = 2,
-    TransactionsPacketInterval = 1000
+    TransactionsPacketInterval = 250
 };
 
 enum ConfidantConsts : Byte {
