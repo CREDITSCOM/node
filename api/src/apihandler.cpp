@@ -654,6 +654,10 @@ void APIHandler::dumbTransactionFlow(api::TransactionFlowResult& _return, const 
         SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is expired");
         break;
 
+    case cs::DumbCv::Condition::TimeOut:
+        SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
+        break;
+
     default:
         SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Wrong Node behaviour");
     }
@@ -847,8 +851,8 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
             std::vector<executor::MethodHeader> methodHeaders;
             {
                 executor::MethodHeader tmp;
-                tmp.methodName  = input_smart.method;
-                tmp.params      = input_smart.params;
+                tmp.methodName = input_smart.method;
+                tmp.params = input_smart.params;
                 methodHeaders.push_back(tmp);
             }
             auto smartAddr = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
@@ -876,9 +880,14 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     cs::Hash hashState;
     csdb::TransactionID newTransactionId{};
 
+    cs::DumbCv::Condition condition = cs::DumbCv::Condition::Success;
+
     if (deploy) {
         auto resWait = hashStateEntry->waitTillFront([&](HashState& ss) {
             hashState = ss.hash;
+
+            if (condition = ss.condition; condition != cs::DumbCv::Condition::Success)
+                return true;
 
             if (!ss.condFlg) {
                 return false;
@@ -887,7 +896,7 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
             ss.condFlg = false;
             newTransactionId = ss.id;
             return true;
-        });
+            });
 
         {
             auto hashStateInst(lockedReference(this->hashStateSL));
@@ -898,6 +907,12 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
             return;
         }
+
+        if (condition == cs::DumbCv::Condition::Expired) {
+            SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is expired");
+            return;
+        }
+
         if (hashState == cs::Zero::hash) {
             _return.status.code = int8_t(ERROR_CODE);
             _return.status.message = "new hash of state is empty!";
@@ -907,17 +922,20 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     else {
         std::string retVal;
         auto resWait = hashStateEntry->waitTillFront([&](HashState& ss) {
+            if (condition = ss.condition; condition != cs::DumbCv::Condition::Success)
+                return true;
+
             if (!ss.condFlg) {
                 return false;
             }
 
-            hashState   = ss.hash;
-            retVal      = ss.retVal;
-            ss.condFlg  = false;
+            hashState = ss.hash;
+            retVal = ss.retVal;
+            ss.condFlg = false;
             newTransactionId = ss.id;
 
             return true;
-        });
+            });
 
         {
             auto hashStateInst(lockedReference(this->hashStateSL));
@@ -928,6 +946,11 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
             SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
             return;
         }
+
+        if (condition == cs::DumbCv::Condition::Expired) {
+            SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is expired");
+            return;
+        } 
 
         if (hashState.empty()) {
             _return.status.code = int8_t(ERROR_CODE);
@@ -1100,7 +1123,17 @@ void APIHandler::onPacketExpired(const cs::TransactionsPacket& packet) {
 
     for (const auto& transaction : transactions) {
         if (is_smart(transaction) || is_smart_state(transaction) || solver_.smart_contracts().is_payable_call(transaction)) {
-            // do nothing
+            auto hashStateInst(lockedReference(this->hashStateSL));
+            auto& item = (*hashStateInst)[transaction.signature()];
+
+            if (!item)
+                item = std::make_shared<smartHashStateEntry>();
+
+            item->updateHash([&](const HashState& oldHash) {
+                HashState res;
+                res.condition = cs::DumbCv::Condition::Expired;
+                return res;
+                });
         }
         else { // if dumb transaction
             dumbCv_.sendCvSignal(transaction.signature(), cs::DumbCv::Condition::Expired);
