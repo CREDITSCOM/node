@@ -183,6 +183,7 @@ private:
         bool isOld{false};
         bool condFlg{false};
         csdb::TransactionID id{};
+        cs::DumbCv::Condition condition{};
     };
 
     using client_type = executor::ContractExecutorConcurrentClient;
