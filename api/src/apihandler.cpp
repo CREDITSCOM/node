@@ -814,7 +814,6 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     cs::Conveyer::instance().addTransaction(send_transaction);
 
     cs::Hash hashState;
-
     cs::DumbCv::Condition condition = cs::DumbCv::Condition::Success;
 
     if (deploy) {
@@ -856,8 +855,9 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     else {
         std::string retVal;
         auto resWait = hashStateEntry->waitTillFront([&](HashState& ss) {
-            if (condition = ss.condition; condition != cs::DumbCv::Condition::Success)
+            if (condition = ss.condition; condition != cs::DumbCv::Condition::Success) {
                 return true;
+            }
 
             if (!ss.condFlg) {
                 return false;
@@ -868,7 +868,7 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
             ss.condFlg = false;
 
             return true;
-            });
+        });
 
         {
             auto hashStateInst(lockedReference(this->hashStateSL));
@@ -909,10 +909,13 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
     }
 
     auto dbTransaction = makeTransaction(transaction);
-    if (!transaction.__isset.smartContract && !solver_.smart_contracts().is_payable_call(dbTransaction))
+
+    if (!transaction.__isset.smartContract && !solver_.smart_contracts().is_payable_call(dbTransaction)) {
         dumbTransactionFlow(_return, transaction);
-    else
+    }
+    else {
         smartTransactionFlow(_return, transaction);
+    }
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
@@ -1056,6 +1059,10 @@ void APIHandler::onPacketExpired(const cs::TransactionsPacket& packet) {
         if (is_smart(transaction) || is_smart_state(transaction) || solver_.smart_contracts().is_payable_call(transaction)) {
             auto hashStateInst(lockedReference(this->hashStateSL));
             auto& item = (*hashStateInst)[transaction.signature()];
+
+            if (!item) {
+                item = std::make_shared<smartHashStateEntry>();
+            }
 
             item->updateHash([&](const HashState&) {
                 HashState res;
