@@ -1058,7 +1058,7 @@ void Transport::sendRegistrationConfirmation(const Connection& conn, const Conne
 }
 
 void Transport::sendRegistrationRefusal(const Connection& conn, const RegistrationRefuseReasons reason) {
-    cslog() << "Refusing registration with " << conn.in << " reason: " << parseRefusalReason(reason);
+    csdebug() << "Refusing registration with " << conn.in << " reason: " << parseRefusalReason(reason);
 
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
@@ -1190,7 +1190,7 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
     }
 
     std::string reasonInfo = parseRefusalReason(reason);
-    cslog() << "Registration to " << task->sender << " refused: " << reasonInfo;
+    csdebug() << "Registration to " << task->sender << " refused by remote: " << reasonInfo;
 
     switch (reason) {
     case RegistrationRefuseReasons::BadClientVersion:
