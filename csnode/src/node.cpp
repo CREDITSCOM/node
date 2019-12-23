@@ -2,6 +2,7 @@
 #include <csignal>
 #include <numeric>
 #include <sstream>
+#include <numeric>
 
 #include <solver/consensus.hpp>
 #include <solver/solvercore.hpp>
@@ -36,7 +37,6 @@
 #include <cscrypto/cscrypto.hpp>
 
 #include <observer.hpp>
-#include  <numeric>
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
