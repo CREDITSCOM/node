@@ -1327,7 +1327,9 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
         auto smartsOperns   = lockedReference(this->smart_operations);
         auto smartsPending  = lockedReference(this->smarts_pending);
 
-        for (auto&[seq, vId] : *smartsPending) {
+        for (auto iter = smartsPending->begin(); iter != smartsPending->end();) {
+            auto&[seq, vId] = *iter;
+
             if (pool.sequence() - seq < MAX_ROUND_WAITING) {
                 break;
             }
@@ -1338,7 +1340,7 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
                 }
             }
 
-            smartsPending->erase(seq);
+            iter = smartsPending->erase(iter);
         }
 
         cleanCount = 0;
