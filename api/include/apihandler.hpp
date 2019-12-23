@@ -182,6 +182,7 @@ private:
         std::string retVal{};
         bool isOld{false};
         bool condFlg{false};
+        cs::DumbCv::Condition condition{};
     };
 
     using client_type = executor::ContractExecutorConcurrentClient;
