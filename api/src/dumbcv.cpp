@@ -23,12 +23,11 @@ void cs::DumbCv::sendCvSignal(const cs::Signature& signature, Condition conditio
 }
 
 cs::DumbCv::Condition cs::DumbCv::waitCvSignal(const cs::Signature& signature) {
-    bool isTimeOver = false;
     Condition condition = cs::DumbCv::Condition::TimeOut;
     std::unique_lock lock(mutex_);
 
     if (auto it = cvInfo_.find(signature); it != cvInfo_.end()) {
-        isTimeOver = it->second.cv.wait_for(lock, std::chrono::seconds(kWaitTimeMs), [it]() -> bool {
+        it->second.cv.wait_for(lock, std::chrono::seconds(kWaitTimeMs), [it]() -> bool {
             return it->second.condFlg;
         });
 
