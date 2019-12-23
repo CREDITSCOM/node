@@ -1126,6 +1126,9 @@ void APIHandler::onPacketExpired(const cs::TransactionsPacket& packet) {
             auto hashStateInst(lockedReference(this->hashStateSL));
             auto& item = (*hashStateInst)[transaction.signature()];
 
+            if (!item)
+                item = std::make_shared<smartHashStateEntry>();
+
             item->updateHash([&](const HashState& oldHash) {
                 HashState res;
                 res.condition = cs::DumbCv::Condition::Expired;
