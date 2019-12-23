@@ -885,7 +885,7 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
             return;
         } 
 
-        if (hashState.empty()) {
+        if (hashState == cs::Zero::hash) {
             _return.status.code = int8_t(ERROR_CODE);
             _return.status.message = "new hash of state is empty!";
             return;
