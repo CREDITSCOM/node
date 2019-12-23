@@ -2,6 +2,7 @@
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+#include <lib/system/concurrent.hpp>
 
 #include <configholder.hpp>
 
@@ -171,7 +172,9 @@ void RoundStat::checkRoundElapse() {
         return;
     }
 
-    emit roundTimeElapsed();
+    cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, [this] {
+        emit roundTimeElapsed();
+    });
 
     {
         // reset time point to tick next time after limit
@@ -197,7 +200,9 @@ void RoundStat::checkStoreBlockElapse() {
         return;
     }
 
-    emit storeBlockTimeElapsed();
+    cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, [this] {
+        emit storeBlockTimeElapsed();
+    });
 
     {
         cs::Lock lock(statsElapseMutex_);
