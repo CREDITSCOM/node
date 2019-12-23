@@ -26,6 +26,7 @@ BlockValidator::BlockValidator(Node& node)
     /*HtimoDtTYGSVotnQ5Eo4eud3FkDv5r2QYiKSZcdWP7Z8 - Timo*/
     /*Auh5VP1qJ8kQmWSzv7F6UEEExfBPmG39edxc9idRCfcR - zero balance after 4 trx*/
     plugins_.insert(std::make_pair(accountBalance, std::make_unique<AccountBalanceChecker>(*this, "Auh5VP1qJ8kQmWSzv7F6UEEExfBPmG39edxc9idRCfcR")));
+    plugins_.insert(std::make_pair(balancesOnly, std::make_unique<BalanceOnlyChecker>(*this)));
 }
 
 BlockValidator::~BlockValidator() {}

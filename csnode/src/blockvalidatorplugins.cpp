@@ -364,6 +364,28 @@ ValidationPlugin::ErrorType BalanceChecker::validateBlock(const csdb::Pool&) {
   return ErrorType::noError;
 }
 
+
+ValidationPlugin::ErrorType BalanceOnlyChecker::validateBlock(const csdb::Pool& pool) {
+    if (pool.transactions().empty()) {
+        return ErrorType::noError;
+    }
+
+    const auto& trxs = pool.transactions();
+    auto wallets = getWallets();
+    wallets->updateFromSource();
+    for (const auto& t : trxs) {
+        const auto& wallState = wallets->getData(t.source());
+        if (wallState.balance_ < zeroBalance_) {
+            cserror() << kLogPrefix << "error detected in pool " << pool.sequence()
+                << ", wall address " << t.source().to_string()
+                << " has balance " << wallState.balance_.to_double();
+            return ErrorType::error;
+        }
+    }
+
+    return ErrorType::noError;
+}
+
 ValidationPlugin::ErrorType TransactionsChecker::validateBlock(const csdb::Pool& block) {
   const auto& trxs = block.transactions();
   std::set<csdb::Address> newStates;
