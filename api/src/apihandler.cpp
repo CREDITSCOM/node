@@ -1397,6 +1397,7 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
 
             if (pool.sequence() - seq < MAX_ROUND_WAITING) {
                 break;
+            }
 
             for (auto& id : vId) {
                 if ((*smartsOperns)[id].state == SmartOperation::State::Pending) {
