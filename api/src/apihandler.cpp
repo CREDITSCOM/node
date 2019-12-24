@@ -1391,16 +1391,21 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
     if ((cleanCount++) > MAX_ROUND_WAITING) {
         auto smartsOperns   = lockedReference(this->smart_operations);
         auto smartsPending  = lockedReference(this->smarts_pending);
-        for (auto&[seq, vId] : *smartsPending) {
-            if (pool.sequence() - seq < MAX_ROUND_WAITING)
+
+        for (auto iter = smartsPending->begin(); iter != smartsPending->end();) {
+            auto&[seq, vId] = *iter;
+
+            if (pool.sequence() - seq < MAX_ROUND_WAITING) {
                 break;
+            }
 
             for (auto& id : vId) {
                 if ((*smartsOperns)[id].state == SmartOperation::State::Pending) {
                     (*smartsOperns)[id].state = SmartOperation::State::Failed;
                 }
             }
-            smartsPending->erase(seq);
+
+            iter = smartsPending->erase(iter);
         }
         cleanCount = 0;
     }

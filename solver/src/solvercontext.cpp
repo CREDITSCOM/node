@@ -237,7 +237,12 @@ void SolverContext::request_round_info(uint8_t respondent1, uint8_t respondent2)
 }
 
 void SolverContext::send_rejected_smarts(const std::vector<RefExecution>& reject_list) {
-    csdebug() << kLogPrefix << "sending " << reject_list.size() << " rejected contract calls";
+    std::ostringstream os;
+    os << "sending " << reject_list.size() << " rejected contract calls: ";
+    for (const auto& item : reject_list) {
+        os << FormatRef(item.first, item.second) << ' ';
+    }
+    csdebug() << kLogPrefix << os.str();
     core.pnode->sendSmartReject(reject_list);
 }
 
