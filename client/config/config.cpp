@@ -964,6 +964,22 @@ bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const st
     return false;
 }
 
+bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, std::string& value) {
+    if (data.count(param)) {
+        auto readValue = data.get<std::string>(param);
+
+        if (readValue.empty()) {
+            std::cout << "[warning] Config.ini> Please, check the block: [" << block << "], so that param: [" << param << "] is empty" << std::endl;
+            return false;
+        }
+
+        value = std::move(readValue);
+        return true;
+    }
+
+    return false;
+}
+
 bool operator==(const EndpointData& lhs, const EndpointData& rhs) {
     return lhs.ip == rhs.ip &&
            lhs.port == rhs.port &&

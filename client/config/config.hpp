@@ -281,6 +281,7 @@ private:
 
     template <typename T>
     bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value);
+    bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, std::string& value);
 
     bool good_ = false;
 
