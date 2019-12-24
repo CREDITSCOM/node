@@ -143,6 +143,9 @@ Reject::Reason TransactionsValidator::validateCommonAsSource(SolverContext& cont
             }
 
             newBalance = wallState.balance_ - trx.amount();
+            if (newBalance < zeroBalance_) {
+                validNewStates_.back().second = false;
+            }
         }
         else {
             if (smarts.is_known_smart_contract(trx.target())) {
@@ -288,13 +291,20 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
         ++i;
     }
 
+
+    std::set<csdb::Address> uniqueInvalidatedStates;
     for (auto& state : validNewStates_) {
-        if (isRejectedSmart(smarts.absolute_address(trxs[state.first].source()))) {
+        auto contract_abs_addr = smarts.absolute_address(trxs[state.first].source());
+        if (isRejectedSmart(contract_abs_addr)) {
+            if (getRejectReason(contract_abs_addr) == Reject::Reason::NegativeResult && !state.second) {
+                if (!uniqueInvalidatedStates.insert(contract_abs_addr).second) {
+                    state.second = true;
+                }
+            }
             continue;
         }
 
         csdb::Transaction initTransaction = SmartContracts::get_transaction(context.blockchain(), trxs[state.first]);
-        const csdb::Address contract_abs_addr = smarts.absolute_address(initTransaction.target());
         auto it = std::find_if(rejectedSmarts.cbegin(), rejectedSmarts.cend(),
                                [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == contract_abs_addr); });
         if (it != rejectedSmarts.end()) {
@@ -302,6 +312,7 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
             wallState.balance_ += initTransaction.amount();
             if (wallState.balance_ >= zeroBalance_) {
                 restoredCounter += makeSmartsValid(context, rejectedSmarts, it->first.source(), maskIncluded);
+                state.second = true;
             }
             else {
                 state.second = false;
