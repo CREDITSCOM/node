@@ -1144,7 +1144,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         //validate block to prevent bc from saving invalid instances:
         bool check_failed = false;
         emit tryToStoreBlockEvent(pool, &check_failed);
-        if (bySync && check_failed) {
+        if (check_failed) {
             csdebug() << kLogPrefix << "The pool " << pool.sequence() << " is invalid, won't be stored";
             return false;
         }

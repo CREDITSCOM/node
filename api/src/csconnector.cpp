@@ -134,6 +134,10 @@ void connector::onPacketExpired(const cs::TransactionsPacket& packet) {
     api_handler->onPacketExpired(packet);
 }
 
+void connector::onTransactionsRejected(const cs::TransactionsPacket& packet) {
+    api_handler->onTransactionsRejected(packet);
+}
+
 connector::ApiHandlerPtr connector::apiHandler() const {
     return api_handler;
 }

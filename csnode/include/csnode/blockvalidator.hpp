@@ -28,7 +28,8 @@ public:
         balances = 1 << 5,
         transactionsSignatures = 1 << 6,
         smartStates = 1 << 7,
-        accountBalance = 1 << 8
+        accountBalance = 1 << 8,
+        balancesOnly = 1 << 9
     };
 
     enum SeverityLevel : uint8_t {

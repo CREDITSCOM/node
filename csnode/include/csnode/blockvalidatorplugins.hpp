@@ -126,6 +126,21 @@ private:
     static constexpr csdb::Amount zeroBalance_ = 0;
 };
 
+
+///
+/// @brief check balances of the given block accounts
+///
+class BalanceOnlyChecker : public ValidationPlugin {
+public:
+    BalanceOnlyChecker(BlockValidator& bv)
+        : ValidationPlugin(bv) {
+    }
+    ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+    static constexpr csdb::Amount zeroBalance_ = 0;
+};
+
 class TransactionsChecker : public ValidationPlugin {
 public:
     TransactionsChecker(BlockValidator& bv)
