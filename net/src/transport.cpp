@@ -1047,7 +1047,7 @@ void Transport::sendRegistrationRequest(Connection& conn) {
 }
 
 void Transport::sendRegistrationConfirmation(const Connection& conn, const Connection::Id requestedId) {
-    cslog() << "Confirming registration with " << conn.getOut();
+    csdebug() << "Confirming registration with " << conn.getOut();
 
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
@@ -1070,7 +1070,7 @@ void Transport::sendRegistrationRefusal(const Connection& conn, const Registrati
 
 // Requests processing
 bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
-    cslog() << "Got registration request from " << task->sender;
+    csdebug() << "Got registration request from " << task->sender;
 
     NodeVersion version;
     uint64_t remoteUuid = 0;
@@ -1156,7 +1156,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
 }
 
 bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
-    cslog() << "Got registration confirmation from " << task->sender;
+    csdebug() << "Got registration confirmation from " << task->sender;
 
     ConnectionId myCId;
     ConnectionId realCId;
@@ -1387,7 +1387,7 @@ bool Transport::gotSSNewFriends()
         }
     }
 
-    cslog() << "Save new friends nodes";
+    csdebug() << "Save new friends nodes";
     return true;
 
 }
@@ -1758,7 +1758,7 @@ void Transport::sendSSIntroduceConsensus(const std::vector<cs::PublicKey>& keys)
 
     ssEp_ = net_->resolve(cs::ConfigHolder::instance().config()->getSignalServerEndpoint());
 
-    cslog() << "Send IntroduceConsensus to start node on " << ssEp_;
+    csdebug() << "Send IntroduceConsensus to start node on " << ssEp_;
 
     cs::Lock lock(oLock_);
 

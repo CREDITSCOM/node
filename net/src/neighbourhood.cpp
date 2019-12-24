@@ -376,7 +376,7 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
     cs::Lock lock(mLockFlag_);
 
     if (enoughConnections()) {
-        cslog() << "Connections limit has reached, ignore request connection to " << ep;
+        csdebug() << "Connections limit has reached, ignore request connection to " << ep;
         return;
     }
 
@@ -540,7 +540,7 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     conn->attempts = 0;
 
     if (enoughConnections()) {
-        cswarning() << "Can not add neighbour, neighbours size is equal to max possible neighbours";
+        csdebug() << "Can not add neighbour, neighbours count is equal to max possible neighbours";
         return;
     }
     // to provide some rotation in neighbours_ add to begin, restrict at the end of:
@@ -813,7 +813,7 @@ void Neighbourhood::pingNeighbours() {
             if (!nb->isSignal) {
                 ++cnt_ping;
                 if (cnt_ping > max_cnt) {
-                    cslog() << "Connections limit " << max_cnt << " has reached, ignore the rest neighbours";
+                    csdebug() << "Connections limit " << max_cnt << " has reached, ignore the rest neighbours";
                     break;
                 }
             }
