@@ -1035,7 +1035,7 @@ void Transport::sendRegistrationRequest(Connection& conn) {
         return;
     }
 
-    cslog() << "Sending registration request to " << (conn.specialOut ? conn.out : conn.in);
+    csdebug() << "Sending registration request to " << (conn.specialOut ? conn.out : conn.in);
 
     cs::Lock lock(oLock_);
     Packet req(netPacksAllocator_.allocateNext(cs::numeric_cast<uint32_t>(regPack_.size())));
@@ -1058,7 +1058,7 @@ void Transport::sendRegistrationConfirmation(const Connection& conn, const Conne
 }
 
 void Transport::sendRegistrationRefusal(const Connection& conn, const RegistrationRefuseReasons reason) {
-    cslog() << "Refusing registration with " << conn.in << " reason: " << parseRefusalReason(reason);
+    csdebug() << "Refusing registration with " << conn.in << " reason: " << parseRefusalReason(reason);
 
     cs::Lock lock(oLock_);
     oPackStream_.init(BaseFlags::NetworkMsg);
@@ -1146,7 +1146,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
     }
 
     if (!neighbourhood_.canAddNeighbour()) {
-        cslog() << "Connections limit has reached, ignore registration request from " << conn.getOut();
+        csdebug() << "Connections limit has reached, ignore registration request from " << conn.getOut();
         sendRegistrationRefusal(conn, RegistrationRefuseReasons::LimitReached);
         return true;
     }
@@ -1179,7 +1179,7 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, Remote
 }
 
 bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodePtr&) {
-    cslog() << "Got registration refusal from " << task->sender;
+    csdebug() << "Got registration refusal from " << task->sender;
 
     RegistrationRefuseReasons reason;
     Connection::Id id;
@@ -1190,17 +1190,22 @@ bool Transport::gotRegistrationRefusal(const TaskPtr<IPacMan>& task, RemoteNodeP
     }
 
     std::string reasonInfo = parseRefusalReason(reason);
-    cslog() << "Registration to " << task->sender << " refused: " << reasonInfo;
 
     switch (reason) {
     case RegistrationRefuseReasons::BadClientVersion:
+    case RegistrationRefuseReasons::IncompatibleBlockchain:
+        cslog() << "Registration to " << task->sender << " refused by remote: " << reasonInfo;
+        neighbourhood_.dropConnection(id);
+        break;
+
     case RegistrationRefuseReasons::BlackListed:
     case RegistrationRefuseReasons::LimitReached:
-    case RegistrationRefuseReasons::IncompatibleBlockchain:
+        csdebug() << "Registration to " << task->sender << " refused by remote: " << reasonInfo;
         neighbourhood_.dropConnection(id);
         break;
 
     default:
+        csdebug() << "Registration to " << task->sender << " refused by remote: " << reasonInfo;
         neighbourhood_.gotRefusal(id);
         break;
     }

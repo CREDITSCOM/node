@@ -289,9 +289,10 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
     }
 
     for (auto& state : validNewStates_) {
-        if (!state.second) {
+        if (isRejectedSmart(smarts.absolute_address(trxs[state.first].source()))) {
             continue;
         }
+
         csdb::Transaction initTransaction = SmartContracts::get_transaction(context.blockchain(), trxs[state.first]);
         const csdb::Address contract_abs_addr = smarts.absolute_address(initTransaction.target());
         auto it = std::find_if(rejectedSmarts.cbegin(), rejectedSmarts.cend(),

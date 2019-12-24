@@ -28,7 +28,7 @@ cs::DumbCv::Condition cs::DumbCv::waitCvSignal(const cs::Signature& signature) {
     std::unique_lock lock(mutex_);
 
     if (auto it = cvInfo_.find(signature); it != cvInfo_.end()) {
-        isTimeOver = it->second.cv.wait_for(lock, std::chrono::seconds(kWaitTimeMs), [it]() -> bool {
+        isTimeOver = it->second.cv.wait_for(lock, std::chrono::seconds(kWaitTimeSec), [it]() -> bool {
             return it->second.condFlg;
         });
 

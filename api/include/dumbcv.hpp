@@ -9,7 +9,7 @@
 namespace cs {
 // for answer dumb transactions
 class DumbCv {
-    const size_t kWaitTimeMs = 30;
+    const size_t kWaitTimeSec = 15 * 60;
 
 public:
     enum class Condition {

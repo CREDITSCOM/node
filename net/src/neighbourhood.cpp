@@ -318,7 +318,7 @@ void Neighbourhood::checkNeighbours() {
             });
             if (!to_drop.empty()) {
                 // drop ending connections to restrict total count
-                cslog() << "Drop " << to_drop.size() << " connections to provide " << reqSlotsAvail << " available slot(s)";
+                csdebug() << "Drop " << to_drop.size() << " connections to provide " << reqSlotsAvail << " available slot(s)";
                 for (const auto& id : to_drop) {
                     dropConnection(id);
                 }
