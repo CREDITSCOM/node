@@ -946,7 +946,7 @@ void Node::createTestTransaction(int tType) {
     transaction.set_counted_fee(csdb::AmountCommission(0.0));
     cs::TransactionsPacket transactionPack;    
     for (size_t i = 0; i < 1; ++i) {
-        transaction.set_innerID((tType-1)*2000);
+        transaction.set_innerID((tType-1)*20);
         auto for_sig = transaction.to_byte_stream_for_sig();
         auto t1 = transaction.to_byte_stream();
         csdebug() << "Transaction for sig: " << cs::Utils::byteStreamToHex(for_sig.data(), for_sig.size());
@@ -3013,7 +3013,6 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     //    ++it;
     //}
 
-
     cs::PacketsHashes hashes = rPackage.roundTable().hashes;
     cs::PublicKeys confidants = rPackage.roundTable().confidants;
     cs::RoundTable roundTable;
@@ -3702,21 +3701,41 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
     }
 }
 
-void Node::deepBlockValidation(csdb::Pool block, bool* shouldStop) {
-    if (!blockValidator_->validateBlock(block,
-        cs::BlockValidator::ValidationLevel::hashIntergrity
-        /*| cs::BlockValidator::ValidationLevel::blockSignatures*/
-        /*| cs::BlockValidator::ValidationLevel::smartSignatures*/
-        /*| cs::BlockValidator::ValidationLevel::balances*/
-        /*| cs::BlockValidator::ValidationLevel::smartStates*/
-        /*| cs::BlockValidator::ValidationLevel::accountBalance*/
-        /*| cs::BlockValidator::ValidationLevel::balances*/
-        | cs::BlockValidator::ValidationLevel::transactionsSignatures
-        | cs::BlockValidator::ValidationLevel::balancesOnly,
-        cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
-        *shouldStop = true;
+void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_failed should be FALSE of the block is ok 
+    auto smartPacks = cs::SmartContracts::grepNewStatesPacks(block.transactions());
+    auto& smartSignatures = block.smartSignatures();
+    if (smartPacks.size() != smartSignatures.size()) {
+        cserror() << "NODE> different size of smatrpackets and signatures at pool " << block.sequence();
+        *check_failed = true;
         return;
     }
+
+    auto iSignatures = smartSignatures.begin();
+    for (auto& it : smartPacks) {
+        for (auto p : iSignatures->signatures) {
+            it.addSignature(p.first, p.second);
+        }
+    }
+    cs::TransactionsPacket trxs;
+    for (auto& it : block.transactions()) {
+        trxs.addTransaction(it);
+    }
+    auto characteristic = solver_->ownValidation(trxs, smartPacks);
+    if (!characteristic.has_value()) {
+        cserror() << "NODE> can't get characteristic from pool " << block.sequence();
+        *check_failed = true;
+        return;
+    }
+    auto cMask = characteristic.value().mask;
+    for (auto it : cMask) {
+        if (it == 0) {
+            csdebug() << "NODE> invalid transaction found in pool #" << block.sequence();
+            *check_failed = true;
+            return;
+        }
+    }
+    csdebug() << "NODE> no bad transactions in pool #" << block.sequence();
+    *check_failed = false;
 }
 
 void Node::onRoundTimeElapsed() {

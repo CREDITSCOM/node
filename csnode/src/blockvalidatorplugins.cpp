@@ -150,13 +150,14 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
 ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block) {
   auto prevHash = block.previous_hash();
   auto& prevBlock = getPrevBlock();
+  
   auto data = prevBlock.to_binary();
   auto countedPrevHash = csdb::PoolHash::calc_from_data(cs::Bytes(data.data(),
                                                           data.data() +
                                                           prevBlock.hashingLength()));
   if (prevHash != countedPrevHash) {
-    csfatal() << kLogPrefix << ": prev pool's (" << prevBlock.sequence()
-              << ") hash != real prev pool's hash";
+      csfatal() << kLogPrefix << ": hash of block (" << prevBlock.sequence()
+          << ") hash != real prev pool's hash of (" << block.sequence() << ")";
     return ErrorType::fatalError;      
   }
   return ErrorType::noError;
@@ -368,6 +369,18 @@ ValidationPlugin::ErrorType BalanceChecker::validateBlock(const csdb::Pool&) {
 ValidationPlugin::ErrorType BalanceOnlyChecker::validateBlock(const csdb::Pool& pool) {
     if (pool.transactions().empty()) {
         return ErrorType::noError;
+    }
+    csdebug() << kLogPrefix << ": checking Block";
+    auto prevHash = pool.previous_hash();
+    auto prevBlock = getBlockChain().getLastBlock();
+    auto data = prevBlock.to_binary();
+    auto countedPrevHash = csdb::PoolHash::calc_from_data(cs::Bytes(data.data(),
+        data.data() +
+        prevBlock.hashingLength()));
+    if (prevHash != countedPrevHash) {
+        csfatal() << kLogPrefix << ": hash of block (" << prevBlock.sequence()
+            << ") hash: " << countedPrevHash.to_string() << " != real prev pool's hash of (" << pool.sequence() << "): " << prevHash.to_string();
+        return ErrorType::fatalError;
     }
 
     const auto& trxs = pool.transactions();
