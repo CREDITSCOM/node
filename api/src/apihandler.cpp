@@ -653,6 +653,10 @@ void APIHandler::dumbTransactionFlow(api::TransactionFlowResult& _return, const 
         SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is expired");
         break;
 
+    case cs::DumbCv::Condition::Rejected:
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is rejected");
+        break;
+
     case cs::DumbCv::Condition::TimeOut:
         SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
         break;
@@ -720,6 +724,34 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
     }
 
     return std::nullopt;
+}
+
+void APIHandler::checkTransactionsFlow(const cs::TransactionsPacket& packet, cs::DumbCv::Condition condition) {
+    const auto& transactions = packet.transactions();
+
+    if (transactions.empty()) {
+        return;
+    }
+
+    for (const auto& transaction : transactions) {
+        if (is_smart(transaction) || is_smart_state(transaction) || solver_.smart_contracts().is_payable_call(transaction)) {
+            auto hashStateInst(lockedReference(this->hashStateSL));
+            auto& item = (*hashStateInst)[transaction.signature()];
+
+            if (!item) {
+                item = std::make_shared<smartHashStateEntry>();
+            }
+
+            item->updateHash([&](const HashState&) {
+                HashState res;
+                res.condition = condition;
+                return res;
+            });
+        }
+        else {
+            dumbCv_.sendCvSignal(transaction.signature(), condition);
+        }
+    }
 }
 
 void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction) {
@@ -843,6 +875,11 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
 
         if (condition == cs::DumbCv::Condition::Expired) {
             SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is expired");
+            return;
+        }
+
+        if (condition == cs::DumbCv::Condition::Rejected) {
+            SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is rejected");
             return;
         }
 
@@ -1049,31 +1086,11 @@ void APIHandler::maxBlocksCount(cs::Sequence lastBlockNum) {
 }
 
 void APIHandler::onPacketExpired(const cs::TransactionsPacket& packet) {
-    const auto& transactions = packet.transactions();
+    checkTransactionsFlow(packet, cs::DumbCv::Condition::Expired);
+}
 
-    if (transactions.empty()) {
-        return;
-    }
-
-    for (const auto& transaction : transactions) {
-        if (is_smart(transaction) || is_smart_state(transaction) || solver_.smart_contracts().is_payable_call(transaction)) {
-            auto hashStateInst(lockedReference(this->hashStateSL));
-            auto& item = (*hashStateInst)[transaction.signature()];
-
-            if (!item) {
-                item = std::make_shared<smartHashStateEntry>();
-            }
-
-            item->updateHash([&](const HashState&) {
-                HashState res;
-                res.condition = cs::DumbCv::Condition::Expired;
-                return res;
-            });
-        }
-        else { // if dumb transaction
-            dumbCv_.sendCvSignal(transaction.signature(), cs::DumbCv::Condition::Expired);
-        }
-    }
+void APIHandler::onTransactionsRejected(const cs::TransactionsPacket& packet) {
+    checkTransactionsFlow(packet, cs::DumbCv::Condition::Rejected);
 }
 
 void APIHandler::collect_all_stats_slot(const csdb::Pool& pool) {

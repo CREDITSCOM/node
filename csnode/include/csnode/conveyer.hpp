@@ -19,6 +19,7 @@ using PacketFlushSignal = cs::Signal<void(const cs::TransactionsPacket&)>;
 using StatesSignal = cs::Signal<void(const std::vector<csdb::Transaction>&)>;
 using RoundChangeSignal = cs::Signal<void(cs::RoundNumber)>;
 using PacketExpiredSignal = cs::Signal<void(const cs::TransactionsPacket&)>;
+using RejectTransactionsSignal = cs::Signal<void(const cs::TransactionsPacket&)>;
 
 ///
 /// @brief The Conveyer class, represents utils and mechanics
@@ -275,6 +276,7 @@ public signals:
     cs::StatesSignal statesCreated;
     cs::RoundChangeSignal roundChanged;
     cs::PacketExpiredSignal packetExpired;
+    cs::RejectTransactionsSignal transactionsRejected;
 
 public slots:
 
