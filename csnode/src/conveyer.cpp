@@ -587,16 +587,18 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     // remove current hashes from table
     removeHashesFromTable(localHashes);
 
-    csdebug() << "\tinvalid transactions count " << invalidTransactions.transactionsCount();
+    if (!invalidTransactions.transactions().empty()) {
+        emit transactionsRejected(invalidTransactions);
+    }
 
     // add current round hashes to storage
     meta->hashTable = std::move(hashTable);
     meta->invalidTransactions = std::move(invalidTransactions);
 
     if (characteristic.mask.size() != newPool.transactions_count()) {
-        auto cnt_total = characteristic.mask.size();
-        auto cnt_valid = newPool.transactions_count();
-        cslog() << "Viewed transactions: " << cnt_total << ", valid : " << cnt_valid << ", invalid: " << cnt_total - cnt_valid;
+        auto countTotal = characteristic.mask.size();
+        auto countValid = newPool.transactions_count();
+        cslog() << "Viewed transactions: " << countTotal << ", valid : " << countValid << ", invalid: " << countTotal - countValid;
     }
 
     csdebug() << "\tsequence = " << metaPoolInfo.sequenceNumber;

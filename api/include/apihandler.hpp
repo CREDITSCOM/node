@@ -276,6 +276,7 @@ private:
     void smartTransactionFlow(api::TransactionFlowResult& _return, const ::api::Transaction&, csdb::Transaction& send_transaction);
 
     std::optional<std::string> checkTransaction(const ::api::Transaction&, csdb::Transaction& cTransaction);
+    void checkTransactionsFlow(const cs::TransactionsPacket& packet, cs::DumbCv::Condition condition);
 
     TokensMaster tm_;
 
@@ -295,6 +296,7 @@ private slots:
     void baseLoaded(const csdb::Pool& pool);
     void maxBlocksCount(cs::Sequence lastBlockNum);
     void onPacketExpired(const cs::TransactionsPacket& packet);
+    void onTransactionsRejected(const cs::TransactionsPacket& packet);
 };
 }  // namespace api
 

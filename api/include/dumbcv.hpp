@@ -14,6 +14,7 @@ class DumbCv {
 public:
     enum class Condition {
         Success,
+        Rejected,
         TimeOut,
         Expired
     };
