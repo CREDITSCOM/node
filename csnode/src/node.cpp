@@ -3708,7 +3708,7 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
         *check_failed = false;
         return;
     }
-    auto smartPacks = cs::SmartContracts::grepNewStatesPacks(block.transactions());
+    auto smartPacks = cs::SmartContracts::grepNewStatesPacks(getBlockChain(), block.transactions());
     auto& smartSignatures = block.smartSignatures();
     size_t smartTrxCounter = 0;
     if (smartPacks.size() != smartSignatures.size()) {
