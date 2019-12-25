@@ -1238,7 +1238,7 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
 }
 
 bool Transport::gotSSReRegistration() {
-    cswarning() << "ReRegistration on start node";
+    cslog() << "ReRegistration on start node";
 
     {
         cs::Lock lock(oLock_);
