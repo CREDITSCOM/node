@@ -89,6 +89,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             tmpNewState.set_target(tr.target());
             tmpNewState.set_currency(tr.currency());
             tmpNewState.set_counted_fee(tr.counted_fee());
+
             tmpNewState.set_currency(tr.currency());
             tmpNewState.set_innerID(tr.innerID());
             tmpNewState.set_max_fee(tr.max_fee());
@@ -717,7 +718,7 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
             csdebug() << kLogPrefix << "contract state is too large, size is " << state_size << "b, not included in package";
         }
     }
-    finalSmartTransactionPack_.setExpiredRound(cs::Conveyer::instance().currentRoundNumber() + Consensus::MaxRoundsCancelContract);
+    finalSmartTransactionPack_.setExpiredRound(/*cs::Conveyer::instance().currentRoundNumber()*/smartRoundNumber_ + Consensus::MaxRoundsCancelContract);
     finalSmartTransactionPack_.makeHash();
 }
 
