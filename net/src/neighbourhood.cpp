@@ -846,15 +846,6 @@ void Neighbourhood::resendPackets() {
         }
         bp.data.sentLastTime = false;
     }
-
-    for (auto& dp : msgDirects_) {
-        if (!dp.data.pack) {
-            continue;
-        }
-        if (!dispatch(dp.data)) {
-            dp.data.pack = Packet();
-        }
-    }
 }
 
 ConnectionPtr Neighbourhood::getConnection(const RemoteNodePtr node) {
