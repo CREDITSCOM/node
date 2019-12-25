@@ -898,7 +898,7 @@ void  BlockChain::printWalletCaches() {
         auto am = wd.balance_.to_string();
         totalCheck += wd.balance_;
         res += am;
-        for (int k = am.size(); k < 28; ++k) { // 28 positiona are covered with " " to align digits
+        for (size_t k = am.size(); k < 28; ++k) { // 28 positions are covered with " " to align digits
             res += " ";
         }
         res += wd.delegated_.to_string() + "\n";
