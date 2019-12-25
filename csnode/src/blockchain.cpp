@@ -889,14 +889,16 @@ bool BlockChain::checkForConsistency(csdb::Pool& pool) {
 
 void  BlockChain::printWalletCaches() {
     std::string res;
+    csdb::Amount totalCheck{ 0 };
     res += ":\n#.     Public Key:                                                    Balance:                    Delegated:\n";
     int counter = 0;
-    iterateOverWallets([&res, &counter](const cs::PublicKey& addr, const cs::WalletsCache::WalletData& wd) {
+    iterateOverWallets([&res, &counter, &totalCheck](const cs::PublicKey& addr, const cs::WalletsCache::WalletData& wd) {
         ++counter;
         res += std::to_string(counter) + ". " + cs::Utils::byteStreamToHex(addr.data(), addr.size()) + "   ";
         auto am = wd.balance_.to_string();
+        totalCheck += wd.balance_;
         res += am;
-        for (int k = am.size(); k < 28; ++k) {
+        for (int k = am.size(); k < 28; ++k) { // 28 positiona are covered with " " to align digits
             res += " ";
         }
         res += wd.delegated_.to_string() + "\n";
@@ -913,6 +915,8 @@ void  BlockChain::printWalletCaches() {
         return true;
 
     });
+    res += "---------------------------------------------------------\n";
+    res += "Total: " + totalCheck.to_string();
     csdebug() << res;
 }
 

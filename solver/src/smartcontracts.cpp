@@ -2252,7 +2252,7 @@ bool SmartContracts::start_consensus(QueueItem& item) {
     }
     item.pconsensus = std::make_unique<SmartConsensus>();
 
-    csdebug() << kLogPrefix << "start consensus Smart round [" << item.seq_start << '.' << run_counter << ']';
+    csdebug() << kLogPrefix << "start consensus Smart round [" << item.seq_start << '.' << static_cast<int>(run_counter) << ']';
     // inform slots if any, packet does not contain smart consensus' data!
     emit signal_smart_executed(integral_packet);
 

@@ -73,7 +73,9 @@ bool estimateMaxFee(const csdb::Transaction& t, csdb::AmountCommission& countedF
 
 void setCountedFees(Transactions& trxs) {
     for (auto& t : trxs) {
-        t.set_counted_fee(getFee(t));  
+        if (!cs::SmartContracts::is_new_state(t)) {
+            t.set_counted_fee(getFee(t));
+        }
     }
 }
 
