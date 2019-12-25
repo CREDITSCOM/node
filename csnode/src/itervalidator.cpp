@@ -97,11 +97,17 @@ void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& chara
         }
         else if (valid && pTransval_->isRejectedSmart(absAddr)) {
             characteristicMask[i] = pTransval_->getRejectReason(absAddr);
+            csdebug() << kLogPrefix << "transaction[" << i << "] is rejected contract: "
+                << Reject::to_string((Reject::Reason)characteristicMask[i]);
         }
     }
 
     if (!rejectList.empty()) {
-        cslog() << kLogPrefix << "reject " << rejectList.size() << " new_state(s) of smart contract(s)";
+        cslog() << kLogPrefix << "reject " << rejectList.size() << " new_state(s) of contract(s)";
+        for (const auto& item : rejectList) {
+            cslog() << kLogPrefix << "rejected items in call " << FormatRef(item.first)
+                << " start from " << FormatRef(item.first, item.second);
+        }
         context.send_rejected_smarts(rejectList);
     }
 }

@@ -68,7 +68,7 @@ bool estimateMaxFee(const csdb::Transaction& t, csdb::AmountCommission& countedF
         countedFee = csdb::AmountCommission(countedFee.to_double() + getContractStateMinFee().to_double());
     }
 
-    return (t.max_fee().to_double() - countedFee.to_double() > std::numeric_limits<double>::epsilon());
+    return (t.max_fee().to_double() - countedFee.to_double() >= 0);
 }
 
 void setCountedFees(Transactions& trxs) {

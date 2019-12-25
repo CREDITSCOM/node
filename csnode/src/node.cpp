@@ -105,6 +105,7 @@ bool Node::init() {
     cs::Connector::connect(&blockChain_.storeBlockEvent, api_.get(), &csconnector::connector::onStoreBlock);
     cs::Connector::connect(&blockChain_.startReadingBlocksEvent(), api_.get(), &csconnector::connector::onMaxBlocksCount);
     cs::Connector::connect(&cs::Conveyer::instance().packetExpired, api_.get(), &csconnector::connector::onPacketExpired);
+    cs::Connector::connect(&cs::Conveyer::instance().transactionsRejected, api_.get(), &csconnector::connector::onTransactionsRejected);
 
 #endif  // NODE_API
 

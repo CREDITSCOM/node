@@ -78,6 +78,7 @@ private:
     std::vector<std::pair<size_t, bool>> validNewStates_; // index in block + false if invalidated by smart source trx
     std::unordered_set<csdb::Address> duplicatedNewStates_;
     Stack negativeNodes_;
+    RejectedSmarts smartsWithNegativeBalances_;
     size_t cntRemovedTrxs_;
 };
 
@@ -86,6 +87,7 @@ inline void TransactionsValidator::clearCaches() {
     rejectedNewStates_.clear();
     validNewStates_.clear();
     duplicatedNewStates_.clear();
+    smartsWithNegativeBalances_.clear();
 }
 
 inline void TransactionsValidator::saveNewState(const csdb::Address& addr, size_t index, Reject::Reason rejectReason) {

@@ -70,6 +70,7 @@ public:
 
 public slots:
     void onPacketExpired(const cs::TransactionsPacket& packet);
+    void onTransactionsRejected(const cs::TransactionsPacket& packet);
 
 public:
     void run();
