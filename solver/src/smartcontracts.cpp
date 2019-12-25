@@ -243,7 +243,12 @@ std::string SmartContracts::get_error_message(int8_t code) {
         return "internal bug in node detected";
     case ExecutorUnreachable:
     case ThriftException:
+    case NodeUnreachable:
         return "executor is disconnected or unavailable, or incompatible";
+    case LogicViolation:
+        return "logic violation, execution result breaks the rules";
+    case ExecutorIncompatible:
+        return "incompatible executor version";
     }
     std::ostringstream os;
     os << "Error code " << (int)code;
