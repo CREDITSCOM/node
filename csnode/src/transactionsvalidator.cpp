@@ -311,7 +311,7 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
             ++it;
         }
 
-        if (availableForSpend >= zeroBalance_ && !state.second) {
+        if (availableForSpend >= zeroBalance_) {
             state.second = true;
         }
 
