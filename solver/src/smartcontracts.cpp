@@ -2247,7 +2247,7 @@ bool SmartContracts::start_consensus(QueueItem& item) {
     }
     item.pconsensus = std::make_unique<SmartConsensus>();
 
-    csdebug() << kLogPrefix << "start consensus Smart round [" << item.seq_start << '.' << run_counter << ']';
+    csdebug() << kLogPrefix << "start consensus Smart round [" << item.seq_start << '.' << static_cast<int>(run_counter) << ']';
     // inform slots if any, packet does not contain smart consensus' data!
     emit signal_smart_executed(integral_packet);
 
@@ -2292,6 +2292,13 @@ csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item, in
     result.add_user_field(trx_uf::new_state::RefStart, item.ref_start.to_user_field());
     // USRFLD2 - total fee
     result.add_user_field(trx_uf::new_state::Fee, item.consumed_fee);
+
+    // clarify counted fee
+    csdb::AmountCommission stored_fee = result.counted_fee();
+    if (stored_fee.get_raw() != cs::fee::getFee(result).get_raw()) {
+        csdebug() << kLogPrefix << "state transaction fee is updated from " << stored_fee.to_double() << " to " << result.counted_fee().to_double();
+    }
+
     return result;
 }
 
