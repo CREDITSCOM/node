@@ -272,7 +272,7 @@ public:
     std::pair<cs::Sequence, uint32_t> getLastNonEmptyBlock();
     std::pair<cs::Sequence, uint32_t> getPreviousNonEmptyBlock(cs::Sequence);
     uint64_t getTransactionsCount() const {
-        return total_transactions_count_;
+        return totalTransactionsCount_;
     }
 
     const csdb::Address& getGenesisAddress() const;
@@ -332,6 +332,7 @@ private:
 
     const csdb::Address genesisAddress_;
     const csdb::Address startAddress_;
+
     std::unique_ptr<cs::WalletsIds> walletIds_;
     std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
     std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
@@ -339,14 +340,14 @@ private:
 
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
-    uint64_t total_transactions_count_ = 0;
+    uint64_t totalTransactionsCount_ = 0;
 
     struct NonEmptyBlockData {
         cs::Sequence poolSeq;
         uint32_t transCount = 0;
     };
-    std::map<cs::Sequence, NonEmptyBlockData> previousNonEmpty_;
 
+    std::map<cs::Sequence, NonEmptyBlockData> previousNonEmpty_;
     NonEmptyBlockData lastNonEmptyBlock_;
 
     /**
@@ -370,7 +371,7 @@ private:
     struct BlockMeta {
         csdb::Pool pool;
         // indicates that block has got by sync, so it is checked & tested in other way than ordinary ones
-        bool by_sync;
+        bool bySync;
     };
     std::map<cs::Sequence, BlockMeta> cachedBlocks_;
 

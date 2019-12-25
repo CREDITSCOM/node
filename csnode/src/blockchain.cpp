@@ -145,15 +145,17 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
 }
 
 inline void BlockChain::updateNonEmptyBlocks(const csdb::Pool& pool) {
-    const auto cntTr = pool.transactions_count();
-    if (cntTr > 0) {
-        total_transactions_count_ += cntTr;
+    const auto transactionsCount = pool.transactions_count();
+
+    if (transactionsCount > 0) {
+        totalTransactionsCount_ += transactionsCount;
 
         if (lastNonEmptyBlock_.transCount && pool.sequence() != lastNonEmptyBlock_.poolSeq) {
             previousNonEmpty_[pool.sequence()] = lastNonEmptyBlock_;
         }
+
         lastNonEmptyBlock_.poolSeq = pool.sequence();
-        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(cntTr);
+        lastNonEmptyBlock_.transCount = static_cast<uint32_t>(transactionsCount);
     }
 }
 
@@ -374,7 +376,7 @@ void BlockChain::removeLastBlock() {
 		}
 
 		// such operations are only possible on valid pool:
-		total_transactions_count_ -= pool.transactions().size();
+        totalTransactionsCount_ -= pool.transactions().size();
 		walletsCacheUpdater_->loadNextBlock(pool, pool.confidants(), *this, true);
 		// remove wallets exposed by the block
 		removeWalletsInPoolFromCache(pool);
@@ -1220,42 +1222,50 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
 
 void BlockChain::testCachedBlocks() {
     csdebug() << "BLOCKCHAIN> test cached blocks";
+
     if (cachedBlocks_.empty()) {
         csdebug() << "BLOCKCHAIN> no cached blocks";
         return;
     }
 
     auto lastSeq = getLastSeq() + 1;
+
     // clear unnecessary sequence
     if (cachedBlocks_.cbegin()->first < lastSeq) {
         auto it = cachedBlocks_.lower_bound(lastSeq);
+
         if (it != cachedBlocks_.begin()) {
             csdebug() << "BLOCKCHAIN> Remove outdated blocks up to #" << (*it).first << " from cache";
             cachedBlocks_.erase(cachedBlocks_.begin(), it);
         }
     }
 
-    size_t cnt_stored = 0;
+    size_t countStored = 0;
     cs::Sequence fromSeq = lastSeq;
+
     while (!cachedBlocks_.empty()) {
         auto firstBlockInCache = cachedBlocks_.begin();
 
         if ((*firstBlockInCache).first == lastSeq) {
             // retrieve and use block if it is exactly what we need:
             auto data = (*firstBlockInCache).second;
-            const bool ok = storeBlock(data.pool, data.by_sync);
+            const bool ok = storeBlock(data.pool, data.bySync);
             cachedBlocks_.erase(firstBlockInCache);
+
             if (!ok) {
                 cserror() << "BLOCKCHAIN> Failed to record cached block to chain, drop it & wait to request again";
                 break;
             }
-            ++cnt_stored;
-            if (cnt_stored >= 1000) {
-                cslog() << "BLOCKCHAIN> stored " << WithDelimiters(cnt_stored)
-                    << " blocks " << WithDelimiters(fromSeq) << " .. " << WithDelimiters(fromSeq + cnt_stored) << " from cache";
-                cnt_stored = 0;
+
+            ++countStored;
+
+            if (countStored >= 1000) {
+                cslog() << "BLOCKCHAIN> stored " << WithDelimiters(countStored)
+                    << " blocks " << WithDelimiters(fromSeq) << " .. " << WithDelimiters(fromSeq + countStored) << " from cache";
+                countStored = 0;
                 fromSeq = lastSeq + 1;
             }
+
             ++lastSeq;
         }
         else {
@@ -1264,10 +1274,11 @@ void BlockChain::testCachedBlocks() {
             break;
         }
     }
-    if (cnt_stored > 0) {
-        cslog() << "BLOCKCHAIN> stored " << WithDelimiters(cnt_stored)
-            << " blocks " << WithDelimiters(fromSeq) << " .. " << WithDelimiters(fromSeq + cnt_stored) << " from cache";
-        cnt_stored = 0;
+
+    if (countStored > 0) {
+        cslog() << "BLOCKCHAIN> stored " << WithDelimiters(countStored)
+            << " blocks " << WithDelimiters(fromSeq) << " .. " << WithDelimiters(fromSeq + countStored) << " from cache";
+        countStored = 0;
         fromSeq = lastSeq + 1;
     }
 }
