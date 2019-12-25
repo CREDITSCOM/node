@@ -3710,7 +3710,7 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     }
     auto smartPacks = cs::SmartContracts::grepNewStatesPacks(block.transactions());
     auto& smartSignatures = block.smartSignatures();
-    int smartTrxCounter = 0;
+    size_t smartTrxCounter = 0;
     if (smartPacks.size() != smartSignatures.size()) {
         cserror() << "NODE> different size of smatrpackets and signatures at pool " << block.sequence();
         *check_failed = true;
@@ -3721,7 +3721,6 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     auto iSignatures = smartSignatures.begin();
     for (auto& it : smartPacks) {
         csdebug() << "NODE> SmartSignatures(" << iSignatures->signatures.size() << ") for contract "<< iSignatures->smartConsensusPool << ":";
-        int cnt = 1;
         for (auto p : iSignatures->signatures) {
             it.addSignature(p.first, p.second);
             csdebug() << "NODE> " << static_cast<int>(p.first) << ". " << cs::Utils::byteStreamToHex(p.second.data(), 64);
