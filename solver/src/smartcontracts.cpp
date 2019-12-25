@@ -8,6 +8,7 @@
 #include <csnode/datastream.hpp>
 #include <csnode/transactionsiterator.hpp>
 #include <csnode/eventreport.hpp>
+#include <csnode/fee.hpp>
 #include <lib/system/logger.hpp>
 #include <csnode/fee.hpp>
 #include <functional>
@@ -143,7 +144,7 @@ void SmartContractRef::from_user_field(const csdb::UserField& fld) {
 void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::Transaction tr_start) {
     csdb::Amount tr_start_fee = csdb::Amount(tr_start.counted_fee().to_double());
     // TODO: here new_state_fee prediction may be calculated, currently it is equal to starter fee
-    csdb::Amount new_state_fee = tr_start_fee;
+    csdb::Amount new_state_fee = csdb::Amount(cs::fee::getContractStateMinFee().to_double());
     // apply starter fee consumed
     csdb::Amount avail_fee = csdb::Amount(tr_start.max_fee().to_double()) - tr_start_fee - new_state_fee;
     //consumed_fee = 0;
@@ -2283,7 +2284,8 @@ csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item, in
                              src.target(),      // contract's address
                              src.currency(),    // source value
                              0,                 // amount
-                             csdb::AmountCommission((item.avail_fee - item.consumed_fee).to_double()), csdb::AmountCommission(item.new_state_fee.to_double()),
+                             csdb::AmountCommission((item.avail_fee - item.consumed_fee).to_double()), 
+                             csdb::AmountCommission(item.new_state_fee.to_double()),
                              Zero::signature  // empty signature
     );
     // USRFLD1 - ref to start trx
