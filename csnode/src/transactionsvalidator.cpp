@@ -289,7 +289,7 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
         }
 
         auto it = std::find_if(smartsWithNegativeBalances_.cbegin(), smartsWithNegativeBalances_.cend(),
-                               [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == contract_abs_addr); });
+                               [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == contract_abs_addr) && o.second > state.first; });
 
         if (it == smartsWithNegativeBalances_.end()) {
             continue;
@@ -299,8 +299,24 @@ size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const 
         csdb::Transaction initTransaction = SmartContracts::get_transaction(context.blockchain(), trxs[state.first]);
         wallState.balance_ += initTransaction.amount();
 
+        csdb::Amount availableForSpend = initTransaction.amount();
+        size_t prevIndex = it->second;
+
+        while (it != smartsWithNegativeBalances_.end()) {
+            if (it->second - prevIndex > 1) {
+                break;
+            }
+            prevIndex = it->second;
+            availableForSpend -= it->first.amount();
+            ++it;
+        }
+
+        if (availableForSpend >= zeroBalance_ && !state.second) {
+            state.second = true;
+        }
+
         if (wallState.balance_ >= zeroBalance_) {
-            restoredCounter += makeSmartsValid(context, smartsWithNegativeBalances_, it->first.source(), maskIncluded);
+            restoredCounter += makeSmartsValid(context, smartsWithNegativeBalances_, contract_abs_addr, maskIncluded);
         }
 
         smartBalances[contract_abs_addr] = wallState.balance_;
