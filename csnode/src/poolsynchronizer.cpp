@@ -376,7 +376,7 @@ void cs::PoolSynchronizer::sendBlock(const Neighbour& neighbour) {
     }
 
     cslog() << "SYNC: requesting for " << sequences.size() << " blocks [" << sequences.front() << ", " << sequences.back()
-        << "] from " << cs::Utils::byteStreamToHex(neighbour.publicKey()) << ", repeat " << packet;
+        << "] from " << cs::Utils::byteStreamToHex(neighbour.publicKey());
 
     emit sendRequest(neighbour.publicKey(), sequences, packet);
 }
