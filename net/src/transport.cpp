@@ -297,7 +297,6 @@ void Transport::deliverDirect(const Packet* pack, const uint32_t size, Connectio
         for (auto ptr = pack; ptr != packEnd; ++ptr) {
             neighbourhood_.registerDirect(ptr, conn);
             sendDirect(ptr, **conn);
-            sendDirect(ptr, **conn);
         }
     }
 }
