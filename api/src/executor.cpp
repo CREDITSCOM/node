@@ -776,7 +776,7 @@ void cs::Executor::checkExecutorVersion() {
             notifyError();
         };
 
-        cs::Concurrent::run(terminate, cs::ConcurrentPolicy::Thread);
+        cs::Concurrent::run(cs::ConcurrentPolicy::Thread, terminate);
     }
 }
 
@@ -848,7 +848,7 @@ cs::Executor::Executor(const cs::ExecutorSettings::Types& types)
         cslog() << "Executor watcher thread finished";
     };
 
-    cs::Concurrent::run(watcher, cs::ConcurrentPolicy::Thread);
+    cs::Concurrent::run(cs::ConcurrentPolicy::Thread, watcher);
 }
 
 cs::Executor::~Executor() {
