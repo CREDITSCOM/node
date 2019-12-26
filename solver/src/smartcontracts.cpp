@@ -2298,7 +2298,7 @@ csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item, in
                              src.target(),      // contract's address
                              src.currency(),    // source value
                              0,                 // amount
-                             csdb::AmountCommission(item.calc_max_fee()), 
+                             csdb::AmountCommission(/*item.calc_max_fee()*/(uint16_t)0), 
                              csdb::AmountCommission(item.new_state_fee.to_double()),
                              Zero::signature  // empty signature
     );

@@ -91,19 +91,24 @@ Reject::Reason TransactionsValidator::validateCommonAsSource(SolverContext& cont
         cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], source equals to target";
         return Reject::Reason::SourceIsTarget;
     }
-    const double max_fee = trx.max_fee().to_double();
-    const double counted_fee = trx.counted_fee().to_double();
-    if (csdb::Amount(max_fee) < csdb::Amount(counted_fee)) {
-        cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], max fee (" << max_fee
-            << ") is less than counted fee (" << counted_fee << ")";
-        return Reject::Reason::InsufficientMaxFee;
+
+    // max_fee does not matter for new_state and smart emitted:
+    bool is_smart_emitted = smarts.is_known_smart_contract(trx.source());
+    if (!is_smart_emitted && !SmartContracts::is_new_state(trx)) {
+        const double max_fee = trx.max_fee().to_double();
+        const double counted_fee = trx.counted_fee().to_double();
+        if (csdb::Amount(max_fee) < csdb::Amount(counted_fee)) {
+            cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], max fee (" << max_fee
+                << ") is less than counted fee (" << counted_fee << ")";
+            return Reject::Reason::InsufficientMaxFee;
+        }
     }
 
     if (SmartContracts::is_executable(trx)) {
         newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
     }
     else {
-        if (smarts.is_known_smart_contract(trx.source())) {
+        if (is_smart_emitted) {
             auto sourceAbsAddr = smarts.absolute_address(trx.source());
             if (isRejectedSmart(sourceAbsAddr)) {
                 csdebug() << kLogPrefix << __func__ << ": reject contract emitted transaction, new_state was rejected.";
