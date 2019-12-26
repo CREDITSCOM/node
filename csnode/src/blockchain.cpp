@@ -480,7 +480,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
 
         cs::Hash trustedHash = cscrypto::calculateHash(trustedToHash.data(), trustedToHash.size());
 
-        cs::Signatures sigs = pool.roundConfirmations();
+        const cs::Signatures& sigs = pool.roundConfirmations();
         const auto& confMask = cs::Utils::bitsToMask(pool.numberConfirmations(), pool.roundConfirmationMask());
         // for debugging only delete->
         csdebug() << "Mask size = " << confMask.size() << " for next confidants:";
