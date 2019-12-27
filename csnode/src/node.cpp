@@ -1899,8 +1899,8 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, 
 }
 
 void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-    csdebug() << __func__;
     csmeta(csdetails) << "started";
+
     if (myLevel_ != Level::Confidant) {
         return;
     }
@@ -1935,10 +1935,6 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
     if (!conveyer.isConfidantExists(requesterNumber) || requester != conveyer.confidantByIndex(requesterNumber)) {
-        return;
-    }
-
-    if (!conveyer.isConfidantExists(requiredNumber)) {
         return;
     }
 
