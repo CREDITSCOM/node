@@ -14,7 +14,7 @@
 class Node;
 
 namespace cs {
-using PoolSynchronizerRequestSignal = cs::Signal<void(const cs::PublicKey& target, const PoolsRequestedSequences& sequences, std::size_t packet)>;
+using PoolSynchronizerRequestSignal = cs::Signal<void(const cs::PublicKey& target, const PoolsRequestedSequences& sequences)>;
 
 class PoolSynchronizer {
 public:
@@ -24,7 +24,7 @@ public:
     void syncLastPool();
 
     // syncro get functions
-    void getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_t packetNum);
+    void getBlockReply(cs::PoolsBlock&& poolsBlock);
 
     // syncro send functions
     void sendBlockRequest();

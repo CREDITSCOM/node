@@ -1230,9 +1230,6 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
         return;
     }
 
-    std::size_t packetNum = 0;
-    stream >> packetNum;
-
     if (sequences.front() > blockChain_.getLastSeq()) {
         csdebug() << "NODE> Get block request> The requested block: " << sequences.front() << " is beyond my last block";
         return;
@@ -1244,7 +1241,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     poolsBlock.reserve(reserveSize);
 
     auto sendReply = [&] {
-        sendBlockReply(poolsBlock, sender, packetNum);
+        sendBlockReply(poolsBlock, sender);
         poolsBlock.clear();
     };
 
@@ -1275,9 +1272,6 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     CompressedRegion region;
     stream >> region;
 
-    size_t packetNumber = 0;
-    stream >> packetNumber;
-
     cs::PoolsBlock poolsBlock = compressor_.decompress<cs::PoolsBlock>(region);
 
     if (poolsBlock.empty()) {
@@ -1285,10 +1279,10 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
         return;
     }
 
-    poolSynchronizer_->getBlockReply(std::move(poolsBlock), packetNumber);
+    poolSynchronizer_->getBlockReply(std::move(poolsBlock));
 }
 
-void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packetNum) {
+void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target) {
     if (poolsBlock.empty()) {
         return;
     }
@@ -1304,7 +1298,7 @@ void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey&
     }
 
     auto region = compressor_.compress(poolsBlock);
-    sendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), region, packetNum);
+    sendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), region);
 }
 
 void Node::becomeWriter() {
@@ -1451,14 +1445,13 @@ void Node::onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender) {
     }
 }
 
-void Node::sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences, std::size_t packetNum) {
+void Node::sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences) {
     const auto round = cs::Conveyer::instance().currentRoundNumber();
     csmeta(csdetails) << "Target out(): " << ", sequence from: " << sequences.front()
-                      << ", to: " << sequences.back() << ", packet: " << packetNum
-                      << ", round: " << round;
+                      << ", to: " << sequences.back() << ", round: " << round;
 
     BaseFlags flags = static_cast<BaseFlags>(BaseFlags::Signed | BaseFlags::Compressed);
-    transport_->sendDirect(formPacket(flags, MsgTypes::BlockRequest, round, sequences, packetNum), target);
+    transport_->sendDirect(formPacket(flags, MsgTypes::BlockRequest, round, sequences), target);
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type, const cs::PublicKey sender) {

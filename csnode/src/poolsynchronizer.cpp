@@ -55,6 +55,7 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
     if (roundNum < totalBlocks) {
         cswarning() << "Round number is lower than synchro total blocks, do clear cache";
         csdebug() << "SYNC warning, round number " << roundNum << ", total blocks " << totalBlocks;
+
         blockChain_->clearBlockCache();
         cachedBlocksSize = 0;
         totalBlocks = lastWrittenSequence;
@@ -100,12 +101,12 @@ void cs::PoolSynchronizer::syncLastPool() {
         cs::Connector::connect(&blockChain_->removeBlockEvent, this, &cs::PoolSynchronizer::onRemoveBlock);
     }
 
-    emit sendRequest(target, PoolsRequestedSequences { lastWrittenSequence + 1}, 0);
+    emit sendRequest(target, PoolsRequestedSequences { lastWrittenSequence + 1});
 }
 
-void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_t packetNum) {
-    csmeta(csdebug) << "Get Block Reply <<<<<<< : count: " << poolsBlock.size() << ", seqs: [" << poolsBlock.front().sequence() << ", " << poolsBlock.back().sequence()
-                    << "], id: " << packetNum;
+void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
+    csmeta(csdebug) << "Get Block Reply <<<<<<< : count: " << poolsBlock.size() << ", seqs: ["
+                    << poolsBlock.front().sequence() << ", " << poolsBlock.back().sequence() << "]";
 
     cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
     const cs::Sequence oldLastWrittenSequence = lastWrittenSequence;
@@ -124,7 +125,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_
         }
 
         //TODO: temp switch off testing confirmations in block received by sync; until fix blocks assembled by init trusted on network restart (issue CP-47)
-        if (blockChain_->storeBlock(pool, true /*by_sync*/)) {
+        if (blockChain_->storeBlock(pool, true)) {
             blockChain_->testCachedBlocks();
             lastWrittenSequence = blockChain_->getLastSeq();
         }
@@ -143,8 +144,6 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     if (neighbours_.empty()) {
         return;
     }
-
-    csmeta(csdetails) << "Start";
 
     for (const auto& el : requestedSequences_) {
         csmeta(csdetails) << "Requested sequence: " << el.first << "(" << el.second << ")";
@@ -322,6 +321,7 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const cs::Sequence lastWri
     const uint32_t remaining = static_cast<uint32_t>(global - last);
 
     ProgressBar bar;
+
     cslog() << "\nSYNC: store " << WithDelimiters(lastWrittenSequence)
         << " (+ " << WithDelimiters(cachedBlocksSize)
         << " in cache), remaining " << WithDelimiters(remaining);
@@ -357,21 +357,18 @@ bool cs::PoolSynchronizer::checkActivity(const CounterType counterType) {
 }
 
 void cs::PoolSynchronizer::sendBlock(const Neighbour& neighbour) {
-    std::size_t packet = 0;
     const auto& sequences = neighbour.sequences();
 
     for (const auto& sequence : sequences) {
         if (!requestedSequences_.count(sequence)) {
             requestedSequences_.emplace(std::make_pair(sequence, 0));
         }
-
-        packet = ++(requestedSequences_.at(sequence));
     }
 
     cslog() << "SYNC: requesting for " << sequences.size() << " blocks [" << sequences.front() << ", " << sequences.back()
         << "] from " << cs::Utils::byteStreamToHex(neighbour.publicKey());
 
-    emit sendRequest(neighbour.publicKey(), sequences, packet);
+    emit sendRequest(neighbour.publicKey(), sequences);
 }
 
 bool cs::PoolSynchronizer::getNeededSequences(Neighbour& neighbour) {

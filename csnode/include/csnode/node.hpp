@@ -203,7 +203,7 @@ public:
     // smarts consensus additional functions:
 
     // syncro send functions
-    void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
+    void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target);
 
     /**
      * Initializes the default round package as containing the default round table (default trusted
@@ -299,7 +299,7 @@ public slots:
     void processTimer();
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
     void onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender);
-    void sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
+    void sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences);
     void validateBlock(csdb::Pool block, bool* shouldStop);
     void onRoundTimeElapsed();
     void onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
