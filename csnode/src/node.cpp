@@ -1866,7 +1866,8 @@ void Node::adjustStageThreeStorage() {
 }
 
 void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, uint8_t iteration) {
-    csdebug() << __func__;
+    csmeta(csdebug) << "started";
+
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
         cswarning() << "NODE> Only confidant nodes can request consensus stages";
         return;
@@ -1899,7 +1900,7 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, 
 }
 
 void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
-    csmeta(csdetails) << "started";
+    csmeta(csdebug) << "started";
 
     if (myLevel_ != Level::Confidant) {
         return;
@@ -1954,8 +1955,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
 }
 
 void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester, cs::Bytes& message) {
-    csdebug() << __func__;
-    csmeta(csdetails) << "started";
+    csmeta(csdebug) << "started";
 
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
