@@ -80,7 +80,6 @@ private:
     cs::Sequence neighboursMaxSequence() const;
 
     void synchroFinished();
-    void printNeighbours(const std::string& funcName) const;
 
 private:
     enum class CounterType {

@@ -173,10 +173,6 @@ void cs::PoolSynchronizer::sendBlockRequest() {
         success = true;
         sendBlock(neighbour);
     }
-
-    if (success) {
-        printNeighbours("Info:");
-    }
 }
 
 bool cs::PoolSynchronizer::isSyncroStarted() const {
@@ -326,8 +322,7 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const cs::Sequence lastWri
     const uint32_t remaining = static_cast<uint32_t>(global - last);
 
     ProgressBar bar;
-    std::cout << "\n";
-    cslog() << "SYNC: store " << WithDelimiters(lastWrittenSequence)
+    cslog() << "\nSYNC: store " << WithDelimiters(lastWrittenSequence)
         << " (+ " << WithDelimiters(cachedBlocksSize)
         << " in cache), remaining " << WithDelimiters(remaining);
     cslog() << "SYNC: " << bar.string(syncStatus) << "\n";
@@ -504,7 +499,6 @@ void cs::PoolSynchronizer::checkNeighbourSequence(const cs::Sequence sequence, c
 
     if (success) {
         csmeta(csdetails) << "Remove success sequence: " << sequence;
-        printNeighbours("Check seq:");
     }
 }
 
@@ -591,12 +585,4 @@ void cs::PoolSynchronizer::synchroFinished() {
     requestedSequences_.clear();
 
     csmeta(csdebug) << "Synchro finished";
-}
-
-void cs::PoolSynchronizer::printNeighbours(const std::string& funcName) const {
-    for (const auto& neighbour : neighbours_) {
-        if (!neighbour.sequences().empty()) {
-            csmeta(csdebug) << funcName << " Neighbour: " << cs::Utils::byteStreamToHex(neighbour.publicKey()) << ", " << neighbour;
-        }
-    }
 }
