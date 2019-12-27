@@ -21,7 +21,7 @@ TEST(PoolSynchronizer, DISABLED_TestSyncLastPool) {
     cs::config::Observer observer(config, map);
 
     Node node(observer);
-    Transport transport(config, &node);
+    Transport transport(&node);
     BlockChain blockChain(genesisAddress, startAddress);
 
     cs::PoolSynchronizer synchronizer(&transport, &blockChain);

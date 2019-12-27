@@ -8,6 +8,7 @@
 
 #include <csnode/node.hpp>
 #include <csnode/conveyer.hpp>
+#include <csnode/configholder.hpp>
 
 #include <lib/system/structures.hpp>
 #include <lib/system/utils.hpp>
@@ -29,7 +30,8 @@ net::NodeId toNodeId(const cs::PublicKey& key) {
     return ret;
 }
 
-net::Config createNetConfig(Config config, bool& good) {
+net::Config createNetConfig(bool& good) {
+    auto config = *cs::ConfigHolder::instance().config();
     net::Config result(toNodeId(config.getMyPublicKey()));
     good = true;
 
@@ -89,8 +91,8 @@ void pollSignalFlag() {
 // Extern function dfined in main.cpp to poll and handle signal status.
 extern void pollSignalFlag();
 
-Transport::Transport(const Config& config, Node* node)
-: config_(createNetConfig(config, good_))
+Transport::Transport(Node* node)
+: config_(createNetConfig(good_))
 , node_(node)
 , neighbourhood_(this, node_)
 , host_(config_, static_cast<HostEventHandler&>(*this)) {

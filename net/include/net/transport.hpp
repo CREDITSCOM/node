@@ -36,7 +36,7 @@ public:
     inline static volatile std::sig_atomic_t gSignalStatus = 0;
     static void stop() { Transport::gSignalStatus = 1; }
 
-    explicit Transport(const Config& config, Node* node);
+    explicit Transport(Node* node);
     ~Transport() override = default;
 
     void run();

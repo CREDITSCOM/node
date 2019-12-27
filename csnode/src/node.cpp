@@ -65,7 +65,7 @@ Node::Node(cs::config::Observer& observer)
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
 
     std::cout << "Start transport... ";
-    transport_ = new Transport(*cs::ConfigHolder::instance().config(), this);
+    transport_ = new Transport(this);
     std::cout << "Done\n";
 
     poolSynchronizer_ = new cs::PoolSynchronizer(transport_, &blockChain_);
