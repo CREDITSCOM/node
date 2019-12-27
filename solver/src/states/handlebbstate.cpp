@@ -5,7 +5,7 @@
 namespace cs {
 
 void HandleBBState::on(SolverContext& context) {
-    cswarning() << name() << ": BigBang processing is implemented in Node class";
+    cswarning() << name() << ": Bootstrap processing is implemented in Node class";
     DefaultStateBehavior::on(context);
 }
 

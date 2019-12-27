@@ -580,7 +580,7 @@ bool Node::canBeTrusted(bool critical) {
 
     if (!critical) {
         if (Consensus::DisableTrustedRequestNextRound) {
-            // ignore flag after bigbang
+            // ignore flag after Bootstrap
             if (myLevel_ == Level::Confidant && subRound_ == 0) {
                 return false;
             }

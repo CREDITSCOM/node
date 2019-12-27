@@ -40,7 +40,7 @@ void TrustedStage3State::on(SolverContext& context) {
             return;
         }
         else {
-            cswarning() << name() << "the stage can't finish successfully, waiting for Big Bang";
+            cswarning() << name() << "the stage can't finish successfully, waiting for Bootstrap round";
             context.fail_stage3();
             return;
         }
@@ -261,7 +261,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
                 csdebug() << "\t==> [" << static_cast<int>(stage.writer) << "]";
             }
             else {
-                cslog() << "\tconsensus failed waiting for BigBang";
+                cslog() << "\tconsensus failed waiting for Bootstrap";
                 return Result::Failure;
             }
         }
@@ -295,7 +295,7 @@ Result TrustedStage3State::finalizeStageThree(SolverContext& context) {
         csdebug() << "\t==> [" << static_cast<int>(stage.writer) << "]";
     }
     else {
-        cslog() << "\tconsensus failed: waiting for BigBang";
+        cslog() << "\tconsensus failed: waiting for Bootstrap";
         context.send_consensus_failed_report();
         return Result::Failure;
     }
@@ -584,7 +584,7 @@ bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
     int cnt = std::min(static_cast<int>(context.cnt_trusted()), (int)Consensus::MaxTrustedNodes);
     int cnt_active = cnt - static_cast<int>(std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex));
     if (cnt_active * 2 < cnt + 1) {
-        cswarning() << name() << ": not enough active confidants to make a decision, BigBang required";
+        cswarning() << name() << ": not enough active confidants to make a decision, Bootstrap required";
         return false;
     }
     int idx_writer = k % cnt_active;

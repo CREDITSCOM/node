@@ -55,8 +55,6 @@ public:
   MOCK_METHOD0(checkMatrixReceived, void());
   MOCK_METHOD1(addConfirmation, void(uint8_t confNumber_));
   MOCK_METHOD0(getIPoolClosed, bool());
-  MOCK_METHOD0(getBigBangStatus, bool());
-  MOCK_METHOD1(setBigBangStatus, void(bool _status));
   MOCK_METHOD1(setRNum, void(size_t _rNum));
   MOCK_METHOD3(setConfidants, void(const std::vector<cs::PublicKey>& confidants, const cs::PublicKey& general,
                                    const cs::RoundNumber roundNum));

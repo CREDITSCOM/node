@@ -6,8 +6,8 @@ const bool Consensus::Log = true;
 /** @brief   True if re-select write node on timeout is enabled*/
 const bool Consensus::ReSelectWriteOnTimeout = false;
 
-/** @brief   True if write node may to reduce desired count of hashes on big bang and spawn next round immediately*/
-const bool Consensus::ReduceMinHashesOnBigBang = false;
+/** @brief   True if write node may to reduce desired count of hashes on bootstrap and spawn next round immediately*/
+const bool Consensus::ReduceMinHashesOnBootstrap = false;
 
 /** @brief   The default state timeout */
 const unsigned int Consensus::DefaultStateTimeout = 5000;
@@ -58,7 +58,7 @@ const uint64_t Consensus::MaxRoundTimerFree = 5;
 /** @brief   Max timeout (msec) to execute smart contract */
 const uint32_t Consensus::TimeSmartContract = 60000;
 
-/** @brief   Max time to collect transactions (PermanentWrite, SolverCore on BigBang) */
+/** @brief   Max time to collect transactions (PermanentWrite, SolverCore on Bootstrap) */
 const uint32_t Consensus::TimeCollTrans = 500;
 
 /** @brief   Max hashes count to include in stage one data */

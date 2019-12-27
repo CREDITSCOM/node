@@ -12,8 +12,8 @@ public:
     /** @brief   True if re-select write node on timeout is enabled*/
     const static bool ReSelectWriteOnTimeout;
 
-    /** @brief   True if write node may to reduce desired count of hashes on big bang and spawn next round immediately*/
-    const static bool ReduceMinHashesOnBigBang;
+    /** @brief   True if write node may to reduce desired count of hashes on bootstrap and spawn next round immediately*/
+    const static bool ReduceMinHashesOnBootstrap;
 
     /** @brief   The default state timeout */
     const static unsigned int DefaultStateTimeout;
@@ -70,7 +70,7 @@ public:
     /** @brief   Max timeout (msec) to execute smart contract */
     const static uint32_t TimeSmartContract;
 
-    /** @brief   Max time to collect transactions (PermanentWrite, SolverCore on BigBang) */
+    /** @brief   Max time to collect transactions (PermanentWrite, SolverCore on Bootstrap) */
     const static uint32_t TimeCollTrans;
 
     /** @brief   Max hashes count to include in stage one data */

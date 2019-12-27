@@ -5,7 +5,7 @@ namespace cs {
 /**
  * @class   HandleBBState
  *
- * @brief   A special state to handle a Big Bang. This class cannot be inherited. Acts almost as
+ * @brief   A special state to handle a bootstrap. This class cannot be inherited. Acts almost as
  *          WriteState. Currently is not functional as Node grab the BB handling
  *
  * @author  aae

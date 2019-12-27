@@ -141,7 +141,7 @@ void SolverCore::beforeNextRound() {
     if (!pstate) {
         return;
     }
-    pstate->onRoundEnd(*pcontext, false /*is_bigbang*/);
+    pstate->onRoundEnd(*pcontext, false /*isBootstrap*/);
 }
 
 void SolverCore::nextRound(bool updateRound) {

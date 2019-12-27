@@ -23,7 +23,7 @@ bool operator==(const std::pair<csdb::Pool, cs::PublicKey>& lhs, uint64_t rhs) {
 
 namespace cs {
 
-void DefaultStateBehavior::onRoundEnd(SolverContext& /*context*/, bool /*is_bigbang*/) {
+void DefaultStateBehavior::onRoundEnd(SolverContext& /*context*/, bool /*isBootstrap*/) {
 }
 
 Result DefaultStateBehavior::onRoundTable(SolverContext& /*context*/, const cs::RoundNumber round) {

@@ -175,7 +175,7 @@ void SolverCore::handleTransitions(Event evt) {
         return;
     }
     if (Event::BigBang == evt) {
-        cswarning() << log_prefix << "BigBang on";
+        cswarning() << log_prefix << "Bootstrap on";
     }
     const auto& variants = transitions[pstate];
     if (variants.empty()) {

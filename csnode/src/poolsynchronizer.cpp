@@ -24,8 +24,6 @@ cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockCh
 
 void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber difference) {
     if (neighbours_.empty()) {
-        csmeta(csdebug) << "Cannot start sync (no neighbours). Needed sequence: " << roundNum
-                        << ",   Requested pools block size:" << cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
         return;
     }
 

@@ -125,12 +125,11 @@ inline cs::Process::Process(boost::process::pid_t pid)
 }
 
 inline Process::~Process() noexcept {
+    stop();
+
     if (isRunning()) {
         if (!process_.wait_for(std::chrono::seconds(5))) {
             terminate();
-        }
-        else {
-            stop();
         }
     }
 }
