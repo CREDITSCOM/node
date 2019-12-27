@@ -97,7 +97,6 @@ Node::Node(cs::config::Observer& observer)
     setupNextMessageBehaviour();
     setupPoolSynchronizerBehaviour();
 
-    alwaysExecuteContracts_ = cs::ConfigHolder::instance().config()->alwaysExecuteContracts();
     good_ = init();
 }
 

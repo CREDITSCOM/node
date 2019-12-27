@@ -3,17 +3,24 @@
 
 #include <ContractExecutor.h>
 #include <base58.h>
+
 #include <cscrypto/cryptoconstants.hpp>
+
 #include <csdb/currency.hpp>
+
+#include <csnode/configholder.hpp>
 #include <csnode/datastream.hpp>
 #include <csnode/transactionsiterator.hpp>
 #include <csnode/eventreport.hpp>
-#include <lib/system/logger.hpp>
 #include <csnode/fee.hpp>
+
+#include <lib/system/logger.hpp>
+
 #include <functional>
 #include <memory>
 #include <optional>
 #include <sstream>
+
 #include <serializer.hpp>
 
 namespace {
@@ -180,7 +187,6 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
 /*explicit*/
 SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& calls_queue_scheduler)
 : scheduler(calls_queue_scheduler)
-, force_execution(false)
 , bc(blockchain)
 , executor_ready(true)
 , max_read_sequence(0)
@@ -215,7 +221,6 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
         exec_handler_ptr = connector_ptr->apiExecHandler();
     }
     node_id = id;
-    force_execution = pnode->alwaysExecuteContracts();
 }
 
 /*static*/
@@ -734,7 +739,7 @@ void SmartContracts::test_exe_queue(bool reading_db) {
 
         if (!reading_db) {
             // call to executor only if is trusted relatively to this contract
-            if (it->is_executor || force_execution) {
+            if (it->is_executor || cs::ConfigHolder::instance().config()->alwaysExecuteContracts()) {
                 // final decision to execute contract is here, based on executor availability
                 if (it->is_executor && !executor_ready && !test_executor_availability()) {
                     cslog() << kLogPrefix << "skip " << FormatRef(it->seq_enqueue) << ", execution is not allowed (executor is not connected)";

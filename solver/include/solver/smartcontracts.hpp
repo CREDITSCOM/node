@@ -467,9 +467,6 @@ public signals:
     // emits on every update of contract state both during reading db and getting block in real time
     SmartContractSignal contract_state_updated;
 
-    // flag to always execute contracts even in normal state
-    bool force_execution;
-
 public slots:
     // called when execute_async() completed
     void on_execution_completed(const std::vector<SmartExecutionData>& data_list) {

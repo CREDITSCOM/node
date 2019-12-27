@@ -277,10 +277,6 @@ public:
     // args: [failed list, restart list]
     using RejectedSmartContractsSignal = cs::Signal<void(const std::vector<RefExecution>&)>;
 
-    bool alwaysExecuteContracts() {
-        return alwaysExecuteContracts_;
-    }
-
     void reportEvent(const cs::Bytes& bin_pack);
 
 public signals:
@@ -414,7 +410,6 @@ private:
     std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
     std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
 
-    //std::vector<cs::Stage> smartStageTemporary_;
     // smart consensus IDs:
     std::vector<uint64_t> activeSmartConsensuses_;
 
@@ -443,8 +438,6 @@ private:
     std::map<cs::RoundNumber, uint8_t> receivedBangs;
     std::map<cs::PublicKey, size_t> blackListCounter_;
     size_t lastRoundPackageTime_ = 0;
-
-    bool alwaysExecuteContracts_ = false;
 
     cs::config::Observer& observer_;
     cs::Compressor compressor_;
