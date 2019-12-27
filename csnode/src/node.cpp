@@ -62,7 +62,6 @@ Node::Node(cs::config::Observer& observer)
 , stat_()
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this))
 , observer_(observer) {
-    autoShutdownEnabled_ = cs::ConfigHolder::instance().config()->autoShutdownEnabled();
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
 
     std::cout << "Start transport... ";

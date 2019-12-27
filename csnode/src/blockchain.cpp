@@ -14,6 +14,7 @@
 #include <csnode/node.hpp>
 #include <csnode/transactionsindex.hpp>
 #include <csnode/transactionsiterator.hpp>
+#include <csnode/configholder.hpp>
 #include <solver/smartcontracts.hpp>
 
 #include <boost/filesystem.hpp>
@@ -1434,24 +1435,25 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) co
 }
 
 cs::Sequence BlockChain::getPreviousPoolSeq(const csdb::Address& addr, cs::Sequence ps) const {
-    auto prev_seq = trxIndex_->getPrevTransBlock(addr, ps);
+    auto previousSequence = trxIndex_->getPrevTransBlock(addr, ps);
 
-    if (prev_seq == ps) {
+    if (previousSequence == ps) {
         auto pubKey = getAddressByType(addr, AddressType::PublicKey).public_key();
         cserror() << "Inconsistent transaction index for public key: "
                   << EncodeBase58(Bytes(pubKey.begin(), pubKey.end()))
                   << ", block seq is " << ps;
 
-        if (Node::autoShutdownEnabled()) {
+        if (cs::ConfigHolder::instance().config()->autoShutdownEnabled()) {
             cserror() << "Node will be stopped due to index error. Please restart it.";
 
             trxIndex_->invalidate();
             Node::requestStop();
         }
+
         return kWrongSequence;
     }
 
-    return prev_seq;
+    return previousSequence;
 }
 
 std::pair<cs::Sequence, uint32_t> BlockChain::getLastNonEmptyBlock() {

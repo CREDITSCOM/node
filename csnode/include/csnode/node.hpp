@@ -71,9 +71,6 @@ public:
     void stop();
 
     static void requestStop();
-    static bool autoShutdownEnabled() {
-        return autoShutdownEnabled_;
-    }
 
     bool isStopRequested() const {
         return stopRequested_;
@@ -347,7 +344,6 @@ private:
     bool good_ = true;
 
     std::atomic_bool stopRequested_{ false };
-    static inline bool autoShutdownEnabled_;
 
     // file names for crypto public/private keys
     inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
