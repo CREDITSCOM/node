@@ -99,6 +99,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             //tmpNewState.add_user_field(trx_uf::new_state::Value, tr.user_field(trx_uf::new_state::Value));
 
             auto stateOnly = tr.user_field(trx_uf::new_state::Value).value<std::string>();
+            csdebug() << kLogPrefix << "new state bytes:" << cs::Utils::byteStreamToHex(stateOnly);
             Hash newStateHash;
             if (stateOnly.size() > 0) {
                 cscrypto::Bytes st(stateOnly.data(), stateOnly.data() + stateOnly.size());

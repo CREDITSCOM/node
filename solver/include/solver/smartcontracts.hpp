@@ -350,7 +350,7 @@ public:
 
     static std::string to_base58(const BlockChain& storage, const csdb::Address& addr);
 
-    static std::vector<cs::TransactionsPacket> grepNewStatesPacks(const std::vector<csdb::Transaction>& trxs);
+    static std::vector<cs::TransactionsPacket> grepNewStatesPacks(const BlockChain& storage, const std::vector<csdb::Transaction>& trxs);
 
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
@@ -582,6 +582,8 @@ private:
         bool operator ==(const SmartContractRef& r) const {
             return ref_start == r;
         }
+
+        double calc_max_fee() const;
     };
 
     // defines an item of execution queue which is a one or more simultaneous calls to specific contract

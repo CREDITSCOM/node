@@ -1,5 +1,6 @@
 build/
 build64/
+build_dbg/
 .dir-locals.el
 /.vs
 /.vscode
