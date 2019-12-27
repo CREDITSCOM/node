@@ -181,7 +181,7 @@ void SolverCore::gotStageOne(const cs::StageOne& stage) {
         uint64_t currentTimeStamp = 0;
         uint8_t sender = stage.sender;
         try {
-            lastTimeStamp = std::stoll(find_stage1(stage.sender)->roundTimeStamp);
+            lastTimeStamp = std::stoull(find_stage1(stage.sender)->roundTimeStamp);
         }
         catch (...) {
             csdebug() << __func__ << ": last stage-1 from " << static_cast<int>(stage.sender) << " Timestamp was announced as zero";

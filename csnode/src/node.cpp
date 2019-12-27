@@ -2847,6 +2847,10 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
         deltaStamp = Consensus::DefaultTimeStampRange;
 
     }
+    if (deltaStamp < Consensus::MinimumTimeStampRange) {
+        deltaStamp = Consensus::MinimumTimeStampRange;
+
+    }
     if (sHash.timeStamp < lastTimeStamp){
         csdebug() << "Incoming TimeStamp(< last BC timeStamp)= " << std::to_string(sHash.timeStamp) << " < " << std::to_string(lastTimeStamp) << " ... return";
         return;

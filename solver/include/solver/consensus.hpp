@@ -21,6 +21,9 @@ public:
     /** @brief   The default state timeout */
     const static uint64_t DefaultTimeStampRange;
 
+    /** @brief   The minimum state timeout */
+    constexpr static uint64_t MinimumTimeStampRange = 300;
+
     /** @brief   Maximum time in msec to wait new round after consensus achieved, after that waiting trusted nodes
      * activates */
     const static unsigned int PostConsensusTimeout;
