@@ -2008,9 +2008,6 @@ void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::Roun
     if (!stream.isValid() || stream.isAvailable(1)) {
         return;
     }
-    if (!stream.isValid() || stream.isAvailable(1)) {
-        return;
-    }
 
     if (rejectList.empty()) {
         csmeta(cserror) << "empty rejected contracts pack received";
