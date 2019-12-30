@@ -231,6 +231,7 @@ public:
 
     void updateConfigFromFile();
 
+    // @TODO: remove this function
     bool isBlackListed(const cs::PublicKey) { return false; }
 
     const cs::PublicKey& getNodeIdKey() const {
