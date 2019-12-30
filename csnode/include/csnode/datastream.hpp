@@ -541,11 +541,7 @@ inline DataStream& operator>>(DataStream& stream, CompressedRegion& region) {
     stream >> bytes;
 
     if (!bytes.empty()) {
-        RegionAllocator allocator;
-        RegionPtr regionPtr = allocator.allocateNext(static_cast<uint32_t>(bytes.size()));
-
-        std::copy(bytes.data(), bytes.data() + bytes.size(), reinterpret_cast<char*>(regionPtr->data()));
-        region = CompressedRegion { std::move(regionPtr), binarySize };
+        region = CompressedRegion { std::move(bytes), binarySize };
     }
 
     return stream;
@@ -574,7 +570,7 @@ inline DataStream& operator<<(DataStream& stream, const cs::Bytes& data) {
 
 inline DataStream& operator<<(DataStream& stream, const CompressedRegion& data) {
     stream << data.binarySize();
-    stream << cs::Bytes(data.data(), data.data() + data.size());
+    stream << data.bytes();
     return stream;
 }
 
