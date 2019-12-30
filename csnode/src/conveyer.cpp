@@ -215,6 +215,8 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundNumber cachedRound, const cs::R
         }
     }
 
+    changeRound(table.round);
+
     setTable(table);
 }
 
