@@ -10,6 +10,7 @@
 #include <csdb/amount.hpp>
 #include <csdb/amount_commission.hpp>
 #include <lib/system/logger.hpp>
+#include <csnode/nodecore.hpp>
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
 #include <walletscache.hpp>
@@ -59,6 +60,7 @@ Reject::Reason TransactionsValidator::validateNewStateAsSource(SolverContext& co
         cslog() << kLogPrefix << __func__ << ": reject new_state transaction, execution fee is not set properly";
         return Reject::Reason::MalformedTransaction;
     }
+
     csdb::Amount feeForExecution(feeField.value<csdb::Amount>());
     if ((csdb::Amount(initTransaction.max_fee().to_double()) - csdb::Amount(initTransaction.counted_fee().to_double())) <
         csdb::Amount(trx.counted_fee().to_double()) + feeForExecution) {
@@ -89,19 +91,24 @@ Reject::Reason TransactionsValidator::validateCommonAsSource(SolverContext& cont
         cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], source equals to target";
         return Reject::Reason::SourceIsTarget;
     }
-    const double max_fee = trx.max_fee().to_double();
-    const double counted_fee = trx.counted_fee().to_double();
-    if (csdb::Amount(max_fee) < csdb::Amount(counted_fee)) {
-        cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], max fee (" << max_fee
-            << ") is less than counted fee (" << counted_fee << ")";
-        return Reject::Reason::InsufficientMaxFee;
+
+    // max_fee does not matter for new_state and smart emitted:
+    bool is_smart_emitted = smarts.is_known_smart_contract(trx.source());
+    if (!is_smart_emitted && !SmartContracts::is_new_state(trx)) {
+        const double max_fee = trx.max_fee().to_double();
+        const double counted_fee = trx.counted_fee().to_double();
+        if (csdb::Amount(max_fee) < csdb::Amount(counted_fee)) {
+            cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], max fee (" << max_fee
+                << ") is less than counted fee (" << counted_fee << ")";
+            return Reject::Reason::InsufficientMaxFee;
+        }
     }
 
     if (SmartContracts::is_executable(trx)) {
         newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
     }
     else {
-        if (smarts.is_known_smart_contract(trx.source())) {
+        if (is_smart_emitted) {
             auto sourceAbsAddr = smarts.absolute_address(trx.source());
             if (isRejectedSmart(sourceAbsAddr)) {
                 csdebug() << kLogPrefix << __func__ << ": reject contract emitted transaction, new_state was rejected.";
@@ -141,13 +148,24 @@ Reject::Reason TransactionsValidator::validateCommonAsSource(SolverContext& cont
             }
 
             newBalance = wallState.balance_ - trx.amount();
+            if (newBalance < zeroBalance_) {
+                validNewStates_.back().second = false;
+                smartsWithNegativeBalances_.push_back(std::make_pair(trx, trxInd));
+            }
         }
         else {
             if (smarts.is_known_smart_contract(trx.target())) {
                 newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
             }
             else {
-                newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
+                //calculate balance only if transaction isn't de-delegate
+                csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegated);
+                if (delegateField.is_valid() && delegateField.value<uint64_t>() == 2) {
+                    newBalance = wallState.balance_ - csdb::Amount(trx.counted_fee().to_double());
+                }
+                else {
+                    newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.counted_fee().to_double());
+                }
             }
         }
     }
@@ -199,13 +217,51 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
 	}
 
     if (wallState.balance_ < zeroBalance_ && !SmartContracts::is_new_state(trx)) {
-        csdetails() << kLogPrefix << "transaction[" << trxInd << "] results to potentially negative balance " << wallState.balance_.to_double();
+        csdebug() << kLogPrefix << "transaction[" << trxInd << "] results to potentially negative balance " << wallState.balance_.to_double();
         // will be checked in rejected smarts
         if (context.smart_contracts().is_known_smart_contract(trx.source())) {
             return Reject::Reason::NegativeResult;
         }
         // will be validated by graph
         negativeNodes_.push_back(&wallState);
+    }
+    csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegated);
+    if (delegateField.is_valid()) {
+        if (trx.amount() < Consensus::MinStakeDelegated) {
+            csdetails() << kLogPrefix << "The delegated amount is too low";
+            return Reject::Reason::AmountTooLow;
+        }
+        WalletsState::WalletData& wallTargetState = walletsState_.getData(trx.target());
+        auto tKey = trx.target().is_public_key() ? trx.target().public_key() : context.blockchain().getCacheUpdater().toPublicKey(trx.target());
+        auto it = wallState.delegats_.find(tKey);
+        if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gate) {
+            if (wallTargetState.delegated_ > csdb::Amount{ 0 }) {
+                csdetails() << kLogPrefix << "Can't delegate to the account that was already delegated";
+                return Reject::Reason::AlreadyDelegated;
+            }
+        }
+        else if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gated_withdraw) {
+            if (it == wallState.delegats_.end()) {
+                csdetails() << kLogPrefix << "No such delegate in account state";
+                return Reject::Reason::IncorrectTarget;
+            }
+            else {
+                if (wallTargetState.delegated_ != wallState.delegats_[tKey]) {
+                    cserror() << kLogPrefix << "The sum of delegation is not properly set to the sender and target accounts";
+                    return Reject::Reason::MalformedDelegation;
+                }
+                else {
+                    if (wallTargetState.delegated_ != trx.amount()) {
+                        csdetails() << kLogPrefix << "The sum of delegation isn't equal the transaction amount";
+                        return Reject::Reason::IncorrectSum;
+                    }
+                }
+            }
+        }
+        else {
+            csdetails() << kLogPrefix << "not specified transaction field";
+            return Reject::Reason::MalformedTransaction;
+        }
     }
 
     wallState.trxTail_.push(trx.innerID());
@@ -218,43 +274,75 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
 
 Reject::Reason TransactionsValidator::validateTransactionAsTarget(const csdb::Transaction& trx) {
     WalletsState::WalletData& wallState = walletsState_.getData(trx.target());
-
+    //TODO insert delegated check code here
     wallState.balance_ = wallState.balance_ + trx.amount();
 
     return Reject::Reason::None;
 }
 
 size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded) {
-    using rejectedSmart = std::pair<csdb::Transaction, size_t>;
     auto& smarts = context.smart_contracts();
-    std::vector<csdb::Transaction> newStates;
-    std::vector<rejectedSmart> rejectedSmarts;
-    size_t maskSize = maskIncluded.size();
-    size_t i = 0;
     size_t restoredCounter = 0;
 
-    for (const auto& t : trxs) {
-        if (i < maskSize && smarts.is_known_smart_contract(t.source()) && !SmartContracts::is_new_state(t)) {
-            WalletsState::WalletData& wallState = walletsState_.getData(t.source());
-            if (wallState.balance_ < zeroBalance_) {
-                rejectedSmarts.push_back(std::make_pair(t, i));
+    std::map<csdb::Address, csdb::Amount> smartBalances;
+
+    for (auto& state : validNewStates_) {
+        auto contract_abs_addr = smarts.absolute_address(trxs[state.first].source());
+
+        if (isRejectedSmart(contract_abs_addr)) { // rejected due to fee, signature or problems with new state
+            continue;
+        }
+
+        auto it = std::find_if(smartsWithNegativeBalances_.cbegin(), smartsWithNegativeBalances_.cend(),
+                               [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == contract_abs_addr) && o.second > state.first; });
+
+        if (it == smartsWithNegativeBalances_.end()) {
+            continue;
+        }
+
+        WalletsState::WalletData& wallState = walletsState_.getData(contract_abs_addr);
+        csdb::Transaction initTransaction = SmartContracts::get_transaction(context.blockchain(), trxs[state.first]);
+        wallState.balance_ += initTransaction.amount();
+
+        csdb::Amount availableForSpend = initTransaction.amount();
+        size_t prevIndex = it->second;
+
+        while (it != smartsWithNegativeBalances_.end()) {
+            if (it->second - prevIndex > 1) {
+                break;
             }
+            prevIndex = it->second;
+            availableForSpend -= it->first.amount();
+            ++it;
         }
-        else if (i < maskSize && SmartContracts::is_new_state(t) && *(maskIncluded.cbegin() + i) == Reject::Reason::None) {
-            newStates.push_back(t);
+
+        if (availableForSpend >= zeroBalance_) {
+            state.second = true;
         }
-        ++i;
+
+        if (wallState.balance_ >= zeroBalance_) {
+            restoredCounter += makeSmartsValid(context, smartsWithNegativeBalances_, contract_abs_addr, maskIncluded);
+        }
+
+        smartBalances[contract_abs_addr] = wallState.balance_;
     }
 
-    for (const auto& state : newStates) {
-        csdb::Transaction initTransaction = SmartContracts::get_transaction(context.blockchain(), state);
-        auto it = std::find_if(rejectedSmarts.cbegin(), rejectedSmarts.cend(),
-                               [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == smarts.absolute_address(initTransaction.target())); });
-        if (it != rejectedSmarts.end()) {
-            WalletsState::WalletData& wallState = walletsState_.getData(it->first.source());
-            wallState.balance_ += initTransaction.amount();
-            if (wallState.balance_ >= zeroBalance_) {
-                restoredCounter += makeSmartsValid(context, rejectedSmarts, it->first.source(), maskIncluded);
+    std::set<csdb::Address> uniqueInvalidatedStates;
+
+    for (auto& state : validNewStates_) {
+        auto contract_abs_addr = smarts.absolute_address(trxs[state.first].source());
+
+        if (isRejectedSmart(contract_abs_addr) && getRejectReason(contract_abs_addr) != Reject::Reason::NegativeResult) {
+            continue;
+        }
+
+        if (smartBalances[contract_abs_addr] >= zeroBalance_) {
+            state.second = true;
+        }
+        else {
+            saveNewState(contract_abs_addr, state.first, Reject::Reason::NegativeResult);
+            if (!state.second && !uniqueInvalidatedStates.insert(contract_abs_addr).second) {
+                state.second = true;
             }
         }
     }

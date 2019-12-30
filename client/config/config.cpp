@@ -27,7 +27,7 @@
 #include <unistd.h>
 #endif
 
-const NodeVersion NODE_VERSION = 441;
+const NodeVersion NODE_VERSION = 450;
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
@@ -37,12 +37,14 @@ const std::string BLOCK_NAME_POOL_SYNC = "pool_sync";
 const std::string BLOCK_NAME_API = "api";
 const std::string BLOCK_NAME_CONVEYER = "conveyer";
 const std::string BLOCK_NAME_EVENT_REPORTER = "event_report";
+const std::string BLOCK_NAME_DBSQL = "dbsql";
 
 const std::string PARAM_NAME_HOSTS_FILENAME = "hosts_filename";
 const std::string PARAM_NAME_INITIAL_TRUSTED = "init_trusted_filename";
 const std::string PARAM_NAME_USE_IPV6 = "ipv6";
 const std::string PARAM_NAME_MIN_NEIGHBOURS = "min_neighbours";
 const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
+const std::string PARAM_NAME_RESTRICT_NEIGHBOURS = "restrict_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
 const std::string PARAM_NAME_ROUND_ELAPSE_TIME = "round_elapse_time";
@@ -92,6 +94,12 @@ const std::string PARAM_NAME_EVENTS_REJECT_TRANSACTION = "reject_transaction";
 const std::string PARAM_NAME_EVENTS_REJECT_CONTRACT_EXECUTION = "reject_contract_execution";
 const std::string PARAM_NAME_EVENTS_REJECT_CONTRACT_CONSENSUS = "reject_contract_consensus";
 const std::string PARAM_NAME_EVENTS_ALARM_INVALID_BLOCK = "alarm_invalid_block";
+
+const std::string PARAM_NAME_DBSQL_HOST = "host";
+const std::string PARAM_NAME_DBSQL_PORT = "port";
+const std::string PARAM_NAME_DBSQL_NAME = "name";
+const std::string PARAM_NAME_DBSQL_USER = "user";
+const std::string PARAM_NAME_DBSQL_PASSWORD = "password";
 
 const std::string ARG_NAME_CONFIG_FILE = "config-file";
 const std::string ARG_NAME_DB_PATH = "db-path";
@@ -727,9 +735,11 @@ Config Config::readFromFile(const std::string& fileName) {
 
         result.minNeighbours_ = params.count(PARAM_NAME_MIN_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MIN_NEIGHBOURS) : DEFAULT_MIN_NEIGHBOURS;
         result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) : DEFAULT_MAX_NEIGHBOURS;
+        result.restrictNeighbours_ = params.count(PARAM_NAME_RESTRICT_NEIGHBOURS) ? params.get<bool>(PARAM_NAME_RESTRICT_NEIGHBOURS) : false;
 
-        if (result.maxNeighbours_ > DEFAULT_MAX_NEIGHBOURS) {
-            result.maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS; // see neighbourhood.hpp, some containers are of static size
+        if (result.maxNeighbours_ > Neighbourhood::kMaxNeighbours) {
+            // see neighbourhood.hpp, some containers are of static size
+            result.maxNeighbours_ = Neighbourhood::kMaxNeighbours;
         }
 
         if (params.count(PARAM_NAME_COMPATIBLE_VERSION)) {
@@ -803,6 +813,7 @@ Config Config::readFromFile(const std::string& fileName) {
         result.readApiData(config);
         result.readConveyerData(config);
         result.readEventsReportData(config);
+        result.readDbSQLData(config);
 
         result.good_ = true;
     }
@@ -944,6 +955,21 @@ void Config::readEventsReportData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_ALARM_INVALID_BLOCK, eventsReport_.alarm_invalid_block);
 }
 
+void Config::readDbSQLData(const boost::property_tree::ptree& config) {
+    const std::string& block = BLOCK_NAME_DBSQL;
+
+    if (!config.count(block)) {
+        return;
+    }
+
+    const boost::property_tree::ptree& data = config.get_child(block);
+    checkAndSaveValue(data, block, PARAM_NAME_DBSQL_HOST, dbSQLData_.host);
+    checkAndSaveValue(data, block, PARAM_NAME_DBSQL_PORT, dbSQLData_.port);
+    checkAndSaveValue(data, block, PARAM_NAME_DBSQL_NAME, dbSQLData_.name);
+    checkAndSaveValue(data, block, PARAM_NAME_DBSQL_USER, dbSQLData_.user);
+    checkAndSaveValue(data, block, PARAM_NAME_DBSQL_PASSWORD, dbSQLData_.password);
+}
+
 template <typename T>
 bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value) {
     if (data.count(param)) {
@@ -956,27 +982,22 @@ bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const st
                       << cs::numeric_cast<T>(max) << "]" << std::endl;
             return false;
         }
-
         value = cs::numeric_cast<T>(readValue);
         return true;
     }
-
     return false;
 }
 
 bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, std::string& value) {
     if (data.count(param)) {
         auto readValue = data.get<std::string>(param);
-
         if (readValue.empty()) {
             std::cout << "[warning] Config.ini> Please, check the block: [" << block << "], so that param: [" << param << "] is empty" << std::endl;
             return false;
         }
-
         value = std::move(readValue);
         return true;
     }
-
     return false;
 }
 
@@ -1054,6 +1075,18 @@ bool operator!=(const EventsReportData& lhs, const EventsReportData& rhs) {
     return !(lhs == rhs);
 }
 
+bool operator==(const DbSQLData& lhs, const DbSQLData& rhs) {
+    return lhs.host == rhs.host &&
+           lhs.port == rhs.port &&
+           lhs.name == rhs.name &&
+           lhs.user == rhs.user &&
+           lhs.password == rhs.password;
+}
+
+bool operator!=(const DbSQLData& lhs, const DbSQLData& rhs) {
+    return !(lhs == rhs);
+}
+
 // logger settings not checked
 bool operator==(const Config& lhs, const Config& rhs) {
     return lhs.good_ == rhs.good_ &&
@@ -1063,6 +1096,7 @@ bool operator==(const Config& lhs, const Config& rhs) {
         lhs.ipv6_ == rhs.ipv6_ &&
         lhs.minNeighbours_ == rhs.minNeighbours_ &&
         lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
+        lhs.restrictNeighbours_ == rhs.restrictNeighbours_ &&
         lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
         lhs.symmetric_ == rhs.symmetric_ &&
         lhs.hostAddressEp_ == rhs.hostAddressEp_ &&

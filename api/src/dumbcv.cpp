@@ -27,7 +27,7 @@ cs::DumbCv::Condition cs::DumbCv::waitCvSignal(const cs::Signature& signature) {
     std::unique_lock lock(mutex_);
 
     if (auto it = cvInfo_.find(signature); it != cvInfo_.end()) {
-        it->second.cv.wait_for(lock, std::chrono::seconds(kWaitTimeMs), [it]() -> bool {
+        it->second.cv.wait_for(lock, std::chrono::seconds(kWaitTimeSec), [it]() -> bool {
             return it->second.condFlg;
         });
 
@@ -39,4 +39,12 @@ cs::DumbCv::Condition cs::DumbCv::waitCvSignal(const cs::Signature& signature) {
     }
 
     return condition;
+}
+
+void cs::DumbCv::setTransactionId(const csdb::TransactionID& id) {
+    id_ = id;
+}
+
+csdb::TransactionID cs::DumbCv::getTransactionId() const {
+    return id_;
 }

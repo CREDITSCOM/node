@@ -37,6 +37,31 @@ std::string Reject::to_string(Reason r) {
         return "CompleteReject";
     case LimitExceeded:
         return "LimitExceeded";
+    case AmountTooLow:
+        return "AmountTooLow";
+    case AlreadyDelegated:
+        return "AlreadyDelegated";
+    case IncorrectTarget:
+        return "IncorrectTarget";
+    case MalformedDelegation:
+        return "MalformedDelegation";
+    case IncorrectSum:
+        return "IncorrectSum";
+    default:
+        break;
+    }
+    return "?";
+}
+
+/*static*/
+std::string Running::to_string(Status s) {
+    switch (s) {
+    case Stop:
+        return "STOP";
+    case ReadBlocks:
+        return "READ_BLOCKS";
+    case Run:
+        return "RUN";
     default:
         break;
     }
@@ -334,3 +359,25 @@ EventReport::Id EventReport::parseContractsProblem(const cs::Bytes& bin_pack, cs
     return Id::None;
 }
 
+/*static*/ void EventReport::sendRunningStatus(Node& node, Running::Status status) {
+    constexpr size_t len = sizeof(EventReport::Id) + sizeof(Running::Status);
+    cs::Bytes bin_pack(len);
+    cs::DataStream out(bin_pack);
+    out << Id::RunningStatus << status;
+    node.reportEvent(bin_pack);
+}
+
+/*static*/
+bool EventReport::parseRunningStatus(const cs::Bytes& bin_pack, Running::Status& status) {
+    if (bin_pack.empty()) {
+        return false;
+    }
+    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    Id id = Id::None;
+    in >> id;
+    if (id != Id::RunningStatus) {
+        return false;
+    }
+    in >> status;
+    return in.isValid() && in.isEmpty();
+}

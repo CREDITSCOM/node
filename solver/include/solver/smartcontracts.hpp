@@ -8,6 +8,7 @@
 #include <lib/system/concurrent.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
+#include <csnode/transactionspacket.hpp>
 
 #include <csnode/node.hpp>  // introduce csconnector::connector::ApiExecHandlerPtr at least
 
@@ -349,6 +350,9 @@ public:
 
     static std::string to_base58(const BlockChain& storage, const csdb::Address& addr);
 
+    static std::vector<cs::TransactionsPacket> grepNewStatesPacks(const BlockChain& storage, const std::vector<csdb::Transaction>& trxs);
+
+
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
@@ -578,6 +582,8 @@ private:
         bool operator ==(const SmartContractRef& r) const {
             return ref_start == r;
         }
+
+        double calc_max_fee() const;
     };
 
     // defines an item of execution queue which is a one or more simultaneous calls to specific contract

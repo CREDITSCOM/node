@@ -21,6 +21,9 @@ public:
     /** @brief   The default state timeout */
     const static uint64_t DefaultTimeStampRange;
 
+    /** @brief   The minimum state timeout */
+    constexpr static uint64_t MinimumTimeStampRange = 300;
+
     /** @brief   Maximum time in msec to wait new round after consensus achieved, after that waiting trusted nodes
      * activates */
     const static unsigned int PostConsensusTimeout;
@@ -36,6 +39,9 @@ public:
 
     /** @brief   The minimum cash for trusted nodes to participate consensus */
     const static csdb::Amount MinStakeValue;
+
+    /** @brief   The minimum stake to be delegated to another node */
+    constexpr static csdb::Amount MinStakeDelegated = csdb::Amount{ 5 };
 
     /** @brief   The round when DPOS starts working */
     const static uint64_t StartingDPOS;

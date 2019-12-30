@@ -231,6 +231,8 @@ public:
 
     void updateConfigFromFile();
 
+    bool isBlackListed(const cs::PublicKey) { return false; }
+
     const cs::PublicKey& getNodeIdKey() const {
         return nodeIdKey_;
     }
@@ -301,6 +303,7 @@ public slots:
     void onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
     void validateBlock(csdb::Pool block, bool* shouldStop);
+    void deepBlockValidation(csdb::Pool block, bool* shouldStop);
     void onRoundTimeElapsed();
     void onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
     void onNeighbourRemoved(const cs::PublicKey& neighbour);
@@ -448,6 +451,8 @@ private:
 
     cs::config::Observer& observer_;
     cs::Compressor compressor_;
+
+    std::string kLogPrefix_;
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;
