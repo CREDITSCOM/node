@@ -285,7 +285,9 @@ ValidationPlugin::ErrorType SmartSourceSignaturesValidator::validateBlock(const 
   }
 
   bool switchCountedFees = block.version() == kBlockVerToSwitchCountedFees;
-  auto smartPacks = switchCountedFees ? switchCountedFee(SmartContracts::grepNewStatesPacks(transactions)) : SmartContracts::grepNewStatesPacks(transactions);
+  auto smartPacks = switchCountedFees ?
+      switchCountedFee(SmartContracts::grepNewStatesPacks(getBlockChain(), transactions)) :
+      SmartContracts::grepNewStatesPacks(getBlockChain(), transactions);
 
   if (!checkSignatures(smartSignatures, smartPacks)) {
     return ErrorType::error;

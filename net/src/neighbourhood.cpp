@@ -262,7 +262,7 @@ void Neighbourhood::checkSilent() {
             ConnectionPtr tc = *connPtrIt;
 
             if (tc->node) {
-                cswarning() << "Node " << tc->in << " stopped responding";
+                csdebug() << "Node " << tc->in << " stopped responding";
                 Connection* c = *tc;
                 tc->node->connection.compare_exchange_strong(c, nullptr, std::memory_order_release, std::memory_order_relaxed);
             }
@@ -376,7 +376,7 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
     cs::Lock lock(mLockFlag_);
 
     if (enoughConnections()) {
-        cslog() << "Connections limit has reached, ignore request connection to " << ep;
+        csdebug() << "Connections limit has reached, ignore request connection to " << ep;
         return;
     }
 
@@ -387,7 +387,7 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
     }
 
     if (!conn->connected && transport_->isShouldPending(*conn)) {
-        cswarning() << "Establishing connection to " << ep;
+        csdebug() << "Establishing connection to " << ep;
         transport_->sendRegistrationRequest(**conn);
     }
 }
@@ -540,7 +540,7 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     conn->attempts = 0;
 
     if (enoughConnections()) {
-        cswarning() << "Can not add neighbour, neighbours size is equal to max possible neighbours";
+        csdebug() << "Can not add neighbour, neighbours count is equal to max possible neighbours";
         return;
     }
     // to provide some rotation in neighbours_ add to begin, restrict at the end of:
@@ -626,16 +626,16 @@ bool Neighbourhood::validateConnectionId(RemoteNodePtr node, const Connection::I
     if (!realPtr) {
         if (nConn) {
             if (enoughConnections()) {
-                cswarning() << "Connections limit has reached, ignore ping from " << ep;
+                csdebug() << "Connections limit has reached, ignore ping from " << ep;
                 return false;
             }
 
-            cswarning() << "[NET] got ping from " << ep << " but the remote node is bound to " << nConn->getOut();
+            cslog() << "[NET] got ping from " << ep << " but the remote node is bound to " << nConn->getOut() << ", request new registration";
             transport_->sendRegistrationRequest(*nConn);
             nConn->lastSeq = lastSeq;
         }
         else {
-            cswarning() << "[NET] got ping from " << ep << " but no connection bound, sending refusal";
+            cslog() << "[NET] got ping from " << ep << " but no connection bound, sending refusal";
             Connection conn;
             conn.id = id;
             conn.in = ep;
@@ -647,16 +647,18 @@ bool Neighbourhood::validateConnectionId(RemoteNodePtr node, const Connection::I
     }
     else if (realPtr->get() != nConn) {
         if (enoughConnections()) {
-            cswarning() << "Connection limit has reached, ignore ping from " << ep;
+            csdebug() << "Connection limit has reached, ignore ping from " << ep;
             return false;
         }
 
         if (nConn) {
-            cswarning() << "[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut() << " but the remote node is bound to " << nConn->getOut();
+            cslog() << "[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut()
+                << " but the remote node is bound to " << nConn->getOut() << ", request new registration";
             transport_->sendRegistrationRequest(*nConn);
         }
         else {
-            cswarning() << "[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut() << " and there is no bindings, sending reg";
+            cslog() << "[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut()
+                << " and there is no bindings, request new registration";
         }
 
         (*realPtr)->lastSeq = lastSeq;
@@ -813,7 +815,7 @@ void Neighbourhood::pingNeighbours() {
             if (!nb->isSignal) {
                 ++cnt_ping;
                 if (cnt_ping > max_cnt) {
-                    cslog() << "Connections limit " << max_cnt << " has reached, ignore the rest neighbours";
+                    csdebug() << "Connections limit " << max_cnt << " has reached, ignore the rest neighbours";
                     break;
                 }
             }
@@ -845,15 +847,6 @@ void Neighbourhood::resendPackets() {
             bp.data.pack = Packet();
         }
         bp.data.sentLastTime = false;
-    }
-
-    for (auto& dp : msgDirects_) {
-        if (!dp.data.pack) {
-            continue;
-        }
-        if (!dispatch(dp.data)) {
-            dp.data.pack = Packet();
-        }
     }
 }
 

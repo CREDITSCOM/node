@@ -2,6 +2,7 @@
 #include <csignal>
 #include <numeric>
 #include <sstream>
+#include <numeric>
 
 #include <solver/consensus.hpp>
 #include <solver/solvercore.hpp>
@@ -36,7 +37,6 @@
 #include <cscrypto/cscrypto.hpp>
 
 #include <observer.hpp>
-#include  <numeric>
 
 const csdb::Address Node::genesisAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000001");
 const csdb::Address Node::startAddress_ = csdb::Address::from_string("0000000000000000000000000000000000000000000000000000000000000002");
@@ -582,6 +582,7 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
     else {
         addToBlackList(sender, true);
     }
+    cs::Bytes toHash = packet.toBinary(cs::TransactionsPacket::Serialization::Transactions);
 }
 
 void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size) {
@@ -3206,6 +3207,10 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
         deltaStamp = Consensus::DefaultTimeStampRange;
 
     }
+    if (deltaStamp < Consensus::MinimumTimeStampRange) {
+        deltaStamp = Consensus::MinimumTimeStampRange;
+
+    }
     if (sHash.timeStamp < lastTimeStamp){
         csdebug() << "Incoming TimeStamp(< last BC timeStamp)= " << std::to_string(sHash.timeStamp) << " < " << std::to_string(lastTimeStamp) << " ... return";
         return;
@@ -3703,23 +3708,47 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
 }
 
 void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_failed should be FALSE of the block is ok 
-    auto smartPacks = cs::SmartContracts::grepNewStatesPacks(block.transactions());
+    if (block.transactions_count() == 0) {
+        *check_failed = false;
+        return;
+    }
+    auto smartPacks = cs::SmartContracts::grepNewStatesPacks(getBlockChain(), block.transactions());
     auto& smartSignatures = block.smartSignatures();
+    size_t smartTrxCounter = 0;
     if (smartPacks.size() != smartSignatures.size()) {
         cserror() << "NODE> different size of smatrpackets and signatures at pool " << block.sequence();
         *check_failed = true;
         return;
     }
 
+    csdebug() << "NODE> SmartPacks = " << smartPacks.size();
     auto iSignatures = smartSignatures.begin();
     for (auto& it : smartPacks) {
+        csdebug() << "NODE> SmartSignatures(" << iSignatures->signatures.size() << ") for contract "<< iSignatures->smartConsensusPool << ":";
         for (auto p : iSignatures->signatures) {
             it.addSignature(p.first, p.second);
+            csdebug() << "NODE> " << static_cast<int>(p.first) << ". " << cs::Utils::byteStreamToHex(p.second.data(), 64);
+        }
+        smartTrxCounter += it.transactionsCount();
+        it.setExpiredRound(iSignatures->smartConsensusPool + Consensus::MaxRoundsCancelContract);
+
+        cs::Bytes toHash = it.toBinary(cs::TransactionsPacket::Serialization::Transactions);
+        it.makeHash();
+        ++iSignatures;
+    }
+
+    cs::TransactionsPacket trxs;
+    int normalTrxCounter = 0;
+    for (auto& it : block.transactions()) {
+        if (it.signature() != cs::Zero::signature) {
+            trxs.addTransaction(it);
+            ++normalTrxCounter;
         }
     }
-    cs::TransactionsPacket trxs;
-    for (auto& it : block.transactions()) {
-        trxs.addTransaction(it);
+    if (normalTrxCounter + smartTrxCounter != block.transactions_count()) {
+        cserror() << "NODE> invalid number of signed transactions in pool " << block.sequence();
+        *check_failed = true;
+        return;
     }
     auto characteristic = solver_->ownValidation(trxs, smartPacks);
     if (!characteristic.has_value()) {

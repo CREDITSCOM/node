@@ -254,13 +254,16 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
                 cswarning() << log_prefix << "incompatible timestamp received from [" << (int)it.sender << "]";
                 continue;
             }
-            double x = static_cast<double>(tStamp - lastTimeStamp);
-            if (x > DBL_EPSILON) {
-                stamps.push_back(x);
-                sx += x;
-                sx2 += x * x;
-                ++N;
+            if (tStamp > lastTimeStamp) {
+                double x = static_cast<double>(tStamp - lastTimeStamp);
+                if (x > DBL_EPSILON) {
+                    stamps.push_back(x);
+                    sx += x;
+                    sx2 += x * x;
+                    ++N;
+                }
             }
+
         }
     }
 
@@ -273,7 +276,7 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
             for (auto& it : stageOneStorage) {
                 int64_t tStamp;
                 try {
-                    tStamp = std::stoll(it.roundTimeStamp);
+                    tStamp = std::stoull(it.roundTimeStamp);
                 }
                 catch (...) {
                     cswarning() << log_prefix << "incompatible timestamp received from [" << (int)it.sender << "]";
@@ -287,7 +290,7 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
                 return std::to_string(sx0/N0);
             }
             else {
-                return std::to_string(lastTimeStamp + 100);
+                return std::to_string(lastTimeStamp + 1);
             }
 
         }

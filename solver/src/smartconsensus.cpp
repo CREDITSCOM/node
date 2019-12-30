@@ -89,6 +89,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             tmpNewState.set_target(tr.target());
             tmpNewState.set_currency(tr.currency());
             tmpNewState.set_counted_fee(tr.counted_fee());
+
             tmpNewState.set_currency(tr.currency());
             tmpNewState.set_innerID(tr.innerID());
             tmpNewState.set_max_fee(tr.max_fee());
@@ -98,6 +99,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             //tmpNewState.add_user_field(trx_uf::new_state::Value, tr.user_field(trx_uf::new_state::Value));
 
             auto stateOnly = tr.user_field(trx_uf::new_state::Value).value<std::string>();
+            csdebug() << kLogPrefix << "new state bytes:" << cs::Utils::byteStreamToHex(stateOnly);
             Hash newStateHash;
             if (stateOnly.size() > 0) {
                 cscrypto::Bytes st(stateOnly.data(), stateOnly.data() + stateOnly.size());
@@ -717,7 +719,7 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
             csdebug() << kLogPrefix << "contract state is too large, size is " << state_size << "b, not included in package";
         }
     }
-    finalSmartTransactionPack_.setExpiredRound(cs::Conveyer::instance().currentRoundNumber() + Consensus::MaxRoundsCancelContract);
+    finalSmartTransactionPack_.setExpiredRound(/*cs::Conveyer::instance().currentRoundNumber()*/smartRoundNumber_ + Consensus::MaxRoundsCancelContract);
     finalSmartTransactionPack_.makeHash();
 }
 

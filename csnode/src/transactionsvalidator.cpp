@@ -91,19 +91,24 @@ Reject::Reason TransactionsValidator::validateCommonAsSource(SolverContext& cont
         cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], source equals to target";
         return Reject::Reason::SourceIsTarget;
     }
-    const double max_fee = trx.max_fee().to_double();
-    const double counted_fee = trx.counted_fee().to_double();
-    if (csdb::Amount(max_fee) < csdb::Amount(counted_fee)) {
-        cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], max fee (" << max_fee
-            << ") is less than counted fee (" << counted_fee << ")";
-        return Reject::Reason::InsufficientMaxFee;
+
+    // max_fee does not matter for new_state and smart emitted:
+    bool is_smart_emitted = smarts.is_known_smart_contract(trx.source());
+    if (!is_smart_emitted && !SmartContracts::is_new_state(trx)) {
+        const double max_fee = trx.max_fee().to_double();
+        const double counted_fee = trx.counted_fee().to_double();
+        if (csdb::Amount(max_fee) < csdb::Amount(counted_fee)) {
+            cslog() << kLogPrefix << __func__ << ": reject transaction[" << trxInd << "], max fee (" << max_fee
+                << ") is less than counted fee (" << counted_fee << ")";
+            return Reject::Reason::InsufficientMaxFee;
+        }
     }
 
     if (SmartContracts::is_executable(trx)) {
         newBalance = wallState.balance_ - trx.amount() - csdb::Amount(trx.max_fee().to_double());
     }
     else {
-        if (smarts.is_known_smart_contract(trx.source())) {
+        if (is_smart_emitted) {
             auto sourceAbsAddr = smarts.absolute_address(trx.source());
             if (isRejectedSmart(sourceAbsAddr)) {
                 csdebug() << kLogPrefix << __func__ << ": reject contract emitted transaction, new_state was rejected.";
@@ -143,6 +148,10 @@ Reject::Reason TransactionsValidator::validateCommonAsSource(SolverContext& cont
             }
 
             newBalance = wallState.balance_ - trx.amount();
+            if (newBalance < zeroBalance_) {
+                validNewStates_.back().second = false;
+                smartsWithNegativeBalances_.push_back(std::make_pair(trx, trxInd));
+            }
         }
         else {
             if (smarts.is_known_smart_contract(trx.target())) {
@@ -273,39 +282,67 @@ Reject::Reason TransactionsValidator::validateTransactionAsTarget(const csdb::Tr
 
 size_t TransactionsValidator::checkRejectedSmarts(SolverContext& context, const Transactions& trxs, CharacteristicMask& maskIncluded) {
     auto& smarts = context.smart_contracts();
-    RejectedSmarts rejectedSmarts;
-    size_t maskSize = maskIncluded.size();
-    size_t i = 0;
     size_t restoredCounter = 0;
 
-    for (const auto& t : trxs) {
-        if (i < maskSize && smarts.is_known_smart_contract(t.source()) && !SmartContracts::is_new_state(t)) {
-            WalletsState::WalletData& wallState = walletsState_.getData(t.source());
-            if (wallState.balance_ < zeroBalance_) {
-                rejectedSmarts.push_back(std::make_pair(t, i));
-            }
-        }
-        ++i;
-    }
+    std::map<csdb::Address, csdb::Amount> smartBalances;
 
     for (auto& state : validNewStates_) {
-        if (isRejectedSmart(smarts.absolute_address(trxs[state.first].source()))) {
+        auto contract_abs_addr = smarts.absolute_address(trxs[state.first].source());
+
+        if (isRejectedSmart(contract_abs_addr)) { // rejected due to fee, signature or problems with new state
             continue;
         }
 
+        auto it = std::find_if(smartsWithNegativeBalances_.cbegin(), smartsWithNegativeBalances_.cend(),
+                               [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == contract_abs_addr) && o.second > state.first; });
+
+        if (it == smartsWithNegativeBalances_.end()) {
+            continue;
+        }
+
+        WalletsState::WalletData& wallState = walletsState_.getData(contract_abs_addr);
         csdb::Transaction initTransaction = SmartContracts::get_transaction(context.blockchain(), trxs[state.first]);
-        const csdb::Address contract_abs_addr = smarts.absolute_address(initTransaction.target());
-        auto it = std::find_if(rejectedSmarts.cbegin(), rejectedSmarts.cend(),
-                               [&](const auto& o) { return (smarts.absolute_address(o.first.source()) == contract_abs_addr); });
-        if (it != rejectedSmarts.end()) {
-            WalletsState::WalletData& wallState = walletsState_.getData(it->first.source());
-            wallState.balance_ += initTransaction.amount();
-            if (wallState.balance_ >= zeroBalance_) {
-                restoredCounter += makeSmartsValid(context, rejectedSmarts, it->first.source(), maskIncluded);
+        wallState.balance_ += initTransaction.amount();
+
+        csdb::Amount availableForSpend = initTransaction.amount();
+        size_t prevIndex = it->second;
+
+        while (it != smartsWithNegativeBalances_.end()) {
+            if (it->second - prevIndex > 1) {
+                break;
             }
-            else {
-                state.second = false;
-                saveNewState(contract_abs_addr, state.first, Reject::Reason::NegativeResult);
+            prevIndex = it->second;
+            availableForSpend -= it->first.amount();
+            ++it;
+        }
+
+        if (availableForSpend >= zeroBalance_) {
+            state.second = true;
+        }
+
+        if (wallState.balance_ >= zeroBalance_) {
+            restoredCounter += makeSmartsValid(context, smartsWithNegativeBalances_, contract_abs_addr, maskIncluded);
+        }
+
+        smartBalances[contract_abs_addr] = wallState.balance_;
+    }
+
+    std::set<csdb::Address> uniqueInvalidatedStates;
+
+    for (auto& state : validNewStates_) {
+        auto contract_abs_addr = smarts.absolute_address(trxs[state.first].source());
+
+        if (isRejectedSmart(contract_abs_addr) && getRejectReason(contract_abs_addr) != Reject::Reason::NegativeResult) {
+            continue;
+        }
+
+        if (smartBalances[contract_abs_addr] >= zeroBalance_) {
+            state.second = true;
+        }
+        else {
+            saveNewState(contract_abs_addr, state.first, Reject::Reason::NegativeResult);
+            if (!state.second && !uniqueInvalidatedStates.insert(contract_abs_addr).second) {
+                state.second = true;
             }
         }
     }
