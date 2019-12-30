@@ -75,6 +75,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
+    cs::Connector::connect(&blockChain_.alarmBadBlock, this, &Node::sendBlockAlarmSignal);
     cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
 
     setupNextMessageBehaviour();
@@ -967,13 +968,17 @@ void Node::createTestTransaction(int tType) {
 #endif
 }
 
+void Node::sendBlockAlarmSignal(cs::Sequence seq) {
+    sendBlockAlarm(cs::Zero::key, seq);
+}
+
 void Node::sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq) {
     cs::Bytes message;
     cs::DataStream stream(message);
     stream << seq;
     cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
-    sendToBroadcast(MsgTypes::BlockAlarm, seq, sig);
-    csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
+    //sendToBroadcast(MsgTypes::BlockAlarm, seq, sig);
+    //csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
     // send event report
     EventReport::sendInvalidBlockAlarm(*this, source_node, seq);
 }
