@@ -418,7 +418,7 @@ private:
     std::mutex lock_;
     T data_;
 
-    const unsigned int kWaitSecondsTime{ 30 };
+    const unsigned int kWaitSecondsTime{ 3 * 60 };
 
 public:
     inline WorkerQueue() noexcept

@@ -9,6 +9,7 @@
 #include <csnode/datastream.hpp>
 #include <csnode/sendcachedata.hpp>
 
+#include <solver/consensus.hpp>
 #include <solver/smartcontracts.hpp>
 
 #include <lib/system/hash.hpp>
@@ -210,6 +211,8 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundNumber cachedRound, const cs::R
             cserror() << csname() << "Round table updation failed";
         }
     }
+
+    changeRound(table.round);
 
     setTable(table);
 }

@@ -26,6 +26,7 @@ void TrustedStage2State::on(SolverContext& context) {
         stage.signatures[ptr->sender] = ptr->signature;
         stage.hashes[ptr->sender] = ptr->messageHash;
     }
+
     // if have already received stage-1, make possible to go further (to stage-3)
     if (!context.stage1_data().empty()) {
         csdebug() << name() << ": handle early received stages-1";
@@ -48,10 +49,16 @@ void TrustedStage2State::on(SolverContext& context) {
         //  - request stages-1 from anyone
         //  - create fake stages-1 from outbound nodes and force to next state
 
-        constexpr size_t TimerBaseId = 20;
-        csunused(TimerBaseId);
-
-        SolverContext* pctx = &context;
+    constexpr size_t TimerBaseId = 20;
+    csunused(TimerBaseId);
+    SolverContext* pctx = &context;
+    //blacklisted nodes stage-1 resolve
+    const auto& confidants = cs::Conveyer::instance().confidants();
+    for (uint8_t i = 0; i < static_cast<uint8_t>(confidants.size()); ++i) {
+        if (pctx->isBlackListed(confidants[i])) {
+            pctx->fake_stage1(i);
+        }
+    }
 
         auto dt = Consensus::TimeStageRequest;
         // increase dt in case of large trx amount:
@@ -123,7 +130,7 @@ Result TrustedStage2State::onStage1(SolverContext& context, const cs::StageOne& 
     if (cnt_recv_stages == context.cnt_trusted()) {
         csdebug() << name() << ": enough stage-1 received";
         /*signing of the second stage should be placed here*/
-        csdebug() << name() << ": --> stage-2 [" << static_cast<int>(stage.sender) << "]";
+        csdebug() << name() << ": --> stageTwo [" << static_cast<int>(stage.sender) << "]";
         stage.toBytes();
         csdebug() << name() << ": stageMessage (" << stage.message.size() << "): " << cs::Utils::byteStreamToHex(stage.message);
         stage.signature = cscrypto::generateSignature(context.private_key(), stage.message.data(), stage.message.size());

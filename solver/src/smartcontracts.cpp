@@ -150,7 +150,7 @@ void SmartContractRef::from_user_field(const csdb::UserField& fld) {
 void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::Transaction tr_start) {
     csdb::Amount tr_start_fee = csdb::Amount(tr_start.counted_fee().to_double());
     // TODO: here new_state_fee prediction may be calculated, currently it is equal to starter fee
-    csdb::Amount new_state_fee = tr_start_fee;
+    csdb::Amount new_state_fee = csdb::Amount(cs::fee::getContractStateMinFee().to_double());
     // apply starter fee consumed
     csdb::Amount avail_fee = csdb::Amount(tr_start.max_fee().to_double()) - tr_start_fee - new_state_fee;
     //consumed_fee = 0;
@@ -247,7 +247,12 @@ std::string SmartContracts::get_error_message(int8_t code) {
         return "internal bug in node detected";
     case ExecutorUnreachable:
     case ThriftException:
+    case NodeUnreachable:
         return "executor is disconnected or unavailable, or incompatible";
+    case LogicViolation:
+        return "logic violation, execution result breaks the rules";
+    case ExecutorIncompatible:
+        return "incompatible executor version";
     }
     std::ostringstream os;
     os << "Error code " << (int)code;
@@ -2060,7 +2065,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
 
         // finalize new_state transaction
         if (!data_item.error.empty() || data_item.result.smartsRes.empty()) {
-            cswarning() << kLogPrefix << "execution of " << data_item.contract_ref << " is failed: " << data_item.error << ", new state is empty";
+            cslog() << kLogPrefix << "execution of " << data_item.contract_ref << " is failed: " << data_item.error << ", new state is empty";
             // result contains empty USRFLD[state::Value]
             result.add_user_field(new_state::Value, std::string{});
             // smartRes or result contains error code for retVal
@@ -2073,7 +2078,7 @@ void SmartContracts::on_execution_completed_impl(const std::vector<SmartExecutio
             packet.addTransaction(result);
         }
         else {
-            // could not get here if smartRes empty (see if())
+            // could not get here if smartRes empty (see corresponding "if" above)
             const auto& execution_result = data_item.result.smartsRes.front();
             csdb::Address primary_abs_addr = absolute_address(result.target());
             if (execution_result.states.count(primary_abs_addr) == 0) {
@@ -2251,6 +2256,7 @@ bool SmartContracts::start_consensus(QueueItem& item) {
     }
     item.pconsensus = std::make_unique<SmartConsensus>();
 
+    csdebug() << kLogPrefix << "start consensus Smart round [" << item.seq_start << '.' << static_cast<int>(run_counter) << ']';
     // inform slots if any, packet does not contain smart consensus' data!
     emit signal_smart_executed(integral_packet);
 
@@ -2277,6 +2283,15 @@ uint64_t SmartContracts::next_inner_id(const csdb::Address& addr) const {
     return id;
 }
 
+// private method, inner struct
+double SmartContracts::ExecutionItem::calc_max_fee() const {
+    if (transaction.is_valid()) {
+        // clarify when transaction available, normally we always here
+        return transaction.max_fee().to_double() - transaction.counted_fee().to_double();
+    }
+    return avail_fee.to_double(); // "by default" value
+}
+
 csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item, int64_t new_id) {
     csdb::Transaction src = item.transaction;
     if (!src.is_valid()) {
@@ -2287,20 +2302,28 @@ csdb::Transaction SmartContracts::create_new_state(const ExecutionItem& item, in
                              src.target(),      // contract's address
                              src.currency(),    // source value
                              0,                 // amount
-                             csdb::AmountCommission((item.avail_fee - item.consumed_fee).to_double()), csdb::AmountCommission(item.new_state_fee.to_double()),
+                             csdb::AmountCommission(/*item.calc_max_fee()*/(uint16_t)0), 
+                             csdb::AmountCommission(item.new_state_fee.to_double()),
                              Zero::signature  // empty signature
     );
     // USRFLD1 - ref to start trx
     result.add_user_field(trx_uf::new_state::RefStart, item.ref_start.to_user_field());
     // USRFLD2 - total fee
     result.add_user_field(trx_uf::new_state::Fee, item.consumed_fee);
+
+    // clarify counted fee
+    csdb::AmountCommission stored_fee = result.counted_fee();
+    if (stored_fee.get_raw() != cs::fee::getFee(result).get_raw()) {
+        csdebug() << kLogPrefix << "state transaction fee is updated from " << stored_fee.to_double() << " to " << result.counted_fee().to_double();
+    }
+
     return result;
 }
 
 // get & handle rejected transactions
 // the aim is
-//  - to perform consensus on successful + 1st rejected execution again
-//  - re-execute valid but "compromised" by rejected items executions
+//  - to perform consensus on successful and rejected executions again
+//  - all executions following the rejected one are also rejected
 
 /*public*/
 void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_list) {
@@ -2308,8 +2331,6 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
     if (reject_list.empty()) {
         return;
     }
-
-    cs::RoundNumber current_sequence = bc.getLastSeq();
 
     cs::Lock lock(public_access_lock);
 
@@ -2337,11 +2358,11 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
             }
 
             for (auto it_queue = exe_queue.begin(); it_queue != exe_queue.end(); ) {
-                if (it_queue->is_rejected) {
-                    // has alredy done before
-                    break;
-                }
                 if (it_queue->seq_enqueue == sequence) {
+                    if (it_queue->is_rejected) {
+                        // has already done before
+                        break;
+                    }
                     // remove outdated executions (duplicated transaction is rejected)
                     size_t cnt_ignored = executions.size();
                     const auto it_state = known_contracts.find(it_queue->abs_addr);
@@ -2368,36 +2389,29 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                             // found (maybe partially) rejected queue item
                             // it_exe here points to the first rejected call in multi-call
                             // replace this item result with empty new state
-                            // and re-execute all "compromised" subsequent items
+                            // also, replace with empty state all subsequent executions
                             it_queue->is_rejected = true;
-
-                            // clear state of rejected execution
-                            if (it_exe->result.transactionsCount() > 0) {
-                                csdb::Transaction empty_new_state = it_exe->result.transactions().front().clone();
-                                using namespace trx_uf;
-                                empty_new_state.add_user_field(new_state::Value, std::string{});
-                                set_return_value(empty_new_state, error::ConsensusRejected);
-                                it_exe->result.clear();
-                                it_exe->result.addTransaction(empty_new_state);
-                            }
-
-                            // schedule re-execution of subsequent non-rejected items if any, remove restarted executions from current it_queue
-                            size_t cnt_restart_items = it_queue->executions.end() - it_exe - 1;
-                            if (cnt_restart_items > 0) {
-                                QueueItem& new_restart_item = exe_queue.emplace_back(it_queue->fork());
-                                new_restart_item.executions.assign(it_exe + 1, it_queue->executions.end());
-                                update_status(new_restart_item, current_sequence, SmartContractStatus::Waiting, false /*skip_log*/);
-                                it_queue->executions.erase(it_exe + 1, it_queue->executions.end());
-                            }
+                            const size_t cnt_rejected = it_queue->executions.cend() - it_exe;
+                            const size_t cnt_accepted = it_exe - it_queue->executions.cbegin();
+                            do {
+                                // clear state of rejected execution
+                                if (it_exe->result.transactionsCount() > 0) {
+                                    csdb::Transaction empty_new_state = it_exe->result.transactions().front().clone();
+                                    empty_new_state.add_user_field(trx_uf::new_state::Value, std::string{});
+                                    set_return_value(empty_new_state, error::ConsensusRejected);
+                                    it_exe->result.clear();
+                                    it_exe->result.addTransaction(empty_new_state);
+                                }
+                                ++it_exe;
+                            } while (it_exe != it_queue->executions.end());
 
                             csdebug() << kLogPrefix << FormatRef(sequence) << " is splitted onto "
-                                << it_queue->executions.size() << " completed + "
-                                << cnt_restart_items << " restarted calls";
+                                << cnt_accepted << " accepted + " << cnt_rejected << " rejected calls";
 
                             break;
                         }
                     }
-    
+
                     // finally, restart consensus on the queue item
                     if (it_queue->is_executor) {
                         if (!start_consensus(*it_queue)) {
@@ -3075,6 +3089,81 @@ Reject::Reason SmartContracts::prevalidate_inner(const cs::TransactionsPacket& p
         }
     }
     return Reject::Reason::None;
+}
+
+std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const BlockChain& storage, const std::vector<csdb::Transaction>& trxs) {
+    Packets res;
+    cs::TransactionsPacket pack;
+    SmartContractRef currentRef;
+    SmartContractRef newRef;
+    csdb::Address zeroSource = csdb::Address::from_public_key(cs::Zero::key);
+    csdb::Address currentSource = zeroSource;
+    size_t counter = 0;
+    for (auto& it : trxs) {
+        ++counter;
+        csdb::Address abs_addr = storage.getAddressByType(it.source(), BlockChain::AddressType::PublicKey);
+
+        if (SmartContracts::is_new_state(it)) {
+
+            csdb::UserField fld;
+            fld = it.user_field(trx_uf::new_state::RefStart);
+            if (fld.is_valid()) {
+                SmartContractRef ref(fld);
+                if (ref.is_valid()) {
+                    newRef = ref;
+                }
+                else {
+                    break;
+                }
+            }
+
+            if (!currentRef.is_valid() && abs_addr != zeroSource) {
+                currentRef = newRef;
+                currentSource = abs_addr;
+                pack.addTransaction(it);
+                continue;
+            }
+            else {
+                if (abs_addr == currentSource || newRef == currentRef) {
+                    if (abs_addr != currentSource) {
+                        currentSource = abs_addr;
+                    }
+                    pack.addTransaction(it);
+                    continue;
+                }
+                else {
+                    currentRef = newRef;
+                    currentSource = abs_addr;
+                    pack.makeHash();
+                    res.push_back(pack);
+                    pack = TransactionsPacket();
+                    pack.addTransaction(it);
+                    continue;
+                }
+            }
+
+        }
+        if (abs_addr == currentSource && abs_addr != zeroSource) {
+            pack.addTransaction(it);
+            continue;
+        }
+        else {
+            if (pack.transactionsCount() > 0) {
+                pack.makeHash();
+                res.push_back(pack);
+                pack = TransactionsPacket();
+            }
+            currentRef = SmartContractRef{};
+            currentSource = zeroSource;
+        }
+
+    }
+
+    if (pack.transactionsCount() > 0) {
+        pack.makeHash();
+        res.push_back(pack);
+    }
+    return res;
 }
 
 }  // namespace cs

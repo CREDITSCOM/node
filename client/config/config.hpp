@@ -90,7 +90,7 @@ struct EventsReportData {
     bool on = false;
 
     // report filters, only actual if on is true
-    
+
     // report every liar in consensus
     bool consensus_liar = false;
     // report every silent trusted node in consensus
@@ -115,6 +115,18 @@ struct EventsReportData {
     bool reject_contract_consensus = true;
     // invalid block detected by node
     bool alarm_invalid_block = true;
+};
+
+struct DbSQLData {
+    // SQL server host name or ip address
+    std::string host { "localhost" };
+    // connection port 5432 by default
+    int port = 5432;
+    // name of database
+    std::string name { "roundinfo" };
+    // username and password for access
+    std::string user { "postgres" };
+    std::string password { "postgres" };
 };
 
 class Config {
@@ -265,6 +277,10 @@ public:
         return eventsReport_;
     }
 
+    const DbSQLData& getDbSQLData() const {
+        return dbSQLData_;
+    }
+
 private:
     static Config readFromFile(const std::string& fileName);
 
@@ -273,6 +289,7 @@ private:
     void readApiData(const boost::property_tree::ptree& config);
     void readConveyerData(const boost::property_tree::ptree& config);
     void readEventsReportData(const boost::property_tree::ptree& config);
+    void readDbSQLData(const boost::property_tree::ptree& config);
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
     void showKeys(const std::string& pk58);
@@ -297,6 +314,7 @@ private:
 
     uint32_t minNeighbours_ = DEFAULT_MIN_NEIGHBOURS;
     uint32_t maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS;
+    bool restrictNeighbours_ = false;
     uint64_t connectionBandwidth_ = DEFAULT_CONNECTION_BANDWIDTH;
 
     bool symmetric_ = false;
@@ -315,6 +333,7 @@ private:
 
     PoolSyncData poolSyncData_;
     ApiData apiData_;
+    DbSQLData dbSQLData_;
 
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
@@ -344,6 +363,9 @@ bool operator!=(const PoolSyncData& lhs, const PoolSyncData& rhs);
 
 bool operator==(const ApiData& lhs, const ApiData& rhs);
 bool operator!=(const ApiData& lhs, const ApiData& rhs);
+
+bool operator==(const DbSQLData& lhs, const DbSQLData& rhs);
+bool operator!=(const DbSQLData& lhs, const DbSQLData& rhs);
 
 bool operator==(const ConveyerData& lhs, const ConveyerData& rhs);
 bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs);

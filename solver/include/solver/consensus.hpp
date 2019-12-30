@@ -40,6 +40,9 @@ public:
     /** @brief   The minimum cash for trusted nodes to participate consensus */
     const static csdb::Amount MinStakeValue;
 
+    /** @brief   The minimum stake to be delegated to another node */
+    constexpr static csdb::Amount MinStakeDelegated = csdb::Amount{ 5 };
+
     /** @brief   The round when DPOS starts working */
     const static uint64_t StartingDPOS;
 
