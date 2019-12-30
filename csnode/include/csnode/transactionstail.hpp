@@ -38,6 +38,17 @@ public:
         }
     }
 
+    bool erase(TransactionId trxId) {
+        if (heap_.empty()) {
+            return false;
+        }
+        if (!heap_.contains(trxId)) {
+            return false;
+        }
+        heap_.pop(trxId);
+        return true;
+    }
+
 	bool isDuplicated(TransactionId trxId) const {
 		if (!heap_.empty()) {
 			return heap_.contains(trxId);

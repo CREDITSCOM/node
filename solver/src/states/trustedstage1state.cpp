@@ -45,7 +45,7 @@ void TrustedStage1State::on(SolverContext& context) {
             pctx->complete_stage1();
         }
         else {
-            csdebug() << name() << ": Something prevents from going on with Stage-1, perhaps later...";
+            csdebug() << name() << ": Something prevents from finishing Stage-1, perhaps later...";
         }
     });
 
