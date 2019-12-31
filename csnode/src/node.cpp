@@ -3721,6 +3721,13 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     auto& smartSignatures = block.smartSignatures();
     size_t smartTrxCounter = 0;
     if (smartPacks.size() != smartSignatures.size()) {
+        // there was known accident in testnet only in block #2'651'597 that contains unsigned smart contract states packet
+        constexpr const uint64_t uuidTestNet = 5283967947175248524;
+        if (getBlockChain().uuid() == uuidTestNet) {
+            *check_failed = false;
+            csdebug() << kLogPrefix_ << "skip validation in testnet: not enough smart contract signatures, #" << WithDelimiters(block.sequence());
+            return;
+        }
         cserror() << "NODE> different size of smatrpackets and signatures at pool " << block.sequence();
         *check_failed = true;
         return;
