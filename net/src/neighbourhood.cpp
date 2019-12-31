@@ -185,13 +185,13 @@ void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
     }
 }
 
-void Neighbourhood::sendByConfidant(const Packet* pack, ConnectionPtr conn) {
+void Neighbourhood::sendByConfidant(Packet* pack, ConnectionPtr conn) {
     auto& bp = msgDirects_.tryStore(pack->getHash());
 
     bp.pack = *pack;
     bp.receiver = conn;
 
-    transport_->sendDirect(pack, **conn);
+    transport_->sendDirectToSock(pack, **conn);
 }
 
 bool Neighbourhood::canHaveNewConnection() {

@@ -365,7 +365,7 @@ bool Transport::checkConfidant(const cs::PublicKey& key) {
 }
 
 // returns pair of (sent count, list of unable-to-send items in input list)
-std::pair< uint32_t, std::list<int> > Transport::deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>& list, int except) {
+std::pair< uint32_t, std::list<int> > Transport::deliverConfidants(Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>& list, int except) {
     std::vector<ConnectionPtr> conns;
     conns.reserve(list.size());
     std::pair< uint32_t, std::list<int> > result = std::make_pair(0, std::list<int>{});

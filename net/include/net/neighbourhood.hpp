@@ -146,7 +146,7 @@ public:
 
     void chooseNeighbours();
     void sendByNeighbours(const Packet*, bool separate = false);
-    void sendByConfidant(const Packet* pack, ConnectionPtr conn);
+    void sendByConfidant(Packet* pack, ConnectionPtr conn);
 
     void establishConnection(const ip::udp::endpoint&);
     ConnectionPtr addConfidant(const ip::udp::endpoint&);
