@@ -268,7 +268,7 @@ void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packe
                 }
             }
             if (correctSignaturesCounter < confidants.size() / 2U + 1U) {
-                cslog() << kLogPrefix << "is not enough valid signatures";
+                csdebug() << kLogPrefix << "is not enough valid signatures";
                 smartSourceInvalidSignatures_.insert(transaction.source());
             }
         }

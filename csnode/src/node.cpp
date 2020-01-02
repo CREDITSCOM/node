@@ -50,6 +50,7 @@ Node::Node(cs::config::Observer& observer)
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this))
 , observer_(observer) {
     autoShutdownEnabled_ = cs::ConfigHolder::instance().config()->autoShutdownEnabled();
+
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
 
     std::cout << "Start transport... ";
@@ -68,13 +69,18 @@ Node::Node(cs::config::Observer& observer)
         return;
     }
 
+    // it should work prior WalletsIds & WalletsCache on reading DB
+    cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::deepBlockValidation);
+    // let blockChain_ to subscribe on signals, WalletsIds & WalletsCache are there
+    blockChain_.preInit();
+    // continue with subscriptions
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
+    cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
+    cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &cs::Executor::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &executor, &cs::Executor::onBlockStored);
-    cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &cs::Executor::onReadBlock);
     cs::Connector::connect(&transport_->pingReceived, this, &Node::onPingReceived);
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
-    cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
     cs::Connector::connect(&blockChain_.alarmBadBlock, this, &Node::sendBlockAlarmSignal);
     cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
 
@@ -3710,12 +3716,15 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
         *shouldStop = true;
         return;
     }
-    deepBlockValidation(block, shouldStop);
 }
 
 void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_failed should be FALSE of the block is ok 
+    *check_failed = false;
+    const auto seq = block.sequence();
+    if (seq == 0) {
+        return;
+    }
     if (block.transactions_count() == 0) {
-        *check_failed = false;
         return;
     }
     auto smartPacks = cs::SmartContracts::grepNewStatesPacks(getBlockChain(), block.transactions());
@@ -3723,13 +3732,20 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     size_t smartTrxCounter = 0;
     
     constexpr const uint64_t uuidTestNet = 5283967947175248524;
-    constexpr const bool collectRejectedInfo = true;
+    constexpr const bool collectRejectedInfo = false;
     const char* kLogPrefix = (collectRejectedInfo ? "NODE> skip block validation: " : "NODE> stop block validation: ");
+
+    if (block.sequence() <= 5504545) {
+        if (getBlockChain().uuid() == uuidTestNet) {
+            csdebug() << kLogPrefix << WithDelimiters(block.sequence()) << " is in special range in Testnet";
+            return;
+        }
+    }
 
     if (smartPacks.size() != smartSignatures.size()) {
         // there was known accident in testnet only in block #2'651'597 that contains unsigned smart contract states packet
         //if (getBlockChain().uuid() == uuidTestNet) {
-        cserror() << kLogPrefix_ << "different size of smatrpackets and signatures in block " << WithDelimiters(block.sequence());
+        cserror() << kLogPrefix << "different size of smatrpackets and signatures in block " << WithDelimiters(block.sequence());
         *check_failed = !collectRejectedInfo;
         return;
     }
@@ -3781,7 +3797,6 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
         ++idx;
     }
     csdebug() << "NODE> no invalid transactions in block #" <<WithDelimiters(block.sequence());
-    *check_failed = false;
 }
 
 void Node::onRoundTimeElapsed() {

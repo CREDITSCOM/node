@@ -66,6 +66,9 @@ public:
 
     bool init(const std::string& path,
               cs::Sequence newBlockchainTop = cs::kWrongSequence);
+    // called immediately after object construction, better place to subscribe on signals
+    void preInit();
+
     bool isGood() const;
 
     // return unique id of database if at least one unique block has written, otherwise (only genesis block) 0
