@@ -3710,6 +3710,7 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
         *shouldStop = true;
         return;
     }
+    deepBlockValidation(block, shouldStop);
 }
 
 void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_failed should be FALSE of the block is ok 
@@ -3720,16 +3721,16 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     auto smartPacks = cs::SmartContracts::grepNewStatesPacks(getBlockChain(), block.transactions());
     auto& smartSignatures = block.smartSignatures();
     size_t smartTrxCounter = 0;
+    
+    constexpr const uint64_t uuidTestNet = 5283967947175248524;
+    constexpr const bool collectRejectedInfo = true;
+    const char* kLogPrefix = (collectRejectedInfo ? "NODE> skip block validation: " : "NODE> stop block validation: ");
+
     if (smartPacks.size() != smartSignatures.size()) {
         // there was known accident in testnet only in block #2'651'597 that contains unsigned smart contract states packet
-        constexpr const uint64_t uuidTestNet = 5283967947175248524;
-        if (getBlockChain().uuid() == uuidTestNet) {
-            *check_failed = false;
-            csdebug() << kLogPrefix_ << "skip validation in testnet: not enough smart contract signatures, #" << WithDelimiters(block.sequence());
-            return;
-        }
-        cserror() << "NODE> different size of smatrpackets and signatures at pool " << block.sequence();
-        *check_failed = true;
+        //if (getBlockChain().uuid() == uuidTestNet) {
+        cserror() << kLogPrefix_ << "different size of smatrpackets and signatures in block " << WithDelimiters(block.sequence());
+        *check_failed = !collectRejectedInfo;
         return;
     }
 
@@ -3758,25 +3759,28 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
         }
     }
     if (normalTrxCounter + smartTrxCounter != block.transactions_count()) {
-        cserror() << "NODE> invalid number of signed transactions in pool " << block.sequence();
-        *check_failed = true;
+        cserror() << kLogPrefix << "invalid number of signed transactions in block " << WithDelimiters(block.sequence());
+        *check_failed = !collectRejectedInfo;
         return;
     }
     auto characteristic = solver_->ownValidation(trxs, smartPacks);
     if (!characteristic.has_value()) {
-        cserror() << "NODE> can't get characteristic from pool " << block.sequence();
-        *check_failed = true;
+        cserror() << kLogPrefix << "cannot get characteristic from block " << WithDelimiters(block.sequence());
+        *check_failed = !collectRejectedInfo;
         return;
     }
     auto cMask = characteristic.value().mask;
+    size_t idx = 0;
     for (auto it : cMask) {
         if (it == 0) {
-            csdebug() << "NODE> invalid transaction found in pool #" << block.sequence();
-            *check_failed = true;
+            cserror() << kLogPrefix << "invalid transaction found " << WithDelimiters(block.sequence())
+                << '.' << idx;
+            *check_failed = !collectRejectedInfo;
             return;
         }
+        ++idx;
     }
-    csdebug() << "NODE> no bad transactions in pool #" << block.sequence();
+    csdebug() << "NODE> no invalid transactions in block #" <<WithDelimiters(block.sequence());
     *check_failed = false;
 }
 
