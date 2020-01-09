@@ -504,7 +504,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             // gotPackRequest(task, sender);
             break;
         case NetworkCommand::IntroduceConsensusReply:
-            gotSSIntroduceConsensusReply();
+            gotSSIntroduceConsensusReply(sender);
             break;
         default:
             result = false;
@@ -1708,16 +1708,27 @@ bool Transport::isOwnNodeTrusted() const {
     return (node_->getNodeLevel() != Node::Level::Normal);
 }
 
-bool Transport::gotSSIntroduceConsensusReply()
+bool Transport::gotSSIntroduceConsensusReply(RemoteNodePtr& sender)
 {
     csdebug() << "Get confidants from start node";
     //if (ssStatus_ != SSBootstrapStatus::Complete) {
     //    return false;
     //}
 
+    Connection* connection = sender->connection.load();
+    if (!connection->isSignal) {
+        csdebug() << "Not start node";
+        return false;
+    }
+
+    const cs::Byte* startPtr = iPackStream_.getCurrentPtr();
+
     uint8_t numCirc{ 0 };
     iPackStream_ >> numCirc;
     csdebug() << "Total confidants count " << uint32_t(numCirc) << ':';
+
+    std::vector<cs::PublicKey> keys;
+    std::vector<EndpointData> eps;
 
     for (uint8_t i = 0; i < numCirc; ++i) {
         EndpointData ep;
@@ -1733,8 +1744,27 @@ bool Transport::gotSSIntroduceConsensusReply()
         csdebug() << '[' << uint32_t(i) << "] " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " - " << ep.ip << ':' << ep.port;
 
         if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
-            storeAddress(key, ep);
+            keys.push_back(key);
+            eps.push_back(ep);
         }
+    }
+
+    if (!iPackStream_.end()) {
+        const cs::Byte* endPtr = iPackStream_.getCurrentPtr();
+        cs::Signature signature;
+        iPackStream_ >> signature;
+        if (!iPackStream_.good()) {
+            csdebug() << "Packet with confidants is broken on read signature";
+            return false;
+        }
+        if (!cscrypto::verifySignature(signature, connection->key, startPtr, endPtr - startPtr)) {
+            csdebug() << "Bad signature";
+            return false;
+        }
+    }
+
+    for (size_t i = 0; i < keys.size(); i++) {
+        storeAddress(keys[i], eps[i]);
     }
 
     return true;

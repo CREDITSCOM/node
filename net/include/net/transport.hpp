@@ -214,7 +214,7 @@ private:
     bool gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
     bool gotPing(const TaskPtr<IPacMan>&, RemoteNodePtr&);
-    bool gotSSIntroduceConsensusReply();
+    bool gotSSIntroduceConsensusReply(RemoteNodePtr&);
 
     void storeAddress(const cs::PublicKey& key, const EndpointData& ep);
 
