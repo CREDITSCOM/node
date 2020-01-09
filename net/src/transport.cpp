@@ -1407,21 +1407,15 @@ bool Transport::gotSSUpdateServer()
     cs::RoundNumber round = 0;
     iPackStream_ >> round;
 
-    if (const auto currentRound = cs::Conveyer::instance().currentRoundNumber(); !(currentRound <= round + DELTA_ROUNDS_VERIFY_NEW_SERVER))
-    {
-        cswarning() << "Server update failed rounds verification. Receive round = " << round << " node round = " << currentRound;
-        return false;
-    }
-    
     EndpointData ep;
     iPackStream_ >> ep.ip >> ep.port;
-    
+
     if (!neighbourhood_.updateSignalServer(net_->resolve(ep)))
     {
         cswarning() << "Don't update start node. Error updating neighbours_";
         return false;
     }
-    
+
     // update config.ini
     if (!Config::replaceBlock("start_node", "ip = " + ep.ip.to_string(), "port = " + std::to_string(ep.port)))
     {
@@ -1431,7 +1425,7 @@ bool Transport::gotSSUpdateServer()
 
     // update config variable
     node_->updateConfigFromFile();
-    
+
     ssEp_ = net_->resolve(ep);
 
     cslog() << "Registration on new start node";
