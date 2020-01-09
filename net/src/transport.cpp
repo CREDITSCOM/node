@@ -504,7 +504,7 @@ void Transport::processNetworkTask(const TaskPtr<IPacMan>& task, RemoteNodePtr& 
             // gotPackRequest(task, sender);
             break;
         case NetworkCommand::IntroduceConsensusReply:
-            gotSSIntroduceConsensusReply();
+            gotSSIntroduceConsensusReply(sender);
             break;
         default:
             result = false;
@@ -1407,21 +1407,15 @@ bool Transport::gotSSUpdateServer()
     cs::RoundNumber round = 0;
     iPackStream_ >> round;
 
-    if (const auto currentRound = cs::Conveyer::instance().currentRoundNumber(); !(currentRound <= round + DELTA_ROUNDS_VERIFY_NEW_SERVER))
-    {
-        cswarning() << "Server update failed rounds verification. Receive round = " << round << " node round = " << currentRound;
-        return false;
-    }
-    
     EndpointData ep;
     iPackStream_ >> ep.ip >> ep.port;
-    
+
     if (!neighbourhood_.updateSignalServer(net_->resolve(ep)))
     {
         cswarning() << "Don't update start node. Error updating neighbours_";
         return false;
     }
-    
+
     // update config.ini
     if (!Config::replaceBlock("start_node", "ip = " + ep.ip.to_string(), "port = " + std::to_string(ep.port)))
     {
@@ -1431,7 +1425,7 @@ bool Transport::gotSSUpdateServer()
 
     // update config variable
     node_->updateConfigFromFile();
-    
+
     ssEp_ = net_->resolve(ep);
 
     cslog() << "Registration on new start node";
@@ -1708,16 +1702,27 @@ bool Transport::isOwnNodeTrusted() const {
     return (node_->getNodeLevel() != Node::Level::Normal);
 }
 
-bool Transport::gotSSIntroduceConsensusReply()
+bool Transport::gotSSIntroduceConsensusReply(RemoteNodePtr& sender)
 {
     csdebug() << "Get confidants from start node";
     //if (ssStatus_ != SSBootstrapStatus::Complete) {
     //    return false;
     //}
 
+    Connection* connection = sender->connection.load();
+    if (!connection->isSignal) {
+        csdebug() << "Not start node";
+        return false;
+    }
+
+    const cs::Byte* startPtr = iPackStream_.getCurrentPtr();
+
     uint8_t numCirc{ 0 };
     iPackStream_ >> numCirc;
     csdebug() << "Total confidants count " << uint32_t(numCirc) << ':';
+
+    std::vector<cs::PublicKey> keys;
+    std::vector<EndpointData> eps;
 
     for (uint8_t i = 0; i < numCirc; ++i) {
         EndpointData ep;
@@ -1733,8 +1738,27 @@ bool Transport::gotSSIntroduceConsensusReply()
         csdebug() << '[' << uint32_t(i) << "] " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " - " << ep.ip << ':' << ep.port;
 
         if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
-            storeAddress(key, ep);
+            keys.push_back(key);
+            eps.push_back(ep);
         }
+    }
+
+    if (!iPackStream_.end()) {
+        const cs::Byte* endPtr = iPackStream_.getCurrentPtr();
+        cs::Signature signature;
+        iPackStream_ >> signature;
+        if (!iPackStream_.good()) {
+            csdebug() << "Packet with confidants is broken on read signature";
+            return false;
+        }
+        if (!cscrypto::verifySignature(signature, connection->key, startPtr, endPtr - startPtr)) {
+            csdebug() << "Bad signature";
+            return false;
+        }
+    }
+
+    for (size_t i = 0; i < keys.size(); i++) {
+        storeAddress(keys[i], eps[i]);
     }
 
     return true;
