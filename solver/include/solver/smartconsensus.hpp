@@ -64,6 +64,7 @@ public:
     cs::Sequence smartRoundNumber();
 
     void createFinalTransactionSet(const std::vector<csdb::Amount>& finalFees);
+    void createZeroStateTransactionSet();
     size_t smartStage3StorageSize();
     void sendFinalTransactionSet();
     bool smartConfidantExist(uint8_t);
@@ -157,6 +158,7 @@ private:
     //std::vector<cs::Stage> smartStageTemporary_;
     cs::Bytes smartConsensusMask;
     std::vector<csdb::Transaction> finalStateTransaction_;
+    bool smartConsensusAchieved_ = false;
 };
 
 }  // namespace cs
