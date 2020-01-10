@@ -1974,10 +1974,14 @@ void Node::sendStageOne(const cs::StageOne& stageOneInfo) {
 }
 
 void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+    if (size < Consensus::StageOneMinimumSize && size > Consensus::StageOneMaximumSize) {
+        csdebug() << kLogPrefix_ << "Invalid stage One size: " << size;
+        return;
+    }
     csmeta(csdetails) << "started";
 
     if (myLevel_ != Level::Confidant) {
-        csdebug() << "NODE> ignore stage-1 as no confidant";
+        csdebug() << kLogPrefix_ << "ignore stage-1 as no confidant";
         return;
     }
 
@@ -1987,7 +1991,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     istream_ >> subRound;
 
     if (subRound != subRound_) {
-        cswarning() << "NODE> ignore stage-1 with subround #" << static_cast<int>(subRound) << ", required #" << static_cast<int>(subRound_);
+        cswarning() << kLogPrefix_ << "ignore stage-1 with subround #" << static_cast<int>(subRound) << ", required #" << static_cast<int>(subRound_);
         return;
     }
 
@@ -1999,8 +2003,8 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
         csmeta(cserror) << "Bad stage-1 packet format";
         return;
     }
-    csdetails() << "Stage1 message: " << cs::Utils::byteStreamToHex(stage.message);
-    csdetails() << "Stage1 signature: " << cs::Utils::byteStreamToHex(stage.signature);
+    csdetails() << kLogPrefix_ << "Stage1 message: " << cs::Utils::byteStreamToHex(stage.message);
+    csdetails() << kLogPrefix_ << "Stage1 signature: " << cs::Utils::byteStreamToHex(stage.signature);
 
 
 
@@ -2061,6 +2065,10 @@ void Node::sendStageTwo(cs::StageTwo& stageTwoInfo) {
 }
 
 void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+    if (size < Consensus::StageTwoMinimumSize && size > Consensus::StageTwoMaximumSize) {
+        csdebug() << kLogPrefix_ << "Invalid stage Two size: " << size;
+        return;
+    }
     csmeta(csdetails);
 
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
@@ -2133,6 +2141,10 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
 }
 
 void Node::getStageThree(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+    if (size < Consensus::StageThreeMinimumSize && size > Consensus::StageThreeMaximumSize) {
+        csdebug() << kLogPrefix_ << "Invalid stage Two size: " << size;
+        return;
+    }
     csmeta(csdetails);
 
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
@@ -3770,9 +3782,9 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     int normalTrxCounter = 0;
     for (auto& it : block.transactions()) {
         if (it.signature() != cs::Zero::signature) {
-            trxs.addTransaction(it);
             ++normalTrxCounter;
         }
+        trxs.addTransaction(it);
     }
     if (normalTrxCounter + smartTrxCounter != block.transactions_count()) {
         cserror() << kLogPrefix << "invalid number of signed transactions in block " << WithDelimiters(block.sequence());

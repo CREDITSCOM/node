@@ -225,7 +225,7 @@ void SolverCore::gotStageOneRequest(uint8_t requester, uint8_t required) {
     csdebug() << kLogPrefix_ << "[" << static_cast<int>(requester) << "] asks for stage-1 of [" << static_cast<int>(required) << "]";
 
     const auto ptr = find_stage1(required);
-    if (ptr != nullptr) {
+    if (ptr != nullptr && ptr->signature != cs::Zero::signature) {
         pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::FirstStage, requester, ptr->message);
     }
 }
@@ -234,7 +234,7 @@ void SolverCore::gotStageTwoRequest(uint8_t requester, uint8_t required) {
     csdebug() << kLogPrefix_ << "[" << static_cast<int>(requester) << "] asks for stage-2 of [" << static_cast<int>(required) << "]";
 
     const auto ptr = find_stage2(required);
-    if (ptr != nullptr) {
+    if (ptr != nullptr && ptr->signature != cs::Zero::signature) {
         pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::SecondStage, requester, ptr->message);
     }
 }
@@ -253,7 +253,7 @@ void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required, uint8
     // const auto ptr = find_stage3(required);
 
     for (auto& it : stageThreeStorage) {
-        if (it.iteration == iteration && it.sender == required) {
+        if (it.iteration == iteration && it.sender == required  && it.signature != cs::Zero::signature) {
             pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester, it.message);
             return;
         }
