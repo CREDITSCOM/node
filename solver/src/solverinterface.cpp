@@ -28,6 +28,10 @@ void SolverCore::init(const cs::PublicKey& pub, const cs::PrivateKey& priv) {
     }
 }
 
+void SolverCore::subscribeToSignals() {
+    psmarts->subscribeToSignals(pnode);
+}
+
 void SolverCore::gotConveyerSync(cs::RoundNumber rNum) {
     // clear data
     markUntrusted.fill(0);

@@ -72,9 +72,10 @@ public:
     }
 
     uint8_t subRound();
+
     // Solver "public" interface,
     // below are the "required" methods to be implemented by Solver-compatibility issue:
-
+    void subscribeToSignals();
     void init(const cs::PublicKey& pub, const cs::PrivateKey& priv);
     void gotConveyerSync(cs::RoundNumber rNum);
     void gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize);

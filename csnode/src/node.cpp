@@ -72,7 +72,9 @@ Node::Node(cs::config::Observer& observer)
     // it should work prior WalletsIds & WalletsCache on reading DB
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::deepBlockValidation);
     // let blockChain_ to subscribe on signals, WalletsIds & WalletsCache are there
-    blockChain_.preInit();
+    blockChain_.subscribeToSignals();
+    // solver MUST subscribe to signals after the BlockChain
+    solver_->subscribeToSignals();
     // continue with subscriptions
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);

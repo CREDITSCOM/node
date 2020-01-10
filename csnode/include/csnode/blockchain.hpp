@@ -67,7 +67,7 @@ public:
     bool init(const std::string& path,
               cs::Sequence newBlockchainTop = cs::kWrongSequence);
     // called immediately after object construction, better place to subscribe on signals
-    void preInit();
+    void subscribeToSignals();
 
     bool isGood() const;
 
