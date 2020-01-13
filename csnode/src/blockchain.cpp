@@ -48,7 +48,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 
 BlockChain::~BlockChain() {}
 
-void BlockChain::preInit() {
+void BlockChain::subscribeToSignals() {
     // the order of two following calls matters
     cs::Connector::connect(&storage_.readBlockEvent(), trxIndex_.get(), &TransactionsIndex::onReadFromDb);
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
