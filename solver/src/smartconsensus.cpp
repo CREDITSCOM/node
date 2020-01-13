@@ -726,6 +726,8 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
     
 
     finalSmartTransactionPack_.setExpiredRound(/*cs::Conveyer::instance().currentRoundNumber()*/smartRoundNumber_ + Consensus::MaxRoundsCancelContract);
+    cs::Bytes packData = finalSmartTransactionPack_.toBinary(cs::TransactionsPacket::Serialization::Transactions);
+    //csdebug() << "Packet: " << cs::Utils::byteStreamToHex(packData.data(), packData.size());
     finalSmartTransactionPack_.makeHash();
 }
 

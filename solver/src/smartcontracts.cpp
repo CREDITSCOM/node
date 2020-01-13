@@ -3088,7 +3088,7 @@ Reject::Reason SmartContracts::prevalidate_inner(const cs::TransactionsPacket& p
 }
 
 std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const BlockChain& storage, const std::vector<csdb::Transaction>& trxs) {
-    Packets res;
+    PacketsVector res;
     cs::TransactionsPacket pack;
     SmartContractRef currentRef;
     SmartContractRef newRef;
@@ -3130,7 +3130,7 @@ std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const Blo
                 else {
                     currentRef = newRef;
                     currentSource = abs_addr;
-                    pack.makeHash();
+                    //pack.makeHash();
                     res.push_back(pack);
                     pack = TransactionsPacket();
                     pack.addTransaction(it);
@@ -3145,7 +3145,7 @@ std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const Blo
         }
         else {
             if (pack.transactionsCount() > 0) {
-                pack.makeHash();
+                //pack.makeHash();
                 res.push_back(pack);
                 pack = TransactionsPacket();
             }
@@ -3156,7 +3156,7 @@ std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const Blo
     }
 
     if (pack.transactionsCount() > 0) {
-        pack.makeHash();
+        //pack.makeHash();
         res.push_back(pack);
     }
     return res;

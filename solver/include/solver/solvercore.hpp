@@ -134,7 +134,7 @@ public:
     size_t trueStagesThree();
     uint8_t currentStage3iteration();
 
-    std::optional<cs::Characteristic> ownValidation(cs::TransactionsPacket& packet, cs::Packets& smartsPackets);
+    std::optional<cs::Characteristic> ownValidation(cs::TransactionsPacket& packet, cs::PacketsVector& smartsPackets);
 
     size_t stagesThree();
     bool stateFailed(Result res);

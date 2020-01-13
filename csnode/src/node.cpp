@@ -714,7 +714,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
 
     istream_.init(data, size);
 
-    cs::Packets packets;
+    cs::PacketsVector packets;
     istream_ >> packets;
 
     if (packets.empty()) {
@@ -1321,7 +1321,7 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
 }
 
 
-void Node::sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target) {
+void Node::sendPacketHashesReply(const cs::PacketsVector& packets, const cs::RoundNumber round, const cs::PublicKey& target) {
     if (packets.empty()) {
         return;
     }
@@ -1436,7 +1436,7 @@ void Node::becomeWriter() {
 void Node::processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
     csdebug() << "NODE> Processing packets sync request";
 
-    cs::Packets packets;
+    cs::PacketsVector packets;
 
     const auto& conveyer = cs::Conveyer::instance();
     std::unique_lock<cs::SharedMutex> lock = conveyer.lock();
@@ -1458,7 +1458,7 @@ void Node::processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumb
     }
 }
 
-void Node::processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round) {
+void Node::processPacketsReply(cs::PacketsVector&& packets, const cs::RoundNumber round) {
     csdebug() << "NODE> Processing packets reply";
 
     cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -2204,7 +2204,6 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
     if (!cscrypto::verifySignature(stage.signature, conveyer.confidantByIndex(stage.sender), bytes.data(), bytes.size())) {
         cswarning() << kLogPrefix_ << "stageThree from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!! Message: " 
             << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
-        return;
         return;
     }
 
@@ -3771,9 +3770,8 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
             csdebug() << "NODE> " << static_cast<int>(p.first) << ". " << cs::Utils::byteStreamToHex(p.second.data(), 64);
         }
         smartTrxCounter += it.transactionsCount();
+        csdebug() << "NODE> setting exp Round = " << iSignatures->smartConsensusPool + Consensus::MaxRoundsCancelContract;
         it.setExpiredRound(iSignatures->smartConsensusPool + Consensus::MaxRoundsCancelContract);
-
-        cs::Bytes toHash = it.toBinary(cs::TransactionsPacket::Serialization::Transactions);
         it.makeHash();
         ++iSignatures;
     }

@@ -17,7 +17,7 @@ public:
     bool push(const csdb::Transaction& transaction);
     void push(const cs::TransactionsPacket& packet);
 
-    cs::TransactionsBlock pop();
+    cs::PacketsVector pop();
 
     std::deque<cs::TransactionsPacket>::const_iterator begin() const;
     std::deque<cs::TransactionsPacket>::const_iterator end() const;

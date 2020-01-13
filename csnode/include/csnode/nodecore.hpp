@@ -26,9 +26,6 @@ namespace cs {
 // table for fast transactions storage
 using TransactionsPacketTable = std::map<TransactionsPacketHash, TransactionsPacket>;   // to be sorted by default
 
-// array of packets
-using TransactionsBlock = std::vector<cs::TransactionsPacket>;
-
 // array of notifications
 using Notifications = std::vector<cs::Bytes>;
 using Signatures = std::vector<cscrypto::Signature>;
@@ -38,7 +35,7 @@ using PrivateKeys = std::vector<PrivateKey>;
 
 using ConfidantsKeys = PublicKeys;
 using PacketsHashes = std::vector<cs::TransactionsPacketHash>;
-using Packets = std::vector<cs::TransactionsPacket>;
+using PacketsVector = std::vector<cs::TransactionsPacket>;
 using Signatures = std::vector<cs::Signature>;
 using Hashes = std::vector<cs::Hash>;
 
