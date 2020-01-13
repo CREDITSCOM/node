@@ -41,30 +41,31 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , multiWallets_(new MultiWallets())
 , cacheMutex_() {
     createCachesPath();
-
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
     blockHashes_ = std::make_unique<cs::BlockHashes>(cachesPath);
     trxIndex_ = std::make_unique<cs::TransactionsIndex>(*this, cachesPath, recreateIndex);
 
-    cs::Connector::connect(&storage_.readingStartedEvent(), trxIndex_.get(), &TransactionsIndex::onStartReadFromDb);
-    cs::Connector::connect(&storage_.readingStartedEvent(), this, &BlockChain::onStartReadFromDB);
+}
 
+BlockChain::~BlockChain() {}
+
+void BlockChain::subscribeToSignals() {
     // the order of two following calls matters
     cs::Connector::connect(&storage_.readBlockEvent(), trxIndex_.get(), &TransactionsIndex::onReadFromDb);
     cs::Connector::connect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
+    cs::Connector::connect(&storage_.readingStartedEvent(), trxIndex_.get(), &TransactionsIndex::onStartReadFromDb);
+    cs::Connector::connect(&storage_.readingStartedEvent(), this, &BlockChain::onStartReadFromDB);
 
     cs::Connector::connect(&storage_.readingStoppedEvent(), trxIndex_.get(), &TransactionsIndex::onDbReadFinished);
     cs::Connector::connect(&storage_.readingStoppedEvent(), walletsCacheUpdater_.get(), &WalletsCache::Updater::onStopReadingFromDB);
 
 #ifdef MONITOR_NODE
     cs::Connector::connect(&walletsCacheUpdater_->updateFromDBFinishedEvent, multiWallets_.get(), &MultiWallets::onDbReadFinished);
-    cs::Connector::connect(&walletsCacheUpdater_->updateFromDBFinishedEvent, [this] (const auto&) {
+    cs::Connector::connect(&walletsCacheUpdater_->updateFromDBFinishedEvent, [this](const auto&) {
         cs::Connector::connect(&walletsCacheUpdater_->walletUpdateEvent, multiWallets_.get(), &MultiWallets::onWalletCacheUpdated);
-    });
+        });
 #endif
 }
-
-BlockChain::~BlockChain() {}
 
 bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
     cs::Connector::connect(&this->removeBlockEvent, trxIndex_.get(), &TransactionsIndex::onRemoveBlock);
@@ -1228,6 +1229,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         emit tryToStoreBlockEvent(pool, &check_failed);
         if (check_failed) {
             csdebug() << kLogPrefix << "The pool " << pool.sequence() << " is invalid, won't be stored";
+            emit alarmBadBlock(pool.sequence());
             return false;
         }
         // update wallet ids

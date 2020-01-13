@@ -587,7 +587,7 @@ uint8_t SolverCore::subRound() {
     return (pnode->subRound());
 }
 
-std::optional<cs::Characteristic> SolverCore::ownValidation(cs::TransactionsPacket& packet, cs::Packets& smartsPackets) {
+std::optional<cs::Characteristic> SolverCore::ownValidation(cs::TransactionsPacket& packet, cs::PacketsVector& smartsPackets) {
     const std::size_t transactionsCount = packet.transactionsCount();
 
     cs::Characteristic characteristic;

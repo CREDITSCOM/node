@@ -43,6 +43,7 @@ using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 /** @brief   The write block or remove block signal emits when block is flushed to disk */
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
 using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
+using AlarmSignal = cs::Signal<void(const cs::Sequence)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
 using StartReadingBlocksSignal = csdb::BlockReadingStartedSingal;
 }  // namespace cs
@@ -65,6 +66,9 @@ public:
 
     bool init(const std::string& path,
               cs::Sequence newBlockchainTop = cs::kWrongSequence);
+    // called immediately after object construction, better place to subscribe on signals
+    void subscribeToSignals();
+
     bool isGood() const;
 
     // return unique id of database if at least one unique block has written, otherwise (only genesis block) 0
@@ -207,6 +211,9 @@ public signals:
 
     /** @brief The remove block event. Raised when the next block is flushed to storage */
     cs::RemoveBlockSignal removeBlockEvent;
+
+    /** @brief Alarm event. Block Isn't correct */
+    cs::AlarmSignal alarmBadBlock;
 
     const cs::ReadBlockSignal& readBlockEvent() const;
     const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;

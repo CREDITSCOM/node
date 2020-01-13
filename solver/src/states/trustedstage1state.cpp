@@ -242,7 +242,7 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
     return Result::Ignore;
 }
 
-cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::TransactionsPacket& packet, cs::Packets& smartsPackets) {
+cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::TransactionsPacket& packet, cs::PacketsVector& smartsPackets) {
     const std::size_t transactionsCount = packet.transactionsCount();
 
     cs::Characteristic characteristic;

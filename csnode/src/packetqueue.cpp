@@ -27,9 +27,9 @@ void cs::PacketQueue::push(const cs::TransactionsPacket& packet) {
     queue_.push_back(cs::TransactionsPacket{});
 }
 
-cs::TransactionsBlock cs::PacketQueue::pop() {
+cs::PacketsVector cs::PacketQueue::pop() {
     const auto round = cs::Conveyer::instance().currentRoundNumber();
-    cs::TransactionsBlock block;
+    cs::PacketsVector block;
 
     if (round == cachedRound_ && cachedPackets_ >= maxPacketsPerRound_) {
         return block;

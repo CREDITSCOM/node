@@ -320,6 +320,9 @@ public:
 
     ~SmartContracts();
 
+    // signals subscription MUST occur AFTER the BlockChains has already subscribed to storage's signals
+    void subscribeToSignals(Node* node);
+
     void init(const cs::PublicKey&, Node* node);
 
     static std::string get_error_message(int8_t code);

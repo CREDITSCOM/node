@@ -21,6 +21,24 @@ public:
     /** @brief   The default state timeout */
     const static uint64_t DefaultTimeStampRange;
 
+    /** @brief   Stage One minimum size */
+    constexpr static uint64_t StageOneMinimumSize = 110;
+
+    /** @brief   Stage One maximum size */
+    constexpr static uint64_t StageOneMaximumSize = 36000;
+
+    /** @brief   Stage Two minimum size */
+    constexpr static uint64_t StageTwoMinimumSize = 350;
+
+    /** @brief   Stage Two maximum size */
+    constexpr static uint64_t StageTwoMaximumSize = 10000;
+
+    /** @brief   Stage Three minimum size */
+    constexpr static uint64_t StageThreeMinimumSize = 260;
+
+    /** @brief   Stage Three maximum size */
+    constexpr static uint64_t StageThreeMaximumSize = 500;
+
     /** @brief   The minimum state timeout */
     constexpr static uint64_t MinimumTimeStampRange = 300;
 

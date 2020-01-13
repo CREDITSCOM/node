@@ -23,7 +23,7 @@ public:
     struct WalletData {
         TransactionIndex lastTrxInd_{};
         csdb::Amount balance_{};
-        csdb::Amount delegated_;
+        csdb::Amount delegated_{};
         std::map<cs::PublicKey, csdb::Amount> delegats_;
         TransactionsTail trxTail_{};
     };
