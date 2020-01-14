@@ -981,10 +981,10 @@ void Node::sendBlockAlarmSignal(cs::Sequence seq) {
 }
 
 void Node::sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq) {
-    cs::Bytes message;
-    cs::DataStream stream(message);
-    stream << seq;
-    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+    //cs::Bytes message;
+    //cs::DataStream stream(message);
+    //stream << seq;
+    //cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
     //sendToBroadcast(MsgTypes::BlockAlarm, seq, sig);
     //csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
     // send event report
@@ -3745,7 +3745,7 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     size_t smartTrxCounter = 0;
     
     constexpr const uint64_t uuidTestNet = 5283967947175248524;
-    constexpr const bool collectRejectedInfo = false;
+    /*constexpr*/ const bool collectRejectedInfo = cs::ConfigHolder::instance().config()->isCompatibleVersion();
     const char* kLogPrefix = (collectRejectedInfo ? "NODE> skip block validation: " : "NODE> stop block validation: ");
 
     if (block.sequence() <= 5504545) {
