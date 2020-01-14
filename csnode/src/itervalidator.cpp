@@ -257,12 +257,12 @@ void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packe
             //csdebug() << kLogPrefix << "Pack expired round = " << smartContractPacket.expiredRound();
             const auto& confidants = poolWithInitTr.confidants();
             const auto& signatures = smartContractPacket.signatures();
+            const cs::Byte* signedHash = smartContractPacket.hash().toBinary().data();
             size_t correctSignaturesCounter = 0;
             std::string invalidSignatures;
             for (const auto& signature : signatures) {
                 if (signature.first < confidants.size()) {
                     const auto& confidantPublicKey = confidants[signature.first];
-                    const cs::Byte* signedHash = smartContractPacket.hash().toBinary().data();
                     //csdebug() << "Hash (" << static_cast<int>(signature.first) << "): " << cs::Utils::byteStreamToHex(signedHash, cscrypto::kHashSize) << " - " << smartContractPacket.hash().toString();
                     if (cscrypto::verifySignature(signature.second, confidantPublicKey, signedHash, cscrypto::kHashSize)) {
                         ++correctSignaturesCounter;
@@ -273,7 +273,7 @@ void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packe
                 }
             }
             if (correctSignaturesCounter < confidants.size() / 2U + 1U) {
-                csdebug() << kLogPrefix << "is not enough valid signatures, bad ones: " << invalidSignatures;
+                csdebug() << kLogPrefix << "is not enough valid signatures, bad ones: " << invalidSignatures << " packet hash: " << smartContractPacket.hash().toString();
                 smartSourceInvalidSignatures_.insert(transaction.source());
             }
         }
