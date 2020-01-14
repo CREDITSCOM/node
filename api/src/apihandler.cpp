@@ -674,11 +674,13 @@ std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type, std::ost
 }
 
 std::optional<std::string> APIHandler::checkTransaction(const Transaction& transaction, csdb::Transaction& cTransaction) {
+    cTransaction = makeTransaction(transaction);
+
     if (transaction.__isset.smartContract && transaction.smartContract.forgetNewState) {
+        cTransaction.add_user_field(cs::trx_uf::deploy::Code, cs::Serializer::serialize(transaction.smartContract));
         return std::nullopt;
     }
 
-    cTransaction = makeTransaction(transaction);
     if (transaction.__isset.smartContract) {
         if (transaction.smartContract.__isset.smartContractDeploy) {
             // deploy info provided
