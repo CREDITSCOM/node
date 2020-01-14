@@ -706,6 +706,9 @@ void SmartConsensus::createFinalTransactionSet(const std::vector<csdb::Amount>& 
             finalSmartTransactionPack_.addTransaction(tr);
         }
     }
+
+    cs::fee::setCountedFees(finalSmartTransactionPack_.transactions());
+
     for (auto& it : finalStateTransaction_) {
         size_t state_size = std::numeric_limits<size_t>::max();
         csdb::UserField fld = it.user_field(cs::trx_uf::new_state::Value);
@@ -822,7 +825,7 @@ void SmartConsensus::sendFinalTransactionSet() {
     conv.addContractPacket(finalSmartTransactionPack_);
 
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
-        << " ==============================================> SEND RESULT TO CONVEYER, packet hash "
+        << " ==================================> SEND RESULT TO CONVEYER, packet(" << finalSmartTransactionPack_.transactionsCount() << " tr) hash "
         << finalSmartTransactionPack_.hash().toString();
 }
 

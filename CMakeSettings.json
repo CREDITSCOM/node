@@ -1,0 +1,123 @@
+﻿{
+  "environments": [
+    {
+      "VS_MSBUILD_COMMAND": "${env.VSINSTALLDIR}MSBuild\\Current\\Bin\\MSBuild.exe",
+      "VCPKG_TOOLCHAIN": "D:/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "VCPKG_TARGET_TRIPLET": "x64-windows-static"
+    }
+  ],
+  "configurations": [
+    {
+      "name": "Debug",
+      "generator": "Ninja",
+      "configurationType": "Debug",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "-v",
+      "ctestCommandArgs": "",
+      "cmakeToolchain": "${env.VCPKG_TOOLCHAIN}",
+      "variables": [
+        {
+          "name": "CMAKE_VS_MSBUILD_COMMAND",
+          "value": "${env.VS_MSBUILD_COMMAND}",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "VCPKG_TARGET_TRIPLET",
+          "value": "x64-windows-static",
+          "type": "STRING"
+        },
+        {
+          "name": "MSVC",
+          "value": "true",
+          "type": "BOOL"
+        }
+      ],
+      "cmakeToolchain": "D:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+    },
+    {
+      "name": "RelWithDebInfo",
+      "generator": "Ninja",
+      "configurationType": "RelWithDebInfo",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "-v",
+      "ctestCommandArgs": "",
+      "cmakeToolchain": "${env.VCPKG_TOOLCHAIN}",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "variables": [
+        {
+          "name": "CMAKE_VS_MSBUILD_COMMAND",
+          "value": "${env.VS_MSBUILD_COMMAND}",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "VCPKG_TARGET_TRIPLET",
+          "value": "${env.VCPKG_TARGET_TRIPLET}",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "name": "RelMonitor",
+      "generator": "Ninja",
+      "configurationType": "RelMonitor",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "cmakeToolchain": "${env.VCPKG_TOOLCHAIN}",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "variables": [
+        {
+          "name": "CMAKE_VS_MSBUILD_COMMAND",
+          "value": "${env.VS_MSBUILD_COMMAND}",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "VCPKG_TARGET_TRIPLET",
+          "value": "${env.VCPKG_TARGET_TRIPLET}",
+          "type": "STRING"
+        },
+        {
+          "name": "OUTDIR",
+          "value": "",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "name": "RelWallet",
+      "generator": "Ninja",
+      "configurationType": "RelWallet",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "cmakeToolchain": "${env.VCPKG_TOOLCHAIN}",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "variables": [
+        {
+          "name": "CMAKE_VS_MSBUILD_COMMAND",
+          "value": "${env.VS_MSBUILD_COMMAND}",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "VCPKG_TARGET_TRIPLET",
+          "value": "${env.VCPKG_TARGET_TRIPLET}",
+          "type": "STRING"
+        },
+        {
+          "name": "OUTDIR",
+          "value": "",
+          "type": "STRING"
+        }
+      ]
+    }
+  ]
+}

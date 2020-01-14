@@ -981,10 +981,10 @@ void Node::sendBlockAlarmSignal(cs::Sequence seq) {
 }
 
 void Node::sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq) {
-    cs::Bytes message;
-    cs::DataStream stream(message);
-    stream << seq;
-    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+    //cs::Bytes message;
+    //cs::DataStream stream(message);
+    //stream << seq;
+    //cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
     //sendToBroadcast(MsgTypes::BlockAlarm, seq, sig);
     //csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
     // send event report
