@@ -1001,7 +1001,7 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     }
 
     _return.id.poolSeq = newTransactionId.pool_seq();
-    _return.id.index = newTransactionId.index();
+    _return.id.index = static_cast<int32_t>(newTransactionId.index());
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, getDelimitedTransactionSigHex(send_transaction));
 }

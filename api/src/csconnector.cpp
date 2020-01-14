@@ -27,7 +27,7 @@ using namespace ::apache::thrift::server;
 using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
-const int32_t kStringLimit = Consensus::MaxTransactionSize;
+const int32_t kStringLimit = static_cast<int32_t>(Consensus::MaxTransactionSize);
 constexpr const int32_t kContainerLimit = 16 * 1024; // max allowed items in any container (map, list, set)
 constexpr const bool kStrictRead = false; // use default Thrift value
 constexpr const bool kStrictWrite = true; // use default Thrift value
