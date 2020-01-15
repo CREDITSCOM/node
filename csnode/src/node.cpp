@@ -2243,12 +2243,7 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, 
         return;
     }
 
-    if (cs::ConfigHolder::instance().config()->isCompatibleVersion()) {
-        sendToConfidant(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required);
-    }
-    else {
-        sendToConfidant(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required, iteration);
-    }
+    sendToConfidant(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required, iteration);
     csmeta(csdetails) << "done";
 }
 

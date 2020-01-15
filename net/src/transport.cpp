@@ -1645,9 +1645,7 @@ void Transport::sendPingPack(const Connection& conn) {
 
     oPackStream_ << node_->getBlockChain().uuid();
 
-    if (!cs::ConfigHolder::instance().config()->isCompatibleVersion()) {
-        oPackStream_ << NODE_VERSION;
-    }
+    oPackStream_ << NODE_VERSION;
 
     sendDirect(oPackStream_.getPackets(), conn);
     oPackStream_.clear();
@@ -1671,7 +1669,7 @@ bool Transport::gotPing(const TaskPtr<IPacMan>& task, RemoteNodePtr& sender) {
         }
     }
 
-    if (!cs::ConfigHolder::instance().config()->isCompatibleVersion() && iPackStream_.end()) {
+    if (iPackStream_.end()) {
         neighbourhood_.gotBadPing(id);
         return false;
     }

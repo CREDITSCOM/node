@@ -14,10 +14,10 @@
       "inheritEnvironments": [ "msvc_x64_x64" ],
       "buildRoot": "${projectDir}\\out\\build\\${name}",
       "installRoot": "${projectDir}\\out\\install\\${name}",
-      "cmakeCommandArgs": "",
-      "buildCommandArgs": "-v",
+      "cmakeCommandArgs": "-v",
+      "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "cmakeToolchain": "${env.VCPKG_TOOLCHAIN}",
+      "cmakeToolchain": "D:/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "variables": [
         {
           "name": "CMAKE_VS_MSBUILD_COMMAND",
@@ -34,8 +34,7 @@
           "value": "true",
           "type": "BOOL"
         }
-      ],
-      "cmakeToolchain": "D:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      ]
     },
     {
       "name": "RelWithDebInfo",
@@ -44,7 +43,7 @@
       "buildRoot": "${projectDir}\\out\\build\\${name}",
       "installRoot": "${projectDir}\\out\\install\\${name}",
       "cmakeCommandArgs": "",
-      "buildCommandArgs": "-v",
+      "buildCommandArgs": "",
       "ctestCommandArgs": "",
       "cmakeToolchain": "${env.VCPKG_TOOLCHAIN}",
       "inheritEnvironments": [ "msvc_x64_x64" ],
@@ -85,7 +84,7 @@
         },
         {
           "name": "OUTDIR",
-          "value": "",
+          "value": "client/",
           "type": "STRING"
         }
       ]
@@ -114,7 +113,7 @@
         },
         {
           "name": "OUTDIR",
-          "value": "",
+          "value": "client/",
           "type": "STRING"
         }
       ]
