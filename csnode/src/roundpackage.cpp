@@ -15,7 +15,7 @@ const Bytes& RoundPackage::toBinary() {
 
     if (binaryRepresentation_.size() == messageSize_) {
         if (roundSignatures_.size() > 0 && poolSignatures_.size() > 0 && trustedSignatures_.size() > 0) {
-            cs::DataStream stream(binaryRepresentation_);
+            cs::ODataStream stream(binaryRepresentation_);
             stream << roundSignatures_;
             stream << poolSignatures_;
             stream << trustedSignatures_;
@@ -31,7 +31,7 @@ cs::Byte RoundPackage::subRound() {
 
 bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::Byte subRound) {
     csdetails() << "rPackage-binary: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
-    cs::DataStream roundStream(bytes.data(), bytes.size());
+    cs::IDataStream roundStream(bytes.data(), bytes.size());
     cs::ConfidantsKeys confidants;
 
     roundTable_.round = rNum;
@@ -209,7 +209,7 @@ void RoundPackage::refillToSign() {
 
     binaryRepresentation_.clear();
     binaryRepresentation_.reserve(expectedMessageSize);
-    cs::DataStream stream(binaryRepresentation_);
+    cs::ODataStream stream(binaryRepresentation_);
 
     uint8_t iteration = 0;
     stream << roundTable_.confidants;

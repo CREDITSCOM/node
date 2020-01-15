@@ -486,7 +486,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
         csdebug() << kLogPrefix << "Finalize: starting confidants validation procedure:";
 
         cs::Bytes trustedToHash;
-        cs::DataStream tth(trustedToHash);
+        cs::ODataStream tth(trustedToHash);
         tth << currentSequence;
         tth << confidants;
 

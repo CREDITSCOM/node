@@ -213,7 +213,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
                         cs::Bytes toVerify;
                         size_t messageSize = sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash);
                         toVerify.reserve(messageSize);
-                        cs::DataStream stream(toVerify);
+                        cs::ODataStream stream(toVerify);
                         stream << cs::Conveyer::instance().currentRoundNumber() << context.subRound();  // Attention!!! the uint32_t type
                         stream << it.hashes[j];
 

@@ -66,6 +66,8 @@ add_library(csnode
   include/csnode/multiwallets.hpp
   include/csnode/sendcachedata.hpp
   include/csnode/eventreport.hpp
+  include/csnode/idatastream.hpp
+  include/csnode/odatastream.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp

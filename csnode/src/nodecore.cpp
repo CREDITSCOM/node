@@ -36,7 +36,7 @@ std::size_t std::hash<cs::TransactionsPacketHash>::operator()(const cs::Transact
 
 cs::Bytes cs::RoundTable::toBinary() const {
     cs::Bytes bytes;
-    cs::DataStream stream(bytes);
+    cs::ODataStream stream(bytes);
 
     stream << round;
     stream << confidants;

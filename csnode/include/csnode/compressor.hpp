@@ -33,7 +33,7 @@ public:
     template<typename T>
     CompressedRegion compress(const T& entity) {
         cs::Bytes bytes;
-        cs::DataStream stream(bytes);
+        cs::ODataStream stream(bytes);
 
         stream << entity;
 
@@ -89,7 +89,7 @@ public:
             size = region.size() - static_cast<size_t>(byteSizeof_);
         }
 
-        cs::DataStream stream(data, size);
+        cs::IDataStream stream(data, size);
 
         T result;
         stream >> result;

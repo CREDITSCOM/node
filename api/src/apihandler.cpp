@@ -700,7 +700,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
                 cs::Bytes msg;
                 msg.resize(s);
                 std::copy(transaction.userFields.data(), transaction.userFields.data() + s, msg.data());
-                cs::DataStream stream(msg.data(), msg.size());
+                cs::IDataStream stream(msg.data(), msg.size());
                 cs::Byte flagg;
                 stream >> flagg;
                 if (flagg) {

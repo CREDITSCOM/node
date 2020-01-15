@@ -80,7 +80,7 @@ void TrustedStage1State::finalizeStage(SolverContext& context) {
     stage.messageHash = cscrypto::calculateHash(stage.message.data(), stage.message.size());
     cs::Bytes messageToSign;
     messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
-    cs::DataStream signStream(messageToSign);
+    cs::ODataStream signStream(messageToSign);
     signStream << cs::Conveyer::instance().currentRoundNumber();
     signStream << context.subRound();
     signStream << stage.messageHash;

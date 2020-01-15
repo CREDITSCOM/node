@@ -82,7 +82,7 @@ void Neighbourhood::sendPong(const cs::PublicKey& receiver) {
 
 void Neighbourhood::gotVersionReply(const cs::PublicKey& sender, const Packet& pack) {
     PeerInfo info;
-    cs::DataStream stream(pack.getMsgData(), pack.getMsgSize());
+    cs::IDataStream stream(pack.getMsgData(), pack.getMsgSize());
     stream >> info.nodeVersion;
     stream >> info.uuid;
     stream >> info.lastSeq;
@@ -103,7 +103,7 @@ void Neighbourhood::gotPong(const cs::PublicKey& sender, const Packet& pack) {
         if (neighbour != neighbours_.end()) {
             PeerInfo& info = neighbour->second;
 
-            cs::DataStream stream(pack.getMsgData(), pack.getMsgSize());
+            cs::IDataStream stream(pack.getMsgData(), pack.getMsgSize());
             stream >> info.lastSeq;
             stream >> info.roundNumber;
 
@@ -215,7 +215,7 @@ bool Neighbourhood::contains(const cs::PublicKey& neighbour) const {
 template<class... Args>
 Packet Neighbourhood::formPacket(BaseFlags flags, NetworkCommand cmd, Args&&... args) {
     cs::Bytes packetBytes;
-    cs::DataStream stream(packetBytes);
+    cs::ODataStream stream(packetBytes);
     stream << flags;
     stream << cmd;
     (void)(stream << ... << std::forward<Args>(args));

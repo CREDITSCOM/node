@@ -44,7 +44,7 @@ namespace {
 template<class... Args>
 Packet formPacket(BaseFlags flags, MsgTypes msgType, cs::RoundNumber round, Args&&... args) {
     cs::Bytes packetBytes;
-    cs::DataStream stream(packetBytes);
+    cs::ODataStream stream(packetBytes);
     stream << flags;
     stream << msgType;
     stream << round;
@@ -271,7 +271,7 @@ void Node::onNeighbourRemoved(const cs::PublicKey& neighbour) {
 void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
     cswarning() << "NODE> Utility message get";
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
     cs::Signature sig;
     cs::Bytes msg;
     cs::RoundNumber rNum;
@@ -284,7 +284,7 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
 
     cs::Byte order;
     cs::PublicKey pKey;
-    cs::DataStream bytes(msg.data(), msg.size());
+    cs::IDataStream bytes(msg.data(), msg.size());
     bytes >> rNum;
     bytes >> order;
     bytes >> pKey;
@@ -320,11 +320,11 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
 void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
     cslog() << "NODE> get Boot strap Round Table #" << rNum;
 
-    cs::DataStream in(data, size);
+    cs::IDataStream in(data, size);
     cs::RoundTable roundTable;
     cs::Bytes bin;
     in >> bin;
-    cs::DataStream stream(bin.data(), bin.size());
+    cs::IDataStream stream(bin.data(), bin.size());
 
     uint8_t confSize = 0;
     stream >> confSize;
@@ -528,7 +528,7 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::Pub
 }
 
 void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender) {
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::TransactionsPacket packet;
     stream >> packet;
@@ -555,7 +555,7 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
         return;
     }
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     uint16_t version = 0;
     cs::Signature sig;
@@ -567,7 +567,7 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
     }
 
     cs::Bytes message;
-    cs::DataStream roundStream(message);
+    cs::ODataStream roundStream(message);
     roundStream << round << version;
 
     cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
@@ -630,7 +630,7 @@ bool Node::canBeTrusted(bool critical) {
 }
 
 void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::PacketsHashes hashes;
     stream >> hashes;
@@ -651,7 +651,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
         return;
     }
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::PacketsVector packets;
     stream >> packets;
@@ -662,7 +662,7 @@ void Node::getPacketHashesReply(const uint8_t* data, const std::size_t size, con
     }
 
     csdebug() << "NODE> Get reply with " << packets.size() <<  " packet hashes from sender " << cs::Utils::byteStreamToHex(sender);
-    processPacketsReply(std::move(packets), stream, round);
+    processPacketsReply(std::move(packets), round);
 }
 
 
@@ -748,7 +748,7 @@ bool Node::checkCharacteristic(cs::RoundPackage& rPackage) {
     return true;
 }
 
-void Node::getCharacteristic(cs::RoundPackage& rPackage, cs::DataStream& stream) {
+void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     csmeta(csdetails) << "started";
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     if (getBlockChain().updateLastBlock(rPackage)) {
@@ -785,11 +785,6 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage, cs::DataStream& stream)
 
     if (realTrustedMaskSize > confidantsReference.size()) {
         csmeta(cserror) << ", real trusted mask size: " << realTrustedMaskSize << ", confidants count " << confidantsReference.size() << ", on round " << round;
-        return;
-    }
-
-    if (!stream.isValid()) {
-        csmeta(cserror) << "Round info parsing failed, data is corrupted";
         return;
     }
 
@@ -875,7 +870,7 @@ void Node::sendBlockAlarmSignal(cs::Sequence seq) {
 
 void Node::sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq) {
     cs::Bytes message;
-    cs::DataStream stream(message);
+    cs::ODataStream stream(message);
     stream << seq;
     cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
     //sendToBroadcast(MsgTypes::BlockAlarm, seq, sig);
@@ -885,13 +880,13 @@ void Node::sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq) {
 }
 
 void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::Signature sig;
     stream >> sig;
 
     cs::Bytes message;
-    cs::DataStream bytes(message);
+    cs::ODataStream bytes(message);
     bytes << rNum;
 
     if (!cscrypto::verifySignature(sig, sender, message.data(), message.size())) {
@@ -909,7 +904,7 @@ void Node::reportEvent(const cs::Bytes& bin_pack) {
         return;
     }
     cs::Bytes message;
-    cs::DataStream stream(message);
+    cs::ODataStream stream(message);
 
     constexpr uint8_t kEventReportVersion = 0;
 
@@ -934,7 +929,7 @@ void Node::reportEvent(const cs::Bytes& bin_pack) {
 }
 
 void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::Signature sig;
     cs::Bytes message;
@@ -945,7 +940,7 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
         return;
     }
 
-    cs::DataStream bytes(message.data(), message.size());
+    cs::IDataStream bytes(message.data(), message.size());
     uint8_t report_version = 0;
     cs::Sequence sender_last_block = 0;
     cs::Bytes bin_pack;
@@ -1100,7 +1095,7 @@ void Node::sendStateRequest(const csdb::Address& contract_abs_addr, const cs::Pu
 
     auto round = cs::Conveyer::instance().currentRoundNumber();
     cs::Bytes message;
-    cs::DataStream stream(message);
+    cs::ODataStream stream(message);
     const auto& key = contract_abs_addr.public_key();
     stream << round << key;
     cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
@@ -1109,7 +1104,7 @@ void Node::sendStateRequest(const csdb::Address& contract_abs_addr, const cs::Pu
 }
 
 void Node::getStateRequest(const uint8_t * data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey & sender) {
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::PublicKey key;
     cs::Signature signature;
@@ -1126,7 +1121,7 @@ void Node::getStateRequest(const uint8_t * data, const std::size_t size, const c
     }
 
     cs::Bytes signed_bytes;
-    cs::DataStream bytesStream(signed_bytes);
+    cs::ODataStream bytesStream(signed_bytes);
     bytesStream << rNum << key;
 
     if (!cscrypto::verifySignature(signature, sender, signed_bytes.data(), signed_bytes.size())) {
@@ -1147,7 +1142,7 @@ void Node::sendStateReply(const cs::PublicKey& respondent, const csdb::Address& 
 
     cs::RoundNumber round = cs::Conveyer::instance().currentRoundNumber();
     cs::Bytes signed_data;
-    cs::DataStream stream(signed_data);
+    cs::ODataStream stream(signed_data);
 
     const cs::PublicKey& key = contract_abs_addr.public_key();
     stream << round << key << data;
@@ -1157,7 +1152,7 @@ void Node::sendStateReply(const cs::PublicKey& respondent, const csdb::Address& 
 }
 
 void Node::getStateReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::PublicKey key;
     cs::Bytes contract_data;
@@ -1175,7 +1170,7 @@ void Node::getStateReply(const uint8_t* data, const std::size_t size, const cs::
     }
 
     cs::Bytes signed_data;
-    cs::DataStream signed_stream(signed_data);
+    cs::ODataStream signed_stream(signed_data);
     signed_stream << rNum << key << contract_data;
 
     if (!cscrypto::verifySignature(signature, sender, signed_data.data(), signed_data.size())) {
@@ -1258,7 +1253,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 
     cs::PoolsRequestedSequences sequences;
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
     stream >> sequences;
 
     csdebug() << "NODE> got request for " << sequences.size() << " block(s) from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
@@ -1305,7 +1300,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
     csdebug() << "NODE> Get Block Reply";
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     CompressedRegion region;
     stream >> region;
@@ -1369,7 +1364,7 @@ void Node::processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumb
     }
 }
 
-void Node::processPacketsReply(cs::PacketsVector&& packets, cs::DataStream& stream, const cs::RoundNumber round) {
+void Node::processPacketsReply(cs::PacketsVector&& packets, const cs::RoundNumber round) {
     csdebug() << "NODE> Processing packets reply";
     cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -1383,7 +1378,7 @@ void Node::processPacketsReply(cs::PacketsVector&& packets, cs::DataStream& stre
         if (roundPackageCache_.size() > 0) {
             auto rPackage = roundPackageCache_.back();
             csdebug() << "NODE> Run characteristic meta";
-            getCharacteristic(rPackage, stream);
+            getCharacteristic(rPackage);
         }
         else {
             csdebug() << "NODE> There is no roundPackage in the list, return and await any";
@@ -1688,7 +1683,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
         return;
     }
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     uint8_t subRound = 0;
     stream >> subRound;
@@ -1714,13 +1709,13 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
     cs::Bytes signedMessage;
-    cs::DataStream signedStream(signedMessage);
+    cs::ODataStream signedStream(signedMessage);
     signedStream << conveyer.currentRoundNumber();
     signedStream << subRound_;
     signedStream << stage.messageHash;
 
     // stream for main message
-    cs::DataStream stageStream(stage.message.data(), stage.message.size());
+    cs::IDataStream stageStream(stage.message.data(), stage.message.size());
     stageStream >> stage.sender;
     stageStream >> stage.hash;
     stageStream >> stage.trustedCandidates;
@@ -1779,7 +1774,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
 
     csdebug() << kLogPrefix_ << "Getting StageTwo from " << getSenderText(sender);
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     uint8_t subRound = 0;
     stream >> subRound;
@@ -1800,7 +1795,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
         return;
     }
 
-    cs::DataStream stageStream(bytes.data(), bytes.size());
+    cs::IDataStream stageStream(bytes.data(), bytes.size());
     stageStream >> stage.sender;
     stageStream >> stage.signatures;
     stageStream >> stage.hashes;
@@ -1853,7 +1848,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
         return;
     }
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
     uint8_t subRound = 0;
     stream >> subRound;
 
@@ -1873,7 +1868,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
         return;
     }
 
-    cs::DataStream stageStream(bytes.data(), bytes.size());
+    cs::IDataStream stageStream(bytes.data(), bytes.size());
     stageStream >> stage.sender;
     stageStream >> stage.writer;
     stageStream >> stage.iteration;  // this is a potential problem!!!
@@ -1958,7 +1953,7 @@ void Node::getStageRequest(const MsgTypes msgType, const uint8_t* data, const si
         return;
     }
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     uint8_t subRound = 0;
     stream >> subRound;
@@ -2035,7 +2030,7 @@ void Node::sendSmartReject(const std::vector<RefExecution>& rejectList) {
     }
 
     cs::Bytes data;
-    cs::DataStream stream(data);
+    cs::ODataStream stream(data);
 
     stream << rejectList;
 
@@ -2047,12 +2042,12 @@ void Node::getSmartReject(const uint8_t* data, const size_t size, const cs::Roun
     csunused(rNum);
     csunused(sender);
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::Bytes bytes;
     stream >> bytes;
 
-    cs::DataStream smartStream(bytes.data(), bytes.size());
+    cs::IDataStream smartStream(bytes.data(), bytes.size());
 
     std::vector<RefExecution> rejectList;
     stream >> rejectList;
@@ -2092,7 +2087,7 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs
 void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender) {
     csdebug() << __func__ << ": starting";
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::StageOneSmarts stage;
     stream >> stage.message >> stage.signature;
@@ -2145,7 +2140,7 @@ void Node::sendSmartStageTwo(const cs::ConfidantsKeys& smartConfidants, cs::Stag
     cs::Bytes bytes;
     bytes.reserve(stageBytesSize);
 
-    cs::DataStream stream(bytes);
+    cs::ODataStream stream(bytes);
     stream << stageTwoInfo.sender;
     stream << stageTwoInfo.id;
     stream << stageTwoInfo.signatures;
@@ -2165,7 +2160,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
 
     csdebug() << "NODE> Getting SmartStage Two from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::StageTwoSmarts stage;
     stream >> stage.message >> stage.signature;
@@ -2180,7 +2175,7 @@ void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::Ro
         return;
     }
 
-    cs::DataStream stageStream(stage.message.data(), stage.message.size());
+    cs::IDataStream stageStream(stage.message.data(), stage.message.size());
     stageStream >> stage.sender;
     stageStream >> stage.id;
     stageStream >> stage.signatures;
@@ -2205,7 +2200,7 @@ void Node::sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::St
     cs::Bytes bytes;
     bytes.reserve(stageSize);
 
-    cs::DataStream stream(bytes);
+    cs::ODataStream stream(bytes);
     stream << stageThreeInfo.sender;
     stream << stageThreeInfo.writer;
     stream << stageThreeInfo.id;
@@ -2227,7 +2222,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
     csmeta(csdetails) << "started";
     csunused(sender);
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::StageThreeSmarts stage;
     stream >> stage.message >> stage.signature;
@@ -2242,7 +2237,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
         return;
     }
 
-    cs::DataStream stageStream(stage.message.data(), stage.message.size());
+    cs::IDataStream stageStream(stage.message.data(), stage.message.size());
     stageStream >> stage.sender;
     stageStream >> stage.writer;
     stageStream >> stage.id;
@@ -2262,7 +2257,7 @@ bool Node::smartStageRequest(MsgTypes msgType, uint64_t smartID, const cs::Publi
 void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester) {
     csmeta(csdebug) << __func__ << "started";
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     uint8_t requesterNumber = 0;
     uint64_t smartID = 0;
@@ -2382,7 +2377,7 @@ void Node::sendRoundPackageToAll(cs::RoundPackage& rPackage) {
         << "\n----------------------------------------------------------------------------------------------------";
 }
 
-void Node::sendRoundTable(cs::RoundPackage& rPackage, cs::DataStream& stream) {
+void Node::sendRoundTable(cs::RoundPackage& rPackage) {
     becomeWriter();
 
     cs::Conveyer& conveyer = cs::Conveyer::instance();
@@ -2402,7 +2397,7 @@ void Node::sendRoundTable(cs::RoundPackage& rPackage, cs::DataStream& stream) {
     csdebug() << "Round " << rPackage.roundTable().round << ", Confidants count " << rPackage.roundTable().confidants.size();
     csdebug() << "Hashes count: " << rPackage.roundTable().hashes.size();
 
-    performRoundPackage(rPackage, solver_->getPublicKey(), stream, false);
+    performRoundPackage(rPackage, solver_->getPublicKey(), false);
 }
 
 bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& currentConfidants) {
@@ -2513,7 +2508,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     // RoundTable evocation
     cs::Byte subRound = 0;
@@ -2562,7 +2557,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     processSync();
 
     if (poolSynchronizer_->isSyncroStarted()) {
-        getCharacteristic(rPackage, stream);
+        getCharacteristic(rPackage);
     }
 
     rPackage.setSenderNode(sender);
@@ -2665,14 +2660,14 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     currentRoundTableMessage_.round = rPackage.roundTable().round;
     currentRoundTableMessage_.sender = sender;
     currentRoundTableMessage_.message = cs::Bytes(data, data + size);
-    performRoundPackage(rPackage, sender, stream, updateRound);
+    performRoundPackage(rPackage, sender, updateRound);
 }
 
 void Node::setCurrentRP(const cs::RoundPackage& rp) {
     currentRoundPackage_ = rp;
 }
 
-void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& /*sender*/, cs::DataStream& stream, bool updateRound) {
+void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& /*sender*/, bool updateRound) {
     csdebug() << __func__;
 
     // got round package in any way, reset default round table flag
@@ -2708,7 +2703,7 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     cs::Conveyer::instance().setTable(roundTable);
 
     // create pool by previous round, then change conveyer state.
-    getCharacteristic(rPackage, stream);
+    getCharacteristic(rPackage);
 
     try {
         lastRoundPackageTime_ = std::stoull(cs::Utils::currentTimestamp());
@@ -2790,7 +2785,7 @@ void Node::sendHash(cs::RoundNumber round) {
             << " nodes will not propose this Node as Trusted Candidate. The probability to become Trusted is too low";
     }
     cs::Bytes message;
-    cs::DataStream stream(message);
+    cs::ODataStream stream(message);
     cs::Byte myTrustedSize = 0;
     cs::Byte myRealTrustedSize = 0;
 
@@ -2844,7 +2839,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
 
     csdetails() << "NODE> get hash of round " << rNum << ", data size " << size;
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
     uint8_t subRound = 0;
     stream >> subRound;
 
@@ -2867,7 +2862,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     sHash.sender = sender;
     sHash.round = rNum;
 
-    cs::DataStream hashStream(message.data(), message.size());
+    cs::IDataStream hashStream(message.data(), message.size());
     hashStream >> tmp;
     hashStream >> sHash.trustedSize;
     hashStream >> sHash.realTrustedSize;
@@ -2910,7 +2905,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     }
 
     sHash.hash = csdb::PoolHash::from_binary(std::move(tmp));
-    cs::DataStream stream1(message);
+    cs::ODataStream stream1(message);
     stream1 << rNum << subRound;
 
     if (!cscrypto::verifySignature(signature, sender, message.data(), message.size())) {
@@ -2988,7 +2983,7 @@ void Node::emptyRoundPackReply(const cs::PublicKey& respondent) {
     csdebug() << "NODE> sending empty roundPack reply to " << cs::Utils::byteStreamToHex(respondent.data(), respondent.size());
     cs::Sequence seq = getBlockChain().getLastSeq();
     cs::Bytes bytes;
-    cs::DataStream stream(bytes);
+    cs::ODataStream stream(bytes);
     stream << seq;
     cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
     sendDirect(respondent, MsgTypes::EmptyRoundPack, seq, signature);
@@ -2997,13 +2992,13 @@ void Node::emptyRoundPackReply(const cs::PublicKey& respondent) {
 void Node::getEmptyRoundPack(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
     csdebug() << "NODE> get empty roundPack reply from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     cs::Signature signature;
     stream >> signature;
 
     cs::Bytes bytes;
-    cs::DataStream message(bytes);
+    cs::ODataStream message(bytes);
     message << rNum;
 
     if (rNum <= getBlockChain().getLastSeq()) {
@@ -3054,7 +3049,7 @@ void Node::sendRoundTableRequest(const cs::PublicKey& respondent) {
 void Node::getRoundTableRequest(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& requester) {
     csmeta(csdetails) << "started, round: " << rNum;
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     uint8_t requesterNumber;
     stream >> requesterNumber;
@@ -3108,7 +3103,7 @@ void Node::getRoundTableReply(const uint8_t* data, const size_t size, const cs::
         return;
     }
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
 
     bool hasRequestedInfo;
     stream >> hasRequestedInfo;
@@ -3301,7 +3296,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
 
     csmeta(csdebug);
 
-    cs::DataStream stream(data, size);
+    cs::IDataStream stream(data, size);
     uint8_t subRound = 0;
     stream >> subRound;
 
@@ -3546,7 +3541,7 @@ void Node::onRoundTimeElapsed() {
         cslog() << "Starting round...";
 
         cs::Bytes bin;
-        cs::DataStream out(bin);
+        cs::ODataStream out(bin);
         out << uint8_t(actualConfidants.size());
 
         for (const auto& item : actualConfidants) {

@@ -131,14 +131,14 @@ namespace cs {
 
 csdb::UserField SmartContractRef::to_user_field() const {
     cs::Bytes data;
-    cs::DataStream stream(data);
+    cs::ODataStream stream(data);
     stream << csdb::PoolHash{} /*for compatibility*/ << sequence << transaction;
     return csdb::UserField(stream.convert<std::string>());
 }
 
 void SmartContractRef::from_user_field(const csdb::UserField& fld) {
     std::string data = fld.value<std::string>();
-    cs::DataStream stream(data.c_str(), data.size());
+    cs::IDataStream stream(data.c_str(), data.size());
     csdb::PoolHash dummy; // for compatibility
     stream >> dummy >> sequence >> transaction;
     if (!stream.isValid() || stream.isAvailable(1)) {
@@ -2916,7 +2916,7 @@ bool SmartContracts::dbcache_update(const BlockChain& blockchain, const csdb::Ad
         // test if new data is actually newer than stored data
         cs::Bytes current_data;
         if (blockchain.getContractData(abs_addr, current_data)) {
-            cs::DataStream stream(current_data.data(), current_data.size());
+            cs::IDataStream stream(current_data.data(), current_data.size());
             SmartContractRef current_ref;
             stream >> current_ref.sequence >> current_ref.transaction;
             if (current_ref.sequence > ref_start.sequence) {
@@ -2936,7 +2936,7 @@ bool SmartContracts::dbcache_update(const BlockChain& blockchain, const csdb::Ad
     }
 
     cs::Bytes data;
-    cs::DataStream stream(data);
+    cs::ODataStream stream(data);
     stream << ref_start.sequence << ref_start.transaction << state;
     return blockchain.updateContractData(abs_addr, data);
 }
@@ -2949,7 +2949,7 @@ bool SmartContracts::dbcache_read(const BlockChain& blockchain, const csdb::Addr
     if (!blockchain.getContractData(abs_addr, data)) {
         return false;
     }
-    cs::DataStream stream(data.data(), data.size());
+    cs::IDataStream stream(data.data(), data.size());
     stream >> ref_start.sequence >> ref_start.transaction >> state;
     // compatibility with obsolete format, possible the block hash has been read instead of contract state
     if (stream.isAvailable(sizeof(size_t)) && state.size() == cscrypto::kHashSize) {
@@ -3002,7 +3002,7 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
 
     cs::SmartContractRef ref;
     std::string state;
-    cs::DataStream stream(contract_data.data(), contract_data.size());
+    cs::IDataStream stream(contract_data.data(), contract_data.size());
     stream >> ref.sequence >> ref.transaction >> state;
 
     if (stream.isValid() && !stream.isAvailable(1)) {

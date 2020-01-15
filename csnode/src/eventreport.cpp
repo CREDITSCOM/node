@@ -83,7 +83,7 @@ void EventReport::sendRejectTransactions(Node& node, const cs::Bytes& rejected) 
     }
     if (!resume.empty()) {
         cs::Bytes bin_pack;
-        cs::DataStream stream(bin_pack);
+        cs::ODataStream stream(bin_pack);
         stream << Id::RejectTransactions << uint8_t(resume.size());
         for (const auto& item : resume) {
             stream << item.first << item.second;
@@ -100,7 +100,7 @@ void EventReport::sendRejectContractExecution(Node& node, const cs::SmartContrac
     }
 
     cs::Bytes bin_pack;
-    cs::DataStream out(bin_pack);
+    cs::ODataStream out(bin_pack);
     out << Id::RejectContractExecution << ref.sequence << ref.transaction << reason;
     node.reportEvent(bin_pack);
 }
@@ -111,7 +111,7 @@ std::map<Reject::Reason, uint16_t> EventReport::parseReject(const cs::Bytes& bin
     if (bin_pack.empty()) {
         return resume;
     }
-    cs::DataStream stream(bin_pack.data(), bin_pack.size());
+    cs::IDataStream stream(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     stream >> id;
     if (id == Id::RejectTransactions) {
@@ -135,7 +135,7 @@ bool EventReport::parseRejectContractExecution(const cs::Bytes& bin_pack, cs::Sm
     if (bin_pack.empty()) {
         return false;
     }
-    cs::DataStream stream(bin_pack.data(), bin_pack.size());
+    cs::IDataStream stream(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     stream >> id;
     if (id == Id::RejectContractExecution) {
@@ -184,7 +184,7 @@ void EventReport::sendListUpdate(Node& node, const cs::PublicKey& key, bool adde
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize + sizeof(count_rounds);
     cs::Bytes bin_pack;
     bin_pack.reserve(len);
-    cs::DataStream stream(bin_pack);
+    cs::ODataStream stream(bin_pack);
     stream << (added ? Id::AddToList : Id::EraseFromList) << key;
     // send zero value is senseless
     if (count_rounds > 0) {
@@ -198,7 +198,7 @@ bool EventReport::parseListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key,
     if (bin_pack.empty()) {
         return false;
     }
-    cs::DataStream stream(bin_pack.data(), bin_pack.size());
+    cs::IDataStream stream(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     stream >> id;
     if (id == Id::AddToList || id == Id::EraseFromList) {
@@ -226,7 +226,7 @@ void EventReport::sendInvalidBlockAlarm(Node& node, const cs::PublicKey& source,
     }
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize + sizeof(sequence);
     cs::Bytes bin_pack(len);
-    cs::DataStream out(bin_pack);
+    cs::ODataStream out(bin_pack);
     out << Id::AlarmInvalidBlock << source << sequence;
     node.reportEvent(bin_pack);
 }
@@ -236,7 +236,7 @@ bool EventReport::parseInvalidBlockAlarm(const cs::Bytes& bin_pack, cs::PublicKe
     if (bin_pack.empty()) {
         return false;
     }
-    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    cs::IDataStream in(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     in >> id;
     if (id != Id::AlarmInvalidBlock) {
@@ -274,7 +274,7 @@ void EventReport::sendConsensusProblem(Node& node, Id problem_id, const cs::Publ
     }
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize;
     cs::Bytes bin_pack(len);
-    cs::DataStream out(bin_pack);
+    cs::ODataStream out(bin_pack);
     out << problem_id << problem_source;
     node.reportEvent(bin_pack);
 }
@@ -284,7 +284,7 @@ EventReport::Id EventReport::parseConsensusProblem(const cs::Bytes& bin_pack, cs
     if (bin_pack.empty()) {
         return Id::None;
     }
-    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    cs::IDataStream in(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     in >> id;
     switch(id) {
@@ -331,7 +331,7 @@ void EventReport::sendContractsProblem(Node& node, Id problem_id, const cs::Publ
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize
         + sizeof(consensus_id.round) + sizeof(consensus_id.transaction) + sizeof(consensus_id.iteration);
     cs::Bytes bin_pack(len);
-    cs::DataStream out(bin_pack);
+    cs::ODataStream out(bin_pack);
     out << problem_id << problem_source << consensus_id.round << consensus_id.transaction << consensus_id.iteration;
     node.reportEvent(bin_pack);
 }
@@ -341,7 +341,7 @@ EventReport::Id EventReport::parseContractsProblem(const cs::Bytes& bin_pack, cs
     if (bin_pack.empty()) {
         return Id::None;
     }
-    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    cs::IDataStream in(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     in >> id;
     switch (id) {
@@ -362,7 +362,7 @@ EventReport::Id EventReport::parseContractsProblem(const cs::Bytes& bin_pack, cs
 /*static*/ void EventReport::sendRunningStatus(Node& node, Running::Status status) {
     constexpr size_t len = sizeof(EventReport::Id) + sizeof(Running::Status);
     cs::Bytes bin_pack(len);
-    cs::DataStream out(bin_pack);
+    cs::ODataStream out(bin_pack);
     out << Id::RunningStatus << status;
     node.reportEvent(bin_pack);
 }
@@ -372,7 +372,7 @@ bool EventReport::parseRunningStatus(const cs::Bytes& bin_pack, Running::Status&
     if (bin_pack.empty()) {
         return false;
     }
-    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    cs::IDataStream in(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     in >> id;
     if (id != Id::RunningStatus) {

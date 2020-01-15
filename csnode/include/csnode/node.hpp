@@ -93,7 +93,7 @@ public:
     // SOLVER3 methods
     void getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender);
     void setCurrentRP(const cs::RoundPackage& rp);
-    void performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& sender, cs::DataStream& stream, bool updateRound);
+    void performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& sender, bool updateRound);
     bool isTransactionsInputAvailable();
     void clearRPCache(cs::RoundNumber rNum);
     void sendHash(cs::RoundNumber round);
@@ -166,7 +166,7 @@ public:
 
     // called by solver, review required:
     bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
-    void sendRoundTable(cs::RoundPackage& rPackage, cs::DataStream& stream);
+    void sendRoundTable(cs::RoundPackage& rPackage);
 
     // transaction's pack syncro
     void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
@@ -175,7 +175,7 @@ public:
     void getEventReport(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
     bool checkCharacteristic(cs::RoundPackage& rPackage);
-    void getCharacteristic(cs::RoundPackage& rPackage, cs::DataStream& stream);
+    void getCharacteristic(cs::RoundPackage& rPackage);
 
     void sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq);
 
@@ -322,7 +322,7 @@ private:
 
     // conveyer
     void processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
-    void processPacketsReply(cs::PacketsVector&& packets, cs::DataStream& stream, const cs::RoundNumber round);
+    void processPacketsReply(cs::PacketsVector&& packets, const cs::RoundNumber round);
     void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
     /// sending interace methods
