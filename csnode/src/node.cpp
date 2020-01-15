@@ -3740,13 +3740,20 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     size_t smartTrxCounter = 0;
     
     constexpr const uint64_t uuidTestNet = 5283967947175248524;
+    constexpr const uint64_t uuidMainNet = 11024959585341937636;
     /*constexpr*/ const bool collectRejectedInfo = cs::ConfigHolder::instance().config()->isCompatibleVersion();
     const char* kLogPrefix = (collectRejectedInfo ? "NODE> skip block validation: " : "NODE> stop block validation: ");
 
-    if (block.sequence() <= 5504545) {
-        if (getBlockChain().uuid() == uuidTestNet) {
-            csdebug() << kLogPrefix << WithDelimiters(block.sequence()) << " is in special range in Testnet";
+    if (block.sequence() <= 26000000) {
+        if (getBlockChain().uuid() == uuidMainNet) {
+            // valid blocks
             return;
+        }
+        if (block.sequence() <= 5504545) {
+            if (getBlockChain().uuid() == uuidTestNet) {
+                // valid blocks
+                return;
+            }
         }
     }
 
