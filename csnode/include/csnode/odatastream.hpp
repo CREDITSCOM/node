@@ -42,12 +42,10 @@ public:
     ///
     template <typename V>
     inline void addValue(const V& streamField) {
-        if (bytes_) {
-            const char* ptr = reinterpret_cast<const char*>(&streamField);
+        const char* ptr = reinterpret_cast<const char*>(&streamField);
 
-            for (std::size_t i = 0; i < sizeof(V); ++i) {
-                bytes_->push_back(static_cast<cs::Byte>(*(ptr + i)));
-            }
+        for (std::size_t i = 0; i < sizeof(V); ++i) {
+            bytes_->push_back(static_cast<cs::Byte>(*(ptr + i)));
         }
     }
 
