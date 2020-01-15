@@ -8,21 +8,22 @@ namespace cs {
 namespace {
 const size_t kCommonTrSize = 152;
 
+// all the values are conform to AmountComission capabilities (source -> AmountComission -> result => source == result)
 constexpr std::array<std::tuple<size_t, double, double>, 14> feeLevels = {
-    std::make_tuple(5 * 1024,    0.08745,    0.008745), // this is min fee value
-    std::make_tuple(20 * 1024,   0.17490,    0.034980),
-    std::make_tuple(50 * 1024,   0.43726,    0.139922),
-    std::make_tuple(100 * 1024,  17.90996,   17.90996),
-    std::make_tuple(256 * 1024,  89.54982,   89.54982),
-    std::make_tuple(512 * 1024,  358.19930,  358.19930),
-    std::make_tuple(768 * 1024,  1432.79718, 1432.79718),
-    std::make_tuple(1024 * 1024, 5731.18874, 5731.18874),
-    std::make_tuple(5 * 1024 * 1024,    22924.75494,    22924.75494),
-    std::make_tuple(15 * 1024 * 1024,   91699.01978,    91699.01978),
-    std::make_tuple(50 * 1024 * 1024,   366796.07910,   366796.07910),
-    std::make_tuple(100 * 1024 * 1024,  1467184.31642,  1467184.31642),
-    std::make_tuple(500 * 1024 * 1024,  5868737.26566,  5868737.26566),
-    std::make_tuple(1000 * 1024 * 1024, 23474949.06266, 23474949.06266)
+    std::make_tuple(5 * 1024,    0.087402,  0.008740), // this is min fee value
+    std::make_tuple(20 * 1024,   0.174805,  0.034961),
+    std::make_tuple(50 * 1024,   0.437500,  0.139648),
+    std::make_tuple(100 * 1024,  17.87109,  17.87109),
+    std::make_tuple(256 * 1024,  89.55078,  89.55078),
+    std::make_tuple(512 * 1024,  358.39844, 358.39844),
+    std::make_tuple(768 * 1024,  1435.5469, 1435.5469),
+    std::make_tuple(1024 * 1024, 5732.4219, 5732.4219),
+    std::make_tuple(5 * 1024 * 1024,    22949.21875, 22949.21875),
+    std::make_tuple(15 * 1024 * 1024,   91699.21875, 91699.21875),
+    std::make_tuple(50 * 1024 * 1024,   367187.5,    367187.5),
+    std::make_tuple(100 * 1024 * 1024,  1464843.75,  1464843.75),
+    std::make_tuple(500 * 1024 * 1024,  5869140.625, 5869140.625),
+    std::make_tuple(1000 * 1024 * 1024, 23437500.0,  23437500.0)
 };
 
 constexpr double minFee() {
