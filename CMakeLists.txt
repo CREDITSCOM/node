@@ -45,7 +45,7 @@ if (MSVC)
   set(CMAKE_C_FLAGS_RELWALLET ${CMAKE_C_FLAGS_RELEASE})
   
   if(NOT DEFINED OUTDIR)
-    set(RELMONITOR_OUTDIR "RelMonitor1/")
+    set(RELMONITOR_OUTDIR "RelMonitor/")
     set(RELWALLET_OUTDIR "RelWallet/")
   else()
     set(RELMONITOR_OUTDIR ${OUTDIR})
