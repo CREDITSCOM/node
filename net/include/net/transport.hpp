@@ -117,7 +117,7 @@ public:
     void deliverDirect(const Packet*, const uint32_t, ConnectionPtr);
     void deliverBroadcast(const Packet*, const uint32_t);
     // returns pair of (sent count, list of unable-to-send items)
-    std::pair< uint32_t, std::list<int> > deliverConfidants(const Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
+    std::pair< uint32_t, std::list<int> > deliverConfidants(Packet* pack, const uint32_t size, const std::vector<cs::PublicKey>&, int except = -1);
     bool checkConfidant(const cs::PublicKey& key);
 
     void gotPacket(const Packet&, RemoteNodePtr&);
@@ -162,7 +162,6 @@ public:
         return neighbourhood_.getNeighboursLock();
     }
 
-    bool isShouldUpdateNeighbours() const;
     bool isShouldPending(Connection* connection) const;
 
     // thread safe negihbours methods
@@ -215,7 +214,7 @@ private:
     bool gotPackRequest(const TaskPtr<IPacMan>&, RemoteNodePtr&);
 
     bool gotPing(const TaskPtr<IPacMan>&, RemoteNodePtr&);
-    bool gotSSIntroduceConsensusReply();
+    bool gotSSIntroduceConsensusReply(RemoteNodePtr&);
 
     void storeAddress(const cs::PublicKey& key, const EndpointData& ep);
 

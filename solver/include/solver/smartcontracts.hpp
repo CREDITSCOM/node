@@ -8,6 +8,7 @@
 #include <lib/system/concurrent.hpp>
 #include <lib/system/logger.hpp>
 #include <lib/system/signals.hpp>
+#include <csnode/transactionspacket.hpp>
 
 #include <csnode/node.hpp>  // introduce csconnector::connector::ApiExecHandlerPtr at least
 
@@ -319,6 +320,9 @@ public:
 
     ~SmartContracts();
 
+    // signals subscription MUST occur AFTER the BlockChains has already subscribed to storage's signals
+    void subscribeToSignals(Node* node);
+
     void init(const cs::PublicKey&, Node* node);
 
     static std::string get_error_message(int8_t code);
@@ -348,6 +352,9 @@ public:
     static std::string get_contract_state(const BlockChain& storage, const csdb::Address& abs_addr);
 
     static std::string to_base58(const BlockChain& storage, const csdb::Address& addr);
+
+    static std::vector<cs::TransactionsPacket> grepNewStatesPacks(const BlockChain& storage, const std::vector<csdb::Transaction>& trxs);
+
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
@@ -578,6 +585,8 @@ private:
         bool operator ==(const SmartContractRef& r) const {
             return ref_start == r;
         }
+
+        double calc_max_fee() const;
     };
 
     // defines an item of execution queue which is a one or more simultaneous calls to specific contract

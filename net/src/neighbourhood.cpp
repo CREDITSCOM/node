@@ -47,6 +47,7 @@ Neighbourhood::Neighbourhood(Transport* net)
 , resqueue(this) {
 }
 
+// must work under nLockFlag_
 void Neighbourhood::chooseNeighbours() {
     static bool redirectLimit = false;
     static auto startTime = std::chrono::high_resolution_clock::now();
@@ -123,8 +124,6 @@ bool Neighbourhood::dispatch(Neighbourhood::BroadPackInfo& bp, bool separate) {
             dp.pack = bp.pack;
             dp.receiver = nb;
 
-            resqueue.insert(bp.pack, nb);
-
             if (!nb->isSignal || send_to_ss) {
                 if (separate) {
                     sent = transport_->sendDirectToSock(&(bp.pack), **nb) || sent;
@@ -172,8 +171,6 @@ void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
             bp.pack = *pack;
             bp.receiver = nb;
 
-            resqueue.insert(*pack, nb);
-
             transport_->sendDirect(pack, **nb);
         }
     }
@@ -188,14 +185,13 @@ void Neighbourhood::sendByNeighbours(const Packet* pack, bool separate) {
     }
 }
 
-void Neighbourhood::sendByConfidant(const Packet* pack, ConnectionPtr conn) {
+void Neighbourhood::sendByConfidant(Packet* pack, ConnectionPtr conn) {
     auto& bp = msgDirects_.tryStore(pack->getHash());
 
     bp.pack = *pack;
     bp.receiver = conn;
-    resqueue.insert(*pack, conn);
 
-    transport_->sendDirect(pack, **conn);
+    transport_->sendDirectToSock(pack, **conn);
 }
 
 bool Neighbourhood::canHaveNewConnection() {
@@ -204,6 +200,14 @@ bool Neighbourhood::canHaveNewConnection() {
 }
 
 void Neighbourhood::checkPending(const uint32_t) {
+
+    {
+        cs::Lock lock(nLockFlag_);
+        if (enoughConnections()) {
+            return;
+        }
+    }
+
     cs::Lock lock(mLockFlag_);
     for (auto conn = connections_.begin(); conn != connections_.end(); ++conn) {
         // Attempt to reconnect if the connection hasn't been established yet
@@ -258,7 +262,7 @@ void Neighbourhood::checkSilent() {
             ConnectionPtr tc = *connPtrIt;
 
             if (tc->node) {
-                cswarning() << "Node " << tc->in << " stopped responding";
+                csdebug() << "Node " << tc->in << " stopped responding";
                 Connection* c = *tc;
                 tc->node->connection.compare_exchange_strong(c, nullptr, std::memory_order_release, std::memory_order_relaxed);
             }
@@ -289,18 +293,36 @@ void Neighbourhood::checkSilent() {
 
 void Neighbourhood::checkNeighbours() {
     bool refill_required = false;
-    if (transport_->isShouldUpdateNeighbours()) {
+    if (getNeighboursCountWithoutSS() < cs::ConfigHolder::instance().config()->getMinNeighbours()) {
         refill_required = true;
     }
     else {
         if (transport_->requireStartNode()) {
+            // look-up starter & count neighbours
             bool starter_found = false;
+            // -1 to provide some "rotation" getting free slot
+            const uint32_t reqSlotsAvail = 1;
+            uint32_t max_cnt_nb = cs::ConfigHolder::instance().config()->getMaxNeighbours() - reqSlotsAvail;
+            uint32_t cnt_nb = 0;
+            std::list<Connection::Id> to_drop; // if cnt_nb >= max_neighbours, store extra neighbours to drop them at the end
             forEachNeighbour([&](ConnectionPtr ptr) {
                 if (ptr->isSignal) {
                     starter_found = true;
                     refill_required = !ptr->connected;
                 }
+                else {
+                    if (++cnt_nb > max_cnt_nb) {
+                        to_drop.push_back(ptr->id);
+                    }
+                }
             });
+            if (!to_drop.empty()) {
+                // drop ending connections to restrict total count
+                csdebug() << "Drop " << to_drop.size() << " connections to provide " << reqSlotsAvail << " available slot(s)";
+                for (const auto& id : to_drop) {
+                    dropConnection(id);
+                }
+            }
             if (!starter_found) {
                 refill_required = true;
             }
@@ -352,6 +374,12 @@ ConnectionPtr Neighbourhood::getConnection(const ip::udp::endpoint& ep) {
 
 void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
     cs::Lock lock(mLockFlag_);
+
+    if (enoughConnections()) {
+        csdebug() << "Connections limit has reached, ignore request connection to " << ep;
+        return;
+    }
+
     auto conn = getConnection(ep);
 
     if (!conn->id) {
@@ -359,7 +387,7 @@ void Neighbourhood::establishConnection(const ip::udp::endpoint& ep) {
     }
 
     if (!conn->connected && transport_->isShouldPending(*conn)) {
-        cswarning() << "Establishing connection to " << ep;
+        csdebug() << "Establishing connection to " << ep;
         transport_->sendRegistrationRequest(**conn);
     }
 }
@@ -511,12 +539,12 @@ void Neighbourhood::connectNode(RemoteNodePtr node, ConnectionPtr conn) {
     conn->connected = true;
     conn->attempts = 0;
 
-    if (!isNewConnectionAvailable()) {
-        cswarning() << "Can not add neighbour, neighbours size is equal to max possible neighbours";
+    if (enoughConnections()) {
+        csdebug() << "Can not add neighbour, neighbours count is equal to max possible neighbours";
         return;
     }
-
-    neighbours_.emplace(neighbours_.end(), conn);
+    // to provide some rotation in neighbours_ add to begin, restrict at the end of:
+    neighbours_.emplace(neighbours_.cbegin(), conn);
     csdebug() << "Node " << conn->getOut() << " is added to neighbours";
     chooseNeighbours();
 }
@@ -597,13 +625,17 @@ bool Neighbourhood::validateConnectionId(RemoteNodePtr node, const Connection::I
 
     if (!realPtr) {
         if (nConn) {
-            cswarning() << "[NET] got ping from " << ep << " but the remote node is bound to " << nConn->getOut();
+            if (enoughConnections()) {
+                csdebug() << "Connections limit has reached, ignore ping from " << ep;
+                return false;
+            }
+
+            cslog() << "[NET] got ping from " << ep << " but the remote node is bound to " << nConn->getOut() << ", request new registration";
             transport_->sendRegistrationRequest(*nConn);
             nConn->lastSeq = lastSeq;
         }
         else {
-            cswarning() << "[NET] got ping from " << ep << " but no connection bound, sending refusal";
-
+            cslog() << "[NET] got ping from " << ep << " but no connection bound, sending refusal";
             Connection conn;
             conn.id = id;
             conn.in = ep;
@@ -614,12 +646,19 @@ bool Neighbourhood::validateConnectionId(RemoteNodePtr node, const Connection::I
         result = !result;
     }
     else if (realPtr->get() != nConn) {
+        if (enoughConnections()) {
+            csdebug() << "Connection limit has reached, ignore ping from " << ep;
+            return false;
+        }
+
         if (nConn) {
-            cswarning() << "[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut() << " but the remote node is bound to " << nConn->getOut();
+            cslog() << "[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut()
+                << " but the remote node is bound to " << nConn->getOut() << ", request new registration";
             transport_->sendRegistrationRequest(*nConn);
         }
         else {
-            cswarning() << "[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut() << " and there is no bindings, sending reg";
+            cslog() << "[NET] got ping from " << ep << " introduced as " << (*realPtr)->getOut()
+                << " and there is no bindings, request new registration";
         }
 
         (*realPtr)->lastSeq = lastSeq;
@@ -639,9 +678,33 @@ void Neighbourhood::gotRefusal(const Connection::Id& id) {
     cs::ScopedLock scopedLock(mLockFlag_, nLockFlag_);
     auto realPtr = findInMap(id, connections_);
 
+    if (enoughConnections()) {
+        return;
+    }
+
     if (realPtr) {
         transport_->sendRegistrationRequest(***realPtr);
     }
+}
+
+// thread unsafe, must work under nLockFlag_
+bool Neighbourhood::enoughConnections() const {
+    const uint32_t conn_limit = std::min(cs::ConfigHolder::instance().config()->getMaxNeighbours(), MaxNeighbours);
+    uint32_t count = 0;
+    for (auto& nb : neighbours_) {
+        if (!nb->isSignal) {
+            ++count;
+            if (count >= conn_limit) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool Neighbourhood::canAddNeighbour() const {
+    cs::Lock lock(nLockFlag_);
+    return !enoughConnections();
 }
 
 void Neighbourhood::gotBadPing(Connection::Id id) {
@@ -676,8 +739,6 @@ void Neighbourhood::neighbourHasPacket(RemoteNodePtr node, const cs::Hash& hash)
 
     auto& dp = msgDirects_.tryStore(hash);
     dp.received = true;
-    resqueue.remove(hash, conn);
-    resqueue.resend();
 }
 
 void Neighbourhood::neighbourSentPacket(RemoteNodePtr node, const cs::Hash& hash) {
@@ -742,9 +803,23 @@ void Neighbourhood::redirectByNeighbours(const Packet* pack) {
 }
 
 void Neighbourhood::pingNeighbours() {
+    const uint32_t max_cnt = cs::ConfigHolder::instance().config()->getMaxNeighbours();
+    const bool limit_cnt_ping = cs::ConfigHolder::instance().config()->restrictNeighbours();
+
     cs::Lock lock(nLockFlag_);
 
+    uint32_t cnt_ping = 0;
     for (auto& nb : neighbours_) {
+        if (limit_cnt_ping) {
+            // stop ping on max neighbours count, then connection will close automatically, ending items will be restricted such a way
+            if (!nb->isSignal) {
+                ++cnt_ping;
+                if (cnt_ping > max_cnt) {
+                    csdebug() << "Connections limit " << max_cnt << " has reached, ignore the rest neighbours";
+                    break;
+                }
+            }
+        }
         transport_->sendPingPack(**nb);
     }
 }
@@ -763,7 +838,16 @@ bool Neighbourhood::isPingDone() {
 
 void Neighbourhood::resendPackets() {
     cs::Lock lock(nLockFlag_);
-    resqueue.resend();
+    for (auto& bp : msgBroads_) {
+        if (!bp.data.pack) {
+            continue;
+        }
+
+        if (!dispatch(bp.data)) {
+            bp.data.pack = Packet();
+        }
+        bp.data.sentLastTime = false;
+    }
 }
 
 ConnectionPtr Neighbourhood::getConnection(const RemoteNodePtr node) {
@@ -843,7 +927,6 @@ void Neighbourhood::registerDirect(const Packet* packPtr, ConnectionPtr conn) {
     auto& bp = msgDirects_.tryStore(packPtr->getHash());
     bp.pack = *packPtr;
     bp.receiver = conn;
-    resqueue.insert(*packPtr, conn);
 }
 
 bool Neighbourhood::isNewConnectionAvailable() const {

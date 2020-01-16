@@ -62,6 +62,8 @@ void TrustedStage3State::on(SolverContext& context) {
             }
         }
 
+
+
         if (finish == Result::Finish) {
             context.complete_stage3();
             return;
@@ -79,6 +81,15 @@ void TrustedStage3State::on(SolverContext& context) {
     //  - create fake stages-2 from outbound nodes and force to next state
 
     SolverContext* pctx = &context;
+
+    //blacklisted nodes stage-2 resolve
+    const auto& confidants = cs::Conveyer::instance().confidants();
+    for (uint8_t i = 0; i < static_cast<uint8_t>(confidants.size()); ++i) {
+        if (pctx->isBlackListed(confidants[i])) {
+            pctx->fake_stage2(i);
+        }
+    }
+
     auto dt = 2 * Consensus::T_stage_request;
     csdebug() << name() << ": start track timeout " << 0 << " ms of stages-2 received";
     timeout_request_stage.start(context.scheduler(), 0,  // no timeout
@@ -276,7 +287,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
         context.next_trusted_candidates(next_round_trust, next_round_hashes);
         // TODO: The pool building is starting here <===
         context.spawn_next_round(stage);
-        csdebug() << name() << ": --> stage-3 [" << static_cast<int>(stage.sender) << "]";
+        csdebug() << name() << ": --> stageThree [" << static_cast<int>(stage.sender) << "]";
         stage.toBytes();
         stage.signature = cscrypto::generateSignature(context.private_key(), stage.message.data(), stage.message.size());
         context.add_stage3(stage);  //, stage.writer != stage.sender);
@@ -300,7 +311,7 @@ Result TrustedStage3State::finalizeStageThree(SolverContext& context) {
     }
     csdebug() << "Starting new collection of stage 3 because a part of nodes didn't respond correct";
     context.spawn_next_round(stage);
-    csdebug() << name() << ": --> stage-3 [" << static_cast<int>(stage.sender) << "]";
+    csdebug() << name() << ": --> stageThree [" << static_cast<int>(stage.sender) << "]";
     stage.toBytes();
     stage.signature = cscrypto::generateSignature(context.private_key(), stage.message.data(), stage.message.size());
     context.add_stage3(stage);  //, stage.writer != stage.sender);
@@ -483,7 +494,7 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     for (auto& it : candidatesElection) {
         BlockChain::WalletData wData;
         context.blockchain().findWalletData(csdb::Address::from_public_key(it.first), wData);
-        csdb::Amount st = wData.balance_;
+        csdb::Amount st = wData.balance_ + wData.delegated_;
         stakers.emplace_back(it.first, st);
     }
 

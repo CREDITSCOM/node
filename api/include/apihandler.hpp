@@ -52,6 +52,7 @@ public:
     void SmartContractGet(SmartContractGetResult& _return, const general::AccessID accessId, const general::Address& address) override;
     void WalletBalanceGet(api::WalletBalanceGetResult& _return, const general::Address& address) override;
     void PoolGet(PoolGetResult& _return, const int64_t sequence) override;
+    void GetDateTime(GetDateTimeResult& _return, const general::AccessID accessId) override;
 
     cs::Executor& getExecutor() const {
         return executor_;
@@ -182,6 +183,7 @@ private:
         bool isOld{false};
         bool condFlg{false};
         csdb::TransactionID id{};
+        cs::DumbCv::Condition condition{};
     };
 
     using client_type = executor::ContractExecutorConcurrentClient;
@@ -270,10 +272,11 @@ private:
     void run();
 
     ::csdb::Transaction makeTransaction(const ::api::Transaction&);
-    void dumb_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
-    void smart_transaction_flow(api::TransactionFlowResult& _return, const ::api::Transaction&);
+    void dumbTransactionFlow(api::TransactionFlowResult& _return, const csdb::Transaction& tr);
+    void smartTransactionFlow(api::TransactionFlowResult& _return, const ::api::Transaction&, csdb::Transaction& send_transaction);
 
-    std::optional<std::string> checkTransaction(const ::api::Transaction&);
+    std::optional<std::string> checkTransaction(const ::api::Transaction&, csdb::Transaction& cTransaction);
+    void checkTransactionsFlow(const cs::TransactionsPacket& packet, cs::DumbCv::Condition condition);
 
     TokensMaster tm_;
 
@@ -292,6 +295,8 @@ private slots:
     void collect_all_stats_slot(const csdb::Pool& pool);
     void baseLoaded(const csdb::Pool& pool);
     void maxBlocksCount(cs::Sequence lastBlockNum);
+    void onPacketExpired(const cs::TransactionsPacket& packet);
+    void onTransactionsRejected(const cs::TransactionsPacket& packet);
 };
 }  // namespace api
 

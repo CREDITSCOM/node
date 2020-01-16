@@ -254,13 +254,16 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
                 cswarning() << log_prefix << "incompatible timestamp received from [" << (int)it.sender << "]";
                 continue;
             }
-            double x = static_cast<double>(tStamp - lastTimeStamp);
-            if (x > DBL_EPSILON) {
-                stamps.push_back(x);
-                sx += x;
-                sx2 += x * x;
-                ++N;
+            if (tStamp > lastTimeStamp) {
+                double x = static_cast<double>(tStamp - lastTimeStamp);
+                if (x > DBL_EPSILON) {
+                    stamps.push_back(x);
+                    sx += x;
+                    sx2 += x * x;
+                    ++N;
+                }
             }
+
         }
     }
 
@@ -268,26 +271,26 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
     while (isDrop) {
         if (N == 0) {
             csdebug() << "There is no nodes with valid TimeStamp";
-            int N0 = 0;
-            int sx0 = 0;
+            int64_t N0 = 0;
+            int64_t sx0 = 0;
             for (auto& it : stageOneStorage) {
                 int64_t tStamp;
                 try {
-                    tStamp = std::stoll(it.roundTimeStamp);
+                    tStamp = std::stoull(it.roundTimeStamp);
                 }
                 catch (...) {
                     cswarning() << log_prefix << "incompatible timestamp received from [" << (int)it.sender << "]";
                     continue;
                 }
                 ++N0;
-                sx0 += static_cast<int>(tStamp);
+                sx0 += static_cast<int64_t>(tStamp);
             }
 
             if (N0 > 0) {
                 return std::to_string(sx0/N0);
             }
             else {
-                return std::to_string(lastTimeStamp + 100);
+                return std::to_string(lastTimeStamp + 1);
             }
 
         }
@@ -579,7 +582,7 @@ uint8_t SolverCore::subRound() {
     return (pnode->subRound());
 }
 
-std::optional<cs::Characteristic> SolverCore::ownValidation(cs::TransactionsPacket& packet, cs::Packets& smartsPackets) {
+std::optional<cs::Characteristic> SolverCore::ownValidation(cs::TransactionsPacket& packet, cs::PacketsVector& smartsPackets) {
     const std::size_t transactionsCount = packet.transactionsCount();
 
     cs::Characteristic characteristic;

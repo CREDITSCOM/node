@@ -35,12 +35,15 @@ class Fee;
 class TransactionsIndex;
 class TransactionsPacket;
 
+/** @brief   The synchronized block signal emits when block is trying to be stored */
+using TryToStoreBlockSignal = cs::Signal<void(const csdb::Pool&, bool*)>;
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
 using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 
 /** @brief   The write block or remove block signal emits when block is flushed to disk */
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
 using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
+using AlarmSignal = cs::Signal<void(const cs::Sequence)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
 using StartReadingBlocksSignal = csdb::BlockReadingStartedSingal;
 }  // namespace cs
@@ -63,6 +66,9 @@ public:
 
     bool init(const std::string& path,
               cs::Sequence newBlockchainTop = cs::kWrongSequence);
+    // called immediately after object construction, better place to subscribe on signals
+    void subscribeToSignals();
+
     bool isGood() const;
 
     // return unique id of database if at least one unique block has written, otherwise (only genesis block) 0
@@ -190,11 +196,17 @@ public signals:
     /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
     cs::StoreBlockSignal storeBlockEvent;
 
+    /** @brief The event storing synchronized block. Raised when the next incoming block is trying to be stored into chain */
+    cs::TryToStoreBlockSignal tryToStoreBlockEvent;
+
     /** @brief The cached block event. Raised when the next block is flushed to storage */
     cs::ChangeBlockSignal cachedBlockEvent;
 
     /** @brief The remove block event. Raised when the next block is flushed to storage */
     cs::RemoveBlockSignal removeBlockEvent;
+
+    /** @brief Alarm event. Block Isn't correct */
+    cs::AlarmSignal alarmBadBlock;
 
     const cs::ReadBlockSignal& readBlockEvent() const;
     const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;
@@ -252,6 +264,8 @@ public:
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
 
     void setBlocksToBeRemoved(cs::Sequence number);
+
+    void printWalletCaches();
 
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);

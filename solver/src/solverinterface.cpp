@@ -28,6 +28,10 @@ void SolverCore::init(const cs::PublicKey& pub, const cs::PrivateKey& priv) {
     }
 }
 
+void SolverCore::subscribeToSignals() {
+    psmarts->subscribeToSignals(pnode);
+}
+
 void SolverCore::gotConveyerSync(cs::RoundNumber rNum) {
     // clear data
     markUntrusted.fill(0);
@@ -71,7 +75,7 @@ bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
     }
     BlockChain::WalletData wData;
     pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(sender), wData);
-    if (wData.balance_ < Consensus::MinStakeValue) {
+    if (wData.balance_ + wData.delegated_ < Consensus::MinStakeValue) {
         return false;
     }
     return true;
@@ -157,6 +161,7 @@ void SolverCore::nextRound(bool updateRound) {
     tempRealTrusted_.clear();
     currentStage3iteration_ = 0;
     updateGrayList(cs::Conveyer::instance().currentRoundNumber());
+    kLogPrefix_ = "R-" + std::to_string(cs::Conveyer::instance().currentRoundNumber()) + " SolverCore> ";
     lastSentSignatures_.poolSignatures.clear();
     lastSentSignatures_.roundSignatures.clear();
     lastSentSignatures_.trustedConfirmation.clear();
@@ -176,10 +181,10 @@ void SolverCore::gotStageOne(const cs::StageOne& stage) {
         uint64_t currentTimeStamp = 0;
         uint8_t sender = stage.sender;
         try {
-            lastTimeStamp = std::stoll(find_stage1(stage.sender)->roundTimeStamp);
+            lastTimeStamp = std::stoull(find_stage1(stage.sender)->roundTimeStamp);
         }
         catch (...) {
-            csdebug() << __func__ << ": last stage-1 from " << static_cast<int>(stage.sender) << " Timestamp was announced as zero";
+            csdebug() << kLogPrefix_ << __func__ << ": last stage-1 from " << static_cast<int>(stage.sender) << " Timestamp was announced as zero";
             auto it = std::find_if(stageOneStorage.begin(), stageOneStorage.end(), [sender](cs::StageOne& st) { return st.sender == sender;});
             stageOneStorage.erase(it);
             //erase this stage
@@ -189,7 +194,7 @@ void SolverCore::gotStageOne(const cs::StageOne& stage) {
             currentTimeStamp = std::stoll(stage.roundTimeStamp);
         }
         catch (...) {
-            csdebug() << __func__ << ": current stage-1 from " << static_cast<int>(stage.sender) << " Timestamp was announced as zero";
+            csdebug() << kLogPrefix_ << __func__ << ": current stage-1 from " << static_cast<int>(stage.sender) << " Timestamp was announced as zero";
             return;
         }
         // duplicated
@@ -206,7 +211,7 @@ void SolverCore::gotStageOne(const cs::StageOne& stage) {
 
 
     stageOneStorage.push_back(stage);
-    csdebug() << "SolverCore: <-- stage-1 [" << static_cast<int>(stage.sender) << "] = " << stageOneStorage.size();
+    csdebug() << kLogPrefix_ << __func__ << ": <-- stage-1 [" << static_cast<int>(stage.sender) << "] = " << stageOneStorage.size();
 
     if (!pstate) {
         return;
@@ -221,19 +226,19 @@ bool SolverCore::isTransactionsInputAvailable() {
 }
 
 void SolverCore::gotStageOneRequest(uint8_t requester, uint8_t required) {
-    csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-1 of [" << static_cast<int>(required) << "]";
+    csdebug() << kLogPrefix_ << "[" << static_cast<int>(requester) << "] asks for stage-1 of [" << static_cast<int>(required) << "]";
 
     const auto ptr = find_stage1(required);
-    if (ptr != nullptr) {
+    if (ptr != nullptr && ptr->signature != cs::Zero::signature) {
         pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::FirstStage, requester, ptr->message);
     }
 }
 
 void SolverCore::gotStageTwoRequest(uint8_t requester, uint8_t required) {
-    csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-2 of [" << static_cast<int>(required) << "]";
+    csdebug() << kLogPrefix_ << "[" << static_cast<int>(requester) << "] asks for stage-2 of [" << static_cast<int>(required) << "]";
 
     const auto ptr = find_stage2(required);
-    if (ptr != nullptr) {
+    if (ptr != nullptr && ptr->signature != cs::Zero::signature) {
         pnode->sendStageReply(ptr->sender, ptr->signature, MsgTypes::SecondStage, requester, ptr->message);
     }
 }
@@ -242,18 +247,22 @@ uint8_t SolverCore::currentStage3iteration() {
     return currentStage3iteration_;
 }
 
+bool SolverCore::isBlackListed(const cs::PublicKey pKey) {
+    return pnode->isBlackListed(pKey);
+}
+
 void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required, uint8_t iteration) {
     csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-3 of [" << static_cast<int>(required) << "] - iteration = " << static_cast<int>(iteration);
 
     // const auto ptr = find_stage3(required);
 
     for (auto& it : stageThreeStorage) {
-        if (it.iteration == iteration && it.sender == required) {
+        if (it.iteration == iteration && it.sender == required  && it.signature != cs::Zero::signature) {
             pnode->sendStageReply(it.sender, it.signature, MsgTypes::ThirdStage, requester, it.message);
             return;
         }
     }
-    csdebug() << "SolverCore: don't have the requested stage three";
+    csdebug() << kLogPrefix_ << "Don't have the requested stage three";
 }
 
 void SolverCore::gotStageTwo(const cs::StageTwo& stage) {
@@ -263,7 +272,7 @@ void SolverCore::gotStageTwo(const cs::StageTwo& stage) {
     }
 
     stageTwoStorage.push_back(stage);
-    csdebug() << "SolverCore: <-- stage-2 [" << static_cast<int>(stage.sender) << "] = " << stageTwoStorage.size();
+    csdebug() << kLogPrefix_ << __func__ << ": <-- stage-2 [" << static_cast<int>(stage.sender) << "] = " << stageTwoStorage.size();
 
     if (!pstate) {
         return;
@@ -344,7 +353,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
         //}
         trueStageThreeStorage.emplace_back(stageFrom);
         addRoundSignature(stageFrom);
-        csdebug() << "Stage3 from T[" << static_cast<int>(stageFrom.sender) << "] - final check ... passed!";
+        csdebug() << kLogPrefix_ << __func__ << ": StageThree from T[" << static_cast<int>(stageFrom.sender) << "] - final check ... passed!";
     };
 
     switch (flagg) {
@@ -372,7 +381,7 @@ void SolverCore::gotStageThree(const cs::StageThree& stage, const uint8_t flagg)
 
     stageThreeStorage.push_back(stage);
 
-    csdebug() << "SolverCore: <-- stage-3 [" << static_cast<int>(stage.sender) << "] = " << stageThreeStorage.size() << " : " << trueStageThreeStorage.size();
+    csdebug() << kLogPrefix_ << __func__ << ": <-- stage-3 [" << static_cast<int>(stage.sender) << "] = " << stageThreeStorage.size() << " : " << trueStageThreeStorage.size();
 
     if (!pstate) {
         return;

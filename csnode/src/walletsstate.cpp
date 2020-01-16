@@ -14,6 +14,8 @@ WalletsState::WalletData& WalletsState::getData(const WalletAddress& address) {
             auto res = storage_.insert(std::make_pair(pubKey,
                                                       WalletData{noInd_,
                                                                  walletPtr->balance_,
+                                                                 walletPtr->delegated_,// amount delegated to current account
+                                                                 walletPtr->delegats_,// accounts to which current round delegated special amounts 
                                                                  walletPtr->trxTail_}));
             return res.first->second;
         }

@@ -72,9 +72,10 @@ public:
     }
 
     uint8_t subRound();
+
     // Solver "public" interface,
     // below are the "required" methods to be implemented by Solver-compatibility issue:
-
+    void subscribeToSignals();
     void init(const cs::PublicKey& pub, const cs::PrivateKey& priv);
     void gotConveyerSync(cs::RoundNumber rNum);
     void gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize);
@@ -122,6 +123,8 @@ public:
     void updateGrayList(cs::RoundNumber round);
     bool isInGrayList(cs::PublicKey key);
     void resetGrayList();
+    bool isBlackListed(const cs::PublicKey pKey);
+
 
     bool isTransactionsInputAvailable();
 
@@ -132,7 +135,7 @@ public:
     size_t trueStagesThree();
     uint8_t currentStage3iteration();
 
-    std::optional<cs::Characteristic> ownValidation(cs::TransactionsPacket& packet, cs::Packets& smartsPackets);
+    std::optional<cs::Characteristic> ownValidation(cs::TransactionsPacket& packet, cs::PacketsVector& smartsPackets);
 
     size_t stagesThree();
     bool stateFailed(Result res);
@@ -342,6 +345,7 @@ private:
     RoundPackage justCreatedRoundPackage;
     SentSignatures lastSentSignatures_;
     std::unique_ptr<IterValidator> pVal_;
+    std::string kLogPrefix_;
 };
 
 }  // namespace cs

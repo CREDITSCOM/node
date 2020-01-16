@@ -9,18 +9,26 @@
 namespace cs {
 // for answer dumb transactions
 class DumbCv {
-    const size_t kWaitTimeMs = 30;
+    const size_t kWaitTimeSec = 15 * 60;
 
 public:
+    enum class Condition {
+        Success,
+        Rejected,
+        TimeOut,
+        Expired
+    };
+
     bool addCVInfo(const cs::Signature& signature);
-    void sendCvSignal(const cs::Signature& signature);
-    bool waitCvSignal(const cs::Signature& signature);
+    void sendCvSignal(const cs::Signature& signature, Condition condition);
+    Condition waitCvSignal(const cs::Signature& signature);
     void setTransactionId(const csdb::TransactionID& id);
     csdb::TransactionID getTransactionId() const;
 private:
     struct CvInfo {
         std::condition_variable cv;
         std::atomic_bool condFlg{ false };
+        std::atomic<Condition> condition { Condition::Success };
     };
 
     csdb::TransactionID id_{};

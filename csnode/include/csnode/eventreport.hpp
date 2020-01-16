@@ -36,10 +36,28 @@ struct Reject {
         EmittedOutOfFee,
         CompleteReject,
 
-        LimitExceeded
+        LimitExceeded,
+
+        // delegation related
+        
+        AmountTooLow,
+        AlreadyDelegated,
+        IncorrectTarget,
+        MalformedDelegation,
+        IncorrectSum,
     };
 
     static std::string to_string(Reason r);
+};
+
+struct Running {
+    enum Status : uint8_t {
+        Stop = 0,
+        ReadBlocks = 1, // is not supproted yet
+        Run = 2
+    };
+
+    static std::string to_string(Status s);
 };
 
 struct ContractConsensusId {
@@ -63,7 +81,8 @@ public:
         AddToList,
         EraseFromList,
         RejectTransactions,
-        RejectContractExecution
+        RejectContractExecution,
+        RunningStatus
     };
 
     static Id getId(const cs::Bytes& bin_pack);
@@ -232,6 +251,32 @@ public:
      */
 
     static Id parseContractsProblem(const cs::Bytes& bin_pack, cs::PublicKey& problem_source, ContractConsensusId& consensus_id);
+
+    /**
+     * Sends a running status
+     *
+     * @author  Alexander Avramenko
+     * @date    19.12.2019
+     *
+     * @param [in,out]  node    The node service.
+     * @param           status  The new status of node.
+     */
+
+    static void sendRunningStatus(Node& node, Running::Status status);
+
+    /**
+     * Parse running status
+     *
+     * @author  Alexander Avramenko
+     * @date    19.12.2019
+     *
+     * @param           bin_pack    The bin pack, must be a product of sendRunningStatus()
+     * @param [in,out]  status      The placeholder for the new status value.
+     *
+     * @returns True if it succeeds, false if it fails.
+     */
+
+    static bool parseRunningStatus(const cs::Bytes& bin_pack, Running::Status& status);
 
 private:
 

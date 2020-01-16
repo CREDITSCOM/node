@@ -9,6 +9,7 @@
 #include <csnode/datastream.hpp>
 #include <csnode/sendcachedata.hpp>
 
+#include <solver/consensus.hpp>
 #include <solver/smartcontracts.hpp>
 
 #include <lib/system/hash.hpp>
@@ -72,6 +73,7 @@ cs::ConveyerBase::ConveyerBase() {
     pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
 
     std::call_once(::onceFlag, &::setup, this);
+    cs::Connector::connect(&roundChanged, this, &cs::Conveyer::onRoundChanged);
 }
 
 void cs::ConveyerBase::setPrivateKey(const cs::PrivateKey& privateKey) {
@@ -112,7 +114,7 @@ void cs::ConveyerBase::addTransaction(const csdb::Transaction& transaction) {
     }
 }
 
-void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
+void cs::ConveyerBase::addContractPacket(cs::TransactionsPacket& packet) {
     cs::TransactionsPacketHash hash = packet.hash();
     csdebug() << csname() << "Add separate transactions packet to conveyer, transactions " << packet.transactionsCount();
     cs::Lock lock(sharedMutex_);
@@ -127,6 +129,14 @@ void cs::ConveyerBase::addSeparatePacket(const cs::TransactionsPacket& packet) {
 }
 
 void cs::ConveyerBase::addTransactionsPacket(const cs::TransactionsPacket& packet) {
+    auto round = currentRoundNumber();
+
+    if (round > packet.expiredRound()) {
+        csdebug() << csname() << "Ignore expired packet, expired round: " << packet.expiredRound() << ", current round " <<
+                     round << "hash " << packet.hash().toString();
+        return;
+    }
+
     cs::TransactionsPacketHash hash = packet.hash();
     cs::Lock lock(sharedMutex_);
 
@@ -146,7 +156,7 @@ const cs::PacketQueue& cs::ConveyerBase::packetQueue() const {
     return pimpl_->packetQueue;
 }
 
-std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::createPacket(cs::RoundNumber round) const {
+std::optional<std::pair<cs::TransactionsPacket, cs::PacketsVector>> cs::ConveyerBase::createPacket(cs::RoundNumber round) const {
     cs::Lock lock(sharedMutex_);
 
     static constexpr size_t smartContractDetector = 1;
@@ -158,7 +168,7 @@ std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::
     }
 
     cs::TransactionsPacket packet;
-    cs::Packets smartContractPackets;
+    cs::PacketsVector smartContractPackets;
 
     cs::PacketsHashes& hashes = meta->roundTable.hashes;
     cs::TransactionsPacketTable& table = pimpl_->packetsTable;
@@ -185,7 +195,7 @@ std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::
         }
     }
 
-    auto data = std::make_pair<cs::TransactionsPacket, cs::Packets>(std::move(packet), std::move(smartContractPackets));
+    auto data = std::make_pair<cs::TransactionsPacket, cs::PacketsVector>(std::move(packet), std::move(smartContractPackets));
     return std::make_optional<decltype(data)>(std::move(data));
 }
 
@@ -200,12 +210,12 @@ void cs::ConveyerBase::updateRoundTable(cs::RoundNumber cachedRound, const cs::R
             --cachedRound;
         }
 
-        changeRound(table.round);
-
         if (pimpl_->metaStorage.contains(table.round)) {
             cserror() << csname() << "Round table updation failed";
         }
     }
+
+    changeRound(table.round);
 
     setTable(table);
 }
@@ -579,16 +589,18 @@ std::optional<csdb::Pool> cs::ConveyerBase::applyCharacteristic(const cs::PoolMe
     // remove current hashes from table
     removeHashesFromTable(localHashes);
 
-    csdebug() << "\tinvalid transactions count " << invalidTransactions.transactionsCount();
+    if (!invalidTransactions.transactions().empty()) {
+        emit transactionsRejected(invalidTransactions);
+    }
 
     // add current round hashes to storage
     meta->hashTable = std::move(hashTable);
     meta->invalidTransactions = std::move(invalidTransactions);
 
     if (characteristic.mask.size() != newPool.transactions_count()) {
-        auto cnt_total = characteristic.mask.size();
-        auto cnt_valid = newPool.transactions_count();
-        cslog() << "Viewed transactions: " << cnt_total << ", valid : " << cnt_valid << ", invalid: " << cnt_total - cnt_valid;
+        auto countTotal = characteristic.mask.size();
+        auto countValid = newPool.transactions_count();
+        cslog() << "Viewed transactions: " << countTotal << ", valid : " << countValid << ", invalid: " << countTotal - countValid;
     }
 
     csdebug() << "\tsequence = " << metaPoolInfo.sequenceNumber;
@@ -707,6 +719,11 @@ void cs::ConveyerBase::flushTransactions() {
 
     for (auto& packet : packets) {
         if ((packet.transactionsCount() != 0u)) {
+            // set max round for no setupped packets
+            if (!packet.expiredRound()) {
+                packet.setExpiredRound(round + cs::ConfigHolder::instance().config()->conveyerData().maxPacketLifeTime);
+            }
+
             if (packet.isHashEmpty()) {
                 if (!packet.makeHash()) {
                     cserror() << csname() << "Transaction packet hashing failed";
@@ -728,6 +745,37 @@ void cs::ConveyerBase::flushTransactions() {
     }
 
     checkSendCache();
+}
+
+void cs::ConveyerBase::onRoundChanged(cs::RoundNumber round) {
+    cs::PacketsVector expiredPackets;
+
+    {
+        cs::SharedLock lock(sharedMutex_);
+
+        for (const auto& element : pimpl_->packetsTable) {
+            if (element.second.expiredRound() < round) {
+                expiredPackets.push_back(element.second);
+            }
+        }
+    }
+
+    if (expiredPackets.empty()) {
+        return;
+    }
+
+    {
+        cs::Lock lock(sharedMutex_);
+
+        for (const auto& packet : expiredPackets) {
+            const auto& hash = packet.hash();
+
+            pimpl_->packetsTable.erase(hash);
+            removeHashFromSendCache(hash);
+
+            emit packetExpired(packet);
+        }
+    }
 }
 
 void cs::ConveyerBase::addPacketToMeta(cs::RoundNumber round, cs::TransactionsPacket& packet) {

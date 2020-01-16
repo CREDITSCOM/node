@@ -147,10 +147,20 @@ public:  // Interface
     size_t transactionsCount() const noexcept;
 
     ///
+    /// @brief Returns max packet lifetime round
+    ///
+    cs::RoundNumber expiredRound() const noexcept;
+
+    ///
     /// @brief Adds signature to transaction vector
     /// @param signature Signature to add
     ///
     bool addSignature(const cs::Byte index, const cs::Signature& signature);
+
+    ///
+    /// @brief Sets max packet lifetime round
+    ///
+    void setExpiredRound(cs::RoundNumber round);
 
     bool sign(const cs::PrivateKey& privateKey);
     std::string verify(const cs::PublicKey& publicKey);
@@ -212,6 +222,7 @@ private:  // Members
     std::vector<csdb::Transaction> transactions_;
     std::vector<csdb::Transaction> stateTransactions_;
     cs::BlockSignatures signatures_;
+    cs::RoundNumber expiredRound_{};
 };
 }  // namespace cs
 

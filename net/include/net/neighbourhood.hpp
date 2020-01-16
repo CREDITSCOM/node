@@ -136,17 +136,17 @@ struct Neighbour {
 
 class Neighbourhood {
 public:
-    const static uint32_t MinConnections = 1;
-    const static uint32_t MaxConnections = 1024;
-    const static uint32_t MaxNeighbours = 256;
-    const static uint32_t MinNeighbours = 3;
-    const static uint32_t MaxConnectAttempts = 64;
+    const static inline uint32_t MinConnections = 1;
+    const static inline uint32_t MaxConnections = 1024;
+    const static inline uint32_t MaxNeighbours = 256;
+    const static inline uint32_t MinNeighbours = 3;
+    const static inline uint32_t MaxConnectAttempts = 64;
 
     explicit Neighbourhood(Transport*);
 
     void chooseNeighbours();
     void sendByNeighbours(const Packet*, bool separate = false);
-    void sendByConfidant(const Packet* pack, ConnectionPtr conn);
+    void sendByConfidant(Packet* pack, ConnectionPtr conn);
 
     void establishConnection(const ip::udp::endpoint&);
     ConnectionPtr addConfidant(const ip::udp::endpoint&);
@@ -202,6 +202,8 @@ public:
 
     void registerDirect(const Packet*, ConnectionPtr);
 
+    bool canAddNeighbour() const;
+
 private:
     struct BroadPackInfo {
         Packet pack;
@@ -233,6 +235,8 @@ private:
 
     void connectNode(RemoteNodePtr, ConnectionPtr);
     void disconnectNode(ConnectionPtr*);
+
+    bool enoughConnections() const;
 
     Transport* transport_;
 

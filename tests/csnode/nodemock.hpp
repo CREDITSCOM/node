@@ -54,7 +54,7 @@ public:
   MOCK_METHOD2(sendPacketHashesRequest, void(const cs::PacketsHashes& hashes, const cs::RoundNumber round));
   MOCK_METHOD2(sendPacketHashesRequestToNeighbours, void(const cs::PacketsHashes& hashes, const cs::RoundNumber round));
   MOCK_METHOD3(sendPacketHashesReply,
-               void(const cs::Packets& packet, const cs::RoundNumber round, const cs::PublicKey& sender));
+               void(const cs::PacketsVector& packet, const cs::RoundNumber round, const cs::PublicKey& sender));
 
   MOCK_METHOD3(sendCharacteristic, void(const csdb::Pool& emptyMetaPool, const uint32_t maskBitsCount,
                                         const std::vector<uint8_t>& characteristic));

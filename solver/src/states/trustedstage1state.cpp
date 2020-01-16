@@ -37,11 +37,15 @@ void TrustedStage1State::on(SolverContext& context) {
     csdebug() << name() << ": start track min time " << dt << " ms to get hashes";
 
     cs::Timer::singleShot(dt, cs::RunPolicy::CallQueuePolicy, [this, pctx]() {
-        csdebug() << name() << ": min time to get hashes is expired, may proceed to the next state";
+        csdebug() << name() << ": min time to get hashes is expired, may proceed to the next state, hashes enough: " 
+            << (enough_hashes ? "Ok" : "NOT Ok") << ", transactions checked: " << (transactions_checked ? "Ok" : "NOT Ok");
         min_time_expired = true;
         if (transactions_checked && enough_hashes) {
             csdebug() << name() << ": transactions & hashes ready, so proceed to the next state now";
             pctx->complete_stage1();
+        }
+        else {
+            csdebug() << name() << ": Something prevents from finishing Stage-1, perhaps later...";
         }
     });
 
@@ -135,6 +139,9 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
         bool continueFlag = false;
         size_t tSize = 0;
         for (const auto& element : conveyer.transactionsPacketTable()) {
+            if (conveyer.currentRoundNumber() + 2 >= element.second.expiredRound()) {
+                continue;
+            }
             const cs::PacketsHashes& hashes = roundTable.hashes;
             continueFlag = false;
             if (std::find(hashes.cbegin(), hashes.cend(), element.first) == hashes.cend()) {
@@ -196,9 +203,12 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
             ++likeMineHashes;
         }
         
-        csdebug() << hString<< ": hash is OK";
         if (std::find(stage.trustedCandidates.cbegin(), stage.trustedCandidates.cend(), sender) == stage.trustedCandidates.cend()) {
             stage.trustedCandidates.push_back(sender);
+            csdebug() << hString << ": hash is OK: added, now total: " << stage.trustedCandidates.size();
+        }
+        else {
+            csdebug() << hString << ": hash is OK, but dupplicated: not added remains: " << stage.trustedCandidates.size();
         }
         //TODO: print hashMask string
         if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes) {
@@ -231,7 +241,7 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
     return Result::Ignore;
 }
 
-cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::TransactionsPacket& packet, cs::Packets& smartsPackets) {
+cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::TransactionsPacket& packet, cs::PacketsVector& smartsPackets) {
     const std::size_t transactionsCount = packet.transactionsCount();
 
     cs::Characteristic characteristic;

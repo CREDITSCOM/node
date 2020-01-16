@@ -27,14 +27,15 @@ const std::string DEFAULT_PATH_TO_PUBLIC_KEY = "NodePublic.txt";
 const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 
 const uint32_t DEFAULT_MIN_NEIGHBOURS = 5;
-const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::MaxNeighbours;
+const uint32_t DEFAULT_MAX_NEIGHBOURS = 24; // Neighbourhood::MaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
 const double DEFAULT_BROADCAST_FILLING = 100 / 3.; // 33.3%
 
-const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = 10;             // rounds
 const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
+const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 10;          // rounds
+const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = (DEFAULT_CONVEYER_MAX_PACKET_LIFETIME/2 > 10) ? 10 : DEFAULT_CONVEYER_MAX_PACKET_LIFETIME/2;              // rounds
 
 [[maybe_unused]]
 const uint8_t DELTA_ROUNDS_VERIFY_NEW_SERVER = 100;
@@ -92,6 +93,7 @@ struct ApiData {
 struct ConveyerData {
     size_t sendCacheValue = DEFAULT_CONVEYER_SEND_CACHE_VALUE;
     size_t maxResendsSendCache = DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE;
+    size_t maxPacketLifeTime = DEFAULT_CONVEYER_MAX_PACKET_LIFETIME;
 };
 
 struct EventsReportData {
@@ -102,7 +104,7 @@ struct EventsReportData {
     bool on = false;
 
     // report filters, only actual if on is true
-    
+
     // report every liar in consensus
     bool consensus_liar = false;
     // report every silent trusted node in consensus
@@ -129,6 +131,18 @@ struct EventsReportData {
     bool alarm_invalid_block = true;
     // big bang occurred
     bool big_bang = false;
+};
+
+struct DbSQLData {
+    // SQL server host name or ip address
+    std::string host { "localhost" };
+    // connection port 5432 by default
+    int port = 5432;
+    // name of database
+    std::string name { "roundinfo" };
+    // username and password for access
+    std::string user { "postgres" };
+    std::string password { "postgres" };
 };
 
 class Config {
@@ -190,6 +204,11 @@ public:
     uint32_t getMaxNeighbours() const {
         return maxNeighbours_;
     }
+
+    bool restrictNeighbours() const {
+        return restrictNeighbours_;
+    }
+
     uint64_t getConnectionBandwidth() const {
         return connectionBandwidth_;
     }
@@ -279,6 +298,10 @@ public:
         return eventsReport_;
     }
 
+    const DbSQLData& getDbSQLData() const {
+        return dbSQLData_;
+    }
+
 private:
     static Config readFromFile(const std::string& fileName);
 
@@ -287,6 +310,7 @@ private:
     void readApiData(const boost::property_tree::ptree& config);
     void readConveyerData(const boost::property_tree::ptree& config);
     void readEventsReportData(const boost::property_tree::ptree& config);
+    void readDbSQLData(const boost::property_tree::ptree& config);
 
     bool readKeys(const std::string& pathToPk, const std::string& pathToSk, const bool encrypt);
     void showKeys(const std::string& pk58);
@@ -295,6 +319,7 @@ private:
 
     template <typename T>
     bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, T& value);
+    bool checkAndSaveValue(const boost::property_tree::ptree& data, const std::string& block, const std::string& param, std::string& value);
 
     bool good_ = false;
 
@@ -311,6 +336,7 @@ private:
 
     uint32_t minNeighbours_ = DEFAULT_MIN_NEIGHBOURS;
     uint32_t maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS;
+    bool restrictNeighbours_ = false;
     uint64_t connectionBandwidth_ = DEFAULT_CONNECTION_BANDWIDTH;
     double broadcastCoefficient_ = DEFAULT_BROADCAST_FILLING / 100;
 
@@ -331,6 +357,7 @@ private:
 
     PoolSyncData poolSyncData_;
     ApiData apiData_;
+    DbSQLData dbSQLData_;
 
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
@@ -358,6 +385,9 @@ bool operator!=(const PoolSyncData& lhs, const PoolSyncData& rhs);
 
 bool operator==(const ApiData& lhs, const ApiData& rhs);
 bool operator!=(const ApiData& lhs, const ApiData& rhs);
+
+bool operator==(const DbSQLData& lhs, const DbSQLData& rhs);
+bool operator!=(const DbSQLData& lhs, const DbSQLData& rhs);
 
 bool operator==(const ConveyerData& lhs, const ConveyerData& rhs);
 bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs);

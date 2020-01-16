@@ -111,7 +111,8 @@ TransactionsPacket::TransactionsPacket(TransactionsPacket&& packet)
 : hash_(std::move(packet.hash_))
 , transactions_(std::move(packet.transactions_))
 , stateTransactions_(std::move(packet.stateTransactions_))
-, signatures_(std::move(packet.signatures_)) {
+, signatures_(std::move(packet.signatures_))
+, expiredRound_(packet.expiredRound()){
     packet.hash_ = TransactionsPacketHash();
     packet.transactions_.clear();
 }
@@ -125,6 +126,7 @@ TransactionsPacket& TransactionsPacket::operator=(const TransactionsPacket& pack
     transactions_ = packet.transactions_;
     signatures_ = packet.signatures_;
     stateTransactions_ = packet.stateTransactions_;
+    expiredRound_ = packet.expiredRound_;
 
     return *this;
 }
@@ -161,6 +163,10 @@ size_t TransactionsPacket::transactionsCount() const noexcept {
     return transactions_.size();
 }
 
+RoundNumber TransactionsPacket::expiredRound() const noexcept {
+    return expiredRound_;
+}
+
 bool TransactionsPacket::addTransaction(const csdb::Transaction& transaction) {
     if (!transaction.is_valid() || !isHashEmpty()) {
         return false;
@@ -190,6 +196,10 @@ bool TransactionsPacket::addSignature(const cs::Byte index, const cs::Signature&
 
     signatures_.push_back(std::make_pair(index, signature));
     return true;
+}
+
+void TransactionsPacket::setExpiredRound(RoundNumber round) {
+    expiredRound_ = round;
 }
 
 bool TransactionsPacket::sign(const cs::PrivateKey& privateKey) {
@@ -236,10 +246,14 @@ std::string TransactionsPacket::verify(const std::vector<cs::PublicKey>& publicK
 
     size_t count = 0;
     size_t total_keys = publicKeys.size();
+    std::string badSignatures;
     for (auto it : signatures_) {
         if (it.first < total_keys) {
             if (cscrypto::verifySignature(it.second.data(), publicKeys[it.first].data(), hash_.toBinary().data(), hash_.toBinary().size())) {
                 ++count;
+            }
+            else {
+                badSignatures += std::to_string(static_cast<int>(it.first)) + ", ";
             }
         }
         else {
@@ -247,7 +261,7 @@ std::string TransactionsPacket::verify(const std::vector<cs::PublicKey>& publicK
         }
     }
 
-    return count <= total_keys / 2 ? std::string{ "Not enough valid signatures" } : std::string{};
+    return count <= total_keys / 2 ? std::string{ "Not enough valid signatures: " } + std::to_string(signatures_.size()) + badSignatures : std::string{};
 }
 
 const cs::BlockSignatures& TransactionsPacket::signatures() const noexcept {
@@ -279,6 +293,8 @@ bool TransactionsPacket::isSmart() const {
 //
 
 void TransactionsPacket::put(::csdb::priv::obstream& os, Serialization options) const {
+    os.put(expiredRound_);
+
     if (options & Serialization::Transactions) {
         os.put(transactions_.size());
 
@@ -306,6 +322,13 @@ void TransactionsPacket::put(::csdb::priv::obstream& os, Serialization options) 
 }
 
 bool TransactionsPacket::get(::csdb::priv::ibstream& is) {
+    cs::RoundNumber round = 0;
+
+    if (!is.get(round)) {
+        return false;
+    }
+
+    expiredRound_ = round;
     std::size_t transactionsCount = 0;
 
     if (!is.get(transactionsCount)) {

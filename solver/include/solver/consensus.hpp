@@ -21,6 +21,27 @@ public:
     /** @brief   The default state timeout */
     constexpr static uint64_t DefaultTimeStampRange = 30000;
 
+    /** @brief   Stage One minimum size */
+    constexpr static uint64_t StageOneMinimumSize = 110;
+
+    /** @brief   Stage One maximum size */
+    constexpr static uint64_t StageOneMaximumSize = 36000;
+
+    /** @brief   Stage Two minimum size */
+    constexpr static uint64_t StageTwoMinimumSize = 350;
+
+    /** @brief   Stage Two maximum size */
+    constexpr static uint64_t StageTwoMaximumSize = 10000;
+
+    /** @brief   Stage Three minimum size */
+    constexpr static uint64_t StageThreeMinimumSize = 260;
+
+    /** @brief   Stage Three maximum size */
+    constexpr static uint64_t StageThreeMaximumSize = 500;
+
+    /** @brief   The minimum state timeout */
+    constexpr static uint64_t MinimumTimeStampRange = 300;
+
     /** @brief   Maximum time in msec to wait new round after consensus achieved, after that waiting trusted nodes
      * activates */
     constexpr static unsigned int PostConsensusTimeout = 60000;
@@ -37,6 +58,9 @@ public:
     /** @brief   The minimum cash for trusted nodes to participate consensus */
     constexpr static csdb::Amount MinStakeValue = csdb::Amount{50000};
 
+    /** @brief   The minimum stake to be delegated to another node */
+    constexpr static csdb::Amount MinStakeDelegated = csdb::Amount{ 5 };
+
     /** @brief   The round when DPOS starts working */
     constexpr static uint64_t StartingDPOS = 10'000ULL;
 
@@ -52,7 +76,7 @@ public:
     /** @brief   Number of rounds to prevent node from consensus participation */
     constexpr static uint32_t GrayListPunishment = 1000;
 
-	/** @brief   Number of node working rounds to start checking roundPackage ctreating speed */
+	/** @brief   Number of node working rounds to start checking roundPackage creating speed */
 	constexpr static uint64_t SpeedCheckRound = 1000;
 
     /** @brief   Max duration (msec) of the whole round (SolverCore on the 1st round) */

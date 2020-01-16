@@ -18,6 +18,8 @@ namespace cs {
 using PacketFlushSignal = cs::Signal<void(const cs::TransactionsPacket&)>;
 using StatesSignal = cs::Signal<void(const std::vector<csdb::Transaction>&)>;
 using RoundChangeSignal = cs::Signal<void(cs::RoundNumber)>;
+using PacketExpiredSignal = cs::Signal<void(const cs::TransactionsPacket&)>;
+using RejectTransactionsSignal = cs::Signal<void(const cs::TransactionsPacket&)>;
 
 ///
 /// @brief The Conveyer class, represents utils and mechanics
@@ -63,7 +65,7 @@ public:
     /// @brief Adds packet to transactions block as monolith entity.
     /// @param packet Created from outside packet with transactions.
     ///
-    void addSeparatePacket(const cs::TransactionsPacket& packet);
+    void addContractPacket(TransactionsPacket& packet);
 
     ///
     /// @brief Adds transactions packet received by network.
@@ -85,7 +87,7 @@ public:
     /// @brief Returns pair of transactions packet created in current round and smart contract packets.
     /// @warning Slow-performance method. Thread safe.
     ///
-    std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> createPacket(cs::RoundNumber round) const;
+    std::optional<std::pair<cs::TransactionsPacket, cs::PacketsVector>> createPacket(cs::RoundNumber round) const;
 
     // round info
 
@@ -310,11 +312,16 @@ public signals:
     cs::PacketFlushSignal packetFlushed;
     cs::StatesSignal statesCreated;
     cs::RoundChangeSignal roundChanged;
+    cs::PacketExpiredSignal packetExpired;
+    cs::RejectTransactionsSignal transactionsRejected;
 
 public slots:
 
     /// try to send transactions packets to network
     void flushTransactions();
+
+private slots:
+    void onRoundChanged(cs::RoundNumber round);
 
 protected:
     void addPacketToMeta(cs::RoundNumber round, cs::TransactionsPacket& packet);

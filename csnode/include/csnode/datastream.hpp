@@ -327,6 +327,20 @@ public:
     }
 
     ///
+    /// Skips run-time size.
+    ///
+    void skip(size_t size) {
+        if (!isAvailable(size)) {
+            badState();
+            return;
+        }
+
+        index_ += size;
+    }
+
+
+
+    ///
     /// Adds bytes vector to stream.
     /// @param data Vector of bytes to write.
     ///

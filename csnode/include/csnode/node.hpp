@@ -186,7 +186,7 @@ public:
 
     void getCharacteristic(cs::RoundPackage& rPackage);
 
-    void createTestTransaction();
+    void createTestTransaction(int tType);
 
     void sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq);
 
@@ -206,7 +206,7 @@ public:
     // transaction's pack syncro
     void sendTransactionsPacket(const cs::TransactionsPacket& packet);
     void sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::RoundNumber round, uint32_t requestStep);
-    void sendPacketHashesReply(const cs::Packets& packets, const cs::RoundNumber round, const cs::PublicKey& target);
+    void sendPacketHashesReply(const cs::PacketsVector& packets, const cs::RoundNumber round, const cs::PublicKey& target);
 
     // smarts consensus additional functions:
 
@@ -225,6 +225,8 @@ public:
     MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes, const cs::PublicKey);
 
     void updateConfigFromFile();
+
+    bool isBlackListed(const cs::PublicKey pKey);
 
     const cs::PublicKey& getNodeIdKey() const {
         return nodeIdKey_;
@@ -310,6 +312,8 @@ public slots:
     void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
     void validateBlock(csdb::Pool block, bool* shouldStop);
+    void deepBlockValidation(csdb::Pool block, bool* shouldStop);
+    void sendBlockAlarmSignal(cs::Sequence seq);
     void onRoundTimeElapsed();
 
 private:
@@ -329,7 +333,7 @@ private:
 
     // conveyer
     void processPacketsRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
-    void processPacketsReply(cs::Packets&& packets, const cs::RoundNumber round);
+    void processPacketsReply(cs::PacketsVector&& packets, const cs::RoundNumber round);
     void processTransactionsPacket(cs::TransactionsPacket&& packet);
 
     /// sending interace methods
@@ -486,6 +490,8 @@ private:
 
     cs::config::Observer& observer_;
     cs::Compressor compressor_;
+
+    std::string kLogPrefix_;
 
     long long deltaTimeSS_{};
 };

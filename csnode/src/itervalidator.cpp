@@ -20,7 +20,7 @@ IterValidator::IterValidator(WalletsState& wallets) {
     pTransval_ = std::make_unique<TransactionsValidator>(wallets, TransactionsValidator::Config{});
 }
 
-Characteristic IterValidator::formCharacteristic(SolverContext& context, Transactions& transactions, Packets& smartsPackets) {
+Characteristic IterValidator::formCharacteristic(SolverContext& context, Transactions& transactions, PacketsVector& smartsPackets) {
     cs::Characteristic characteristic;
     characteristic.mask.resize(transactions.size(), Reject::Reason::None);
 
@@ -97,11 +97,17 @@ void IterValidator::checkRejectedSmarts(SolverContext& context, cs::Bytes& chara
         }
         else if (valid && pTransval_->isRejectedSmart(absAddr)) {
             characteristicMask[i] = pTransval_->getRejectReason(absAddr);
+            csdebug() << kLogPrefix << "transaction[" << i << "] is rejected contract: "
+                << Reject::to_string((Reject::Reason)characteristicMask[i]);
         }
     }
 
     if (!rejectList.empty()) {
-        cslog() << kLogPrefix << "reject " << rejectList.size() << " new_state(s) of smart contract(s)";
+        cslog() << kLogPrefix << "reject " << rejectList.size() << " new_state(s) of contract(s)";
+        for (const auto& item : rejectList) {
+            cslog() << kLogPrefix << "rejected items in call " << FormatRef(item.first)
+                << " start from " << FormatRef(item.first, item.second);
+        }
         context.send_rejected_smarts(rejectList);
     }
 }
@@ -168,7 +174,7 @@ Reject::Reason IterValidator::deployAdditionalCheck(SolverContext& context, size
     return Reject::Reason::None;
 }
 
-void IterValidator::checkTransactionsSignatures(SolverContext& context, const Transactions& transactions, cs::Bytes& characteristicMask, Packets& smartsPackets) {
+void IterValidator::checkTransactionsSignatures(SolverContext& context, const Transactions& transactions, cs::Bytes& characteristicMask, PacketsVector& smartsPackets) {
     checkSignaturesSmartSource(context, smartsPackets);
     size_t transactionsCount = transactions.size();
     size_t maskSize = characteristicMask.size();
@@ -222,13 +228,13 @@ bool IterValidator::checkTransactionSignature(SolverContext& context, const csdb
     }
 }
 
-void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packets& smartContractsPackets) {
+void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::PacketsVector& smartContractsPackets) {
     smartSourceInvalidSignatures_.clear();
 
     for (auto& smartContractPacket : smartContractsPackets) {
         if (smartContractPacket.transactions().size() > 0) {
+            smartContractPacket.makeHash();
             const auto& transaction = smartContractPacket.transactions()[0];
-
             SmartContractRef smartRef;
             if (SmartContracts::is_new_state(transaction)) {
                 smartRef.from_user_field(transaction.user_field(trx_uf::new_state::RefStart));
@@ -248,21 +254,26 @@ void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packe
                 smartSourceInvalidSignatures_.insert(transaction.source());
                 continue;
             }
-
+            //csdebug() << kLogPrefix << "Pack expired round = " << smartContractPacket.expiredRound();
             const auto& confidants = poolWithInitTr.confidants();
             const auto& signatures = smartContractPacket.signatures();
+            const cs::Byte* signedHash = smartContractPacket.hash().toBinary().data();
             size_t correctSignaturesCounter = 0;
+            std::string invalidSignatures;
             for (const auto& signature : signatures) {
                 if (signature.first < confidants.size()) {
                     const auto& confidantPublicKey = confidants[signature.first];
-                    const cs::Byte* signedHash = smartContractPacket.hash().toBinary().data();
+                    //csdebug() << "Hash (" << static_cast<int>(signature.first) << "): " << cs::Utils::byteStreamToHex(signedHash, cscrypto::kHashSize) << " - " << smartContractPacket.hash().toString();
                     if (cscrypto::verifySignature(signature.second, confidantPublicKey, signedHash, cscrypto::kHashSize)) {
                         ++correctSignaturesCounter;
+                    }
+                    else {
+                        invalidSignatures += (std::to_string(static_cast<int>(signature.first)) + ", ");
                     }
                 }
             }
             if (correctSignaturesCounter < confidants.size() / 2U + 1U) {
-                cslog() << kLogPrefix << "is not enough valid signatures";
+                csdebug() << kLogPrefix << "is not enough valid signatures, bad ones: " << invalidSignatures << " packet hash: " << smartContractPacket.hash().toString();
                 smartSourceInvalidSignatures_.insert(transaction.source());
             }
         }
@@ -285,6 +296,14 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
             return "Transaction's source doesn't exist in blockchain.";
         case kContractViolation:
             return "Contract execution violations detected";
+        case kTransactionProhibited:
+            return "Transaction of such type is prohibited for this account or target account";
+        case kNoDelegate:
+            return "No such delegate in your list";
+        case kDifferentDelegatedAmount:
+            return "This account has another delegation amount from your account";
+        case kAmountTooLow:
+            return "The amount of thansaction is too low";
         default :
             return "Unknown reject reason.";
     }
@@ -294,6 +313,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
     RejectCode rc = kAllCorrect;
 
     BlockChain::WalletData wallet;
+    BlockChain::WalletData tWallet;
     csdb::AmountCommission countedFee;
 
     if (!fee::estimateMaxFee(t, countedFee, sc)) {
@@ -310,6 +330,58 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
 
     if (!rc && !bc.findWalletData(t.source(), wallet)) {
         rc = kSourceDoesNotExists;
+    }
+
+    csdb::UserField fld;
+    fld = t.user_field(trx_uf::sp::delegated);
+    bool notCheck = false;
+    if (fld.is_valid()) {
+        if (t.amount() < Consensus::MinStakeDelegated) {
+            rc = kAmountTooLow;
+        }
+        auto flagg = fld.value<uint64_t>();
+        switch(flagg) {
+            case trx_uf::sp::dele::gate:
+                
+                if (!rc) {
+                    if (bc.findWalletData(t.target(), tWallet)) {
+                        if (tWallet.delegated_ > csdb::Amount{ 0 }) {
+                            rc = kTransactionProhibited;
+                        }
+                    }
+                }
+                break;
+            case trx_uf::sp::dele::gated_withdraw:
+                if (!rc) {
+                    if (bc.findWalletData(t.target(), tWallet)) {
+                        auto tKey = bc.getCacheUpdater().toPublicKey(t.target());
+                        auto it = wallet.delegats_.find(tKey);
+                        if (it == wallet.delegats_.end()) {
+                            rc = kNoDelegate;
+                        }
+                        else {
+                            if (tWallet.delegated_ != wallet.delegats_[tKey]) {
+                                rc = kNoDelegate;
+                            }
+                            else {
+                                if (tWallet.delegated_ != t.amount()) {
+                                    rc = kDifferentDelegatedAmount;
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        rc = kNoDelegate;
+                    }
+                }
+                break;
+            default:
+                if (!rc) {
+                    notCheck = true;
+                }
+                break;
+
+        }
     }
 
     if (!rc && wallet.balance_ < (t.amount() + t.max_fee().to_double())) {

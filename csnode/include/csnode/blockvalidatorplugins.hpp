@@ -104,12 +104,12 @@ public:
 
 private:
     bool containsNewState(const Transactions&);
-    Packets grepNewStatesPacks(const Transactions&, bool switchFees);
+    //Packets grepNewStatesPacks(const Transactions&, bool switchFees); moved to static in SmartContracts
     bool checkSignatures(const SmartSignatures&, const Packets&);
 
     // must be performed if block version is 0
     // to pass validation
-    csdb::Transaction switchCountedFee(const csdb::Transaction& newState);
+    Packets switchCountedFee(const Packets& packs);
 };
 
 ///
@@ -119,6 +119,21 @@ class BalanceChecker : public ValidationPlugin {
 public:
     BalanceChecker(BlockValidator& bv)
     : ValidationPlugin(bv) {
+    }
+    ErrorType validateBlock(const csdb::Pool&) override;
+
+private:
+    static constexpr csdb::Amount zeroBalance_ = 0;
+};
+
+
+///
+/// @brief check balances of the given block accounts
+///
+class BalanceOnlyChecker : public ValidationPlugin {
+public:
+    BalanceOnlyChecker(BlockValidator& bv)
+        : ValidationPlugin(bv) {
     }
     ErrorType validateBlock(const csdb::Pool&) override;
 

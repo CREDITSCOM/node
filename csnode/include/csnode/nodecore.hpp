@@ -26,9 +26,6 @@ namespace cs {
 // table for fast transactions storage
 using TransactionsPacketTable = std::map<TransactionsPacketHash, TransactionsPacket>;   // to be sorted by default
 
-// array of packets
-using TransactionsBlock = std::vector<cs::TransactionsPacket>;
-
 // array of notifications
 using Notifications = std::vector<cs::Bytes>;
 using Signatures = std::vector<cscrypto::Signature>;
@@ -38,7 +35,7 @@ using PrivateKeys = std::vector<PrivateKey>;
 
 using ConfidantsKeys = PublicKeys;
 using PacketsHashes = std::vector<cs::TransactionsPacketHash>;
-using Packets = std::vector<cs::TransactionsPacket>;
+using PacketsVector = std::vector<cs::TransactionsPacket>;
 using Signatures = std::vector<cs::Signature>;
 using Hashes = std::vector<cs::Hash>;
 
@@ -52,7 +49,7 @@ enum NodeConsts : uint32_t {
 
 enum ConveyerConsts : uint32_t {
     TransactionsFlushRound = 2,
-    TransactionsPacketInterval = 1000
+    TransactionsPacketInterval = 250
 };
 
 enum ConfidantConsts : Byte {
@@ -117,6 +114,21 @@ struct RoundTableMessage {
     cs::RoundNumber round = 0;
     cs::PublicKey sender;
 };
+
+// transactions user fields
+namespace trx_uf {
+    // delegation transaction fields
+    namespace sp { //specific
+        // delegation
+        constexpr csdb::user_field_id_t delegated = 5; // value: 0 - delegation, 1 - withdraw delegation
+        namespace dele {
+            constexpr uint32_t gate = 1;
+            constexpr uint32_t gated_withdraw = 2;
+        }
+        // count of user fields
+        constexpr size_t Count = 1;
+    }
+}
 
 // meta storages
 using ConveyerMetaStorage = cs::MetaStorage<cs::ConveyerMeta>;

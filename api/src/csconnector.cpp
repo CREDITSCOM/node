@@ -16,6 +16,7 @@
 #include "csconnector/csconnector.hpp"
 
 #include <csnode/configholder.hpp>
+#include <csnode/transactionspacket.hpp>
 
 namespace csconnector {
 
@@ -25,6 +26,11 @@ using namespace ::apache::thrift::stdcxx;
 using namespace ::apache::thrift::server;
 using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
+
+constexpr const int32_t kStringLimit = Consensus::MaxTransactionSize;
+constexpr const int32_t kContainerLimit = 16 * 1024; // max allowed items in any container (map, list, set)
+constexpr const bool kStrictRead = false; // use default Thrift value
+constexpr const bool kStrictWrite = true; // use default Thrift value
 
 connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
 : executor_(cs::Executor::instance())
@@ -36,7 +42,8 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
 , server(p_api_processor, make_shared<TServerSocket>(cs::ConfigHolder::instance().config()->getApiSettings().port,
                                                      cs::ConfigHolder::instance().config()->getApiSettings().serverSendTimeout,
                                                      cs::ConfigHolder::instance().config()->getApiSettings().serverReceiveTimeout),
-    make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
+    make_shared<TBufferedTransportFactory>(),
+    make_shared<TBinaryProtocolFactory>(kStringLimit, kContainerLimit, kStrictRead, kStrictWrite))
 #endif
 #ifdef AJAX_IFACE
 , ajax_server(p_api_processor, make_shared<TServerSocket>(cs::ConfigHolder::instance().config()->getApiSettings().ajaxPort,
@@ -46,7 +53,8 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
 #endif
 #ifdef BINARY_TCP_EXECAPI
 , exec_server(p_apiexec_processor, make_shared<TServerSocket>(cs::ConfigHolder::instance().config()->getApiSettings().apiexecPort),
-    make_shared<TBufferedTransportFactory>(), make_shared<TBinaryProtocolFactory>())
+    make_shared<TBufferedTransportFactory>(),
+    make_shared<TBinaryProtocolFactory>(kStringLimit, kContainerLimit, kStrictRead, kStrictWrite))
 #endif
 {
 #ifdef PROFILE_API
@@ -127,6 +135,14 @@ connector::~connector() {
         ajax_thread.join();
     }
 #endif
+}
+
+void connector::onPacketExpired(const cs::TransactionsPacket& packet) {
+    api_handler->onPacketExpired(packet);
+}
+
+void connector::onTransactionsRejected(const cs::TransactionsPacket& packet) {
+    api_handler->onTransactionsRejected(packet);
 }
 
 connector::ApiHandlerPtr connector::apiHandler() const {
