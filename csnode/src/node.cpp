@@ -107,7 +107,7 @@ bool Node::init() {
 #ifdef NODE_API
     std::cout << "Init API... ";
 
-    api_ = std::make_unique<csconnector::connector>(blockChain_, solver_);
+    api_ = std::make_unique<csconnector::connector>(*this);
 
     std::cout << "Done\n";
 

@@ -23,6 +23,8 @@
 #include <memory>
 #include <thread>
 
+#include <apidiaghandler.hpp>
+
 #ifdef PROFILE_API
 #include <profiler/profilerprocessor.hpp>
 #include <profiler/profilereventhandler.hpp>
@@ -31,12 +33,14 @@
 namespace cs {
 class TransactionsPacket;
 }
+class Node;
 
 namespace csconnector {
 class connector {
 public:
     using ApiHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<api::APIHandler>;
     using ApiExecHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<apiexec::APIEXECHandler>;
+    using DiagHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<api_diag::APIDiagHandler>;
 
 #ifdef PROFILE_API
     using ApiProcessor = cs::ProfilerProcessor;
@@ -44,7 +48,7 @@ public:
     using ApiProcessor = ::api::APIProcessor;
 #endif
 
-    explicit connector(BlockChain& m_blockchain, cs::SolverCore* solver);
+    explicit connector(Node& node);
     ~connector();
 
     connector(const connector&) = delete;
@@ -101,6 +105,15 @@ private:
     std::thread exec_thread;
     uint16_t exec_server_port;
 #endif
+
+#if defined(DIAG_API)
+    DiagHandlerPtr diag_handler;
+    ::apache::thrift::stdcxx::shared_ptr<::api_diag::API_DIAGProcessor> diag_processor;
+
+    ::apache::thrift::server::TThreadedServer diag_server;
+    std::thread diag_thread;
+    uint16_t diag_server_port;
+#endif // DIAG_API
 };
 }  // namespace csconnector
 

@@ -17,6 +17,7 @@
 
 #include <csnode/configholder.hpp>
 #include <csnode/transactionspacket.hpp>
+#include <csnode/node.hpp>
 
 namespace csconnector {
 
@@ -32,12 +33,13 @@ constexpr const int32_t kContainerLimit = 16 * 1024; // max allowed items in any
 constexpr const bool kStrictRead = false; // use default Thrift value
 constexpr const bool kStrictWrite = true; // use default Thrift value
 
-connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
+connector::connector(Node& node)
 : executor_(cs::Executor::instance())
-, api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, executor_))
-, apiexec_handler(make_shared<apiexec::APIEXECHandler>(m_blockchain, *solver, executor_))
+, api_handler(make_shared<api::APIHandler>(node.getBlockChain(), *node.getSolver(), executor_))
+, apiexec_handler(make_shared<apiexec::APIEXECHandler>(node.getBlockChain(), *node.getSolver(), executor_))
 , p_api_processor(make_shared<connector::ApiProcessor>(api_handler))
 , p_apiexec_processor(make_shared<apiexec::APIEXECProcessor>(apiexec_handler))
+
 #ifdef BINARY_TCP_API
 , server(p_api_processor, make_shared<TServerSocket>(cs::ConfigHolder::instance().config()->getApiSettings().port,
                                                      cs::ConfigHolder::instance().config()->getApiSettings().serverSendTimeout,
@@ -45,16 +47,32 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
     make_shared<TBufferedTransportFactory>(),
     make_shared<TBinaryProtocolFactory>(kStringLimit, kContainerLimit, kStrictRead, kStrictWrite))
 #endif
+
 #ifdef AJAX_IFACE
 , ajax_server(p_api_processor, make_shared<TServerSocket>(cs::ConfigHolder::instance().config()->getApiSettings().ajaxPort,
                                                           cs::ConfigHolder::instance().config()->getApiSettings().ajaxServerSendTimeout,
                                                           cs::ConfigHolder::instance().config()->getApiSettings().ajaxServerReceiveTimeout),
     make_shared<THttpServerTransportFactory>(), make_shared<TJSONProtocolFactory>())
 #endif
+
 #ifdef BINARY_TCP_EXECAPI
 , exec_server(p_apiexec_processor, make_shared<TServerSocket>(cs::ConfigHolder::instance().config()->getApiSettings().apiexecPort),
     make_shared<TBufferedTransportFactory>(),
     make_shared<TBinaryProtocolFactory>(kStringLimit, kContainerLimit, kStrictRead, kStrictWrite))
+#endif
+
+#if defined(DIAG_API)
+    , diag_handler(make_shared<api_diag::APIDiagHandler>(node))
+    , diag_processor(make_shared<::api_diag::API_DIAGProcessor>(diag_handler))
+    , diag_server_port(9060)
+    , diag_server(
+        diag_processor,
+        make_shared<TServerSocket>(
+            diag_server_port,
+            cs::ConfigHolder::instance().config()->getApiSettings().serverSendTimeout,
+            cs::ConfigHolder::instance().config()->getApiSettings().serverReceiveTimeout),
+        make_shared<TBufferedTransportFactory>(),
+        make_shared<TBinaryProtocolFactory>(kStringLimit, kContainerLimit, kStrictRead, kStrictWrite))
 #endif
 {
 #ifdef PROFILE_API
@@ -70,7 +88,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
             exec_server.run();
         }
         catch (...) {
-            cserror() << "Oh no! I'm dead :'-(";
+            cserror() << "Executor API server is stopped unexpectedly. Executor support will be unavailable";
         }
     });
 #endif
@@ -93,7 +111,7 @@ void connector::run() {
             server.run();
         }
         catch (...) {
-            cserror() << "Oh no! I'm dead :'-(";
+            cserror() << "Public API server is stopped unexpectedly. All API services will be unavailable";
         }
         });
 #endif
@@ -106,10 +124,22 @@ void connector::run() {
             ajax_server.run();
         }
         catch (...) {
-            cserror() << "Oh no! I'm dead in AJAX :'-(";
+            cserror() << "AJAX server is stopped unexpectedly. All AJAX services will be unavailable";
         }
         });
 #endif
+
+#if defined(DIAG_API)
+    cslog() << "Starting diagnostic API on port " << diag_server_port;
+    diag_thread = std::thread([this]() {
+        try {
+            diag_server.run();
+        }
+        catch (...) {
+            cserror() << "Diagnostic API server is stopped unexpectedly. All diagnostic services will be unavailable";
+        }
+    });
+#endif // DIAG_API
 
     api_handler->run();
 }
