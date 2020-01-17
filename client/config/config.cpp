@@ -52,6 +52,7 @@ const std::string PARAM_NAME_STORE_BLOCK_ELAPSE_TIME = "store_block_elapse_time"
 const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
 const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
 const std::string PARAM_NAME_COMPATIBLE_VERSION = "compatible_version";
+const std::string PARAM_NAME_TRAVERSE_NAT = "traverse_nat";
 
 const std::string PARAM_NAME_CONVEYER_MAX_PACKET_LIFETIME = "max_packet_life_time";
 
@@ -109,7 +110,6 @@ const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
 const std::string ARG_NAME_RECREATE_INDEX = "recreate-index";
 const std::string ARG_NAME_NEW_BC_TOP = "set-bc-top";
 const std::string ARG_NAME_DISABLE_AUTO_SHUTDOWN = "disable-auto-shutdown";
-const std::string ARG_NAME_TRAVERSE_NAT = "traverse-nat";
 
 const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
@@ -213,7 +213,6 @@ Config Config::read(po::variables_map& vm) {
 
     result.recreateIndex_ = vm.count(ARG_NAME_RECREATE_INDEX);
     result.autoShutdownEnabled_ = !vm.count(ARG_NAME_DISABLE_AUTO_SHUTDOWN);
-    result.traverseNAT_ = vm.count(ARG_NAME_TRAVERSE_NAT);
     result.pathToDb_ = getArgFromCmdLine(vm, ARG_NAME_DB_PATH, DEFAULT_PATH_TO_DB);
 
     if (vm.count(ARG_NAME_NEW_BC_TOP)) {
@@ -732,6 +731,10 @@ Config Config::readFromFile(const std::string& fileName) {
         const boost::property_tree::ptree& params = config.get_child(BLOCK_NAME_PARAMS);
 
         result.ipv6_ = !(params.count(PARAM_NAME_USE_IPV6) && params.get<std::string>(PARAM_NAME_USE_IPV6) == "false");
+
+        if (params.count(PARAM_NAME_TRAVERSE_NAT)) {
+            result.traverseNAT_ = (params.get<std::string>(PARAM_NAME_TRAVERSE_NAT) == "true");
+        }
 
         result.minNeighbours_ = params.count(PARAM_NAME_MIN_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MIN_NEIGHBOURS) : DEFAULT_MIN_NEIGHBOURS;
         result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) : DEFAULT_MAX_NEIGHBOURS;
