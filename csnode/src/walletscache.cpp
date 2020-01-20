@@ -42,7 +42,7 @@ PublicKey WalletsCache::Updater::toPublicKey(const csdb::Address& addr) const {
     return res.public_key();
 }
 
-void WalletsCache::Updater::loadNextBlock(csdb::Pool& pool,
+void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
                                           const cs::ConfidantsKeys& confidants,
                                           const BlockChain& blockchain,
                                           bool inverse /* = false */) {
@@ -50,7 +50,6 @@ void WalletsCache::Updater::loadNextBlock(csdb::Pool& pool,
     csdb::Amount totalAmountOfCountedFee = 0;
 
     for (auto itTrx = transactions.begin(); itTrx != transactions.end(); ++itTrx) {
-        itTrx->set_time(pool.get_time());
         totalAmountOfCountedFee += load(*itTrx, blockchain, inverse);
         if (SmartContracts::is_new_state(*itTrx)) {
             fundConfidantsWalletsWithExecFee(*itTrx, blockchain, inverse);

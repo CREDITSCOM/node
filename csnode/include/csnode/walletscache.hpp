@@ -87,7 +87,7 @@ class WalletsCache::Updater {
 public:
     Updater(WalletsCache& data);
 
-    void loadNextBlock(csdb::Pool& curr,
+    void loadNextBlock(const csdb::Pool& curr,
                        const cs::ConfidantsKeys& confidants,
                        const BlockChain& blockchain,
                        bool inverse = false); // inverse all operations
