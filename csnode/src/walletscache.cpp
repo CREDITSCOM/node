@@ -42,7 +42,7 @@ PublicKey WalletsCache::Updater::toPublicKey(const csdb::Address& addr) const {
     return res.public_key();
 }
 
-void WalletsCache::Updater::loadNextBlock(csdb::Pool& pool,
+void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
                                           const cs::ConfidantsKeys& confidants,
                                           const BlockChain& blockchain,
                                           bool inverse /* = false */) {
@@ -50,7 +50,6 @@ void WalletsCache::Updater::loadNextBlock(csdb::Pool& pool,
     csdb::Amount totalAmountOfCountedFee = 0;
 
     for (auto itTrx = transactions.begin(); itTrx != transactions.end(); ++itTrx) {
-        itTrx->set_time(pool.get_time());
         totalAmountOfCountedFee += load(*itTrx, blockchain, inverse);
         if (SmartContracts::is_new_state(*itTrx)) {
             fundConfidantsWalletsWithExecFee(*itTrx, blockchain, inverse);
@@ -315,6 +314,10 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         wallAddress = tr.source();
     }
 
+    // Attention!!!
+    // In case of contract new state (smartIniter == true) and wallData is initer, not contract
+    // Otherwise (smartIniter = false) and wallData is tr.source()
+
     auto& wallData = getWalletData(wallAddress);
 
     if (SmartContracts::is_executable(tr)) {
@@ -468,7 +471,15 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
     }
 
     if (inverse) {
-        wallData.trxTail_.erase(tr.innerID());
+        if (smartIniter) {
+            wallAddress = tr.source();
+        }
+        auto& wallData_s = getWalletData(wallAddress);
+        auto pubKey = toPublicKey(wallAddress);
+        csdetails() << "Wallets: erase innerID of "
+            << EncodeBase58(cs::Bytes(pubKey.begin(), pubKey.end()))
+            << " -> " << tr.innerID();
+        wallData_s.trxTail_.erase(tr.innerID());
     }
 
 #ifdef MONITOR_NODE

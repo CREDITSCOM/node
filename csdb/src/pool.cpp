@@ -198,6 +198,21 @@ class Pool::priv : public ::csdb::internal::shared_data {
         os.put(realTrusted_);
     }
 
+    // serialize only transactions, new wallets, user fields, sequence, round cost: the sensitive content of the block
+    void put_content_only(::csdb::priv::obstream& os) const {
+        os.put(sequence_);
+        os.put(user_fields_);
+        os.put(roundCost_);
+        os.put(static_cast<uint32_t>(transactions_.size()));
+        for (const auto& it : transactions_) {
+            os.put(it);
+        }
+        os.put(static_cast<uint32_t>(newWallets_.size()));
+        for (const auto& wall : newWallets_) {
+            os.put(wall);
+        }
+    }
+
     bool get_meta(::csdb::priv::ibstream& is, size_t& cnt) {
         if (!is.get(version_)) {
             csmeta(cswarning) << "get version is failed";
@@ -528,6 +543,14 @@ class Pool::priv : public ::csdb::internal::shared_data {
         result.storage_ = storage_;
 
         return result;
+    }
+
+    static bool compare_content_only(const csdb::Pool::priv& lhs, const csdb::Pool::priv& rhs) {
+        ::csdb::priv::obstream os_lhs;
+        lhs.put_content_only(os_lhs);
+        ::csdb::priv::obstream os_rhs;
+        lhs.put_content_only(os_rhs);
+        return PoolHash::calc_from_data(os_lhs.buffer()) == PoolHash::calc_from_data(os_rhs.buffer());
     }
 
     bool is_valid_ = false;
@@ -1064,6 +1087,18 @@ bool Pool::NewWalletInfo::get(::csdb::priv::ibstream& is) {
     auto id = reinterpret_cast<size_t*>(&addressId_);
     *id = address_id;
     return is.get(walletId_);
+}
+
+/*static*/
+bool Pool::content_equal(const csdb::Pool& lhs, const csdb::Pool& rhs) {
+    if (lhs.is_valid() != rhs.is_valid()) {
+        return false;
+    }
+    if (!lhs.is_valid()) {
+        // both has no content
+        return true;
+    }
+    return Pool::priv::compare_content_only(*lhs.d, *rhs.d);
 }
 
 }  // namespace csdb

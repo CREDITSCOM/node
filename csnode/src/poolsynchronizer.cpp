@@ -625,6 +625,10 @@ void cs::PoolSynchronizer::refreshNeighbours() {
             auto& item = *(neighbours_.begin() + static_cast<std::ptrdiff_t>(i));
             ConnectionPtr neighbour = transport_->getConnectionByNumber(connectionNumber);
 
+            if (!neighbour) {
+              continue;
+            }
+
             if (neighbour->isSignal) {
                 ++connectionNumber;
 
@@ -633,6 +637,10 @@ void cs::PoolSynchronizer::refreshNeighbours() {
                 }
 
                 neighbour = transport_->getConnectionByNumber(connectionNumber);
+
+                if (!neighbour) {
+                  continue;
+                }
             }
 
             item.setIndex(uint8_t(connectionNumber));
