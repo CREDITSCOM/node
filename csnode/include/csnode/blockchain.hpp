@@ -319,7 +319,7 @@ private:
 
     void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
 
-    bool updateFromNextBlock(csdb::Pool& pool);
+    bool updateFromNextBlock(const csdb::Pool& pool);
 
     // returns true if new id was inserted
     bool getWalletId(const WalletAddress& address, WalletId& id);

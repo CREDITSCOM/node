@@ -58,7 +58,8 @@
           "value": "${env.VCPKG_TARGET_TRIPLET}",
           "type": "STRING"
         }
-      ]
+      ],
+      "intelliSenseMode": "windows-msvc-x64"
     },
     {
       "name": "RelMonitor",
