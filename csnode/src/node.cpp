@@ -86,6 +86,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.alarmBadBlock, this, &Node::sendBlockAlarmSignal);
     cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
+    cs::Connector::connect(&blockChain_.specialInfo, this, &Node::processSpecialInfo);
 
     setupNextMessageBehaviour();
 
@@ -3710,6 +3711,20 @@ void Node::onStopRequested() {
     else {
         stop();
     }
+}
+
+
+void Node::processSpecialInfo(const cs::Bytes& msg) {
+    cs::RoundNumber rNum;
+    cs::DataStream stream(msg.data(), msg.size());
+    stream >> rNum;
+    std::string inst;
+    while (!stream.isEmpty()) {
+        inst.clear();
+        stream >> inst;
+        //parse instruction here
+    }
+
 }
 
 void Node::validateBlock(csdb::Pool block, bool* shouldStop) {

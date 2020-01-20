@@ -43,6 +43,7 @@ using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 /** @brief   The write block or remove block signal emits when block is flushed to disk */
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
 using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
+using SpecialSignal = cs::Signal<void(const cs::Bytes&)>;
 using AlarmSignal = cs::Signal<void(const cs::Sequence)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
 using StartReadingBlocksSignal = csdb::BlockReadingStartedSingal;
@@ -144,6 +145,8 @@ public:
     bool updateLastBlock(cs::RoundPackage& rPackage);
     bool updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom);
     bool deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool);
+    bool isSpecial(const csdb::Transaction& t);
+    cs::Bytes BlockChain::checkForSpecialTransactions(const std::vector<csdb::Transaction>& trxs, cs::Sequence seq);
     cs::Sequence getLastSeq() const;
 
     const cs::MultiWallets& multiWallets() const;
@@ -204,6 +207,9 @@ public signals:
 
     /** @brief The remove block event. Raised when the next block is flushed to storage */
     cs::RemoveBlockSignal removeBlockEvent;
+
+    /** @brief Special signal on special event. Raised when there are spacial transactions in the pool */
+    cs::SpecialSignal specialInfo;
 
     /** @brief Alarm event. Block Isn't correct */
     cs::AlarmSignal alarmBadBlock;

@@ -91,6 +91,12 @@ struct PoolSyncMeta {
     cs::PublicKey sender;
 };
 
+struct Command{
+    cs::RoundNumber rNum;
+    size_t intParam;
+    cs::Bytes data;
+};
+
 using PoolMetaMap = std::map<cs::Sequence, cs::PoolSyncMeta>;
 
 struct ConveyerMeta {
@@ -120,11 +126,15 @@ namespace trx_uf {
     // delegation transaction fields
     namespace sp { //specific
         // delegation
-        constexpr csdb::user_field_id_t delegated = 5; // value: 0 - delegation, 1 - withdraw delegation
-        namespace dele {
-            constexpr uint32_t gate = 1;
-            constexpr uint32_t gated_withdraw = 2;
+        constexpr csdb::user_field_id_t delegated = 5; // value: 1 - delegation, 2 - withdraw delegation
+        constexpr csdb::user_field_id_t managing = 7;
+        namespace de {
+            constexpr uint64_t legate = 1;
+            constexpr uint64_t legated_withdraw = 2;
+            constexpr uint64_t legated_release = 3;
+            constexpr uint64_t liver_hold = 4;
         }
+
         // count of user fields
         constexpr size_t Count = 1;
     }

@@ -1012,6 +1012,10 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     }
     csdetails() << kLogPrefix << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
     emit storeBlockEvent(pool);
+    cs::Bytes msg = checkForSpecialTransactions(pool.transactions(), pool.sequence());
+    if (msg.size() > 0) {
+        emit specialInfo(msg);
+    }
 
     // log cached block
     csdebug() << "----------------------- Defer block #" << pool.sequence() << " until next round ----------------------";
@@ -1107,6 +1111,26 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
     return true;
 }
 
+bool BlockChain::isSpecial(const csdb::Transaction& t) {
+    if (t.user_field(cs::trx_uf::sp::managing).is_valid()) {
+        return true;
+    }
+}
+
+cs::Bytes BlockChain::checkForSpecialTransactions(const std::vector<csdb::Transaction>& trxs, cs::Sequence seq) {
+    cs::Bytes msg;
+    cs::DataStream stream(msg);
+    for (auto it : trxs) {
+        if (isSpecial(it)){
+            if (msg.size() == 0) {
+                stream << seq;
+            }
+            stream << it.user_field(cs::trx_uf::sp::managing).value<std::string>();
+        }
+    }
+    return msg;
+}
+
 bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     const auto lastSequence = getLastSeq();
     const auto poolSequence = pool.sequence();
@@ -1152,7 +1176,6 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             removeLastBlock();
             return false;
         }
-
 
         setTransactionsFees(pool);
 

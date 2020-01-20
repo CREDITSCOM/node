@@ -311,6 +311,7 @@ public slots:
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
     void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
+    void processSpecialInfo(const cs::Bytes& msg);
     void validateBlock(csdb::Pool block, bool* shouldStop);
     void deepBlockValidation(csdb::Pool block, bool* shouldStop);
     void sendBlockAlarmSignal(cs::Sequence seq);
@@ -492,6 +493,7 @@ private:
     cs::Compressor compressor_;
 
     std::string kLogPrefix_;
+    std::map<uint16_t, cs::Command> changeableParams_;
 
     long long deltaTimeSS_{};
 };
