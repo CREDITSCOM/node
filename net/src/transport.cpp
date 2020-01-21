@@ -591,7 +591,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
             ++count;
 
-            if (key != cs::ConfigHolder::instance().config()->getMyPublicKey()) {
+            if (key != myPublicKey_) {
                 if (count <= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
                     neighbourhood_.establishConnection(net_->resolve(ep));
                 }
