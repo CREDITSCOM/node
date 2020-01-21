@@ -3,6 +3,8 @@
 #include <node.hpp>
 #include <smartcontracts.hpp>
 #include <serializer.hpp>
+#include <tokens.hpp>
+#include <nodecore.hpp>
 
 #include <api_types.h>
 
@@ -42,6 +44,7 @@ namespace api_diag {
         else {
             resp.code = kOk;
 
+            ::api_diag::TransactionType tt = TT_Transfer;
             ::api_diag::TransactionData data;
             data.__set_id(t.innerID());
             data.__set_source(to_string<cs::PublicKey>(t.source().public_key()));
@@ -69,64 +72,142 @@ namespace api_diag {
             // time
             data.__set_timestamp((int64_t)t.get_time());
 
-            // user fields
-            std::vector<api_diag::UserField> user_fields;
-            for (auto fid : t.user_field_ids()) {
-                api_diag::UserField user_field;
-                user_field.__set_id((int8_t)fid);
-                const auto& fld = t.user_field(fid);
-                if (fld.is_valid()) {
-                    bool is_valid_data = true;
-                    UserFielData fld_data;
-                    if (cs::SmartContracts::is_executable(t)) {
-                        std::string bytes = fld.value<std::string>();
-                        if (!bytes.empty()) {
-                            ::api::SmartContractInvocation tmp = cs::Serializer::deserialize<::api::SmartContractInvocation>(std::move(bytes));
-                            if (cs::SmartContracts::is_deploy(t)) {
-                                if (tmp.__isset.smartContractDeploy) {
-                                    const auto& src = tmp.smartContractDeploy;
-                                    ::api_diag::ContractDeploy deploy;
-                                    deploy.__set_byteCodeObjects(src.byteCodeObjects);
-                                    deploy.__set_hashState(src.hashState);
-                                    deploy.__set_sourceCode(src.sourceCode);
-                                    deploy.__set_tokenStandard(src.tokenStandard);
-                                    fld_data.__set_deploy(deploy);
-                                }
-                                else {
-                                    // deploy, but not set properly
-                                    is_valid_data = false;
-                                }
-                            }
-                            else {
-                                // cs::SmartContracts::is_execute(t)
-                                ::api_diag::ContractCall invocation;
-                                invocation.__set_getter(tmp.forgetNewState);
-                                invocation.__set_method(tmp.method);
-                                invocation.__set_params(tmp.params);
-                                invocation.__set_version(tmp.version);
-                                invocation.__set_uses(tmp.usedContracts);
-                                fld_data.__set_call(invocation);
-                            }
+            // user fields & contracts
+            if (cs::SmartContracts::is_executable(t)) {
+                // cs::trx_uf::start::Methods == cs::trx_uf::deploy::Code
+                std::string bytes = t.user_field(cs::trx_uf::deploy::Code).value<std::string>();
+                if (!bytes.empty()) {
 
+                    ::api_diag::Contract contract;
+                    
+                    ::api::SmartContractInvocation tmp = cs::Serializer::deserialize<::api::SmartContractInvocation>(std::move(bytes));
+                    if (cs::SmartContracts::is_deploy(t)) {
+
+                        tt = TT_ContractDeploy;
+                        
+                        if (tmp.__isset.smartContractDeploy) {
+                            const auto& src = tmp.smartContractDeploy;
+                            ::api_diag::ContractDeploy deploy;
+                            deploy.__set_byteCodeObjects(src.byteCodeObjects);
+                            deploy.__set_sourceCode(src.sourceCode);
+                            deploy.__set_tokenStandard(src.tokenStandard);
+                            contract.__set_deploy(deploy);
+
+                            if (src.tokenStandard != NotAToken) {
+                                tt = TT_TokenDeploy;
+                            }
                         }
                         else {
-                            // string not set
-                            is_valid_data = false;
+                            // deploy, but not set properly
+                            tt = TT_Malformed;
                         }
                     }
                     else {
-                        // other, non-executable
+                        // cs::SmartContracts::is_execute(t)
+                        // 
+                        tt = TT_ContractCall;
+
+                        //TODO:  test token transfer
+                        
+                        ::api_diag::ContractCall invocation;
+                        invocation.__set_getter(tmp.forgetNewState);
+                        invocation.__set_method(tmp.method);
+                        invocation.__set_params(tmp.params);
+                        invocation.__set_uses(tmp.usedContracts);
+                        contract.__set_call(invocation);
+                    }
+
+                    data.__set_contract(contract);
+                }
+                else {
+                    // string not set
+                    tt = TT_Malformed;
+                }
+
+            }
+            else if (cs::SmartContracts::is_new_state(t)) {
+
+                tt = TT_ContractState;
+
+                ::api_diag::ContractState state;
+
+                using namespace cs::trx_uf::new_state;
+
+                csdb::UserField fld = t.user_field(Value);
+                if (fld.is_valid()) {
+                    state.__set_hashed(false);
+                    state.__set_content(fld.value<std::string>());
+                }
+
+                fld = t.user_field(Hash);
+                if (fld.is_valid()) {
+                    state.__set_hashed(true);
+                    state.__set_content(fld.value<std::string>());
+                }
+
+                fld = t.user_field(RetVal);
+                if (fld.is_valid()) {
+                    state.__set_returned(fld.value<std::string>());
+                }
+
+                fld = t.user_field(Fee);
+                if (fld.is_valid()) {
+                    csdb::Amount tmp = fld.value<csdb::Amount>();
+                    amount.__set_integral(tmp.integral());
+                    amount.__set_fraction(tmp.fraction());
+                    money.__set_amount(amount);
+                    money.__set_value(tmp.to_double());
+                    state.__set_fee(money);
+                }
+
+                fld = t.user_field(RefStart);
+                if (fld.is_valid()) {
+                    cs::SmartContractRef ref(fld);
+                    ::api_diag::TransactionId call;
+                    call.__set_sequence((int64_t)ref.sequence);
+                    call.__set_index((int16_t)ref.transaction);
+                    state.__set_call(call);
+                }
+
+                ::api_diag::Contract contract;
+                contract.__set_state(state);
+                data.__set_contract(contract);
+            }
+            else {
+
+                std::vector<api_diag::UserField> user_fields;
+
+                for (auto fid : t.user_field_ids()) {
+                    api_diag::UserField user_field;
+                    user_field.__set_id((int8_t)fid);
+                    const auto& fld = t.user_field(fid);
+                    if (fld.is_valid()) {
+                        bool is_valid_data = true;
+                        UserFielData fld_data;
+
                         switch (fld.type()) {
                         case csdb::UserField::Type::Amount:
-                        {
-                            const csdb::Amount v = fld.value<csdb::Amount>();
-                            amount.__set_integral(v.integral());
-                            amount.__set_fraction(v.fraction());
-                            fld_data.__set_amount(amount);
-                        }
-                        break;
+                            {
+                                const csdb::Amount v = fld.value<csdb::Amount>();
+                                amount.__set_integral(v.integral());
+                                amount.__set_fraction(v.fraction());
+                                fld_data.__set_amount(amount);
+                            }
+                            break;
                         case csdb::UserField::Type::Integer:
-                            fld_data.__set_integer(fld.value<int64_t>());
+                            {
+                                int64_t v = fld.value<int64_t>();
+                                fld_data.__set_integer(v);
+                                using namespace cs::trx_uf::sp;
+                                if (fid == delegated) {
+                                    if (v == dele::gate) {
+                                        tt = TT_Delegation;
+                                    }
+                                    else if (v == dele::gated_withdraw) {
+                                        tt = TT_RevokeDelegation;
+                                    }
+                                }
+                            }
                             break;
                         case csdb::UserField::Type::String:
                             fld_data.__set_bytes(fld.value<std::string>());
@@ -135,16 +216,29 @@ namespace api_diag {
                             is_valid_data = false;
                             break;
                         }
+                        
+                        if (is_valid_data) {
+                            user_field.__set_data(fld_data);
+                        }
+
                     }
-                    if (is_valid_data) {
-                        user_field.__set_data(fld_data);
-                    }
+
+                    user_fields.push_back(user_field);
                 }
-                user_fields.push_back(user_field);
+
+                if (!user_fields.empty()) {
+                    data.__set_userFields(user_fields);
+                }
+
             }
-            if (!user_fields.empty()) {
-                data.__set_userFields(user_fields);
+
+            // transaction type
+            if (tt == TT_Transfer) {
+                if (node_.getSolver()->smart_contracts().is_payable_call(t)) {
+                    tt = TT_ContractReplenish;
+                }
             }
+            data.__set_type(tt);
             _return.__set_transaction(data);
         }
         _return.__set_status(resp);
