@@ -109,10 +109,8 @@ private:
 #if defined(DIAG_API)
     DiagHandlerPtr diag_handler;
     ::apache::thrift::stdcxx::shared_ptr<::api_diag::API_DIAGProcessor> diag_processor;
-
     ::apache::thrift::server::TThreadedServer diag_server;
     std::thread diag_thread;
-    uint16_t diag_server_port;
 #endif // DIAG_API
 };
 }  // namespace csconnector

@@ -64,11 +64,10 @@ connector::connector(Node& node)
 #if defined(DIAG_API)
     , diag_handler(make_shared<api_diag::APIDiagHandler>(node))
     , diag_processor(make_shared<::api_diag::API_DIAGProcessor>(diag_handler))
-    , diag_server_port(9060)
     , diag_server(
         diag_processor,
         make_shared<TServerSocket>(
-            diag_server_port,
+            cs::ConfigHolder::instance().config()->getApiSettings().diagPort,
             cs::ConfigHolder::instance().config()->getApiSettings().serverSendTimeout,
             cs::ConfigHolder::instance().config()->getApiSettings().serverReceiveTimeout),
         make_shared<TBufferedTransportFactory>(),
@@ -113,7 +112,8 @@ void connector::run() {
         catch (...) {
             cserror() << "Public API server is stopped unexpectedly. All API services will be unavailable";
         }
-        });
+        cslog() << "Stop public API";
+    });
 #endif
 
 #ifdef AJAX_IFACE
@@ -126,11 +126,12 @@ void connector::run() {
         catch (...) {
             cserror() << "AJAX server is stopped unexpectedly. All AJAX services will be unavailable";
         }
-        });
+        cslog() << "Stop AJAX server";
+    });
 #endif
 
 #if defined(DIAG_API)
-    cslog() << "Starting diagnostic API on port " << diag_server_port;
+    cslog() << "Starting diagnostic API on port " << cs::ConfigHolder::instance().config()->getApiSettings().diagPort;
     diag_thread = std::thread([this]() {
         try {
             diag_server.run();
@@ -138,6 +139,7 @@ void connector::run() {
         catch (...) {
             cserror() << "Diagnostic API server is stopped unexpectedly. All diagnostic services will be unavailable";
         }
+        cslog() << "Stop diagnostic API";
     });
 #endif // DIAG_API
 

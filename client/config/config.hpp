@@ -73,6 +73,7 @@ struct ApiData {
     uint16_t ajaxPort = 8081;
     uint16_t executorPort = 9080;
     uint16_t apiexecPort = 9070;
+    uint16_t diagPort = 9060;
     int executorSendTimeout = 4000;
     int executorReceiveTimeout = 4000;
     int serverSendTimeout = 30000;
