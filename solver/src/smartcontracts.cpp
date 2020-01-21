@@ -186,6 +186,25 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
 , executor_ready(true)
 , max_read_sequence(0)
 {
+}
+
+SmartContracts::~SmartContracts() = default;
+
+/*public*/
+void SmartContracts::init(const cs::PublicKey& id, Node* node) {
+    cs::Lock lock(public_access_lock);
+
+    pnode = node;
+    auto connector_ptr = pnode->getConnector();
+    if (connector_ptr != nullptr) {
+        exec_handler_ptr = connector_ptr->apiExecHandler();
+    }
+    node_id = id;
+    force_execution = pnode->alwaysExecuteContracts();
+}
+
+/*public*/
+void SmartContracts::subscribeToSignals(Node* node) {
     // signals subscription (MUST occur AFTER the BlockChains has already subscribed to storage)
     // as event receiver:
     cs::Connector::connect(&bc.startReadingBlocksEvent(), this, &SmartContracts::on_start_reading_blocks);
@@ -200,23 +219,11 @@ SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& call
     cs::Connector::connect(&rollback_payable_invoke, &bc, &BlockChain::rollbackPayableContractReplenish);
     cs::Connector::connect(&rollback_contract_timeout, &bc, &BlockChain::rollbackContractTimeout);
     cs::Connector::connect(&rollback_emitted_accepted, &bc, &BlockChain::rollbackContractEmittedAccepted);
-}
 
-SmartContracts::~SmartContracts() = default;
-
-/*public*/
-void SmartContracts::init(const cs::PublicKey& id, Node* node) {
-    cs::Lock lock(public_access_lock);
-
-    cs::Connector::connect(&node->gotRejectedContracts, this, &SmartContracts::on_reject);
-
-    pnode = node;
-    auto connector_ptr = pnode->getConnector();
-    if (connector_ptr != nullptr) {
-        exec_handler_ptr = connector_ptr->apiExecHandler();
+    // Node's signal
+    if (node) {
+        cs::Connector::connect(&node->gotRejectedContracts, this, &SmartContracts::on_reject);
     }
-    node_id = id;
-    force_execution = pnode->alwaysExecuteContracts();
 }
 
 /*static*/
@@ -3088,7 +3095,7 @@ Reject::Reason SmartContracts::prevalidate_inner(const cs::TransactionsPacket& p
 }
 
 std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const BlockChain& storage, const std::vector<csdb::Transaction>& trxs) {
-    Packets res;
+    PacketsVector res;
     cs::TransactionsPacket pack;
     SmartContractRef currentRef;
     SmartContractRef newRef;
@@ -3130,7 +3137,7 @@ std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const Blo
                 else {
                     currentRef = newRef;
                     currentSource = abs_addr;
-                    pack.makeHash();
+                    //pack.makeHash();
                     res.push_back(pack);
                     pack = TransactionsPacket();
                     pack.addTransaction(it);
@@ -3145,7 +3152,7 @@ std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const Blo
         }
         else {
             if (pack.transactionsCount() > 0) {
-                pack.makeHash();
+                //pack.makeHash();
                 res.push_back(pack);
                 pack = TransactionsPacket();
             }
@@ -3156,7 +3163,7 @@ std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const Blo
     }
 
     if (pack.transactionsCount() > 0) {
-        pack.makeHash();
+        //pack.makeHash();
         res.push_back(pack);
     }
     return res;

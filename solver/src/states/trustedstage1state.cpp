@@ -45,7 +45,7 @@ void TrustedStage1State::on(SolverContext& context) {
             pctx->complete_stage1();
         }
         else {
-            csdebug() << name() << ": Something prevents from going on with Stage-1, perhaps later...";
+            csdebug() << name() << ": Something prevents from finishing Stage-1, perhaps later...";
         }
     });
 
@@ -241,7 +241,7 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
     return Result::Ignore;
 }
 
-cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::TransactionsPacket& packet, cs::Packets& smartsPackets) {
+cs::Hash TrustedStage1State::build_vector(SolverContext& context, cs::TransactionsPacket& packet, cs::PacketsVector& smartsPackets) {
     const std::size_t transactionsCount = packet.transactionsCount();
 
     cs::Characteristic characteristic;

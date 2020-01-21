@@ -156,7 +156,7 @@ const cs::PacketQueue& cs::ConveyerBase::packetQueue() const {
     return pimpl_->packetQueue;
 }
 
-std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::createPacket(cs::RoundNumber round) const {
+std::optional<std::pair<cs::TransactionsPacket, cs::PacketsVector>> cs::ConveyerBase::createPacket(cs::RoundNumber round) const {
     cs::Lock lock(sharedMutex_);
 
     static constexpr size_t smartContractDetector = 1;
@@ -168,7 +168,7 @@ std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::
     }
 
     cs::TransactionsPacket packet;
-    cs::Packets smartContractPackets;
+    cs::PacketsVector smartContractPackets;
 
     cs::PacketsHashes& hashes = meta->roundTable.hashes;
     cs::TransactionsPacketTable& table = pimpl_->packetsTable;
@@ -195,7 +195,7 @@ std::optional<std::pair<cs::TransactionsPacket, cs::Packets>> cs::ConveyerBase::
         }
     }
 
-    auto data = std::make_pair<cs::TransactionsPacket, cs::Packets>(std::move(packet), std::move(smartContractPackets));
+    auto data = std::make_pair<cs::TransactionsPacket, cs::PacketsVector>(std::move(packet), std::move(smartContractPackets));
     return std::make_optional<decltype(data)>(std::move(data));
 }
 
@@ -748,7 +748,7 @@ void cs::ConveyerBase::flushTransactions() {
 }
 
 void cs::ConveyerBase::onRoundChanged(cs::RoundNumber round) {
-    cs::Packets expiredPackets;
+    cs::PacketsVector expiredPackets;
 
     {
         cs::SharedLock lock(sharedMutex_);

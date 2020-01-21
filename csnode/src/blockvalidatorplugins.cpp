@@ -243,7 +243,7 @@ ValidationPlugin::ErrorType BlockSignaturesValidator::validateBlock(const csdb::
   return ErrorType::noError;
 }
 
-Packets  SmartSourceSignaturesValidator::switchCountedFee(const Packets& packs) {
+PacketsVector  SmartSourceSignaturesValidator::switchCountedFee(const PacketsVector& packs) {
     Packets result;
     for (auto& it : packs) {
         csdb::Transaction initTrx;
@@ -288,6 +288,16 @@ ValidationPlugin::ErrorType SmartSourceSignaturesValidator::validateBlock(const 
   auto smartPacks = switchCountedFees ?
       switchCountedFee(SmartContracts::grepNewStatesPacks(getBlockChain(), transactions)) :
       SmartContracts::grepNewStatesPacks(getBlockChain(), transactions);
+
+  if (smartPacks.size() != smartSignatures.size()) {
+      return ErrorType::error;
+  }
+  auto itSigns = smartSignatures.cbegin();
+    for (auto& it : smartPacks) {
+      it.setExpiredRound(itSigns->smartConsensusPool + Consensus::MaxRoundsCancelContract);
+      it.makeHash();
+      ++itSigns;
+    }
 
   if (!checkSignatures(smartSignatures, smartPacks)) {
     return ErrorType::error;

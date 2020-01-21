@@ -25,7 +25,7 @@ public:
     using Transactions = std::vector<csdb::Transaction>;
 
     IterValidator(WalletsState& wallets);
-    Characteristic formCharacteristic(SolverContext&, Transactions&, Packets& smartsPackets);
+    Characteristic formCharacteristic(SolverContext&, Transactions&, PacketsVector& smartsPackets);
     // transform characteristic from "array of reject reasons" to its canonical form of "0 or 1"
     void normalizeCharacteristic(Characteristic& inout) const;
     class SimpleValidator;
@@ -35,8 +35,8 @@ private:
 
     void checkRejectedSmarts(SolverContext&, Bytes& characteristicMask, const Transactions&);
 
-    void checkSignaturesSmartSource(SolverContext&, Packets& smartContractsPackets);
-    void checkTransactionsSignatures(SolverContext& context, const Transactions& transactions, Bytes& characteristicMask, Packets& smartsPackets);
+    void checkSignaturesSmartSource(SolverContext&, PacketsVector& smartContractsPackets);
+    void checkTransactionsSignatures(SolverContext& context, const Transactions& transactions, Bytes& characteristicMask, PacketsVector& smartsPackets);
     bool checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction);
 
 	Reject::Reason deployAdditionalCheck(SolverContext& context, size_t trxInd, const csdb::Transaction& transaction);

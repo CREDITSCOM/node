@@ -72,9 +72,10 @@ public:
     }
 
     uint8_t subRound();
+
     // Solver "public" interface,
     // below are the "required" methods to be implemented by Solver-compatibility issue:
-
+    void subscribeToSignals();
     void init(const cs::PublicKey& pub, const cs::PrivateKey& priv);
     void gotConveyerSync(cs::RoundNumber rNum);
     void gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize);
@@ -134,7 +135,7 @@ public:
     size_t trueStagesThree();
     uint8_t currentStage3iteration();
 
-    std::optional<cs::Characteristic> ownValidation(cs::TransactionsPacket& packet, cs::Packets& smartsPackets);
+    std::optional<cs::Characteristic> ownValidation(cs::TransactionsPacket& packet, cs::PacketsVector& smartsPackets);
 
     size_t stagesThree();
     bool stateFailed(Result res);

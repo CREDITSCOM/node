@@ -467,6 +467,10 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         }
     }
 
+    if (inverse) {
+        wallData.trxTail_.erase(tr.innerID());
+    }
+
 #ifdef MONITOR_NODE
     emit walletUpdateEvent(toPublicKey(wallAddress), wallData);
 #endif

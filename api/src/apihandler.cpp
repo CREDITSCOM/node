@@ -674,11 +674,13 @@ std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type, std::ost
 }
 
 std::optional<std::string> APIHandler::checkTransaction(const Transaction& transaction, csdb::Transaction& cTransaction) {
+    cTransaction = makeTransaction(transaction);
+
     if (transaction.__isset.smartContract && transaction.smartContract.forgetNewState) {
+        cTransaction.add_user_field(cs::trx_uf::deploy::Code, cs::Serializer::serialize(transaction.smartContract));
         return std::nullopt;
     }
 
-    cTransaction = makeTransaction(transaction);
     if (transaction.__isset.smartContract) {
         if (transaction.smartContract.__isset.smartContractDeploy) {
             // deploy info provided
@@ -1257,7 +1259,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
         csdb::TransactionID trId(scr.sequence, scr.transaction);
         const auto execTrans = solver_.smart_contracts().get_contract_call(trxn);
 
-        csdebug() << "[API]: state transaction found: " << trxn.id().pool_seq() << '.' << trxn.id().index()
+        csdetails() << "[API]: state transaction found: " << trxn.id().pool_seq() << '.' << trxn.id().index()
             << " <- " << execTrans.id().pool_seq() << '.' << execTrans.id().index();
 
         if ((execTrans.is_valid() && is_smart(execTrans)) ||
@@ -1282,7 +1284,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                 op.state = cs::SmartContracts::is_state_updated(trxn) ? SmartOperation::State::Success : SmartOperation::State::Failed;
                 op.stateTransaction = trxn.id();
 
-                csdebug() << "[API]: status of state " << trxn.id().pool_seq() << '.' << trxn.id().index() << " is " << static_cast<int>(op.state);
+                csdetails() << "[API]: status of state " << trxn.id().pool_seq() << '.' << trxn.id().index() << " is " << static_cast<int>(op.state);
 
                 auto sp = lockedReference(this->smarts_pending);// std::map<cs::Sequence, std::vector<csdb::TransactionID>>
                 auto seq = execTrans.id().pool_seq();
@@ -1346,7 +1348,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
                         res.id = trxn.id();
                         return res;
                     });
-                    csdebug() << "[API]: sended signal, state trx: " << trxn.id().pool_seq() << '.' << trxn.id().index()
+                    csdetails() << "[API]: sended signal, state trx: " << trxn.id().pool_seq() << '.' << trxn.id().index()
                         << ", hash: " << cs::Utils::byteStreamToHex(newHashStr.data(), newHashStr.size());
                 }
             }
@@ -1368,7 +1370,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
         }
     }
     else {
-        csdebug() << "[API]: deploy/execute found: " << trxn.id().pool_seq() << '.' << trxn.id().index();
+        csdetails() << "[API]: deploy/execute found: " << trxn.id().pool_seq() << '.' << trxn.id().index();
         {
             auto& e = [&]() -> decltype(auto) {
                 auto smartLastTrxn = lockedReference(this->smartLastTrxn_);

@@ -57,7 +57,7 @@ protected:
     size_t differentHashes;
     cs::ConfidantsKeys differKeys;
 
-    cs::Hash build_vector(SolverContext& context, TransactionsPacket& trans_pack, cs::Packets& smartsPackets);
+    cs::Hash build_vector(SolverContext& context, TransactionsPacket& trans_pack, cs::PacketsVector& smartsPackets);
     cs::Hash formHashFromCharacteristic(const cs::Characteristic& characteristic);
 
     std::unique_ptr<IterValidator> pValidator_;
