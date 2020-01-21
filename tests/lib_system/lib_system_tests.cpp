@@ -30,10 +30,10 @@
 
 void CreateRegionAllocatorAndThenAllocateInIt([[maybe_unused]] const uint32_t pageSize, [[maybe_unused]] const uint32_t initialNumberOfPages,
                                               const uint32_t numberOfAdditionalAllocations, const uint32_t additionalAllocationSize, uint32_t& finalNumberOfPages) {
-    static_assert(std::is_destructible_v<RegionAllocator>, "RegionAllocator is not default constructible");
+    static_assert(std::is_destructible_v<cs::RegionAllocator>, "RegionAllocator is not default constructible");
 
-    RegionAllocator allocator;
-    std::vector<RegionPtr> pointers;
+    cs::RegionAllocator allocator;
+    std::vector<cs::RegionPtr> pointers;
 
     for (uint32_t i = 0; i < numberOfAdditionalAllocations; ++i) {
         pointers.push_back(allocator.allocateNext(additionalAllocationSize));
@@ -63,14 +63,14 @@ constexpr int32_t AlignNumberTo64(const int32_t number) {
 }
 
 TEST(RegionAllocator, NoAdditionalPageIsAddedIfInitialPagesAreEnough) {
-    constexpr uint32_t kAllocationSize = 4, kPageSize = AlignNumberTo64(sizeof(Region) + kAllocationSize) * 10, kInitialNumberOfPages = 2, kNumberOfAllocations = 20;
+    constexpr uint32_t kAllocationSize = 4, kPageSize = AlignNumberTo64(sizeof(cs::Region) + kAllocationSize) * 10, kInitialNumberOfPages = 2, kNumberOfAllocations = 20;
     uint32_t finalNumberOfPages;
     CreateRegionAllocatorAndThenAllocateInIt(kPageSize, kInitialNumberOfPages, kNumberOfAllocations, kAllocationSize, finalNumberOfPages);
     ASSERT_EQ(finalNumberOfPages, kInitialNumberOfPages);
 }
 
 TEST(RegionAllocator, CorrectNumberOfPagesAllocated) {
-    constexpr uint32_t kAllocationSize = 4, kPageSize = AlignNumberTo64(sizeof(Region) + kAllocationSize) * 10, kInitialNumberOfPages = 2, kNumberOfAllocations = 50;
+    constexpr uint32_t kAllocationSize = 4, kPageSize = AlignNumberTo64(sizeof(cs::Region) + kAllocationSize) * 10, kInitialNumberOfPages = 2, kNumberOfAllocations = 50;
 
     uint32_t finalNumberOfPages;
 
@@ -82,7 +82,7 @@ TEST(RegionAllocator, CorrectNumberOfPagesAllocated) {
 }
 
 TEST(RegionAllocator, AllocateAndFreeUnusedObject) {
-    MockAllocator allocator;
+    cs::MockAllocator allocator;
     uint32_t allocations = 100;
 
     for (uint32_t i = 0; i < allocations; ++i) {
@@ -96,10 +96,10 @@ TEST(RegionAllocator, AllocateAndFreeUnusedObject) {
 }
 
 TEST(RegionAllocator, alloc_with_resizes) {
-    [[maybe_unused]] constexpr uint32_t kPageSize = AlignNumberTo64(sizeof(Region) + 1) * 101;
+    [[maybe_unused]] constexpr uint32_t kPageSize = AlignNumberTo64(sizeof(cs::Region) + 1) * 101;
 
-    MockAllocator allocator;
-    std::vector<RegionPtr> regs;
+    cs::MockAllocator allocator;
+    std::vector<cs::RegionPtr> regs;
     uint32_t allocations = 100;
 
     for (uint32_t i = 0; i < allocations; ++i) {
@@ -113,11 +113,11 @@ TEST(RegionAllocator, alloc_with_resizes) {
 }
 
 TEST(RegionAllocator, multithreaded_stress) {
-    RegionAllocator a;
+    cs::RegionAllocator a;
     uint64_t total = 0;
 
     std::mutex mutex;
-    std::list<RegionPtr> regs;
+    std::list<cs::RegionPtr> regs;
     uint64_t lTot = 0;
 
     std::thread wr([&]() {
@@ -136,12 +136,12 @@ TEST(RegionAllocator, multithreaded_stress) {
     });
 
     auto rrout = [&]() {
-        std::vector<RegionPtr> inCase;
+        std::vector<cs::RegionPtr> inCase;
         uint64_t t = 0;
 
         for (uint32_t i = 0; i < 250000; ++i) {
             for (;;) {
-                RegionPtr p;
+                cs::RegionPtr p;
 
                 {
                     std::lock_guard<std::mutex> lock(mutex);
@@ -309,9 +309,9 @@ TEST(boost_spsc_queue, DISABLED_multithreaded_stress) {
 
 // TODO: Enable test and fix crush on linux
 TEST(typed_allocator, DISABLED_one_page) {
-    TypedAllocator<uint32_t> allocator(100);
+    cs::TypedAllocator<uint32_t> allocator(100);
 
-    std::array<MemPtr<TypedSlot<uint32_t>>, 100> uis = {};
+    std::array<cs::MemPtr<cs::TypedSlot<uint32_t>>, 100> uis = {};
 
     for (uint32_t i = 0; i < 100; ++i) {
         uis[i] = allocator.emplace(i);
@@ -322,14 +322,14 @@ TEST(typed_allocator, DISABLED_one_page) {
     }
 
     for (uint32_t i = 0; i < 100; ++i) {
-        uis[i] = MemPtr<TypedSlot<uint32_t>>();
+        uis[i] = cs::MemPtr<cs::TypedSlot<uint32_t>>();
     }
 }
 
 TEST(typed_allocator, multiple_pages) {
-    TypedAllocator<uint32_t> allocator(100);
+    cs::TypedAllocator<uint32_t> allocator(100);
 
-    std::array<MemPtr<TypedSlot<uint32_t>>, 1000> uis;
+    std::array<cs::MemPtr<cs::TypedSlot<uint32_t>>, 1000> uis;
 
     for (uint32_t i = 0; i < 1000; ++i) {
         uis[i] = allocator.emplace(i);
@@ -340,12 +340,12 @@ TEST(typed_allocator, multiple_pages) {
     }
 
     for (uint32_t i = 0; i < 1000; ++i) {
-        uis[i] = MemPtr<TypedSlot<uint32_t>>();
+        uis[i] = cs::MemPtr<cs::TypedSlot<uint32_t>>();
     }
 }
 
 TEST(typed_allocator, reput) {
-    TypedAllocator<uint32_t> allocator(1);
+    cs::TypedAllocator<uint32_t> allocator(1);
 
     auto first = *allocator.emplace(42);
 
@@ -355,15 +355,15 @@ TEST(typed_allocator, reput) {
 }
 
 TEST(typed_allocator, inconsistent) {
-    TypedAllocator<uint32_t> allocator(100);
+    cs::TypedAllocator<uint32_t> allocator(100);
 
-    std::array<MemPtr<TypedSlot<uint32_t>>, 1000> uis;
+    std::array<cs::MemPtr<cs::TypedSlot<uint32_t>>, 1000> uis;
 
     for (uint32_t i = 0; i < 1000; ++i) {
         uis[i] = allocator.emplace(i);
 
         if (i % 7 == 0) {
-            uis[i] = MemPtr<TypedSlot<uint32_t>>();
+            uis[i] = cs::MemPtr<cs::TypedSlot<uint32_t>>();
         }
     }
 

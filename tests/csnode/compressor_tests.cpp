@@ -76,7 +76,7 @@ TEST(SynchronizedCompressor, BaseSynchronizedCompressorUsage) {
 
     for (size_t i = 0; i < threadsCount; ++i) {
         std::thread thread([&] {
-            CompressedRegion region;
+            cs::CompressedRegion region;
             std::vector<size_t> raw;
 
             {

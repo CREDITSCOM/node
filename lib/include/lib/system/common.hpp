@@ -33,6 +33,12 @@ using BytesView = cscrypto::BytesView;
 template <std::size_t size>
 using ByteArray = cscrypto::ByteArray<size>;
 
+#ifdef __cpp_lib_memory_resource
+using PmrBytes = std::pmr::vector<cs::Byte>;
+#else
+using PmrBytes = cs::Bytes;
+#endif
+
 // common data structures
 using PublicKey = cscrypto::PublicKey;
 using Signature = cscrypto::Signature;

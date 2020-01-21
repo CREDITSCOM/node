@@ -1302,7 +1302,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
     cs::IDataStream stream(data, size);
 
-    CompressedRegion region;
+    cs::CompressedRegion region;
     stream >> region;
 
     cs::PoolsBlock poolsBlock = compressor_.decompress<cs::PoolsBlock>(region);

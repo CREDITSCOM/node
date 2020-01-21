@@ -11,6 +11,7 @@
 
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
+
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
@@ -367,8 +368,6 @@ private:
 #ifdef NODE_API
     std::unique_ptr<csconnector::connector> api_;
 #endif
-
-    RegionAllocator allocator_;
 
     uint32_t startPacketRequestPoint_ = 0;
 

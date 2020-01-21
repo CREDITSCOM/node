@@ -13,6 +13,11 @@
 #include "logger.hpp"
 #include "utils.hpp"
 
+#ifdef __cpp_lib_memory_resource
+#include <memory_resource>
+#endif
+
+namespace cs {
 /* Now, RegionAllocator provides a basic allocation strategy, where we
    malloc() several memory pages of predefined size and a page can be
    reused if and only if all of its memory has been unuse()d.
@@ -405,5 +410,23 @@ inline void TypedSlot<T>::unuse() {
         allocator_->remove(this);
     }
 }
+
+// size - default bytes buffer size
+template<size_t size>
+class PmrAllocator {
+#ifdef __cpp_lib_memory_resource
+public:
+    PmrAllocator():resource_(std::begin(buffer_), std::size(buffer_), std::pmr::new_delete_resource()) {}
+
+    std::pmr::monotonic_buffer_resource& resource() const {
+        return resource_;
+    }
+
+private:
+    cs::Byte buffer_[size];
+    std::pmr::monotonic_buffer_resource resource_;
+#endif
+};
+}   // namespace cs
 
 #endif  // ALLOCATORS_HPP
