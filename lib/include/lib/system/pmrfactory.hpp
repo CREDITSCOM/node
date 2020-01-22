@@ -11,10 +11,11 @@ public:
     template<size_t size>
     static cs::PmrBytes bytes(const cs::PmrAllocator<size>& allocator) {
 #ifdef __cpp_lib_memory_resource
-        return cs::PmrBytes(allocator.resource());
+        using Allocator = cs::PmrBytes::allocator_type;
+        return cs::PmrBytes(Allocator(allocator.resource()));
 #else
         csunused(allocator);
-        return cs::Bytes{};
+        return cs::PmrBytes{};
 #endif
     }
 };

@@ -418,13 +418,13 @@ class PmrAllocator {
 public:
     PmrAllocator():resource_(std::begin(buffer_), std::size(buffer_), std::pmr::new_delete_resource()) {}
 
-    std::pmr::monotonic_buffer_resource& resource() const {
-        return resource_;
+    std::pmr::monotonic_buffer_resource* resource() const {
+        return &resource_;
     }
 
 private:
     cs::Byte buffer_[size];
-    std::pmr::monotonic_buffer_resource resource_;
+    mutable std::pmr::monotonic_buffer_resource resource_;
 #endif
 };
 }   // namespace cs

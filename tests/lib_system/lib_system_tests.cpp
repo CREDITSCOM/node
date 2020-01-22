@@ -15,6 +15,7 @@
 #include <lib/system/structures.hpp>
 #include <lib/system/lockfreechanger.hpp>
 #include <lib/system/console.hpp>
+#include <lib/system/pmrfactory.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(push, 0)
@@ -734,4 +735,17 @@ TEST(LockFreeChanger, BaseUsageSimple) {
 
     writer.join();
     reader.join();
+}
+
+TEST(PmrBytes, BaseUsage) {
+    cs::PmrAllocator<sizeof(size_t) * 100> allocator;
+    auto bytes = cs::PmrFactory::bytes(allocator);
+
+    bytes.push_back(0xFF);
+    bytes.push_back(0xAA);
+    bytes.push_back(0xBB);
+    bytes.push_back(0xEE);
+
+    cs::Bytes expectedBytes = { 0xFF, 0xAA, 0xBB, 0xEE };
+    ASSERT_TRUE(std::equal(std::begin(bytes), std::end(bytes), std::begin(expectedBytes)));
 }
