@@ -554,6 +554,13 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
     }
     // pool signatures check: end
 
+    if (pool.transactions_count() > 0) {
+        const auto block_time = pool.get_time();
+        for (auto& t : pool.transactions()) {
+            t.set_time(block_time);
+        }
+    }
+
     trxIndex_->update(pool);
     updateNonEmptyBlocks(pool);
 
