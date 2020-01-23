@@ -13,8 +13,8 @@ public:
 
 public:
     BitHeap()
-    : greatest_(std::numeric_limits<T>::max())
-    , isValueSet_(false) {
+        : greatest_(std::numeric_limits<T>::max())
+        , isValueSet_(false) {
     }
 
     void push(T val) {
@@ -91,6 +91,10 @@ public:
             return 0;
         else
             return 1 + bits_.count();
+    }
+
+    T getGreatest() {
+        return greatest_;
     }
 
 private:

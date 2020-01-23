@@ -276,10 +276,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     result.trxn.source = fromByteArray(address.public_key());
     result.trxn.target = fromByteArray(target.public_key());
     result.trxn.fee.commission = int16_t(transaction.counted_fee().get_raw());
-
     result.trxn.timeCreation = static_cast<int64_t>(transaction.get_time());
-
-    result.trxn.poolNumber = static_cast<int64_t>(executor_.loadBlockApi(transaction.id().pool_seq()).sequence());
+    result.trxn.poolNumber = static_cast<int64_t>(transaction.id().pool_seq());
 
     if (is_smart(transaction)) {
         using namespace cs::trx_uf;
@@ -674,11 +672,13 @@ std::enable_if<std::is_convertible<T*, ::apache::thrift::TBase*>::type, std::ost
 }
 
 std::optional<std::string> APIHandler::checkTransaction(const Transaction& transaction, csdb::Transaction& cTransaction) {
+    cTransaction = makeTransaction(transaction);
+
     if (transaction.__isset.smartContract && transaction.smartContract.forgetNewState) {
+        cTransaction.add_user_field(cs::trx_uf::deploy::Code, cs::Serializer::serialize(transaction.smartContract));
         return std::nullopt;
     }
 
-    cTransaction = makeTransaction(transaction);
     if (transaction.__isset.smartContract) {
         if (transaction.smartContract.__isset.smartContractDeploy) {
             // deploy info provided

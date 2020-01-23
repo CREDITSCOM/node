@@ -11,6 +11,21 @@
 // it may be network command type or node type messages
 
 namespace cs {
+
+namespace {
+std::string bcStr("81p93jgrHqA9L4Vkdut9ESSCV1XNoge7LXBW96cuA7sm");
+
+struct BlockChainKey {
+  BlockChainKey() {
+      cs::Bytes keyBytes;
+      DecodeBase58(bcStr, keyBytes);
+      std::copy(keyBytes.begin(), keyBytes.end(), key_.begin());
+  }
+
+  cs::PublicKey key_{};
+};
+} // namespace
+
 constexpr static cs::RoundNumber packetTypeRoundTimeout(const MsgTypes type) {
     switch (type) {
         case MsgTypes::FirstSmartStage:
@@ -38,6 +53,11 @@ bool PacketValidator::validate(const Packet& packet) {
     }
 
     return validateNodePacket(packet);
+}
+
+const cs::PublicKey& PacketValidator::getBlockChainKey() {
+    static BlockChainKey bcKey;
+    return bcKey.key_;
 }
 
 bool PacketValidator::validateNetworkPacket(const Packet&) {

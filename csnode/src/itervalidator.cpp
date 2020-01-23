@@ -7,6 +7,7 @@
 #include <csnode/walletsstate.hpp>
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
+#include <net/packetvalidator.hpp>
 
 namespace {
 const char* kLogPrefix = "Validator: ";
@@ -209,7 +210,19 @@ bool IterValidator::checkTransactionSignature(SolverContext& context, const csdb
     if (!SmartContracts::is_new_state(transaction) && !smartSourceTransaction) {
         if (src.is_wallet_id()) {
             auto pub = context.blockchain().getAddressByType(src, BlockChain::AddressType::PublicKey);
+            if (context.blockchain().isSpecial(transaction)) {
+                const auto& starter_key = cs::PacketValidator::getBlockChainKey();
+                if (pub.public_key() != starter_key) {
+                    return false;
+                }
+            }
             return transaction.verify_signature(pub.public_key());
+        }
+        if (context.blockchain().isSpecial(transaction)) {
+            const auto& starter_key = cs::PacketValidator::getBlockChainKey();
+            if (src.public_key() != starter_key) {
+                return false;
+            }
         }
         return transaction.verify_signature(src.public_key());
     }
@@ -257,12 +270,12 @@ void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packe
             //csdebug() << kLogPrefix << "Pack expired round = " << smartContractPacket.expiredRound();
             const auto& confidants = poolWithInitTr.confidants();
             const auto& signatures = smartContractPacket.signatures();
+            const cs::Byte* signedHash = smartContractPacket.hash().toBinary().data();
             size_t correctSignaturesCounter = 0;
             std::string invalidSignatures;
             for (const auto& signature : signatures) {
                 if (signature.first < confidants.size()) {
                     const auto& confidantPublicKey = confidants[signature.first];
-                    const cs::Byte* signedHash = smartContractPacket.hash().toBinary().data();
                     //csdebug() << "Hash (" << static_cast<int>(signature.first) << "): " << cs::Utils::byteStreamToHex(signedHash, cscrypto::kHashSize) << " - " << smartContractPacket.hash().toString();
                     if (cscrypto::verifySignature(signature.second, confidantPublicKey, signedHash, cscrypto::kHashSize)) {
                         ++correctSignaturesCounter;
@@ -273,7 +286,7 @@ void IterValidator::checkSignaturesSmartSource(SolverContext& context, cs::Packe
                 }
             }
             if (correctSignaturesCounter < confidants.size() / 2U + 1U) {
-                csdebug() << kLogPrefix << "is not enough valid signatures, bad ones: " << invalidSignatures;
+                csdebug() << kLogPrefix << "is not enough valid signatures, bad ones: " << invalidSignatures << " packet hash: " << smartContractPacket.hash().toString();
                 smartSourceInvalidSignatures_.insert(transaction.source());
             }
         }
@@ -341,7 +354,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
         }
         auto flagg = fld.value<uint64_t>();
         switch(flagg) {
-            case trx_uf::sp::dele::gate:
+        case trx_uf::sp::de::legate:
                 
                 if (!rc) {
                     if (bc.findWalletData(t.target(), tWallet)) {
@@ -351,7 +364,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
                     }
                 }
                 break;
-            case trx_uf::sp::dele::gated_withdraw:
+        case trx_uf::sp::de::legated_withdraw:
                 if (!rc) {
                     if (bc.findWalletData(t.target(), tWallet)) {
                         auto tKey = bc.getCacheUpdater().toPublicKey(t.target());

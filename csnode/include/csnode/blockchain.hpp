@@ -144,6 +144,8 @@ public:
     bool updateLastBlock(cs::RoundPackage& rPackage);
     bool updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom);
     bool deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool);
+    bool isSpecial(const csdb::Transaction& t);
+    cs::Bytes checkForSpecialTransactions(const std::vector<csdb::Transaction>& trxs, cs::Sequence seq);
     cs::Sequence getLastSeq() const;
 
     static inline const csdb::user_field_id_t kFieldTimestamp = 0;
@@ -326,7 +328,7 @@ private:
 
     void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
 
-    bool updateFromNextBlock(csdb::Pool& pool);
+    bool updateFromNextBlock(const csdb::Pool& pool);
 
     // returns true if new id was inserted
     bool getWalletId(const WalletAddress& address, WalletId& id);

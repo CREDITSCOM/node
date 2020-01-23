@@ -3,6 +3,7 @@ build64/
 build_dbg/
 .dir-locals.el
 /.vs
+out/
 /.vscode
 /local
 /CMakeSettings.json
@@ -13,5 +14,3 @@ js-client/js/*
 /CMakeLists.txt.user.4.10-pre1
 /p2p
 /build_debug
-
-

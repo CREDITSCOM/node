@@ -234,13 +234,13 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
         WalletsState::WalletData& wallTargetState = walletsState_.getData(trx.target());
         auto tKey = trx.target().is_public_key() ? trx.target().public_key() : context.blockchain().getCacheUpdater().toPublicKey(trx.target());
         auto it = wallState.delegats_.find(tKey);
-        if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gate) {
+        if (delegateField.value<uint64_t>() == trx_uf::sp::de::legate) {
             if (wallTargetState.delegated_ > csdb::Amount{ 0 }) {
                 csdetails() << kLogPrefix << "Can't delegate to the account that was already delegated";
                 return Reject::Reason::AlreadyDelegated;
             }
         }
-        else if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gated_withdraw) {
+        else if (delegateField.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
             if (it == wallState.delegats_.end()) {
                 csdetails() << kLogPrefix << "No such delegate in account state";
                 return Reject::Reason::IncorrectTarget;

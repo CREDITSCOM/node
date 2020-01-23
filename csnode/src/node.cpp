@@ -82,7 +82,8 @@ Node::Node(cs::config::Observer& observer)
     }
 
     // it should work prior WalletsIds & WalletsCache on reading DB
-    cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::deepBlockValidation);
+    // to prevent slow BCh reading skip deep validation of already validated blocks
+    //cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::deepBlockValidation);
     // let blockChain_ to subscribe on signals, WalletsIds & WalletsCache are there
     blockChain_.subscribeToSignals();
     // solver MUST subscribe to signals after the BlockChain
@@ -103,6 +104,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
     cs::Connector::connect(&blockChain_.alarmBadBlock, this, &Node::sendBlockAlarmSignal);
     cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
+    cs::Connector::connect(&blockChain_.storeBlockEvent, this, &Node::processSpecialInfo);
 
     initPoolSynchronizer();
     setupNextMessageBehaviour();
@@ -124,15 +126,6 @@ Node::~Node() {
 bool Node::init() {
     auto& initConfidants = cs::ConfigHolder::instance().config()->getInitialConfidants();
     initialConfidants_ = decltype(initialConfidants_)(initConfidants.begin(), initConfidants.end());
-
-    if (initialConfidants_.find(solver_->getPublicKey()) != initialConfidants_.end()) {
-        transport_->setPermanentNeighbours(initConfidants);
-    }
-
-    if (initialConfidants_.size() < Consensus::MinTrustedNodes) {
-        cserror() << "Not enough initial confidants, min " << Consensus::MinTrustedNodes;
-        return false;
-    }
 
 #ifdef NODE_API
     std::cout << "Init API... ";
@@ -161,6 +154,15 @@ bool Node::init() {
     }
 
     if (!blockChain_.init(cs::ConfigHolder::instance().config()->getPathToDB())) {
+        return false;
+    }
+
+    if (initialConfidants_.find(solver_->getPublicKey()) != initialConfidants_.end()) {
+        transport_->setPermanentNeighbours(initConfidants);
+    }
+
+    if (initialConfidants_.size() < Consensus::MinTrustedNodes) {
+        cserror() << "Not enough initial confidants, min " << Consensus::MinTrustedNodes;
         return false;
     }
 
@@ -869,10 +871,10 @@ void Node::sendBlockAlarmSignal(cs::Sequence seq) {
 }
 
 void Node::sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq) {
-    cs::Bytes message;
-    cs::ODataStream stream(message);
-    stream << seq;
-    cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
+    //cs::Bytes message;
+    //cs::DataStream stream(message);
+    //stream << seq;
+    //cs::Signature sig = cscrypto::generateSignature(solver_->getPrivateKey(), message.data(), message.size());
     //sendToBroadcast(MsgTypes::BlockAlarm, seq, sig);
     //csmeta(csdebug) << "Alarm of block #" << seq << " was successfully sent to all";
     // send event report
@@ -3370,7 +3372,37 @@ void Node::onStopRequested() {
     }
 }
 
-void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
+
+void Node::processSpecialInfo(const csdb::Pool& pool) {
+    for (auto it : pool.transactions()) {
+        if (getBlockChain().isSpecial(it)) {
+            auto stringBytes = it.user_field(cs::trx_uf::sp::managing).value<std::string>();
+            std::vector<cs::Byte> msg(stringBytes.begin(), stringBytes.end());
+            cs::IDataStream stream(msg.data(), msg.size());
+            uint16_t order;
+            stream >> order;
+            if (order == 2U) {
+                uint8_t cnt;
+                stream >> cnt;
+                if (size_t(cnt) < Consensus::MinTrustedNodes) {
+                  continue;
+                }
+                csdebug() << "New bootstrap nodes: ";
+                initialConfidants_.clear();
+                for (uint8_t i = 0; i < cnt; ++i) {
+                    cs::PublicKey key;
+                    stream >> key;
+                    initialConfidants_.insert(key);
+                    csdebug() << static_cast<int>(i) << ". " << cs::Utils::byteStreamToHex(key);
+                }
+
+            }
+        }
+    }
+
+}
+
+void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
     if (stopRequested_) {
         *shouldStop = true;
         return;
@@ -3383,6 +3415,7 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
         *shouldStop = true;
         return;
     }
+    processSpecialInfo(block);
 }
 
 void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_failed should be FALSE of the block is ok 
@@ -3399,13 +3432,20 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     size_t smartTrxCounter = 0;
     
     constexpr const uint64_t uuidTestNet = 5283967947175248524;
-    constexpr const bool collectRejectedInfo = false;
+    constexpr const uint64_t uuidMainNet = 11024959585341937636;
+    /*constexpr*/ const bool collectRejectedInfo = cs::ConfigHolder::instance().config()->isCompatibleVersion();
     const char* kLogPrefix = (collectRejectedInfo ? "NODE> skip block validation: " : "NODE> stop block validation: ");
 
-    if (block.sequence() <= 5504545) {
-        if (getBlockChain().uuid() == uuidTestNet) {
-            csdebug() << kLogPrefix << WithDelimiters(block.sequence()) << " is in special range in Testnet";
+    if (block.sequence() <= 27020000) {
+        if (getBlockChain().uuid() == uuidMainNet) {
+            // valid blocks
             return;
+        }
+        if (block.sequence() <= 5504545) {
+            if (getBlockChain().uuid() == uuidTestNet) {
+                // valid blocks
+                return;
+            }
         }
     }
 

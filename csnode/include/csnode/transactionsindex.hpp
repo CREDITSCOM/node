@@ -53,7 +53,7 @@ private:
     BlockChain& bc_;
     const std::string rootPath_;
     std::unique_ptr<Lmdb> db_;
-    Sequence lastIndexedPool_;
+    Sequence lastIndexedPool_ = 0;
     bool recreate_;
     MMappedFileWrap<FileSink> lastIndexedFile_;
 

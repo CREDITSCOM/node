@@ -146,8 +146,16 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
             cserror() << kLogPrefix << "blockHashes_->onReadBlock(block) failed on block #" << block.sequence();
             *shouldStop = true;
         }
-        updateNonEmptyBlocks(block);
-        walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
+        else {
+            if (block.transactions_count() > 0) {
+                const auto block_time = block.get_time();
+                for (auto& t : block.transactions()) {
+                    t.set_time(block_time);
+                }
+            }
+            updateNonEmptyBlocks(block);
+            walletsCacheUpdater_->loadNextBlock(block, block.confidants(), *this);
+        }
     }
 }
 
@@ -333,6 +341,10 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
     return transaction;
 }
 
+// - remove the last block from the top of blockchain
+// - remove pair (hash, sequence) from cache (blockHashes_)
+// - decrement the last sequence by 1
+// - undo all transactions / new wallets
 void BlockChain::removeLastBlock() {
     if (blocksToBeRemoved_ == 0) {
         csmeta(csdebug) << kLogPrefix << "There are no blocks, allowed to be removed";
@@ -341,7 +353,7 @@ void BlockChain::removeLastBlock() {
     //--blocksToBeRemoved_;
 	cs::Sequence remove_seq = lastSequence_;
 	csdb::PoolHash remove_hash = blockHashes_->find(remove_seq);
-	csmeta(csdebug) << remove_seq;
+    csmeta(csdebug) << remove_seq;
     csdb::Pool pool{};
 
     {
@@ -374,18 +386,18 @@ void BlockChain::removeLastBlock() {
 
 		cswarning() << kLogPrefix << "Wallets balances maybe invalidated, storage rescan required";
     }
-	else {
-		// just removed pool is valid
-		
-		if (!(remove_hash == pool.hash())) {
-			cswarning() << kLogPrefix << "Hashes cache is corrupted, storage rescan is required";
-			remove_hash = pool.hash();
-		}
+    else {
+        // just removed pool is valid
 
-		if (pool.sequence() == 0) {
-			csmeta(cswarning) << kLogPrefix << "Attempt to remove Genesis block !!!!!";
-			return;
-		}
+        if (!(remove_hash == pool.hash())) {
+            cswarning() << kLogPrefix << "Hashes cache is corrupted, storage rescan is required";
+            remove_hash = pool.hash();
+        }
+
+        if (pool.sequence() == 0) {
+            csmeta(cswarning) << kLogPrefix << "Attempt to remove Genesis block !!!!!";
+            return;
+        }
 
 		// such operations are only possible on valid pool:
         totalTransactionsCount_ -= pool.transactions().size();
@@ -399,7 +411,7 @@ void BlockChain::removeLastBlock() {
             lastNonEmptyBlock_ = previousNonEmpty_[lastNonEmptyBlock_.poolSeq];
             previousNonEmpty_.erase(pool.sequence());
         }
-	}
+    }
 
     // to be sure, try to remove both sequence and hash
     if (!blockHashes_->remove(remove_seq)) {
@@ -544,6 +556,13 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
         csmeta(csdebug) << kLogPrefix << "Genesis block will be written without signatures verification";
     }
     // pool signatures check: end
+
+    if (pool.transactions_count() > 0) {
+        const auto block_time = pool.get_time();
+        for (auto& t : pool.transactions()) {
+            t.set_time(block_time);
+        }
+    }
 
     trxIndex_->update(pool);
     updateNonEmptyBlocks(pool);
@@ -764,7 +783,7 @@ void BlockChain::createCachesPath() {
     }
 }
 
-bool BlockChain::updateFromNextBlock(csdb::Pool& nextPool) {
+bool BlockChain::updateFromNextBlock(const csdb::Pool& nextPool) {
     if (!walletsCacheUpdater_) {
         cserror() << "!walletsCacheUpdater";
         return false;
@@ -1173,6 +1192,13 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
     return true;
 }
 
+bool BlockChain::isSpecial(const csdb::Transaction& t) {
+    if (t.user_field(cs::trx_uf::sp::managing).is_valid()) {
+        return true;
+    }
+}
+
+
 bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     const auto lastSequence = getLastSeq();
     const auto poolSequence = pool.sequence();
@@ -1220,7 +1246,6 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             removeLastBlock();
             return false;
         }
-
 
         setTransactionsFees(pool);
 
