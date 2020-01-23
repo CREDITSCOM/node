@@ -466,8 +466,19 @@ void Neighbourhood::addSignalServer(const ip::udp::endpoint& in, const ip::udp::
     cs::ScopedLock scopeLock(mLockFlag_, nLockFlag_);
 
     if ((*node)->connection.load(std::memory_order_relaxed)) {
-        cserror() << "Connection with the SS node has already been established";
-        return;
+        bool ss_actual = false;
+        for (const ConnectionPtr& connection : neighbours_) {
+            if (connection && connection->isSignal && connection->connected) {
+                ss_actual = true;
+            }
+        }
+        if (ss_actual) {
+            cserror() << "Connection to start node has already been established";
+            return;
+        }
+        else {
+            csdebug() << "Update connection to start node";
+        }
     }
 
     ConnectionPtr conn = getConnection(out);

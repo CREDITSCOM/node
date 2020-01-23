@@ -1218,7 +1218,7 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
         return false;
     }
     
-    cslog() << "Connection to the start node has been established";
+    cslog() << "Connection to start node has been established";
     neighbourhood_.addSignalServer(task->sender, ssEp_, rNode);
 
     constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
