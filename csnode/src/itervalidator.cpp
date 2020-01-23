@@ -210,11 +210,19 @@ bool IterValidator::checkTransactionSignature(SolverContext& context, const csdb
     if (!SmartContracts::is_new_state(transaction) && !smartSourceTransaction) {
         if (src.is_wallet_id()) {
             auto pub = context.blockchain().getAddressByType(src, BlockChain::AddressType::PublicKey);
-            const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
-            if (context.blockchain().isSpecial(transaction) && pub.public_key() != starter_key) {
-                return false;
+            if (context.blockchain().isSpecial(transaction)) {
+                const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
+                if (pub.public_key() != starter_key) {
+                    return false;
+                }
             }
             return transaction.verify_signature(pub.public_key());
+        }
+        if (context.blockchain().isSpecial(transaction)) {
+            const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
+            if (src.public_key() != starter_key) {
+                return false;
+            }
         }
         return transaction.verify_signature(src.public_key());
     }
