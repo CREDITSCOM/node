@@ -86,7 +86,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.alarmBadBlock, this, &Node::sendBlockAlarmSignal);
     cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
-    cs::Connector::connect(&blockChain_.specialInfo, this, &Node::processSpecialInfo);
+    cs::Connector::connect(&blockChain_.storeBlockEvent, this, &Node::processSpecialInfo);
 
     setupNextMessageBehaviour();
 
@@ -3714,20 +3714,32 @@ void Node::onStopRequested() {
 }
 
 
-void Node::processSpecialInfo(const cs::Bytes& msg) {
-    cs::RoundNumber rNum;
-    cs::DataStream stream(msg.data(), msg.size());
-    stream >> rNum;
-    std::string inst;
-    while (!stream.isEmpty()) {
-        inst.clear();
-        stream >> inst;
-        //parse instruction here
+void Node::processSpecialInfo(const csdb::Pool& pool) {
+    for (auto it : pool.transactions()) {
+        if (getBlockChain().isSpecial(it)) {
+            auto stringBytes = it.user_field(cs::trx_uf::sp::managing).value<std::string>();
+            std::vector<cs::Byte> msg(stringBytes.begin(), stringBytes.end());
+            cs::DataStream stream(msg.data(), msg.size());
+            uint16_t order;
+            stream >> order;
+            if (order == 2U) {
+                uint8_t cnt;
+                stream >> cnt;
+                csdebug() << "New bootstrap nodes: ";
+                for (uint8_t i = 0; i < cnt; ++i) {
+                    cs::PublicKey key;
+                    stream >> key;
+                    bootStrapNodes_.push_back(key);
+                    csdebug() << static_cast<int>(i) << ". " << cs::Utils::byteStreamToHex(key);
+                }
+
+            }
+        }
     }
 
 }
 
-void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
+void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
     if (stopRequested_) {
         *shouldStop = true;
         return;
@@ -3740,6 +3752,7 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
         *shouldStop = true;
         return;
     }
+    processSpecialInfo(block);
 }
 
 void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_failed should be FALSE of the block is ok 
