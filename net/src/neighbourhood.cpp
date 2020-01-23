@@ -1,6 +1,7 @@
 #include <neighbourhood.hpp>
 
 #include <cscrypto/cscrypto.hpp>
+#include <csnode/configholder.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/datastream.hpp>
 #include <csnode/node.hpp>
@@ -118,7 +119,7 @@ void Neighbourhood::gotPong(const cs::PublicKey& sender, const Packet& pack) {
 }
 
 bool Neighbourhood::isCompatible(const PeerInfo& info) const {
-    if (NODE_VERSION != info.nodeVersion) {
+    if (info.nodeVersion < cs::ConfigHolder::instance().config()->getMinCompatibleVersion()) {
         return false;
     }
 
