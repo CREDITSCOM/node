@@ -1126,6 +1126,13 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
     return true;
 }
 
+bool BlockChain::isSpecial(const csdb::Transaction& t) {
+    if (t.user_field(cs::trx_uf::sp::managing).is_valid()) {
+        return true;
+    }
+}
+
+
 bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     const auto lastSequence = getLastSeq();
     const auto poolSequence = pool.sequence();
@@ -1171,7 +1178,6 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             removeLastBlock();
             return false;
         }
-
 
         setTransactionsFees(pool);
 

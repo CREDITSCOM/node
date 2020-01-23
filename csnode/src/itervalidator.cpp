@@ -7,6 +7,7 @@
 #include <csnode/walletsstate.hpp>
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
+#include <net/packetvalidator.hpp>
 
 namespace {
 const char* kLogPrefix = "Validator: ";
@@ -209,6 +210,10 @@ bool IterValidator::checkTransactionSignature(SolverContext& context, const csdb
     if (!SmartContracts::is_new_state(transaction) && !smartSourceTransaction) {
         if (src.is_wallet_id()) {
             auto pub = context.blockchain().getAddressByType(src, BlockChain::AddressType::PublicKey);
+            const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
+            if (context.blockchain().isSpecial(transaction) && pub.public_key() != starter_key) {
+                return false;
+            }
             return transaction.verify_signature(pub.public_key());
         }
         return transaction.verify_signature(src.public_key());
@@ -341,7 +346,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
         }
         auto flagg = fld.value<uint64_t>();
         switch(flagg) {
-            case trx_uf::sp::dele::gate:
+        case trx_uf::sp::de::legate:
                 
                 if (!rc) {
                     if (bc.findWalletData(t.target(), tWallet)) {
@@ -351,7 +356,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
                     }
                 }
                 break;
-            case trx_uf::sp::dele::gated_withdraw:
+        case trx_uf::sp::de::legated_withdraw:
                 if (!rc) {
                     if (bc.findWalletData(t.target(), tWallet)) {
                         auto tKey = bc.getCacheUpdater().toPublicKey(t.target());
