@@ -636,11 +636,11 @@ void APIHandler::dumbTransactionFlow(api::TransactionFlowResult& _return, const 
     cs::Conveyer::instance().addTransaction(tr);
 
     // wait for transaction in blockchain
-    cs::DumbCv::Condition condition = dumbCv_.waitCvSignal(tr.signature());
+    auto result = dumbCv_.waitCvSignal(tr.signature());
 
-    switch (condition) {
+    switch (result.condition) {
     case cs::DumbCv::Condition::Success: {
-            auto newTransactionId = dumbCv_.getTransactionId();
+            auto newTransactionId = result.id;
             _return.id.poolSeq = static_cast<int64_t>(newTransactionId.pool_seq());
             _return.id.index = static_cast<int32_t>(newTransactionId.index());
 
@@ -813,7 +813,7 @@ void APIHandler::checkTransactionsFlow(const cs::TransactionsPacket& packet, cs:
             });
         }
         else {
-            dumbCv_.sendCvSignal(transaction.signature(), condition);
+            dumbCv_.sendCvSignal(transaction.signature(), condition, transaction.id());
         }
     }
 }
@@ -1439,8 +1439,7 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
             updateSmartCachesTransaction(trx, pool.sequence());
         }
         else { // if dumb transaction
-            dumbCv_.setTransactionId(trx.id());
-            dumbCv_.sendCvSignal(trx.signature(), cs::DumbCv::Condition::Success);
+            dumbCv_.sendCvSignal(trx.signature(), cs::DumbCv::Condition::Success, trx.id());
         }
     }
 }
