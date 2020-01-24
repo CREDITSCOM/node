@@ -25,10 +25,7 @@ public:
     };
 
     bool addCVInfo(const cs::Signature& signature);
-
     void sendCvSignal(const cs::Signature& signature, Condition condition, const csdb::TransactionID& id);
-    void sendCvSignal(const cs::Signature& signature, Condition condition);
-
     DumbCv::Result waitCvSignal(const cs::Signature& signature);
 
 private:

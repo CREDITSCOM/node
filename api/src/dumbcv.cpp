@@ -24,10 +24,6 @@ void cs::DumbCv::sendCvSignal(const cs::Signature& signature, Condition conditio
     }
 }
 
-void cs::DumbCv::sendCvSignal(const cs::Signature& signature, Condition condition) {
-    sendCvSignal(signature, condition, csdb::TransactionID{});
-}
-
 cs::DumbCv::Result cs::DumbCv::waitCvSignal(const cs::Signature& signature) {
     Result result;
     result.condition = cs::DumbCv::Condition::TimeOut;
