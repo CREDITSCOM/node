@@ -16,7 +16,7 @@ if(NOT APPLE)
 endif()
 set (BOOST_ALL_DYN_LINK OFF)
 
-find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem)
+find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem serialization)
 if (Boost_FOUND)
   # From the offical documentation:
   # Add include directories to the build. [...] If the SYSTEM option is given,
@@ -48,6 +48,7 @@ add_library(csnode
   include/csnode/transactionsiterator.hpp
   include/csnode/walletscache.hpp
   include/csnode/walletsids.hpp
+  include/csnode/walletsids_serializer.hpp
   include/csnode/blockhashes.hpp
   include/csnode/poolsynchronizer.hpp
   include/csnode/fee.hpp
@@ -75,6 +76,7 @@ add_library(csnode
   src/transactionspacket.cpp
   src/walletscache.cpp
   src/walletsids.cpp
+  src/walletsids_serializer.cpp
   src/blockhashes.cpp
   src/poolsynchronizer.cpp
   src/fee.cpp
