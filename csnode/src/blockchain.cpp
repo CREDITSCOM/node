@@ -1196,8 +1196,9 @@ bool BlockChain::isSpecial(const csdb::Transaction& t) {
     if (t.user_field(cs::trx_uf::sp::managing).is_valid()) {
         return true;
     }
-}
 
+    return false;
+}
 
 bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     const auto lastSequence = getLastSeq();

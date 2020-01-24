@@ -549,7 +549,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
         ::csdb::priv::obstream os_lhs;
         lhs.put_content_only(os_lhs);
         ::csdb::priv::obstream os_rhs;
-        lhs.put_content_only(os_rhs);
+        rhs.put_content_only(os_rhs);
         return PoolHash::calc_from_data(os_lhs.buffer()) == PoolHash::calc_from_data(os_rhs.buffer());
     }
 
