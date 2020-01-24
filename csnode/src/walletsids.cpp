@@ -6,10 +6,8 @@
 using namespace std;
 
 namespace cs {
-
 WalletsIds::WalletsIds()
 : nextId_(0) {
-    special_.reset(new Special(*this));
     norm_.reset(new Normal(*this));
 }
 
@@ -102,78 +100,4 @@ bool WalletsIds::Normal::remove(const WalletAddress& address) {
     }
     return true;
 }
-
-WalletsIds::WalletId WalletsIds::Special::makeSpecial(WalletId id) {
-    return (id | maskSpecial_);
-}
-
-WalletsIds::WalletId WalletsIds::Special::makeNormal(WalletId id) {
-    return (id & ~maskSpecial_);
-}
-
-bool WalletsIds::Special::isSpecial(WalletId id) {
-    return (id & maskSpecial_) != 0;
-}
-
-WalletsIds::Special::Special(WalletsIds& norm)
-: norm_(norm)
-, nextIdSpecial_(makeSpecial(0)) {
-}
-
-bool WalletsIds::Special::insertNormal(const WalletAddress& address, WalletId idNormal, WalletId& idSpecial) {
-    idSpecial = noSpecial_;
-
-    if (address.is_wallet_id()) {
-        if (idNormal != address.wallet_id()) {
-            cserror() << "Wrong address";
-        }
-        return false;
-    }
-    else if (address.is_public_key()) {
-        auto res = norm_.data_.insert({address, idNormal});
-
-        const bool isInserted = res.second;
-        auto& value = (*res.first).id;
-
-        if (!isInserted) {
-            if (!isSpecial(value)) {
-                return false;
-            }
-            idSpecial = value;
-            auto &index = norm_.data_.get<Wallet::byId>();
-            auto it = norm_.data_.project<Wallet::byId>(res.first);
-            index.modify(it, [=](Wallet& wallet) { wallet.id = idNormal; });
-        }
-
-        if (idNormal >= norm_.nextId_) {
-            if (idNormal >= numeric_limits<WalletId>::max() / 2)
-                throw runtime_error("idNormal >= numeric_limits<WalletId>::max() / 2");
-
-            norm_.nextId_ = idNormal + 1;
-        }
-        return true;
-    }
-    cserror() << "Wrong address";
-    return false;
-}
-
-bool WalletsIds::Special::findAnyOrInsertSpecial(const WalletAddress& address, WalletId& id) {
-    if (address.is_wallet_id()) {
-        id = address.wallet_id();
-        return true;
-    }
-    else if (address.is_public_key()) {
-        auto res = norm_.data_.insert({address, nextIdSpecial_});
-        if (res.second) {
-            if (nextIdSpecial_ == numeric_limits<WalletId>::max())
-                throw runtime_error("nextIdSpecial_ == numeric_limits<WalletId>::max()");
-            ++nextIdSpecial_;
-        }
-        id = (*res.first).id;
-        return true;
-    }
-    cserror() << "Wrong address";
-    return false;
-}
-
 }  // namespace cs

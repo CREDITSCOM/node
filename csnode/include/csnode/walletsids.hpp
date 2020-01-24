@@ -21,29 +21,6 @@ public:
     using WalletAddress = csdb::Address;
 
 public:
-    class Special {
-    public:
-        static bool isSpecial(WalletId id);
-        static WalletId makeSpecial(WalletId id);
-        static WalletId makeNormal(WalletId id);
-
-    public:
-        Special(WalletsIds& norm);
-        // returns true if new id was inserted
-        bool insertNormal(const WalletAddress& address, WalletId id, WalletId& idSpecial);
-        bool findAnyOrInsertSpecial(const WalletAddress& address, WalletId& id);
-
-    private:
-        WalletsIds& norm_;
-        WalletId nextIdSpecial_;
-        static constexpr uint32_t maskSpecial_ = (1u << 31);
-        static constexpr WalletId noSpecial_ = 0;
-
-        static_assert(std::is_integral<WalletId>::value, "WalletId is expected to be integer");
-        static_assert(sizeof(WalletId) == sizeof(maskSpecial_), "sizeof(WalletId) == sizeof(maskSpecial_)");
-    };
-
-public:
     class Normal {
     public:
         Normal(WalletsIds& norm);
@@ -66,14 +43,7 @@ public:
     WalletsIds& operator=(const WalletsIds&) = delete;
     WalletsIds(const WalletsIds&&) = delete;
     WalletsIds& operator=(const WalletsIds&&) = delete;
-
-    Special& special() {
-        return *special_;
-    }
-    const Special& special() const {
-        return *special_;
-    }
-
+    
     Normal& normal() {
         return *norm_;
     }
@@ -105,7 +75,6 @@ private:
 
     Data data_;
     WalletId nextId_;
-    std::unique_ptr<Special> special_;
     std::unique_ptr<Normal> norm_;
 };
 
