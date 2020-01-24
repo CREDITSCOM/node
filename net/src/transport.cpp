@@ -1374,7 +1374,7 @@ bool Transport::gotSSNewFriends()
             return false;
         }
 
-        if (key != cs::ConfigHolder::instance().config()->getMyPublicKey()) {
+        if (key != myPublicKey_) {
             if (neighbourhood_.canAddNeighbour()) {
                 neighbourhood_.establishConnection(net_->resolve(ep));
             }
