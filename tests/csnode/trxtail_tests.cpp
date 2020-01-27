@@ -1,3 +1,5 @@
+#define TESTING
+
 #include "gtest/gtest.h"
 #include <csnode/transactionstail.hpp>
 
