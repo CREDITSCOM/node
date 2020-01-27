@@ -47,6 +47,7 @@ add_library(csnode
   include/csnode/transactionsindex.hpp
   include/csnode/transactionsiterator.hpp
   include/csnode/walletscache.hpp
+  include/csnode/walletscache_serializer.hpp
   include/csnode/walletsids.hpp
   include/csnode/walletsids_serializer.hpp
   include/csnode/blockhashes.hpp
@@ -75,6 +76,7 @@ add_library(csnode
   src/conveyer.cpp
   src/transactionspacket.cpp
   src/walletscache.cpp
+  src/walletscache_serializer.cpp
   src/walletsids.cpp
   src/walletsids_serializer.cpp
   src/blockhashes.cpp

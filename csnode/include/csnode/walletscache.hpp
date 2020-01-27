@@ -78,6 +78,8 @@ private:
 #ifdef MONITOR_NODE
     std::map<PublicKey, TrustedData> trusted_info_;
 #endif
+
+    friend class WalletsCache_Serializer;
 };
 
 using WalletUpdateSignal = cs::Signal<void(const PublicKey&, const WalletsCache::WalletData&)>;

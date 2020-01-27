@@ -5,6 +5,8 @@
 
 #include <sstream>
 
+#include <boost/serialization/serialization.hpp>
+
 namespace cs {
 class TransactionsTail {
 public:
@@ -66,6 +68,12 @@ public:
     }
 
 private:
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
+        ar & heap_;
+    }
+
     using Heap = BitHeap<TransactionId, BitSize>;
     Heap heap_;
 };

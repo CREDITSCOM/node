@@ -5,6 +5,9 @@
 #include <climits>
 #include <limits>
 
+#include <boost/serialization/serialization.hpp>
+#include <boost/serialization/bitset.hpp>
+
 namespace cs {
 template <typename T, size_t BitSize = sizeof(T) * CHAR_BIT, typename = std::enable_if<std::is_integral<T>::value>>
 class BitHeap {
@@ -98,6 +101,14 @@ public:
     }
 
 private:
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
+        ar & greatest_;
+        ar & isValueSet_;
+        ar & bits_;
+    }
+
     T greatest_;
     uint8_t isValueSet_;
     std::bitset<BitSize> bits_;
