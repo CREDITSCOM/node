@@ -591,7 +591,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
             ++count;
 
-            if (key != myPublicKey_) {
+            if (!std::equal(key.cbegin(), key.cend(), myPublicKey_)) {
                 if (count <= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
                     neighbourhood_.establishConnection(net_->resolve(ep));
                 }
@@ -1136,7 +1136,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         return false;
     }
 
-    if (!std::equal(conn.key.cbegin(), conn.key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
+    if (!std::equal(conn.key.cbegin(), conn.key.cend(), myPublicKey_)) {
         EndpointData epd;
         epd.ip = conn.getOut().address();
         epd.ipSpecified = true;
@@ -1167,7 +1167,7 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, Remote
     }
 
     neighbourhood_.gotConfirmation(myCId, realCId, task->sender, key, sender);
-    if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
+    if (!std::equal(key.cbegin(), key.cend(), myPublicKey_)) {
         EndpointData epd;
         epd.ip = task->sender.address();
         epd.ipSpecified = true;
@@ -1735,7 +1735,7 @@ bool Transport::gotSSIntroduceConsensusReply(RemoteNodePtr& sender)
         }
         csdebug() << '[' << uint32_t(i) << "] " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " - " << ep.ip << ':' << ep.port;
 
-        if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
+        if (!std::equal(key.cbegin(), key.cend(), myPublicKey_)) {
             keys.push_back(key);
             eps.push_back(ep);
         }
