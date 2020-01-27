@@ -156,8 +156,6 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     // remove unnecessary sequences
     removeExistingSequence(blockChain_->getLastSeq(), SequenceRemovalAccuracy::LowerBound);
 
-    bool success = false;
-
     for (auto& neighbour : neighbours_) {
         if (!getNeededSequences(neighbour)) {
             csmeta(csdetails) << "Neighbor: " << cs::Utils::byteStreamToHex(neighbour.publicKey()) << " is busy";
@@ -169,7 +167,6 @@ void cs::PoolSynchronizer::sendBlockRequest() {
             break;
         }
 
-        success = true;
         sendBlock(neighbour);
     }
 }

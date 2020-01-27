@@ -347,7 +347,6 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
 
     csdb::UserField fld;
     fld = t.user_field(trx_uf::sp::delegated);
-    bool notCheck = false;
     if (fld.is_valid()) {
         if (t.amount() < Consensus::MinStakeDelegated) {
             rc = kAmountTooLow;
@@ -389,9 +388,6 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
                 }
                 break;
             default:
-                if (!rc) {
-                    notCheck = true;
-                }
                 break;
 
         }

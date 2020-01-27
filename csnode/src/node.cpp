@@ -3429,8 +3429,8 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     auto& smartSignatures = block.smartSignatures();
     size_t smartTrxCounter = 0;
     
-    constexpr const uint64_t uuidTestNet = 5283967947175248524;
-    constexpr const uint64_t uuidMainNet = 11024959585341937636;
+    constexpr const uint64_t uuidTestNet = 5283967947175248524ull;
+    constexpr const uint64_t uuidMainNet = 11024959585341937636ull;
     /*constexpr*/ const bool collectRejectedInfo = cs::ConfigHolder::instance().config()->isCompatibleVersion();
     const char* kLogPrefix = (collectRejectedInfo ? "NODE> skip block validation: " : "NODE> stop block validation: ");
 
