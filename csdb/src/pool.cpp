@@ -645,10 +645,10 @@ const std::vector<cs::Signature>& Pool::roundConfirmations() const noexcept {
 }
 
 Transaction Pool::transaction(TransactionID id) const {
-    if ((!d->is_valid_) || (!d->read_only_) || (!id.is_valid()) || (id.pool_seq() != d->sequence_) || (d->transactions_.size() <= id.d->index_)) {
+    if ((!d->is_valid_) || (!d->read_only_) || (!id.is_valid()) || (id.pool_seq() != d->sequence_) || (d->transactions_.size() <= id.index_)) {
         return Transaction{};
     }
-    return d->transactions_[id.d->index_];
+    return d->transactions_[id.index_];
 }
 
 Transaction Pool::get_last_by_source(const Address& source) const noexcept {
