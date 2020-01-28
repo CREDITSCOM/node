@@ -186,7 +186,7 @@ bool Neighbourhood::isLimitReached() const {
     return neighbours_.size() >= kMaxNeighbours;
 }
 
-void Neighbourhood::setPermanentNeighbours(const std::vector<cs::PublicKey>& permanent) {
+void Neighbourhood::setPermanentNeighbours(const std::set<cs::PublicKey>& permanent) {
     std::lock_guard lock(permNeighbourMux_);
     permanentNeighbours_ = decltype(permanentNeighbours_)(permanent.begin(), permanent.end());
 }

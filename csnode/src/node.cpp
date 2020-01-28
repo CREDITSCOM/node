@@ -125,6 +125,10 @@ bool Node::init() {
     auto& initConfidants = cs::ConfigHolder::instance().config()->getInitialConfidants();
     initialConfidants_ = decltype(initialConfidants_)(initConfidants.begin(), initConfidants.end());
 
+    if (initialConfidants_.find(solver_->getPublicKey()) != initialConfidants_.end()) {
+        transport_->setPermanentNeighbours(initialConfidants_);
+    }
+
 #ifdef NODE_API
     std::cout << "Init API... ";
 
@@ -153,10 +157,6 @@ bool Node::init() {
 
     if (!blockChain_.init(cs::ConfigHolder::instance().config()->getPathToDB())) {
         return false;
-    }
-
-    if (initialConfidants_.find(solver_->getPublicKey()) != initialConfidants_.end()) {
-        transport_->setPermanentNeighbours(initConfidants);
     }
 
     if (initialConfidants_.size() < Consensus::MinTrustedNodes) {
@@ -3393,6 +3393,9 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                     csdebug() << static_cast<int>(i) << ". " << cs::Utils::byteStreamToHex(key);
                 }
 
+                if (initialConfidants_.find(solver_->getPublicKey()) != initialConfidants_.end()) {
+                    transport_->setPermanentNeighbours(initialConfidants_);
+                }
             }
         }
     }

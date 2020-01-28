@@ -54,7 +54,7 @@ public:
     void clearBanList();
 
     // neighbours interface
-    void setPermanentNeighbours(const std::vector<cs::PublicKey>&);
+    void setPermanentNeighbours(const std::set<cs::PublicKey>&);
     uint32_t getNeighboursCount() const;
     uint32_t getMaxNeighbours() const;
     void forEachNeighbour(Neighbourhood::NeighboursCallback);

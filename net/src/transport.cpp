@@ -311,7 +311,7 @@ void Transport::processPostponed(const cs::RoundNumber rNum) {
     csdebug() << "TRANSPORT> POSTPHONED finished, round " << rNum;
 }
 
-void Transport::setPermanentNeighbours(const std::vector<cs::PublicKey>& neighbours) {
+void Transport::setPermanentNeighbours(const std::set<cs::PublicKey>& neighbours) {
     neighbourhood_.setPermanentNeighbours(neighbours);
 }
 

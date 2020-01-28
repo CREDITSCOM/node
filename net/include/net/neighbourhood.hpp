@@ -5,6 +5,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
+#include <set>
 
 #include <networkcommands.hpp>
 #include <packet.hpp>
@@ -26,7 +27,7 @@ public:
 
     Neighbourhood(Transport*, Node*);
 
-    void setPermanentNeighbours(const std::vector<cs::PublicKey>&);
+    void setPermanentNeighbours(const std::set<cs::PublicKey>&);
     
     void processNeighbourMessage(const cs::PublicKey& sender, const Packet&);
     void newPeerDiscovered(const cs::PublicKey&);
