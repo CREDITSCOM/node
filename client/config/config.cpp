@@ -763,7 +763,11 @@ Config Config::readFromFile(const std::string& fileName) {
         }
 
         const auto hostsFileName = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
-        const auto initTrustedFileName = params.get<std::string>(PARAM_NAME_INITIAL_TRUSTED);
+
+        std::string initTrustedFileName;
+        try {
+            initTrustedFileName = params.get<std::string>(PARAM_NAME_INITIAL_TRUSTED);
+        } catch (...) {}
 
         std::string line;
 
