@@ -742,6 +742,7 @@ void BlockChain::tryFlushDeferredBlock() {
 }
 
 void BlockChain::close() {
+    stop_ = true;
     tryFlushDeferredBlock();
     cs::Lock lock(dbLock_);
     storage_.close();
@@ -1261,6 +1262,12 @@ void BlockChain::testCachedBlocks() {
     size_t cnt_stored = 0;
     cs::Sequence fromSeq = lastSeq;
     while (!cachedBlocks_.empty()) {
+
+        if (stop_) {
+            // stop requested while handle cached blocks
+            return;
+        }
+
         auto firstBlockInCache = cachedBlocks_.begin();
 
         if ((*firstBlockInCache).first == lastSeq) {
