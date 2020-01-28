@@ -801,7 +801,7 @@ Config Config::readFromFile(const std::string& fileName) {
         }
 
         if (result.initialConfidants_.empty()) {
-            throw std::length_error("No initial confidants specified");
+            cslog() << "No initial confidants specified.";
         }
 
         if (params.count(PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS) > 0) {

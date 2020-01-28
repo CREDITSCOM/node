@@ -160,8 +160,7 @@ bool Node::init() {
     }
 
     if (initialConfidants_.size() < Consensus::MinTrustedNodes) {
-        cserror() << "Not enough initial confidants, min " << Consensus::MinTrustedNodes;
-        return false;
+        cslog() << "After reading blockchain, init confidants size is " << initialConfidants_.size();
     }
 
     cslog() << "Blockchain is ready, contains " << WithDelimiters(stat_.totalTransactions()) << " transactions";
