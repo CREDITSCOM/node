@@ -12,18 +12,12 @@
 
 #include <thread>
 
-// Signal transport to stop and stop Node
-static void stopNode() noexcept(false) {
-    Node::requestStop();
-    // Transport::stop();
-}
-
 // Called periodically to poll the signal flag.
 void pollSignalFlag() {
     if (gSignalStatus == 1) {
         gSignalStatus = 0;
         try {
-            stopNode();
+            Node::requestStop();
         }
         catch (...) {
             cserror() << "Poll signal error!";

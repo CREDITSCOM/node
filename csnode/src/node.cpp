@@ -179,13 +179,19 @@ void Node::run() {
 }
 
 void Node::stop() {
+    // stopping transport stops the node (see Node::run() method)
+    transport_->stop();
+    cswarning() << "[TRANSPORT STOPPED]";
+}
+
+void Node::destroy() {
 
     EventReport::sendRunningStatus(*this, Running::Status::Stop);
 
     good_ = false;
 
-    transport_->stop();
-    cswarning() << "[TRANSPORT STOPPED]";
+    api_->stop();
+    cswarning() << "[API STOPPED]";
 
     solver_->finish();
     cswarning() << "[SOLVER STOPPED]";
@@ -198,6 +204,7 @@ void Node::stop() {
 
     observer_.stop();
     cswarning() << "[CONFIG OBSERVER STOPPED]";
+
 }
 
 void Node::initCurrentRP() {
@@ -3693,12 +3700,16 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
 
 /*static*/
 void Node::requestStop() {
+    // use existing global flag as a crutch against duplicated request handling
+    if (gSignalStatus == 0) {
+        return;
+    }
+    gSignalStatus = 0;
     emit stopRequested();
 }
 
 void Node::onStopRequested() {
     if (stopRequested_) {
-        // subsequent request is handled as unconditional stop
         stop();
         return;
     }
