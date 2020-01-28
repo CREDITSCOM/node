@@ -74,6 +74,7 @@ public slots:
 
 public:
     void run();
+    void stop();
 
     // interface
     ApiHandlerPtr apiHandler() const;
@@ -86,20 +87,20 @@ private:
 
     ::apache::thrift::stdcxx::shared_ptr<ApiProcessor> p_api_processor;
     ::apache::thrift::stdcxx::shared_ptr<::apiexec::APIEXECProcessor> p_apiexec_processor;
+
 #ifdef BINARY_TCP_API
-    ::apache::thrift::server::TThreadedServer server;
-    std::thread thread;
-    uint16_t server_port;
+    std::thread api_thread;
+    std::shared_ptr<::apache::thrift::server::TThreadedServer> api_server;
 #endif
+
 #ifdef AJAX_IFACE
-    ::apache::thrift::server::TThreadedServer ajax_server;
     std::thread ajax_thread;
-    uint16_t ajax_server_port;
+    std::shared_ptr<::apache::thrift::server::TThreadedServer> ajax_server;
 #endif
+
 #ifdef BINARY_TCP_EXECAPI
-    ::apache::thrift::server::TThreadedServer exec_server;
-    std::thread exec_thread;
-    uint16_t exec_server_port;
+    std::thread execapi_thread;
+    std::shared_ptr<::apache::thrift::server::TThreadedServer> execapi_server;
 #endif
 };
 }  // namespace csconnector
