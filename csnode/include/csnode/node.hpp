@@ -70,6 +70,7 @@ public:
 
     void run();
     void stop();
+    void destroy();
 
     static void requestStop();
 

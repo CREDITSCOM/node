@@ -285,7 +285,7 @@ int main(int argc, char* argv[]) {
     node.run();
 
     cswarning() << "+++++++++++++>>> NODE ATTEMPT TO STOP! <<<++++++++++++++++++++++";
-    node.stop();
+    node.destroy();
 
     cswarning() << "Exiting Main Function";
 

@@ -329,7 +329,7 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
     std::lock_guard l(dbLock_);
     csdb::Transaction transaction;
 
-    if (deferredBlock_.sequence() == transId.pool_seq()) {
+    if (deferredBlock_.is_valid() && deferredBlock_.sequence() == transId.pool_seq()) {
         transaction = deferredBlock_.transaction(transId).clone();
         transaction.set_time(deferredBlock_.get_time());
     }
@@ -1196,7 +1196,6 @@ bool BlockChain::isSpecial(const csdb::Transaction& t) {
     if (t.user_field(cs::trx_uf::sp::managing).is_valid()) {
         return true;
     }
-
     return false;
 }
 
