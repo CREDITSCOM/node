@@ -46,7 +46,8 @@ std::string cs::ExecutorManager::jpsData() const {
         finished.store(true, std::memory_order_release);
     });
 
-    cs::Connector::connect(&process.errorOccured, [&](auto...) {
+    cs::Connector::connect(&process.errorOccured, [&](const auto& e) {
+        csdebug() << "Executor manager, run jps failed: " << e.what();
         errorOccured.store(true, std::memory_order_release);
     });
 
