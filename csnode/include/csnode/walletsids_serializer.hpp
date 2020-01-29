@@ -6,6 +6,8 @@
 #include <boost/serialization/set.hpp>
 
 namespace cs {
+class WalletsIds;
+
 class WalletsIds_Serializer {
 public:
     void bind(WalletsIds&);
@@ -13,13 +15,6 @@ public:
     void load();
 
 private:
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive &ar, const unsigned int version) {
-        ar & *data_;
-        ar & *nextId_;
-    }
-
     using WalletId = csdb::internal::WalletId;
     using WalletAddress = csdb::Address;
 

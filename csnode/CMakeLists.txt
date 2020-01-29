@@ -35,6 +35,7 @@ if (Boost_FOUND)
 endif ()
 
 add_library(csnode
+  include/csnode/address_serializer.hpp
   include/csnode/bitheap.hpp
   include/csnode/blockchain.hpp
   include/csnode/cyclicbuffer.hpp
@@ -70,6 +71,7 @@ add_library(csnode
   include/csnode/eventreport.hpp
   include/csnode/idatastream.hpp
   include/csnode/odatastream.hpp
+  include/csnode/smartcontracts_serializer.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -98,6 +100,7 @@ add_library(csnode
   src/multiwallets.cpp
   src/sendcachedata.cpp
   src/eventreport.cpp
+  src/smartcontracts_serializer.cpp
 )
 
 configure_msvc_flags()

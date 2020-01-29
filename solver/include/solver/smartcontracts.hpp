@@ -901,6 +901,8 @@ private:
     void net_request_contract_state(const csdb::Address& abs_addr);
 
     Reject::Reason prevalidate_inner(const cs::TransactionsPacket& pack);
+
+    friend class SmartContracts_Serializer;
 };
 
 }  // namespace cs
