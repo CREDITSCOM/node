@@ -475,6 +475,12 @@ void Node::updateBlackListCounter() {
 }
 
 bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::PublicKey& key) {
+    auto lws = getBlockChain().getLastSeq();
+    if (lws + cs::ConfigHolder::instance().config()->conveyerData().maxPacketLifeTime < packet.expiredRound()) {
+        csdebug() << "NODE> Packet " << packet.hash().toString() << " was added to HashTable without transaction's check";
+        return true;
+    }
+
     size_t sum = 0;
     size_t cnt = packet.transactionsCount();
 
