@@ -415,5 +415,6 @@ private:
     mutable uint64_t uuid_ = 0;
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
+    std::atomic_bool stop_ = false;
 };
 #endif  //  BLOCKCHAIN_HPP
