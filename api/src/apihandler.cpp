@@ -125,6 +125,11 @@ void APIHandler::WalletDataGet(WalletDataGetResult& _return, const general::Addr
     const cs::TransactionsTail& tail = wallData.trxTail_;
     _return.walletData.lastTransactionId = tail.empty() ? 0 : tail.getLastTransactionId();
 
+    std::optional delegated = getDelegated(wallData);
+    if (delegated.has_value()) {
+        _return.walletData.__set_delegated(delegated.value());
+    }
+
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
@@ -160,7 +165,40 @@ void APIHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const ge
     }
     _return.balance.integral = wallData.balance_.integral();
     _return.balance.fraction = static_cast<decltype(_return.balance.fraction)>(wallData.balance_.fraction());
+    std::optional<api::Delegated> delegated = getDelegated(wallData);
+    if (delegated.has_value()) {
+        _return.__set_delegated(delegated.value());
+    }
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+std::optional<api::Delegated> APIHandler::getDelegated(const BlockChain::WalletData& wallet) {
+    csdb::Amount zero(0);
+    api::Delegated delegated;
+    if (wallet.delegated_ > zero) {
+        general::Amount am;
+        am.__set_integral(wallet.delegated_.integral());
+        am.__set_fraction(wallet.delegated_.fraction());
+        delegated.__set_incoming(am);
+    }
+    if (!wallet.delegats_.empty()) {
+        csdb::Amount sum(0);
+        for (const auto& item : wallet.delegats_) {
+            if (item.second > zero) {
+                sum += item.second;
+            }
+        }
+        if (sum > zero) {
+            general::Amount am;
+            am.__set_integral(sum.integral());
+            am.__set_fraction(sum.fraction());
+            delegated.__set_outgoing(am);
+        }
+    }
+    if (delegated.__isset.incoming || delegated.__isset.outgoing) {
+        std::make_optional(std::move(delegated));
+    }
+    return std::nullopt;
 }
 
 std::string fromByteArray(const cs::Bytes& bar) {

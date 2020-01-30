@@ -289,6 +289,8 @@ private:
 
     cs::Sequence maxReadSequence{};
 
+    std::optional<api::Delegated> getDelegated(const BlockChain::WalletData& wallet);
+
 private slots:
     void updateSmartCachesPool(const csdb::Pool& pool);
     void store_block_slot(const csdb::Pool& pool);
