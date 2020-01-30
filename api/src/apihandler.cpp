@@ -172,35 +172,6 @@ void APIHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const ge
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
-std::optional<api::Delegated> APIHandler::getDelegated(const BlockChain::WalletData& wallet) {
-    csdb::Amount zero(0);
-    api::Delegated delegated;
-    if (wallet.delegated_ > zero) {
-        general::Amount am;
-        am.__set_integral(wallet.delegated_.integral());
-        am.__set_fraction(wallet.delegated_.fraction());
-        delegated.__set_incoming(am);
-    }
-    if (!wallet.delegats_.empty()) {
-        csdb::Amount sum(0);
-        for (const auto& item : wallet.delegats_) {
-            if (item.second > zero) {
-                sum += item.second;
-            }
-        }
-        if (sum > zero) {
-            general::Amount am;
-            am.__set_integral(sum.integral());
-            am.__set_fraction(sum.fraction());
-            delegated.__set_outgoing(am);
-        }
-    }
-    if (delegated.__isset.incoming || delegated.__isset.outgoing) {
-        std::make_optional(std::move(delegated));
-    }
-    return std::nullopt;
-}
-
 std::string fromByteArray(const cs::Bytes& bar) {
     std::string res;
     {
@@ -272,6 +243,41 @@ bool is_deploy_transaction(const csdb::Transaction& tr) {
     using namespace cs::trx_uf;
     auto uf = tr.user_field(deploy::Code);
     return uf.type() == csdb::UserField::Type::String && is_smart_deploy(cs::Serializer::deserialize<api::SmartContractInvocation>(uf.value<std::string>()));
+}
+
+std::optional<api::Delegated> APIHandler::getDelegated(const BlockChain::WalletData& wallet) {
+    csdb::Amount zero(0);
+    api::Delegated delegated;
+    if (wallet.delegated_ > zero) {
+        auto tmp = convertAmount(wallet.delegated_);
+        delegated.__set_incoming(tmp);
+        // fill donors list after it is implemented
+    }
+    if (!wallet.delegats_.empty()) {
+        csdb::Amount sum(0);
+        std::vector<api::DelegatedItem> recipients;
+        for (const auto& item : wallet.delegats_) {
+            if (item.second > zero) {
+                sum += item.second;
+            }
+            api::DelegatedItem recipient;
+            recipient.__set_wallet(fromByteArray(item.first));
+            auto s = convertAmount(item.second);
+            recipient.__set_sum(s);
+            recipients.push_back(recipient);
+        }
+        if (sum > zero) {
+            auto am = convertAmount(sum);
+            delegated.__set_outgoing(am);
+        }
+        if (!recipients.empty()) {
+            delegated.__set_recipients(recipients);
+        }
+    }
+    if (delegated.__isset.incoming || delegated.__isset.outgoing) {
+        return std::make_optional(std::move(delegated));
+    }
+    return std::nullopt;
 }
 
 APIHandler::SmartOperation APIHandler::getSmartStatus(const csdb::TransactionID tId) {
@@ -595,10 +601,10 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
     tm_.loadTokenInfo([&tr, &res](const TokensMap& tokens, const HoldersMap&) {
         auto it = tokens.find(tr.target());
         if (it != tokens.end()) {
-            res.smartContractDeploy.tokenStandard = it->second.tokenStandard;
+            res.smartContractDeploy.tokenStandard = int32_t(it->second.tokenStandard);
         }
         else {
-            res.smartContractDeploy.tokenStandard = TokenStandard::NotAToken;
+            res.smartContractDeploy.tokenStandard = int32_t(TokenStandard::NotAToken);
         }
     });
 #else
@@ -2309,7 +2315,10 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
         wi.address = fromByteArray(addr_b);
         wi.balance.integral = ptr->second->balance_.integral();
         wi.balance.fraction = static_cast<int64_t>(ptr->second->balance_.fraction());
-
+        auto delegated = getDelegated(*(ptr->second));
+        if (delegated.has_value()) {
+            wi.__set_delegated(delegated.value());
+        }
         _return.wallets.push_back(wi);
     }
 #else
@@ -2336,6 +2345,14 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
         wi.transactionsNumber = static_cast<int64_t>(data.transactionsCount);
         wi.firstTransactionTime = static_cast<int64_t>(data.createTime);
 
+        const csdb::Address addr = csdb::Address::from_public_key(data.key);
+        BlockChain::WalletData wallData{};
+        if (blockchain_.findWalletData(addr, wallData)) {
+            auto delegated = getDelegated(wallData);
+            if (delegated.has_value()) {
+                wi.__set_delegated(delegated.value());
+            }
+        }
         _return.wallets.push_back(wi);
     }
 
