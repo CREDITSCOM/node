@@ -160,7 +160,7 @@ bool Node::init() {
     }
 
     if (initialConfidants_.size() < Consensus::MinTrustedNodes) {
-        cslog() << "After reading blockchain, init confidants size is " << initialConfidants_.size();
+        cslog() << "After reading blockchain, bootstrap nodes number is " << initialConfidants_.size();
     }
 
     cslog() << "Blockchain is ready, contains " << WithDelimiters(stat_.totalTransactions()) << " transactions";
@@ -3401,13 +3401,13 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 if (size_t(cnt) < Consensus::MinTrustedNodes) {
                   continue;
                 }
-                csdebug() << "New bootstrap nodes: ";
+                cslog() << "New bootstrap nodes: ";
                 initialConfidants_.clear();
                 for (uint8_t i = 0; i < cnt; ++i) {
                     cs::PublicKey key;
                     stream >> key;
                     initialConfidants_.insert(key);
-                    csdebug() << static_cast<int>(i) << ". " << cs::Utils::byteStreamToHex(key);
+                    cslog() << static_cast<int>(i) << ". " << cs::Utils::byteStreamToHex(key);
                 }
 
                 if (initialConfidants_.find(solver_->getPublicKey()) != initialConfidants_.end()) {
