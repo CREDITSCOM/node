@@ -748,9 +748,8 @@ Pool Storage::pool_remove_last() {
         return Pool{};
     }
 
-	size_t dummy = 0;
-	// need only previous_hash to discover:
-	res = Pool::meta_from_binary(std::move(data), dummy);
+	// need full block content to discover:
+	res = Pool::from_binary(std::move(data));
     if (!res.is_valid()) {
         d->set_last_error(DataIntegrityError, "%s: Error decoding pool meta [hash: %s]", funcName(), last_hash().to_string().c_str());
 		return Pool{};
