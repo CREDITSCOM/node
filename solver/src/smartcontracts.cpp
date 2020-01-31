@@ -1500,10 +1500,6 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                 }
             }
         } // endif is_new_state(t)
-        else if (is_payable_target(t)) {
-            /*signal*/
-            rollback_payable_invoke(t);
-        }
         else if (is_executable(t)) {
             // erase execution from exe queue
             SmartContractRef ref;
@@ -1525,6 +1521,10 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
                 csdebug() << kLogPrefix << "completely erase " << to_base58(abs_addr) << " as deploy " << ref << " in removed block";
                 known_contracts.erase(abs_addr);
             }
+        }
+        else if (is_payable_target(t)) {
+            /*signal*/
+            rollback_payable_invoke(t);
         }
         else {
             csdb::Address abs_addr = absolute_address(t.source());

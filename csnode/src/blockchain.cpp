@@ -1181,7 +1181,6 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         }
         else {
             csdebug() << kLogPrefix << "we have to rewrite #" << poolSequence;
-            // removeLastBlock();
         }
     }
 
