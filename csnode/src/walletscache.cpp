@@ -542,6 +542,13 @@ void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& i
             fee = fld.value<csdb::Amount>();
         }
         rollbackExceededTimeoutContract(initTransaction, fee, inverse);
+        auto& wallDataIniter = getWalletData(initTransaction.source());
+        if (!inverse) {
+            wallDataIniter.balance_ -= csdb::Amount(newStateTransaction.counted_fee().to_double());
+        }
+        else {
+            wallDataIniter.balance_ += csdb::Amount(newStateTransaction.counted_fee().to_double());
+        }
         return;
     }
     bool waitingSmart = false;
