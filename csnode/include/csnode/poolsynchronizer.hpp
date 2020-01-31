@@ -18,7 +18,7 @@ using PoolSynchronizerRequestSignal = cs::Signal<void(const cs::PublicKey& targe
 
 class PoolSynchronizer {
 public:
-    explicit PoolSynchronizer(Transport* transport, BlockChain* blockChain);
+    explicit PoolSynchronizer(BlockChain* blockChain);
 
     void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = roundDifferentForSync);
     void syncLastPool();
@@ -207,8 +207,10 @@ private:
         PoolsRequestedSequences sequences_;  // requested sequence
     };
 
+protected:
+    std::vector<std::pair<cs::PublicKey, cs::Sequence>> neighbours() const;
+
 private:
-    Transport* transport_;
     BlockChain* blockChain_;
 
     // flag starting  syncronization

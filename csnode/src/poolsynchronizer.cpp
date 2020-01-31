@@ -7,18 +7,16 @@
 #include <csnode/conveyer.hpp>
 #include <csnode/configholder.hpp>
 
-#include <net/transport.hpp>
-
-cs::PoolSynchronizer::PoolSynchronizer(Transport* transport, BlockChain* blockChain)
-: transport_(transport)
-, blockChain_(blockChain) {
+cs::PoolSynchronizer::PoolSynchronizer(BlockChain* blockChain)
+: blockChain_(blockChain) {
     cs::Connector::connect(&timer_.timeOut, this, &cs::PoolSynchronizer::onTimeOut);
 
     // Print Pool Sync Data Info
     const uint8_t hl = 25;
     const uint8_t vl = 6;
     csmeta(csdebug) << "Pool sync data : \n"
-                    << std::setw(hl) << "Block pools:      " << std::setw(vl) << static_cast<int>(cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount) << "\n"
+                    << std::setw(hl) << "Block pools:      " << std::setw(vl) << static_cast<int>(cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount)
+                    << "\n"
                     << std::setw(hl) << "Polling frequency:" << std::setw(vl) << cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency;
 }
 
@@ -579,4 +577,15 @@ void cs::PoolSynchronizer::synchroFinished() {
     requestedSequences_.clear();
 
     csmeta(csdebug) << "Synchro finished";
+}
+
+std::vector<std::pair<cs::PublicKey, cs::Sequence>> cs::PoolSynchronizer::neighbours() const {
+    std::vector<std::pair<cs::PublicKey, cs::Sequence>> result;
+    result.reserve(neighbours_.size());
+
+    for (const auto& neighbour : neighbours_) {
+        result.push_back(std::make_pair(neighbour.publicKey(), neighbour.maxSequence()));
+    }
+
+    return result;
 }

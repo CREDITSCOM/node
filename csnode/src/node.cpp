@@ -69,7 +69,7 @@ Node::Node(cs::config::Observer& observer)
     transport_ = new Transport(this);
     std::cout << "Done\n";
 
-    poolSynchronizer_ = new cs::PoolSynchronizer(transport_, &blockChain_);
+    poolSynchronizer_ = new cs::PoolSynchronizer(&blockChain_);
 
     cs::ExecutorSettings::set(cs::makeReference(blockChain_), cs::makeReference(solver_));
     auto& executor = cs::Executor::instance();
