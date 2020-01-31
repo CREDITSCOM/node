@@ -311,6 +311,7 @@ private:
 
     // Thread unsafe
     bool finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys lastConfidants);
+    bool applyBlockToCaches(const csdb::Pool& pool);
 
     void onStartReadFromDB(cs::Sequence lastWrittenPoolSeq);
     void onReadFromDB(csdb::Pool block, bool* shouldStop);
@@ -320,8 +321,6 @@ private:
     bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
     void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
-
-    bool updateFromNextBlock(const csdb::Pool& pool);
 
     // returns true if new id was inserted
     bool getWalletId(const WalletAddress& address, WalletId& id);
@@ -408,5 +407,15 @@ private:
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
     std::atomic_bool stop_ = false;
+
+    // support the ability to replace last deferred block by the alternative with the same content, anti-fork feature
+    // flag the last block is uncertain:
+    bool uncertainLastBlock_ = false;
+    // sequence of uncertain block, if uncertainLastBlock_ == true
+    cs::Sequence uncertainSequence_ = 0;
+    // hash of uncertain block
+    csdb::PoolHash uncertainHash_;
+    // desired hash of block with the same (uncertain) sequence and the same content as the current (uncertain) block:
+    csdb::PoolHash desiredHash_;
 };
 #endif  //  BLOCKCHAIN_HPP

@@ -249,7 +249,8 @@ void BlockChain::writeGenesisBlock() {
 
     csdebug() << kLogPrefix << "Genesis block completed ... trying to save";
 
-    finalizeBlock(genesis, true, cs::PublicKeys{});
+    /*ignored =*/ finalizeBlock(genesis, true, cs::PublicKeys{});
+    /*ignored =*/ applyBlockToCaches(genesis);
     deferredBlock_ = genesis;
     emit storeBlockEvent(deferredBlock_);
 
@@ -561,15 +562,47 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
         }
     }
 
-    trxIndex_->update(pool);
-    updateNonEmptyBlocks(pool);
+    csmeta(csdetails) << kLogPrefix << "last hash: " << pool.hash().to_string();
+    return true;
+}
 
-    if (!updateFromNextBlock(pool)) {
-        csmeta(cserror) << kLogPrefix << "Error in updateFromNextBlock()";
+bool BlockChain::applyBlockToCaches(const csdb::Pool& pool) {
+    // Attention!
+    // wallets Ids updated separately, in storeBlock() on normal/sync nodes and in Solver::spawn_next_round() on trusted nodes
+
+    if (!walletsCacheUpdater_) {
+        cserror() << "apply block to caches: wallets cache updater unitialized";
         return false;
     }
 
-    csmeta(csdetails) << kLogPrefix << "last hash: " << pool.hash().to_string();
+    // update wallet caches
+
+    // former updateFromNextBlock(pool) method:
+    try {
+        std::lock_guard lock(cacheMutex_);
+        // currently block stores own round confidants, not next round:
+        const auto& currentRoundConfidants = pool.confidants();
+        walletsCacheUpdater_->loadNextBlock(pool, currentRoundConfidants, *this);
+
+        if (!blockHashes_->onNextBlock(pool)) {
+            cslog() << kLogPrefix << "Error updating block hashes storage";
+        }
+
+        // update non-empty block storage
+        updateNonEmptyBlocks(pool);
+    }
+    catch (std::exception & e) {
+        cserror() << "apply block to caches, exception: " << e.what();
+        return false;
+    }
+    catch (...) {
+        cserror() << "apply block to caches, unexpected exception";
+        return false;
+    }
+
+    // update transactions index
+    trxIndex_->update(pool);
+
     return true;
 }
 
@@ -781,33 +814,6 @@ void BlockChain::createCachesPath() {
     }
 }
 
-bool BlockChain::updateFromNextBlock(const csdb::Pool& nextPool) {
-    if (!walletsCacheUpdater_) {
-        cserror() << "!walletsCacheUpdater";
-        return false;
-    }
-
-    try {
-        std::lock_guard lock(cacheMutex_);
-
-        // currently block stores own round confidants, not next round:
-        const auto& currentRoundConfidants = nextPool.confidants();
-        walletsCacheUpdater_->loadNextBlock(nextPool, currentRoundConfidants, *this);
-        if (!blockHashes_->onNextBlock(nextPool)) {
-            cslog() << kLogPrefix << "Error writing DB structure";
-        }
-    }
-    catch (std::exception& e) {
-        cserror() << "Exc=" << e.what();
-        return false;
-    }
-    catch (...) {
-        cserror() << "Exc=...";
-        return false;
-    }
-    return true;
-}
-
 bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallData, WalletId& id) const {
     if (address.is_wallet_id()) {
         id = address.wallet_id();
@@ -965,10 +971,6 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         return std::nullopt;
     }
 
-    if (!checkForConsistency(deferredBlock_)) {
-        csdebug() << kLogPrefix << "Deferred Block #" << deferredBlock_.sequence() << " failed the consistency check";
-        return std::nullopt;
-    }
     constexpr cs::Sequence NoSequence = std::numeric_limits<cs::Sequence>::max();
     cs::Sequence flushed_block_seq = NoSequence;
 
@@ -1004,32 +1006,40 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
     //printWalletCaches();
 
+    cs::PublicKeys lastConfidants;
+    if (pool_seq > 1) {
+
+        cs::Lock lock(dbLock_);
+
+        if (deferredBlock_.sequence() + 1 == pool_seq) {
+            lastConfidants = deferredBlock_.confidants();
+        }
+        else {
+            lastConfidants = loadBlock(pool_seq - 1).confidants();
+        }
+    }
+
+    if (finalizeBlock(pool, isTrusted, lastConfidants)) {
+        csdebug() << kLogPrefix << "The block is correct";
+        if (!applyBlockToCaches(pool)) {
+            csdebug() << kLogPrefix << "failed to apply block to caches";
+            return std::nullopt;
+        }
+    }
+    else {
+        csdebug() << kLogPrefix << "the signatures of the block are incorrect";
+        setBlocksToBeRemoved(1U);
+        return std::nullopt;
+    }
+
     {
         cs::Lock lock(dbLock_);
 
-        cs::PublicKeys lastConfidants;
-        if (pool_seq > 1) {
-            if (deferredBlock_.sequence() + 1 == pool_seq) {
-                lastConfidants = deferredBlock_.confidants();
-            }
-            else {
-                lastConfidants = loadBlock(pool_seq - 1).confidants();
-            }
-        }
-
-        // next 2 calls order is extremely significant: finalizeBlock() may call to smarts-"enqueue"-"execute", so deferredBlock MUST BE SET properly
         deferredBlock_ = pool;
-        lastSequence_ = pool.sequence();
-        if (finalizeBlock(deferredBlock_, isTrusted, lastConfidants)) {
-            csdebug() << kLogPrefix << "The block is correct";
-        }
-        else {
-            csdebug() << kLogPrefix << "the signatures of the block are incorrect";
-            setBlocksToBeRemoved(1U);
-            return std::nullopt;
-        }
         pool = deferredBlock_.clone();
+        lastSequence_ = deferredBlock_.sequence();
     }
+
     csdetails() << kLogPrefix << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
     emit storeBlockEvent(pool);
 
@@ -1106,24 +1116,34 @@ bool BlockChain::updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& p
 }
 
 bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool) {
-    deferredBlock_ = csdb::Pool{};
-    deferredBlock_ = newPool;
+
+    // final compose and test:
+    csdb::Pool tmp_clone = newPool.clone();
     auto tmp = rPackage.poolSignatures();
-    deferredBlock_.set_signatures(tmp);
-    deferredBlock_.compose();
+    tmp_clone.set_signatures(tmp);
+    tmp_clone.compose();
     Hash tempHash;
-    auto hash = deferredBlock_.hash();
-    this->blockHashes_->update(deferredBlock_);
+    auto hash = tmp_clone.hash();
     auto bytes = hash.to_binary();
     std::copy(bytes.cbegin(), bytes.cend(), tempHash.data());
-    if (NodeUtils::checkGroupSignature(deferredBlock_.confidants(), rPackage.poolMetaInfo().realTrustedMask, rPackage.poolSignatures(), tempHash)) {
+    if (NodeUtils::checkGroupSignature(tmp_clone.confidants(), rPackage.poolMetaInfo().realTrustedMask, rPackage.poolSignatures(), tempHash)) {
         csmeta(csdebug) << kLogPrefix << "The number of signatures is sufficient and all of them are OK!";
-
+        if (!checkForConsistency(tmp_clone)) {
+            csdebug() << kLogPrefix << "Replace the deferred block #" << tmp_clone.sequence() << ": consistency check failed";
+            return false;
+        }
     }
     else {
         cswarning() << kLogPrefix << "Some of Pool Signatures aren't valid. The pool will not be written to DB. It will be automatically written, when we get proper data";
         return false;
     }
+
+
+    // update deferred block
+    std::lock_guard lock(dbLock_);
+    deferredBlock_ = tmp_clone;
+    this->blockHashes_->update(deferredBlock_);
+
     return true;
 }
 
@@ -1133,7 +1153,6 @@ bool BlockChain::isSpecial(const csdb::Transaction& t) {
     }
     return false;
 }
-
 
 bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     const auto lastSequence = getLastSeq();
