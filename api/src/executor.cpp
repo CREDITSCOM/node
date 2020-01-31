@@ -211,6 +211,8 @@ void cs::Executor::stop() {
         }
     }
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
     if (manager_.isExecutorProcessRunning()) {
         manager_.stopExecutorProcess();
     }
