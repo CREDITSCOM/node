@@ -50,7 +50,7 @@ static std::map<cs::PublicKey, cs::Sequence> createKeys() {
     return keys;
 }
 
-TEST(PoolSynchronizer, TestNeighbours) {
+TEST(PoolSynchronizer, DISABLED_TestNeighbours) {
     static const size_t iterations = 1000;
 
     auto synchronizer = createPoolSynchronizer();
@@ -65,8 +65,10 @@ TEST(PoolSynchronizer, TestNeighbours) {
         auto iter = std::next(keys.begin(), static_cast<std::ptrdiff_t>(index));
         auto sequenceStep = cs::Random::generateValue<cs::Sequence>(10, 1000);
 
-        iter->second += sequenceStep;
+        auto& [key, sequence] = *iter;
+        sequence += sequenceStep;
 
+        synchronizer->onPingReceived(sequence, key);
         ASSERT_TRUE(synchronizer->isCorrect());
     }
 }
