@@ -72,6 +72,7 @@ add_library(csnode
   include/csnode/idatastream.hpp
   include/csnode/odatastream.hpp
   include/csnode/smartcontracts_serializer.hpp
+  include/csnode/tokens_serializer.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -101,6 +102,7 @@ add_library(csnode
   src/sendcachedata.cpp
   src/eventreport.cpp
   src/smartcontracts_serializer.cpp
+  src/tokens_serializer.cpp
 )
 
 configure_msvc_flags()
