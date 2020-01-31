@@ -224,7 +224,6 @@ void Node::stop() {
 }
 
 void Node::destroy() {
-
     EventReport::sendRunningStatus(*this, Running::Status::Stop);
 
     good_ = false;
@@ -238,12 +237,8 @@ void Node::destroy() {
     blockChain_.close();    
     cswarning() << "[BLOCKCHAIN STORAGE CLOSED]";
 
-    cs::Executor::instance().stop();
-    cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
-
     observer_.stop();
     cswarning() << "[CONFIG OBSERVER STOPPED]";
-
 }
 
 void Node::initBootstrapRP(const std::set<cs::PublicKey>& confidants) {
@@ -3384,6 +3379,9 @@ void Node::onStopRequested() {
     else {
         stop();
     }
+
+    cs::Executor::instance().stop();
+    cswarning() << "[EXECUTOR IS SIGNALED TO STOP]";
 }
 
 
