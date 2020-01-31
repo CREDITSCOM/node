@@ -248,12 +248,15 @@ bool is_deploy_transaction(const csdb::Transaction& tr) {
 std::optional<api::Delegated> APIHandler::getDelegated(const BlockChain::WalletData& wallet) {
     csdb::Amount zero(0);
     api::Delegated delegated;
+    bool has_delegations = false;
     if (wallet.delegated_ > zero) {
         auto tmp = convertAmount(wallet.delegated_);
         delegated.__set_incoming(tmp);
+        has_delegations = true;
         // fill donors list after it is implemented
     }
     if (!wallet.delegats_.empty()) {
+        has_delegations = true;
         csdb::Amount sum(0);
         std::vector<api::DelegatedItem> recipients;
         for (const auto& item : wallet.delegats_) {
@@ -274,7 +277,7 @@ std::optional<api::Delegated> APIHandler::getDelegated(const BlockChain::WalletD
             delegated.__set_recipients(recipients);
         }
     }
-    if (delegated.__isset.incoming || delegated.__isset.outgoing) {
+    if (has_delegations || delegated.__isset.donors || delegated.__isset.recipients) {
         return std::make_optional(std::move(delegated));
     }
     return std::nullopt;
