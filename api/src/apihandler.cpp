@@ -2292,36 +2292,6 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
         return;
     }
 
-    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
-
-#ifndef MONITOR_NODE
-    WCSortedList lst;
-    const uint64_t num = static_cast<uint64_t>(_offset + _limit);
-
-    if (_ordCol == 0) {  // Balance
-        iterateOverWallets<csdb::Amount>([](const cs::WalletsCache::WalletData& wd) -> const csdb::Amount& { return wd.balance_; }, num, _desc, lst, blockchain_);
-    }
-
-    if (lst.size() < static_cast<uint64_t>(_offset)) {
-        return;
-    }
-
-    auto ptr = lst.begin();
-    std::advance(ptr, _offset);
-
-    for (; ptr != lst.end(); ++ptr) {
-        api::WalletInfo wi;
-        const cs::Bytes addr_b((*(ptr->first)).begin(), (*(ptr->first)).end());
-        wi.address = fromByteArray(addr_b);
-        wi.balance.integral = ptr->second->balance_.integral();
-        wi.balance.fraction = static_cast<int64_t>(ptr->second->balance_.fraction());
-        auto delegated = getDelegated(*(ptr->second));
-        if (delegated.has_value()) {
-            wi.__set_delegated(delegated.value());
-        }
-        _return.wallets.push_back(wi);
-    }
-#else
     const auto& multiWallets = blockchain_.multiWallets();
     auto order = _desc ? cs::MultiWallets::Order::Greater : cs::MultiWallets::Order::Less;
     std::vector<cs::MultiWallets::InternalData> result;
@@ -2330,7 +2300,12 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
         result = multiWallets.iterate<cs::MultiWallets::ByBalance>(_offset, _limit, order);
     }
     else if (_ordCol == 1) {  // Create time
+#ifdef MONITOR_NODE
         result = multiWallets.iterate<cs::MultiWallets::ByCreateTime>(_offset, _limit, order);
+#else
+        SetResponseStatus(_return.status, APIRequestStatusType::NOT_IMPLEMENTED);
+        return;
+#endif
     }
     else {  // Transactions count
         result = multiWallets.iterate<cs::MultiWallets::ByTransactionsCount>(_offset, _limit, order);
@@ -2343,8 +2318,9 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
         wi.balance.integral = data.balance.integral();
         wi.balance.fraction = static_cast<int64_t>(data.balance.fraction());
         wi.transactionsNumber = static_cast<int64_t>(data.transactionsCount);
+#ifdef MONITOR_NODE
         wi.firstTransactionTime = static_cast<int64_t>(data.createTime);
-
+#endif
         const csdb::Address addr = csdb::Address::from_public_key(data.key);
         BlockChain::WalletData wallData{};
         if (blockchain_.findWalletData(addr, wallData)) {
@@ -2356,9 +2332,8 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
         _return.wallets.push_back(wi);
     }
 
-#endif
-
     _return.count = static_cast<int32_t>(blockchain_.getWalletsCountWithBalance());
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
 void APIHandler::TrustedGet(TrustedGetResult& _return, int32_t _page) {

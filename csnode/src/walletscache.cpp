@@ -109,13 +109,11 @@ void WalletsCache::Updater::invokeReplenishPayableContract(const csdb::Transacti
             sourceWallData.balance_ -= csdb::Amount(transaction.counted_fee().to_double());
             sourceWallData.balance_ += csdb::Amount(transaction.max_fee().to_double());
         }
-#ifdef MONITOR_NODE
+
         emit walletUpdateEvent(toPublicKey(transaction.source()), sourceWallData);
-#endif
     }
-#ifdef MONITOR_NODE
+
     emit walletUpdateEvent(toPublicKey(transaction.target()), wallData);
-#endif
 }
 
 void WalletsCache::Updater::smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx,
@@ -134,10 +132,9 @@ void WalletsCache::Updater::smartSourceTransactionReleased(const csdb::Transacti
         smartWallData.balance_ -= countedFee;
         initWallData.balance_ += countedFee;
     }
-#ifdef MONITOR_NODE
+
     emit walletUpdateEvent(toPublicKey(smartSourceTrx.source()), smartWallData);
     emit walletUpdateEvent(toPublicKey(initTrx.source()), initWallData);
-#endif
 }
 
 void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transaction& transaction,
@@ -185,9 +182,8 @@ void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transact
             }
         }
     }
-#ifdef MONITOR_NODE
+
     emit walletUpdateEvent(toPublicKey(transaction.source()), wallData);
-#endif
 }
 
 #ifdef MONITOR_NODE
@@ -241,9 +237,8 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
             if (numPayedTrusted == (realTrustedNumber - 1)) {
                 feeToEachConfidant = totalFee - payedFee;
             }
-#ifdef MONITOR_NODE
+
             emit walletUpdateEvent(confidants[i], walletData);
-#endif
         }
     }
 }
@@ -285,9 +280,8 @@ void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transac
             if (numPayedTrusted == (realTrustedNumber - 1)) {
                 feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>() - payedFee;
             }
-#ifdef MONITOR_NODE
+
             emit walletUpdateEvent(confidants[i], walletData);
-#endif
         }
     }
 }
@@ -375,7 +369,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         }
         auto& wallData_s = getWalletData(tr.source());
         if (!inverse) {
-		    ++wallData_s.transNum_;
+            ++wallData_s.transNum_;
             wallData_s.trxTail_.push(tr.innerID());
             wallData_s.lastTransaction_ = tr.id();
 
@@ -385,11 +379,10 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                         << " <- " << tr.innerID();
         }
         else {
-		    --wallData_s.transNum_;
+            --wallData_s.transNum_;
         }
-#ifdef MONITOR_NODE
+
         emit walletUpdateEvent(toPublicKey(tr.source()), wallData_s);
-#endif
     }
     else {
         if (!inverse) {
@@ -427,7 +420,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
             else {
                 wallData.balance_ -= tr.amount();
             }
-		    ++wallData.transNum_;
+            ++wallData.transNum_;
             wallData.trxTail_.push(tr.innerID());
             wallData.lastTransaction_ = tr.id();
 
@@ -466,7 +459,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                 wallData.balance_ += tr.amount();
             }
 
-		    --wallData.transNum_;
+            --wallData.transNum_;
         }
     }
 
@@ -482,9 +475,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         wallData_s.trxTail_.erase(tr.innerID());
     }
 
-#ifdef MONITOR_NODE
     emit walletUpdateEvent(toPublicKey(wallAddress), wallData);
-#endif
     return tr.counted_fee().to_double();
 }
 
@@ -514,22 +505,27 @@ void WalletsCache::Updater::checkCanceledSmart(const csdb::Address& contract_add
         return;
     }
 
-auto it = data_.canceledSmarts_.find(contract_addr);
-if (it == data_.canceledSmarts_.end()) {
-    return;
-}
-const auto seq = tid.pool_seq();
-const auto idx = tid.index();
-for (auto i = it->second.cbegin(); i != it->second.cend(); ++i) {
-    const auto s = i->pool_seq();
-    if (s <= seq || (s == seq && i->index() <= idx)) {
-        it->second.erase(i, it->second.cend());
-        break;
+    auto it = data_.canceledSmarts_.find(contract_addr);
+
+    if (it == data_.canceledSmarts_.end()) {
+        return;
     }
-}
-if (it->second.empty()) {
-    data_.canceledSmarts_.erase(it);
-}
+
+    const auto seq = tid.pool_seq();
+    const auto idx = tid.index();
+
+    for (auto i = it->second.cbegin(); i != it->second.cend(); ++i) {
+        const auto s = i->pool_seq();
+
+        if (s <= seq || (s == seq && i->index() <= idx)) {
+            it->second.erase(i, it->second.cend());
+            break;
+        }
+    }
+
+    if (it->second.empty()) {
+        data_.canceledSmarts_.erase(it);
+    }
 }
 
 void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction,
@@ -571,10 +567,9 @@ void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& i
 
             auto& wallData = getWalletData(initTransaction.target());
             wallData.balance_ -= initTransaction.amount();
-#ifdef MONITOR_NODE
+
             emit walletUpdateEvent(toPublicKey(initTransaction.source()), wallDataIniter);
             emit walletUpdateEvent(toPublicKey(initTransaction.target()), wallData);
-#endif
         }
     }
 
@@ -587,10 +582,9 @@ void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& i
 
         auto& wallData = getWalletData(initTransaction.target());
         wallData.balance_ += initTransaction.amount();
-#ifdef MONITOR_NODE
+
         emit walletUpdateEvent(toPublicKey(initTransaction.source()), wallDataIniter);
         emit walletUpdateEvent(toPublicKey(initTransaction.target()), wallData);
-#endif
     }
 }
 
@@ -637,12 +631,10 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
     }
 
     if (tr.source() != tr.target()) { // Already counted in loadTrxForSource
-        if (!inverse) ++wallData.transNum_;
-        else --wallData.transNum_;
+        !inverse ? ++wallData.transNum_ : --wallData.transNum_;
     }
-#ifdef MONITOR_NODE
+
     emit walletUpdateEvent(toPublicKey(tr.target()), wallData);
-#endif
 }
 
 void WalletsCache::Updater::updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>& updates) {
@@ -650,9 +642,8 @@ void WalletsCache::Updater::updateLastTransactions(const std::vector<std::pair<P
         auto it = data_.wallets_.find(u.first);
         if (it != data_.wallets_.end()) {
             it->second.lastTransaction_ = u.second;
-#ifdef MONITOR_NODE
+
             emit walletUpdateEvent(it->first, it->second);
-#endif
         }
     }
 }
