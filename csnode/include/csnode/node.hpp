@@ -311,7 +311,10 @@ public slots:
     void processTimer();
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
     void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
+    // request specified target for set of sequences
     void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
+    // request current trusted nodes for block with specific sequence
+    void sendBlockRequestToConfidants(cs::Sequence sequence);
     void processSpecialInfo(const csdb::Pool& pool);
     void validateBlock(const csdb::Pool& block, bool* shouldStop);
     void deepBlockValidation(csdb::Pool block, bool* shouldStop);

@@ -420,6 +420,44 @@ void BlockChain::removeLastBlock() {
     csmeta(csdebug) << kLogPrefix << "done";
 }
 
+bool BlockChain::compromiseLastBlock(const csdb::PoolHash& desired_hash) {
+    csdb::Pool last_block = csdb::Pool{};
+    {
+        cs::Lock lock(dbLock_);
+
+        if (deferredBlock_.is_valid()) {
+            last_block = deferredBlock_.clone();
+        }
+    }
+    if (!last_block.is_valid()) {
+        cserror() << kLogPrefix << "can only compromise the deferred block";
+        uncertainLastBlockFlag_ = false;
+        return false;
+    }
+
+    const auto seq = last_block.sequence();
+    const auto current = last_block.hash();
+    const auto desired = desired_hash;
+
+    if (uncertainLastBlockFlag_ && seq != uncertainSequence_) {
+        cswarning() << kLogPrefix << "change uncertain sequence from " << uncertainSequence_ << " to " << seq;
+    }
+    uncertainSequence_ = seq;
+    if (uncertainLastBlockFlag_ && current != uncertainHash_) {
+        cswarning() << kLogPrefix << "change uncertain hash";
+    }
+    uncertainHash_ = current;
+    if (uncertainLastBlockFlag_ && current != desiredHash_) {
+        cswarning() << kLogPrefix << "change desired hash";
+    }
+    desiredHash_ = desired;
+
+    uncertainLastBlockFlag_ = true;
+    /*signal*/ uncertainBlock(uncertainSequence_);
+
+    return true;
+}
+
 void BlockChain::updateLastTransactions(const std::vector<std::pair<cs::PublicKey, csdb::TransactionID>>& updates) {
     std::lock_guard l(cacheMutex_);
     walletsCacheUpdater_->updateLastTransactions(updates);
@@ -1171,6 +1209,29 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     }
 
     if (poolSequence == lastSequence) {
+        if (isLastBlockUncertain()) {
+            if (pool.sequence() == uncertainSequence_ && pool.hash() == desiredHash_) {
+
+                std::lock_guard lock(dbLock_);
+
+                if (csdb::Pool::content_equal(pool, deferredBlock_)) {
+                    deferredBlock_ = pool;
+                    uncertainLastBlockFlag_ = false;
+                    uncertainSequence_ = 0;
+                    uncertainHash_ = csdb::PoolHash{};
+                    desiredHash_ = csdb::PoolHash{};
+                    ++cntUncertainReplaced;
+                    csdebug() << kLogPrefix << "get desired last block with the same content, continue with blockchain successfully";
+                    return true;
+                }
+                else {
+                    csdebug() << kLogPrefix << "the desired last block has the different content, drop it and remove own last block";
+                    removeLastBlock();
+                    return false;
+                }
+            }
+        }
+
         std::lock_guard lock(dbLock_);
 
         if (!deferredBlock_.signatures().empty()) {
@@ -1194,8 +1255,13 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
                 cserror() << kLogPrefix << "new pool\'s prev. hash is empty, don\'t write it, do not any harm to our blockchain";
 				return false;
             }
-			csdebug() << kLogPrefix << "remove own last block and cancel store operation";
-            removeLastBlock();
+            if (compromiseLastBlock(pool.previous_hash())) {
+                csdebug() << kLogPrefix << "compromise own last block and cancel store operation";
+            }
+            else {
+			    csdebug() << kLogPrefix << "remove own last block and cancel store operation";
+                removeLastBlock();
+            }
             return false;
         }
 

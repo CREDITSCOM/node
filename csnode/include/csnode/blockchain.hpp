@@ -123,6 +123,21 @@ public:
     void removeWalletsInPoolFromCache(const csdb::Pool& pool);
     void removeLastBlock();
 
+    /**
+     * Mark last block as compromised and handle the situation:
+     *  - store required parameters  
+     *  - make a request for proper block variant
+     *
+     * @author  Alexander Avramenko
+     * @date    31.01.2020
+     *
+     * @param   desired_hash    The desired hash of last block to request.
+     *
+     * @returns True if it succeeds, false if it fails.
+     */
+
+    bool compromiseLastBlock(const csdb::PoolHash& desired_hash);
+
     // updates fees in every transaction
     void setTransactionsFees(cs::TransactionsPacket& packet);
     void setTransactionsFees(csdb::Pool& pool);
@@ -193,6 +208,10 @@ public:
 
     void testCachedBlocks();
 
+    bool isLastBlockUncertain() const {
+        return uncertainLastBlockFlag_;
+    }
+
 public signals:
 
     /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
@@ -209,6 +228,9 @@ public signals:
 
     /** @brief Alarm event. Block Isn't correct */
     cs::AlarmSignal alarmBadBlock;
+
+    /** @brief Alarm event. Uncertain that last block is valid */
+    cs::AlarmSignal uncertainBlock;
 
     const cs::ReadBlockSignal& readBlockEvent() const;
     const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;
@@ -410,12 +432,14 @@ private:
 
     // support the ability to replace last deferred block by the alternative with the same content, anti-fork feature
     // flag the last block is uncertain:
-    bool uncertainLastBlock_ = false;
+    bool uncertainLastBlockFlag_ = false;
     // sequence of uncertain block, if uncertainLastBlock_ == true
     cs::Sequence uncertainSequence_ = 0;
     // hash of uncertain block
     csdb::PoolHash uncertainHash_;
     // desired hash of block with the same (uncertain) sequence and the same content as the current (uncertain) block:
     csdb::PoolHash desiredHash_;
+    // counter of successfully replaced uncertain blocks
+    size_t cntUncertainReplaced = 0;
 };
 #endif  //  BLOCKCHAIN_HPP

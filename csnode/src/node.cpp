@@ -87,6 +87,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.alarmBadBlock, this, &Node::sendBlockAlarmSignal);
     cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
     cs::Connector::connect(&blockChain_.storeBlockEvent, this, &Node::processSpecialInfo);
+    cs::Connector::connect(&blockChain_.uncertainBlock, this, &Node::sendBlockRequestToConfidants);
 
     setupNextMessageBehaviour();
 
@@ -1405,7 +1406,9 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
-    if (!poolSynchronizer_->isSyncroStarted()) {
+    bool is_sync_on = poolSynchronizer_->isSyncroStarted();
+    bool is_blockchain_uncertain = blockChain_.isLastBlockUncertain();
+    if (!is_sync_on && !is_blockchain_uncertain) {
         csdebug() << "NODE> Get block reply> Pool sync has already finished";
         return;
     }
@@ -1427,7 +1430,18 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
         return;
     }
 
-    poolSynchronizer_->getBlockReply(std::move(poolsBlock), packetNumber);
+    if (is_blockchain_uncertain) {
+        const auto last = blockChain_.getLastSeq();
+        for (auto& b: poolsBlock) {
+            if (b.sequence() == last) {
+                blockChain_.storeBlock(b, true /*by_sync*/);
+            }
+        }
+    }
+
+    if (is_sync_on) {
+        poolSynchronizer_->getBlockReply(std::move(poolsBlock), packetNumber);
+    }
 }
 
 void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packetNum) {
@@ -1615,6 +1629,18 @@ void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequested
     transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 
     ostream_.clear();
+}
+
+void Node::sendBlockRequestToConfidants(cs::Sequence sequence) {
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    cs::PoolsRequestedSequences sequences;
+    sequences.push_back(sequence);
+
+    // try to send to confidants..
+    if (sendToConfidants(MsgTypes::BlockRequest, round, sequences, size_t(0) /*packetNum*/) < Consensus::MinTrustedNodes) {
+        // .. otherwise broadcast hash
+        sendToBroadcast(MsgTypes::BlockRequest, round, sequences, size_t(0) /*packetNum*/);
+    }
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type, const cs::PublicKey sender) {
@@ -3697,7 +3723,9 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
         // TODO: examine what will be done without this function
         if (!roundPackageCache_.empty() && roundPackageCache_.back().poolMetaInfo().realTrustedMask.size() > cs::TrustedMask::trustedSize(roundPackageCache_.back().poolMetaInfo().realTrustedMask)) {
             blockChain_.setBlocksToBeRemoved(1U);
-            blockChain_.removeLastBlock();
+            if (!blockChain_.compromiseLastBlock(hash)) {
+                blockChain_.removeLastBlock();
+            }
             lastBlockRemoved_ = true;
         }
 
