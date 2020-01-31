@@ -38,6 +38,7 @@ add_library(csnode
   include/csnode/address_serializer.hpp
   include/csnode/bitheap.hpp
   include/csnode/blockchain.hpp
+  include/csnode/blockchain_serializer.hpp
   include/csnode/cyclicbuffer.hpp
   include/csnode/node.hpp
   include/csnode/datastream.hpp
@@ -74,6 +75,7 @@ add_library(csnode
   include/csnode/smartcontracts_serializer.hpp
   include/csnode/tokens_serializer.hpp
   src/blockchain.cpp
+  src/blockchain_serializer.cpp
   src/node.cpp
   src/nodecore.cpp
   src/conveyer.cpp

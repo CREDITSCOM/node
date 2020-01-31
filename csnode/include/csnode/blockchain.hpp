@@ -34,6 +34,7 @@ class WalletsIds;
 class Fee;
 class TransactionsIndex;
 class TransactionsPacket;
+class BlockChain_Serializer;
 
 /** @brief   The synchronized block signal emits when block is trying to be stored */
 using TryToStoreBlockSignal = cs::Signal<void(const csdb::Pool&, bool*)>;
@@ -416,5 +417,7 @@ private:
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
     std::atomic_bool stop_ = false;
+
+    friend class cs::BlockChain_Serializer;
 };
 #endif  //  BLOCKCHAIN_HPP
