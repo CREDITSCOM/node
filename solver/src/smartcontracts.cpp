@@ -1554,6 +1554,13 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
             auto it_queue = find_in_queue(ref);
             if (it_queue != exe_queue.end()) {
                 /*emit*/ rollback_payable_invoke(t);
+                auto it_exe = find_in_queue_item(it_queue, ref);
+                if (it_exe != it_queue->executions.end()) {
+                    it_queue->executions.erase(it_exe);
+                }
+                if (it_queue->executions.empty()) {
+                    exe_queue.erase(it_queue);
+                }
             }
             else {
                 csdebug() << kLogPrefix << "cannot find in queue deleted call to payable() " << ref << ", assume it was finished with timeout";
