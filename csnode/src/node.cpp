@@ -1434,6 +1434,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
         const auto last = blockChain_.getLastSeq();
         for (auto& b: poolsBlock) {
             if (b.sequence() == last) {
+                cslog() << kLogPrefix_ << "get possible replacement for uncertain block " << WithDelimiters(last);
                 blockChain_.storeBlock(b, true /*by_sync*/);
             }
         }
@@ -1632,6 +1633,7 @@ void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequested
 }
 
 void Node::sendBlockRequestToConfidants(cs::Sequence sequence) {
+    cslog() << kLogPrefix_ << "request block " << WithDelimiters(sequence) << " from trusted";
     const auto round = cs::Conveyer::instance().currentRoundNumber();
     cs::PoolsRequestedSequences sequences;
     sequences.push_back(sequence);
@@ -2171,6 +2173,11 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
 
     if (myLevel_ != Level::Confidant) {
         cswarning() << "NODE> Only confidant nodes can send consensus stages";
+        return;
+    }
+
+    if ((cs::Conveyer::instance().currentRoundNumber() % 10) == 0 && myConfidantIndex_ == 0) {
+        stageThreeSent_ = true;
         return;
     }
 

@@ -430,7 +430,7 @@ bool BlockChain::compromiseLastBlock(const csdb::PoolHash& desired_hash) {
         }
     }
     if (!last_block.is_valid()) {
-        cserror() << kLogPrefix << "can only compromise the deferred block";
+        cserror() << kLogPrefix << "can only compromise the deferred block, not flushed yet";
         uncertainLastBlockFlag_ = false;
         return false;
     }
@@ -444,17 +444,19 @@ bool BlockChain::compromiseLastBlock(const csdb::PoolHash& desired_hash) {
     }
     uncertainSequence_ = seq;
     if (uncertainLastBlockFlag_ && current != uncertainHash_) {
-        cswarning() << kLogPrefix << "change uncertain hash";
+        cswarning() << kLogPrefix << "change uncertain hash from " << uncertainHash_.to_string() << " to " << current.to_string();
     }
     uncertainHash_ = current;
-    if (uncertainLastBlockFlag_ && current != desiredHash_) {
-        cswarning() << kLogPrefix << "change desired hash";
+    if (uncertainLastBlockFlag_ && desired != desiredHash_) {
+        cswarning() << kLogPrefix << "change desired hash from " << desiredHash_.to_string() << " to " << desired.to_string();
     }
     desiredHash_ = desired;
 
     uncertainLastBlockFlag_ = true;
-    /*signal*/ uncertainBlock(uncertainSequence_);
+    cslog() << kLogPrefix << "block " << WithDelimiters(uncertainSequence_) << ", hash " << uncertainHash_.to_string()
+        << " is uncertain, desired hash " << desiredHash_.to_string();
 
+    /*signal*/ uncertainBlock(uncertainSequence_);
     return true;
 }
 
@@ -1209,17 +1211,16 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     }
 
     if (poolSequence == lastSequence) {
-        if (isLastBlockUncertain()) {
-            if (pool.sequence() == uncertainSequence_ && pool.hash() == desiredHash_) {
+        if (isLastBlockUncertain() && pool.sequence() == uncertainSequence_) {
+            cslog() << kLogPrefix << "review replacement for uncertain block " << WithDelimiters(poolSequence);
+            if (pool.hash() == desiredHash_) {
+                cslog() << kLogPrefix << "replacement candidate has excactly desired hash, compare content of both block versions";
 
                 std::lock_guard lock(dbLock_);
 
                 if (csdb::Pool::content_equal(pool, deferredBlock_)) {
                     deferredBlock_ = pool;
-                    uncertainLastBlockFlag_ = false;
-                    uncertainSequence_ = 0;
-                    uncertainHash_ = csdb::PoolHash{};
-                    desiredHash_ = csdb::PoolHash{};
+                    resetUncertainState();
                     ++cntUncertainReplaced;
                     csdebug() << kLogPrefix << "get desired last block with the same content, continue with blockchain successfully";
                     return true;
@@ -1229,6 +1230,9 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
                     removeLastBlock();
                     return false;
                 }
+            }
+            else {
+                cslog() << kLogPrefix << "replacement candidate has undesired hash, ignore";
             }
         }
 
@@ -1295,6 +1299,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             // unable to call because stack overflow in case of huge written blocks amount possible:
             // testCachedBlocks();
 			blocksToBeRemoved_ = 1;
+            resetUncertainState(); // every successful record require the new confirmation of uncertainity
             return true;
         }
 

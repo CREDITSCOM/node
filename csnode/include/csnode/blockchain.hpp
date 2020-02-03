@@ -441,5 +441,12 @@ private:
     csdb::PoolHash desiredHash_;
     // counter of successfully replaced uncertain blocks
     size_t cntUncertainReplaced = 0;
+
+    void resetUncertainState() {
+        uncertainLastBlockFlag_ = false;
+        uncertainSequence_ = 0;
+        uncertainHash_ = csdb::PoolHash{};
+        desiredHash_ = csdb::PoolHash{};
+    }
 };
 #endif  //  BLOCKCHAIN_HPP
