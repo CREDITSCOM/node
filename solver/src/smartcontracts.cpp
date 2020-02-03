@@ -832,6 +832,14 @@ uint32_t SmartContracts::test_violations(const csdb::Transaction& tr) {
 
     uint32_t result = Violations::None;
 
+    if (SmartContracts::is_executable(tr) || is_payable_target(tr)) {
+        const double avail_fee = tr.max_fee().to_double() - cs::fee::getFee(tr).to_double();
+        if (avail_fee - cs::fee::getContractStateMinFee().to_double() < std::numeric_limits<double>::epsilon()) {
+            csdebug() << kLogPrefix << "insufficient max fee in start transaction, prevalidation failed";
+            result += Reject::Reason::InsufficientMaxFee;
+        }
+    }
+
     // test smart contract as source of transaction
     bool is_emitted = false;
     csdb::Address abs_addr = absolute_address(tr.source());
