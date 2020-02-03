@@ -503,7 +503,7 @@ void WalletsCache::Updater::checkCanceledSmart(const csdb::Address& contract_add
     const csdb::TransactionID& tid,
     bool inverse) {
 
-    if (inverse) {
+   /* if (inverse) {
         auto it = data_.canceledSmarts_.find(contract_addr);
         if (it == data_.canceledSmarts_.end()) {
             data_.canceledSmarts_.insert(std::make_pair(contract_addr, std::list<csdb::TransactionID>{tid}));
@@ -512,7 +512,7 @@ void WalletsCache::Updater::checkCanceledSmart(const csdb::Address& contract_add
             it->second.push_front(tid);
         }
         return;
-    }
+    }*/
 
     auto it = data_.canceledSmarts_.find(contract_addr);
     if (it == data_.canceledSmarts_.end()) {
