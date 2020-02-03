@@ -1652,6 +1652,14 @@ void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Ar
 }
 
 template <class... Args>
+void Node::sendBroadcastIfNoConnection(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+    csdetails() << "NODE> Sending broadcast IF NO CONNECTION, round: " << round
+                << ", msgType: " << Packet::messageTypeToString(msgType);
+
+    transport_->sendBroadcastIfNoConnection(formPacket(BaseFlags::Compressed, msgType, round, args...), target);
+}
+
+template <class... Args>
 void Node::sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
     csdebug() << "NODE> Sending confidants, round: " << round
               << ", msgType: " << Packet::messageTypeToString(msgType);

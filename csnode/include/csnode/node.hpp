@@ -339,6 +339,9 @@ private:
     template <class... Args>
     void sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
+    template <class... Args>
+    void sendBroadcastIfNoConnection(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
     // to current confidants list
     template <class... Args>
     void sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
