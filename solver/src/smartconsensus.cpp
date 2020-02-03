@@ -617,9 +617,10 @@ void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) 
         if (!cscrypto::verifySignature(stageFrom.packageSignature, smartConfidants().at(stageFrom.sender), hash.data(), hash.size())) {
             cslog() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
             << " ____ The signature is not valid";
-            return;  // returns this function if the signature of smartco
+            return false;  // returns this function if the signature of smartco
         }
         smartStageThreeStorage_.at(stageFrom.sender) = stageFrom;
+        return true;
     };
 
     if (!smartConfidantExist(stage.sender)) {
@@ -664,11 +665,15 @@ void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) 
         }
     }
     else {
-        smartStageThreeStorage_.at(stage.sender) = stage;
+        smartStageThreeStorage_.at(stage.sender) = stage; // this should be our stage so check isn't necessary 
         for (auto& it : smartStageThreeTempStorage_) {
-            lambda(it, finalSmartTransactionPack_.hash().toBinary());
-            csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " <-- SMART-Stage-3 [" << static_cast<int>(stage.sender)
-                      << "] = " << smartStage3StorageSize();
+            if (lambda(it, finalSmartTransactionPack_.hash().toBinary())) {
+                csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " <-- SMART-Stage-3 [" << static_cast<int>(it.sender)
+                    << "] = " << smartStage3StorageSize();
+                if (smartStageThreeEnough()) {
+                    break;
+                }
+            }
         }
     }
 
@@ -921,7 +926,7 @@ bool SmartConsensus::smartStageEnough(const std::vector<T>& smartStageStorage, c
     }
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << ' ' << funcName << " completed " << stageSize << " of " << cSize;
-    return stageSize == cSize;
+    return stageSize >= cSize;
 }
 
 void SmartConsensus::startTimer(int st) {
