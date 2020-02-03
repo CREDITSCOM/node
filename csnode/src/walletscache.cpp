@@ -500,8 +500,8 @@ bool WalletsCache::Updater::isCanceledSmart(const csdb::Address& contract_addr, 
 }
 
 void WalletsCache::Updater::checkCanceledSmart(const csdb::Address& contract_addr,
-                                               const csdb::TransactionID& tid,
-                                               bool inverse) {
+    const csdb::TransactionID& tid,
+    bool inverse) {
 
     if (inverse) {
         auto it = data_.canceledSmarts_.find(contract_addr);
@@ -514,22 +514,22 @@ void WalletsCache::Updater::checkCanceledSmart(const csdb::Address& contract_add
         return;
     }
 
-auto it = data_.canceledSmarts_.find(contract_addr);
-if (it == data_.canceledSmarts_.end()) {
-    return;
-}
-const auto seq = tid.pool_seq();
-const auto idx = tid.index();
-for (auto i = it->second.cbegin(); i != it->second.cend(); ++i) {
-    const auto s = i->pool_seq();
-    if (s <= seq || (s == seq && i->index() <= idx)) {
-        it->second.erase(i, it->second.cend());
-        break;
+    auto it = data_.canceledSmarts_.find(contract_addr);
+    if (it == data_.canceledSmarts_.end()) {
+        return;
     }
-}
-if (it->second.empty()) {
-    data_.canceledSmarts_.erase(it);
-}
+    const auto seq = tid.pool_seq();
+    const auto idx = tid.index();
+    for (auto i = it->second.cbegin(); i != it->second.cend(); ++i) {
+        const auto s = i->pool_seq();
+        if (s <= seq || (s == seq && i->index() <= idx)) {
+            it->second.erase(i, it->second.cend());
+            break;
+        }
+    }
+    if (it->second.empty()) {
+        data_.canceledSmarts_.erase(it);
+    }
 }
 
 void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& initTransaction,
