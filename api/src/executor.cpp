@@ -893,7 +893,7 @@ uint64_t cs::Executor::generateAccessId(cs::Sequence explicitSequence, uint64_t 
         // try to get time from block
         const csdb::Pool block = blockchain_.loadBlock(accessSequence_[lastAccessId_]);
         if (block.is_valid()) {
-            executeTrxnsTime[lastAccessId_] = block.get_time();
+            executeTrxnsTime[lastAccessId_] = BlockChain::getBlockTime(block);
         }
     }
 

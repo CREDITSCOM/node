@@ -501,7 +501,7 @@ bool WalletsCache::Updater::isCanceledSmart(const csdb::Address& contract_addr, 
 
 void WalletsCache::Updater::checkCanceledSmart(const csdb::Address& contract_addr,
     const csdb::TransactionID& tid,
-    bool inverse) {
+    bool /*inverse*/) {
 
    /* if (inverse) {
         auto it = data_.canceledSmarts_.find(contract_addr);
