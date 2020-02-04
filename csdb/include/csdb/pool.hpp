@@ -87,7 +87,6 @@ SHARED_DATA_CLASS_IMPLEMENTATION_INLINE(PoolHash)
 class Pool {
     SHARED_DATA_CLASS_DECLARE(Pool)
 public:
-    inline static const user_field_id_t TimestampID = 0;
 
     using Transactions = std::vector<csdb::Transaction>;
     class NewWalletInfo {
@@ -158,10 +157,6 @@ public:
 
     Pool meta_from_byte_stream(const char*, size_t);
     static Pool from_lz4_byte_stream(size_t);
-
-    // compare only state content: transactions, new wallets, sequence, round fee, user fields
-    // true if both pools are not valid, or both pools have equal state content
-    static bool content_equal(const csdb::Pool& lhs, const csdb::Pool& rhs);
 
     bool is_valid() const noexcept;
     bool is_read_only() const noexcept;
@@ -240,8 +235,6 @@ public:
      */
     PoolHash hash() const noexcept;
     void recount() noexcept;
-
-    uint64_t get_time() const noexcept;
 
     /**
      * @brief Бинарное представление пула
