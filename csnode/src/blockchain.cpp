@@ -487,9 +487,18 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
                 return;
             }
             if (!walletIds_->normal().remove(newWallAddress)) {
-                cswarning() << kLogPrefix << "Wallet was not removed";
+                cswarning() << kLogPrefix << "Wallet was not removed " << newWallAddress.to_string();
             }
         }
+
+        for (const auto it : pool.transactions()) {
+            if (cs::SmartContracts::is_deploy(it)) {
+                if (!walletIds_->normal().remove(it.target())) {
+                    cswarning() << kLogPrefix << "Contract address was not removed: " << it.target().to_string();
+                }
+            }
+        }
+
     }
     catch (std::exception& e) {
         cserror() << "Exc=" << e.what();
@@ -959,21 +968,25 @@ bool BlockChain::checkForConsistency(csdb::Pool& pool) {
 
 }
 
-void  BlockChain::printWalletCaches() {
+std::string  BlockChain::printWalletCaches() {
     std::string res;
     csdb::Amount totalCheck{ 0 };
-    res += ":\n#.     Public Key:                                                    Balance:                    Delegated:\n";
+    res += ":\nLast block: " + std::to_string(lastSequence_) + "\n#.     Public Key:                                                    Balance:                    Delegated:  TrxsCount: LastTrxId:  TrxID: Heap:\n";
     int counter = 0;
     iterateOverWallets([&res, &counter, &totalCheck](const cs::PublicKey& addr, const cs::WalletsCache::WalletData& wd) {
         ++counter;
         res += std::to_string(counter) + ". " + cs::Utils::byteStreamToHex(addr.data(), addr.size()) + "   ";
         auto am = wd.balance_.to_string();
-        totalCheck += wd.balance_;
+        totalCheck += wd.balance_ + wd.delegated_;
         res += am;
         for (size_t k = am.size(); k < 28; ++k) { // 28 positions are covered with " " to align digits
             res += " ";
         }
-        res += wd.delegated_.to_string() + "\n";
+        res += wd.delegated_.to_string() + "   ";
+        res += std::to_string(wd.transNum_) + "   ";
+        res += (wd.trxTail_.getLastTransactionId() > 1'000'000'000 ? "No" : std::to_string(wd.trxTail_.getLastTransactionId())) + "   ";
+        res += (wd.lastTransaction_.pool_seq() > 1'000'000'000 ? "No" : std::to_string(wd.lastTransaction_.pool_seq())) +"." + std::to_string(wd.lastTransaction_.index()) + "  ";
+        res += wd.trxTail_.printHeap() + "\n";
         if (!wd.delegats_.empty()) {
             int delCounter = 0;
             res += "    Delegats(" + std::to_string(wd.delegats_.size()) + "):" + "\n";
@@ -989,7 +1002,8 @@ void  BlockChain::printWalletCaches() {
     });
     res += "---------------------------------------------------------\n";
     res += "Total: " + totalCheck.to_string();
-    csdebug() << res;
+    //csdebug() << res;
+    return res;
 }
 
 std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrusted) {
