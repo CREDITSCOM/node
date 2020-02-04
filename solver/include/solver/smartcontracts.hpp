@@ -635,7 +635,7 @@ private:
             , is_executor(false)
             , is_rejected(false) {
 
-            add(ref_contract, tr_start);
+            add(ref_contract, tr_start, true /*at_end*/);
         }
 
         // executions & pconsensus remains empty
@@ -654,7 +654,7 @@ private:
 
         // add contract execution to existing exe queue item
         // caller is responsible the execution to refer to the same contract, call to other method of the same contract is allowed
-        void add(const SmartContractRef& ref_contract, csdb::Transaction tr_start);
+        void add(const SmartContractRef& ref_contract, csdb::Transaction tr_start, bool at_end);
     };
 
     // execution queue
