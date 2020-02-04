@@ -147,7 +147,7 @@ void BlockChain::onReadFromDB(csdb::Pool block, bool* shouldStop) {
         }
         else {
             if (block.transactions_count() > 0) {
-                const auto block_time = block.get_time();
+                const auto block_time = BlockChain::getBlockTime(block);
                 for (auto& t : block.transactions()) {
                     t.set_time(block_time);
                 }
@@ -199,15 +199,15 @@ std::string BlockChain::getLastTimeStamp() const {
     std::lock_guard<decltype(dbLock_)> l(dbLock_);
 
     if (deferredBlock_.is_valid()) {
-        if (deferredBlock_.user_field_ids().count(0) > 0) {
-            return deferredBlock_.user_field(0).value<std::string>();
+        if (deferredBlock_.user_field_ids().count(TimestampID) > 0) {
+            return deferredBlock_.user_field(TimestampID).value<std::string>();
         }
         else {
             return std::string("0");
         }
     }
     else {
-        return getLastBlock().user_field(0).value<std::string>();
+        return getLastBlock().user_field(TimestampID).value<std::string>();
     }
 }
 
@@ -329,11 +329,12 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
 
     if (deferredBlock_.is_valid() && deferredBlock_.sequence() == transId.pool_seq()) {
         transaction = deferredBlock_.transaction(transId).clone();
-        transaction.set_time(deferredBlock_.get_time());
+        transaction.set_time(BlockChain::getBlockTime(deferredBlock_));
     }
     else {
         transaction = storage_.transaction(transId);
-        transaction.set_time(storage_.pool_load(transId.pool_seq()).get_time());
+        auto tmp = storage_.pool_load(transId.pool_seq());
+        transaction.set_time(BlockChain::getBlockTime(tmp));
     }
 
     return transaction;
@@ -465,6 +466,7 @@ void BlockChain::updateLastTransactions(const std::vector<std::pair<cs::PublicKe
     walletsCacheUpdater_->updateLastTransactions(updates);
 }
 
+/*static*/
 csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
     if (key.size() == kPublicKeyLength) {
         csdb::Address res = csdb::Address::from_public_key(key.data());
@@ -475,6 +477,22 @@ csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
         csdb::Address res = csdb::Address::from_wallet_id(id);
         return res;
     }
+}
+
+/*static*/
+uint64_t BlockChain::getBlockTime(const csdb::Pool& block) noexcept {
+    if (block.is_valid()) {
+        if (block.user_field_ids().count(TimestampID) > 0) {
+            std::string tmp = block.user_field(TimestampID).value<std::string>();
+            try {
+                return std::stoull(tmp);
+            }
+            catch (...) {
+                csdebug() << kLogPrefix << "block " << WithDelimiters(block.sequence()) << " contains incorrect timestamp value " << tmp;
+            }
+        }
+    }
+    return 0;
 }
 
 void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
@@ -523,8 +541,8 @@ void BlockChain::logBlockInfo(csdb::Pool& pool) {
         csdebug() << "\t- " << cs::Utils::byteStreamToHex(t.data(), t.size());
     }
     csdebug() << " transactions count " << pool.transactions_count();
-    if (pool.user_field_ids().count(0) > 0) {
-        csdebug() << " time: " << pool.user_field(0).value<std::string>().c_str();
+    if (pool.user_field_ids().count(TimestampID) > 0) {
+        csdebug() << " time: " << pool.user_field(TimestampID).value<std::string>().c_str();
     }
     csdebug() << " previous hash: " << pool.previous_hash().to_string();
     csdebug() << " hash(" << pool.sequence() << "): " << pool.hash().to_string();
@@ -605,7 +623,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
     // pool signatures check: end
 
     if (pool.transactions_count() > 0) {
-        const auto block_time = pool.get_time();
+        const auto block_time = BlockChain::getBlockTime(pool);
         for (auto& t : pool.transactions()) {
             t.set_time(block_time);
         }
@@ -708,7 +726,7 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
         }
 
         transactions.push_back(*trIt);
-        transactions.back().set_time(trIt.getPool().get_time());
+        transactions.back().set_time(BlockChain::getBlockTime(trIt.getPool()));
 
         if (--limit == 0)
             break;
@@ -1145,7 +1163,7 @@ bool BlockChain::updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& p
     for (auto& it : poolFrom.transactions()) {
         tmpPool.add_transaction(it);
     }
-    tmpPool.add_user_field(csdb::Pool::TimestampID, rPackage.poolMetaInfo().timestamp);
+    tmpPool.add_user_field(TimestampID, rPackage.poolMetaInfo().timestamp);
     for (auto& it : poolFrom.smartSignatures()) {
         tmpPool.add_smart_signature(it);
     }
@@ -1232,7 +1250,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
 
                 std::lock_guard lock(dbLock_);
 
-                if (csdb::Pool::content_equal(pool, deferredBlock_)) {
+                if (BlockChain::testContentEqual(pool, deferredBlock_)) {
                     deferredBlock_ = pool;
                     resetUncertainState();
                     ++cntUncertainReplaced;
@@ -1602,4 +1620,81 @@ void BlockChain::setBlocksToBeRemoved(cs::Sequence number) {
     }
     csdebug() << kLogPrefix << "Allowed NUMBER blocks to remove is set to " << blocksToBeRemoved_;
     blocksToBeRemoved_ = number;
+}
+
+namespace {
+    static void serializeComparableContent(cs::DataStream& out, const csdb::Pool& block) {
+        out << block.sequence();
+
+        // put user fields except special timestamp field "TimestampID"
+        const auto ids = block.user_field_ids();
+        size_t cnt = ids.size();
+        if (cnt > 0) {
+            cnt -= ids.count(BlockChain::TimestampID);
+            if (cnt > 0) {
+                for (const auto id: ids) {
+                    if (id == BlockChain::TimestampID) {
+                        continue;
+                    }
+                    out << id;
+                    const auto fld = block.user_field(id);
+                    if (fld.is_valid()) {
+                        switch (fld.type()) {
+                        case csdb::UserField::Integer:
+                            out << fld.value<int>();
+                            break;
+                        case csdb::UserField::Amount:
+                            out << fld.value<csdb::Amount>();
+                            break;
+                        case csdb::UserField::String:
+                            out << fld.value<std::string>();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        out << block.roundCost();
+
+        out << block.transactions_count();
+        for (const auto& t : block.transactions()) {
+            out << t.to_byte_stream_for_sig();
+        }
+
+        const auto& wallets = block.newWallets();
+        out << wallets.size();
+        for (const auto& w : wallets) {
+            union {
+                csdb::Pool::NewWalletInfo::AddressId address_id;
+                size_t value;
+            } conv{};
+            conv.address_id = w.addressId_;
+            out << conv.value;
+            out << w.walletId_;
+        }
+    }
+}
+
+/*static*/
+bool BlockChain::testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs) {
+    if (lhs.is_valid() != rhs.is_valid()) {
+        return false;
+    }
+    if (!lhs.is_valid()) {
+        // both has no content
+        return true;
+    }
+
+    cs::Bytes lhs_bin;
+    cs::DataStream lhs_out(lhs_bin);
+    serializeComparableContent(lhs_out, lhs);
+    const cs::Hash l = cscrypto::calculateHash(lhs_bin.data(), lhs_bin.size());
+
+    cs::Bytes rhs_bin;
+    cs::DataStream rhs_out(rhs_bin);
+    serializeComparableContent(rhs_out, rhs);
+    const cs::Hash r = cscrypto::calculateHash(rhs_bin.data(), rhs_bin.size());
+
+    return std::equal(l.cbegin(), l.cend(), r.cbegin());
 }

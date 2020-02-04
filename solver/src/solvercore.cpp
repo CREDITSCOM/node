@@ -406,7 +406,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         for (auto& it : deferredBlock_.transactions()) {
             tmpPool.add_transaction(it);
         }
-        tmpPool.add_user_field(csdb::Pool::TimestampID, justCreatedRoundPackage.poolMetaInfo().timestamp);
+        tmpPool.add_user_field(BlockChain::TimestampID, justCreatedRoundPackage.poolMetaInfo().timestamp);
         for (auto& it : deferredBlock_.smartSignatures()) {
             tmpPool.add_smart_signature(it);
         }

@@ -55,6 +55,9 @@ public:
     using WalletAddress = csdb::Address;
     using WalletData = cs::WalletsCache::WalletData;
 
+    // using user field "0" to store block timestamp
+    inline const static csdb::user_field_id_t TimestampID = 0;
+
     enum class AddressType {
         PublicKey,
         Id
@@ -80,6 +83,8 @@ public:
     bool isEqual(const csdb::Address& laddr, const csdb::Address& raddr) const;
 
     static csdb::Address getAddressFromKey(const std::string&);
+
+    static uint64_t getBlockTime(const csdb::Pool& block) noexcept;
 
     // create/save block and related methods
 
@@ -448,5 +453,9 @@ private:
         uncertainHash_ = csdb::PoolHash{};
         desiredHash_ = csdb::PoolHash{};
     }
+
+    // compare only state content: transactions, new wallets, sequence, round fee, user fields
+    // true if both pools are not valid, or both pools have equal state content
+    static bool testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs);
 };
 #endif  //  BLOCKCHAIN_HPP

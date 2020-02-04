@@ -451,7 +451,7 @@ api::Pool APIHandler::convertPool(const csdb::Pool& pool) {
         result.poolNumber = static_cast<int64_t>(pool.sequence());
         assert(result.poolNumber >= 0);
         result.prevHash = fromByteArray(pool.previous_hash().to_binary());
-        result.time = static_cast<int64_t>(pool.get_time());
+        result.time = static_cast<int64_t>(BlockChain::getBlockTime(pool));
 
         result.transactionsCount = int32_t(pool.transactions_count());  // DO NOT EVER CREATE POOLS WITH
                                                                         // MORE THAN 2 BILLION
@@ -575,7 +575,7 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
     }
 
     auto pool = executor_.loadBlockApi(tr.id().pool_seq());
-    res.createTime = static_cast<int64_t>(pool.get_time());
+    res.createTime = static_cast<int64_t>(BlockChain::getBlockTime(pool));
 
     return res;
 }
@@ -1001,7 +1001,7 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     }
 
     _return.id.poolSeq = newTransactionId.pool_seq();
-    _return.id.index = newTransactionId.index();
+    _return.id.index = int32_t(newTransactionId.index());
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, getDelimitedTransactionSigHex(send_transaction));
 }
@@ -1954,7 +1954,7 @@ void APIHandler::TransactionsListGet(api::TransactionsGetResult& _return, int64_
             offset = 0;
 
             while (it != p.transactions().rend() && limit > 0) {
-                it->set_time(p.get_time());
+                it->set_time(BlockChain::getBlockTime(p));
                 _return.transactions.push_back(convertTransaction(*it));
                 _return.result = true;
                 ++it;

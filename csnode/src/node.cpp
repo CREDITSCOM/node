@@ -901,7 +901,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     auto tmpPool = solver_->getDeferredBlock().clone();
     if (tmpPool.is_valid() && tmpPool.sequence() == round) {
         auto tmp2 = rPackage.poolSignatures();
-        tmpPool.add_user_field(csdb::Pool::TimestampID, rPackage.poolMetaInfo().timestamp);
+        tmpPool.add_user_field(BlockChain::TimestampID, rPackage.poolMetaInfo().timestamp);
         tmpPool.add_number_trusted(static_cast<uint8_t>(rPackage.poolMetaInfo().realTrustedMask.size()));
         tmpPool.add_real_trusted(cs::Utils::maskToBits(rPackage.poolMetaInfo().realTrustedMask));
         tmpPool.set_signatures(tmp2);
