@@ -2172,11 +2172,6 @@ void Node::sendStageThree(cs::StageThree& stageThreeInfo) {
         return;
     }
 
-    if ((cs::Conveyer::instance().currentRoundNumber() % 10) == 0 && myConfidantIndex_ == 0) {
-        stageThreeSent_ = true;
-        return;
-    }
-
     // TODO: think how to improve this code
     sendToConfidants(MsgTypes::ThirdStage, cs::Conveyer::instance().currentRoundNumber(), subRound_, stageThreeInfo.signature, stageThreeInfo.message);
 
