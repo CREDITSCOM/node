@@ -5,7 +5,8 @@
 
 namespace cs {
 /*private*/
-PacketValidator::PacketValidator() {
+PacketValidator::PacketValidator()
+    : last_ss_reg_failed(false) {
     starterKey_ = cs::Zero::key;
 }
 
@@ -30,6 +31,10 @@ bool PacketValidator::validate(const Packet& pack) {
                         break;
                     case NetworkCommand::SSRegistration:
                         result = validateStarterRegistration(pack);
+                        last_ss_reg_failed = !result; // depends on pack validation result
+                        break;
+                    case NetworkCommand::SSRegistrationRefused:
+                        last_ss_reg_failed = true; // the packet itself means registration failed
                         break;
                     default:
                         break;
@@ -131,6 +136,12 @@ bool PacketValidator::validateStopRequest(const uint8_t* data, size_t size) {
     if (size != payload_size + cscrypto::kSignatureSize) {
         return false;  // incorrect packet size
     }
+    // if starterKey_ is zero, there is no registration yet; if previous registration on starter is failed also
+    // assume the node cannot work, allow to stop
+    if (last_ss_reg_failed && std::equal(starterKey_.cbegin(), starterKey_.cend(), cs::Zero::key.cbegin())) {
+        return true;  // no SS key registered
+    }
+
     return validateStarterSignature(data, size);
 }
 

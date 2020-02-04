@@ -17,6 +17,8 @@ public:
 
 private:
     cs::PublicKey starterKey_;
+    // indicates the last registration on starter result: success or failure
+    bool last_ss_reg_failed;
 
     PacketValidator();
 

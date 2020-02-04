@@ -630,11 +630,7 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
     cs::Bytes message;
     cs::DataStream stream(message);
     stream << round << version;
-    const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
-    if (!cscrypto::verifySignature(sig, starter_key, message.data(), message.size())) {
-        cswarning() << "NODE> Get incorrect stoprequest signature, possible attack";
-        return;
-    }
+    // packet validator have already tested starter signature
     cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
 
     if (NODE_VERSION > version) {
