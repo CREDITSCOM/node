@@ -1145,7 +1145,7 @@ bool BlockChain::updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& p
     for (auto& it : poolFrom.transactions()) {
         tmpPool.add_transaction(it);
     }
-    tmpPool.add_user_field(0, rPackage.poolMetaInfo().timestamp);
+    tmpPool.add_user_field(csdb::Pool::TimestampID, rPackage.poolMetaInfo().timestamp);
     for (auto& it : poolFrom.smartSignatures()) {
         tmpPool.add_smart_signature(it);
     }
@@ -1213,7 +1213,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     const auto poolSequence = pool.sequence();
     csdebug() << csfunc() << "last #" << lastSequence << ", pool #" << poolSequence;
 
-    if (poolSequence <= lastSequence) {
+    if (poolSequence < lastSequence) {
         // ignore
         csdebug() << kLogPrefix << "ignore oudated block #" << poolSequence << ", last written #" << lastSequence;
         // it is not error, so caller code nothing to do with it
@@ -1252,15 +1252,10 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
 
         std::lock_guard lock(dbLock_);
 
-        if (!deferredBlock_.signatures().empty()) {
-            // ignore
-            csdebug() << kLogPrefix << "ignore oudated block #" << poolSequence << ", last written #" << lastSequence;
-            // it is not error, so caller code nothing to do with it
-            return true;
-        }
-        else {
-            csdebug() << kLogPrefix << "we have to rewrite #" << poolSequence;
-        }
+        // ignore
+        csdebug() << kLogPrefix << "ignore oudated block #" << poolSequence << ", last written #" << lastSequence;
+        // it is not error, so caller code nothing to do with it
+        return true;
     }
 
     if (poolSequence == lastSequence + 1) {

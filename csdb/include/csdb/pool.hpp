@@ -87,6 +87,8 @@ SHARED_DATA_CLASS_IMPLEMENTATION_INLINE(PoolHash)
 class Pool {
     SHARED_DATA_CLASS_DECLARE(Pool)
 public:
+    inline static const user_field_id_t TimestampID = 0;
+
     using Transactions = std::vector<csdb::Transaction>;
     class NewWalletInfo {
     public:

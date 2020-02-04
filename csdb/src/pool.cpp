@@ -201,7 +201,21 @@ class Pool::priv : public ::csdb::internal::shared_data {
     // serialize only transactions, new wallets, user fields, sequence, round cost: the sensitive content of the block
     void put_content_only(::csdb::priv::obstream& os) const {
         os.put(sequence_);
-        os.put(user_fields_);
+        // put user fields except special timestamp field "0"
+        size_t cnt = user_fields_.size();
+        if (cnt > 0) {
+            cnt -= user_fields_.count(TimestampID);
+            if (cnt > 0) {
+                for (const auto& it : user_fields_) {
+                    if (it.first == TimestampID) {
+                        continue;
+                    }
+                    os.put(it.first);
+                    os.put(it.second);
+                }
+            }
+        }
+
         os.put(roundCost_);
         os.put(static_cast<uint32_t>(transactions_.size()));
         for (const auto& it : transactions_) {
@@ -932,7 +946,7 @@ cs::Bytes Pool::to_binary() const noexcept {
 }
 
 uint64_t Pool::get_time() const noexcept {
-    return atoll(user_field(0).value<std::string>().c_str());
+    return atoll(user_field(TimestampID).value<std::string>().c_str());
 }
 
 /*static*/
