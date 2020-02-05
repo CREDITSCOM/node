@@ -824,14 +824,6 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     const auto smart_addr = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
     bool deploy = transaction.__isset.smartContract ? is_smart_deploy(input_smart) : false;
 
-    if (transaction.__isset.smartContract) {
-        send_transaction.add_user_field(cs::trx_uf::deploy::Code, cs::Serializer::serialize(transaction.smartContract));
-    }
-    else if (!transaction.userFields.empty()) { // for payable
-        send_transaction.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
-        deploy = false;
-    }
-
     std::vector<general::ByteCodeObject> origin_bytecode;
     if (!deploy) {
         for (auto& it : input_smart.smartContractDeploy.byteCodeObjects) {
