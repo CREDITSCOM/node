@@ -103,7 +103,7 @@ void APIHandlerBase::SetResponseStatus(general::APIResponse& response, APIReques
     };
 
     response.code = int8_t(statuses[static_cast<uint8_t>(status)].code);
-    response.message = statuses[static_cast<uint8_t>(status)].message + details;
+    response.message = statuses[static_cast<uint8_t>(status)].message + ": " + details;
 }
 
 void APIHandlerBase::SetResponseStatus(general::APIResponse& response, bool commandWasHandled) {
@@ -629,7 +629,7 @@ void APIHandler::dumbTransactionFlow(api::TransactionFlowResult& _return, const 
     // remember dumb transaction 
     if (!dumbCv_.addCVInfo(tr.signature())) {
         _return.status.code = int8_t(ERROR_CODE);
-        _return.status.message = "This signature is already there!";
+        _return.status.message = "This transaction has been seen before";
         return;
     }
 
@@ -649,11 +649,11 @@ void APIHandler::dumbTransactionFlow(api::TransactionFlowResult& _return, const 
         break;
 
     case cs::DumbCv::Condition::Expired:
-        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is expired");
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "transaction is expired");
         break;
 
     case cs::DumbCv::Condition::Rejected:
-        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is rejected");
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "transaction is rejected by consensus");
         break;
 
     case cs::DumbCv::Condition::TimeOut:
@@ -661,7 +661,7 @@ void APIHandler::dumbTransactionFlow(api::TransactionFlowResult& _return, const 
         break;
 
     default:
-        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Wrong Node behaviour");
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "wrong Node behaviour");
     }
 }
 
@@ -824,14 +824,6 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     const auto smart_addr = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
     bool deploy = transaction.__isset.smartContract ? is_smart_deploy(input_smart) : false;
 
-    if (transaction.__isset.smartContract) {
-        send_transaction.add_user_field(cs::trx_uf::deploy::Code, cs::Serializer::serialize(transaction.smartContract));
-    }
-    else if (!transaction.userFields.empty()) { // for payable
-        send_transaction.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
-        deploy = false;
-    }
-
     std::vector<general::ByteCodeObject> origin_bytecode;
     if (!deploy) {
         for (auto& it : input_smart.smartContractDeploy.byteCodeObjects) {
@@ -914,92 +906,54 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
 
     cs::DumbCv::Condition condition = cs::DumbCv::Condition::Success;
 
-    if (deploy) {
-        auto resWait = hashStateEntry->waitTillFront([&](HashState& ss) {
-            hashState = ss.hash;
-
-            if (condition = ss.condition; condition != cs::DumbCv::Condition::Success)
-                return true;
-
-            if (!ss.condFlg) {
-                return false;
-            }
-
-            ss.condFlg = false;
-            newTransactionId = ss.id;
+    std::string retVal;
+    auto resWait = hashStateEntry->waitTillFront([&](HashState& ss) {
+        if (condition = ss.condition; condition != cs::DumbCv::Condition::Success)
             return true;
-            });
 
-        {
-            auto hashStateInst(lockedReference(this->hashStateSL));
-            hashStateInst->erase(send_transaction.signature());
+        if (!ss.condFlg) {
+            return false;
         }
 
-        if (!resWait) {  // time is over
-            SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
-            return;
-        }
+        hashState = ss.hash;
+        retVal = ss.retVal;
+        ss.condFlg = false;
+        newTransactionId = ss.id;
 
-        if (condition == cs::DumbCv::Condition::Expired) {
-            SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is expired");
-            return;
-        }
+        return true;
+    });
 
-        if (condition == cs::DumbCv::Condition::Rejected) {
-            SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is rejected");
-            return;
-        }
-
-        if (hashState == cs::Zero::hash) {
-            _return.status.code = int8_t(ERROR_CODE);
-            _return.status.message = "new hash of state is empty!";
-            return;
-        }
-    }
-    else {
-        std::string retVal;
-        auto resWait = hashStateEntry->waitTillFront([&](HashState& ss) {
-            if (condition = ss.condition; condition != cs::DumbCv::Condition::Success)
-                return true;
-
-            if (!ss.condFlg) {
-                return false;
-            }
-
-            hashState = ss.hash;
-            retVal = ss.retVal;
-            ss.condFlg = false;
-            newTransactionId = ss.id;
-
-            return true;
-            });
-
-        {
-            auto hashStateInst(lockedReference(this->hashStateSL));
-            hashStateInst->erase(send_transaction.signature());
-        }
-
-        if (!resWait) { // time is over
-            SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
-            return;
-        }
-
-        if (condition == cs::DumbCv::Condition::Expired) {
-            SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "Transaction is expired");
-            return;
-        } 
-
-        if (hashState.empty()) {
-            _return.status.code = int8_t(ERROR_CODE);
-            _return.status.message = "new hash of state is empty!";
-            return;
-        }
-
-        if (!retVal.empty()) {
-            _return.__set_smart_contract_result(cs::Serializer::deserialize<::general::Variant>(std::move(retVal)));
-        }
+    {
+        auto hashStateInst(lockedReference(this->hashStateSL));
+        hashStateInst->erase(send_transaction.signature());
     }
 
+    if (!resWait) { // time is over
+        SetResponseStatus(_return.status, APIRequestStatusType::INPROGRESS);
+        return;
+    }
+
+    if (condition == cs::DumbCv::Condition::Expired) {
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "transaction is expired");
+        return;
+    }
+
+    if (condition == cs::DumbCv::Condition::Rejected) {
+        SetResponseStatus(_return.status, APIRequestStatusType::FAILURE, "transaction is rejected by consensus");
+        return;
+    }
+
+    if (hashState == cs::Zero::hash) {
+        _return.status.code = int8_t(ERROR_CODE);
+        const std::string op = deploy ? "deployment of" : "call to";
+        _return.status.message = op + " contract failed";
+        return;
+    }
+
+    if (! deploy && !retVal.empty()) {
+        _return.__set_smart_contract_result(cs::Serializer::deserialize<::general::Variant>(std::move(retVal)));
+    }
+    
     _return.id.poolSeq = newTransactionId.pool_seq();
     _return.id.index = int32_t(newTransactionId.index());
 
