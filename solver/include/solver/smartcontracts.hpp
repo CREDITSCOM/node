@@ -16,6 +16,8 @@
 #include <mutex>
 #include <optional>
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
 
 //#define DEBUG_SMARTS
 
@@ -554,13 +556,13 @@ private:
         // current state which is result of last successful execution / deploy
         std::string state;
         // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
-        std::map<std::string, std::map<csdb::Address, std::string>> uses;
+        std::unordered_map<std::string, std::unordered_map<csdb::Address, std::string>> uses;
     };
 
     // last contract's state storage
-    std::map<csdb::Address, StateItem> known_contracts;
+    std::unordered_map<csdb::Address, StateItem> known_contracts;
 
-    std::set<csdb::Address> locked_contracts;
+    std::unordered_set<csdb::Address> locked_contracts;
 
     // contract replenish transactions stored during reading from DB on stratup
     std::vector<SmartContractRef> uncompleted_contracts;
