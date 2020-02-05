@@ -12,18 +12,12 @@
 
 #include <thread>
 
-// Signal transport to stop and stop Node
-static void stopNode() noexcept(false) {
-    Node::requestStop();
-    // Transport::stop();
-}
-
 // Called periodically to poll the signal flag.
 void pollSignalFlag() {
     if (gSignalStatus == 1) {
         gSignalStatus = 0;
         try {
-            stopNode();
+            Node::requestStop();
         }
         catch (...) {
             cserror() << "Poll signal error!";
@@ -591,7 +585,7 @@ bool Transport::parseSSSignal(const TaskPtr<IPacMan>& task) {
 
             ++count;
 
-            if (key != myPublicKey_) {
+            if (!std::equal(key.cbegin(), key.cend(), myPublicKey_.cbegin())) {
                 if (count <= cs::ConfigHolder::instance().config()->getMaxNeighbours()) {
                     neighbourhood_.establishConnection(net_->resolve(ep));
                 }
@@ -1136,7 +1130,7 @@ bool Transport::gotRegistrationRequest(const TaskPtr<IPacMan>& task, RemoteNodeP
         return false;
     }
 
-    if (!std::equal(conn.key.cbegin(), conn.key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
+    if (!std::equal(conn.key.cbegin(), conn.key.cend(), myPublicKey_.cbegin())) {
         EndpointData epd;
         epd.ip = conn.getOut().address();
         epd.ipSpecified = true;
@@ -1167,7 +1161,7 @@ bool Transport::gotRegistrationConfirmation(const TaskPtr<IPacMan>& task, Remote
     }
 
     neighbourhood_.gotConfirmation(myCId, realCId, task->sender, key, sender);
-    if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
+    if (!std::equal(key.cbegin(), key.cend(), myPublicKey_.cbegin())) {
         EndpointData epd;
         epd.ip = task->sender.address();
         epd.ipSpecified = true;
@@ -1218,7 +1212,7 @@ bool Transport::gotSSRegistration(const TaskPtr<IPacMan>& task, RemoteNodePtr& r
         return false;
     }
     
-    cslog() << "Connection to the start node has been established";
+    cslog() << "Connection to start node has been established";
     neighbourhood_.addSignalServer(task->sender, ssEp_, rNode);
 
     constexpr int MinRegistrationSize = 1 + cscrypto::kPublicKeySize;
@@ -1374,7 +1368,7 @@ bool Transport::gotSSNewFriends()
             return false;
         }
 
-        if (key != cs::ConfigHolder::instance().config()->getMyPublicKey()) {
+        if (key != myPublicKey_) {
             if (neighbourhood_.canAddNeighbour()) {
                 neighbourhood_.establishConnection(net_->resolve(ep));
             }
@@ -1735,7 +1729,7 @@ bool Transport::gotSSIntroduceConsensusReply(RemoteNodePtr& sender)
         }
         csdebug() << '[' << uint32_t(i) << "] " << cs::Utils::byteStreamToHex(key.data(), key.size()) << " - " << ep.ip << ':' << ep.port;
 
-        if (!std::equal(key.cbegin(), key.cend(), cs::ConfigHolder::instance().config()->getMyPublicKey().cbegin())) {
+        if (!std::equal(key.cbegin(), key.cend(), myPublicKey_.cbegin())) {
             keys.push_back(key);
             eps.push_back(ep);
         }

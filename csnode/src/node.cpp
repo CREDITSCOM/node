@@ -86,6 +86,8 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&transport_->pingReceived, &stat_, &cs::RoundStat::onPingReceived);
     cs::Connector::connect(&blockChain_.alarmBadBlock, this, &Node::sendBlockAlarmSignal);
     cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
+    cs::Connector::connect(&blockChain_.storeBlockEvent, this, &Node::processSpecialInfo);
+    cs::Connector::connect(&blockChain_.uncertainBlock, this, &Node::sendBlockRequestToConfidants);
 
     setupNextMessageBehaviour();
 
@@ -178,13 +180,19 @@ void Node::run() {
 }
 
 void Node::stop() {
+    // stopping transport stops the node (see Node::run() method)
+    transport_->stop();
+    cswarning() << "[TRANSPORT STOPPED]";
+}
+
+void Node::destroy() {
 
     EventReport::sendRunningStatus(*this, Running::Status::Stop);
 
     good_ = false;
 
-    transport_->stop();
-    cswarning() << "[TRANSPORT STOPPED]";
+    api_->stop();
+    cswarning() << "[API STOPPED]";
 
     solver_->finish();
     cswarning() << "[SOLVER STOPPED]";
@@ -197,6 +205,7 @@ void Node::stop() {
 
     observer_.stop();
     cswarning() << "[CONFIG OBSERVER STOPPED]";
+
 }
 
 void Node::initCurrentRP() {
@@ -517,6 +526,12 @@ void Node::updateBlackListCounter() {
 }
 
 bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::PublicKey& key) {
+    auto lws = getBlockChain().getLastSeq();
+    if (lws + cs::ConfigHolder::instance().config()->conveyerData().maxPacketLifeTime < packet.expiredRound()) {
+        csdebug() << "NODE> Packet " << packet.hash().toString() << " was added to HashTable without transaction's check";
+        return true;
+    }
+
     size_t sum = 0;
     size_t cnt = packet.transactionsCount();
 
@@ -615,11 +630,7 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
     cs::Bytes message;
     cs::DataStream stream(message);
     stream << round << version;
-    const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
-    if (!cscrypto::verifySignature(sig, starter_key, message.data(), message.size())) {
-        cswarning() << "NODE> Get incorrect stoprequest signature, possible attack";
-        return;
-    }
+    // packet validator have already tested starter signature
     cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
 
     if (NODE_VERSION > version) {
@@ -890,7 +901,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     auto tmpPool = solver_->getDeferredBlock().clone();
     if (tmpPool.is_valid() && tmpPool.sequence() == round) {
         auto tmp2 = rPackage.poolSignatures();
-        tmpPool.add_user_field(0, rPackage.poolMetaInfo().timestamp);
+        tmpPool.add_user_field(BlockChain::TimestampID, rPackage.poolMetaInfo().timestamp);
         tmpPool.add_number_trusted(static_cast<uint8_t>(rPackage.poolMetaInfo().realTrustedMask.size()));
         tmpPool.add_real_trusted(cs::Utils::maskToBits(rPackage.poolMetaInfo().realTrustedMask));
         tmpPool.set_signatures(tmp2);
@@ -1391,7 +1402,9 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
-    if (!poolSynchronizer_->isSyncroStarted()) {
+    bool is_sync_on = poolSynchronizer_->isSyncroStarted();
+    bool is_blockchain_uncertain = blockChain_.isLastBlockUncertain();
+    if (!is_sync_on && !is_blockchain_uncertain) {
         csdebug() << "NODE> Get block reply> Pool sync has already finished";
         return;
     }
@@ -1413,7 +1426,19 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
         return;
     }
 
-    poolSynchronizer_->getBlockReply(std::move(poolsBlock), packetNumber);
+    if (is_blockchain_uncertain) {
+        const auto last = blockChain_.getLastSeq();
+        for (auto& b: poolsBlock) {
+            if (b.sequence() == last) {
+                cslog() << kLogPrefix_ << "get possible replacement for uncertain block " << WithDelimiters(last);
+                blockChain_.storeBlock(b, true /*by_sync*/);
+            }
+        }
+    }
+
+    if (is_sync_on) {
+        poolSynchronizer_->getBlockReply(std::move(poolsBlock), packetNumber);
+    }
 }
 
 void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packetNum) {
@@ -1601,6 +1626,19 @@ void Node::sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequested
     transport_->deliverDirect(ostream_.getPackets(), ostream_.getPacketsCount(), target);
 
     ostream_.clear();
+}
+
+void Node::sendBlockRequestToConfidants(cs::Sequence sequence) {
+    cslog() << kLogPrefix_ << "request block " << WithDelimiters(sequence) << " from trusted";
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    cs::PoolsRequestedSequences sequences;
+    sequences.push_back(sequence);
+
+    // try to send to confidants..
+    if (sendToConfidants(MsgTypes::BlockRequest, round, sequences, size_t(0) /*packetNum*/) < Consensus::MinTrustedNodes) {
+        // .. otherwise broadcast hash
+        sendToBroadcast(MsgTypes::BlockRequest, round, sequences, size_t(0) /*packetNum*/);
+    }
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type, const cs::PublicKey sender) {
@@ -3683,7 +3721,9 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
         // TODO: examine what will be done without this function
         if (!roundPackageCache_.empty() && roundPackageCache_.back().poolMetaInfo().realTrustedMask.size() > cs::TrustedMask::trustedSize(roundPackageCache_.back().poolMetaInfo().realTrustedMask)) {
             blockChain_.setBlocksToBeRemoved(1U);
-            blockChain_.removeLastBlock();
+            if (!blockChain_.compromiseLastBlock(hash)) {
+                blockChain_.removeLastBlock();
+            }
             lastBlockRemoved_ = true;
         }
 
@@ -3692,12 +3732,16 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
 
 /*static*/
 void Node::requestStop() {
+    // use existing global flag as a crutch against duplicated request handling
+    if (gSignalStatus == 0) {
+        return;
+    }
+    gSignalStatus = 0;
     emit stopRequested();
 }
 
 void Node::onStopRequested() {
     if (stopRequested_) {
-        // subsequent request is handled as unconditional stop
         stop();
         return;
     }
@@ -3712,7 +3756,33 @@ void Node::onStopRequested() {
     }
 }
 
-void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
+
+void Node::processSpecialInfo(const csdb::Pool& pool) {
+    for (auto it : pool.transactions()) {
+        if (getBlockChain().isSpecial(it)) {
+            auto stringBytes = it.user_field(cs::trx_uf::sp::managing).value<std::string>();
+            std::vector<cs::Byte> msg(stringBytes.begin(), stringBytes.end());
+            cs::DataStream stream(msg.data(), msg.size());
+            uint16_t order;
+            stream >> order;
+            if (order == 2U) {
+                uint8_t cnt;
+                stream >> cnt;
+                csdebug() << "New bootstrap nodes: ";
+                for (uint8_t i = 0; i < cnt; ++i) {
+                    cs::PublicKey key;
+                    stream >> key;
+                    bootStrapNodes_.push_back(key);
+                    csdebug() << static_cast<int>(i) << ". " << cs::Utils::byteStreamToHex(key);
+                }
+
+            }
+        }
+    }
+
+}
+
+void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
     if (stopRequested_) {
         *shouldStop = true;
         return;
@@ -3725,6 +3795,7 @@ void Node::validateBlock(csdb::Pool block, bool* shouldStop) {
         *shouldStop = true;
         return;
     }
+    processSpecialInfo(block);
 }
 
 void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_failed should be FALSE of the block is ok 

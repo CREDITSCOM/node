@@ -145,6 +145,10 @@ struct DbSQLData {
     std::string password { "postgres" };
 };
 
+namespace cs::config {
+class Observer;
+}
+
 class Config {
 public:
     Config() = default;
@@ -374,6 +378,7 @@ private:
     EventsReportData eventsReport_;
 
     friend bool operator==(const Config&, const Config&);
+    friend class cs::config::Observer;
 };
 
 // all operators

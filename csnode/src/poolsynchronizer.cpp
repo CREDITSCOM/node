@@ -591,7 +591,19 @@ void cs::PoolSynchronizer::removeExistingSequence(const cs::Sequence sequence, c
 
 void cs::PoolSynchronizer::refreshNeighbours() {
     const size_t neededNeighboursCount = transport_->getNeighboursCountWithoutSS();
-    const size_t nSize = neighbours_.size();
+    size_t nSize = neighbours_.size();
+
+    bool force_refresh = false;
+    for (auto& n : neighbours_) {
+        if (n.roundCounter() > 3) {
+
+            force_refresh = true;
+        }
+    }
+    if (force_refresh) {
+        neighbours_.clear();
+        nSize = 0;
+    }
 
     if (nSize == neededNeighboursCount) {
         return;

@@ -55,6 +55,9 @@ public:
     using WalletAddress = csdb::Address;
     using WalletData = cs::WalletsCache::WalletData;
 
+    // using user field "0" to store block timestamp
+    inline const static csdb::user_field_id_t TimestampID = 0;
+
     enum class AddressType {
         PublicKey,
         Id
@@ -80,6 +83,8 @@ public:
     bool isEqual(const csdb::Address& laddr, const csdb::Address& raddr) const;
 
     static csdb::Address getAddressFromKey(const std::string&);
+
+    static uint64_t getBlockTime(const csdb::Pool& block) noexcept;
 
     // create/save block and related methods
 
@@ -123,6 +128,21 @@ public:
     void removeWalletsInPoolFromCache(const csdb::Pool& pool);
     void removeLastBlock();
 
+    /**
+     * Mark last block as compromised and handle the situation:
+     *  - store required parameters  
+     *  - make a request for proper block variant
+     *
+     * @author  Alexander Avramenko
+     * @date    31.01.2020
+     *
+     * @param   desired_hash    The desired hash of last block to request.
+     *
+     * @returns True if it succeeds, false if it fails.
+     */
+
+    bool compromiseLastBlock(const csdb::PoolHash& desired_hash);
+
     // updates fees in every transaction
     void setTransactionsFees(cs::TransactionsPacket& packet);
     void setTransactionsFees(csdb::Pool& pool);
@@ -144,6 +164,8 @@ public:
     bool updateLastBlock(cs::RoundPackage& rPackage);
     bool updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom);
     bool deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool);
+    bool isSpecial(const csdb::Transaction& t);
+    cs::Bytes checkForSpecialTransactions(const std::vector<csdb::Transaction>& trxs, cs::Sequence seq);
     cs::Sequence getLastSeq() const;
 
     const cs::MultiWallets& multiWallets() const;
@@ -191,6 +213,10 @@ public:
 
     void testCachedBlocks();
 
+    bool isLastBlockUncertain() const {
+        return uncertainLastBlockFlag_;
+    }
+
 public signals:
 
     /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
@@ -207,6 +233,9 @@ public signals:
 
     /** @brief Alarm event. Block Isn't correct */
     cs::AlarmSignal alarmBadBlock;
+
+    /** @brief Alarm event. Uncertain that last block is valid */
+    cs::AlarmSignal uncertainBlock;
 
     const cs::ReadBlockSignal& readBlockEvent() const;
     const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;
@@ -265,7 +294,7 @@ public:
 
     void setBlocksToBeRemoved(cs::Sequence number);
 
-    void printWalletCaches();
+    std::string printWalletCaches();
 
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);
@@ -309,6 +338,7 @@ private:
 
     // Thread unsafe
     bool finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys lastConfidants);
+    bool applyBlockToCaches(const csdb::Pool& pool);
 
     void onStartReadFromDB(cs::Sequence lastWrittenPoolSeq);
     void onReadFromDB(csdb::Pool block, bool* shouldStop);
@@ -318,8 +348,6 @@ private:
     bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
     void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
-
-    bool updateFromNextBlock(const csdb::Pool& pool);
 
     // returns true if new id was inserted
     bool getWalletId(const WalletAddress& address, WalletId& id);
@@ -405,5 +433,29 @@ private:
     mutable uint64_t uuid_ = 0;
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
+    std::atomic_bool stop_ = false;
+
+    // support the ability to replace last deferred block by the alternative with the same content, anti-fork feature
+    // flag the last block is uncertain:
+    bool uncertainLastBlockFlag_ = false;
+    // sequence of uncertain block, if uncertainLastBlock_ == true
+    cs::Sequence uncertainSequence_ = 0;
+    // hash of uncertain block
+    csdb::PoolHash uncertainHash_;
+    // desired hash of block with the same (uncertain) sequence and the same content as the current (uncertain) block:
+    csdb::PoolHash desiredHash_;
+    // counter of successfully replaced uncertain blocks
+    size_t cntUncertainReplaced = 0;
+
+    void resetUncertainState() {
+        uncertainLastBlockFlag_ = false;
+        uncertainSequence_ = 0;
+        uncertainHash_ = csdb::PoolHash{};
+        desiredHash_ = csdb::PoolHash{};
+    }
+
+    // compare only state content: transactions, new wallets, sequence, round fee, user fields
+    // true if both pools are not valid, or both pools have equal state content
+    static bool testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs);
 };
 #endif  //  BLOCKCHAIN_HPP

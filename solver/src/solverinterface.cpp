@@ -82,7 +82,6 @@ bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
 }
 
 void SolverCore::addToGraylist(const cs::PublicKey & sender, uint32_t rounds) {
-
     if (grayList_.find(sender) == grayList_.cend()) {
         grayList_.emplace(sender, rounds);
         csdebug() << "Node " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " is in gray list now";

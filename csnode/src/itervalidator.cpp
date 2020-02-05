@@ -7,6 +7,7 @@
 #include <csnode/walletsstate.hpp>
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
+#include <net/packetvalidator.hpp>
 
 namespace {
 const char* kLogPrefix = "Validator: ";
@@ -209,6 +210,10 @@ bool IterValidator::checkTransactionSignature(SolverContext& context, const csdb
     if (!SmartContracts::is_new_state(transaction) && !smartSourceTransaction) {
         if (src.is_wallet_id()) {
             auto pub = context.blockchain().getAddressByType(src, BlockChain::AddressType::PublicKey);
+            const auto& starter_key = cs::PacketValidator::instance().getStarterKey();
+            if (context.blockchain().isSpecial(transaction) && pub.public_key() != starter_key) {
+                return false;
+            }
             return transaction.verify_signature(pub.public_key());
         }
         return transaction.verify_signature(src.public_key());
@@ -321,7 +326,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
     }
 
     if (!rc) {
-        if (sc.is_known_smart_contract(t.source()) || sc.is_known_smart_contract(t.target())) {
+        if (cs::SmartContracts::is_executable(t) || sc.is_known_smart_contract(t.source()) || sc.is_known_smart_contract(t.target())) {
             if (sc.test_violations(t) != cs::SmartContracts::Violations::None) {
                 rc = kContractViolation;
             }
@@ -335,13 +340,14 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
     csdb::UserField fld;
     fld = t.user_field(trx_uf::sp::delegated);
     bool notCheck = false;
+    bool wDel = false;
     if (fld.is_valid()) {
         if (t.amount() < Consensus::MinStakeDelegated) {
             rc = kAmountTooLow;
         }
         auto flagg = fld.value<uint64_t>();
         switch(flagg) {
-            case trx_uf::sp::dele::gate:
+        case trx_uf::sp::de::legate:
                 
                 if (!rc) {
                     if (bc.findWalletData(t.target(), tWallet)) {
@@ -349,10 +355,14 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
                             rc = kTransactionProhibited;
                         }
                     }
+                    if (sc.is_known_smart_contract(t.target())) {
+                        rc = kTransactionProhibited; 
+                    }
                 }
                 break;
-            case trx_uf::sp::dele::gated_withdraw:
+        case trx_uf::sp::de::legated_withdraw:
                 if (!rc) {
+                    wDel = true;
                     if (bc.findWalletData(t.target(), tWallet)) {
                         auto tKey = bc.getCacheUpdater().toPublicKey(t.target());
                         auto it = wallet.delegats_.find(tKey);
@@ -384,7 +394,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
         }
     }
 
-    if (!rc && wallet.balance_ < (t.amount() + t.max_fee().to_double())) {
+    if (!rc && !(wallet.balance_ >= (t.amount() + t.max_fee().to_double()) || (wDel && wallet.balance_ - t.max_fee().to_double() >= csdb::Amount{ 0 }))) {
         rc = kInsufficientBalance;
     }
 

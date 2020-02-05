@@ -70,6 +70,7 @@ public:
 
     void run();
     void stop();
+    void destroy();
 
     static void requestStop();
     static bool autoShutdownEnabled() {
@@ -310,8 +311,12 @@ public slots:
     void processTimer();
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
     void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
+    // request specified target for set of sequences
     void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
-    void validateBlock(csdb::Pool block, bool* shouldStop);
+    // request current trusted nodes for block with specific sequence
+    void sendBlockRequestToConfidants(cs::Sequence sequence);
+    void processSpecialInfo(const csdb::Pool& pool);
+    void validateBlock(const csdb::Pool& block, bool* shouldStop);
     void deepBlockValidation(csdb::Pool block, bool* shouldStop);
     void sendBlockAlarmSignal(cs::Sequence seq);
     void onRoundTimeElapsed();
@@ -492,6 +497,8 @@ private:
     cs::Compressor compressor_;
 
     std::string kLogPrefix_;
+    std::map<uint16_t, cs::Command> changeableParams_;
+    cs::PublicKeys bootStrapNodes_;
 
     long long deltaTimeSS_{};
 };

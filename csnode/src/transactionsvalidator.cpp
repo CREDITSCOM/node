@@ -227,20 +227,24 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
     }
     csdb::UserField delegateField = trx.user_field(trx_uf::sp::delegated);
     if (delegateField.is_valid()) {
-        if (trx.amount() < Consensus::MinStakeDelegated) {
-            csdetails() << kLogPrefix << "The delegated amount is too low";
-            return Reject::Reason::AmountTooLow;
-        }
         WalletsState::WalletData& wallTargetState = walletsState_.getData(trx.target());
         auto tKey = trx.target().is_public_key() ? trx.target().public_key() : context.blockchain().getCacheUpdater().toPublicKey(trx.target());
         auto it = wallState.delegats_.find(tKey);
-        if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gate) {
+        if (delegateField.value<uint64_t>() == trx_uf::sp::de::legate) {
+            if (trx.amount() < Consensus::MinStakeDelegated) {
+                csdetails() << kLogPrefix << "The delegated amount is too low";
+                return Reject::Reason::AmountTooLow;
+            }
             if (wallTargetState.delegated_ > csdb::Amount{ 0 }) {
                 csdetails() << kLogPrefix << "Can't delegate to the account that was already delegated";
                 return Reject::Reason::AlreadyDelegated;
             }
+            if (context.smart_contracts().is_known_smart_contract(trx.target())) {
+                csdetails() << kLogPrefix << "Target can't be a smart contract";
+                return Reject::Reason::IncorrectTarget;
+            }
         }
-        else if (delegateField.value<uint64_t>() == trx_uf::sp::dele::gated_withdraw) {
+        else if (delegateField.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
             if (it == wallState.delegats_.end()) {
                 csdetails() << kLogPrefix << "No such delegate in account state";
                 return Reject::Reason::IncorrectTarget;

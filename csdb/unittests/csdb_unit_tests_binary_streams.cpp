@@ -116,7 +116,7 @@ TEST_BS_INT(int64_t_max, int64_t, std::numeric_limits<int64_t>::max(), "\xFF\xFF
 // uint64_t
 TEST_BS_INT(uint64_t_0, uint64_t, 0, "\x00")
 TEST_BS_INT(uint64_t_1p, uint64_t, 1, "\x02")
-// std::numeric_limits<uint64_t>::max() С‚Рѕ Р¶Рµ СЃР°РјРѕРµ, С‡С‚Рѕ (-1), С‚Р°Рє РґРѕР±Р°РІРёРј РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Р№ С‚РµСЃС‚
+// std::numeric_limits<uint64_t>::max() то же самое, что (-1), так добавим дополнительный тест
 TEST_BS_INT(uint64_t_max, uint64_t, std::numeric_limits<uint64_t>::max(), "\xFE")
 TEST_BS_INT(uint64_t_max_1m, uint64_t, std::numeric_limits<uint64_t>::max() >> 2, "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x3F")
 

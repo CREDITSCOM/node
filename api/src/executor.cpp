@@ -886,8 +886,16 @@ uint64_t cs::Executor::generateAccessId(cs::Sequence explicitSequence, uint64_t 
     ++lastAccessId_;
     accessSequence_[lastAccessId_] = (explicitSequence != kUseLastSequence ? explicitSequence : blockchain_.getLastSeq());
 
-    if(time)
+    if (time) {
         executeTrxnsTime[lastAccessId_] = time;
+    }
+    else {
+        // try to get time from block
+        const csdb::Pool block = blockchain_.loadBlock(accessSequence_[lastAccessId_]);
+        if (block.is_valid()) {
+            executeTrxnsTime[lastAccessId_] = BlockChain::getBlockTime(block);
+        }
+    }
 
     return static_cast<uint64_t>(lastAccessId_);
 }

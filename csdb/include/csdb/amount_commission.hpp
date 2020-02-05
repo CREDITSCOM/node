@@ -10,7 +10,7 @@
 #include <cinttypes>
 #include <type_traits>
 
-#include <boost/endian/conversion.hpp>
+#include <boost/predef/other/endian.h>
 
 namespace csdb {
 class AmountCommission;
@@ -57,7 +57,7 @@ private:
     union {
         uint16_t bits{};  // All bits
         struct {
-#ifdef BOOST_BIG_ENDIAN
+#if BOOST_ENDIAN_BIG_BYTE
             uint16_t sign : 1;   // sign
             uint16_t exp : 5;    // exponent
             uint16_t frac : 10;  // mantissa
