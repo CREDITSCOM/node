@@ -103,6 +103,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.alarmBadBlock, this, &Node::sendBlockAlarmSignal);
     cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
     cs::Connector::connect(&blockChain_.storeBlockEvent, this, &Node::processSpecialInfo);
+    cs::Connector::connect(&blockChain_.uncertainBlock, this, &Node::sendBlockRequestToConfidants);
 
     initPoolSynchronizer();
     setupNextMessageBehaviour();
@@ -577,6 +578,7 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
     cs::ODataStream roundStream(message);
     roundStream << round << version;
 
+    // packet validator have already tested starter signature
     cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
 
     if (NODE_VERSION > version) {
@@ -1300,7 +1302,9 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
-    if (!poolSynchronizer_->isSyncroStarted()) {
+    bool is_sync_on = poolSynchronizer_->isSyncroStarted();
+    bool is_blockchain_uncertain = blockChain_.isLastBlockUncertain();
+    if (!is_sync_on && !is_blockchain_uncertain) {
         csdebug() << "NODE> Get block reply> Pool sync has already finished";
         return;
     }
@@ -1319,7 +1323,19 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
         return;
     }
 
-    poolSynchronizer_->getBlockReply(std::move(poolsBlock));
+    if (is_blockchain_uncertain) {
+        const auto last = blockChain_.getLastSeq();
+        for (auto& b: poolsBlock) {
+            if (b.sequence() == last) {
+                cslog() << kLogPrefix_ << "get possible replacement for uncertain block " << WithDelimiters(last);
+                blockChain_.storeBlock(b, true /*by_sync*/);
+            }
+        }
+    }
+
+    if (is_sync_on) {
+        poolSynchronizer_->getBlockReply(std::move(poolsBlock));
+    }
 }
 
 void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target) {
@@ -1492,6 +1508,17 @@ void Node::sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequeste
 
     BaseFlags flags = static_cast<BaseFlags>(BaseFlags::Signed | BaseFlags::Compressed);
     transport_->sendDirect(formPacket(flags, MsgTypes::BlockRequest, round, sequences), target);
+}
+
+void Node::sendBlockRequestToConfidants(cs::Sequence sequence) {
+    cslog() << kLogPrefix_ << "request block " << WithDelimiters(sequence) << " from trusted";
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    cs::PoolsRequestedSequences sequences;
+    sequences.push_back(sequence);
+
+    // try to send to confidants..
+    const auto& confidants = cs::Conveyer::instance().confidants();
+    sendDirect(confidants, MsgTypes::BlockRequest, round, sequences, size_t(0) /*packetNum*/);
 }
 
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type, const cs::PublicKey sender) {
@@ -2842,11 +2869,6 @@ void Node::sendHash(cs::RoundNumber round) {
     // try to send to confidants..
     const auto& confidants = cs::Conveyer::instance().confidants();
 
-    if (confidants.size() < Consensus::MinTrustedNodes) {
-        sendBroadcast(MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
-        return;
-    }
-
     sendDirect(confidants, MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
     csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_) << ", message: " << cs::Utils::byteStreamToHex(messageToSend);
 }
@@ -3360,7 +3382,9 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
         // TODO: examine what will be done without this function
         if (!roundPackageCache_.empty() && roundPackageCache_.back().poolMetaInfo().realTrustedMask.size() > cs::TrustedMask::trustedSize(roundPackageCache_.back().poolMetaInfo().realTrustedMask)) {
             blockChain_.setBlocksToBeRemoved(1U);
-            blockChain_.removeLastBlock();
+            if (!blockChain_.compromiseLastBlock(hash)) {
+                blockChain_.removeLastBlock();
+            }
             lastBlockRemoved_ = true;
         }
 

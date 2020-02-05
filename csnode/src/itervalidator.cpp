@@ -334,7 +334,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
     }
 
     if (!rc) {
-        if (sc.is_known_smart_contract(t.source()) || sc.is_known_smart_contract(t.target())) {
+        if (cs::SmartContracts::is_executable(t) || sc.is_known_smart_contract(t.source()) || sc.is_known_smart_contract(t.target())) {
             if (sc.test_violations(t) != cs::SmartContracts::Violations::None) {
                 rc = kContractViolation;
             }
@@ -347,6 +347,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
 
     csdb::UserField fld;
     fld = t.user_field(trx_uf::sp::delegated);
+    bool wDel = false;
     if (fld.is_valid()) {
         if (t.amount() < Consensus::MinStakeDelegated) {
             rc = kAmountTooLow;
@@ -361,10 +362,14 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
                             rc = kTransactionProhibited;
                         }
                     }
+                    if (sc.is_known_smart_contract(t.target())) {
+                        rc = kTransactionProhibited; 
+                    }
                 }
                 break;
         case trx_uf::sp::de::legated_withdraw:
                 if (!rc) {
+                    wDel = true;
                     if (bc.findWalletData(t.target(), tWallet)) {
                         auto tKey = bc.getCacheUpdater().toPublicKey(t.target());
                         auto it = wallet.delegats_.find(tKey);
@@ -393,7 +398,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
         }
     }
 
-    if (!rc && wallet.balance_ < (t.amount() + t.max_fee().to_double())) {
+    if (!rc && !(wallet.balance_ >= (t.amount() + t.max_fee().to_double()) || (wDel && wallet.balance_ - t.max_fee().to_double() >= csdb::Amount{ 0 }))) {
         rc = kInsufficientBalance;
     }
 
