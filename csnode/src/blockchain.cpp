@@ -642,6 +642,10 @@ bool BlockChain::applyBlockToCaches(const csdb::Pool& pool) {
         return false;
     }
 
+    // ATTENTION! Due to undesired side effect trxIndex_ must be updated prior to wallets caches
+    // update transactions index
+    trxIndex_->update(pool);
+
     // update wallet caches
 
     // former updateFromNextBlock(pool) method:
@@ -666,9 +670,6 @@ bool BlockChain::applyBlockToCaches(const csdb::Pool& pool) {
         cserror() << "apply block to caches, unexpected exception";
         return false;
     }
-
-    // update transactions index
-    trxIndex_->update(pool);
 
     return true;
 }

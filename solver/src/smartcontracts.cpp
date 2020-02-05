@@ -2789,7 +2789,7 @@ std::string SmartContracts::print_executed_method(const csdb::Transaction& t) {
     }
     if (is_payable_target(t)) {
         // cuurently, the 2nd arg is user_field[1]
-        std::string arg = t.user_field(1).value<std::string>();
+        std::string arg = t.user_field(trx_uf::ordinary::Text).value<std::string>();
         if (arg.empty()) {
             arg = "<empty>";
         }
