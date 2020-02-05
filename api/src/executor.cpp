@@ -400,8 +400,9 @@ std::optional<cs::Executor::ExecuteResult> cs::Executor::executeTransaction(cons
             // add arg[1]
             str_val.clear();
 
-            if (smart.user_field(1).is_valid()) {
-                str_val = smart.user_field(1).value<std::string>();
+            using namespace cs::trx_uf;
+            if (smart.user_field(ordinary::Text).is_valid()) {
+                str_val = smart.user_field(ordinary::Text).value<std::string>();
             }
 
             general::Variant& var1 = header.params.emplace_back(::general::Variant{});
@@ -540,8 +541,9 @@ std::optional<cs::Executor::ExecuteResult> cs::Executor::reexecuteContract(cs::E
         // add arg[1]
         str_val.clear();
 
-        if (contract.transaction.user_field(1).is_valid()) {
-            str_val = contract.transaction.user_field(1).value<std::string>();
+        using namespace cs::trx_uf;
+        if (contract.transaction.user_field(ordinary::Text).is_valid()) {
+            str_val = contract.transaction.user_field(ordinary::Text).value<std::string>();
         }
 
         general::Variant& var1 = header.params.emplace_back(::general::Variant{});

@@ -379,7 +379,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     }
     else {
         result.trxn.type = api::TransactionType::TT_Normal;
-        auto ufd = transaction.user_field(1);
+        auto ufd = transaction.user_field(cs::trx_uf::ordinary::Text);
         if (ufd.is_valid())
             result.trxn.__set_userFields(ufd.value<std::string>());
     }

@@ -166,7 +166,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " SMART confidants (" << smartConfidants_.size() << "), proposed fee(s): " << strFees;
 
-    // pack_.transactions(0).user_field(1) = 0;
+    // pack_.transactions(0).user_field(cs::trx_uf::ordinary::Text) = 0;
 
     currentSmartTransactionPack_ = tmpPacket;//pack;
 
