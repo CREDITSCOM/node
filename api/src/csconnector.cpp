@@ -50,7 +50,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
         while (true) {
             const uint16_t exec_server_port = uint16_t(cs::ConfigHolder::instance().config()->getApiSettings().apiexecPort);
             if (exec_server_port == 0) {
-                cslog() << "Start API port disabled ([api] apiexec_port = 0)";
+                cslog() << "Executor API is disabled ([api] apiexec_port = 0)";
                 std::this_thread::sleep_for(std::chrono::seconds(kTestConfigPortPeriod_sec));
                 if (stop_flag) {
                     break;
@@ -99,7 +99,7 @@ void connector::run() {
             const auto& config = cs::ConfigHolder::instance().config()->getApiSettings();
             const uint16_t api_port = uint16_t(config.port);
             if (api_port == 0) {
-                cslog() << "Start API port disabled ([api] port = 0)";
+                cslog() << "Public API is disabled ([api] port = 0)";
                 std::this_thread::sleep_for(std::chrono::seconds(kTestConfigPortPeriod_sec));
                 if (stop_flag) {
                     break;
@@ -147,14 +147,14 @@ void connector::run() {
             const auto& config = cs::ConfigHolder::instance().config()->getApiSettings();
             const uint16_t ajax_port = uint16_t(config.ajaxPort);
             if (ajax_port == 0) {
-                csdebug() << "Start AJAX port disabled ([api] ajax_port = 0)";
+                csdebug() << "AJAX service is disabled ([api] ajax_port = 0)";
                 std::this_thread::sleep_for(std::chrono::seconds(kTestConfigPortPeriod_sec));
                 if (stop_flag) {
                     break;
                 }
                 continue;
             }
-            cslog() << "Starting AJAX server on port " << ajax_port;
+            cslog() << "Starting AJAX service on port " << ajax_port;
             ajax_server = std::make_unique<TThreadedServer>(
                 p_api_processor,
                 make_shared<TServerSocket>(ajax_port, config.ajaxServerSendTimeout, config.ajaxServerReceiveTimeout),
@@ -166,11 +166,11 @@ void connector::run() {
                 std::shared_ptr<TThreadedServer> srv = ajax_server;
                 srv->setConcurrentClientLimit(AJAX_CONCURRENT_API_CLIENTS);
                 srv->run();
-                cslog() << "Stop public AJAX server on port " << ajax_port;
+                cslog() << "Stop AJAX service on port " << ajax_port;
                 break;
             }
             catch (...) {
-                cserror() << "AJAX server stopped unexpectedly";
+                cserror() << "AJAX service stopped unexpectedly";
             }
             // wait before restarting server
             std::this_thread::sleep_for(std::chrono::milliseconds(kRestartThriftPause_ms));
@@ -204,7 +204,7 @@ void connector::stop() {
 
 #ifdef BINARY_TCP_EXECAPI
     if (execapi_server) {
-        cslog() << "API: stop executor server";
+        cslog() << "API: stop executor API";
         execapi_server->stop();
         execapi_server.reset();
         if (execapi_thread.joinable()) {
@@ -215,7 +215,7 @@ void connector::stop() {
 
 #ifdef AJAX_IFACE
     if (ajax_server) {
-        cslog() << "API: stop AJAX server";
+        cslog() << "API: stop AJAX service";
         ajax_server->stop();
         ajax_server.reset();
         if (ajax_thread.joinable()) {
