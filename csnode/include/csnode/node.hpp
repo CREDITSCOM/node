@@ -298,6 +298,8 @@ public slots:
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
     void onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences);
+    // request current trusted nodes for block with specific sequence
+    void sendBlockRequestToConfidants(cs::Sequence sequence);
     void processSpecialInfo(const csdb::Pool& pool);
     void validateBlock(const csdb::Pool& block, bool* shouldStop);
     void deepBlockValidation(csdb::Pool block, bool* shouldStop);
@@ -338,6 +340,12 @@ private:
 
     template <class... Args>
     void sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+    template <class... Args>
+    void sendBroadcastIfNoConnection(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+    template <class... Args>
+    void sendBroadcastIfNoConnection(const cs::PublicKeys& keys, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     // to current confidants list
     template <class... Args>

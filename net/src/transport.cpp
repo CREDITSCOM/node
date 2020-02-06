@@ -163,6 +163,10 @@ void Transport::sendBroadcast(Packet&& pack) {
     host_.SendBroadcast(pack.moveData());
 }
 
+void Transport::sendBroadcastIfNoConnection(Packet&& pack, const cs::PublicKey& receiver) {
+    host_.SendBroadcastIfNoConnection(toNodeId(receiver), pack.moveData());
+}
+
 void Transport::processorRoutine() {
     constexpr size_t kRoutineWaitTimeMs = 50;
 

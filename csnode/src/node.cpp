@@ -103,6 +103,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.alarmBadBlock, this, &Node::sendBlockAlarmSignal);
     cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
     cs::Connector::connect(&blockChain_.storeBlockEvent, this, &Node::processSpecialInfo);
+    cs::Connector::connect(&blockChain_.uncertainBlock, this, &Node::sendBlockRequestToConfidants);
 
     initPoolSynchronizer();
     setupNextMessageBehaviour();
@@ -577,6 +578,7 @@ void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, 
     cs::ODataStream roundStream(message);
     roundStream << round << version;
 
+    // packet validator have already tested starter signature
     cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
 
     if (NODE_VERSION > version) {
@@ -1300,7 +1302,9 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
 }
 
 void Node::getBlockReply(const uint8_t* data, const size_t size) {
-    if (!poolSynchronizer_->isSyncroStarted()) {
+    bool is_sync_on = poolSynchronizer_->isSyncroStarted();
+    bool is_blockchain_uncertain = blockChain_.isLastBlockUncertain();
+    if (!is_sync_on && !is_blockchain_uncertain) {
         csdebug() << "NODE> Get block reply> Pool sync has already finished";
         return;
     }
@@ -1319,7 +1323,19 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
         return;
     }
 
-    poolSynchronizer_->getBlockReply(std::move(poolsBlock));
+    if (is_blockchain_uncertain) {
+        const auto last = blockChain_.getLastSeq();
+        for (auto& b: poolsBlock) {
+            if (b.sequence() == last) {
+                cslog() << kLogPrefix_ << "get possible replacement for uncertain block " << WithDelimiters(last);
+                blockChain_.storeBlock(b, true /*by_sync*/);
+            }
+        }
+    }
+
+    if (is_sync_on) {
+        poolSynchronizer_->getBlockReply(std::move(poolsBlock));
+    }
 }
 
 void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target) {
@@ -1494,6 +1510,17 @@ void Node::sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequeste
     transport_->sendDirect(formPacket(flags, MsgTypes::BlockRequest, round, sequences), target);
 }
 
+void Node::sendBlockRequestToConfidants(cs::Sequence sequence) {
+    cslog() << kLogPrefix_ << "request block " << WithDelimiters(sequence) << " from trusted";
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    cs::PoolsRequestedSequences sequences;
+    sequences.push_back(sequence);
+
+    // try to send to confidants..
+    const auto& confidants = cs::Conveyer::instance().confidants();
+    sendDirect(confidants, MsgTypes::BlockRequest, round, sequences, size_t(0) /*packetNum*/);
+}
+
 Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const MsgTypes type, const cs::PublicKey sender) {
     if (!good_) {
         return MessageActions::Drop;
@@ -1652,11 +1679,29 @@ void Node::sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Ar
 }
 
 template <class... Args>
+void Node::sendBroadcastIfNoConnection(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+    csdetails() << "NODE> Sending broadcast IF NO CONNECTION, round: " << round
+                << ", msgType: " << Packet::messageTypeToString(msgType);
+
+    transport_->sendBroadcastIfNoConnection(formPacket(BaseFlags::Compressed, msgType, round, args...), target);
+}
+
+template <class... Args>
+void Node::sendBroadcastIfNoConnection(const cs::PublicKeys& keys, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
+    csdetails() << "NODE> Sending broadcast IF NO CONNECTION, round: " << round
+                << ", msgType: " << Packet::messageTypeToString(msgType);
+
+    for (auto& key : keys) {
+        transport_->sendBroadcastIfNoConnection(formPacket(BaseFlags::Compressed, msgType, round, args...), key);
+    }
+}
+
+template <class... Args>
 void Node::sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args) {
     csdebug() << "NODE> Sending confidants, round: " << round
               << ", msgType: " << Packet::messageTypeToString(msgType);
 
-    sendDirect(cs::Conveyer::instance().confidants(), msgType, round, std::forward<Args>(args)...);
+    sendBroadcastIfNoConnection(cs::Conveyer::instance().confidants(), msgType, round, std::forward<Args>(args)...);
 }
 
 void Node::sendStageOne(const cs::StageOne& stageOneInfo) {
@@ -1943,12 +1988,7 @@ void Node::stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, 
         return;
     }
 
-    if (cs::ConfigHolder::instance().config()->isCompatibleVersion()) {
-        sendDirect(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required);
-    }
-    else {
-        sendDirect(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required, iteration);
-    }
+    sendBroadcastIfNoConnection(conveyer.confidantByIndex(respondent), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, myConfidantIndex_, required, iteration);
 
     csmeta(csdetails) << "done";
 }
@@ -2022,7 +2062,7 @@ void Node::sendStageReply(const uint8_t sender, const cs::Signature& signature, 
         return;
     }
 
-    sendDirect(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
+    sendBroadcastIfNoConnection(conveyer.confidantByIndex(requester), msgType, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, message);
     csmeta(csdetails) << "done";
 }
 
@@ -2085,7 +2125,7 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs
                       << "Sender: " << static_cast<int>(stageOneInfo.sender) << std::endl
                       << "Hash: " << cs::Utils::byteStreamToHex(stageOneInfo.hash.data(), stageOneInfo.hash.size());
 
-    sendDirect(smartConfidants, MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
+    sendBroadcastIfNoConnection(smartConfidants, MsgTypes::FirstSmartStage, cs::Conveyer::instance().currentRoundNumber(),
                stageOneInfo.message, stageOneInfo.signature);
 
     csmeta(csdebug) << "done";
@@ -2155,7 +2195,7 @@ void Node::sendSmartStageTwo(const cs::ConfidantsKeys& smartConfidants, cs::Stag
 
     // create signature
     stageTwoInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
-    sendDirect(smartConfidants, MsgTypes::SecondSmartStage, cs::Conveyer::instance().currentRoundNumber(), bytes, stageTwoInfo.signature);
+    sendBroadcastIfNoConnection(smartConfidants, MsgTypes::SecondSmartStage, cs::Conveyer::instance().currentRoundNumber(), bytes, stageTwoInfo.signature);
 
     // cash our stage two
     stageTwoInfo.message = std::move(bytes);
@@ -2216,7 +2256,7 @@ void Node::sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::St
 
     stageThreeInfo.signature = cscrypto::generateSignature(solver_->getPrivateKey(), bytes.data(), bytes.size());
 
-    sendDirect(smartConfidants, MsgTypes::ThirdSmartStage, cs::Conveyer::instance().currentRoundNumber(),
+    sendBroadcastIfNoConnection(smartConfidants, MsgTypes::ThirdSmartStage, cs::Conveyer::instance().currentRoundNumber(),
                // payload:
               bytes, stageThreeInfo.signature);
 
@@ -2256,7 +2296,7 @@ void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::
 
 bool Node::smartStageRequest(MsgTypes msgType, uint64_t smartID, const cs::PublicKey& confidant, uint8_t respondent, uint8_t required) {
     csmeta(csdebug) << __func__ << "started";
-    sendDirect(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartID, respondent, required);
+    sendBroadcastIfNoConnection(confidant, msgType, cs::Conveyer::instance().currentRoundNumber(), smartID, respondent, required);
     csmeta(csdebug) << "done";
     return true;
 }
@@ -2284,7 +2324,7 @@ void Node::getSmartStageRequest(const MsgTypes msgType, const uint8_t* data, con
 void Node::sendSmartStageReply(const cs::Bytes& message, const cs::Signature& signature, const MsgTypes msgType, const cs::PublicKey& requester) {
     csmeta(csdebug) << "started";
 
-    sendDirect(requester, msgType, cs::Conveyer::instance().currentRoundNumber(), message, signature);
+    sendBroadcastIfNoConnection(requester, msgType, cs::Conveyer::instance().currentRoundNumber(), message, signature);
     csmeta(csdebug) << "done";
 }
 
@@ -2829,11 +2869,6 @@ void Node::sendHash(cs::RoundNumber round) {
     // try to send to confidants..
     const auto& confidants = cs::Conveyer::instance().confidants();
 
-    if (confidants.size() < Consensus::MinTrustedNodes) {
-        sendBroadcast(MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
-        return;
-    }
-
     sendDirect(confidants, MsgTypes::BlockHash, round, subRound_, messageToSend, signature);
     csdebug() << "NODE> Hash sent, round: " << round << "." << cs::numeric_cast<int>(subRound_) << ", message: " << cs::Utils::byteStreamToHex(messageToSend);
 }
@@ -3347,7 +3382,9 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
         // TODO: examine what will be done without this function
         if (!roundPackageCache_.empty() && roundPackageCache_.back().poolMetaInfo().realTrustedMask.size() > cs::TrustedMask::trustedSize(roundPackageCache_.back().poolMetaInfo().realTrustedMask)) {
             blockChain_.setBlocksToBeRemoved(1U);
-            blockChain_.removeLastBlock();
+            if (!blockChain_.compromiseLastBlock(hash)) {
+                blockChain_.removeLastBlock();
+            }
             lastBlockRemoved_ = true;
         }
 

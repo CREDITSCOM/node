@@ -48,6 +48,7 @@ public:
     void sendDirect(Packet&&, const cs::PublicKey&);
     void sendMulticast(Packet&&, const std::vector<cs::PublicKey>&);
     void sendBroadcast(Packet&&);
+    void sendBroadcastIfNoConnection(Packet&&, const cs::PublicKey&);
 
     void ban(const cs::PublicKey&);
     void revertBan(const cs::PublicKey&);
