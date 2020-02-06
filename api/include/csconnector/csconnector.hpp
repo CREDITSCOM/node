@@ -102,6 +102,8 @@ private:
     std::thread execapi_thread;
     std::shared_ptr<::apache::thrift::server::TThreadedServer> execapi_server;
 #endif
+
+    std::atomic_bool stop_flag;
 };
 }  // namespace csconnector
 
