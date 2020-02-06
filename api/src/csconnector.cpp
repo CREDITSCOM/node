@@ -17,6 +17,7 @@
 
 #include <csnode/configholder.hpp>
 #include <csnode/transactionspacket.hpp>
+#include <csnode/node.hpp>
 
 namespace csconnector {
 
@@ -34,12 +35,14 @@ constexpr const bool kStrictRead = false; // use default Thrift value
 constexpr const bool kStrictWrite = true; // use default Thrift value
 constexpr const uint32_t kTestConfigPortPeriod_sec = 10;
 
-connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
+connector::connector(Node& node)
 : executor_(cs::Executor::instance())
-, api_handler(make_shared<api::APIHandler>(m_blockchain, *solver, executor_))
-, apiexec_handler(make_shared<apiexec::APIEXECHandler>(m_blockchain, *solver, executor_))
-, p_api_processor(make_shared<connector::ApiProcessor>(api_handler))
-, p_apiexec_processor(make_shared<apiexec::APIEXECProcessor>(apiexec_handler))
+, api_handler(make_shared<api::APIHandler>(node.getBlockChain(), *node.getSolver(), executor_))
+, apiexec_handler(make_shared<apiexec::APIEXECHandler>(node.getBlockChain(), *node.getSolver(), executor_))
+, diag_handler(make_shared<api_diag::APIDiagHandler>(node))
+, api_processor(make_shared<connector::ApiProcessor>(api_handler))
+, apiexec_processor(make_shared<apiexec::APIEXECProcessor>(apiexec_handler))
+, diag_processor(make_shared<api_diag::API_DIAGProcessor>(diag_handler))
 , stop_flag(false)
 {
 
@@ -59,7 +62,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
             }
             cslog() << "Starting executor API on port " << exec_server_port;
             execapi_server = std::make_shared<TThreadedServer>(
-                p_apiexec_processor,
+                apiexec_processor,
                 make_shared<TServerSocket>(exec_server_port),
                 make_shared<TBufferedTransportFactory>(),
                 make_shared<TBinaryProtocolFactory>(kStringLimit, kContainerLimit, kStrictRead, kStrictWrite)
@@ -87,7 +90,7 @@ connector::connector(BlockChain& m_blockchain, cs::SolverCore* solver)
 
 void connector::run() {
 
-    stop_flag - false;
+    stop_flag = false;
 
     using ::apache::thrift::server::TThreadedServer;
 
@@ -107,8 +110,8 @@ void connector::run() {
                 continue;
             }
             cslog() << "Starting public API on port " << api_port;
-            api_server = std::make_unique<TThreadedServer>(
-                p_api_processor,
+            api_server = std::make_shared<TThreadedServer>(
+                api_processor,
                 make_shared<TServerSocket>(api_port, config.serverSendTimeout, config.serverReceiveTimeout),
                 make_shared<TBufferedTransportFactory>(),
                 make_shared<TBinaryProtocolFactory>(kStringLimit, kContainerLimit, kStrictRead, kStrictWrite)
@@ -155,8 +158,8 @@ void connector::run() {
                 continue;
             }
             cslog() << "Starting AJAX service on port " << ajax_port;
-            ajax_server = std::make_unique<TThreadedServer>(
-                p_api_processor,
+            ajax_server = std::make_shared<TThreadedServer>(
+                api_processor,
                 make_shared<TServerSocket>(ajax_port, config.ajaxServerSendTimeout, config.ajaxServerReceiveTimeout),
                 make_shared<THttpServerTransportFactory>(),
                 make_shared<TJSONProtocolFactory>()
@@ -174,11 +177,57 @@ void connector::run() {
             }
             // wait before restarting server
             std::this_thread::sleep_for(std::chrono::milliseconds(kRestartThriftPause_ms));
+            if (stop_flag) {
+                break;
+            }
         }
 
     });
 
 #endif
+
+#if defined(DIAG_API)
+
+    diag_thread = std::thread([this]() {
+
+        while (true) {
+            const auto& config = cs::ConfigHolder::instance().config()->getApiSettings();
+            const uint16_t diag_port = uint16_t(config.diagPort);
+            if (diag_port == 0) {
+                csdebug() << "Diagnostic API is disabled ([api] diag_port = 0)";
+                std::this_thread::sleep_for(std::chrono::seconds(kTestConfigPortPeriod_sec));
+                if (stop_flag) {
+                    break;
+                }
+                continue;
+            }
+            cslog() << "Starting diagnostic API on port " << diag_port;
+            diag_server = std::make_shared<TThreadedServer>(
+                diag_processor,
+                make_shared<TServerSocket>(diag_port, config.serverSendTimeout, config.serverReceiveTimeout),
+                make_shared<TBufferedTransportFactory>(),
+                make_shared<TBinaryProtocolFactory>(kStringLimit, kContainerLimit, kStrictRead, kStrictWrite)
+            );
+
+            try {
+                std::shared_ptr<TThreadedServer> srv = diag_server;
+                srv->run();
+                cslog() << "Stop diagnostic API on port " << diag_port;
+                break;
+            }
+            catch (...) {
+                cserror() << "Diagnostic API stopped unexpectedly";
+            }
+            // wait before restarting server
+            std::this_thread::sleep_for(std::chrono::milliseconds(kRestartThriftPause_ms));
+            if (stop_flag) {
+                break;
+            }
+        }
+
+    });
+
+#endif // DIAG_API
 
     api_handler->run();
 }
@@ -223,6 +272,18 @@ void connector::stop() {
         }
     }
 #endif
+
+#ifdef DIAG_API
+    if (diag_server) {
+        cslog() << "API: stop diagnostic API";
+        diag_server->stop();
+        diag_server.reset();
+        if (diag_thread.joinable()) {
+            diag_thread.join();
+        }
+    }
+#endif
+
 }
 
 void connector::onPacketExpired(const cs::TransactionsPacket& packet) {

@@ -31,6 +31,8 @@ add_library(csconnector
     include/executor.hpp
     src/executor.cpp
     include/serializer.hpp
+    include/apidiaghandler.hpp
+    src/apidiaghandler.cpp
 )
 
 target_link_libraries (csconnector PUBLIC csdb csnode lib csconnector_gen csconnector_executor_gen variant_gen)
