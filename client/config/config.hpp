@@ -31,7 +31,7 @@ const uint32_t DEFAULT_MAX_NEIGHBOURS = 24; // Neighbourhood::MaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
-const double DEFAULT_BROADCAST_FILLING = 100 / 3.; // 33.3%
+const double DEFAULT_BROADCAST_FILLING = 100.0; // 33.3%
 
 const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
 const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 10;          // rounds
@@ -69,10 +69,16 @@ struct PoolSyncData {
 };
 
 struct ApiData {
+    // on by default:
     uint16_t port = 9090;
-    uint16_t ajaxPort = 8081;
+    // off by default:
+    uint16_t ajaxPort = 0; // former 8081;
+    // on by default:
     uint16_t executorPort = 9080;
+    // on by default:
     uint16_t apiexecPort = 9070;
+    // off by default:
+    uint16_t diagPort = 0; // former 9060;
     int executorSendTimeout = 4000;
     int executorReceiveTimeout = 4000;
     int serverSendTimeout = 30000;
