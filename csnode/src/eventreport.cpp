@@ -225,7 +225,8 @@ void EventReport::sendInvalidBlockAlarm(Node& node, const cs::PublicKey& source,
         return;
     }
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize + sizeof(sequence);
-    cs::Bytes bin_pack(len);
+    cs::Bytes bin_pack;
+    bin_pack.reserve(len);
     cs::DataStream out(bin_pack);
     out << Id::AlarmInvalidBlock << source << sequence;
     node.reportEvent(bin_pack);
@@ -273,7 +274,8 @@ void EventReport::sendConsensusProblem(Node& node, Id problem_id, const cs::Publ
         return;
     }
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize;
-    cs::Bytes bin_pack(len);
+    cs::Bytes bin_pack;
+    bin_pack.reserve(len);
     cs::DataStream out(bin_pack);
     out << problem_id << problem_source;
     node.reportEvent(bin_pack);
@@ -330,7 +332,8 @@ void EventReport::sendContractsProblem(Node& node, Id problem_id, const cs::Publ
     }
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize
         + sizeof(consensus_id.round) + sizeof(consensus_id.transaction) + sizeof(consensus_id.iteration);
-    cs::Bytes bin_pack(len);
+    cs::Bytes bin_pack;
+    bin_pack.reserve(len);
     cs::DataStream out(bin_pack);
     out << problem_id << problem_source << consensus_id.round << consensus_id.transaction << consensus_id.iteration;
     node.reportEvent(bin_pack);
@@ -361,7 +364,8 @@ EventReport::Id EventReport::parseContractsProblem(const cs::Bytes& bin_pack, cs
 
 /*static*/ void EventReport::sendRunningStatus(Node& node, Running::Status status) {
     constexpr size_t len = sizeof(EventReport::Id) + sizeof(Running::Status);
-    cs::Bytes bin_pack(len);
+    cs::Bytes bin_pack;
+    bin_pack.reserve(len);
     cs::DataStream out(bin_pack);
     out << Id::RunningStatus << status;
     node.reportEvent(bin_pack);

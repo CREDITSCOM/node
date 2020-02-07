@@ -180,15 +180,15 @@ void Node::run() {
 }
 
 void Node::stop() {
+    EventReport::sendRunningStatus(*this, Running::Status::Stop);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
     // stopping transport stops the node (see Node::run() method)
     transport_->stop();
     cswarning() << "[TRANSPORT STOPPED]";
 }
 
 void Node::destroy() {
-
-    EventReport::sendRunningStatus(*this, Running::Status::Stop);
-
     good_ = false;
 
     api_->stop();
@@ -1182,7 +1182,7 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             Running::Status status;
             if (EventReport::parseRunningStatus(bin_pack, status)) {
                 csevent() << log_prefix << cs::Utils::byteStreamToHex(sender.data(), sender.size())
-                    << " updated status to " << Running::to_string(status);
+                    << " go to state " << Running::to_string(status);
             }
             else {
                 csevent() << log_prefix << "failed to parse invalid running status from "
