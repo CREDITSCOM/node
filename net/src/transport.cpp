@@ -115,10 +115,16 @@ void Transport::run() {
 }
 
 void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data) {
+    if (data.size() + bytesToHandle_ > kMaxBytesToHandle) {
+        return;
+    }
+    bytesToHandle_ += data.size();
+
     {
-        std::lock_guard<std::mutex> g(inboxMux_);
+        std::lock_guard g(inboxMux_);
         inboxQueue_.emplace_back(std::make_pair(toPublicKey(id), Packet(std::move(data))));
     }
+
     newPacketsReceived_.notify_one();
 }
 
@@ -171,23 +177,27 @@ void Transport::processorRoutine() {
     constexpr size_t kRoutineWaitTimeMs = 50;
 
     while (!node_->isStopRequested()) {
-        CallsQueue::instance().callAll();
-
         std::unique_lock lock(inboxMux_);
         newPacketsReceived_.wait_for(lock, std::chrono::milliseconds{kRoutineWaitTimeMs}, [this]() {
             return !inboxQueue_.empty();
         });
 
-        checkNeighboursChange();
-
         while (!inboxQueue_.empty()) {
             Packet pack(std::move(inboxQueue_.front().second));
             cs::PublicKey sender(inboxQueue_.front().first);
             inboxQueue_.pop_front();
+            bytesToHandle_ -= pack.size();
+
+            lock.unlock();
+
+            CallsQueue::instance().callAll();
+            checkNeighboursChange();
 
             if (cs::PacketValidator::validate(pack)) {
                 pack.isNetwork() ? neighbourhood_.processNeighbourMessage(sender, pack) : processNodeMessage(sender, pack);
             }
+
+            lock.lock();
         }
     }
 }
