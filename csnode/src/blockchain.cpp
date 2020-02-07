@@ -333,7 +333,7 @@ csdb::Transaction BlockChain::loadTransaction(const csdb::TransactionID& transId
         transaction.set_time(BlockChain::getBlockTime(deferredBlock_));
     }
     else {
-        transaction = storage_.transaction(transId);
+        transaction = storage_.transaction(transId).clone();
         auto tmp = storage_.pool_load(transId.pool_seq());
         transaction.set_time(BlockChain::getBlockTime(tmp));
     }
