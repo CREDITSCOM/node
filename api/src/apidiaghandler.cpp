@@ -8,6 +8,17 @@
 
 #include <api_types.h>
 
+// see: deprecated transport.cpp #1008
+constexpr int8_t platform() {
+#ifdef _WIN32
+    return api_diag::Platform::OS_Windows;
+#elif __APPLE__
+    return api_diag::Platform::OS_MacOS;
+#else
+    return api_diag::Platform::OS_Linux;
+#endif
+}
+
 // see: apihandler.cpp #175
 //extern std::string fromByteArray(const cs::PublicKey& key);
 template <typename TArr>
