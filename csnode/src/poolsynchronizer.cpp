@@ -203,6 +203,10 @@ void cs::PoolSynchronizer::onTimeOut() {
         synchroFinished();
         sync(round);
     }
+
+    if (blockChain_->getCachedBlocksSize() >= kCachedBlocksLimit) {
+        checkCachedBlocks();
+    }
 }
 
 void cs::PoolSynchronizer::onWriteBlock(const csdb::Pool& pool) {
@@ -218,7 +222,7 @@ void cs::PoolSynchronizer::onRemoveBlock(const csdb::Pool& pool) {
     csmeta(csdetails) << removedSequence;
     cs::RoundNumber round = cs::Conveyer::instance().currentRoundNumber();
 
-    if (round > removedSequence && round - removedSequence > cs::PoolSynchronizer::roundDifferentForSync && !neighbours_.empty()) {
+    if (round > removedSequence && round - removedSequence > cs::PoolSynchronizer::kRoundDifferentForSync && !neighbours_.empty()) {
         auto iter = std::find_if(std::begin(neighbours_), std::end(neighbours_), [](const auto& neighbour) {
             return neighbour.sequences().empty();
         });
@@ -564,6 +568,39 @@ cs::Sequence cs::PoolSynchronizer::neighboursMaxSequence() const {
     }
 
     return neighbours_.front().maxSequence();
+}
+
+void cs::PoolSynchronizer::checkCachedBlocks() {
+    if (!isSyncroStarted_ || !canRequestFreeBlocks) {
+        return;
+    }
+
+    auto sequences = blockChain_->getFreeSpaceBlocks();
+
+    if (!sequences.has_value() || neighbours_.empty()) {
+        return;
+    }
+
+    auto& neighbour = neighbours_.front();
+    auto [begin, end] = sequences.value();
+
+    PoolsRequestedSequences seqs;
+    seqs.reserve(end - begin);
+
+    for (; begin <= end; ++begin) {
+        seqs.push_back(begin);
+    }
+
+    emit sendRequest(neighbour.publicKey() , seqs);
+
+    neighbour.addSequences(seqs);
+    neighbour.orderSequences();
+
+    canRequestFreeBlocks = false;
+
+    cs::Timer::singleShot(kFreeBlocksTimeoutMs, cs::RunPolicy::ThreadPolicy, [this] {
+        canRequestFreeBlocks = true;
+    });
 }
 
 void cs::PoolSynchronizer::synchroFinished() {

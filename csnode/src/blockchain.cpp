@@ -1357,7 +1357,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
                 csdebug() << kLogPrefix << "compromise own last block and cancel store operation";
             }
             else {
-			    csdebug() << kLogPrefix << "remove own last block and cancel store operation";
+                csdebug() << kLogPrefix << "remove own last block and cancel store operation";
                 removeLastBlock();
             }
             return false;
@@ -1392,7 +1392,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             csdebug() << kLogPrefix << "block #" << poolSequence << " has recorded to chain successfully";
             // unable to call because stack overflow in case of huge written blocks amount possible:
             // testCachedBlocks();
-			blocksToBeRemoved_ = 1;
+            blocksToBeRemoved_ = 1;
             resetUncertainState(); // every successful record require the new confirmation of uncertainity
             return true;
         }
@@ -1410,17 +1410,21 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
         return false;
     }
 
+    cs::Lock lock(cachedBlocksMutex_);
+
     if (cachedBlocks_.count(poolSequence) > 0) {
         csdebug() << kLogPrefix << "ignore duplicated block #" << poolSequence << " in cache";
         // it is not error, so caller code nothing to do with it
         cachedBlockEvent(poolSequence);
         return true;
     }
+
     // cache block for future recording
     cachedBlocks_.emplace(poolSequence, BlockMeta{pool, bySync});
     csdebug() << kLogPrefix << "cache block #" << poolSequence << " signed by " << pool.signatures().size()
         << " nodes for future (" << cachedBlocks_.size() << " total)";
     cachedBlockEvent(poolSequence);
+
     // cache always successful
     return true;
 }
@@ -1494,6 +1498,25 @@ void BlockChain::testCachedBlocks() {
     }
 }
 
+std::optional<BlockChain::SequenceInterval> BlockChain::getFreeSpaceBlocks() const {
+    auto lastWrittenSequence = getLastSeq();
+    cs::Sequence sequence = 0;
+
+    {
+        cs::Lock lock(cachedBlocksMutex_);
+
+        if (!cachedBlocks_.empty()) {
+            sequence = cachedBlocks_.begin()->first;
+        }
+    }
+
+    if (sequence <= lastWrittenSequence || (sequence - lastWrittenSequence) == 0) {
+        return std::nullopt;
+    }
+
+    return std::make_optional(std::make_pair(lastWrittenSequence + 1, sequence));
+}
+
 const cs::ReadBlockSignal& BlockChain::readBlockEvent() const {
     return storage_.readBlockEvent();
 }
@@ -1503,15 +1526,17 @@ const cs::StartReadingBlocksSignal& BlockChain::startReadingBlocksEvent() const 
 }
 
 std::size_t BlockChain::getCachedBlocksSize() const {
+    cs::Lock lock(cachedBlocksMutex_);
     return cachedBlocks_.size();
 }
 
 void BlockChain::clearBlockCache() {
-	cachedBlocks_.clear();
+    cs::Lock lock(cachedBlocksMutex_);
+    cachedBlocks_.clear();
 }
 
 std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const {
-	cs::Sequence seq = getLastSeq();
+    cs::Sequence seq = getLastSeq();
     const auto firstSequence = seq + 1;
     const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
 
