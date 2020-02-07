@@ -69,11 +69,16 @@ struct PoolSyncData {
 };
 
 struct ApiData {
+    // on by default:
     uint16_t port = 9090;
+    // off by default:
     uint16_t ajaxPort = 0; // former 8081;
+    // on by default:
     uint16_t executorPort = 9080;
+    // on by default:
     uint16_t apiexecPort = 9070;
-    uint16_t diagPort = 9060;
+    // off by default:
+    uint16_t diagPort = 0; // former 9060;
     int executorSendTimeout = 4000;
     int executorReceiveTimeout = 4000;
     int serverSendTimeout = 30000;

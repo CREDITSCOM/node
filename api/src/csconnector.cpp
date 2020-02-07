@@ -70,8 +70,12 @@ connector::connector(Node& node)
             try {
                 std::shared_ptr<TThreadedServer> srv = execapi_server;
                 srv->run();
-                cslog() << "Stop executor API on port " << exec_server_port;
-                break;
+                if (stop_flag) {
+                    cslog() << "Stop executor API on port " << exec_server_port;
+                    break;
+                }
+                cslog() << "Executor API is trying to stop";
+                continue;
             }
             catch (...) {
                 cserror() << "Executor API stopped unexpectedly";
@@ -125,8 +129,12 @@ void connector::run() {
             try {
                 std::shared_ptr<TThreadedServer> srv = api_server;
                 srv->run();
-                cslog() << "Stop public API on port " << api_port;
-                break;
+                if (stop_flag) {
+                    cslog() << "Stop public API on port " << api_port;
+                    break;
+                }
+                cslog() << "Public API is trying to stop";
+                continue;
             }
             catch (...) {
                 cserror() << "Public API stopped unexpectedly";
@@ -169,8 +177,12 @@ void connector::run() {
                 std::shared_ptr<TThreadedServer> srv = ajax_server;
                 srv->setConcurrentClientLimit(AJAX_CONCURRENT_API_CLIENTS);
                 srv->run();
-                cslog() << "Stop AJAX service on port " << ajax_port;
-                break;
+                if (stop_flag) {
+                    cslog() << "Stop AJAX service on port " << ajax_port;
+                    break;
+                }
+                cslog() << "AJAX service is trying to stop";
+                continue;
             }
             catch (...) {
                 cserror() << "AJAX service stopped unexpectedly";
@@ -212,8 +224,12 @@ void connector::run() {
             try {
                 std::shared_ptr<TThreadedServer> srv = diag_server;
                 srv->run();
-                cslog() << "Stop diagnostic API on port " << diag_port;
-                break;
+                if (stop_flag) {
+                    cslog() << "Stop diagnostic API on port " << diag_port;
+                    break;
+                }
+                cslog() << "Diagnostic API is trying to stop";
+                continue;
             }
             catch (...) {
                 cserror() << "Diagnostic API stopped unexpectedly";
