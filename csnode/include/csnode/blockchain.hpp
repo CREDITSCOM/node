@@ -437,7 +437,7 @@ private:
     //uint64_t initUuid() const;
 
     // may be modified once in uuid() method:
-    mutable std::atomic<uint64_t> uuid_ = 0;
+    mutable uint64_t uuid_ = 0;
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
     std::atomic_bool stop_ = false;
