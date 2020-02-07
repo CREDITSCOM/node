@@ -20,7 +20,7 @@ class PoolSynchronizer {
 public:
     explicit PoolSynchronizer(BlockChain* blockChain);
 
-    void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = roundDifferentForSync);
+    void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = kRoundDifferentForSync);
     void syncLastPool();
 
     // syncro get functions
@@ -31,7 +31,9 @@ public:
 
     bool isSyncroStarted() const;
 
-    static const cs::RoundNumber roundDifferentForSync = cs::values::kDefaultMetaStorageMaxSize;
+    static const cs::RoundNumber kRoundDifferentForSync = cs::values::kDefaultMetaStorageMaxSize;
+    static const size_t kFreeBlocksTimeoutMs = 10000;
+    static const size_t kCachedBlocksLimit = 10000;
 
 public signals:
     PoolSynchronizerRequestSignal sendRequest;
@@ -79,6 +81,7 @@ private:
     Neighbour& getNeighbour(const Neighbour& element);
     cs::Sequence neighboursMaxSequence() const;
 
+    void checkCachedBlocks();
     void synchroFinished();
 
 private:
@@ -147,6 +150,17 @@ private:
         inline void addSequences(const cs::Sequence sequence) {
             sequences_.push_back(sequence);
         }
+        inline void addSequences(cs::Sequence begin, cs::Sequence end) {
+            for (;begin <= end; ++begin) {
+                sequences_.push_back(begin);
+            }
+        }
+        inline void addSequences(const PoolsRequestedSequences& sequences) {
+            sequences_.insert(sequences_.end(), sequences.begin(), sequences.end());
+        }
+        inline void orderSequences() {
+            std::sort(std::begin(sequences_), std::end(sequences_));
+        }
         inline void reset() {
             resetSequences();
         }
@@ -214,7 +228,8 @@ private:
     BlockChain* blockChain_;
 
     // flag starting  syncronization
-    bool isSyncroStarted_ = false;
+    std::atomic<bool> isSyncroStarted_ = false;
+    std::atomic<bool> canRequestFreeBlocks = true;
 
     // [key] = sequence,
     // [value] =  packet counter

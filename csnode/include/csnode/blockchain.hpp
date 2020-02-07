@@ -186,7 +186,6 @@ public:
      */
 
     std::size_t getCachedBlocksSize() const;
-
     void clearBlockCache();
 
     // continuous interval from ... to
@@ -216,6 +215,7 @@ public:
      */
 
     void testCachedBlocks();
+    std::optional<SequenceInterval> getFreeSpaceBlocks() const;
 
     bool isLastBlockUncertain() const {
         return uncertainLastBlockFlag_;
@@ -412,6 +412,8 @@ private:
         // indicates that block has got by sync, so it is checked & tested in other way than ordinary ones
         bool bySync;
     };
+
+    mutable std::mutex cachedBlocksMutex_;
     std::map<cs::Sequence, BlockMeta> cachedBlocks_;
 
     // block storage to defer storing it in blockchain until confirmation from other nodes got

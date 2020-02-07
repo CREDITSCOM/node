@@ -1444,11 +1444,11 @@ void Node::processSync() {
     const auto lastSequence = blockChain_.getLastSeq();
     const auto round = cs::Conveyer::instance().currentRoundNumber();
 
-    if (stat_.isCurrentRoundTooLong(kLastPoolSynchroDelay_) && round < lastSequence + cs::PoolSynchronizer::roundDifferentForSync) {
+    if (stat_.isCurrentRoundTooLong(kLastPoolSynchroDelay_) && round < lastSequence + cs::PoolSynchronizer::kRoundDifferentForSync) {
         poolSynchronizer_->syncLastPool();
     }
     else {
-        poolSynchronizer_->sync(round, cs::PoolSynchronizer::roundDifferentForSync);
+        poolSynchronizer_->sync(round, cs::PoolSynchronizer::kRoundDifferentForSync);
     }
 }
 
@@ -2792,7 +2792,7 @@ bool Node::isTransactionsInputAvailable() {
         }
         else {
             bool condition = (!poolSynchronizer_->isSyncroStarted()) && (cs::Conveyer::instance().currentRoundNumber() 
-                - getBlockChain().getLastSeq() < cs::PoolSynchronizer::roundDifferentForSync);
+                - getBlockChain().getLastSeq() < cs::PoolSynchronizer::kRoundDifferentForSync);
             return condition;
         }
     }

@@ -21,10 +21,15 @@ const csdb::Address startAddress = csdb::Address::from_string("00000000000000000
 
 class PoolSynchronizerTest : public cs::PoolSynchronizer {
 public:
-    PoolSynchronizerTest(BlockChain* blockchain):PoolSynchronizer(blockchain) {}
+    explicit PoolSynchronizerTest(BlockChain* blockchain):PoolSynchronizer(blockchain) {}
 
     bool isCorrect() const {
         auto n = neighbours();
+
+        for (const auto& e : n) {
+            std::cout << "Neighbour " << cs::Utils::byteStreamToHex(e.first) << ", " << e.second << std::endl;
+        }
+
         return std::is_sorted(std::begin(n), std::end(n), [](const auto& lhs, const auto& rhs) {
             return lhs.second > rhs.second;
         });
