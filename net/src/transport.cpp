@@ -115,25 +115,14 @@ void Transport::run() {
 }
 
 void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data) {
-    Packet pack(std::move(data));
-    if (!cs::PacketValidator::validate(pack)) {
-        return;
-    }
-
-    auto publicKey = toPublicKey(id);
-    if (pack.isNetwork()) {
-        neighbourhood_.processNeighbourMessage(publicKey, pack);
-        return;
-    }
-
-    if (pack.size() + bytesToHandle_ > kMaxBytesToHandle) {
+    if (data.size() + bytesToHandle_ > kMaxBytesToHandle) {
         return;
     }
     bytesToHandle_ += data.size();
 
     {
         std::lock_guard g(inboxMux_);
-        inboxQueue_.emplace_back(std::make_pair(publicKey, std::move(pack)));
+        inboxQueue_.emplace_back(std::make_pair(toPublicKey(id), Packet(std::move(data))));
     }
 
     newPacketsReceived_.notify_one();
@@ -203,7 +192,10 @@ void Transport::processorRoutine() {
 
             CallsQueue::instance().callAll();
             checkNeighboursChange();
-            processNodeMessage(sender, pack);
+
+            if (cs::PacketValidator::validate(pack)) {
+                pack.isNetwork() ? neighbourhood_.processNeighbourMessage(sender, pack) : processNodeMessage(sender, pack);
+            }
 
             lock.lock();
         }
