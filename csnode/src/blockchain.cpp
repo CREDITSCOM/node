@@ -115,7 +115,6 @@ bool BlockChain::isGood() const {
 }
 
 uint64_t BlockChain::uuid() const {
-    cs::Lock lock(dbLock_);
     return uuid_;
 }
 
