@@ -370,6 +370,20 @@ void cs::PoolSynchronizer::sendBlock(const Neighbour& neighbour) {
     emit sendRequest(neighbour.publicKey(), sequences);
 }
 
+void cs::PoolSynchronizer::sendBlock(const cs::PoolSynchronizer::Neighbour& neighbour, const cs::PoolsRequestedSequences& sequences) {
+    const auto requestedSize = cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
+    const auto parts = requestedSize % sequences.size();
+    const auto seqs = cs::Utils::splitVector(sequences, parts);
+    const auto key = cs::Utils::byteStreamToHex(neighbour.publicKey());
+
+    for (const auto& s : seqs) {
+        cslog() << "SYNC FREE BLOCKS: requesting for " << sequences.size() << " blocks [" << sequences.front() << ", " << sequences.back()
+            << "] from " << key;
+
+        emit sendRequest(neighbour.publicKey(), s);
+    }
+}
+
 bool cs::PoolSynchronizer::getNeededSequences(Neighbour& neighbour) {
     const bool isLastPacket = isLastRequest();
 
@@ -591,7 +605,7 @@ void cs::PoolSynchronizer::checkCachedBlocks() {
         seqs.push_back(begin);
     }
 
-    emit sendRequest(neighbour.publicKey() , seqs);
+    sendBlock(neighbour, seqs);
 
     neighbour.addSequences(seqs);
     neighbour.orderSequences();

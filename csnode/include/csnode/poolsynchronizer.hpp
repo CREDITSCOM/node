@@ -62,6 +62,7 @@ private:
     bool checkActivity(const CounterType counterType);
 
     void sendBlock(const Neighbour& neighbour);
+    void sendBlock(const Neighbour& neighbour, const PoolsRequestedSequences& sequeces);
 
     bool getNeededSequences(Neighbour& neighbour);
 
