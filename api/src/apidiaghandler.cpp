@@ -23,12 +23,7 @@ constexpr int8_t platform() {
 //extern std::string fromByteArray(const cs::PublicKey& key);
 template <typename TArr>
 std::string to_string(const TArr& ar) {
-    std::string res;
-    {
-        res.reserve(ar.size());
-        std::transform(ar.begin(), ar.end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
-    }
-    return res;
+    return std::string(ar.begin(), ar.end());
 }
 
 namespace api_diag {

@@ -173,30 +173,15 @@ void APIHandler::WalletBalanceGet(api::WalletBalanceGetResult& _return, const ge
 }
 
 std::string fromByteArray(const cs::Bytes& bar) {
-    std::string res;
-    {
-        res.reserve(bar.size());
-        std::transform(bar.begin(), bar.end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
-    }
-    return res;
+    return std::string(bar.begin(), bar.end());
 }
 
 std::string fromByteArray(const cs::PublicKey& bar) {
-    std::string res;
-    {
-        res.reserve(bar.size());
-        std::transform(bar.begin(), bar.end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
-    }
-    return res;
+    return std::string(bar.begin(), bar.end());
 }
 
 cs::Bytes toByteArray(const std::string& s) {
-    cs::Bytes res;
-    {
-        res.reserve(s.size());
-        std::transform(s.begin(), s.end(), std::back_inserter<decltype(res)>(res), [](uint8_t _) { return uint8_t(_); });
-    }
-    return res;
+    return cs::Bytes(s.begin(), s.end());
 }
 
 general::Amount convertAmount(const csdb::Amount& amount) {
