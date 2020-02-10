@@ -1003,19 +1003,44 @@ std::string  BlockChain::printWalletCaches() {
         for (size_t k = am.size(); k < 28; ++k) { // 28 positions are covered with " " to align digits
             res += " ";
         }
-        res += wd.delegated_.to_string() + "   ";
-        res += std::to_string(wd.transNum_) + "   ";
-        res += (wd.trxTail_.getLastTransactionId() > 1'000'000'000 ? "No" : std::to_string(wd.trxTail_.getLastTransactionId())) + "   ";
-        res += (wd.lastTransaction_.pool_seq() > 1'000'000'000 ? "No" : std::to_string(wd.lastTransaction_.pool_seq())) +"." + std::to_string(wd.lastTransaction_.index()) + "  ";
-        res += wd.trxTail_.printHeap() + "\n";
-        if (!wd.delegats_.empty()) {
+        auto deleg = wd.delegated_.to_string();
+        res += deleg;
+        //res += std::to_string(wd.transNum_) + "   ";
+        //res += (wd.trxTail_.getLastTransactionId() > 1'000'000'000 ? "No" : std::to_string(wd.trxTail_.getLastTransactionId())) + "   ";
+        //res += (wd.lastTransaction_.pool_seq() > 1'000'000'000 ? "No" : std::to_string(wd.lastTransaction_.pool_seq())) + "." + std::to_string(wd.lastTransaction_.index()) + "  ";
+        //res += wd.trxTail_.printHeap();
+        res += "\n";
+
+        if (wd.delegateSources_ && !wd.delegateSources_->empty()) {
             int delCounter = 0;
-            res += "    Delegats(" + std::to_string(wd.delegats_.size()) + "):" + "\n";
-            for (auto& it : wd.delegats_) {
+            res += "    Delegate Sources(" + std::to_string(wd.delegateSources_->size()) + "):" + "\n";
+            for (auto& it : *wd.delegateSources_) {
                 ++delCounter;
                 res += "        " + std::to_string(counter) + "." + std::to_string(delCounter) + " " + cs::Utils::byteStreamToHex(it.first.data(), it.first.size());
-                res += "    " + it.second.to_string() + "\n";
-
+                int cnt = 0;
+                for (auto& itt : it.second) {
+                    if (cnt > 0) {
+                        res += "                                                                            ";
+                    }
+                    res += "                      " + itt.amount.to_string() + "      " + cs::Utils::timeFromNumber(itt.time) + "\n";
+                    ++cnt;
+                }
+            }
+        }
+        if (wd.delegateTargets_ && !wd.delegateTargets_->empty()) {
+            int delCounter = 0;
+            res += "    Delegate Targets(" + std::to_string(wd.delegateTargets_->size()) + "):" + "\n";
+            for (auto& it : *wd.delegateTargets_) {
+                ++delCounter;
+                res += "        " + std::to_string(counter) + "." + std::to_string(delCounter) + " " + cs::Utils::byteStreamToHex(it.first.data(), it.first.size());
+                int cnt = 0;
+                for (auto& itt : it.second) {
+                    if (cnt > 0) {
+                        res += "                                                                            ";
+                    }
+                    res += "                      " + itt.amount.to_string() + "      " + cs::Utils::timeFromNumber(itt.time) + "\n";
+                    ++cnt;
+                }
             }
         }
         return true;

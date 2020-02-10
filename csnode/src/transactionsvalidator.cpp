@@ -232,7 +232,7 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
         auto it = wallState.delegats_.find(tKey);
         if (delegateField.value<uint64_t>() == trx_uf::sp::de::legate) {
             if (trx.amount() < Consensus::MinStakeDelegated) {
-                csdetails() << kLogPrefix << "The delegated amount is too low";
+                csdebug() << kLogPrefix << "The delegated amount is too low";
                 return Reject::Reason::AmountTooLow;
             }
             if (wallTargetState.delegated_ > csdb::Amount{ 0 }) {
@@ -240,24 +240,33 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
                 return Reject::Reason::AlreadyDelegated;
             }
             if (context.smart_contracts().is_known_smart_contract(trx.target())) {
-                csdetails() << kLogPrefix << "Target can't be a smart contract";
+                csdebug() << kLogPrefix << "Target can't be a smart contract";
                 return Reject::Reason::IncorrectTarget;
             }
         }
         else if (delegateField.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
-            if (it == wallState.delegats_.end()) {
-                csdetails() << kLogPrefix << "No such delegate in account state";
+            if (itTarget == wallState.delegateTargets_.end()) {
+                csdebug() << kLogPrefix << "No such target delegate in source account state";
                 return Reject::Reason::IncorrectTarget;
             }
             else {
-                if (wallTargetState.delegated_ != wallState.delegats_[tKey]) {
-                    cserror() << kLogPrefix << "The sum of delegation is not properly set to the sender and target accounts";
-                    return Reject::Reason::MalformedDelegation;
+
+                if (itSource == wallTargetState.delegateSources_.end()) {
+                    cserror() << kLogPrefix << "No such delegate source in target records";
+                    return Reject::Reason::IncorrectTarget;
                 }
                 else {
-                    if (wallTargetState.delegated_ != trx.amount()) {
-                        csdetails() << kLogPrefix << "The sum of delegation isn't equal the transaction amount";
-                        return Reject::Reason::IncorrectSum;
+                    auto& itt = std::find_if(itTarget->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                    auto& its = std::find_if(itSource->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                    if (itt->amount != its->amount) {
+                        cserror() << kLogPrefix << "The sum of delegation is not properly set to the sender and target accounts";
+                        return Reject::Reason::MalformedDelegation;
+                    }
+                    else {
+                        if (itt->amount < trx.amount()) {
+                            csdebug() << kLogPrefix << "The sum of delegation isn't enough for this transaction";
+                            return Reject::Reason::IncorrectSum;
+                        }
                     }
                 }
             }

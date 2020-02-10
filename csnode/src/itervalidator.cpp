@@ -365,17 +365,39 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
                     wDel = true;
                     if (bc.findWalletData(t.target(), tWallet)) {
                         auto tKey = bc.getCacheUpdater().toPublicKey(t.target());
-                        auto it = wallet.delegats_.find(tKey);
-                        if (it == wallet.delegats_.end()) {
-                            rc = kNoDelegate;
+                        auto itSource = sWallet.delegateTargets_->find(tKey);
+                        if (itSource == sWallet.delegateTargets_->end()) {
+                            rc = kNoDelegateTarget;//you don't contain target among your delegats
                         }
                         else {
-                            if (tWallet.delegated_ != wallet.delegats_[tKey]) {
-                                rc = kNoDelegate;
+                            auto sKey = bc.getCacheUpdater().toPublicKey(t.source());
+                            auto itTarget = tWallet.delegateSources_->find(sKey);
+                            if (itTarget == tWallet.delegateSources_->end()) {
+                                rc = kNoDelegateSource;//target account doesn't contain you as source
                             }
                             else {
-                                if (tWallet.delegated_ != t.amount()) {
-                                    rc = kDifferentDelegatedAmount;
+                                auto& itt = std::find_if(itTarget->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == 0U;});
+                                if (itt == itTarget->second.cend()) {
+                                    rc = kNoDelegatedAmountToWithdraw;//target account doesn't contain delegated amount that could be withdrawn
+                                }
+                                else {
+                                    auto& its = std::find_if(itSource->second.begin(), itSource->second.end(), [](cs::TimeMoney& tm) {return tm.time == 0U; });
+                                    if (its == itSource->second.cend()) {
+                                        rc = kNoDelegatedAmountToWithdraw;//target account doesn't contain delegated amount that could be withdrawn
+                                    }
+                                    else {
+                                        if (itt->amount != its->amount) {
+                                            rc = kDifferentDelegatedAmount;//target and source have different delegate records 
+                                        }
+                                        else {
+                                            if (itt->amount < t.amount()) {
+                                                rc = kInsufficientDelegatedBalance;//previously delegated amount is not as much as you demand to withdraw
+                                            }
+                                            else {
+                                                wDel = true;
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
