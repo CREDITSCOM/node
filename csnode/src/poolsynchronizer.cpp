@@ -372,15 +372,22 @@ void cs::PoolSynchronizer::sendBlock(const Neighbour& neighbour) {
 
 void cs::PoolSynchronizer::sendBlock(const cs::PoolSynchronizer::Neighbour& neighbour, const cs::PoolsRequestedSequences& sequences) {
     const auto requestedSize = cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
-    const auto parts = requestedSize / sequences.size();
-    const auto seqs = cs::Utils::splitVector(sequences, parts);
+    const auto parts = sequences.size() / requestedSize;
     const auto key = cs::Utils::byteStreamToHex(neighbour.publicKey());
 
-    for (const auto& s : seqs) {
-        cslog() << "SYNC FREE BLOCKS: requesting for " << s.size() << " blocks [" << s.front() << ", " << s.back()
-            << "] from " << key;
+    if (parts <= 1) {
+        printFreeBlocks(key, sequences);
 
-        emit sendRequest(neighbour.publicKey(), s);
+        emit sendRequest(neighbour.publicKey(), sequences);
+    }
+    else {
+        const auto seqs = cs::Utils::splitVector(sequences, parts);
+
+        for (const auto& s : seqs) {
+            printFreeBlocks(key, s);
+
+            emit sendRequest(neighbour.publicKey(), s);
+        }
     }
 }
 
@@ -639,4 +646,10 @@ std::vector<std::pair<cs::PublicKey, cs::Sequence>> cs::PoolSynchronizer::neighb
     }
 
     return result;
+}
+
+template<typename T>
+void cs::PoolSynchronizer::printFreeBlocks(const T& key, const cs::PoolsRequestedSequences& sequeces) {
+    cslog() << "SYNC FREE BLOCKS: requesting for " << sequeces.size() << " blocks [" << sequeces.front() << ", " << sequeces.back()
+        << "] from " << key;
 }

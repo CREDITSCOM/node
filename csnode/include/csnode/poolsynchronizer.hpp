@@ -67,8 +67,10 @@ private:
     bool getNeededSequences(Neighbour& neighbour);
 
     void checkNeighbourSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
-
     void removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
+
+    template<typename T>
+    void printFreeBlocks(const T& key, const PoolsRequestedSequences& sequeces);
 
     bool isLastRequest() const;
 
