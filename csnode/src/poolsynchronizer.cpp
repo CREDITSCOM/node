@@ -372,12 +372,12 @@ void cs::PoolSynchronizer::sendBlock(const Neighbour& neighbour) {
 
 void cs::PoolSynchronizer::sendBlock(const cs::PoolSynchronizer::Neighbour& neighbour, const cs::PoolsRequestedSequences& sequences) {
     const auto requestedSize = cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
-    const auto parts = requestedSize % sequences.size();
+    const auto parts = requestedSize / sequences.size();
     const auto seqs = cs::Utils::splitVector(sequences, parts);
     const auto key = cs::Utils::byteStreamToHex(neighbour.publicKey());
 
     for (const auto& s : seqs) {
-        cslog() << "SYNC FREE BLOCKS: requesting for " << sequences.size() << " blocks [" << sequences.front() << ", " << sequences.back()
+        cslog() << "SYNC FREE BLOCKS: requesting for " << s.size() << " blocks [" << s.front() << ", " << s.back()
             << "] from " << key;
 
         emit sendRequest(neighbour.publicKey(), s);
