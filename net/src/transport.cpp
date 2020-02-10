@@ -96,7 +96,7 @@ Transport::Transport(Node* node)
 , node_(node)
 , neighbourhood_(this, node_)
 , host_(config_, static_cast<HostEventHandler&>(*this)) {
-    cs::Connector::connect(&neighbourhood_.neighbourPingReceived, &pingReceived);
+    cs::Connector::connect(&neighbourhood_.neighbourPingReceived, this, &Transport::onPingReceived);
 }
 
 void Transport::run() {
@@ -151,6 +151,12 @@ void Transport::onNeighboursChanged(const cs::PublicKey& neighbour, cs::Sequence
                                     cs::RoundNumber lastRound, bool added) {
     std::lock_guard<std::mutex> g(neighboursMux_);
     neighboursToHandle_.emplace_back(neighbour, lastSeq, lastRound, added);
+}
+
+void Transport::onPingReceived(cs::Sequence sequence, const cs::PublicKey& key) {
+    cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, [=] {
+        emit pingReceived(sequence, key);
+    });
 }
 
 void Transport::sendDirect(Packet&& pack, const cs::PublicKey& receiver) {

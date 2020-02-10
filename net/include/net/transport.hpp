@@ -70,6 +70,8 @@ public:
     // @param added - true if new neighbour adder, false if removed
     void onNeighboursChanged(const cs::PublicKey&, cs::Sequence lastSeq,
                             cs::RoundNumber lastRound, bool added);
+public slots:
+    void onPingReceived(cs::Sequence sequence, const cs::PublicKey& key);
 
 public signals:
     PingSignal pingReceived;
@@ -103,7 +105,7 @@ private:
     std::mutex inboxMux_;
     std::list<std::pair<cs::PublicKey, Packet>> inboxQueue_;
 
-    constexpr static size_t kMaxBytesToHandle = 1 << 31;
+    constexpr static size_t kMaxBytesToHandle = 1ul << 31;
     std::atomic<size_t> bytesToHandle_ = 0;
 
     Neighbourhood neighbourhood_;
