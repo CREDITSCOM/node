@@ -70,6 +70,8 @@ public:
     // @param added - true if new neighbour adder, false if removed
     void onNeighboursChanged(const cs::PublicKey&, cs::Sequence lastSeq,
                             cs::RoundNumber lastRound, bool added);
+public slots:
+    void onPingReceived(cs::Sequence sequence, const cs::PublicKey& key);
 
 public signals:
     PingSignal pingReceived;
@@ -92,6 +94,7 @@ private:
     void dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes,
                              const cs::RoundNumber, const uint8_t* data, size_t);
     void processorRoutine();
+    void process();
     void checkNeighboursChange();
 
     bool good_ = false;
