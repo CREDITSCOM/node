@@ -129,7 +129,7 @@ void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data)
     if (pack.size() + bytesToHandle_ > kMaxBytesToHandle) {
         return;
     }
-    bytesToHandle_ += data.size();
+    bytesToHandle_ += pack.size();
 
     {
         std::lock_guard g(inboxMux_);
@@ -194,6 +194,8 @@ void Transport::processorRoutine() {
     constexpr size_t kRoutineWaitTimeMs = 50;
 
     while (!node_->isStopRequested()) {
+        process();
+
         std::unique_lock lock(inboxMux_);
         newPacketsReceived_.wait_for(lock, std::chrono::milliseconds{kRoutineWaitTimeMs}, [this]() {
             return !inboxQueue_.empty();
@@ -207,13 +209,17 @@ void Transport::processorRoutine() {
 
             lock.unlock();
 
-            CallsQueue::instance().callAll();
-            checkNeighboursChange();
+            process();
             processNodeMessage(sender, pack);
 
             lock.lock();
         }
     }
+}
+
+void Transport::process() {
+    checkNeighboursChange();
+    CallsQueue::instance().callAll();
 }
 
 void Transport::checkNeighboursChange() {

@@ -94,6 +94,7 @@ private:
     void dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes,
                              const cs::RoundNumber, const uint8_t* data, size_t);
     void processorRoutine();
+    void process();
     void checkNeighboursChange();
 
     bool good_ = false;
