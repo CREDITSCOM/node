@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <tuple>
 
 #include <cscrypto/cscrypto.hpp>
 #include <csdb/address.hpp>
@@ -27,6 +28,9 @@ class Transaction;
 namespace cs {
 
 class WalletsIds;
+
+using Delegations = std::vector<std::tuple<cs::PublicKey, cs::PublicKey, csdb::TransactionID>>;
+using DelegationsTiming = std::map<uint64_t, Delegations>;
 
 class WalletsCache {
 public:
@@ -75,7 +79,7 @@ private:
     std::list<csdb::TransactionID> smartPayableTransactions_;
     std::map< csdb::Address, std::list<csdb::TransactionID> > canceledSmarts_;
     std::unordered_map<PublicKey, WalletData> wallets_;
-    std::map<uint64_t, std::vector<std::pair<cs::PublicKey, cs::PublicKey>>> currentDelegations_;
+    DelegationsTiming currentDelegations_;
 
 #ifdef MONITOR_NODE
     std::map<PublicKey, TrustedData> trusted_info_;
@@ -84,8 +88,7 @@ private:
 
 using WalletUpdateSignal = cs::Signal<void(const PublicKey&, const WalletsCache::WalletData&)>;
 using FinishedUpdateFromDB = cs::Signal<void(const std::unordered_map<PublicKey, WalletsCache::WalletData>&)>;
-using Delegations = std::vector<std::pair<cs::PublicKey, cs::PublicKey>>;
-using DelegationsTiming = std::map<uint64_t, Delegations>;
+
 
 class WalletsCache::Updater {
 public:
@@ -98,6 +101,7 @@ public:
 
     void cleanObsoletteDelegations(uint64_t time);
     void cleanDelegationsFromCache(uint64_t delTime, Delegations& value);
+    bool removeSingleDelegation(uint64_t delTime, PublicKey& first, PublicKey& second, csdb::TransactionID id);
 
     const WalletData* findWallet(const PublicKey&) const;
     const WalletData* findWallet(const csdb::Address&) const;
