@@ -2803,7 +2803,7 @@ bool Node::isTransactionsInputAvailable() {
         }
         else {
             bool condition = (!poolSynchronizer_->isSyncroStarted()) && (cs::Conveyer::instance().currentRoundNumber()
-                - getBlockChain().getLastSeq() < cs::PoolSynchronizer::roundDifferentForSync);
+                - getBlockChain().getLastSeq() < cs::PoolSynchronizer::kRoundDifferentForSync);
             return condition;
         }
     }
