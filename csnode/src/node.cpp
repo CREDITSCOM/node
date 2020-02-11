@@ -2787,26 +2787,28 @@ bool Node::isTransactionsInputAvailable() {
 
     if (justTime > lastRoundPackageTime_) {
         if (justTime - lastRoundPackageTime_ > Consensus::MaxRoundDuration) {
-            csdebug() << "NODE> The current round lasts too long, possible traffic problems";
+            cslog() << "NODE> reject transaction: the current round lasts too long, possible traffic problems";
             return false; //
-        }
-        else {
-            bool condition = (!poolSynchronizer_->isSyncroStarted()) && (cs::Conveyer::instance().currentRoundNumber() 
-                - getBlockChain().getLastSeq() < cs::PoolSynchronizer::kRoundDifferentForSync);
-            return condition;
         }
     }
     else {
         if (lastRoundPackageTime_ - justTime > Consensus::MaxRoundDuration) {
-            csdebug() << "NODE> Possible wrong node clock";
+            cslog() << "NODE> reject transaction: possible wrong node clock";
             return false;
         }
-        else {
-            bool condition = (!poolSynchronizer_->isSyncroStarted()) && (cs::Conveyer::instance().currentRoundNumber()
-                - getBlockChain().getLastSeq() < cs::PoolSynchronizer::kRoundDifferentForSync);
-            return condition;
-        }
     }
+    // default conditions: no sync and last block is near to current round
+    if (poolSynchronizer_->isSyncroStarted()) {
+        cslog() << "NODE> reject transaction: node is synchronizing now";
+        return false;
+    }
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    const auto sequence = getBlockChain().getLastSeq();
+    if(round < sequence || round - sequence >= cs::PoolSynchronizer::kRoundDifferentForSync) {
+        cslog() << "NODE> reject transaction: sequence " << sequence << " is not actual, round " << round;
+        return false;
+    }
+    return true;
 }
 
 void Node::clearRPCache(cs::RoundNumber rNum) {
