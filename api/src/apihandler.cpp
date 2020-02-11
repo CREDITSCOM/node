@@ -252,6 +252,9 @@ std::optional<api::Delegated> APIHandler::getDelegated(const BlockChain::WalletD
             recipient.__set_wallet(fromByteArray(item.first));
             auto s = convertAmount(item.second);
             recipient.__set_sum(s);
+            //if (item.is_limited) {
+            //  recipient.__set_validUntil();
+            //}
             recipients.push_back(recipient);
         }
         if (sum > zero) {
