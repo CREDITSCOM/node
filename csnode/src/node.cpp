@@ -3126,8 +3126,15 @@ bool Node::isTransactionsInputAvailable() {
         }
     }
     else {
-        csdebug() << "NODE> Possible wrong node clock";
-        return false;
+        if (lastRoundPackageTime_ - justTime > Consensus::MaxRoundDuration) {
+            csdebug() << "NODE> Possible wrong node clock";
+            return false;
+        }
+        else {
+            bool condition = (!poolSynchronizer_->isSyncroStarted()) && (cs::Conveyer::instance().currentRoundNumber()
+                - getBlockChain().getLastSeq() < cs::PoolSynchronizer::roundDifferentForSync);
+            return condition;
+        }
     }
 
 }
