@@ -364,3 +364,18 @@ bool Transport::hasNeighbour(const cs::PublicKey& neighbour) const {
 uint32_t Transport::getMaxNeighbours() const {
     return Neighbourhood::kMaxNeighbours;
 }
+
+void Transport::getKnownPeers(std::vector<cs::PeerData>& result) {
+    std::vector<net::NodeEntrance> knownPeers;
+    host_.GetKnownNodes(knownPeers);
+
+    for (auto& p : knownPeers) {
+        cs::PeerData peerData;
+        auto ptr = reinterpret_cast<const uint8_t*>(p.id.GetPtr());
+        peerData.id = EncodeBase58(ptr, ptr + p.id.size());
+        peerData.ip = p.address.to_string();
+        peerData.port = p.udp_port;
+
+        result.push_back(peerData);
+    }
+}

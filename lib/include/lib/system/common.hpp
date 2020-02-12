@@ -45,6 +45,19 @@ using Signature = cscrypto::Signature;
 using Hash = cscrypto::Hash;
 using PrivateKey = cscrypto::PrivateKey;
 
+constexpr static int8_t OS_UNSPECIFIED = int8_t(-1);
+
+struct PeerData {
+    // encoded to base58 NodeId
+    std::string id;
+    // p2p public address
+    std::string ip;
+    // p2p port
+    uint16_t port = 0;
+    int8_t platform = OS_UNSPECIFIED;
+    int8_t version = 0;
+};
+
 using ConfidantSignature = std::pair<Byte, Signature>;
 using BlockSignatures = std::vector<ConfidantSignature>;
 

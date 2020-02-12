@@ -61,10 +61,7 @@ public:
     void forEachNeighbour(Neighbourhood::NeighboursCallback);
     bool hasNeighbour(const cs::PublicKey&) const;
 
-    // HostEventHandler
-    void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
-    void OnNodeDiscovered(const net::NodeId&) override;
-    void OnNodeRemoved(const net::NodeId&) override;
+    void getKnownPeers(std::vector<cs::PeerData>&);
 
     // from neigbours
     // @param added - true if new neighbour adder, false if removed
@@ -78,6 +75,12 @@ public signals:
     cs::Action mainThreadIterated;
     NeighbourAddedSignal neighbourAdded;
     NeighbourRemovedSignal neighbourRemoved;
+
+protected:
+    // HostEventHandler
+    void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
+    void OnNodeDiscovered(const net::NodeId&) override;
+    void OnNodeRemoved(const net::NodeId&) override;
 
 private:
 // Postpone logic - beg

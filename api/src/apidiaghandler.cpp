@@ -29,7 +29,7 @@ namespace api_diag {
 
     void APIDiagHandler::GetActiveNodes(ActiveNodesResult& _return) {
         general::APIResponse resp;
-        std::vector<Node::PeerData> peers;
+        std::vector<cs::PeerData> peers;
         if (!node_.getKnownPeers(peers)) {
             resp.__set_code(kError);
             resp.__set_message("Discovery service is unavailable on this node");
