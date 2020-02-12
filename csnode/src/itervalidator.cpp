@@ -386,12 +386,12 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
                                 rc = kNoDelegateSource;//target account doesn't contain you as source
                             }
                             else {
-                                auto& itt = std::find_if(itTarget->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == 0U;});
+                                auto itt = std::find_if(itTarget->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == 0U;});
                                 if (itt == itTarget->second.cend()) {
                                     rc = kNoDelegatedAmountToWithdraw;//target account doesn't contain delegated amount that could be withdrawn
                                 }
                                 else {
-                                    auto& its = std::find_if(itSource->second.begin(), itSource->second.end(), [](cs::TimeMoney& tm) {return tm.time == 0U; });
+                                    auto its = std::find_if(itSource->second.begin(), itSource->second.end(), [](cs::TimeMoney& tm) {return tm.time == 0U; });
                                     if (its == itSource->second.cend()) {
                                         rc = kNoDelegatedAmountToWithdraw;//target account doesn't contain delegated amount that could be withdrawn
                                     }
