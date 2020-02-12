@@ -265,11 +265,38 @@ public:
         return solver_;
     }
 
-#ifdef NODE_API
+#if defined(NODE_API) // see client/include/params.hpp
     csconnector::connector* getConnector() {
         return api_.get();
     }
 #endif
+
+    static const inline int8_t OS_UNSPECIFIED = int8_t(-1);
+
+    // almost clone of client/include/config.hpp EndpointData:
+    struct EndpointData {
+        // encoded to base58 NodeId
+        std::string id;
+        // p2p public address
+        std::string ip;
+        // p2p port
+        uint16_t port = 0;
+        int8_t platform = OS_UNSPECIFIED;
+    };
+
+    /**
+     * Gets known peers obtained by special discovery service
+     *
+     * @author  Alexander Avramenko
+     * @date    12.02.2020
+     *
+     * @param [in,out]  peers is a placeholder for requested information. Only actual if method returns true.
+     *                  Caller should pass an empty vector to method, otherwise duplicated items are possible
+     *
+     * @returns True if it succeeds, false if discovery service is unavailable
+     */
+
+    bool getKnownPeers(std::vector<Node::EndpointData>& peers);
 
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;

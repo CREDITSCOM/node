@@ -3672,3 +3672,18 @@ void Node::onRoundTimeElapsed() {
         cslog() << "Wait for " << EncodeBase58(beg, end) << " to start round...";
     }
 }
+
+bool Node::getKnownPeers(std::vector<Node::EndpointData>& peers) {
+    Node::EndpointData item;
+    const auto& own_info = cs::ConfigHolder::instance().config()->getInputEndpoint();
+    if (own_info.ipSpecified) {
+        item.ip = own_info.ip;
+        item.port = own_info.port;
+    }
+    item.id = EncodeBase58(nodeIdKey_.data(), nodeIdKey_.data() + nodeIdKey_.size());
+
+    item.platform = csconnector::connector::platform();
+
+    peers.push_back(item);
+    return true;
+}

@@ -17,6 +17,18 @@ namespace api_diag {
     private:
         Node& node_;
     };
+
+    // see: deprecated transport.cpp #1008
+    constexpr int8_t platform() {
+#ifdef _WIN32
+        return api_diag::Platform::OS_Windows;
+#elif __APPLE__
+        return api_diag::Platform::OS_MacOS;
+#else
+        return api_diag::Platform::OS_Linux;
+#endif
+    }
+
 }
 
 #endif  // API_DIAG_HANDLER_HPP
