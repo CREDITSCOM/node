@@ -301,10 +301,18 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
             return "Transaction's source doesn't exist in blockchain.";
         case kContractViolation:
             return "Contract execution violations detected";
-        case kTransactionProhibited:
-            return "Transaction of such type is prohibited for this account or target account";
         case kNoDelegate:
+            return "This account has no valid account";
+        case kTransactionProhibited:
+            return "Such kind of transactions is prohibited for this recipient";
+        case kNoDelegateTarget:
             return "No such delegate in your list";
+        case  kNoDelegateSource:
+            return "Target account doesn't have you as source";
+        case kNoDelegatedAmountToWithdraw:
+            return "Target account doesn't have delegated amount that could be withdrawn";
+        case kInsufficientDelegatedBalance:
+            return "Previously delegated amount is not as much as you demand to withdraw";
         case kDifferentDelegatedAmount:
             return "This account has another delegation amount from your account";
         case kAmountTooLow:
@@ -317,7 +325,7 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
 bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const BlockChain& bc, SmartContracts& sc, csdb::AmountCommission* countedFeePtr, RejectCode* rcPtr) {
     RejectCode rc = kAllCorrect;
 
-    BlockChain::WalletData wallet;
+    BlockChain::WalletData sWallet;
     BlockChain::WalletData tWallet;
     csdb::AmountCommission countedFee;
 
@@ -333,36 +341,30 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
         }
     }
 
-    if (!rc && !bc.findWalletData(t.source(), wallet)) {
+    if (!rc && !bc.findWalletData(t.source(), sWallet)) {
         rc = kSourceDoesNotExists;
     }
 
     csdb::UserField fld;
     fld = t.user_field(trx_uf::sp::delegated);
     bool notCheck = false;
-    bool wDel = false;
+    bool wDel = true;
     if (fld.is_valid()) {
         if (t.amount() < Consensus::MinStakeDelegated) {
             rc = kAmountTooLow;
         }
         auto flagg = fld.value<uint64_t>();
         switch(flagg) {
-        case trx_uf::sp::de::legate:
-                
+        case trx_uf::sp::de::legate:            
                 if (!rc) {
-                    if (bc.findWalletData(t.target(), tWallet)) {
-                        if (tWallet.delegated_ > csdb::Amount{ 0 }) {
-                            rc = kTransactionProhibited;
-                        }
-                    }
                     if (sc.is_known_smart_contract(t.target())) {
                         rc = kTransactionProhibited; 
                     }
                 }
                 break;
         case trx_uf::sp::de::legated_withdraw:
+            wDel = false;
                 if (!rc) {
-                    wDel = true;
                     if (bc.findWalletData(t.target(), tWallet)) {
                         auto tKey = bc.getCacheUpdater().toPublicKey(t.target());
                         auto itSource = sWallet.delegateTargets_->find(tKey);
@@ -394,7 +396,12 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
                                                 rc = kInsufficientDelegatedBalance;//previously delegated amount is not as much as you demand to withdraw
                                             }
                                             else {
-                                                wDel = true;
+                                                if (sWallet.balance_ < csdb::Amount{ 0 } +t.max_fee().to_double()) {
+                                                    rc = kInsufficientBalance;
+                                                }
+                                                else {
+                                                    wDel = true;
+                                                }
                                             }
                                         }
                                     }
@@ -408,6 +415,11 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
                 }
                 break;
             default:
+                if (!rc && flagg >= trx_uf::sp::de::legate_min_utc) {
+                    if (sc.is_known_smart_contract(t.target())) {
+                        rc = kTransactionProhibited;
+                    }
+                }
                 if (!rc) {
                     notCheck = true;
                 }
@@ -416,7 +428,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
         }
     }
 
-    if (!rc && !(wallet.balance_ >= (t.amount() + t.max_fee().to_double()) || (wDel && wallet.balance_ - t.max_fee().to_double() >= csdb::Amount{ 0 }))) {
+    if ((!rc && !(sWallet.balance_ >= (t.amount() + t.max_fee().to_double())) && !wDel)) {
         rc = kInsufficientBalance;
     }
 

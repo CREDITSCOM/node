@@ -515,7 +515,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
             wallData.balance_ += csdb::Amount(tr.counted_fee().to_double());
         }
     }
-
+	//wallData = sources Account
     if (!smartIniter) {
         csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
         if (!inverse) {

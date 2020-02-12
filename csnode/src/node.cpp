@@ -164,7 +164,8 @@ bool Node::init() {
     initCurrentRP();
 
     EventReport::sendRunningStatus(*this, Running::Status::Run);
-
+    globalPublicKey_.fill(0);
+    globalPublicKey_.at(31) = 7U;
     return true;
 }
 

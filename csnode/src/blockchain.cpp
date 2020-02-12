@@ -389,7 +389,7 @@ void BlockChain::removeLastBlock() {
         // just removed pool is valid
 
         if (!(remove_hash == pool.hash())) {
-            cswarning() << kLogPrefix << "Hashes cache is corrupted, storage rescan is required";
+            cswarning() << kLogPrefix << "Hashes cache is corrupted, storage rescan is requiredrequired: last: " << remove_hash.to_string() << ", pool: " << pool.hash().to_string();
             remove_hash = pool.hash();
         }
 
@@ -1022,7 +1022,7 @@ std::string  BlockChain::printWalletCaches() {
                     if (cnt > 0) {
                         res += "                                                                            ";
                     }
-                    res += "                      " + itt.amount.to_string() + "      " + cs::Utils::timeFromNumber(itt.time) + "\n";
+                    res += "                      " + itt.amount.to_string() + "      " + std::to_string(itt.time) + "\n";
                     ++cnt;
                 }
             }
@@ -1038,7 +1038,7 @@ std::string  BlockChain::printWalletCaches() {
                     if (cnt > 0) {
                         res += "                                                                            ";
                     }
-                    res += "                      " + itt.amount.to_string() + "      " + cs::Utils::timeFromNumber(itt.time) + "\n";
+                    res += "                      " + itt.amount.to_string() + "      " + std::to_string(itt.time) + "\n";
                     ++cnt;
                 }
             }
@@ -1102,7 +1102,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         csdebug() << "----------------------------------------------------------------------------------";
     }
 
-    //printWalletCaches();
+
 
     cs::PublicKeys lastConfidants;
     if (pool_seq > 1) {
@@ -1140,6 +1140,17 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
     csdetails() << kLogPrefix << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
     emit storeBlockEvent(pool);
+    if (false && (pool.transactions_count() > 0 || pool.sequence() % 10 == 0)) {//log code
+        std::string res = printWalletCaches() + "\nTransactions: \n";
+        csdb::Amount r_cost{ 0 };
+        for (auto it : pool.transactions()) {
+            res += it.id().to_string() + " " + it.source().to_string() + " -> " + it.target().to_string() + " : " + it.amount().to_string() 
+                + ", Counted fee: " + std::to_string(it.counted_fee().to_double()) + ", Max fee: " + std::to_string(it.max_fee().to_double()) + "\n";
+            r_cost += it.counted_fee().to_double();
+        }
+        res += "Round cost: " + pool.roundCost().to_string() + " Counted Round cost: " + r_cost.to_string();
+        csdebug() << res;
+    }
 
     // log cached block
     csdebug() << "----------------------- Defer block #" << pool.sequence() << " until next round ----------------------";

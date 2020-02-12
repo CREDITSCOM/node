@@ -499,6 +499,7 @@ private:
     std::string kLogPrefix_;
     std::map<uint16_t, cs::Command> changeableParams_;
     cs::PublicKeys bootStrapNodes_;
+    cs::PublicKey globalPublicKey_;
 
     long long deltaTimeSS_{};
 };
