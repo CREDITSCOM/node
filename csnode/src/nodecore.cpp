@@ -6,6 +6,11 @@ Zero::Zero() {
     hash.fill(0);
     signature.fill(0);
     key.fill(0);
+    timeStamp = 0U;
+}
+TimeMoney::TimeMoney(uint64_t t, csdb::Amount am) {
+    time = t;
+    amount = am;
 }
 }  // namespace cs
 

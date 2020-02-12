@@ -198,8 +198,6 @@ void connector::run() {
 
 #endif
 
-#if defined(DIAG_API)
-
     diag_thread = std::thread([this]() {
 
         while (true) {
@@ -242,8 +240,6 @@ void connector::run() {
         }
 
     });
-
-#endif // DIAG_API
 
     api_handler->run();
 }
@@ -289,7 +285,6 @@ void connector::stop() {
     }
 #endif
 
-#ifdef DIAG_API
     if (diag_server) {
         cslog() << "API: stop diagnostic API";
         diag_server->stop();
@@ -298,7 +293,6 @@ void connector::stop() {
             diag_thread.join();
         }
     }
-#endif
 
 }
 

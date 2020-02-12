@@ -24,7 +24,8 @@ public:
         TransactionIndex lastTrxInd_{};
         csdb::Amount balance_{};
         csdb::Amount delegated_{};
-        std::map<cs::PublicKey, csdb::Amount> delegats_ {};
+        std::map<cs::PublicKey, std::vector<cs::TimeMoney>> delegateSources_{};
+        std::map<cs::PublicKey, std::vector<cs::TimeMoney>> delegateTargets_{};
         TransactionsTail trxTail_{};
     };
 

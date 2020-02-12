@@ -234,28 +234,57 @@ std::optional<api::Delegated> APIHandler::getDelegated(const BlockChain::WalletD
     csdb::Amount zero(0);
     api::Delegated delegated;
     bool has_delegations = false;
+
+    // fill incoming delegations total sum
     if (wallet.delegated_ > zero) {
         auto tmp = convertAmount(wallet.delegated_);
         delegated.__set_incoming(tmp);
         has_delegations = true;
-        // fill donors list after it is implemented
     }
-    if (!wallet.delegats_.empty()) {
+
+    // fill donors list
+    if (wallet.delegateSources_ && !wallet.delegateSources_->empty()) {
+        has_delegations = true;
+        std::vector<api::DelegatedItem> donors;
+        for (const auto& item : *wallet.delegateSources_) {
+
+            for (const auto& tm : item.second) {
+                api::DelegatedItem donor;
+                donor.__set_wallet(fromByteArray(item.first));
+                auto s = convertAmount(tm.amount);
+                donor.__set_sum(s);
+                if (tm.time > 0) {
+                    donor.__set_validUntil(tm.time);
+                }
+                donors.push_back(donor);
+            }
+        }
+        if (!donors.empty()) {
+            delegated.__set_donors(donors);
+        }
+    }
+
+    // fill recipients list after it is implemented, calculate total sum on-the-fly
+    if (wallet.delegateTargets_ && !wallet.delegateTargets_->empty()) {
         has_delegations = true;
         csdb::Amount sum(0);
         std::vector<api::DelegatedItem> recipients;
-        for (const auto& item : wallet.delegats_) {
-            if (item.second > zero) {
-                sum += item.second;
+        for (const auto& item : *wallet.delegateTargets_) {
+
+            for (const auto& tm : item.second) {
+                if (tm.amount > zero) {
+                    sum += tm.amount;
+                }
+                api::DelegatedItem recipient;
+                recipient.__set_wallet(fromByteArray(item.first));
+                auto s = convertAmount(tm.amount);
+                recipient.__set_sum(s);
+                if (tm.time > 0) {
+                    recipient.__set_validUntil(tm.time);
+                }
+                recipients.push_back(recipient);
             }
-            api::DelegatedItem recipient;
-            recipient.__set_wallet(fromByteArray(item.first));
-            auto s = convertAmount(item.second);
-            recipient.__set_sum(s);
-            //if (item.is_limited) {
-            //  recipient.__set_validUntil();
-            //}
-            recipients.push_back(recipient);
+
         }
         if (sum > zero) {
             auto am = convertAmount(sum);
@@ -265,6 +294,7 @@ std::optional<api::Delegated> APIHandler::getDelegated(const BlockChain::WalletD
             delegated.__set_recipients(recipients);
         }
     }
+
     if (has_delegations || delegated.__isset.donors || delegated.__isset.recipients) {
         return std::make_optional(std::move(delegated));
     }
