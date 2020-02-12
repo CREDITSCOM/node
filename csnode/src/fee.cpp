@@ -39,6 +39,11 @@ constexpr double minContractStateFee() {
 namespace fee {
 
 csdb::AmountCommission getFee(const csdb::Transaction& t) {
+    if (t.user_field_ids().empty()) {
+        // all fields except user fields have constant size, so transaction cannot exceed "cheapest" size
+        return csdb::AmountCommission(minFee());
+    }
+
     size_t size = t.to_byte_stream().size();
 
     if (!SmartContracts::is_smart_contract(t) && size <= kCommonTrSize) {

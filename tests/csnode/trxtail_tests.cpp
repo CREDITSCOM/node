@@ -57,6 +57,25 @@ TEST(TransactionTail, BasicOperations) {
     ASSERT_TRUE(tail.isAllowed(1025));
 
 
+    cs::TransactionsTail tail2;
+
+    tail2.push(1);
+    tail2.push(2);
+    tail2.push(3);
+    tail2.push(4);
+    ASSERT_FALSE(tail2.isAllowed(1));
+    ASSERT_FALSE(tail2.isAllowed(4));
+    ASSERT_TRUE(tail2.isAllowed(5));
+    tail2.erase(4);
+    tail2.erase(3);
+    tail2.erase(2);
+    tail2.erase(1);
+    ASSERT_TRUE(tail2.isAllowed(1024));
+    ASSERT_TRUE(tail2.isAllowed(1025));
+    ASSERT_TRUE(tail2.getLastTransactionId() == std::numeric_limits<int64_t>::max());
+
+    tail2.printRange();
+
     //ASSERT_TRUE(cnt > 0);
     //ASSERT_FALSE(tail.empty());
     //ASSERT_TRUE(tail.getLastTransactionId() == maxId);

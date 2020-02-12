@@ -67,7 +67,7 @@ private:
     size_t totalReceivedTransactions_;
 
     // amount of accepted transactions (stored in blockchain)
-    size_t totalAcceptedTransactions_;
+    std::atomic<size_t> totalAcceptedTransactions_;
 
     // amount of deferred transactions (in deferred block)
     size_t deferredTransactionsCount_;

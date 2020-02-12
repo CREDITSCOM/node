@@ -48,6 +48,7 @@ public:
     void sendDirect(Packet&&, const cs::PublicKey&);
     void sendMulticast(Packet&&, const std::vector<cs::PublicKey>&);
     void sendBroadcast(Packet&&);
+    void sendBroadcastIfNoConnection(Packet&&, const cs::PublicKey&);
 
     void ban(const cs::PublicKey&);
     void revertBan(const cs::PublicKey&);
@@ -69,6 +70,8 @@ public:
     // @param added - true if new neighbour adder, false if removed
     void onNeighboursChanged(const cs::PublicKey&, cs::Sequence lastSeq,
                             cs::RoundNumber lastRound, bool added);
+public slots:
+    void onPingReceived(cs::Sequence sequence, const cs::PublicKey& key);
 
 public signals:
     PingSignal pingReceived;
@@ -91,6 +94,7 @@ private:
     void dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes,
                              const cs::RoundNumber, const uint8_t* data, size_t);
     void processorRoutine();
+    void process();
     void checkNeighboursChange();
 
     bool good_ = false;
@@ -101,6 +105,9 @@ private:
     std::condition_variable newPacketsReceived_;
     std::mutex inboxMux_;
     std::list<std::pair<cs::PublicKey, Packet>> inboxQueue_;
+
+    constexpr static size_t kMaxBytesToHandle = 1ul << 31;
+    std::atomic<size_t> bytesToHandle_ = 0;
 
     Neighbourhood neighbourhood_;
     std::thread processorThread_;

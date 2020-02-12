@@ -67,6 +67,24 @@ public:
         return os.str();
     }
 
+    std::string printHeap() const {
+        if (heap_.empty()) {
+            return "0";
+        }
+        std::ostringstream os;
+        os << "[";
+        for (auto i = heap_.minMaxRange().first; i <= heap_.minMaxRange().second; ++i) {
+            if (heap_.contains(i)) {
+                os << "1";
+            }
+            else {
+                os << "0";
+            }
+        }
+        os << ']';
+        return os.str();
+    }
+
 private:
     friend class boost::serialization::access;
     template<class Archive>

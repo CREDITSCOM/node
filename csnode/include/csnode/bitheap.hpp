@@ -61,6 +61,7 @@ public:
             }
             if (count < 0) {
                 isValueSet_ = false;
+                greatest_ = std::numeric_limits<T>::max();
                 return;
             }
             bits_ >>= 1;

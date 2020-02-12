@@ -1,6 +1,7 @@
 #ifndef WALLET_IDS_HPP
 #define WALLET_IDS_HPP
 
+#include <map>
 #include <memory>
 #include <type_traits>
 
@@ -10,6 +11,7 @@
 
 #include <csdb/address.hpp>
 #include <csdb/internal/types.hpp>
+#include <csdb/pool.hpp>
 
 using namespace boost::multi_index;
 
@@ -18,6 +20,7 @@ class WalletsIds {
 public:
     using WalletId = csdb::internal::WalletId;
     using WalletAddress = csdb::Address;
+    constexpr static WalletId kWrongWalletId = std::numeric_limits<WalletId>::max();
 
 public:
     class Normal {
@@ -31,6 +34,7 @@ public:
         // returns true if new id was inserted
         bool get(const WalletAddress& address, WalletId& id);
         bool remove(const WalletAddress& address);
+        void fillIds(std::map<csdb::Address, std::pair<WalletId, csdb::Pool::NewWalletInfo::AddressId>>& addrsAndIds);
 
     private:
         WalletsIds& norm_;

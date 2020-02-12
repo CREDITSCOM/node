@@ -211,6 +211,8 @@ void cs::Executor::stop() {
         }
     }
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
     if (manager_.isExecutorProcessRunning()) {
         manager_.stopExecutorProcess();
     }
@@ -400,8 +402,9 @@ std::optional<cs::Executor::ExecuteResult> cs::Executor::executeTransaction(cons
             // add arg[1]
             str_val.clear();
 
-            if (smart.user_field(1).is_valid()) {
-                str_val = smart.user_field(1).value<std::string>();
+            using namespace cs::trx_uf;
+            if (smart.user_field(ordinary::Text).is_valid()) {
+                str_val = smart.user_field(ordinary::Text).value<std::string>();
             }
 
             general::Variant& var1 = header.params.emplace_back(::general::Variant{});
@@ -540,8 +543,9 @@ std::optional<cs::Executor::ExecuteResult> cs::Executor::reexecuteContract(cs::E
         // add arg[1]
         str_val.clear();
 
-        if (contract.transaction.user_field(1).is_valid()) {
-            str_val = contract.transaction.user_field(1).value<std::string>();
+        using namespace cs::trx_uf;
+        if (contract.transaction.user_field(ordinary::Text).is_valid()) {
+            str_val = contract.transaction.user_field(ordinary::Text).value<std::string>();
         }
 
         general::Variant& var1 = header.params.emplace_back(::general::Variant{});
@@ -893,7 +897,7 @@ uint64_t cs::Executor::generateAccessId(cs::Sequence explicitSequence, uint64_t 
         // try to get time from block
         const csdb::Pool block = blockchain_.loadBlock(accessSequence_[lastAccessId_]);
         if (block.is_valid()) {
-            executeTrxnsTime[lastAccessId_] = block.get_time();
+            executeTrxnsTime[lastAccessId_] = BlockChain::getBlockTime(block);
         }
     }
 

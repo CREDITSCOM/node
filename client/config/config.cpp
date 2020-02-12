@@ -27,7 +27,7 @@
 #include <unistd.h>
 #endif
 
-const NodeVersion NODE_VERSION = 500;
+const NodeVersion NODE_VERSION = 502;
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
@@ -65,6 +65,7 @@ const std::string PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ = "sequences_verification_
 
 const std::string PARAM_NAME_API_PORT = "port";
 const std::string PARAM_NAME_AJAX_PORT = "ajax_port";
+const std::string PARAM_NAME_DIAG_PORT = "diag_port";
 const std::string PARAM_NAME_EXECUTOR_PORT = "executor_port";
 const std::string PARAM_NAME_APIEXEC_PORT = "apiexec_port";
 const std::string PARAM_NAME_EXECUTOR_SEND_TIMEOUT = "executor_send_timeout";
@@ -893,6 +894,7 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
 
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_API_PORT, apiData_.port);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_AJAX_PORT, apiData_.ajaxPort);
+    checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_DIAG_PORT, apiData_.diagPort);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_PORT, apiData_.executorPort);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_SEND_TIMEOUT, apiData_.executorSendTimeout);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_RECEIVE_TIMEOUT, apiData_.executorReceiveTimeout);

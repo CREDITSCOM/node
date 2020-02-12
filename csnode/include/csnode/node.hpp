@@ -265,11 +265,42 @@ public:
         return solver_;
     }
 
-#ifdef NODE_API
+#if defined(NODE_API) // see client/include/params.hpp
     csconnector::connector* getConnector() {
         return api_.get();
     }
 #endif
+
+    static const inline int8_t OS_UNSPECIFIED = int8_t(-1);
+
+    struct PeerData {
+        // encoded to base58 NodeId
+        std::string id;
+        // p2p public address
+        std::string ip;
+        // p2p port
+        uint16_t port = 0;
+        int8_t platform = OS_UNSPECIFIED;
+        int8_t version = 0;
+    };
+
+    size_t getTotalTransactionsCount() const {
+        return stat_.totalTransactions();
+    }
+
+    /**
+     * Gets known peers obtained by special discovery service
+     *
+     * @author  Alexander Avramenko
+     * @date    12.02.2020
+     *
+     * @param [in,out]  peers is a placeholder for requested information. Only actual if method returns true.
+     *                  Caller should pass an empty vector to method, otherwise duplicated items are possible
+     *
+     * @returns True if it succeeds, false if discovery service is unavailable
+     */
+
+    bool getKnownPeers(std::vector<Node::PeerData>& peers);
 
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;
@@ -298,6 +329,8 @@ public slots:
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
     void onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender);
     void sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences);
+    // request current trusted nodes for block with specific sequence
+    void sendBlockRequestToConfidants(cs::Sequence sequence);
     void processSpecialInfo(const csdb::Pool& pool);
     void validateBlock(const csdb::Pool& block, bool* shouldStop);
     void deepBlockValidation(csdb::Pool block, bool* shouldStop);
@@ -338,6 +371,12 @@ private:
 
     template <class... Args>
     void sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+    template <class... Args>
+    void sendBroadcastIfNoConnection(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+
+    template <class... Args>
+    void sendBroadcastIfNoConnection(const cs::PublicKeys& keys, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     // to current confidants list
     template <class... Args>
@@ -446,6 +485,7 @@ private:
 
     std::string kLogPrefix_;
     std::map<uint16_t, cs::Command> changeableParams_;
+    cs::PublicKey globalPublicKey_;
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;

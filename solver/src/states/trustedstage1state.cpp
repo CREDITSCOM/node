@@ -66,11 +66,17 @@ void TrustedStage1State::on(SolverContext& context) {
 void TrustedStage1State::finalizeStage(SolverContext& context) {
     
     //if(context.own_conf_number() == 1 && cs::Conveyer::instance().currentRoundNumber() > 10) {
-    //    stage.roundTimeStamp = std::to_string(std::stoll(cs::Utils::currentTimestamp()) + 10000); 
+    //    stage.roundTimeStamp = std::to_string(cs::Utils::currentTimestamp() + 10000ULL); 
     //} 
     //else {
-    uint64_t lastTimeStamp = std::atoll(context.blockchain().getLastTimeStamp().c_str());
-    uint64_t currentTimeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
+    uint64_t lastTimeStamp = 0;
+    try {
+        lastTimeStamp = std::stoull(context.blockchain().getLastTimeStamp().c_str());
+    }
+    catch (...) {
+        csdebug() << name() << __func__ << ": blockchain tmestamp was announced as zero";
+    }
+    uint64_t currentTimeStamp = cs::Utils::currentTimestamp();
     if (currentTimeStamp < lastTimeStamp) {
         currentTimeStamp = lastTimeStamp + 1;
     }

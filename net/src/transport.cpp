@@ -96,7 +96,7 @@ Transport::Transport(Node* node)
 , node_(node)
 , neighbourhood_(this, node_)
 , host_(config_, static_cast<HostEventHandler&>(*this)) {
-    cs::Connector::connect(&neighbourhood_.neighbourPingReceived, &pingReceived);
+    cs::Connector::connect(&neighbourhood_.neighbourPingReceived, this, &Transport::onPingReceived);
 }
 
 void Transport::run() {
@@ -115,10 +115,27 @@ void Transport::run() {
 }
 
 void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data) {
-    {
-        std::lock_guard<std::mutex> g(inboxMux_);
-        inboxQueue_.emplace_back(std::make_pair(toPublicKey(id), Packet(std::move(data))));
+    Packet pack(std::move(data));
+    if (!cs::PacketValidator::validate(pack)) {
+        return;
     }
+
+    auto publicKey = toPublicKey(id);
+    if (pack.isNetwork()) {
+        neighbourhood_.processNeighbourMessage(publicKey, pack);
+        return;
+    }
+
+    if (pack.size() + bytesToHandle_ > kMaxBytesToHandle) {
+        return;
+    }
+    bytesToHandle_ += pack.size();
+
+    {
+        std::lock_guard g(inboxMux_);
+        inboxQueue_.emplace_back(std::make_pair(publicKey, std::move(pack)));
+    }
+
     newPacketsReceived_.notify_one();
 }
 
@@ -134,6 +151,12 @@ void Transport::onNeighboursChanged(const cs::PublicKey& neighbour, cs::Sequence
                                     cs::RoundNumber lastRound, bool added) {
     std::lock_guard<std::mutex> g(neighboursMux_);
     neighboursToHandle_.emplace_back(neighbour, lastSeq, lastRound, added);
+}
+
+void Transport::onPingReceived(cs::Sequence sequence, const cs::PublicKey& key) {
+    cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, [=] {
+        emit pingReceived(sequence, key);
+    });
 }
 
 void Transport::sendDirect(Packet&& pack, const cs::PublicKey& receiver) {
@@ -163,29 +186,40 @@ void Transport::sendBroadcast(Packet&& pack) {
     host_.SendBroadcast(pack.moveData());
 }
 
+void Transport::sendBroadcastIfNoConnection(Packet&& pack, const cs::PublicKey& receiver) {
+    host_.SendBroadcastIfNoConnection(toNodeId(receiver), pack.moveData());
+}
+
 void Transport::processorRoutine() {
     constexpr size_t kRoutineWaitTimeMs = 50;
 
     while (!node_->isStopRequested()) {
-        CallsQueue::instance().callAll();
+        process();
 
         std::unique_lock lock(inboxMux_);
         newPacketsReceived_.wait_for(lock, std::chrono::milliseconds{kRoutineWaitTimeMs}, [this]() {
             return !inboxQueue_.empty();
         });
 
-        checkNeighboursChange();
-
         while (!inboxQueue_.empty()) {
             Packet pack(std::move(inboxQueue_.front().second));
             cs::PublicKey sender(inboxQueue_.front().first);
             inboxQueue_.pop_front();
+            bytesToHandle_ -= pack.size();
 
-            if (cs::PacketValidator::validate(pack)) {
-                pack.isNetwork() ? neighbourhood_.processNeighbourMessage(sender, pack) : processNodeMessage(sender, pack);
-            }
+            lock.unlock();
+
+            process();
+            processNodeMessage(sender, pack);
+
+            lock.lock();
         }
     }
+}
+
+void Transport::process() {
+    checkNeighboursChange();
+    CallsQueue::instance().callAll();
 }
 
 void Transport::checkNeighboursChange() {
