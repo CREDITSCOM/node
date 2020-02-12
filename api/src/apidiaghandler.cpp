@@ -33,20 +33,31 @@ namespace api_diag {
         if (!node_.getKnownPeers(peers)) {
             resp.__set_code(kError);
             resp.__set_message("Discovery service is unavailable on this node");
-            for (const auto& peer: peers) {
+        }
+        else {
+            std::vector<api_diag::ServerNode> nodes;
+            for (const auto& peer : peers) {
                 api_diag::ServerNode node;
                 node.__set_ip(peer.ip);
+                node.__isset.ip = true;
                 node.__set_port(std::to_string(peer.port));
+                node.__isset.port = true;
                 node.__set_publicKey(peer.id);
+                node.__isset.publicKey = true;
                 node.__set_version(std::to_string(peer.version));
+                node.__isset.version = true;
                 node.__set_platform(std::to_string(peer.platform));
+                node.__isset.platform = true;
                 node.__set_countTrust(0);
                 //node.__set_hash("");
                 node.__set_timeActive(0);
                 node.__set_timeRegistration(0);
+                nodes.push_back(node);
             }
-        }
-        else {
+            if (!nodes.empty()) {
+                _return.__set_nodes(nodes);
+                _return.__isset.nodes = true;
+            }
             resp.__set_code(kOk);
         }
         _return.__set_result(resp);
