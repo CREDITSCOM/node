@@ -12,6 +12,11 @@ namespace api_diag {
         APIDiagHandler(Node& node);
         APIDiagHandler(const APIDiagHandler&) = delete;
 
+        // former start node proto
+        void GetActiveNodes(ActiveNodesResult& _return) override;
+        void GetActiveTransactionsCount(ActiveTransactionsResult& _return) override;
+
+        // diagnocstic proro
         void GetTransaction(GetTransactionResponse& _return, const TransactionId& id) override;
 
     private:

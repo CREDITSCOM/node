@@ -3673,8 +3673,8 @@ void Node::onRoundTimeElapsed() {
     }
 }
 
-bool Node::getKnownPeers(std::vector<Node::EndpointData>& peers) {
-    Node::EndpointData item;
+bool Node::getKnownPeers(std::vector<Node::PeerData>& peers) {
+    Node::PeerData item;
     const auto& own_info = cs::ConfigHolder::instance().config()->getInputEndpoint();
     if (own_info.ipSpecified) {
         item.ip = own_info.ip;
@@ -3683,6 +3683,7 @@ bool Node::getKnownPeers(std::vector<Node::EndpointData>& peers) {
     item.id = EncodeBase58(nodeIdKey_.data(), nodeIdKey_.data() + nodeIdKey_.size());
 
     item.platform = csconnector::connector::platform();
+    item.version = NODE_VERSION;
 
     peers.push_back(item);
     return true;

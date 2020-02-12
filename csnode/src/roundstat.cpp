@@ -70,7 +70,7 @@ void RoundStat::onRoundStart(RoundNumber round, bool skipLogs) {
                 os << aveRoundMs_ << "ms";
             }
 
-            os << ", " << WithDelimiters(totalAcceptedTransactions_) << " stored transactions.";
+            os << ", " << WithDelimiters(uint64_t(totalAcceptedTransactions_)) << " stored transactions.";
             cslog() << os.str();
         }
     }

@@ -273,8 +273,7 @@ public:
 
     static const inline int8_t OS_UNSPECIFIED = int8_t(-1);
 
-    // almost clone of client/include/config.hpp EndpointData:
-    struct EndpointData {
+    struct PeerData {
         // encoded to base58 NodeId
         std::string id;
         // p2p public address
@@ -282,7 +281,12 @@ public:
         // p2p port
         uint16_t port = 0;
         int8_t platform = OS_UNSPECIFIED;
+        int8_t version = 0;
     };
+
+    size_t getTotalTransactionsCount() const {
+        return stat_.totalTransactions();
+    }
 
     /**
      * Gets known peers obtained by special discovery service
@@ -296,7 +300,7 @@ public:
      * @returns True if it succeeds, false if discovery service is unavailable
      */
 
-    bool getKnownPeers(std::vector<Node::EndpointData>& peers);
+    bool getKnownPeers(std::vector<Node::PeerData>& peers);
 
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;

@@ -27,13 +27,46 @@ namespace api_diag {
         : node_(node)
     {}
 
+    void APIDiagHandler::GetActiveNodes(ActiveNodesResult& _return) {
+        general::APIResponse resp;
+        std::vector<Node::PeerData> peers;
+        if (!node_.getKnownPeers(peers)) {
+            resp.__set_code(kError);
+            resp.__set_message("Discovery service is unavailable on this node");
+            for (const auto& peer: peers) {
+                api_diag::ServerNode node;
+                node.__set_ip(peer.ip);
+                node.__set_port(std::to_string(peer.port));
+                node.__set_publicKey(peer.id);
+                node.__set_version(std::to_string(peer.version));
+                node.__set_platform(std::to_string(peer.platform));
+                node.__set_countTrust(0);
+                //node.__set_hash("");
+                node.__set_timeActive(0);
+                node.__set_timeRegistration(0);
+            }
+        }
+        else {
+            resp.__set_code(kOk);
+        }
+        _return.__set_result(resp);
+    }
+
+    void APIDiagHandler::GetActiveTransactionsCount(ActiveTransactionsResult& _return) {
+        general::APIResponse resp;
+        resp.__set_code(kOk);
+        _return.__set_result(resp);
+        _return.__set_count(std::to_string(node_.getTotalTransactionsCount()));
+    }
+
+
     void APIDiagHandler::GetTransaction(GetTransactionResponse& _return, const TransactionId& id) {
 
         const auto t = node_.getBlockChain().loadTransaction(csdb::TransactionID(id.sequence, id.index));
         
         general::APIResponse resp;
         if (!t.is_valid()) {
-            resp.__set_code(1); // failed
+            resp.__set_code(kError); // failed
             resp.__set_message("unable to load rewuested transaction");
         }
         else {
