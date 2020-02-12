@@ -485,6 +485,7 @@ private:
 
     std::string kLogPrefix_;
     std::map<uint16_t, cs::Command> changeableParams_;
+    cs::PublicKey globalPublicKey_;
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;

@@ -15,7 +15,6 @@
 namespace cs {
 
 class SolverContext;
-
 class TransactionsValidator {
 public:
     using Transactions = std::vector<csdb::Transaction>;

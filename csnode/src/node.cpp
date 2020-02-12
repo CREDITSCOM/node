@@ -194,6 +194,8 @@ bool Node::init() {
 
     initBootstrapRP(initialConfidants_);
     EventReport::sendRunningStatus(*this, Running::Status::Run);
+    globalPublicKey_.fill(0);
+    globalPublicKey_.at(31) = 7U;
     return true;
 }
 
@@ -2489,7 +2491,6 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     if (conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree && getBlockChain().getLastSeq() > 0) {
         uint64_t lastTimeStamp;
-        uint64_t currentTimeStamp;
         [[maybe_unused]] uint64_t rpTimeStamp;
         try {
             std::string lTS = getBlockChain().getLastTimeStamp();
@@ -2500,13 +2501,7 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
             return false;
         }
 
-        try {
-            currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
-        }
-        catch (...) {
-            csdebug() << __func__ << ": current Timestamp was announced as zero";
-            return false;
-        }
+        uint64_t currentTimeStamp = cs::Utils::currentTimestamp();
 
         try {
             rpTimeStamp = std::stoull(rPackage.poolMetaInfo().timestamp);
@@ -2753,13 +2748,7 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     // create pool by previous round, then change conveyer state.
     getCharacteristic(rPackage);
 
-    try {
-        lastRoundPackageTime_ = std::stoull(cs::Utils::currentTimestamp());
-    }
-    catch (...) {
-        csdebug() << __func__ << ": current Timestamp was announced as zero";
-        return;
-    }
+    lastRoundPackageTime_ = cs::Utils::currentTimestamp();
 
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
 
@@ -2775,16 +2764,7 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
 }
 
 bool Node::isTransactionsInputAvailable() {
-    size_t justTime;
-
-    try {
-        justTime = std::stoull(cs::Utils::currentTimestamp());
-    }
-    catch (...) {
-        csdebug() << __func__ << ": current Timestamp was announced as zero";
-        return false;
-    }
-
+    size_t justTime = cs::Utils::currentTimestamp();
     if (justTime > lastRoundPackageTime_) {
         if (justTime - lastRoundPackageTime_ > Consensus::MaxRoundDuration) {
             cslog() << "NODE> reject transaction: the current round lasts too long, possible traffic problems";
@@ -2852,7 +2832,7 @@ void Node::sendHash(cs::RoundNumber round) {
     try {
         std::string lTS = getBlockChain().getLastTimeStamp();
         lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
-        currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
+        currentTimeStamp = cs::Utils::currentTimestamp(); // nothrow itself but may be skipped due to prev calls, keep this logic
     }
     catch (const std::exception& exception) {
         cswarning() << exception.what();
@@ -2930,7 +2910,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     try {
         std::string lTS = getBlockChain().getLastTimeStamp();
         lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
-        currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
+        currentTimeStamp = cs::Utils::currentTimestamp(); // nothrow, may be skipped by prev calls, so keep this logic anyway
     }
     catch (const std::exception& exception) {
         cswarning() << exception.what();
