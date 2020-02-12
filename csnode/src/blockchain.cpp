@@ -634,13 +634,13 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
 }
 
 bool BlockChain::applyBlockToCaches(const csdb::Pool& pool) {
-    // Attention!
-    // wallets Ids updated separately, in storeBlock() on normal/sync nodes and in Solver::spawn_next_round() on trusted nodes
-
     if (!walletsCacheUpdater_) {
         cserror() << "apply block to caches: wallets cache updater unitialized";
         return false;
     }
+
+    csdebug() << kLogPrefix << "store block #" << pool.sequence() << " to chain, update wallets ids";
+    updateWalletIds(pool, *walletsCacheUpdater_);
 
     // ATTENTION! Due to undesired side effect trxIndex_ must be updated prior to wallets caches
     // update transactions index
@@ -772,23 +772,9 @@ bool BlockChain::insertNewWalletId(const csdb::Address& newWallAddress, WalletId
     return true;
 }
 
-void BlockChain::addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets) {
-    if (!walletAddress.is_public_key()) {
-        return;
-    }
-
-    if (walletAddress == genesisAddress_) {
-        return;
-    }
-
-    WalletId id{};
-
-    if (getWalletId(walletAddress, id)) {
-        newWallets.emplace_back(csdb::Pool::NewWalletInfo{addressId, id});
-    }
-}
-
 void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
+    csdebug() << kLogPrefix << "store block #" << pool.sequence() << " add new wallets to pool";
+
     csdb::Pool::NewWallets* newWallets = pool.newWallets();
 
     if (!newWallets) {
@@ -798,24 +784,30 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
 
     newWallets->clear();
 
-    csdb::Pool::Transactions& transactions = pool.transactions();
+    std::map<csdb::Address, std::pair<WalletId, csdb::Pool::NewWalletInfo::AddressId>> addrsAndIds;
 
+    csdb::Pool::Transactions& transactions = pool.transactions();
     for (size_t idx = 0; idx < transactions.size(); ++idx) {
-        {
-            csdb::Pool::NewWalletInfo::AddressId addressId = {idx, csdb::Pool::NewWalletInfo::AddressType::AddressIsSource};
-            addNewWalletToPool(transactions[idx].source(), addressId, *newWallets);
-        }
-        {
-            csdb::Pool::NewWalletInfo::AddressId addressId = {idx, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
-            addNewWalletToPool(transactions[idx].target(), addressId, *newWallets);
-        }
+        addrsAndIds[transactions[idx].source()].second = {idx, csdb::Pool::NewWalletInfo::AddressType::AddressIsSource};
+        addrsAndIds[transactions[idx].target()].second = {idx, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
     }
 
     const auto& confidants = pool.confidants();
     size_t confWalletsIndexStart = transactions.size();
     for (size_t i = 0; i < confidants.size(); ++i) {
-        csdb::Pool::NewWalletInfo::AddressId addressId = {confWalletsIndexStart + i, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
-        addNewWalletToPool(csdb::Address::from_public_key(confidants[i]), addressId, *newWallets);
+        addrsAndIds[csdb::Address::from_public_key(confidants[i])].second = {confWalletsIndexStart + i, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
+    }
+
+    {
+        std::lock_guard lock(cacheMutex_);
+        walletIds_->normal().fillIds(addrsAndIds);
+    }
+
+    for (auto& addrAndId : addrsAndIds) {
+        if (!addrAndId.first.is_public_key() || addrAndId.second.first == WalletsIds::kWrongWalletId || addrAndId.first == genesisAddress_) {
+            continue;
+        }
+        newWallets->emplace_back(csdb::Pool::NewWalletInfo{addrAndId.second.second, addrAndId.second.first});
     }
 }
 
@@ -937,20 +929,6 @@ bool BlockChain::findWalletId(const WalletAddress& address, WalletId& id) const 
     else if (address.is_public_key()) {
         std::lock_guard lock(cacheMutex_);
         return walletIds_->normal().find(address, id);
-    }
-
-    cserror() << kLogPrefix << "Wrong address";
-    return false;
-}
-
-bool BlockChain::getWalletId(const WalletAddress& address, WalletId& id) {
-    if (address.is_wallet_id()) {
-        id = address.wallet_id();
-        return false;
-    }
-    else if (address.is_public_key()) {
-        std::lock_guard lock(cacheMutex_);
-        return walletIds_->normal().get(address, id);
     }
 
     cserror() << kLogPrefix << "Wrong address";
@@ -1372,19 +1350,6 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             emit alarmBadBlock(pool.sequence());
             return false;
         }
-        // update wallet ids
-        // it should be done before check pool's signature,
-        // because it can change pool's binary representation
-        if (bySync) {
-            // ready-to-record block does not require anything
-            csdebug() << kLogPrefix << "store block #" << poolSequence << " to chain, update wallets ids";
-            updateWalletIds(pool, *walletsCacheUpdater_);
-        }
-        else {
-            csdebug() << kLogPrefix << "store block #" << poolSequence << " add new wallets to pool";
-            addNewWalletsToPool(pool);
-        }
-
 
         // write immediately
         if (recordBlock(pool, false).has_value()) {

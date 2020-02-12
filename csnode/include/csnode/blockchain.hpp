@@ -351,10 +351,6 @@ private:
     bool updateWalletIds(const csdb::Pool& pool, cs::WalletsCache::Updater& updater);
     bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
-    void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
-
-    // returns true if new id was inserted
-    bool getWalletId(const WalletAddress& address, WalletId& id);
     bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
 
     class TransactionsLoader;

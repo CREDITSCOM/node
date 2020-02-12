@@ -84,6 +84,30 @@ bool WalletsIds::Normal::get(const WalletAddress& address, WalletId& id) {
     return false;
 }
 
+void WalletsIds::Normal::fillIds(std::map<csdb::Address, std::pair<WalletId, csdb::Pool::NewWalletInfo::AddressId>>& addrsAndIds) {
+    auto nextId = norm_.nextId_;
+
+    for (auto& addrAndId : addrsAndIds) {
+        if (addrAndId.first.is_wallet_id()) {
+            addrAndId.second.first = addrAndId.first.wallet_id();
+            continue;
+        }
+
+        if (addrAndId.first.is_public_key()) {
+            auto it = norm_.data_.find(addrAndId.first);
+            if (it != norm_.data_.end()) {
+                addrAndId.second.first = kWrongWalletId;
+            }
+            else {
+                addrAndId.second.first = nextId++;
+                if (norm_.nextId_ >= numeric_limits<WalletId>::max() / 2) {
+                    throw runtime_error("nextId_ >= numeric_limits<WalletId>::max() / 2");
+                }
+            }
+        }
+    }
+}
+
 bool WalletsIds::Normal::remove(const WalletAddress& address) {
     if (address.is_wallet_id()) {
         cserror() << __func__ << ": wrong address type";

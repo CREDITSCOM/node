@@ -862,6 +862,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     if (isBootstrapRound()) {
         BlockChain::setBootstrap(pool.value(), true);
     }
+    blockChain_.addNewWalletsToPool(pool.value());
     if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
         cserror() << "NODE> failed to store block in BlockChain";
     }
