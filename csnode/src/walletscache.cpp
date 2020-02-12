@@ -102,8 +102,8 @@ void WalletsCache::Updater::cleanDelegationsFromCache(uint64_t delTime, Delegati
     for (auto it : value) {
         auto& sourceWallData = getWalletData(std::get<0>(it));
         auto& targetWallData = getWalletData(std::get<1>(it));
-        auto& itt = sourceWallData.delegateTargets_->find(std::get<1>(it));
-        auto& its = targetWallData.delegateSources_->find(std::get<0>(it));
+        auto itt = sourceWallData.delegateTargets_->find(std::get<1>(it));
+        auto its = targetWallData.delegateSources_->find(std::get<0>(it));
         if (itt != sourceWallData.delegateTargets_->end()) {
             auto shuttle = itt->second.begin();
             while (shuttle != itt->second.end()) {
@@ -144,13 +144,13 @@ void WalletsCache::Updater::cleanDelegationsFromCache(uint64_t delTime, Delegati
 }
 
 bool WalletsCache::Updater::removeSingleDelegation(uint64_t delTime, PublicKey& first, PublicKey& second, csdb::TransactionID id) {
-    auto& value = getCurrentDelegations().find(delTime);
+    auto value = getCurrentDelegations().find(delTime);
     if (value == getCurrentDelegations().end()) {
         cserror() << "Delegated amount couldn't be removed. Could be database inconsistency";
         return false;
     }
 
-    auto& current = std::find_if(value->second.begin(), value->second.end(), [id](std::tuple<PublicKey, PublicKey, csdb::TransactionID> iter) {return std::get<2>(iter) == id; });
+    auto current = std::find_if(value->second.begin(), value->second.end(), [id](std::tuple<PublicKey, PublicKey, csdb::TransactionID> iter) {return std::get<2>(iter) == id; });
     if (current != value->second.end()) {
         value->second.erase(current);
     }
@@ -158,8 +158,8 @@ bool WalletsCache::Updater::removeSingleDelegation(uint64_t delTime, PublicKey& 
     for (auto it : value->second) {
         auto& sourceWallData = getWalletData(first);
         auto& targetWallData = getWalletData(second);
-        auto& itt = sourceWallData.delegateTargets_->find(second);
-        auto& its = targetWallData.delegateSources_->find(first);
+        auto itt = sourceWallData.delegateTargets_->find(second);
+        auto its = targetWallData.delegateSources_->find(first);
         if (itt != sourceWallData.delegateTargets_->end()) {
             auto shuttle = itt->second.begin();
             while (shuttle != itt->second.end()) {
@@ -527,7 +527,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                         wallData.delegateTargets_->emplace(tKey, firstElement);
                     }
                     else {
-                        auto& itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                        auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
                         if (itt == it->second.end()) {
                             it->second.push_back(tm);
                         }
@@ -538,7 +538,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                 }
                 else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
                     if (it != wallData.delegateTargets_->end()) {
-                        auto& itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                        auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
                         if (itt != it->second.end()) {
                             itt->amount -= tr.amount();
                             wallData.balance_ += tr.amount();
@@ -594,7 +594,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                 auto it = wallData.delegateTargets_->find(tKey);
                 if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
                     if (it != wallData.delegateTargets_->end()) {
-                        auto& itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                        auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
                         if (itt != it->second.end()) {
                             itt->amount -= tr.amount();
                             wallData.balance_ += tr.amount();
@@ -619,7 +619,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                         wallData.delegateTargets_->emplace(tKey, firstElement);
                     }
                     else {
-                        auto& itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                        auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
                         if (itt == it->second.end()) {
                             it->second.push_back(tm);
                         }
@@ -785,7 +785,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
                     wallData.delegateSources_->emplace(sKey, firstElement);
                 }
                 else {
-                    auto& itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
                     if (itt == it->second.end()) {
                         it->second.push_back(tm);
                     }
@@ -797,7 +797,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
             }
             else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
                 if (it != wallData.delegateSources_->end()) {
-                    auto& itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
                     if (itt != it->second.end()) {
                         itt->amount -= tr.amount();
                         wallData.delegated_ -= tr.amount();
@@ -822,7 +822,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
                     it->second.push_back(tm);
                 }
                 wallData.delegated_ += tr.amount();
-                auto& it = getCurrentDelegations().find(tm.time);
+                auto it = getCurrentDelegations().find(tm.time);
                 auto tKey = toPublicKey(tr.target());
                 if (it == getCurrentDelegations().end()) {
                     Delegations deleg;
@@ -855,7 +855,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
             auto it = wallData.delegateSources_->find(sKey);
             if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
                 if (it != wallData.delegateSources_->end()) {
-                    auto& itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
                     if (itt != it->second.end()) {
                         itt->amount -= tr.amount();
                         wallData.delegated_ -= tr.amount();
@@ -877,7 +877,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
                     wallData.delegateSources_->emplace(sKey, firstElement);
                 }
                 else {
-                    auto& itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
                     if (itt == it->second.end()) {
                         it->second.push_back(tm);
                     }

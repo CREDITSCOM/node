@@ -258,8 +258,8 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
                     return Reject::Reason::IncorrectTarget;
                 }
                 else {
-                    auto& itt = std::find_if(itTarget->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                    auto& its = std::find_if(itSource->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                    auto itt = std::find_if(itTarget->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                    auto its = std::find_if(itSource->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
                     if (itt->amount != its->amount) {
                         cserror() << kLogPrefix << "The sum of delegation is not properly set to the sender and target accounts";
                         return Reject::Reason::MalformedDelegation;
