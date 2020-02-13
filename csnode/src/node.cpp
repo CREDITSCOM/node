@@ -3673,6 +3673,8 @@ bool Node::getKnownPeers(std::vector<cs::PeerData>& peers) {
 }
 
 void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info) {
+    cs::Sequence sequence = blockChain_.getLastSeq();
+
     // assume call from processorRoutine() as mentioned in header comment
     info.id = EncodeBase58(nodeIdKey_.data(), nodeIdKey_.data() + nodeIdKey_.size());
     info.version = std::to_string(NODE_VERSION);
@@ -3681,11 +3683,15 @@ void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeI
         api_diag::SessionInfo session;
         session.__set_startRound(stat_.nodeStartRound());
         session.__set_curRound(cs::Conveyer::instance().currentRoundNumber());
-        session.__set_lastBlock(blockChain_.getLastSeq());
+        session.__set_lastBlock(sequence);
         session.__set_uptimeMs(stat_.uptimeMs());
         session.__set_aveRoundMs(stat_.aveRoundMs());
         info.__set_session(session);
     }
+
+    Transport::BanList bl;
+    transport_->getBanList(bl);
+
     if (request.state) {
         api_diag::StateInfo state;
         state.__set_transactionsCount(stat_.totalTransactions());
@@ -3694,8 +3700,30 @@ void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeI
         state.__set_contractsCount(solver_->smart_contracts().contracts_count());
         state.__set_contractsQueueSize(solver_->smart_contracts().contracts_queue_size());
         state.__set_grayListSize(solver_->grayListSize());
-        state.__set_blackListSize(0);
+        state.__set_blackListSize(bl.size());
         state.__set_blockCacheSize(blockChain_.getCachedBlocksSize());
+        /*
+            9: StageCacheSize consensusMessage
+            10: StageCacheSize contractsMessage
+            11: StageCacheSize contractsStorage
+        */
+        api_diag::StageCacheSize cache_size;
+        
+        cache_size.__set_stage1(stageOneMessage_.size());
+        cache_size.__set_stage2(stageTwoMessage_.size());
+        cache_size.__set_stage3(stageThreeMessage_.size());
+        state.__set_consensusMessage(cache_size);
+
+        cache_size.__set_stage1(smartStageOneMessage_.size());
+        cache_size.__set_stage2(smartStageTwoMessage_.size());
+        cache_size.__set_stage3(smartStageThreeMessage_.size());
+        state.__set_contractsMessage(cache_size);
+
+        cache_size.__set_stage1(smartStageOneStorage_.size());
+        cache_size.__set_stage2(smartStageTwoStorage_.size());
+        cache_size.__set_stage3(smartStageThreeStorage_.size());
+        state.__set_contractsStorage(cache_size);
+
         info.__set_state(state);
     }
     if (request.grayListContent) {
@@ -3705,7 +3733,39 @@ void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeI
     }
     if (request.blackListContent) {
         std::vector<std::string> black_list;
-        //solver_->getBlackListContentBase58(black_list);
-        info.__set_grayListContent(black_list);
+        for (const auto bl_item : bl) {
+            black_list.emplace_back(bl_item.first + ':' + std::to_string(bl_item.second));
+        }
+        info.__set_blackListContent(black_list);
     }
+
+    // get bootstrap nodes
+    std::map<cs::PublicKey, api_diag::BootstrapNode> bootstrap;
+    for (const auto& item : initialConfidants_) {
+        bool alive = (item == nodeIdKey_);
+        cs::Sequence seq = alive ? sequence : 0;
+        api_diag::BootstrapNode bn;
+        bn.__set_id(EncodeBase58(item.data(), item.data() + item.size()));
+        bn.__set_alive(alive);
+        bn.__set_sequence(seq);
+        bootstrap[item] = bn;
+    }
+    // update alive bootstrap nodes
+    auto callback = [&bootstrap, this](const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber) {
+        const auto it = initialConfidants_.find(neighbour);
+        if (it == initialConfidants_.end()) {
+            return;
+        }
+        auto& item = bootstrap[*it];
+        item.__set_alive(true);
+        item.__set_sequence(lastSeq);
+    };
+    transport_->forEachNeighbour(std::move(callback));
+    // store bootstrap
+    std::vector<api_diag::BootstrapNode> bootstrap_list;
+    for (const auto& item : bootstrap) {
+        bootstrap_list.push_back(item.second);
+    }
+    info.__set_bootstrap(bootstrap_list);
+
 }
