@@ -256,8 +256,9 @@ void BlockChain::writeGenesisBlock() {
 
     csdebug() << genesis.hash().to_string();
 
-    uint32_t bSize;
-    genesis.to_byte_stream(bSize);
+    //uint32_t bSize;
+    //auto p = genesis.to_byte_stream(bSize);
+    //csdebug() << "Genesis" << cs::Utils::byteStreamToHex(p, bSize);
 }
 
 void BlockChain::iterateOverWallets(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::WalletData&)> func) {
@@ -801,6 +802,10 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
     size_t confWalletsIndexStart = transactions.size();
     for (size_t i = 0; i < confidants.size(); ++i) {
         addrsAndIds[csdb::Address::from_public_key(confidants[i])].second = {confWalletsIndexStart + i, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
+    }
+
+    if (pool.sequence() == 0) {
+        addrsAndIds.erase(genesisAddress_);
     }
 
     {
