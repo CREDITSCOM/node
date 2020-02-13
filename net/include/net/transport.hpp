@@ -36,6 +36,9 @@ public:
     inline static volatile std::sig_atomic_t gSignalStatus = 0;
     static void stop() { Transport::gSignalStatus = 1; }
 
+    using AddressAndPort = std::pair<std::string, uint16_t>;
+    using BanList = std::vector<AddressAndPort>;
+
     explicit Transport(Node* node);
     ~Transport() override = default;
 
@@ -53,6 +56,7 @@ public:
     void ban(const cs::PublicKey&);
     void revertBan(const cs::PublicKey&);
     void clearBanList();
+    void getBanList(BanList&) const;
 
     // neighbours interface
     void setPermanentNeighbours(const std::set<cs::PublicKey>&);

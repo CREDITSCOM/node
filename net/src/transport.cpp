@@ -175,6 +175,15 @@ void Transport::clearBanList() {
     host_.ClearBanList();
 }
 
+void Transport::getBanList(BanList& ret_container) const {
+    std::set<net::BanEntry> banned;
+    host_.GetBanList(banned);
+
+    for (auto& b : banned) {
+        ret_container.push_back(std::make_pair(b.addr.to_string(), b.port));
+    }
+}
+
 void Transport::sendMulticast(Packet&& pack, const std::vector<cs::PublicKey>& receivers) {
     for (auto& receiver : receivers) {
         auto ptr = reinterpret_cast<const uint8_t*>(pack.data());
