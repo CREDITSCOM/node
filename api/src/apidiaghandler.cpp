@@ -283,5 +283,29 @@ namespace api_diag {
         _return.__set_status(resp);
     }
 
+    void APIDiagHandler::GetNodeInfo(NodeInfoRespone& _return, const NodeInfoRequest& request) {
+        general::APIResponse resp;
+        resp.__set_code(kNotImplemented);
+        _return.__set_result(resp);
+
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        api_diag::NodeInfo info;
+        
+        auto task = [&]() {
+            node_.getNodeInfo(request, info);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] {return done; });
+        }
+
+        _return.__set_info(info);
+    }
+
 }
 

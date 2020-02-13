@@ -410,6 +410,16 @@ public:
         return is_payable_target(t);
     }
 
+    size_t contracts_count() const {
+        cs::Lock lock(public_access_lock);
+        return known_contracts.size();
+    }
+
+    size_t contracts_queue_size() const {
+        cs::Lock lock(public_access_lock);
+        return exe_queue.size();
+    }
+
     bool executionAllowed();
 
     /**

@@ -19,6 +19,8 @@ namespace api_diag {
         // diagnocstic proro
         void GetTransaction(GetTransactionResponse& _return, const TransactionId& id) override;
 
+        void GetNodeInfo(NodeInfoRespone& _return, const NodeInfoRequest& request) override;
+
     private:
         Node& node_;
     };

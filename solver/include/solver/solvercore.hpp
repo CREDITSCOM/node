@@ -123,6 +123,10 @@ public:
     void updateGrayList(cs::RoundNumber round);
     bool isInGrayList(cs::PublicKey key);
     void resetGrayList();
+    size_t grayListSize() const {
+        return grayList_.size();
+    }
+    void getGrayListContentBase58(std::vector<std::string>& gray_list) const;
     bool isBlackListed(const cs::PublicKey pKey);
 
 

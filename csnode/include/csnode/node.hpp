@@ -289,6 +289,18 @@ public:
 
     bool getKnownPeers(std::vector<cs::PeerData>& peers);
 
+    /**
+     * Gets node information. Caller MUST care about concurrency.
+     * One SHOULD make a call to this from CallsQueue or directly from processorRoutine
+     *
+     * @author  Alexander Avramenko
+     * @date    13.02.2020
+     *
+     * @param [in,out]  info    The information.
+     */
+
+    void getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info);
+
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;
     using SmartStageRequestSignal = cs::Signal<void(uint8_t, uint64_t, uint8_t, uint8_t, const cs::PublicKey&)>;

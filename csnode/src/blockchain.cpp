@@ -719,6 +719,11 @@ uint64_t BlockChain::getWalletsCountWithBalance() {
     return count;
 }
 
+uint64_t BlockChain::getWalletsCount() const {
+    std::lock_guard lock(cacheMutex_);
+    return walletsCacheStorage_->getCount();
+}
+
 void BlockChain::getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit) {
     for (auto trIt = cs::TransactionsIterator(*this, address); trIt.isValid(); trIt.next()) {
         if (offset > 0) {
@@ -1118,7 +1123,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
     csdetails() << kLogPrefix << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
     emit storeBlockEvent(pool);
-    if (false && (pool.transactions_count() > 0 || pool.sequence() % 10 == 0)) {//log code
+    if constexpr (false && (pool.transactions_count() > 0 || pool.sequence() % 10 == 0)) {//log code
         std::string res = printWalletCaches() + "\nTransactions: \n";
         csdb::Amount r_cost{ 0 };
         for (auto it : pool.transactions()) {
@@ -1431,6 +1436,8 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
 
 void BlockChain::testCachedBlocks() {
     csdebug() << kLogPrefix << "test cached blocks";
+
+    cs::Lock lock(cachedBlocksMutex_);
 
     if (cachedBlocks_.empty()) {
         csdebug() << kLogPrefix << "no cached blocks";

@@ -2522,7 +2522,7 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
             }
             uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
 
-            const auto ave_duration = stat_.aveTime();
+            const auto ave_duration = stat_.aveRoundMs();
             if (speed < ave_duration / 10 && rPackage.roundTable().round - stat_.nodeStartRound() > Consensus::SpeedCheckRound) {
                 stat_.onRoundStart(rPackage.roundTable().round, true /*skip_logs*/);
                 cserror() << "drop RoundPackage created in " << speed << " ms/block, average ms/round is " << ave_duration;
@@ -3670,4 +3670,42 @@ bool Node::getKnownPeers(std::vector<cs::PeerData>& peers) {
 
     transport_->getKnownPeers(peers);
     return true;
+}
+
+void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info) {
+    // assume call from processorRoutine() as mentioned in header comment
+    info.id = EncodeBase58(nodeIdKey_.data(), nodeIdKey_.data() + nodeIdKey_.size());
+    info.version = std::to_string(NODE_VERSION);
+    info.platform = (api_diag::Platform) csconnector::connector::platform();
+    if (request.session) {
+        api_diag::SessionInfo session;
+        session.__set_startRound(stat_.nodeStartRound());
+        session.__set_curRound(cs::Conveyer::instance().currentRoundNumber());
+        session.__set_lastBlock(blockChain_.getLastSeq());
+        session.__set_uptimeMs(stat_.uptimeMs());
+        session.__set_aveRoundMs(stat_.aveRoundMs());
+        info.__set_session(session);
+    }
+    if (request.state) {
+        api_diag::StateInfo state;
+        state.__set_transactionsCount(stat_.totalTransactions());
+        state.__set_totalWalletsCount(blockChain_.getWalletsCount());
+        state.__set_aliveWalletsCount(blockChain_.getWalletsCountWithBalance());
+        state.__set_contractsCount(solver_->smart_contracts().contracts_count());
+        state.__set_contractsQueueSize(solver_->smart_contracts().contracts_queue_size());
+        state.__set_grayListSize(solver_->grayListSize());
+        state.__set_blackListSize(0);
+        state.__set_blockCacheSize(blockChain_.getCachedBlocksSize());
+        info.__set_state(state);
+    }
+    if (request.grayListContent) {
+        std::vector<std::string> gray_list;
+        solver_->getGrayListContentBase58(gray_list);
+        info.__set_grayListContent(gray_list);
+    }
+    if (request.blackListContent) {
+        std::vector<std::string> black_list;
+        //solver_->getBlackListContentBase58(black_list);
+        info.__set_grayListContent(black_list);
+    }
 }

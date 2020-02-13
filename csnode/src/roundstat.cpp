@@ -86,11 +86,16 @@ void RoundStat::onStoreBlock(csdb::Pool block) {
     totalAcceptedTransactions_ += block.transactions_count();
 }
 
-size_t RoundStat::aveTime() {
+size_t RoundStat::uptimeMs() const {
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(steady_clock::now() - startPointMs_).count();
+}
+
+size_t RoundStat::aveRoundMs() const {
     return aveRoundMs_;
 }
 
-size_t RoundStat::nodeStartRound() {
+size_t RoundStat::nodeStartRound() const {
     return nodeStartRound_;
 }
 

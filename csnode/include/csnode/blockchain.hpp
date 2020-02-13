@@ -283,6 +283,7 @@ public:
 
     size_t getSize() const;
     uint64_t getWalletsCountWithBalance();
+    uint64_t getWalletsCount() const;
     csdb::PoolHash getLastHash() const;
     csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
     cs::Sequence getSequenceByHash(const csdb::PoolHash&) const;
@@ -299,6 +300,7 @@ public:
     void setBlocksToBeRemoved(cs::Sequence number);
 
     std::string printWalletCaches();
+
 
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);

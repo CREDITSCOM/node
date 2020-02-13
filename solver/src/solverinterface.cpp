@@ -506,6 +506,12 @@ void SolverCore::resetGrayList() {
     EventReport::sendGrayListUpdate(*pnode, Zero::key, false /*removed*/); // for 1 round clear, 1 is default
 }
 
+void SolverCore::getGrayListContentBase58(std::vector<std::string>& gray_list) const {
+    for (const auto& item : grayList_) {
+        gray_list.emplace_back(EncodeBase58(item.first.data(), item.first.data() + item.first.size()));
+    }
+}
+
 cs::Bytes SolverCore::getRealTrusted() {
     return tempRealTrusted_;
 }

@@ -54,8 +54,8 @@ struct PeerData {
     std::string ip;
     // p2p port
     uint16_t port = 0;
+    int16_t version = 0;
     int8_t platform = OS_UNSPECIFIED;
-    int8_t version = 0;
 };
 
 using ConfidantSignature = std::pair<Byte, Signature>;

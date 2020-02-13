@@ -34,8 +34,9 @@ public:
         return totalAcceptedTransactions_;
     }
 
-    size_t aveTime();
-    size_t nodeStartRound();
+    size_t uptimeMs() const;
+    size_t aveRoundMs() const;
+    size_t nodeStartRound() const;
 
     // returns duration from last round in ms,
     // only if connected to transport ping signal

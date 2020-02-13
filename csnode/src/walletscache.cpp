@@ -822,9 +822,9 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
                     it->second.push_back(tm);
                 }
                 wallData.delegated_ += tr.amount();
-                auto it = getCurrentDelegations().find(tm.time);
+                auto it2 = getCurrentDelegations().find(tm.time);
                 auto tKey = toPublicKey(tr.target());
-                if (it == getCurrentDelegations().end()) {
+                if (it2 == getCurrentDelegations().end()) {
                     Delegations deleg;
                     deleg.push_back(std::make_tuple(sKey, tKey, tr.id()));
                     getCurrentDelegations().emplace(tm.time, deleg);
