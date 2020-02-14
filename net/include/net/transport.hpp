@@ -113,7 +113,8 @@ private:
     std::mutex inboxMux_;
     std::list<std::pair<cs::PublicKey, Packet>> inboxQueue_;
 
-    constexpr static size_t kMaxBytesToHandle = 1ul << 31;
+    constexpr static size_t kMaxPacketsToHandle = 1ul << 17; // 131_072
+    constexpr static size_t kMaxBytesToHandle = 1ul << 29; // 536_870_912 bytes
     std::atomic<size_t> bytesToHandle_ = 0;
 
     Neighbourhood neighbourhood_;

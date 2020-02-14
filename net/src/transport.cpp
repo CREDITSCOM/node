@@ -127,12 +127,23 @@ void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data)
     }
 
     if (pack.size() + bytesToHandle_ > kMaxBytesToHandle) {
-        return;
+        // remove all unhandled packets
+        std::lock_guard g(inboxMux_);
+        inboxQueue_.clear();
+        bytesToHandle_ = 0;
+        // continue with empty queue
+        //return;
     }
     bytesToHandle_ += pack.size();
 
     {
         std::lock_guard g(inboxMux_);
+
+        if (inboxQueue_.size() >= kMaxPacketsToHandle) {
+            inboxQueue_.clear();
+            bytesToHandle_ = pack.size();
+            // continue with empty queue
+        }
         inboxQueue_.emplace_back(std::make_pair(publicKey, std::move(pack)));
     }
 
