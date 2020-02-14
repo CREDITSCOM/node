@@ -29,38 +29,26 @@ namespace api_diag {
 
     void APIDiagHandler::GetActiveNodes(ActiveNodesResult& _return) {
         general::APIResponse resp;
-        std::vector<cs::PeerData> peers;
-        if (!node_.getKnownPeers(peers)) {
-            resp.__set_code(kError);
-            resp.__set_message("Discovery service is unavailable on this node");
-        }
-        else {
-            std::vector<api_diag::ServerNode> nodes;
-            for (const auto& peer : peers) {
-                api_diag::ServerNode node;
-                node.__set_ip(peer.ip);
-                node.__isset.ip = true;
-                node.__set_port(std::to_string(peer.port));
-                node.__isset.port = true;
-                node.__set_publicKey(peer.id);
-                node.__isset.publicKey = true;
-                node.__set_version(std::to_string(peer.version));
-                node.__isset.version = true;
-                node.__set_platform(std::to_string(peer.platform));
-                node.__isset.platform = true;
-                node.__set_countTrust(0);
-                //node.__set_hash("");
-                node.__set_timeActive(0);
-                node.__set_timeRegistration(0);
-                nodes.push_back(node);
-            }
-            if (!nodes.empty()) {
-                _return.__set_nodes(nodes);
-                _return.__isset.nodes = true;
-            }
-            resp.__set_code(kOk);
-        }
+        resp.__set_code(kOk);
         _return.__set_result(resp);
+
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        std::vector<api_diag::ServerNode> nodes;
+
+        auto task = [&]() {
+            node_.getKnownPeers(nodes);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+
+        _return.__set_nodes(nodes);
     }
 
     void APIDiagHandler::GetActiveTransactionsCount(ActiveTransactionsResult& _return) {
@@ -285,7 +273,7 @@ namespace api_diag {
 
     void APIDiagHandler::GetNodeInfo(NodeInfoRespone& _return, const NodeInfoRequest& request) {
         general::APIResponse resp;
-        resp.__set_code(kNotImplemented);
+        resp.__set_code(kOk);
         _return.__set_result(resp);
 
         std::mutex mtx;
@@ -301,7 +289,7 @@ namespace api_diag {
         cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
         {
             std::unique_lock<std::mutex> lock(mtx);
-            cv.wait(lock, [&] {return done; });
+            cv.wait(lock, [&] { return done; });
         }
 
         _return.__set_info(info);
