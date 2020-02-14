@@ -127,12 +127,23 @@ void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data)
     }
 
     if (pack.size() + bytesToHandle_ > kMaxBytesToHandle) {
-        return;
+        // remove all unhandled packets
+        std::lock_guard g(inboxMux_);
+        inboxQueue_.clear();
+        bytesToHandle_ = 0;
+        // continue with empty queue
+        //return;
     }
     bytesToHandle_ += pack.size();
 
     {
         std::lock_guard g(inboxMux_);
+
+        if (inboxQueue_.size() >= kMaxPacketsToHandle) {
+            inboxQueue_.clear();
+            bytesToHandle_ = pack.size();
+            // continue with empty queue
+        }
         inboxQueue_.emplace_back(std::make_pair(publicKey, std::move(pack)));
     }
 
@@ -173,6 +184,15 @@ void Transport::revertBan(const cs::PublicKey& key) {
 
 void Transport::clearBanList() {
     host_.ClearBanList();
+}
+
+void Transport::getBanList(BanList& ret_container) const {
+    std::set<net::BanEntry> banned;
+    host_.GetBanList(banned);
+
+    for (auto& b : banned) {
+        ret_container.push_back(std::make_pair(b.addr.to_string(), b.port));
+    }
 }
 
 void Transport::sendMulticast(Packet&& pack, const std::vector<cs::PublicKey>& receivers) {
@@ -363,4 +383,19 @@ bool Transport::hasNeighbour(const cs::PublicKey& neighbour) const {
 
 uint32_t Transport::getMaxNeighbours() const {
     return Neighbourhood::kMaxNeighbours;
+}
+
+void Transport::getKnownPeers(std::vector<cs::PeerData>& result) {
+    std::vector<net::NodeEntrance> knownPeers;
+    host_.GetKnownNodes(knownPeers);
+
+    for (auto& p : knownPeers) {
+        cs::PeerData peerData;
+        auto ptr = reinterpret_cast<const uint8_t*>(p.id.GetPtr());
+        peerData.id = EncodeBase58(ptr, ptr + p.id.size());
+        peerData.ip = p.address.to_string();
+        peerData.port = p.udp_port;
+
+        result.push_back(peerData);
+    }
 }

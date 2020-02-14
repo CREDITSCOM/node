@@ -84,6 +84,10 @@ public:
     ApiHandlerPtr apiHandler() const;
     ApiExecHandlerPtr apiExecHandler() const;
 
+    constexpr static inline int8_t platform() {
+        return api_diag::platform();
+    }
+
 private:
     cs::Executor& executor_;
     ApiHandlerPtr api_handler;
@@ -109,10 +113,8 @@ private:
     std::shared_ptr<::apache::thrift::server::TThreadedServer> execapi_server;
 #endif
 
-#if defined(DIAG_API)
     std::thread diag_thread;
     std::shared_ptr<::apache::thrift::server::TThreadedServer> diag_server;
-#endif // DIAG_API
 
     std::atomic_bool stop_flag;
 };

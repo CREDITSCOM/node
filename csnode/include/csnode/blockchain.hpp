@@ -283,6 +283,7 @@ public:
 
     size_t getSize() const;
     uint64_t getWalletsCountWithBalance();
+    uint64_t getWalletsCount() const;
     csdb::PoolHash getLastHash() const;
     csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
     cs::Sequence getSequenceByHash(const csdb::PoolHash&) const;
@@ -299,6 +300,7 @@ public:
     void setBlocksToBeRemoved(cs::Sequence number);
 
     std::string printWalletCaches();
+
 
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);
@@ -351,10 +353,6 @@ private:
     bool updateWalletIds(const csdb::Pool& pool, cs::WalletsCache::Updater& updater);
     bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
-    void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
-
-    // returns true if new id was inserted
-    bool getWalletId(const WalletAddress& address, WalletId& id);
     bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
 
     class TransactionsLoader;

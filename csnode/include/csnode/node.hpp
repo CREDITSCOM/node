@@ -265,11 +265,41 @@ public:
         return solver_;
     }
 
-#ifdef NODE_API
+#if defined(NODE_API) // see client/include/params.hpp
     csconnector::connector* getConnector() {
         return api_.get();
     }
 #endif
+
+    size_t getTotalTransactionsCount() const {
+        return stat_.totalTransactions();
+    }
+
+    /**
+     * Gets known peers obtained by special discovery service
+     *
+     * @author  Alexander Avramenko
+     * @date    12.02.2020
+     *
+     * @param [in,out]  peers is a placeholder for requested information. Only actual if method returns true.
+     *                  Caller should pass an empty vector to method, otherwise duplicated items are possible
+     *
+     * @returns True if it succeeds, false if discovery service is unavailable
+     */
+
+    bool getKnownPeers(std::vector<cs::PeerData>& peers);
+
+    /**
+     * Gets node information. Caller MUST care about concurrency.
+     * One SHOULD make a call to this from CallsQueue or directly from processorRoutine
+     *
+     * @author  Alexander Avramenko
+     * @date    13.02.2020
+     *
+     * @param [in,out]  info    The information.
+     */
+
+    void getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info);
 
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;
@@ -435,10 +465,6 @@ private:
     cs::ConfirmationList confirmationList_;
     cs::RoundTableMessage currentRoundTableMessage_;
 
-    //expected rounds
-    std::vector<cs::RoundNumber> expectedRounds_;
-    cs::Bytes lastTrustedMask_;
-
     std::unique_ptr<cs::BlockValidator> blockValidator_;
     std::vector<cs::RoundPackage> roundPackageCache_;
 
@@ -454,6 +480,7 @@ private:
 
     std::string kLogPrefix_;
     std::map<uint16_t, cs::Command> changeableParams_;
+    cs::PublicKey globalPublicKey_;
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;

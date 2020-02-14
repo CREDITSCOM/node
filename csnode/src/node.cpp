@@ -194,6 +194,8 @@ bool Node::init() {
 
     initBootstrapRP(initialConfidants_);
     EventReport::sendRunningStatus(*this, Running::Status::Run);
+    globalPublicKey_.fill(0);
+    globalPublicKey_.at(31) = 7U;
     return true;
 }
 
@@ -862,6 +864,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     if (isBootstrapRound()) {
         BlockChain::setBootstrap(pool.value(), true);
     }
+    blockChain_.addNewWalletsToPool(pool.value());
     if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
         cserror() << "NODE> failed to store block in BlockChain";
     }
@@ -2489,7 +2492,6 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     if (conveyer.currentRoundNumber() > Consensus::MaxRoundTimerFree && getBlockChain().getLastSeq() > 0) {
         uint64_t lastTimeStamp;
-        uint64_t currentTimeStamp;
         [[maybe_unused]] uint64_t rpTimeStamp;
         try {
             std::string lTS = getBlockChain().getLastTimeStamp();
@@ -2500,13 +2502,7 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
             return false;
         }
 
-        try {
-            currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
-        }
-        catch (...) {
-            csdebug() << __func__ << ": current Timestamp was announced as zero";
-            return false;
-        }
+        uint64_t currentTimeStamp = cs::Utils::currentTimestamp();
 
         try {
             rpTimeStamp = std::stoull(rPackage.poolMetaInfo().timestamp);
@@ -2526,7 +2522,7 @@ bool Node::rpSpeedOk(cs::RoundPackage& rPackage) {
             }
             uint64_t speed = delta / (rPackage.roundTable().round - conveyer.currentRoundNumber());
 
-            const auto ave_duration = stat_.aveTime();
+            const auto ave_duration = stat_.aveRoundMs();
             if (speed < ave_duration / 10 && rPackage.roundTable().round - stat_.nodeStartRound() > Consensus::SpeedCheckRound) {
                 stat_.onRoundStart(rPackage.roundTable().round, true /*skip_logs*/);
                 cserror() << "drop RoundPackage created in " << speed << " ms/block, average ms/round is " << ave_duration;
@@ -2620,8 +2616,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
                 if (cs::TrustedMask::trustedSize(rPackage.poolMetaInfo().realTrustedMask) > cs::TrustedMask::trustedSize(mask)) {
                     csdebug() << "Current Roundpackage of " << rNum << " will be replaced by new one";
                     auto it = roundPackageCache_.end();
-                    --it;
-                    roundPackageCache_.erase(it);
+                    if (!roundPackageCache_.empty()) {
+                        --it;
+                        roundPackageCache_.erase(it);
+                    }
                     roundPackageCache_.push_back(rPackage);
                     updateRound = true;
                 }
@@ -2753,13 +2751,7 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     // create pool by previous round, then change conveyer state.
     getCharacteristic(rPackage);
 
-    try {
-        lastRoundPackageTime_ = std::stoull(cs::Utils::currentTimestamp());
-    }
-    catch (...) {
-        csdebug() << __func__ << ": current Timestamp was announced as zero";
-        return;
-    }
+    lastRoundPackageTime_ = cs::Utils::currentTimestamp();
 
     onRoundStart(cs::Conveyer::instance().currentRoundTable(), updateRound);
 
@@ -2775,31 +2767,31 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
 }
 
 bool Node::isTransactionsInputAvailable() {
-    size_t justTime;
-
-    try {
-        justTime = std::stoull(cs::Utils::currentTimestamp());
-    }
-    catch (...) {
-        csdebug() << __func__ << ": current Timestamp was announced as zero";
-        return false;
-    }
-
+    size_t justTime = cs::Utils::currentTimestamp();
     if (justTime > lastRoundPackageTime_) {
         if (justTime - lastRoundPackageTime_ > Consensus::MaxRoundDuration) {
-            csdebug() << "NODE> The current round lasts too long, possible traffic problems";
+            cslog() << "NODE> reject transaction: the current round lasts too long, possible traffic problems";
             return false; //
-        }
-        else {
-            bool condition = (!poolSynchronizer_->isSyncroStarted()) && (cs::Conveyer::instance().currentRoundNumber() 
-                - getBlockChain().getLastSeq() < cs::PoolSynchronizer::kRoundDifferentForSync);
-            return condition;
         }
     }
     else {
-        csdebug() << "NODE> Possible wrong node clock";
+        if (lastRoundPackageTime_ - justTime > Consensus::MaxRoundDuration) {
+            cslog() << "NODE> reject transaction: possible wrong node clock";
+            return false;
+        }
+    }
+    // default conditions: no sync and last block is near to current round
+    if (poolSynchronizer_->isSyncroStarted()) {
+        cslog() << "NODE> reject transaction: node is synchronizing now";
         return false;
     }
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    const auto sequence = getBlockChain().getLastSeq();
+    if(round < sequence || round - sequence >= cs::PoolSynchronizer::kRoundDifferentForSync) {
+        cslog() << "NODE> reject transaction: sequence " << sequence << " is not actual, round " << round;
+        return false;
+    }
+    return true;
 }
 
 void Node::clearRPCache(cs::RoundNumber rNum) {
@@ -2808,7 +2800,7 @@ void Node::clearRPCache(cs::RoundNumber rNum) {
         return;
     }
     while (flagg) {
-        auto tmp = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum](cs::RoundPackage& rp) {return rp.roundTable().round == rNum - 5; });
+        auto tmp = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum](cs::RoundPackage& rp) {return rp.roundTable().round <= rNum - 5; });
         if (tmp == roundPackageCache_.end()) {
             break;
         }
@@ -2843,7 +2835,7 @@ void Node::sendHash(cs::RoundNumber round) {
     try {
         std::string lTS = getBlockChain().getLastTimeStamp();
         lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
-        currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
+        currentTimeStamp = cs::Utils::currentTimestamp(); // nothrow itself but may be skipped due to prev calls, keep this logic
     }
     catch (const std::exception& exception) {
         cswarning() << exception.what();
@@ -2921,7 +2913,7 @@ void Node::getHash(const uint8_t* data, const size_t size, cs::RoundNumber rNum,
     try {
         std::string lTS = getBlockChain().getLastTimeStamp();
         lastTimeStamp = std::stoull(lTS.empty() == 0 ? "0" : lTS);
-        currentTimeStamp = std::stoull(cs::Utils::currentTimestamp());
+        currentTimeStamp = cs::Utils::currentTimestamp(); // nothrow, may be skipped by prev calls, so keep this logic anyway
     }
     catch (const std::exception& exception) {
         cswarning() << exception.what();
@@ -3662,4 +3654,120 @@ void Node::onRoundTimeElapsed() {
         const auto end = beg + actualConfidants.cbegin()->size();
         cslog() << "Wait for " << EncodeBase58(beg, end) << " to start round...";
     }
+}
+
+bool Node::getKnownPeers(std::vector<cs::PeerData>& peers) {
+    cs::PeerData item;
+    const auto& own_info = cs::ConfigHolder::instance().config()->getInputEndpoint();
+    if (own_info.ipSpecified) {
+        item.ip = own_info.ip;
+        item.port = own_info.port;
+    }
+    item.id = EncodeBase58(nodeIdKey_.data(), nodeIdKey_.data() + nodeIdKey_.size());
+
+    item.platform = csconnector::connector::platform();
+    item.version = NODE_VERSION;
+
+    peers.push_back(item);
+
+    transport_->getKnownPeers(peers);
+    return true;
+}
+
+void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info) {
+    cs::Sequence sequence = blockChain_.getLastSeq();
+
+    // assume call from processorRoutine() as mentioned in header comment
+    info.id = EncodeBase58(nodeIdKey_.data(), nodeIdKey_.data() + nodeIdKey_.size());
+    info.version = std::to_string(NODE_VERSION);
+    info.platform = (api_diag::Platform) csconnector::connector::platform();
+    if (request.session) {
+        api_diag::SessionInfo session;
+        session.__set_startRound(stat_.nodeStartRound());
+        session.__set_curRound(cs::Conveyer::instance().currentRoundNumber());
+        session.__set_lastBlock(sequence);
+        session.__set_uptimeMs(stat_.uptimeMs());
+        session.__set_aveRoundMs(stat_.aveRoundMs());
+        info.__set_session(session);
+    }
+
+    Transport::BanList bl;
+    transport_->getBanList(bl);
+
+    if (request.state) {
+        api_diag::StateInfo state;
+        state.__set_transactionsCount(stat_.totalTransactions());
+        state.__set_totalWalletsCount(blockChain_.getWalletsCount());
+        state.__set_aliveWalletsCount(blockChain_.getWalletsCountWithBalance());
+        state.__set_contractsCount(solver_->smart_contracts().contracts_count());
+        state.__set_contractsQueueSize(solver_->smart_contracts().contracts_queue_size());
+        state.__set_grayListSize(solver_->grayListSize());
+        state.__set_blackListSize(bl.size());
+        state.__set_blockCacheSize(blockChain_.getCachedBlocksSize());
+        /*
+            9: StageCacheSize consensusMessage
+            10: StageCacheSize contractsMessage
+            11: StageCacheSize contractsStorage
+        */
+        api_diag::StageCacheSize cache_size;
+        
+        cache_size.__set_stage1(stageOneMessage_.size());
+        cache_size.__set_stage2(stageTwoMessage_.size());
+        cache_size.__set_stage3(stageThreeMessage_.size());
+        state.__set_consensusMessage(cache_size);
+
+        cache_size.__set_stage1(smartStageOneMessage_.size());
+        cache_size.__set_stage2(smartStageTwoMessage_.size());
+        cache_size.__set_stage3(smartStageThreeMessage_.size());
+        state.__set_contractsMessage(cache_size);
+
+        cache_size.__set_stage1(smartStageOneStorage_.size());
+        cache_size.__set_stage2(smartStageTwoStorage_.size());
+        cache_size.__set_stage3(smartStageThreeStorage_.size());
+        state.__set_contractsStorage(cache_size);
+
+        info.__set_state(state);
+    }
+    if (request.grayListContent) {
+        std::vector<std::string> gray_list;
+        solver_->getGrayListContentBase58(gray_list);
+        info.__set_grayListContent(gray_list);
+    }
+    if (request.blackListContent) {
+        std::vector<std::string> black_list;
+        for (const auto bl_item : bl) {
+            black_list.emplace_back(bl_item.first + ':' + std::to_string(bl_item.second));
+        }
+        info.__set_blackListContent(black_list);
+    }
+
+    // get bootstrap nodes
+    std::map<cs::PublicKey, api_diag::BootstrapNode> bootstrap;
+    for (const auto& item : initialConfidants_) {
+        bool alive = (item == nodeIdKey_);
+        cs::Sequence seq = alive ? sequence : 0;
+        api_diag::BootstrapNode bn;
+        bn.__set_id(EncodeBase58(item.data(), item.data() + item.size()));
+        bn.__set_alive(alive);
+        bn.__set_sequence(seq);
+        bootstrap[item] = bn;
+    }
+    // update alive bootstrap nodes
+    auto callback = [&bootstrap, this](const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber) {
+        const auto it = initialConfidants_.find(neighbour);
+        if (it == initialConfidants_.end()) {
+            return;
+        }
+        auto& item = bootstrap[*it];
+        item.__set_alive(true);
+        item.__set_sequence(lastSeq);
+    };
+    transport_->forEachNeighbour(std::move(callback));
+    // store bootstrap
+    std::vector<api_diag::BootstrapNode> bootstrap_list;
+    for (const auto& item : bootstrap) {
+        bootstrap_list.push_back(item.second);
+    }
+    info.__set_bootstrap(bootstrap_list);
+
 }

@@ -121,6 +121,11 @@ struct RoundTableMessage {
     cs::PublicKey sender;
 };
 
+struct TimeMoney {
+    TimeMoney(uint64_t t, csdb::Amount am);
+    uint64_t time;
+    csdb::Amount amount;
+};
 // transactions user fields
 namespace trx_uf {
     // delegation transaction fields
@@ -132,7 +137,7 @@ namespace trx_uf {
             constexpr uint64_t legate = 1;
             constexpr uint64_t legated_withdraw = 2;
             constexpr uint64_t legated_release = 3;
-            constexpr uint64_t liver_hold = 4;
+            constexpr uint64_t legate_min_utc = 4;
         }
 
         // count of user fields
@@ -149,7 +154,7 @@ struct Zero {
     inline static cs::Hash hash;
     inline static cs::Signature signature;
     inline static cs::PublicKey key;
-
+	inline static uint64_t timeStamp;
     Zero();
 };
 }  // namespace cs

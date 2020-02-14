@@ -36,6 +36,9 @@ public:
     inline static volatile std::sig_atomic_t gSignalStatus = 0;
     static void stop() { Transport::gSignalStatus = 1; }
 
+    using AddressAndPort = std::pair<std::string, uint16_t>;
+    using BanList = std::vector<AddressAndPort>;
+
     explicit Transport(Node* node);
     ~Transport() override = default;
 
@@ -53,6 +56,7 @@ public:
     void ban(const cs::PublicKey&);
     void revertBan(const cs::PublicKey&);
     void clearBanList();
+    void getBanList(BanList&) const;
 
     // neighbours interface
     void setPermanentNeighbours(const std::set<cs::PublicKey>&);
@@ -61,10 +65,7 @@ public:
     void forEachNeighbour(Neighbourhood::NeighboursCallback);
     bool hasNeighbour(const cs::PublicKey&) const;
 
-    // HostEventHandler
-    void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
-    void OnNodeDiscovered(const net::NodeId&) override;
-    void OnNodeRemoved(const net::NodeId&) override;
+    void getKnownPeers(std::vector<cs::PeerData>&);
 
     // from neigbours
     // @param added - true if new neighbour adder, false if removed
@@ -78,6 +79,12 @@ public signals:
     cs::Action mainThreadIterated;
     NeighbourAddedSignal neighbourAdded;
     NeighbourRemovedSignal neighbourRemoved;
+
+protected:
+    // HostEventHandler
+    void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
+    void OnNodeDiscovered(const net::NodeId&) override;
+    void OnNodeRemoved(const net::NodeId&) override;
 
 private:
 // Postpone logic - beg
@@ -106,7 +113,8 @@ private:
     std::mutex inboxMux_;
     std::list<std::pair<cs::PublicKey, Packet>> inboxQueue_;
 
-    constexpr static size_t kMaxBytesToHandle = 1ul << 31;
+    constexpr static size_t kMaxPacketsToHandle = 1ul << 17; // 131_072
+    constexpr static size_t kMaxBytesToHandle = 1ul << 29; // 536_870_912 bytes
     std::atomic<size_t> bytesToHandle_ = 0;
 
     Neighbourhood neighbourhood_;

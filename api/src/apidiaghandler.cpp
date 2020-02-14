@@ -8,17 +8,6 @@
 
 #include <api_types.h>
 
-// see: deprecated transport.cpp #1008
-constexpr int8_t platform() {
-#ifdef _WIN32
-    return api_diag::Platform::OS_Windows;
-#elif __APPLE__
-    return api_diag::Platform::OS_MacOS;
-#else
-    return api_diag::Platform::OS_Linux;
-#endif
-}
-
 // see: apihandler.cpp #175
 //extern std::string fromByteArray(const cs::PublicKey& key);
 template <typename TArr>
@@ -38,13 +27,57 @@ namespace api_diag {
         : node_(node)
     {}
 
+    void APIDiagHandler::GetActiveNodes(ActiveNodesResult& _return) {
+        general::APIResponse resp;
+        std::vector<cs::PeerData> peers;
+        if (!node_.getKnownPeers(peers)) {
+            resp.__set_code(kError);
+            resp.__set_message("Discovery service is unavailable on this node");
+        }
+        else {
+            std::vector<api_diag::ServerNode> nodes;
+            for (const auto& peer : peers) {
+                api_diag::ServerNode node;
+                node.__set_ip(peer.ip);
+                node.__isset.ip = true;
+                node.__set_port(std::to_string(peer.port));
+                node.__isset.port = true;
+                node.__set_publicKey(peer.id);
+                node.__isset.publicKey = true;
+                node.__set_version(std::to_string(peer.version));
+                node.__isset.version = true;
+                node.__set_platform(std::to_string(peer.platform));
+                node.__isset.platform = true;
+                node.__set_countTrust(0);
+                //node.__set_hash("");
+                node.__set_timeActive(0);
+                node.__set_timeRegistration(0);
+                nodes.push_back(node);
+            }
+            if (!nodes.empty()) {
+                _return.__set_nodes(nodes);
+                _return.__isset.nodes = true;
+            }
+            resp.__set_code(kOk);
+        }
+        _return.__set_result(resp);
+    }
+
+    void APIDiagHandler::GetActiveTransactionsCount(ActiveTransactionsResult& _return) {
+        general::APIResponse resp;
+        resp.__set_code(kOk);
+        _return.__set_result(resp);
+        _return.__set_count(std::to_string(node_.getTotalTransactionsCount()));
+    }
+
+
     void APIDiagHandler::GetTransaction(GetTransactionResponse& _return, const TransactionId& id) {
 
         const auto t = node_.getBlockChain().loadTransaction(csdb::TransactionID(id.sequence, id.index));
         
         general::APIResponse resp;
         if (!t.is_valid()) {
-            resp.__set_code(1); // failed
+            resp.__set_code(kError); // failed
             resp.__set_message("unable to load rewuested transaction");
         }
         else {
@@ -248,6 +281,30 @@ namespace api_diag {
             _return.__set_transaction(data);
         }
         _return.__set_status(resp);
+    }
+
+    void APIDiagHandler::GetNodeInfo(NodeInfoRespone& _return, const NodeInfoRequest& request) {
+        general::APIResponse resp;
+        resp.__set_code(kNotImplemented);
+        _return.__set_result(resp);
+
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        api_diag::NodeInfo info;
+        
+        auto task = [&]() {
+            node_.getNodeInfo(request, info);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] {return done; });
+        }
+
+        _return.__set_info(info);
     }
 
 }

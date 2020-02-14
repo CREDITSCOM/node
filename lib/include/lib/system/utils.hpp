@@ -321,11 +321,11 @@ public:
 
 public:
     ///
-    /// Returns current time point as string representation
+    /// Returns current time point as integer value in milliseconds
     ///
-    static std::string currentTimestamp() {
+    static uint64_t currentTimestamp() {
         auto now = std::chrono::system_clock::now();
-        return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
+        return (uint64_t) std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     }
 
     ///

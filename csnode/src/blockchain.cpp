@@ -256,8 +256,9 @@ void BlockChain::writeGenesisBlock() {
 
     csdebug() << genesis.hash().to_string();
 
-    uint32_t bSize;
-    genesis.to_byte_stream(bSize);
+    //uint32_t bSize;
+    //auto p = genesis.to_byte_stream(bSize);
+    //csdebug() << "Genesis" << cs::Utils::byteStreamToHex(p, bSize);
 }
 
 void BlockChain::iterateOverWallets(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::WalletData&)> func) {
@@ -389,7 +390,7 @@ void BlockChain::removeLastBlock() {
         // just removed pool is valid
 
         if (!(remove_hash == pool.hash())) {
-            cswarning() << kLogPrefix << "Hashes cache is corrupted, storage rescan is required";
+            cswarning() << kLogPrefix << "Hashes cache is corrupted, storage rescan is requiredrequired: last: " << remove_hash.to_string() << ", pool: " << pool.hash().to_string();
             remove_hash = pool.hash();
         }
 
@@ -634,13 +635,13 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
 }
 
 bool BlockChain::applyBlockToCaches(const csdb::Pool& pool) {
-    // Attention!
-    // wallets Ids updated separately, in storeBlock() on normal/sync nodes and in Solver::spawn_next_round() on trusted nodes
-
     if (!walletsCacheUpdater_) {
         cserror() << "apply block to caches: wallets cache updater unitialized";
         return false;
     }
+
+    csdebug() << kLogPrefix << "store block #" << pool.sequence() << " to chain, update wallets ids";
+    updateWalletIds(pool, *walletsCacheUpdater_);
 
     // ATTENTION! Due to undesired side effect trxIndex_ must be updated prior to wallets caches
     // update transactions index
@@ -719,6 +720,11 @@ uint64_t BlockChain::getWalletsCountWithBalance() {
     return count;
 }
 
+uint64_t BlockChain::getWalletsCount() const {
+    std::lock_guard lock(cacheMutex_);
+    return walletsCacheStorage_->getCount();
+}
+
 void BlockChain::getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit) {
     for (auto trIt = cs::TransactionsIterator(*this, address); trIt.isValid(); trIt.next()) {
         if (offset > 0) {
@@ -772,23 +778,9 @@ bool BlockChain::insertNewWalletId(const csdb::Address& newWallAddress, WalletId
     return true;
 }
 
-void BlockChain::addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets) {
-    if (!walletAddress.is_public_key()) {
-        return;
-    }
-
-    if (walletAddress == genesisAddress_) {
-        return;
-    }
-
-    WalletId id{};
-
-    if (getWalletId(walletAddress, id)) {
-        newWallets.emplace_back(csdb::Pool::NewWalletInfo{addressId, id});
-    }
-}
-
 void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
+    csdebug() << kLogPrefix << "store block #" << pool.sequence() << " add new wallets to pool";
+
     csdb::Pool::NewWallets* newWallets = pool.newWallets();
 
     if (!newWallets) {
@@ -798,24 +790,32 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
 
     newWallets->clear();
 
-    csdb::Pool::Transactions& transactions = pool.transactions();
+    std::map<csdb::Address, std::pair<WalletId, csdb::Pool::NewWalletInfo::AddressId>> addrsAndIds;
 
+    csdb::Pool::Transactions& transactions = pool.transactions();
     for (size_t idx = 0; idx < transactions.size(); ++idx) {
-        {
-            csdb::Pool::NewWalletInfo::AddressId addressId = {idx, csdb::Pool::NewWalletInfo::AddressType::AddressIsSource};
-            addNewWalletToPool(transactions[idx].source(), addressId, *newWallets);
-        }
-        {
-            csdb::Pool::NewWalletInfo::AddressId addressId = {idx, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
-            addNewWalletToPool(transactions[idx].target(), addressId, *newWallets);
-        }
+        addrsAndIds[transactions[idx].source()].second = {idx, csdb::Pool::NewWalletInfo::AddressType::AddressIsSource};
+        addrsAndIds[transactions[idx].target()].second = {idx, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
     }
 
     const auto& confidants = pool.confidants();
     size_t confWalletsIndexStart = transactions.size();
     for (size_t i = 0; i < confidants.size(); ++i) {
-        csdb::Pool::NewWalletInfo::AddressId addressId = {confWalletsIndexStart + i, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
-        addNewWalletToPool(csdb::Address::from_public_key(confidants[i]), addressId, *newWallets);
+        addrsAndIds[csdb::Address::from_public_key(confidants[i])].second = {confWalletsIndexStart + i, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
+    }
+
+    addrsAndIds.erase(genesisAddress_);
+
+    {
+        std::lock_guard lock(cacheMutex_);
+        walletIds_->normal().fillIds(addrsAndIds);
+    }
+
+    for (auto& addrAndId : addrsAndIds) {
+        if (!addrAndId.first.is_public_key() || addrAndId.second.first == WalletsIds::kWrongWalletId || addrAndId.first == genesisAddress_) {
+            continue;
+        }
+        newWallets->emplace_back(csdb::Pool::NewWalletInfo{addrAndId.second.second, addrAndId.second.first});
     }
 }
 
@@ -943,20 +943,6 @@ bool BlockChain::findWalletId(const WalletAddress& address, WalletId& id) const 
     return false;
 }
 
-bool BlockChain::getWalletId(const WalletAddress& address, WalletId& id) {
-    if (address.is_wallet_id()) {
-        id = address.wallet_id();
-        return false;
-    }
-    else if (address.is_public_key()) {
-        std::lock_guard lock(cacheMutex_);
-        return walletIds_->normal().get(address, id);
-    }
-
-    cserror() << kLogPrefix << "Wrong address";
-    return false;
-}
-
 bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address& addr) const {
     if (!walletIds_->normal().findaddr(id, addr)) {
         return false;
@@ -1003,19 +989,44 @@ std::string  BlockChain::printWalletCaches() {
         for (size_t k = am.size(); k < 28; ++k) { // 28 positions are covered with " " to align digits
             res += " ";
         }
-        res += wd.delegated_.to_string() + "   ";
-        res += std::to_string(wd.transNum_) + "   ";
-        res += (wd.trxTail_.getLastTransactionId() > 1'000'000'000 ? "No" : std::to_string(wd.trxTail_.getLastTransactionId())) + "   ";
-        res += (wd.lastTransaction_.pool_seq() > 1'000'000'000 ? "No" : std::to_string(wd.lastTransaction_.pool_seq())) +"." + std::to_string(wd.lastTransaction_.index()) + "  ";
-        res += wd.trxTail_.printHeap() + "\n";
-        if (!wd.delegats_.empty()) {
+        auto deleg = wd.delegated_.to_string();
+        res += deleg;
+        //res += std::to_string(wd.transNum_) + "   ";
+        //res += (wd.trxTail_.getLastTransactionId() > 1'000'000'000 ? "No" : std::to_string(wd.trxTail_.getLastTransactionId())) + "   ";
+        //res += (wd.lastTransaction_.pool_seq() > 1'000'000'000 ? "No" : std::to_string(wd.lastTransaction_.pool_seq())) + "." + std::to_string(wd.lastTransaction_.index()) + "  ";
+        //res += wd.trxTail_.printHeap();
+        res += "\n";
+
+        if (wd.delegateSources_ && !wd.delegateSources_->empty()) {
             int delCounter = 0;
-            res += "    Delegats(" + std::to_string(wd.delegats_.size()) + "):" + "\n";
-            for (auto& it : wd.delegats_) {
+            res += "    Delegate Sources(" + std::to_string(wd.delegateSources_->size()) + "):" + "\n";
+            for (auto& it : *wd.delegateSources_) {
                 ++delCounter;
                 res += "        " + std::to_string(counter) + "." + std::to_string(delCounter) + " " + cs::Utils::byteStreamToHex(it.first.data(), it.first.size());
-                res += "    " + it.second.to_string() + "\n";
-
+                int cnt = 0;
+                for (auto& itt : it.second) {
+                    if (cnt > 0) {
+                        res += "                                                                            ";
+                    }
+                    res += "                      " + itt.amount.to_string() + "      " + std::to_string(itt.time) + "\n";
+                    ++cnt;
+                }
+            }
+        }
+        if (wd.delegateTargets_ && !wd.delegateTargets_->empty()) {
+            int delCounter = 0;
+            res += "    Delegate Targets(" + std::to_string(wd.delegateTargets_->size()) + "):" + "\n";
+            for (auto& it : *wd.delegateTargets_) {
+                ++delCounter;
+                res += "        " + std::to_string(counter) + "." + std::to_string(delCounter) + " " + cs::Utils::byteStreamToHex(it.first.data(), it.first.size());
+                int cnt = 0;
+                for (auto& itt : it.second) {
+                    if (cnt > 0) {
+                        res += "                                                                            ";
+                    }
+                    res += "                      " + itt.amount.to_string() + "      " + std::to_string(itt.time) + "\n";
+                    ++cnt;
+                }
             }
         }
         return true;
@@ -1077,7 +1088,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         csdebug() << "----------------------------------------------------------------------------------";
     }
 
-    //printWalletCaches();
+
 
     cs::PublicKeys lastConfidants;
     if (pool_seq > 1) {
@@ -1115,6 +1126,17 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
     csdetails() << kLogPrefix << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
     emit storeBlockEvent(pool);
+    if constexpr (false && (pool.transactions_count() > 0 || pool.sequence() % 10 == 0)) {//log code
+        std::string res = printWalletCaches() + "\nTransactions: \n";
+        csdb::Amount r_cost{ 0 };
+        for (auto it : pool.transactions()) {
+            res += it.id().to_string() + " " + it.source().to_string() + " -> " + it.target().to_string() + " : " + it.amount().to_string() 
+                + ", Counted fee: " + std::to_string(it.counted_fee().to_double()) + ", Max fee: " + std::to_string(it.max_fee().to_double()) + "\n";
+            r_cost += it.counted_fee().to_double();
+        }
+        res += "Round cost: " + pool.roundCost().to_string() + " Counted Round cost: " + r_cost.to_string();
+        csdebug() << res;
+    }
 
     // log cached block
     csdebug() << "----------------------- Defer block #" << pool.sequence() << " until next round ----------------------";
@@ -1372,19 +1394,6 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
             emit alarmBadBlock(pool.sequence());
             return false;
         }
-        // update wallet ids
-        // it should be done before check pool's signature,
-        // because it can change pool's binary representation
-        if (bySync) {
-            // ready-to-record block does not require anything
-            csdebug() << kLogPrefix << "store block #" << poolSequence << " to chain, update wallets ids";
-            updateWalletIds(pool, *walletsCacheUpdater_);
-        }
-        else {
-            csdebug() << kLogPrefix << "store block #" << poolSequence << " add new wallets to pool";
-            addNewWalletsToPool(pool);
-        }
-
 
         // write immediately
         if (recordBlock(pool, false).has_value()) {
@@ -1430,6 +1439,8 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
 
 void BlockChain::testCachedBlocks() {
     csdebug() << kLogPrefix << "test cached blocks";
+
+    cs::Lock lock(cachedBlocksMutex_);
 
     if (cachedBlocks_.empty()) {
         csdebug() << kLogPrefix << "no cached blocks";
