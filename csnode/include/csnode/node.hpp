@@ -276,18 +276,19 @@ public:
     }
 
     /**
-     * Gets known peers obtained by special discovery service
+     * Gets known peers obtained by special discovery service. Caller MUST care about concurrency.
+     * One SHOULD make a call to this from CallsQueue or directly from processorRoutine
      *
      * @author  Alexander Avramenko
      * @date    12.02.2020
      *
-     * @param [in,out]  peers is a placeholder for requested information. Only actual if method returns true.
-     *                  Caller should pass an empty vector to method, otherwise duplicated items are possible
+     * @param [in,out]  nodes   is a placeholder for requested information. Only actual if method
+     *  returns true. Caller should pass an empty vector to method, otherwise duplicated items are
+     *  possible.
      *
-     * @returns True if it succeeds, false if discovery service is unavailable
      */
-
-    bool getKnownPeers(std::vector<cs::PeerData>& peers);
+    
+    void getKnownPeers(std::vector<api_diag::ServerNode>& nodes);
 
     /**
      * Gets node information. Caller MUST care about concurrency.

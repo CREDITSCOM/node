@@ -3656,23 +3656,50 @@ void Node::onRoundTimeElapsed() {
     }
 }
 
-bool Node::getKnownPeers(std::vector<cs::PeerData>& peers) {
-    cs::PeerData item;
-    const auto& own_info = cs::ConfigHolder::instance().config()->getInputEndpoint();
-    if (own_info.ipSpecified) {
-        item.ip = own_info.ip;
-        item.port = own_info.port;
-    }
-    item.id = EncodeBase58(nodeIdKey_.data(), nodeIdKey_.data() + nodeIdKey_.size());
-
-    item.platform = csconnector::connector::platform();
-    item.version = NODE_VERSION;
-
-    peers.push_back(item);
-
+void Node::getKnownPeers(std::vector<api_diag::ServerNode>& nodes) {
+    // assume call from processorRoutine() as mentioned in header comment
+    std::vector<cs::PeerData> peers;
     transport_->getKnownPeers(peers);
-    return true;
+    for (const auto& peer : peers) {
+        api_diag::ServerNode node;
+        node.__set_ip(peer.ip);
+        node.__set_port(std::to_string(peer.port));
+        node.__set_publicKey(peer.id);
+        node.__set_version(std::to_string(peer.version));
+        node.__set_platform(std::to_string(peer.platform));
+        node.__set_countTrust(0);
+        //node.__set_hash(""); // ???
+        node.__set_timeActive(0);
+        node.__set_timeRegistration(0);
+
+        cs::Bytes bytes;
+        if (DecodeBase58(peer.id, bytes)) {
+            cs::PublicKey key;
+            if (key.size() == bytes.size()) {
+                std::copy(bytes.cbegin(), bytes.cend(), key.begin());
+                if (key == nodeIdKey_) {
+                    node.__set_platform(std::to_string(csconnector::connector::platform()));
+                    node.__set_version(std::to_string(NODE_VERSION));
+                }
+
+#if defined(MONITOR_NODE)
+                blockChain_.iterateOverWriters([&](const cs::PublicKey& k, const cs::WalletsCache::TrustedData& d) {
+                    if (k == key) {
+                        node.__set_countTrust(static_cast<int32_t>(d.times_trusted));
+                        // d.times; - (senseless) count to be writer
+                        return false; // stop loop
+                    }
+                    return true;
+                });
+#endif // MONITOR_NODE
+            }
+        }
+
+        nodes.push_back(node);
+    }
+
 }
+
 
 void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info) {
     cs::Sequence sequence = blockChain_.getLastSeq();
