@@ -86,6 +86,7 @@ private:
 
     void checkCachedBlocks();
     void synchroFinished();
+    size_t nextIndex(size_t index) const;
 
 private:
     enum class CounterType {

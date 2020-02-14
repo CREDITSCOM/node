@@ -592,6 +592,11 @@ cs::Sequence cs::PoolSynchronizer::neighboursMaxSequence() const {
 }
 
 void cs::PoolSynchronizer::checkCachedBlocks() {
+    static BlockChain::SequenceInterval interval{}; // cached interval
+    static size_t counter = 0;                      // retry count
+    static size_t index = 0;                        // neighbour index
+    static const size_t maxCounter = 5;             // max retryies count
+
     if (!isSyncroStarted_ || !canRequestFreeBlocks) {
         return;
     }
@@ -602,7 +607,21 @@ void cs::PoolSynchronizer::checkCachedBlocks() {
         return;
     }
 
-    auto& neighbour = neighbours_.front();
+    if (interval != sequences.value()) {
+        interval = sequences.value();
+        counter = 0;
+        index = 0;
+    }
+    else {
+        ++counter;
+
+        if (counter > maxCounter) {
+            index = nextIndex(index);
+            counter = 0;
+        }
+    }
+
+    auto& neighbour = *(std::next(neighbours_.begin(), static_cast<std::ptrdiff_t>(index)));
     auto [begin, end] = sequences.value();
 
     PoolsRequestedSequences seqs;
@@ -635,6 +654,16 @@ void cs::PoolSynchronizer::synchroFinished() {
     requestedSequences_.clear();
 
     csmeta(csdebug) << "Synchro finished";
+}
+
+size_t cs::PoolSynchronizer::nextIndex(size_t index) const {
+    auto count = neighbours_.size();
+
+    if ((index + 1) < count) {
+        return index + 1;
+    }
+
+    return 0;
 }
 
 std::vector<std::pair<cs::PublicKey, cs::Sequence>> cs::PoolSynchronizer::neighbours() const {

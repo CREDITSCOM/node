@@ -31,7 +31,7 @@ public:
     bool contains(cs::Sequence sequence) const;
     bool isEmpty() const;
 
-    // check on isEmpty() before use it
+    // check on isEmpty() before use it, or UB
     cs::Sequence minSequence() const;
     cs::Sequence maxSequence() const;
 
