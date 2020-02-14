@@ -2616,8 +2616,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
                 if (cs::TrustedMask::trustedSize(rPackage.poolMetaInfo().realTrustedMask) > cs::TrustedMask::trustedSize(mask)) {
                     csdebug() << "Current Roundpackage of " << rNum << " will be replaced by new one";
                     auto it = roundPackageCache_.end();
-                    --it;
-                    roundPackageCache_.erase(it);
+                    if (!roundPackageCache_.empty()) {
+                        --it;
+                        roundPackageCache_.erase(it);
+                    }
                     roundPackageCache_.push_back(rPackage);
                     updateRound = true;
                 }
@@ -2798,7 +2800,7 @@ void Node::clearRPCache(cs::RoundNumber rNum) {
         return;
     }
     while (flagg) {
-        auto tmp = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum](cs::RoundPackage& rp) {return rp.roundTable().round == rNum - 5; });
+        auto tmp = std::find_if(roundPackageCache_.begin(), roundPackageCache_.end(), [rNum](cs::RoundPackage& rp) {return rp.roundTable().round <= rNum - 5; });
         if (tmp == roundPackageCache_.end()) {
             break;
         }
