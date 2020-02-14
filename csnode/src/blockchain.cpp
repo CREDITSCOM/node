@@ -804,9 +804,7 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
         addrsAndIds[csdb::Address::from_public_key(confidants[i])].second = {confWalletsIndexStart + i, csdb::Pool::NewWalletInfo::AddressType::AddressIsTarget};
     }
 
-    if (pool.sequence() == 0) {
-        addrsAndIds.erase(genesisAddress_);
-    }
+    addrsAndIds.erase(genesisAddress_);
 
     {
         std::lock_guard lock(cacheMutex_);
