@@ -2,9 +2,7 @@
 
 #include <csdb/pool.hpp>
 
-namespace {
-const std::string dbPath = "/hashdb";
-}
+static const std::string dbPath = "/poolcachedb";
 
 cs::PoolCache::PoolCache(const std::string& path)
 : db_(path + dbPath) {
