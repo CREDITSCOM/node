@@ -865,7 +865,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         BlockChain::setBootstrap(pool.value(), true);
     }
     blockChain_.addNewWalletsToPool(pool.value());
-    if (!blockChain_.storeBlock(pool.value(), false /*by_sync*/)) {
+    if (!blockChain_.storeBlock(pool.value(), cs::PoolStoreType::Created)) {
         cserror() << "NODE> failed to store block in BlockChain";
     }
     else {
@@ -1332,7 +1332,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
         for (auto& b: poolsBlock) {
             if (b.sequence() == last) {
                 cslog() << kLogPrefix_ << "get possible replacement for uncertain block " << WithDelimiters(last);
-                blockChain_.storeBlock(b, true /*by_sync*/);
+                blockChain_.storeBlock(b, cs::PoolStoreType::Created);
             }
         }
     }

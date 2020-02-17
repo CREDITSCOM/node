@@ -1312,7 +1312,7 @@ bool BlockChain::isSpecial(const csdb::Transaction& t) {
     return false;
 }
 
-bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
+bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
     const auto lastSequence = getLastSeq();
     const auto poolSequence = pool.sequence();
     csdebug() << csfunc() << "last #" << lastSequence << ", pool #" << poolSequence;
@@ -1428,7 +1428,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, bool bySync) {
     }
 
     // cache block for future recording
-    cachedBlocks_.emplace(poolSequence, BlockMeta{pool, bySync});
+    cachedBlocks_.emplace(poolSequence, BlockMeta { pool, type });
     csdebug() << kLogPrefix << "cache block #" << poolSequence << " signed by " << pool.signatures().size()
         << " nodes for future (" << cachedBlocks_.size() << " total)";
     cachedBlockEvent(poolSequence);
@@ -1474,7 +1474,7 @@ void BlockChain::testCachedBlocks() {
         if ((*firstBlockInCache).first == lastSeq) {
             // retrieve and use block if it is exactly what we need:
             auto data = (*firstBlockInCache).second;
-            const bool ok = storeBlock(data.pool, data.bySync);
+            const bool ok = storeBlock(data.pool, data.type);
             cachedBlocks_.erase(firstBlockInCache);
 
             if (!ok) {

@@ -16,11 +16,12 @@
 #include <csdb/amount_commission.hpp>
 #include <csdb/pool.hpp>
 #include <csdb/storage.hpp>
-
 #include <csdb/internal/types.hpp>
+
 #include <csnode/nodecore.hpp>
 #include <csnode/multiwallets.hpp>
 #include <csnode/walletsids.hpp>
+
 #include <roundpackage.hpp>
 
 #include <lib/system/concurrent.hpp>
@@ -103,7 +104,7 @@ public:
      *            for future use and will be recorded on time
      */
 
-    bool storeBlock(csdb::Pool& pool, bool bySync);
+    bool storeBlock(csdb::Pool& pool, cs::PoolStoreType type);
 
     /**
      * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool);
@@ -408,7 +409,7 @@ private:
     struct BlockMeta {
         csdb::Pool pool;
         // indicates that block has got by sync, so it is checked & tested in other way than ordinary ones
-        bool bySync;
+        cs::PoolStoreType type;
     };
 
     mutable std::mutex cachedBlocksMutex_;

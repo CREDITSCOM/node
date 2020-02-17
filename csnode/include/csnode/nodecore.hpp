@@ -63,6 +63,11 @@ enum SpoilingConsts : Byte {
     SpoilByPublicKey,
 };
 
+enum class PoolStoreType : cs::Byte {
+    Created,
+    Synced
+};
+
 // all info about round
 struct Characteristic {
     cs::Bytes mask;

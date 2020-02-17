@@ -123,7 +123,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
         }
 
         //TODO: temp switch off testing confirmations in block received by sync; until fix blocks assembled by init trusted on network restart (issue CP-47)
-        if (blockChain_->storeBlock(pool, true)) {
+        if (blockChain_->storeBlock(pool, cs::PoolStoreType::Synced)) {
             blockChain_->testCachedBlocks();
             lastWrittenSequence = blockChain_->getLastSeq();
         }
