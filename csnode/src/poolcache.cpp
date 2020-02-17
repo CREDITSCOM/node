@@ -13,11 +13,12 @@ cs::PoolCache::~PoolCache() {
     db_.close();
 }
 
-void cs::PoolCache::insert(const csdb::Pool& pool) {
-    insert(pool.sequence(), pool.to_binary());
+void cs::PoolCache::insert(const csdb::Pool& pool, PoolStoreType type) {
+    insert(pool.sequence(), pool.to_binary(), type);
 }
 
-void cs::PoolCache::insert(cs::Sequence sequence, const cs::Bytes& bytes) {
+void cs::PoolCache::insert(cs::Sequence sequence, const cs::Bytes& bytes, cs::PoolStoreType type) {
+    type_ = type;
     db_.insert(sequence, bytes);
 }
 
@@ -44,19 +45,68 @@ bool cs::PoolCache::isEmpty() const {
 }
 
 cs::Sequence cs::PoolCache::minSequence() const {
-    return *(sequences_.begin());
+    return (sequences_.begin())->first;
 }
 
 cs::Sequence cs::PoolCache::maxSequence() const {
-    return *(std::prev(sequences_.end()));
+    return std::prev(sequences_.end())->first;
+}
+
+std::pair<csdb::Pool, cs::PoolStoreType> cs::PoolCache::value(cs::Sequence sequence) const {
+    auto bytes = db_.value<cs::Bytes>(sequence);
+    return std::make_pair(csdb::Pool::from_binary(std::move(bytes)), cachedType(sequence));
+}
+
+std::pair<csdb::Pool, cs::PoolStoreType> cs::PoolCache::pop(cs::Sequence sequence) {
+    auto [pool, type] = value(sequence);
+    db_.remove(sequence);
+
+    return std::make_pair(std::move(pool), type);
+}
+
+size_t cs::PoolCache::size() const {
+    return sequences_.size();
+}
+
+size_t cs::PoolCache::sizeSynced() const {
+    return syncedPoolSize_;
+}
+
+size_t cs::PoolCache::sizeCreated() const {
+    return size() - sizeSynced();
+}
+
+void cs::PoolCache::clear() {
+    if (isEmpty()) {
+        return;
+    }
+
+    auto min = minSequence();
+    auto max = maxSequence();
+
+    for (; min <= max; ++min) {
+        remove(min);
+    }
 }
 
 void cs::PoolCache::onInserted(const char* data, size_t size) {
-    sequences_.insert(cs::Lmdb::convert<cs::Sequence>(data, size));
+    if (type_ == cs::PoolStoreType::Synced) {
+        ++syncedPoolSize_;
+    }
+
+    sequences_.emplace(cs::Lmdb::convert<cs::Sequence>(data, size), type_);
 }
 
 void cs::PoolCache::onRemoved(const char* data, size_t size) {
-    sequences_.erase(cs::Lmdb::convert<cs::Sequence>(data, size));
+    const auto iter = sequences_.find(cs::Lmdb::convert<cs::Sequence>(data, size));
+
+    if (iter != sequences_.end()) {
+        if (iter->second == cs::PoolStoreType::Synced) {
+            --syncedPoolSize_;
+        }
+
+        sequences_.erase(iter);
+    }
 }
 
 void cs::PoolCache::onFailed(const cs::LmdbException& exception) {
@@ -70,4 +120,8 @@ void cs::PoolCache::initialization() {
 
     db_.setMapSize(cs::Lmdb::Default1GbMapSize);
     db_.open();
+}
+
+cs::PoolStoreType cs::PoolCache::cachedType(cs::Sequence sequence) const {
+    return sequences_.find(sequence)->second;
 }

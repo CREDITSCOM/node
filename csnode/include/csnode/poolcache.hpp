@@ -1,10 +1,11 @@
 #ifndef POOLCACHE_HPP
 #define POOLCACHE_HPP
 
-#include <set>
+#include <map>
 #include <optional>
 
 #include <lmdb.hpp>
+#include <nodecore.hpp>
 
 namespace csdb {
 class Pool;
@@ -18,8 +19,8 @@ public:
     ~PoolCache();
 
     // add new pool to db
-    void insert(const csdb::Pool& pool);
-    void insert(cs::Sequence sequence, const cs::Bytes& bytes);
+    void insert(const csdb::Pool& pool, cs::PoolStoreType type);
+    void insert(cs::Sequence sequence, const cs::Bytes& bytes, cs::PoolStoreType type);
 
     // removes pool from db
     bool remove(cs::Sequence sequence);
@@ -35,6 +36,23 @@ public:
     cs::Sequence minSequence() const;
     cs::Sequence maxSequence() const;
 
+    // returns value by key
+    std::pair<csdb::Pool, cs::PoolStoreType> value(cs::Sequence sequence) const;
+
+    // returns pool and remove key sequence
+    std::pair<csdb::Pool, cs::PoolStoreType> pop(cs::Sequence sequence);
+
+    // returns all pool cache size
+    size_t size() const;
+
+    // returns synced pools size
+    size_t sizeSynced() const;
+
+    // returns created pools size
+    size_t sizeCreated() const;
+
+    void clear();
+
 private slots:
     void onInserted(const char* data, size_t size);
     void onRemoved(const char* data, size_t size);
@@ -42,8 +60,12 @@ private slots:
 
 private:
     void initialization();
+    cs::PoolStoreType cachedType(cs::Sequence sequence) const;
     
-    std::set<cs::Sequence> sequences_;
+    size_t syncedPoolSize_ = 0;
+    cs::PoolStoreType type_;
+
+    std::map<cs::Sequence, cs::PoolStoreType> sequences_;
     cs::Lmdb db_;
 };
 }
