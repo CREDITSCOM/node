@@ -204,7 +204,7 @@ void cs::PoolSynchronizer::onTimeOut() {
         sync(round);
     }
 
-    if (blockChain_->getCachedBlocksSize() >= kCachedBlocksLimit) {
+    if (blockChain_->getCachedBlocksSizeSynced() >= kCachedBlocksLimit) {
         checkCachedBlocks();
     }
 }

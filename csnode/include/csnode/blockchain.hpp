@@ -21,6 +21,7 @@
 #include <csnode/nodecore.hpp>
 #include <csnode/multiwallets.hpp>
 #include <csnode/walletsids.hpp>
+#include <csnode/poolcache.hpp>
 
 #include <roundpackage.hpp>
 
@@ -187,6 +188,7 @@ public:
      */
 
     std::size_t getCachedBlocksSize() const;
+    std::size_t getCachedBlocksSizeSynced() const;
     void clearBlockCache();
 
     // continuous interval from ... to
@@ -413,7 +415,7 @@ private:
     };
 
     mutable std::mutex cachedBlocksMutex_;
-    std::map<cs::Sequence, BlockMeta> cachedBlocks_;
+    std::unique_ptr<cs::PoolCache> cachedBlocks_;
 
     // block storage to defer storing it in blockchain until confirmation from other nodes got
     // (idea is it is more easy not to store block immediately then to revert it after storing)
@@ -432,8 +434,6 @@ private:
         }
         return 0;
     }
-
-    //uint64_t initUuid() const;
 
     // may be modified once in uuid() method:
     mutable std::atomic<uint64_t> uuid_ = 0;

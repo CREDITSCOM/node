@@ -43,8 +43,8 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
     createCachesPath();
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
     blockHashes_ = std::make_unique<cs::BlockHashes>(cachesPath);
+    cachedBlocks_ = std::make_unique<cs::PoolCache>(cachesPath);
     trxIndex_ = std::make_unique<cs::TransactionsIndex>(*this, cachesPath, recreateIndex);
-
 }
 
 BlockChain::~BlockChain() {}
@@ -1420,7 +1420,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
 
     cs::Lock lock(cachedBlocksMutex_);
 
-    if (cachedBlocks_.count(poolSequence) > 0) {
+    if (cachedBlocks_->contains(poolSequence)) {
         csdebug() << kLogPrefix << "ignore duplicated block #" << poolSequence << " in cache";
         // it is not error, so caller code nothing to do with it
         cachedBlockEvent(poolSequence);
@@ -1428,9 +1428,10 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
     }
 
     // cache block for future recording
-    cachedBlocks_.emplace(poolSequence, BlockMeta { pool, type });
+    cachedBlocks_->insert(pool, type);
+
     csdebug() << kLogPrefix << "cache block #" << poolSequence << " signed by " << pool.signatures().size()
-        << " nodes for future (" << cachedBlocks_.size() << " total)";
+        << " nodes for future (" << cachedBlocks_->size() << " total)";
     cachedBlockEvent(poolSequence);
 
     // cache always successful
@@ -1442,7 +1443,7 @@ void BlockChain::testCachedBlocks() {
 
     cs::Lock lock(cachedBlocksMutex_);
 
-    if (cachedBlocks_.empty()) {
+    if (cachedBlocks_->isEmpty()) {
         csdebug() << kLogPrefix << "no cached blocks";
         return;
     }
@@ -1450,32 +1451,26 @@ void BlockChain::testCachedBlocks() {
     auto lastSeq = getLastSeq() + 1;
 
     // clear unnecessary sequence
-    if (cachedBlocks_.cbegin()->first < lastSeq) {
-        auto it = cachedBlocks_.lower_bound(lastSeq);
-
-        if (it != cachedBlocks_.begin()) {
-            csdebug() << kLogPrefix << "Remove outdated blocks up to #" << (*it).first << " from cache";
-            cachedBlocks_.erase(cachedBlocks_.begin(), it);
-        }
+    if (cachedBlocks_->minSequence() < lastSeq) {
+        csdebug() << kLogPrefix << "Remove outdated blocks up to #" << lastSeq << " from cache";
+        cachedBlocks_->remove(cachedBlocks_->minSequence(), lastSeq - 1);
     }
 
     size_t countStored = 0;
     cs::Sequence fromSeq = lastSeq;
 
-    while (!cachedBlocks_.empty()) {
-
+    while (!cachedBlocks_->isEmpty()) {
         if (stop_) {
             // stop requested while handle cached blocks
             return;
         }
 
-        auto firstBlockInCache = cachedBlocks_.begin();
+        auto firstBlockInCache = cachedBlocks_->minSequence();
 
-        if ((*firstBlockInCache).first == lastSeq) {
+        if (firstBlockInCache == lastSeq) {
             // retrieve and use block if it is exactly what we need:
-            auto data = (*firstBlockInCache).second;
-            const bool ok = storeBlock(data.pool, data.type);
-            cachedBlocks_.erase(firstBlockInCache);
+            auto [data, type] = cachedBlocks_->pop(firstBlockInCache);
+            const bool ok = storeBlock(data, type);
 
             if (!ok) {
                 cserror() << kLogPrefix << "Failed to record cached block to chain, drop it & wait to request again";
@@ -1495,7 +1490,7 @@ void BlockChain::testCachedBlocks() {
         }
         else {
             // stop processing, we have not got required block in cache yet
-            csdebug() << kLogPrefix << "Stop store blocks from cache. Next blocks in cache #" << (*firstBlockInCache).first;
+            csdebug() << kLogPrefix << "Stop store blocks from cache. Next blocks in cache #" << firstBlockInCache;
             break;
         }
     }
@@ -1515,8 +1510,8 @@ std::optional<BlockChain::SequenceInterval> BlockChain::getFreeSpaceBlocks() con
     {
         cs::Lock lock(cachedBlocksMutex_);
 
-        if (!cachedBlocks_.empty()) {
-            sequence = cachedBlocks_.begin()->first;
+        if (!cachedBlocks_->isEmpty()) {
+            sequence = cachedBlocks_->minSequence();
         }
     }
 
@@ -1537,12 +1532,17 @@ const cs::StartReadingBlocksSignal& BlockChain::startReadingBlocksEvent() const 
 
 std::size_t BlockChain::getCachedBlocksSize() const {
     cs::Lock lock(cachedBlocksMutex_);
-    return cachedBlocks_.size();
+    return cachedBlocks_->size();
+}
+
+std::size_t BlockChain::getCachedBlocksSizeSynced() const {
+    cs::Lock lock(cachedBlocksMutex_);
+    return cachedBlocks_->sizeSynced();
 }
 
 void BlockChain::clearBlockCache() {
     cs::Lock lock(cachedBlocksMutex_);
-    cachedBlocks_.clear();
+    cachedBlocks_->clear();
 }
 
 std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const {
@@ -1558,26 +1558,28 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const 
 
     // return at least [next, 0] or [next, currentRoundNumber]:
     std::vector<SequenceInterval> vec{std::make_pair(firstSequence, roundNumber)};
+    auto firstSeq = firstSequence + 1;
 
     // always point to last interval
-    auto firstUpper = cachedBlocks_.upper_bound(firstSequence);
-
-    if (firstUpper != cachedBlocks_.end()) {
-        auto sequence = firstUpper->first;
+    if (cachedBlocks_->contains(firstSeq)) {
+        auto sequence = firstSequence;
+        auto max = cachedBlocks_->maxSequence();
         vec[0].second = sequence - 1;
 
-        while ((++firstUpper) != cachedBlocks_.end()) {
+        while (++firstSeq != max + 1) {
             ++sequence;
-            if (firstUpper->first != sequence) {
-                vec.emplace_back(std::make_pair(sequence, firstUpper->first - 1));
-                sequence = firstUpper->first;
+
+            if (firstSeq != sequence) {
+                vec.emplace_back(std::make_pair(sequence, firstSeq - 1));
+                sequence = firstSeq;
             }
         }
     }
 
     // add last interval [final + 1, end]
-    if (!cachedBlocks_.empty()) {
-        const auto lastCahedBlock = cachedBlocks_.crbegin()->first;
+    if (!cachedBlocks_->isEmpty()) {
+        const auto lastCahedBlock = cachedBlocks_->maxSequence();
+
         if (roundNumber > lastCahedBlock) {
             vec.emplace_back(std::make_pair(lastCahedBlock, roundNumber));
         }
@@ -1646,25 +1648,6 @@ uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
 
     return static_cast<uint32_t>(wallDataPtr->transNum_);
 }
-
-//uint64_t BlockChain::initUuid() const {
-//    // protects from subsequent calls
-//    if (uuid_ != 0) {
-//        return uuid_;
-//    }
-//    // lookup in hashes
-//    if (!blockHashes_->empty()) {
-//        const auto& hashes = blockHashes_->getHashes();
-//        if (hashes.size() > 1) {
-//            const auto tmp = uuidFromHash(hashes[1]);
-//            if (tmp != 0) {
-//                return tmp;
-//            }
-//        }
-//    }
-//    // lookup in chain
-//    return uuidFromBlock(loadBlock(1));
-//}
 
 csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) const {
     std::lock_guard lock(cacheMutex_);
