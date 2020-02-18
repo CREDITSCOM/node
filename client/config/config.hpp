@@ -283,6 +283,8 @@ public:
 
     void swap(Config& config);
 
+    void updateKnownHosts(std::vector<cs::PeerData>&) const;
+
     const EventsReportData& getEventsReportData() const {
         return eventsReport_;
     }
@@ -335,6 +337,7 @@ private:
     std::vector<cs::PublicKey> initialConfidants_;
 
     std::string pathToDb_;
+    std::string hostsFileName_;
 
     cs::PublicKey publicKey_{};
     cs::PrivateKey privateKey_{};

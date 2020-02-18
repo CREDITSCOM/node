@@ -170,7 +170,7 @@ private:
         >
     > PoolCache;
     PoolCache pools_cache;
-    static const size_t cacheSize = 10000;
+    static const size_t cacheSize = 1000;
 
     void pools_cache_insert(const cs::Sequence& seq, const PoolHash &hash, const Pool &pool) {
         if (pools_cache.size() == cacheSize) {

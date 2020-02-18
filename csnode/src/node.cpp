@@ -122,6 +122,12 @@ Node::~Node() {
     delete poolSynchronizer_;
 }
 
+void Node::dumpKnownPeersToFile() {
+    std::vector<cs::PeerData> peers;
+    transport_->getKnownPeers(peers);
+    cs::ConfigHolder::instance().config()->updateKnownHosts(peers);
+}
+
 bool Node::init() {
     auto& initConfidants = cs::ConfigHolder::instance().config()->getInitialConfidants();
     initialConfidants_ = decltype(initialConfidants_)(initConfidants.begin(), initConfidants.end());
@@ -221,6 +227,7 @@ void Node::run() {
 }
 
 void Node::stop() {
+    dumpKnownPeersToFile();
     EventReport::sendRunningStatus(*this, Running::Status::Stop);
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
