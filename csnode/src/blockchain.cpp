@@ -1469,8 +1469,14 @@ void BlockChain::testCachedBlocks() {
 
         if (firstBlockInCache == lastSeq) {
             // retrieve and use block if it is exactly what we need:
-            auto [data, type] = cachedBlocks_->pop(firstBlockInCache);
-            const bool ok = storeBlock(data, type);
+            auto data = cachedBlocks_->pop(firstBlockInCache);
+
+            if (!data.has_value()) {
+                cswarning() << "cached blocks returned not valid pool, stop testing cache";
+                break;
+            }
+
+            const bool ok = storeBlock(data.value().pool, data.value().type);
 
             if (!ok) {
                 cserror() << kLogPrefix << "Failed to record cached block to chain, drop it & wait to request again";
@@ -1486,7 +1492,7 @@ void BlockChain::testCachedBlocks() {
                 fromSeq = lastSeq + 1;
             }
 
-            ++lastSeq;
+            lastSeq = getLastSeq() + 1;
         }
         else {
             // stop processing, we have not got required block in cache yet

@@ -52,16 +52,27 @@ cs::Sequence cs::PoolCache::maxSequence() const {
     return std::prev(sequences_.end())->first;
 }
 
-std::pair<csdb::Pool, cs::PoolStoreType> cs::PoolCache::value(cs::Sequence sequence) const {
+std::optional<cs::PoolCache::Data> cs::PoolCache::value(cs::Sequence sequence) const {
     auto bytes = db_.value<cs::Bytes>(sequence);
-    return std::make_pair(csdb::Pool::from_binary(std::move(bytes)), cachedType(sequence));
+    Data data { csdb::Pool::from_binary(std::move(bytes)), cachedType(sequence) };
+
+    if (data.pool.sequence() != sequence) {
+        return std::nullopt;
+    }
+
+    return std::make_optional(std::move(data));
 }
 
-std::pair<csdb::Pool, cs::PoolStoreType> cs::PoolCache::pop(cs::Sequence sequence) {
-    auto [pool, type] = value(sequence);
+std::optional<cs::PoolCache::Data> cs::PoolCache::pop(cs::Sequence sequence) {
+    auto data = value(sequence);
     db_.remove(sequence);
 
-    return std::make_pair(std::move(pool), type);
+    if (!data.has_value()) {
+        onRemoved(sequence);
+        return std::nullopt;
+    }
+
+    return std::make_optional(std::move(data).value());
 }
 
 size_t cs::PoolCache::size() const {
@@ -98,7 +109,11 @@ void cs::PoolCache::onInserted(const char* data, size_t size) {
 }
 
 void cs::PoolCache::onRemoved(const char* data, size_t size) {
-    const auto iter = sequences_.find(cs::Lmdb::convert<cs::Sequence>(data, size));
+    onRemoved(cs::Lmdb::convert<cs::Sequence>(data, size));
+}
+
+void cs::PoolCache::onRemoved(cs::Sequence sequence) {
+    const auto iter = sequences_.find(sequence);
 
     if (iter != sequences_.end()) {
         if (iter->second == cs::PoolStoreType::Synced) {
@@ -115,7 +130,7 @@ void cs::PoolCache::onFailed(const cs::LmdbException& exception) {
 
 void cs::PoolCache::initialization() {
     cs::Connector::connect(&db_.commited, this, &cs::PoolCache::onInserted);
-    cs::Connector::connect(&db_.removed, this, &cs::PoolCache::onRemoved);
+    cs::Connector::connect(&db_.removed, this, static_cast<void(cs::PoolCache::*)(const char*, size_t)>(&cs::PoolCache::onRemoved));
     cs::Connector::connect(&db_.failed, this, &cs::PoolCache::onFailed);
 
     db_.setMapSize(cs::Lmdb::Default1GbMapSize);

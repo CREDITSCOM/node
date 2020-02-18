@@ -82,13 +82,14 @@ TEST(PoolCache, TestPoolCorrectSerialization) {
     pool.add_transaction(createTestTransaction(1, 100));
     pool.compose();
 
-    cache->insert(1, pool.to_binary(), cs::PoolStoreType::Created);
+    cache->insert(pool, cs::PoolStoreType::Created);
 
-    auto [p, type] = cache->pop(1);
-    ASSERT_EQ(cs::PoolStoreType::Created, type);
+    auto data = cache->pop(10);
+    ASSERT_TRUE(data.has_value());
+    ASSERT_EQ(cs::PoolStoreType::Created, data.value().type);
 
-    ASSERT_EQ(pool.sequence(), p.sequence());
-    ASSERT_EQ(pool.transactions().front().to_binary(), p.transactions().front().to_binary());
+    ASSERT_EQ(pool.sequence(), data.value().pool.sequence());
+    ASSERT_EQ(pool.transactions().front().to_binary(), data.value().pool.transactions().front().to_binary());
 
     ASSERT_TRUE(cache->isEmpty());
 }
@@ -114,7 +115,7 @@ TEST(PoolCache, TestHighLoadPoolSerialization) {
     }
 
     for (const auto& pool : expectedPools) {
-        cache->insert(pool.sequence(), pool.to_binary(), cs::PoolStoreType::Created);
+        cache->insert(pool, cs::PoolStoreType::Created);
     }
 
     std::vector<csdb::Pool> currentPools;
@@ -124,8 +125,9 @@ TEST(PoolCache, TestHighLoadPoolSerialization) {
 
         auto data = cache->value(i);
 
-        ASSERT_EQ(data.first.sequence(), i);
-        currentPools.push_back(data.first);
+        ASSERT_TRUE(data.has_value());
+        ASSERT_EQ(data.value().pool.sequence(), i);
+        currentPools.push_back(data.value().pool);
     }
 
     for (size_t i = 0; i < poolsCount; ++i) {
