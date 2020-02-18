@@ -59,7 +59,7 @@ private:
     // pool sync progress
     bool showSyncronizationProgress(const cs::Sequence lastWrittenSequence) const;
 
-    bool checkActivity(const CounterType counterType);
+    bool checkActivity();
 
     void sendBlock(const Neighbour& neighbour);
     void sendBlock(const Neighbour& neighbour, const PoolsRequestedSequences& sequeces);
@@ -89,10 +89,6 @@ private:
     size_t nextIndex(size_t index) const;
 
 private:
-    enum class CounterType {
-        Timer
-    };
-
     enum class SequenceRemovalAccuracy {
         Exact,
         LowerBound,
@@ -246,16 +242,6 @@ private:
     friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType);
     friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::SequenceRemovalAccuracy);
 };
-
-inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::CounterType type) {
-    switch (type) {
-        case PoolSynchronizer::CounterType::Timer:
-            os << "Timer";
-            break;
-    }
-
-    return os;
-}
 
 inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::SequenceRemovalAccuracy type) {
     switch (type) {

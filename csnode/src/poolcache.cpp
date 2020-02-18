@@ -100,6 +100,39 @@ void cs::PoolCache::clear() {
     }
 }
 
+std::vector<cs::PoolCache::Interval> cs::PoolCache::ranges() const {
+    std::vector<Interval> intervals;
+
+    if (isEmpty()) {
+        return intervals;
+    }
+
+    auto adder = [&](cs::Sequence begin, cs::Sequence end) {
+        intervals.push_back(std::make_pair(begin, end));
+    };
+
+    auto start = minSequence();
+    auto max = maxSequence();
+    auto isFreeSpace = false;
+
+    for (auto value = minSequence(); value <= max; ++value) {
+        if (contains(value)) {
+            if (isFreeSpace) {
+                adder(start, value - 1);
+                isFreeSpace = false;
+            }
+        }
+        else {
+            if (!isFreeSpace) {
+                start = value;
+                isFreeSpace = true;
+            }
+        }
+    }
+
+    return intervals;
+}
+
 void cs::PoolCache::onInserted(const char* data, size_t size) {
     if (type_ == cs::PoolStoreType::Synced) {
         ++syncedPoolSize_;

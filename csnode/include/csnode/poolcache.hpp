@@ -15,6 +15,8 @@ namespace cs {
 // storage for temporary pools received by sync or applyCharacterictic
 class PoolCache {
 public:
+    using Interval = std::pair<cs::Sequence, cs::Sequence>;
+
     struct Data {
         csdb::Pool pool;
         cs::PoolStoreType type;
@@ -57,6 +59,9 @@ public:
     size_t sizeCreated() const;
 
     void clear();
+
+    // returns free spaces at pool caches ranges
+    std::vector<Interval> ranges() const;
 
 private slots:
     void onInserted(const char* data, size_t size);

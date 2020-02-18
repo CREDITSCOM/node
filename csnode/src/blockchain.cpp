@@ -1563,35 +1563,25 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const 
     const auto roundNumber = currentRoundNumber > 0 ? std::max(firstSequence, currentRoundNumber - 1) : 0;
 
     // return at least [next, 0] or [next, currentRoundNumber]:
-    std::vector<SequenceInterval> vec{std::make_pair(firstSequence, roundNumber)};
-    auto firstSeq = firstSequence + 1;
-
-    // always point to last interval
-    if (cachedBlocks_->contains(firstSeq)) {
-        auto sequence = firstSequence;
-        auto max = cachedBlocks_->maxSequence();
-        vec[0].second = sequence - 1;
-
-        while (++firstSeq != max + 1) {
-            ++sequence;
-
-            if (firstSeq != sequence) {
-                vec.emplace_back(std::make_pair(sequence, firstSeq - 1));
-                sequence = firstSeq;
-            }
-        }
+    if (cachedBlocks_->isEmpty()) {
+        return std::vector<SequenceInterval>{ {firstSequence, roundNumber} };
     }
 
-    // add last interval [final + 1, end]
-    if (!cachedBlocks_->isEmpty()) {
-        const auto lastCahedBlock = cachedBlocks_->maxSequence();
+    auto ranges = cachedBlocks_->ranges();
 
-        if (roundNumber > lastCahedBlock) {
-            vec.emplace_back(std::make_pair(lastCahedBlock, roundNumber));
-        }
+    if (ranges.empty()) {
+        return std::vector<SequenceInterval>{ {firstSequence, roundNumber} };
     }
 
-    return vec;
+    if (firstSequence < ranges.front().first) {
+        ranges.front().first = firstSequence;
+    }
+
+    if (ranges.back().second < roundNumber) {
+        ranges.back().second = roundNumber;
+    }
+
+    return ranges;
 }
 
 void BlockChain::setTransactionsFees(TransactionsPacket& packet) {

@@ -138,3 +138,25 @@ TEST(PoolCache, TestHighLoadPoolSerialization) {
         ASSERT_EQ(lhs.to_binary(), rhs.to_binary());
     }
 }
+
+TEST(PoolCache, TestFreeRanges) {
+    auto bytes = []() {
+        return cs::Bytes{0};
+    };
+
+    auto cache = createPoolCache();
+    auto inserter = [&](auto&&... sequences) {
+        (cache->insert(static_cast<cs::Sequence>(sequences), bytes(), cs::PoolStoreType::Created),...);
+    };
+
+    inserter(1, 2, 4, 5, 10, 11, 50, 51);
+
+    std::vector<std::pair<cs::Sequence, cs::Sequence>> expectedRanges = {
+        {3, 3},
+        {6, 9},
+        {12, 49}
+    };
+
+    auto ranges = cache->ranges();
+    ASSERT_EQ(ranges, expectedRanges);
+}
