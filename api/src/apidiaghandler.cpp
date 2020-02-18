@@ -295,5 +295,26 @@ namespace api_diag {
         _return.__set_info(info);
     }
 
+    void APIDiagHandler::SendBootstrap(general::APIResponse& _return, const BootstrapTable& table) {
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        bool success = false;
+
+        auto task = [&]() {
+            success = node_.bootstrap(table.nodes, (uint64_t) table.round);
+            done = true;
+            cv.notify_one();
+        };
+
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+
+        _return.__set_code(success? kOk : kError);
+
+    }
 }
 

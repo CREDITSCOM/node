@@ -21,6 +21,8 @@ namespace api_diag {
 
         void GetNodeInfo(NodeInfoRespone& _return, const NodeInfoRequest& request) override;
 
+        void SendBootstrap(general::APIResponse& _return, const BootstrapTable& table) override;
+
     private:
         Node& node_;
     };

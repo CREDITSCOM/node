@@ -3596,6 +3596,13 @@ void Node::onRoundTimeElapsed() {
     transport_->forEachNeighbour(std::move(callback));
     initBootstrapRP(actualConfidants);
 
+    cslog() << "NODE> Bootstrap available nodes [" << actualConfidants.size() << "]:";
+    for (const auto& item : actualConfidants) {
+        const auto beg = item.data();
+        const auto end = beg + item.size();
+        cslog() << "NODE> " << " - " << EncodeBase58(beg, end) << (item == own_key ? " (me)" : "");
+    }
+
     if (actualConfidants.size() < Consensus::MinTrustedNodes) {
         cslog() << "Not enough confidants with max sequence " << maxGlobalBlock
             << " (" << actualConfidants.size() << ", min " << Consensus::MinTrustedNodes
@@ -3615,13 +3622,6 @@ void Node::onRoundTimeElapsed() {
 
     // do not increment, only "mark" default round start
     subRound_ = 1;
-
-    cslog() << "NODE> Bootstrap available nodes [" << actualConfidants.size() << "]:";
-    for (const auto& item : actualConfidants) {
-        const auto beg = item.data();
-        const auto end = beg + item.size();
-        cslog() << "NODE> " << " - " << EncodeBase58(beg, end) << (item == own_key ? " (me)" : "");
-    }
 
     if (*actualConfidants.cbegin() == own_key) {
 
@@ -3656,6 +3656,66 @@ void Node::onRoundTimeElapsed() {
         const auto end = beg + actualConfidants.cbegin()->size();
         cslog() << "Wait for " << EncodeBase58(beg, end) << " to start round...";
     }
+}
+
+bool Node::bootstrap(const std::vector<std::string>& table, cs::RoundNumber round) {
+    std::set<cs::PublicKey> confidants;
+    for (const auto& s58 : table) {
+        cs::Bytes b58;
+        if (DecodeBase58(s58, b58)) {
+            cs::PublicKey k;
+            std::copy(b58.cbegin(), b58.cend(), k.begin());
+            confidants.insert(k);
+        }
+    }
+    if (confidants.size() < 3) {
+        return false;
+    }
+
+    cslog() << "NODE> Bootstrap available nodes [" << confidants.size() << "]:";
+    for (const auto& item : confidants) {
+        const auto beg = item.data();
+        const auto end = beg + item.size();
+        cslog() << "NODE> " << " - " << EncodeBase58(beg, end);
+    }
+
+    initBootstrapRP(confidants);
+    cs::RoundPackage rp;
+    cs::RoundTable rt;
+    rt.round = std::max(getBlockChain().getLastSeq() + 1, round);
+    for (auto& key : confidants) {
+        rt.confidants.push_back(key);
+    }
+    rp.updateRoundTable(rt);
+    roundPackageCache_.push_back(rp);
+
+    cslog() << "Bootstrap round " << rt.round << "...";
+
+    cs::Bytes bin;
+    cs::ODataStream out(bin);
+    out << uint8_t(confidants.size());
+
+    for (const auto& item : confidants) {
+        out << item;
+    }
+
+    // when we try to start rounds several times, we will not send duplicates
+    auto random = std::random_device{}();
+    out << random;
+
+    auto& conveyer = cs::Conveyer::instance();
+    conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
+
+    sendBroadcast(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bin);
+    if (!isBootstrapRound_) {
+        isBootstrapRound_ = true;
+        cslog() << "NODE> Bootstrap on, sending bootstrap table";
+    }
+
+    onRoundStart(roundPackageCache_.back().roundTable(), true);
+    reviewConveyerHashes();
+
+    return true;
 }
 
 void Node::getKnownPeers(std::vector<api_diag::ServerNode>& nodes) {

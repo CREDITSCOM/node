@@ -302,6 +302,8 @@ public:
 
     void getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info);
 
+    bool bootstrap(const std::vector<std::string>& table, cs::RoundNumber round);
+
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;
     using SmartStageRequestSignal = cs::Signal<void(uint8_t, uint64_t, uint8_t, uint8_t, const cs::PublicKey&)>;
