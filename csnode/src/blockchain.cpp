@@ -1469,8 +1469,14 @@ void BlockChain::testCachedBlocks() {
 
         if (firstBlockInCache == lastSeq) {
             // retrieve and use block if it is exactly what we need:
-            auto [data, type] = cachedBlocks_->pop(firstBlockInCache);
-            const bool ok = storeBlock(data, type);
+            auto data = cachedBlocks_->pop(firstBlockInCache);
+
+            if (!data.has_value()) {
+                cswarning() << "cached blocks returned not valid pool, stop testing cache";
+                break;
+            }
+
+            const bool ok = storeBlock(data.value().pool, data.value().type);
 
             if (!ok) {
                 cserror() << kLogPrefix << "Failed to record cached block to chain, drop it & wait to request again";
@@ -1486,7 +1492,7 @@ void BlockChain::testCachedBlocks() {
                 fromSeq = lastSeq + 1;
             }
 
-            ++lastSeq;
+            lastSeq = getLastSeq() + 1;
         }
         else {
             // stop processing, we have not got required block in cache yet
@@ -1557,35 +1563,25 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const 
     const auto roundNumber = currentRoundNumber > 0 ? std::max(firstSequence, currentRoundNumber - 1) : 0;
 
     // return at least [next, 0] or [next, currentRoundNumber]:
-    std::vector<SequenceInterval> vec{std::make_pair(firstSequence, roundNumber)};
-    auto firstSeq = firstSequence + 1;
-
-    // always point to last interval
-    if (cachedBlocks_->contains(firstSeq)) {
-        auto sequence = firstSequence;
-        auto max = cachedBlocks_->maxSequence();
-        vec[0].second = sequence - 1;
-
-        while (++firstSeq != max + 1) {
-            ++sequence;
-
-            if (firstSeq != sequence) {
-                vec.emplace_back(std::make_pair(sequence, firstSeq - 1));
-                sequence = firstSeq;
-            }
-        }
+    if (cachedBlocks_->isEmpty()) {
+        return std::vector<SequenceInterval>{ {firstSequence, roundNumber} };
     }
 
-    // add last interval [final + 1, end]
-    if (!cachedBlocks_->isEmpty()) {
-        const auto lastCahedBlock = cachedBlocks_->maxSequence();
+    auto ranges = cachedBlocks_->ranges();
 
-        if (roundNumber > lastCahedBlock) {
-            vec.emplace_back(std::make_pair(lastCahedBlock, roundNumber));
-        }
+    if (ranges.empty()) {
+        return std::vector<SequenceInterval>{ {firstSequence, roundNumber} };
     }
 
-    return vec;
+    if (firstSequence < ranges.front().first) {
+        ranges.front().first = firstSequence;
+    }
+
+    if (ranges.back().second < roundNumber) {
+        ranges.back().second = roundNumber;
+    }
+
+    return ranges;
 }
 
 void BlockChain::setTransactionsFees(TransactionsPacket& packet) {

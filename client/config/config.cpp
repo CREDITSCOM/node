@@ -205,6 +205,17 @@ void Config::swap(Config& config) {
     (*this) = std::move(temp);
 }
 
+void Config::updateKnownHosts(std::vector<cs::PeerData>& peers) const {
+  if (peers.empty()) return;
+
+  std::ofstream f(hostsFileName_);
+  if (!f.is_open()) return;
+
+  for (auto& p : peers) {
+    f << p.ip << ":" << p.port << " " << p.id << std::endl;
+  }
+}
+
 Config::Config(const ConveyerData& conveyerData)
 : conveyerData_(conveyerData) {
 }
@@ -763,7 +774,7 @@ Config Config::readFromFile(const std::string& fileName) {
             result.symmetric_ = true;
         }
 
-        const auto hostsFileName = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
+        result.hostsFileName_ = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
 
         std::string initTrustedFileName;
         try {
@@ -775,10 +786,10 @@ Config Config::readFromFile(const std::string& fileName) {
         std::ifstream hostsFile;
         hostsFile.exceptions(std::ifstream::failbit);
         try {
-            hostsFile.open(hostsFileName);
+            hostsFile.open(result.hostsFileName_);
         }
         catch (std::ios_base::failure& fail) {
-            cserror() << "failed to open file " << hostsFileName;
+            cserror() << "failed to open file " << result.hostsFileName_;
             throw fail;
         }
         hostsFile.exceptions(std::ifstream::goodbit);

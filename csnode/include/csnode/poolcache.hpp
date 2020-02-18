@@ -15,6 +15,13 @@ namespace cs {
 // storage for temporary pools received by sync or applyCharacterictic
 class PoolCache {
 public:
+    using Interval = std::pair<cs::Sequence, cs::Sequence>;
+
+    struct Data {
+        csdb::Pool pool;
+        cs::PoolStoreType type;
+    };
+
     explicit PoolCache(const std::string& path);
     ~PoolCache();
 
@@ -37,10 +44,10 @@ public:
     cs::Sequence maxSequence() const;
 
     // returns value by key
-    std::pair<csdb::Pool, cs::PoolStoreType> value(cs::Sequence sequence) const;
+    std::optional<Data> value(cs::Sequence sequence) const;
 
     // returns pool and remove key sequence
-    std::pair<csdb::Pool, cs::PoolStoreType> pop(cs::Sequence sequence);
+    std::optional<Data> pop(cs::Sequence sequence);
 
     // returns all pool cache size
     size_t size() const;
@@ -53,9 +60,13 @@ public:
 
     void clear();
 
+    // returns free spaces at pool caches ranges
+    std::vector<Interval> ranges() const;
+
 private slots:
     void onInserted(const char* data, size_t size);
     void onRemoved(const char* data, size_t size);
+    void onRemoved(cs::Sequence sequence);
     void onFailed(const cs::LmdbException& exception);
 
 private:
