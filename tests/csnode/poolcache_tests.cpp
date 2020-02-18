@@ -92,3 +92,47 @@ TEST(PoolCache, TestPoolCorrectSerialization) {
 
     ASSERT_TRUE(cache->isEmpty());
 }
+
+static csdb::Pool createPool(cs::Sequence sequence, uint8_t amount = 100) {
+    csdb::Pool pool;
+
+    pool.set_sequence(sequence);
+    pool.add_transaction(createTestTransaction(static_cast<int64_t>(sequence), amount));
+    pool.compose();
+
+    return pool;
+}
+
+TEST(PoolCache, TestHighLoadPoolSerialization) {
+    const static size_t poolsCount = 10000;
+    auto cache = createPoolCache();
+
+    std::vector<csdb::Pool> expectedPools;
+
+    for (size_t i = 0; i < poolsCount; ++i) {
+        expectedPools.push_back(createPool(i));
+    }
+
+    for (const auto& pool : expectedPools) {
+        cache->insert(pool.sequence(), pool.to_binary(), cs::PoolStoreType::Created);
+    }
+
+    std::vector<csdb::Pool> currentPools;
+
+    for (size_t i = 0; i < poolsCount; ++i) {
+        ASSERT_TRUE(cache->contains(i));
+
+        auto data = cache->value(i);
+
+        ASSERT_EQ(data.first.sequence(), i);
+        currentPools.push_back(data.first);
+    }
+
+    for (size_t i = 0; i < poolsCount; ++i) {
+        auto& lhs = expectedPools[i];
+        auto& rhs = currentPools[i];
+
+        ASSERT_EQ(lhs.sequence(), rhs.sequence());
+        ASSERT_EQ(lhs.to_binary(), rhs.to_binary());
+    }
+}
