@@ -86,6 +86,7 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 
 void cs::PoolSynchronizer::syncLastPool() {
     if (neighbours_.empty()) {
+        csmeta(csdebug) << "no actual neighbours to request the last block";
         return;
     }
 
@@ -140,6 +141,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
 
 void cs::PoolSynchronizer::sendBlockRequest() {
     if (neighbours_.empty()) {
+        csmeta(csdebug) << "no actual neighbours to request required blocks";
         return;
     }
 
