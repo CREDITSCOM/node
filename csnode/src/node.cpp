@@ -1251,6 +1251,7 @@ void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::Ro
     cs::Timer::singleShot(static_cast<int>(cs::NeighboursRequestDelay + requestStep), cs::RunPolicy::CallQueuePolicy, requestClosure);
 }
 
+
 void Node::sendPacketHashesReply(const cs::PacketsVector& packets, const cs::RoundNumber round, const cs::PublicKey& target) {
     if (packets.empty()) {
         return;
@@ -1281,20 +1282,17 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     }
 
     const std::size_t reserveSize = sequences.size();
-    const std::size_t possibleMaxSize = cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
-    const std::size_t answerSize = possibleMaxSize > reserveSize ? reserveSize : possibleMaxSize;
 
     cs::PoolsBlock poolsBlock;
-    poolsBlock.reserve(answerSize);
+    poolsBlock.reserve(reserveSize);
 
     auto sendReply = [&] {
         sendBlockReply(poolsBlock, sender);
         poolsBlock.clear();
     };
 
-    for (size_t i = 0; i < answerSize; ++i) {
-        auto sequence = sequences[i];
-        auto pool = blockChain_.loadBlock(sequence);
+    for (auto& sequence : sequences) {
+        csdb::Pool pool = blockChain_.loadBlock(sequence);
 
         if (pool.is_valid()) {
             poolsBlock.push_back(std::move(pool));
