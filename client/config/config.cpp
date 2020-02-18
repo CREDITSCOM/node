@@ -206,6 +206,8 @@ void Config::swap(Config& config) {
 }
 
 void Config::updateKnownHosts(std::vector<cs::PeerData>& peers) const {
+  if (peers.empty()) return;
+
   std::ofstream f(hostsFileName_);
   if (!f.is_open()) return;
 
