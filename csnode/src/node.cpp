@@ -378,6 +378,7 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
     }
 
     roundTable.round = rNum;
+    confirmationList_.remove(rNum);
 
     cs::Conveyer::instance().updateRoundTable(rNum, roundTable);
     onRoundStart(roundTable, false);

@@ -34,7 +34,7 @@ void ConfirmationList::remove(cs::RoundNumber rNum) {
         csdebug() << "The confirmation of R-" << rNum << " was successfully erased, conf.size = " << confirmationList_.size();
     }
     else {
-        csdebug() << "The confirmation of R-" << rNum << " was not found";
+        csdebug() << "Unable erase the confirmation of R-" << rNum << " was not found";
     }
 }
 
