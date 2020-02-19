@@ -413,7 +413,12 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
         }
 
         auto blocksCount = (seqLast >= seqToRemove) ? (seqLast - seqToRemove + 1) : 0;
-        cslog() << "start remove " << blocksCount << " blocks: " << seqToRemove << " .. " << seqLast;
+        if(seqToRemove <= seqLast) {
+            cslog() << "start remove " << blocksCount << " blocks: " << seqToRemove << " .. " << seqLast;
+        }
+        else {
+            cslog() << "nothing to remove over " << opt.newBlockchainTop << ", current last block is " << seqLast;
+        }
 
         while (seqToRemove <= seqLast) {
             cs::Bytes poolBinary;

@@ -277,8 +277,10 @@ int main(int argc, char* argv[]) {
 
     if (vm.count(argSetBCTop) > 0) {
         node.stop();
+        node.destroy();
         logger::cleanup();
         std::_Exit(EXIT_SUCCESS);
+        //return 0;
     }
 
     std::cout << "Running Node\n";
@@ -293,4 +295,5 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Logger cleaned" << std::endl;
     std::_Exit(EXIT_SUCCESS);
+    //return 0;
 }
