@@ -399,3 +399,7 @@ void Transport::getKnownPeers(std::vector<cs::PeerData>& result) {
         result.push_back(peerData);
     }
 }
+
+void Transport::addToNeighbours(const std::set<cs::PublicKey>& keys) {
+    neighbourhood_.add(keys);
+}
