@@ -227,11 +227,14 @@ namespace api_diag {
                                 fld_data.__set_integer(v);
                                 using namespace cs::trx_uf::sp;
                                 if (fid == delegated) {
-                                    if (v == de::legate) {
+                                    if (v == de::legate || v >= de::legate_min_utc) {
                                         tt = TT_Delegation;
                                     }
                                     else if (v == de::legated_withdraw) {
                                         tt = TT_RevokeDelegation;
+                                    }
+                                    else if (v == de::legated_release) {
+                                        tt = TT_Release;
                                     }
                                 }
                             }

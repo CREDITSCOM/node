@@ -317,6 +317,7 @@ static void fillTransInfoWithOpData(const SmartOp& op, TransInfo& ti) {
 }
 
 api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& transaction) {
+    using namespace cs::trx_uf;
     api::SealedTransaction result;
     const csdb::Amount amount = transaction.amount();
     csdb::Currency currency = transaction.currency();
@@ -345,7 +346,6 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     result.trxn.poolNumber = static_cast<int64_t>(transaction.id().pool_seq());
 
     if (is_smart(transaction)) {
-        using namespace cs::trx_uf;
         auto sci = cs::Serializer::deserialize<api::SmartContractInvocation>(transaction.user_field(deploy::Code).value<std::string>());
         bool isToken = false;
 
@@ -353,7 +353,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         result.trxn.__set_smartInfo(api::SmartTransInfo{});
 
         if (is_smart_deploy(sci)) {
-            result.trxn.type = api::TransactionType::TT_SmartDeploy;
+            result.trxn.type = api::TransactionType::TT_ContractDeploy;
             tm_.loadTokenInfo([&isToken, &target, &result](const TokensMap& tokens, const HoldersMap&) {
                 auto it = tokens.find(target);
                 if (it != tokens.end()) {
@@ -363,6 +363,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
                     dti.code = it->second.symbol;
                     dti.tokenStandard = int32_t(it->second.tokenStandard);
                     result.trxn.smartInfo.__set_v_tokenDeploy(dti);
+                    result.trxn.type = api::TransactionType::TT_TokenDeploy;
                 }
             });
 
@@ -375,7 +376,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         }
         else {
             bool isTransfer = TokensMaster::isTransfer(sci.method, sci.params);
-            result.trxn.type = api::TransactionType::TT_SmartExecute;
+            result.trxn.type = api::TransactionType::TT_ContractCall;
             if (isTransfer) {
                 tm_.loadTokenInfo([&isToken, &isTransfer, &target, &result](const TokensMap& tokens, const HoldersMap&) {
                     auto it = tokens.find(target);
@@ -384,6 +385,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
                         api::TokenTransferTransInfo tti;
                         tti.code = it->second.symbol;
                         result.trxn.smartInfo.__set_v_tokenTransfer(tti);
+                        result.trxn.type = api::TransactionType::TT_TokenTransfer;
                     }
                     else
                         isTransfer = false;
@@ -415,15 +417,15 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         result.trxn.__set_smartContract(sci);
     }
     else if (is_smart_state(transaction)) {
-        result.trxn.type = api::TransactionType::TT_SmartState;
+        result.trxn.type = api::TransactionType::TT_ContractState;
         api::SmartStateTransInfo sti;
         sti.success = cs::SmartContracts::is_state_updated(transaction);
-        sti.executionFee = convertAmount(transaction.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>());
+        sti.executionFee = convertAmount(transaction.user_field(new_state::Fee).value<csdb::Amount>());
         cs::SmartContractRef scr;
-        scr.from_user_field(transaction.user_field(cs::trx_uf::new_state::RefStart));
+        scr.from_user_field(transaction.user_field(new_state::RefStart));
         sti.startTransaction = convert_transaction_id(scr.getTransactionID());
 
-        auto fld = transaction.user_field(cs::trx_uf::new_state::RetVal);
+        auto fld = transaction.user_field(new_state::RetVal);
         if (fld.is_valid()) {
             auto retVal = fld.value<std::string>();
             auto variant = cs::Serializer::deserialize<::general::Variant>(std::move(retVal));
@@ -443,12 +445,12 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         result.trxn.__isset.smartInfo = true;
     }
     else {
-        result.trxn.type = api::TransactionType::TT_Normal;
-        auto ufd = transaction.user_field(cs::trx_uf::ordinary::Text);
+        result.trxn.type = api::TransactionType::TT_Transfer;
+        auto ufd = transaction.user_field(ordinary::Text);
         if (ufd.is_valid()) {
             result.trxn.__set_userFields(ufd.value<std::string>());
         }
-        auto ufdDel = transaction.user_field(cs::trx_uf::sp::delegated);
+        auto ufdDel = transaction.user_field(sp::delegated);
         if (ufdDel.is_valid()) {
             cs::Bytes msg;
             cs::ODataStream stream(msg);
@@ -457,9 +459,26 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
             stream << uint8_t(1U); //uf number
             stream << uint32_t(5U); //uf ID
             stream << uint8_t(1U); //type = int
-            stream << uint64_t(ufdDel.value<uint64_t>()); // value
+            const uint64_t opcode = ufdDel.value<uint64_t>();
+            stream << opcode; // value
             std::string tmp((char*)(msg.data()), msg.size());
             result.trxn.__set_userFields(tmp);
+            if (opcode == sp::de::legate || opcode >= sp::de::legate_min_utc) {
+                result.trxn.type = api::TransactionType::TT_Delegation;
+            }
+            else {
+                switch (opcode) {
+                case sp::de::legated_withdraw:
+                    result.trxn.type = api::TransactionType::TT_RevokeDelegation;
+                    break;
+                case sp::de::legated_release:
+                    result.trxn.type = api::TransactionType::TT_Release;
+                    break;
+                default:
+                    // actually unreachable
+                    break;
+                }
+            }
         }
     }
 
