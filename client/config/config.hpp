@@ -52,7 +52,7 @@ enum BootstrapType {
 };
 
 struct PoolSyncData {
-    cs::Sequence blockPoolsCount = 25;               // max block count in one request: cannot be 0
+    cs::Sequence blockPoolsCount = 100;              // max block count in one request: cannot be 0
     uint16_t sequencesVerificationFrequency = 350;   // sequences received verification frequency : 0-never; 1-once per round: other- in ms;
 };
 
@@ -283,6 +283,8 @@ public:
 
     void swap(Config& config);
 
+    void updateKnownHosts(std::vector<cs::PeerData>&) const;
+
     const EventsReportData& getEventsReportData() const {
         return eventsReport_;
     }
@@ -335,6 +337,7 @@ private:
     std::vector<cs::PublicKey> initialConfidants_;
 
     std::string pathToDb_;
+    std::string hostsFileName_;
 
     cs::PublicKey publicKey_{};
     cs::PrivateKey privateKey_{};

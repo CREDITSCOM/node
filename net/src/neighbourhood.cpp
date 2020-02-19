@@ -213,6 +213,14 @@ bool Neighbourhood::contains(const cs::PublicKey& neighbour) const {
     return neighbours_.find(neighbour) != neighbours_.end();
 }
 
+void Neighbourhood::add(const std::set<cs::PublicKey>& keys) {
+    for (auto& key : keys) {
+        if (!contains(key)) {
+            sendVersionRequest(key);
+        }
+    }
+}
+
 template<class... Args>
 Packet Neighbourhood::formPacket(BaseFlags flags, NetworkCommand cmd, Args&&... args) {
     cs::Bytes packetBytes;

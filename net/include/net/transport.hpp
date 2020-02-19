@@ -64,6 +64,7 @@ public:
     uint32_t getMaxNeighbours() const;
     void forEachNeighbour(Neighbourhood::NeighboursCallback);
     bool hasNeighbour(const cs::PublicKey&) const;
+    void addToNeighbours(const std::set<cs::PublicKey>&);
 
     void getKnownPeers(std::vector<cs::PeerData>&);
 

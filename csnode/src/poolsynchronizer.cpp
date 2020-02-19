@@ -86,6 +86,7 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 
 void cs::PoolSynchronizer::syncLastPool() {
     if (neighbours_.empty()) {
+        csmeta(csdebug) << "no actual neighbours to request the last block";
         return;
     }
 
@@ -140,6 +141,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
 
 void cs::PoolSynchronizer::sendBlockRequest() {
     if (neighbours_.empty()) {
+        csmeta(csdebug) << "no actual neighbours to request required blocks";
         return;
     }
 
@@ -186,7 +188,7 @@ void cs::PoolSynchronizer::onTimeOut() {
 
     if (!isAvailable) {
         csmeta(csdetails) << "OnTimeOut: " << cs::ConfigHolder::instance().config()->getPoolSyncSettings().sequencesVerificationFrequency;
-        isAvailable = checkActivity(cs::PoolSynchronizer::CounterType::Timer);
+        isAvailable = checkActivity();
     }
 
     if (isAvailable) {
@@ -329,27 +331,20 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const cs::Sequence lastWri
     return remaining == 0;
 }
 
-bool cs::PoolSynchronizer::checkActivity(const CounterType counterType) {
+bool cs::PoolSynchronizer::checkActivity() {
     if (neighbours_.empty()) {
         csmeta(csdetails) << "Neighbours count is 0";
         return false;
     }
 
-    csmeta(csdetails) << counterType;
     bool isNeedRequest = false;
 
-    switch (counterType) {
-        case CounterType::Timer:
-            for (auto& neighbour : neighbours_) {
-                isNeedRequest = neighbour.sequences().empty();
+    for (auto& neighbour : neighbours_) {
+        isNeedRequest = neighbour.sequences().empty();
 
-                if (isNeedRequest) {
-                    break;
-                }
-            }
-
-            csmeta(csdetails) << "isNeedRequest: " << isNeedRequest;
+        if (isNeedRequest) {
             break;
+        }
     }
 
     return isNeedRequest;
