@@ -38,6 +38,7 @@ public:
     void forEachNeighbour(NeighboursCallback);
     uint32_t getNeighboursCount() const;
     bool contains(const cs::PublicKey& neighbour) const;
+    void add(const std::set<cs::PublicKey>&);
 
 public signals:
     NeighbourPingSignal neighbourPingReceived;

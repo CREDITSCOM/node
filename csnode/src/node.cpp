@@ -3607,6 +3607,8 @@ void Node::onRoundTimeElapsed() {
         cslog() << "Not enough confidants with max sequence " << maxGlobalBlock
             << " (" << actualConfidants.size() << ", min " << Consensus::MinTrustedNodes
             << " required). Wait until syncro finished or more bootstrap nodes to start...";
+
+        transport_->addToNeighbours(initialConfidants_);
         return;
     }
 

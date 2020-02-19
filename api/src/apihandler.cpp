@@ -445,8 +445,22 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     else {
         result.trxn.type = api::TransactionType::TT_Normal;
         auto ufd = transaction.user_field(cs::trx_uf::ordinary::Text);
-        if (ufd.is_valid())
+        if (ufd.is_valid()) {
             result.trxn.__set_userFields(ufd.value<std::string>());
+        }
+        auto ufdDel = transaction.user_field(cs::trx_uf::sp::delegated);
+        if (ufdDel.is_valid()) {
+            cs::Bytes msg;
+            cs::ODataStream stream(msg);
+            //Aufmerksamkeit!!! Bemerken, bitte, dass dieser Codeteil nur fuer die Einuserfieldstransactionen leistungsfaehig ist.
+            stream << uint8_t(0U); //different uf flagg
+            stream << uint8_t(1U); //uf number
+            stream << uint32_t(5U); //uf ID
+            stream << uint8_t(1U); //type = int
+            stream << uint64_t(ufdDel.value<uint64_t>()); // value
+            std::string tmp((char*)(msg.data()), msg.size());
+            result.trxn.__set_userFields(tmp);
+        }
     }
 
     // fill ExtraFee
@@ -559,7 +573,9 @@ std::vector<api::SealedTransaction> APIHandler::extractTransactions(const csdb::
     }
 
     for (int64_t index = offset; index < (offset + limit); ++index) {
-        result.push_back(convertTransaction(pool.transaction(static_cast<size_t>(index))));
+        auto tr = pool.transaction(static_cast<size_t>(index));
+        tr.set_time(BlockChain::getBlockTime(pool));
+        result.push_back(convertTransaction(tr));
     }
 
     return result;
