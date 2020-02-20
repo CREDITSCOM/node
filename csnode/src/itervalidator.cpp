@@ -355,7 +355,6 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
 
     csdb::UserField fld;
     fld = t.user_field(trx_uf::sp::delegated);
-    bool notCheck = false;
     bool wDel = true;
     if (fld.is_valid()) {
         if (t.amount() < Consensus::MinStakeDelegated) {
@@ -427,9 +426,6 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
                     if (sc.is_known_smart_contract(t.target())) {
                         rc = kTransactionProhibited;
                     }
-                }
-                if (!rc) {
-                    notCheck = true;
                 }
                 break;
 
