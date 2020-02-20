@@ -37,19 +37,75 @@ void cs::PoolCache::remove(cs::Sequence from, cs::Sequence to) {
 }
 
 bool cs::PoolCache::contains(cs::Sequence sequence) const {
-    return sequences_.find(sequence) != sequences_.end();
+    auto result = syncedSequences_.find(sequence) != syncedSequences_.end();
+
+    if (result) {
+        return result;
+    }
+
+    return createdSequences_.find(sequence) != createdSequences_.end();
 }
 
 bool cs::PoolCache::isEmpty() const {
-    return sequences_.empty();
+    return syncedSequences_.empty() && createdSequences_.empty();
+}
+
+bool cs::PoolCache::isSyncedEmpty() const {
+    return syncedSequences_.empty();
+}
+
+bool cs::PoolCache::isCreatedEmpty() const {
+    return createdSequences_.empty();
 }
 
 cs::Sequence cs::PoolCache::minSequence() const {
-    return (sequences_.begin())->first;
+    cs::Sequence minSynced = 0;
+    cs::Sequence minCreated = 0;
+
+    if (!syncedSequences_.empty()) {
+        minSynced = *(syncedSequences_.begin());
+    }
+
+    if (!createdSequences_.empty()) {
+        minCreated = *(createdSequences_.begin());
+    }
+
+    if (minSynced == 0 && minCreated != 0) {
+        return minCreated;
+    }
+    else if (minSynced !=0 && minCreated == 0) {
+        return minSynced;
+    }
+    else {
+        return std::min(minSynced, minCreated);
+    }
 }
 
 cs::Sequence cs::PoolCache::maxSequence() const {
-    return std::prev(sequences_.end())->first;
+    cs::Sequence maxSynced = 0;
+    cs::Sequence maxCreated = 0;
+
+    if (!syncedSequences_.empty()) {
+        maxSynced = *std::prev((syncedSequences_.end()));
+    }
+
+    if (!createdSequences_.empty()) {
+        maxCreated = *std::prev((createdSequences_.end()));
+    }
+
+    if (maxSynced == 0 && maxCreated != 0) {
+        return maxCreated;
+    }
+    else if (maxSynced !=0 && maxCreated == 0) {
+        return maxSynced;
+    }
+    else {
+        return std::max(maxSynced, maxCreated);
+    }
+}
+
+cs::Sequence cs::PoolCache::maxSyncedSequence() const {
+    return *std::prev(syncedSequences_.end());
 }
 
 std::optional<cs::PoolCache::Data> cs::PoolCache::value(cs::Sequence sequence) const {
@@ -76,15 +132,15 @@ std::optional<cs::PoolCache::Data> cs::PoolCache::pop(cs::Sequence sequence) {
 }
 
 size_t cs::PoolCache::size() const {
-    return sequences_.size();
+    return syncedSequences_.size() + createdSequences_.size();
 }
 
 size_t cs::PoolCache::sizeSynced() const {
-    return syncedPoolSize_;
+    return syncedSequences_.size();
 }
 
 size_t cs::PoolCache::sizeCreated() const {
-    return size() - sizeSynced();
+    return createdSequences_.size();
 }
 
 void cs::PoolCache::clear() {
@@ -112,7 +168,7 @@ std::vector<cs::PoolCache::Interval> cs::PoolCache::ranges() const {
     };
 
     auto start = minSequence();
-    auto max = maxSequence();
+    auto max = maxSyncedSequence();
     auto isFreeSpace = false;
 
     for (auto value = minSequence(); value <= max; ++value) {
@@ -134,11 +190,8 @@ std::vector<cs::PoolCache::Interval> cs::PoolCache::ranges() const {
 }
 
 void cs::PoolCache::onInserted(const char* data, size_t size) {
-    if (type_ == cs::PoolStoreType::Synced) {
-        ++syncedPoolSize_;
-    }
-
-    sequences_.emplace(cs::Lmdb::convert<cs::Sequence>(data, size), type_);
+    const auto seq = cs::Lmdb::convert<cs::Sequence>(data, size);
+    type_ == cs::PoolStoreType::Synced ? syncedSequences_.emplace(seq) : createdSequences_.emplace(seq);
 }
 
 void cs::PoolCache::onRemoved(const char* data, size_t size) {
@@ -146,15 +199,8 @@ void cs::PoolCache::onRemoved(const char* data, size_t size) {
 }
 
 void cs::PoolCache::onRemoved(cs::Sequence sequence) {
-    const auto iter = sequences_.find(sequence);
-
-    if (iter != sequences_.end()) {
-        if (iter->second == cs::PoolStoreType::Synced) {
-            --syncedPoolSize_;
-        }
-
-        sequences_.erase(iter);
-    }
+    syncedSequences_.erase(sequence);
+    createdSequences_.erase(sequence);
 }
 
 void cs::PoolCache::onFailed(const cs::LmdbException& exception) {
@@ -170,6 +216,12 @@ void cs::PoolCache::initialization() {
     db_.open();
 }
 
-cs::PoolStoreType cs::PoolCache::cachedType(cs::Sequence sequence) const {
-    return sequences_.find(sequence)->second;
+cs::PoolStoreType cs::PoolCache::cachedType(Sequence sequence) const {
+    auto iter = syncedSequences_.find(sequence);
+
+    if (iter != syncedSequences_.end()) {
+        return cs::PoolStoreType::Synced;
+    }
+
+    return cs::PoolStoreType::Created;
 }

@@ -1,7 +1,7 @@
 #ifndef POOLCACHE_HPP
 #define POOLCACHE_HPP
 
-#include <map>
+#include <set>
 #include <optional>
 
 #include <lmdb.hpp>
@@ -39,9 +39,13 @@ public:
     bool contains(cs::Sequence sequence) const;
     bool isEmpty() const;
 
+    bool isSyncedEmpty() const;
+    bool isCreatedEmpty() const;
+
     // check on isEmpty() before use it, or UB
     cs::Sequence minSequence() const;
     cs::Sequence maxSequence() const;
+    cs::Sequence maxSyncedSequence() const;
 
     // returns value by key
     std::optional<Data> value(cs::Sequence sequence) const;
@@ -71,12 +75,13 @@ private slots:
 
 private:
     void initialization();
+
     cs::PoolStoreType cachedType(cs::Sequence sequence) const;
-    
-    size_t syncedPoolSize_ = 0;
     cs::PoolStoreType type_;
 
-    std::map<cs::Sequence, cs::PoolStoreType> sequences_;
+    std::set<cs::Sequence> syncedSequences_;
+    std::set<cs::Sequence> createdSequences_;
+
     cs::Lmdb db_;
 };
 }

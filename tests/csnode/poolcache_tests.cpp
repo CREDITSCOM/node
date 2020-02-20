@@ -146,7 +146,7 @@ TEST(PoolCache, TestFreeRanges) {
 
     auto cache = createPoolCache();
     auto inserter = [&](auto&&... sequences) {
-        (cache->insert(static_cast<cs::Sequence>(sequences), bytes(), cs::PoolStoreType::Created),...);
+        (cache->insert(static_cast<cs::Sequence>(sequences), bytes(), cs::PoolStoreType::Synced),...);
     };
 
     inserter(1, 2, 4, 5, 10, 11, 50, 51);
