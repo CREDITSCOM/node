@@ -113,7 +113,7 @@ Node::Node(cs::config::Observer& observer)
 }
 
 Node::~Node() {
-    std::cout << "Desturctor called\n";
+    std::cout << "Destructor called\n";
 
     sendingTimer_.stop();
 

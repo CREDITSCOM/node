@@ -99,6 +99,12 @@ Transport::Transport(Node* node)
     cs::Connector::connect(&neighbourhood_.neighbourPingReceived, this, &Transport::onPingReceived);
 }
 
+Transport::~Transport() {
+    if (processorThread_.joinable()) {
+        processorThread_.join();
+    }
+}
+
 void Transport::run() {
     host_.Run();
     processorThread_ = std::thread(&Transport::processorRoutine, this);
