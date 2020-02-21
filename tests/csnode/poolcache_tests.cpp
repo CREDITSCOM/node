@@ -139,7 +139,7 @@ TEST(PoolCache, TestHighLoadPoolSerialization) {
     }
 }
 
-TEST(PoolCache, TestFreeRanges) {
+TEST(PoolCache, TestFreeRangesCreated) {
     auto bytes = []() {
         return cs::Bytes{0};
     };
@@ -160,3 +160,54 @@ TEST(PoolCache, TestFreeRanges) {
     auto ranges = cache->ranges();
     ASSERT_EQ(ranges, expectedRanges);
 }
+
+TEST(PoolCache, TestFreeRangesSynced) {
+    auto bytes = []() {
+        return cs::Bytes{0};
+    };
+
+    auto cache = createPoolCache();
+    auto inserter = [&](auto&&... sequences) {
+        (cache->insert(static_cast<cs::Sequence>(sequences), bytes(), cs::PoolStoreType::Synced),...);
+    };
+
+    inserter(1, 2, 4, 5, 20, 21, 22, 35, 36, 50, 51);
+
+    std::vector<std::pair<cs::Sequence, cs::Sequence>> expectedRanges = {
+        {3, 3},
+        {6, 19},
+        {23, 34},
+        {37, 49}
+    };
+
+    auto ranges = cache->ranges();
+    ASSERT_EQ(ranges, expectedRanges);
+}
+
+TEST(PoolCache, TestFreeRangesMixed) {
+    auto bytes = []() {
+        return cs::Bytes{0};
+    };
+
+    auto cache = createPoolCache();
+    auto inserter = [&](cs::PoolStoreType type, auto&&... sequences) {
+        (cache->insert(static_cast<cs::Sequence>(sequences), bytes(), type),...);
+    };
+
+    inserter(cs::PoolStoreType::Synced, 1, 2, 4, 5, 20, 21, 22, 35, 36, 50, 51);
+    inserter(cs::PoolStoreType::Created, 60, 61, 62, 63, 75, 76, 100);
+
+    std::vector<std::pair<cs::Sequence, cs::Sequence>> expectedRanges = {
+        {3, 3},
+        {6, 19},
+        {23, 34},
+        {37, 49},
+        {52, 59},
+        {64, 74},
+        {77, 99}
+    };
+
+    auto ranges = cache->ranges();
+    ASSERT_EQ(ranges, expectedRanges);
+}
+

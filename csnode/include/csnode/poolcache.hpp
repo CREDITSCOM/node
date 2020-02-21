@@ -73,10 +73,14 @@ private:
     void initialization();
     cs::PoolStoreType cachedType(cs::Sequence sequence) const;
     
+    std::vector<Interval> createInterval(cs::Sequence min, cs::Sequence max) const;
+
     size_t syncedPoolSize_ = 0;
     cs::PoolStoreType type_;
 
     std::map<cs::Sequence, cs::PoolStoreType> sequences_;
+    decltype(sequences_)::iterator syncedIter;
+
     cs::Lmdb db_;
 };
 }
