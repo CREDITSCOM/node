@@ -1342,7 +1342,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
         for (auto& b: poolsBlock) {
             if (b.sequence() == last) {
                 cslog() << kLogPrefix_ << "get possible replacement for uncertain block " << WithDelimiters(last);
-                blockChain_.storeBlock(b, cs::PoolStoreType::Created);
+                blockChain_.storeBlock(b, cs::PoolStoreType::Synced);
             }
         }
     }
