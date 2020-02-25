@@ -353,7 +353,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         result.trxn.__set_smartInfo(api::SmartTransInfo{});
 
         if (is_smart_deploy(sci)) {
-            result.trxn.type = api::TransactionType::TT_SmartDeploy;
+            result.trxn.type = api::TransactionType::TT_ContractDeploy;
             tm_.loadTokenInfo([&isToken, &target, &result](const TokensMap& tokens, const HoldersMap&) {
                 auto it = tokens.find(target);
                 if (it != tokens.end()) {
@@ -375,7 +375,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         }
         else {
             bool isTransfer = TokensMaster::isTransfer(sci.method, sci.params);
-            result.trxn.type = api::TransactionType::TT_SmartExecute;
+            result.trxn.type = api::TransactionType::TT_ContractCall;
             if (isTransfer) {
                 tm_.loadTokenInfo([&isToken, &isTransfer, &target, &result](const TokensMap& tokens, const HoldersMap&) {
                     auto it = tokens.find(target);
@@ -415,7 +415,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         result.trxn.__set_smartContract(sci);
     }
     else if (is_smart_state(transaction)) {
-        result.trxn.type = api::TransactionType::TT_SmartState;
+        result.trxn.type = api::TransactionType::TT_ContractState;
         api::SmartStateTransInfo sti;
         sti.success = cs::SmartContracts::is_state_updated(transaction);
         sti.executionFee = convertAmount(transaction.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>());
@@ -443,7 +443,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         result.trxn.__isset.smartInfo = true;
     }
     else {
-        result.trxn.type = api::TransactionType::TT_Normal;
+        result.trxn.type = api::TransactionType::TT_Transfer;
         auto ufd = transaction.user_field(cs::trx_uf::ordinary::Text);
         if (ufd.is_valid())
             result.trxn.__set_userFields(ufd.value<std::string>());

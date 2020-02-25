@@ -5,7 +5,7 @@
 #include <serializer.hpp>
 #include <tokens.hpp>
 #include <nodecore.hpp>
-
+#include <packetvalidator.hpp>
 #include <api_types.h>
 
 // see: apihandler.cpp #175
@@ -295,14 +295,33 @@ namespace api_diag {
         _return.__set_info(info);
     }
 
-    void APIDiagHandler::SendBootstrap(general::APIResponse& _return, const BootstrapTable& table) {
+    void APIDiagHandler::SetRawData(general::APIResponse& _return, const std::string& data) {
+        const size_t min_len = sizeof(cs::RoundNumber) + 1 + Consensus::MinTrustedNodes * kPublicKeyLength + cscrypto::kSignatureSize;
+        if (data.size() < min_len) {
+            _return.__set_code(kError);
+            _return.__set_message("data is malformed, reject");
+            return;
+        }
+
+        const size_t signed_len = data.size() - cscrypto::kSignatureSize;
+        if (!cscrypto::verifySignature((cs::Byte *)data.data() + signed_len, cs::PacketValidator::getBlockChainKey().data(),
+            (cs::Byte *) data.data(), signed_len)) {
+            _return.__set_code(kError);
+            _return.__set_message("data is not properly signed, reject");
+            return;
+        }
+
+
         std::mutex mtx;
         std::condition_variable cv;
         bool done = false;
         bool success = false;
+        cs::RoundNumber r = *reinterpret_cast<const cs::RoundNumber*>(data.data());
+        cs::Bytes bytes(data.begin() + sizeof(cs::RoundNumber), data.end());
 
         auto task = [&]() {
-            success = node_.bootstrap(table.nodes, (uint64_t) table.round);
+
+            success = node_.bootstrap(bytes, r);
             done = true;
             cv.notify_one();
         };
@@ -317,4 +336,3 @@ namespace api_diag {
 
     }
 }
-

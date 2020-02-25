@@ -327,9 +327,9 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
 
     cs::IDataStream in(data, size);
     cs::RoundTable roundTable;
-    cs::Bytes bin;
-    in >> bin;
-    cs::IDataStream stream(bin.data(), bin.size());
+    cs::Bytes payload;
+    in >> payload;
+    cs::IDataStream stream(payload.data(), payload.size());
 
     uint8_t confSize = 0;
     stream >> confSize;
@@ -343,14 +343,38 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
     cs::ConfidantsKeys confidants;
     confidants.reserve(confSize);
 
+    bool unknown = false;
     for (int i = 0; i < confSize; ++i) {
         cs::PublicKey key;
         stream >> key;
         confidants.push_back(std::move(key));
+        if (initialConfidants_.find(key) == initialConfidants_.cend()) {
+            unknown = true;
+        }
+    }
+
+    if (unknown) {
+        cs::Signature sig;
+        stream >> sig;
+        if (!stream.isValid()) {
+            cswarning() << "malformed bootstrap round table, ignore";
+        }
+        const size_t signed_subdata_len = 1 + size_t(confSize) * cscrypto::kPublicKeySize;
+        const size_t signed_buf_len = sizeof(cs::RoundNumber) + signed_subdata_len;
+        cs::Bytes buf;
+        buf.reserve(signed_buf_len);
+        auto* ptr = reinterpret_cast<const uint8_t*>(&rNum);
+        std::copy(ptr, ptr + sizeof(cs::RoundNumber), std::back_inserter(buf));
+        ptr = payload.data();
+        std::copy(ptr, ptr + signed_subdata_len, std::back_inserter(buf));
+        if (!cscrypto::verifySignature(sig, cs::PacketValidator::getBlockChainKey(), buf.data(), buf.size())) {
+            cswarning() << kLogPrefix_ << "failed to test bootstrap signature, drop";
+            return;
+        }
     }
 
     if (!stream.isValid() || confidants.size() < confSize) {
-        cswarning() << "Bad round table format, ignoring";
+        cswarning() << "Bad round table format, ignore";
         return;
     }
     subRound_ = 1;
@@ -3658,19 +3682,23 @@ void Node::onRoundTimeElapsed() {
     }
 }
 
-bool Node::bootstrap(const std::vector<std::string>& table, cs::RoundNumber round) {
+bool Node::bootstrap(const cs::Bytes& bytes, cs::RoundNumber round) {
     std::set<cs::PublicKey> confidants;
-    for (const auto& s58 : table) {
-        cs::Bytes b58;
-        if (DecodeBase58(s58, b58)) {
-            cs::PublicKey k;
-            std::copy(b58.cbegin(), b58.cend(), k.begin());
-            confidants.insert(k);
-        }
-    }
-    if (confidants.size() < 3) {
+    cs::IDataStream input(bytes.data(), bytes.size());
+    uint8_t boot_cnt = 0;
+    input >> boot_cnt;
+    const size_t req_len = 1 + size_t(boot_cnt) * cscrypto::kPublicKeySize + cscrypto::kSignatureSize;
+    if (bytes.size() != req_len) {
+        csdebug() << kLogPrefix_ << "malformed bootstrap packet, drop";
         return false;
     }
+    for (size_t i = 0; i < size_t(boot_cnt); ++i) {
+        cs::PublicKey key;
+        input >> key;
+        confidants.insert(key);
+    }
+    cs::Signature sig;
+    input >> sig;
 
     cslog() << "NODE> Bootstrap available nodes [" << confidants.size() << "]:";
     for (const auto& item : confidants) {
@@ -3691,22 +3719,10 @@ bool Node::bootstrap(const std::vector<std::string>& table, cs::RoundNumber roun
 
     cslog() << "Bootstrap round " << rt.round << "...";
 
-    cs::Bytes bin;
-    cs::ODataStream out(bin);
-    out << uint8_t(confidants.size());
-
-    for (const auto& item : confidants) {
-        out << item;
-    }
-
-    // when we try to start rounds several times, we will not send duplicates
-    auto random = std::random_device{}();
-    out << random;
-
     auto& conveyer = cs::Conveyer::instance();
     conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
 
-    sendBroadcast(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bin);
+    sendBroadcast(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bytes);
     if (!isBootstrapRound_) {
         isBootstrapRound_ = true;
         cslog() << "NODE> Bootstrap on, sending bootstrap table";

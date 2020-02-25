@@ -302,7 +302,7 @@ public:
 
     void getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info);
 
-    bool bootstrap(const std::vector<std::string>& table, cs::RoundNumber round);
+    bool bootstrap(const cs::Bytes& bytes, cs::RoundNumber round);
 
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;
