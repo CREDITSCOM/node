@@ -33,6 +33,7 @@ add_library(lib
   include/lib/system/shareable.hpp
   include/lib/system/lockfreechanger.hpp
   include/lib/system/dynamicbuffer.hpp
+  include/lib/system/pmrfactory.hpp
 )
 
 if (MSVC)

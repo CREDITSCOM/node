@@ -16,11 +16,13 @@
 #include <csdb/amount_commission.hpp>
 #include <csdb/pool.hpp>
 #include <csdb/storage.hpp>
-
 #include <csdb/internal/types.hpp>
+
 #include <csnode/nodecore.hpp>
 #include <csnode/multiwallets.hpp>
 #include <csnode/walletsids.hpp>
+#include <csnode/poolcache.hpp>
+
 #include <roundpackage.hpp>
 
 #include <lib/system/concurrent.hpp>
@@ -54,9 +56,6 @@ public:
     using WalletId = csdb::internal::WalletId;
     using WalletAddress = csdb::Address;
     using WalletData = cs::WalletsCache::WalletData;
-
-    // using user field "0" to store block timestamp
-    inline const static csdb::user_field_id_t TimestampID = 0;
 
     enum class AddressType {
         PublicKey,
@@ -106,7 +105,7 @@ public:
      *            for future use and will be recorded on time
      */
 
-    bool storeBlock(csdb::Pool& pool, bool bySync);
+    bool storeBlock(csdb::Pool& pool, cs::PoolStoreType type);
 
     /**
      * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool);
@@ -168,6 +167,13 @@ public:
     cs::Bytes checkForSpecialTransactions(const std::vector<csdb::Transaction>& trxs, cs::Sequence seq);
     cs::Sequence getLastSeq() const;
 
+    static inline const csdb::user_field_id_t kFieldTimestamp = 0;
+    static inline const csdb::user_field_id_t kFieldServiceInfo = 1;
+
+    static void setTimestamp(csdb::Pool& block, const std::string& timestamp);
+    static void setBootstrap(csdb::Pool& block, bool is_bootstrap);
+    static bool isBootstrap(const csdb::Pool& block);
+
     const cs::MultiWallets& multiWallets() const;
 
     /**
@@ -182,7 +188,7 @@ public:
      */
 
     std::size_t getCachedBlocksSize() const;
-
+    std::size_t getCachedBlocksSizeSynced() const;
     void clearBlockCache();
 
     // continuous interval from ... to
@@ -212,6 +218,7 @@ public:
      */
 
     void testCachedBlocks();
+    std::optional<SequenceInterval> getFreeSpaceBlocks() const;
 
     bool isLastBlockUncertain() const {
         return uncertainLastBlockFlag_;
@@ -279,6 +286,7 @@ public:
 
     size_t getSize() const;
     uint64_t getWalletsCountWithBalance();
+    uint64_t getWalletsCount() const;
     csdb::PoolHash getLastHash() const;
     csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
     cs::Sequence getSequenceByHash(const csdb::PoolHash&) const;
@@ -296,6 +304,7 @@ public:
 
     std::string printWalletCaches();
 
+
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);
     void applyToWallet(const csdb::Address&, const std::function<void(const cs::WalletsCache::WalletData&)>); 
@@ -308,7 +317,7 @@ public:
     std::pair<cs::Sequence, uint32_t> getLastNonEmptyBlock();
     std::pair<cs::Sequence, uint32_t> getPreviousNonEmptyBlock(cs::Sequence);
     uint64_t getTransactionsCount() const {
-        return total_transactions_count_;
+        return totalTransactionsCount_;
     }
 
     const csdb::Address& getGenesisAddress() const;
@@ -347,10 +356,6 @@ private:
     bool updateWalletIds(const csdb::Pool& pool, cs::WalletsCache::Updater& updater);
     bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
-    void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
-
-    // returns true if new id was inserted
-    bool getWalletId(const WalletAddress& address, WalletId& id);
     bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
 
     class TransactionsLoader;
@@ -367,6 +372,7 @@ private:
 
     const csdb::Address genesisAddress_;
     const csdb::Address startAddress_;
+
     std::unique_ptr<cs::WalletsIds> walletIds_;
     std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
     std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
@@ -374,14 +380,14 @@ private:
 
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
-    uint64_t total_transactions_count_ = 0;
+    uint64_t totalTransactionsCount_ = 0;
 
     struct NonEmptyBlockData {
         cs::Sequence poolSeq;
         uint32_t transCount = 0;
     };
-    std::map<cs::Sequence, NonEmptyBlockData> previousNonEmpty_;
 
+    std::map<cs::Sequence, NonEmptyBlockData> previousNonEmpty_;
     NonEmptyBlockData lastNonEmptyBlock_;
 
     /**
@@ -405,9 +411,11 @@ private:
     struct BlockMeta {
         csdb::Pool pool;
         // indicates that block has got by sync, so it is checked & tested in other way than ordinary ones
-        bool by_sync;
+        cs::PoolStoreType type;
     };
-    std::map<cs::Sequence, BlockMeta> cachedBlocks_;
+
+    mutable std::mutex cachedBlocksMutex_;
+    std::unique_ptr<cs::PoolCache> cachedBlocks_;
 
     // block storage to defer storing it in blockchain until confirmation from other nodes got
     // (idea is it is more easy not to store block immediately then to revert it after storing)
@@ -427,10 +435,8 @@ private:
         return 0;
     }
 
-    //uint64_t initUuid() const;
-
     // may be modified once in uuid() method:
-    mutable uint64_t uuid_ = 0;
+    mutable std::atomic<uint64_t> uuid_ = 0;
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
     std::atomic_bool stop_ = false;

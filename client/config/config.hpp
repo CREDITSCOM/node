@@ -26,46 +26,34 @@ const std::string DEFAULT_PATH_TO_KEY = "keys.dat";
 const std::string DEFAULT_PATH_TO_PUBLIC_KEY = "NodePublic.txt";
 const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 
-const uint32_t DEFAULT_MIN_NEIGHBOURS = 5;
-const uint32_t DEFAULT_MAX_NEIGHBOURS = 24; // Neighbourhood::MaxNeighbours;
+const uint32_t DEFAULT_MIN_NEIGHBOURS = Neighbourhood::kMinNeighbours;
+const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::kMaxNeighbours;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
-const double DEFAULT_BROADCAST_FILLING = 100.0; // 33.3%
+const uint32_t DEFAULT_STORE_BLOCK_ELAPSE_TIME = 1000 * 40; // ms
 
-const size_t DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE = 10;       // retries
-const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 10;          // rounds
-const size_t DEFAULT_CONVEYER_SEND_CACHE_VALUE = (DEFAULT_CONVEYER_MAX_PACKET_LIFETIME/2 > 10) ? 10 : DEFAULT_CONVEYER_MAX_PACKET_LIFETIME/2;              // rounds
+const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 10; // rounds
 
-[[maybe_unused]]
-const uint8_t DELTA_ROUNDS_VERIFY_NEW_SERVER = 100;
 using Port = short unsigned;
 
 struct EndpointData {
     bool ipSpecified = false;
+
+    std::string id;
+    std::string ip;
     short unsigned port = 0;
-    ip::address ip{};
 
     static EndpointData fromString(const std::string&);
 };
 
-enum NodeType {
-    Client,
-    Router
-};
-
 enum BootstrapType {
-    SignalServer,
     IpList
 };
 
 struct PoolSyncData {
-    bool oneReplyBlock = true;                      // true: sendBlockRequest one pool at a time. false: equal to number of pools requested.
-    bool isFastMode = false;                        // true: is silent mode synchro(sync up to the current round). false: normal mode
-    uint8_t blockPoolsCount = 25;                   // max block count in one request: cannot be 0
-    uint8_t requestRepeatRoundCount = 20;           // round count for repeat request : 0-never
-    uint8_t neighbourPacketsCount = 10;             // packet count for connect another neighbor : 0-never
-    uint16_t sequencesVerificationFrequency = 350;  // sequences received verification frequency : 0-never; 1-once per round: other- in ms;
+    cs::Sequence blockPoolsCount = 100;              // max block count in one request: cannot be 0
+    uint16_t sequencesVerificationFrequency = 350;   // sequences received verification frequency : 0-never; 1-once per round: other- in ms;
 };
 
 struct ApiData {
@@ -89,7 +77,7 @@ struct ApiData {
     std::string executorCmdLine{};
     int executorRunDelay = 100;
     int executorBackgroundThreadDelay = 100;
-    int executorCheckVersionDelay = 1000;
+    int executorCheckVersionDelay = 5000;
     bool executorMultiInstance = false;
     int executorCommitMin = 1506;   // first commit with support of checking
     int executorCommitMax{-1};      // unlimited range on the right
@@ -97,8 +85,6 @@ struct ApiData {
 };
 
 struct ConveyerData {
-    size_t sendCacheValue = DEFAULT_CONVEYER_SEND_CACHE_VALUE;
-    size_t maxResendsSendCache = DEFAULT_CONVEYER_MAX_RESENDS_SEND_CACHE;
     size_t maxPacketLifeTime = DEFAULT_CONVEYER_MAX_PACKET_LIFETIME;
 };
 
@@ -135,8 +121,6 @@ struct EventsReportData {
     bool reject_contract_consensus = true;
     // invalid block detected by node
     bool alarm_invalid_block = true;
-    // big bang occurred
-    bool big_bang = false;
 };
 
 struct DbSQLData {
@@ -167,29 +151,21 @@ public:
     Config& operator=(Config&&) = default;
 
     static Config read(po::variables_map&);
-
-    template<typename T, typename ... Ts, typename = cs::IsConvertToString<T, Ts...>>
-    static bool replaceBlock(T&& blockName, Ts&& ... newLines);
-
+    
     const EndpointData& getInputEndpoint() const {
         return inputEp_;
     }
+
     const EndpointData& getOutputEndpoint() const {
         return outputEp_;
     }
 
-    const EndpointData& getSignalServerEndpoint() const {
-        return signalServerEp_;
-    }
-
-    BootstrapType getBootstrapType() const {
-        return bType_;
-    }
-    NodeType getNodeType() const {
-        return nType_;
-    }
     const std::vector<EndpointData>& getIpList() const {
         return bList_;
+    }
+
+    const std::vector<cs::PublicKey>& getInitialConfidants() const {
+        return initialConfidants_;
     }
 
     const std::string& getPathToDB() const {
@@ -203,6 +179,7 @@ public:
     bool useIPv6() const {
         return ipv6_;
     }
+
     bool hasTwoSockets() const {
         return twoSockets_;
     }
@@ -215,10 +192,6 @@ public:
         return maxNeighbours_;
     }
 
-    bool restrictNeighbours() const {
-        return restrictNeighbours_;
-    }
-
     uint64_t getConnectionBandwidth() const {
         return connectionBandwidth_;
     }
@@ -226,6 +199,7 @@ public:
     bool isSymmetric() const {
         return symmetric_;
     }
+
     const EndpointData& getAddressEndpoint() const {
         return hostAddressEp_;
     }
@@ -253,6 +227,7 @@ public:
     const cs::PublicKey& getMyPublicKey() const {
         return publicKey_;
     }
+
     const cs::PrivateKey& getMyPrivateKey() const {
         return privateKey_;
     }
@@ -279,6 +254,10 @@ public:
         return compatibleVersion_;
     }
 
+    bool traverseNAT() const {
+        return traverseNAT_;
+    }
+
     uint64_t newBlockchainTopSeq() const {
         return newBlockchainTopSeq_;
     }
@@ -291,8 +270,8 @@ public:
         return roundElapseTime_;
     }
 
-    double getBroadcastCoefficient() const {
-        return broadcastCoefficient_;
+    uint64_t storeBlockElapseTime() const {
+        return storeBlockElapseTime_;
     }
 
     bool readKeys(const po::variables_map& vm);
@@ -303,6 +282,8 @@ public:
     }
 
     void swap(Config& config);
+
+    void updateKnownHosts(std::vector<cs::PeerData>&) const;
 
     const EventsReportData& getEventsReportData() const {
         return eventsReport_;
@@ -339,7 +320,6 @@ private:
 
     EndpointData outputEp_;
 
-    NodeType nType_ = NodeType::Client;
     NodeVersion minCompatibleVersion_ = NODE_VERSION;
 
     bool ipv6_ = false;
@@ -348,17 +328,16 @@ private:
     uint32_t maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS;
     bool restrictNeighbours_ = false;
     uint64_t connectionBandwidth_ = DEFAULT_CONNECTION_BANDWIDTH;
-    double broadcastCoefficient_ = DEFAULT_BROADCAST_FILLING / 100;
 
     bool symmetric_ = false;
+
     EndpointData hostAddressEp_;
 
-    BootstrapType bType_ = SignalServer;
-    EndpointData signalServerEp_;
-
     std::vector<EndpointData> bList_;
+    std::vector<cs::PublicKey> initialConfidants_;
 
     std::string pathToDb_;
+    std::string hostsFileName_;
 
     cs::PublicKey publicKey_{};
     cs::PrivateKey privateKey_{};
@@ -373,11 +352,13 @@ private:
     bool recreateIndex_ = false;
     bool newBlockchainTop_ = false;
     bool autoShutdownEnabled_ = true;
-    bool compatibleVersion_ = false;
+    bool compatibleVersion_ = true;
+    bool traverseNAT_ = true;
     uint64_t newBlockchainTopSeq_;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
     uint64_t roundElapseTime_ = DEFAULT_ROUND_ELAPSE_TIME;
+    uint64_t storeBlockElapseTime_ = DEFAULT_STORE_BLOCK_ELAPSE_TIME;
 
     ConveyerData conveyerData_;
 
@@ -405,44 +386,5 @@ bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs);
 
 bool operator==(const Config& lhs, const Config& rhs);
 bool operator!=(const Config& lhs, const Config& rhs);
-
-
-template<typename T, typename ... Ts, typename>
-bool Config::replaceBlock(T&& blockName, Ts&& ... newLines) {
-    std::ifstream in(DEFAULT_PATH_TO_CONFIG, std::ios::in);
-
-    if (!in) {
-        cswarning() << "Couldn't read config file " << DEFAULT_PATH_TO_CONFIG;
-        return false;
-    }
-
-    std::string newConfig = cs::Utils::readAllFileData(in);
-
-    const std::string fullBlockName = "[" + std::string(blockName) + "]";
-    const std::string fullReplaceString = fullBlockName + "\n" + ((std::string(newLines) + "\n") + ...) + "\n";
-
-    if (const auto startPos = newConfig.find(fullBlockName); startPos != std::string::npos) {
-        const auto tmpPos = newConfig.find("[", startPos + 1);
-        const auto endPos = (tmpPos != std::string::npos ? tmpPos - 1 : newConfig.size());
-        newConfig.replace(startPos, endPos, fullReplaceString);
-    }
-    else {
-        newConfig += fullReplaceString;
-    }
-
-    in.close();
-
-    std::ofstream out(DEFAULT_PATH_TO_CONFIG, std::ios::out | std::ios::trunc);
-
-    if (!out) {
-        cswarning() << "Couldn't read config file " << DEFAULT_PATH_TO_CONFIG;
-        return false;
-    }
-
-    out << newConfig.data();
-    out.close();
-
-    return true;
-}
 
 #endif  // CONFIG_HPP

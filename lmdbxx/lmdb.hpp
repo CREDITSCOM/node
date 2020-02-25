@@ -284,18 +284,35 @@ public:
         return value<T>(reinterpret_cast<const char*>(k.data()), k.size());
     }
 
+    // returns first pair of key/value inserted to database
+    template<typename Key, typename Value>
+    std::pair<Key, Value> first(const char* name = nullptr) const {
+        return keyValueImpl<Key, Value>(MDB_RDONLY, MDB_FIRST, name);
+    }
+
     // returns last pair of key/value inserted to database
     template<typename Key, typename Value>
     std::pair<Key, Value> last(const char* name = nullptr) const {
+        return keyValueImpl<Key, Value>(MDB_RDONLY, MDB_LAST, name);
+    }
+
+    template<typename T>
+    static T convert(const char* data, size_t size) {
+        return createResult<T>(data, size);
+    }
+
+protected:
+    template<typename Key, typename Value>
+    std::pair<Key, Value> keyValueImpl(unsigned int mdbFlag, MDB_cursor_op cursorFlag, const char* name = nullptr) const {
         try {
-            auto transaction = lmdb::txn::begin(*env_, nullptr, MDB_RDONLY);
+            auto transaction = lmdb::txn::begin(*env_, nullptr, mdbFlag);
             auto dbi = lmdb::dbi::open(transaction, name);
             auto cursor = lmdb::cursor::open(transaction, dbi);
 
             lmdb::val key;
             lmdb::val value;
 
-            const auto result = cursor.get(key, value, MDB_LAST);
+            const auto result = cursor.get(key, value, cursorFlag);
 
             if (result) {
                 return std::make_pair<Key, Value>(createResult<Key>(key), createResult<Value>(value));
@@ -308,7 +325,6 @@ public:
         return std::make_pair<Key, Value>(Key{}, Value{});
     }
 
-protected:
     void flushImpl(bool force) {
         try {
             env_->sync(force);
@@ -359,7 +375,7 @@ protected:
     }
 
     template<typename T>
-    T allocateResult(const char* data, size_t size) const {
+    static T allocateResult(const char* data, size_t size) {
         static_assert (std::is_integral_v<T> || std::is_floating_point_v<T>, "Allocate result supports only integral or floating-point types");
 
         try {
@@ -382,11 +398,11 @@ protected:
     }
 
     template<typename T>
-    T createResult(const lmdb::val& value) const {
+    static T createResult(const char* data, size_t size) {
         if constexpr (IsArray<T>::value) {
             T array;
-            assert(array.size() == value.size());
-            std::copy(value.data(), value.data() + value.size(), array.data());
+            assert(array.size() == size);
+            std::copy(data, data + size, array.data());
 
             return array;
         }
@@ -396,29 +412,34 @@ protected:
             if constexpr (std::is_integral_v<T>) {
 #endif
                 T result = 0;
-                const auto res = std::from_chars(value.data(), value.data() + value.size(), result);
+                const auto res = std::from_chars(data, data + size, result);
 
                 if (res.ec != std::errc{}) {
-                    return allocateResult<T>(value.data(), value.size());
+                    return allocateResult<T>(data, size);
                 }
 
                 return result;
 #ifdef LMDBXX_FP_SUPPORT
             }
             else if constexpr (std::is_floating_point_v<T>) {
-                return allocateResult<T>(value.data(), value.size());
+                return allocateResult<T>(data, size);
             }
 #endif
 #else
-            return allocateResult<T>(value.data(), value.size());
+            return allocateResult<T>(data, size);
 #endif
         }
         else if constexpr (std::is_same_v<std::string_view, T>) {
-            return std::string_view(value.data(), value.size());
+            return std::string_view(data, size);
         }
         else {
-            return T(value.data(), value.data() + value.size());
+            return T(data, data + size);
         }
+    }
+
+    template<typename T>
+    static T createResult(const lmdb::val& value) {
+        return createResult<T>(value.data(), value.size());
     }
 
     Info info() const {
@@ -450,7 +471,7 @@ protected:
     auto environment(const unsigned flags) const {
         return std::make_unique<lmdb::env>(lmdb::env::create(flags));
     }
-
+    
 private:
     std::unique_ptr<lmdb::env> env_;
     std::string path_;

@@ -29,7 +29,7 @@ using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::protocol;
 
 constexpr const int32_t kRestartThriftPause_ms = 200; // milliseconds
-constexpr const int32_t kStringLimit = Consensus::MaxTransactionSize;
+const int32_t kStringLimit = static_cast<int32_t>(Consensus::MaxTransactionSize);
 constexpr const int32_t kContainerLimit = 16 * 1024; // max allowed items in any container (map, list, set)
 constexpr const bool kStrictRead = false; // use default Thrift value
 constexpr const bool kStrictWrite = true; // use default Thrift value
@@ -198,8 +198,6 @@ void connector::run() {
 
 #endif
 
-#if defined(DIAG_API)
-
     diag_thread = std::thread([this]() {
 
         while (true) {
@@ -243,8 +241,6 @@ void connector::run() {
 
     });
 
-#endif // DIAG_API
-
     api_handler->run();
 }
 
@@ -261,9 +257,10 @@ void connector::stop() {
         cslog() << "API: stop public API";
         api_server->stop();
         api_server.reset();
-        if (api_thread.joinable()) {
-            api_thread.join();
-        }
+    }
+
+    if (api_thread.joinable()) {
+        api_thread.join();
     }
 #endif
 
@@ -272,9 +269,10 @@ void connector::stop() {
         cslog() << "API: stop executor API";
         execapi_server->stop();
         execapi_server.reset();
-        if (execapi_thread.joinable()) {
-            execapi_thread.join();
-        }
+    }
+
+    if (execapi_thread.joinable()) {
+        execapi_thread.join();
     }
 #endif
 
@@ -283,22 +281,22 @@ void connector::stop() {
         cslog() << "API: stop AJAX service";
         ajax_server->stop();
         ajax_server.reset();
-        if (ajax_thread.joinable()) {
-            ajax_thread.join();
-        }
+    }
+
+    if (ajax_thread.joinable()) {
+       ajax_thread.join();
     }
 #endif
 
-#ifdef DIAG_API
     if (diag_server) {
         cslog() << "API: stop diagnostic API";
         diag_server->stop();
         diag_server.reset();
-        if (diag_thread.joinable()) {
-            diag_thread.join();
-        }
     }
-#endif
+
+    if (diag_thread.joinable()) {
+       diag_thread.join();
+    }
 
 }
 

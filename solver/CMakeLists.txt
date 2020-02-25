@@ -37,6 +37,7 @@ add_library(${PROJECT_NAME} STATIC
     include/solver/states/writingstate.hpp
     include/solver/states/waitingstate.hpp
 
+    src/consensus.cpp
     src/solvercore.cpp
     src/solvercontext.cpp
     src/solverinterface.cpp

@@ -5,7 +5,6 @@
 
 #include <csnode/blockchain.hpp>
 #include <csnode/nodecore.hpp>
-#include <csnode/packstream.hpp>
 
 #include <lib/system/timer.hpp>
 #include <lib/system/signals.hpp>
@@ -15,88 +14,97 @@
 class Node;
 
 namespace cs {
-using PoolSynchronizerRequestSignal = cs::Signal<void(const ConnectionPtr target, const PoolsRequestedSequences& sequences, std::size_t packet)>;
+using PoolSynchronizerRequestSignal = cs::Signal<void(const cs::PublicKey& target, const PoolsRequestedSequences& sequences)>;
 
 class PoolSynchronizer {
 public:
-    explicit PoolSynchronizer(Transport* transport, BlockChain* blockChain);
+    explicit PoolSynchronizer(BlockChain* blockChain);
 
-    void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = roundDifferentForSync, bool isBigBand = false);
+    void sync(cs::RoundNumber roundNum, cs::RoundNumber difference = kRoundDifferentForSync);
     void syncLastPool();
 
     // syncro get functions
-    void getBlockReply(cs::PoolsBlock&& poolsBlock, std::size_t packetNum);
+    void getBlockReply(cs::PoolsBlock&& poolsBlock);
 
     // syncro send functions
     void sendBlockRequest();
 
     bool isSyncroStarted() const;
 
-    bool isOneBlockReply() const;
-
-    bool isFastMode() const;
-
-    static const cs::RoundNumber roundDifferentForSync = cs::values::kDefaultMetaStorageMaxSize;
+    static const cs::RoundNumber kRoundDifferentForSync = cs::values::kDefaultMetaStorageMaxSize;
+    static const size_t kFreeBlocksTimeoutMs = 10000;
+    static const size_t kCachedBlocksLimit = 10000;
 
 public signals:
     PoolSynchronizerRequestSignal sendRequest;
 
 private slots:
     void onTimeOut();
-    void onRoundSimulation();
 
-    void onWriteBlock(const csdb::Pool pool);
+    void onWriteBlock(const csdb::Pool& pool);
     void onWriteBlock(const cs::Sequence sequence);
     void onRemoveBlock(const csdb::Pool& pool);
+
+public slots:
+    void onStoreBlockTimeElapsed();
+    void onPingReceived(cs::Sequence sequence, const cs::PublicKey& publicKey);
+    void onNeighbourAdded(const cs::PublicKey& publicKey, cs::Sequence sequence);
+    void onNeighbourRemoved(const cs::PublicKey& publicKey);
 
 private:
     enum class CounterType;
     enum class SequenceRemovalAccuracy;
-    class NeighboursSetElemet;
+    class Neighbour;
 
     // pool sync progress
     bool showSyncronizationProgress(const cs::Sequence lastWrittenSequence) const;
 
-    bool checkActivity(const CounterType counterType);
+    bool checkActivity();
 
-    void sendBlock(const NeighboursSetElemet& neighbour);
+    void sendBlock(const Neighbour& neighbour);
+    void sendBlock(const Neighbour& neighbour, const PoolsRequestedSequences& sequeces);
 
-    bool getNeededSequences(NeighboursSetElemet& neighbour);
+    bool getNeededSequences(Neighbour& neighbour);
 
     void checkNeighbourSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
-
     void removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
 
-    void refreshNeighbours();
+    template<typename T>
+    void printFreeBlocks(const T& key, const PoolsRequestedSequences& sequeces);
 
     bool isLastRequest() const;
 
-    bool isAvailableRequest(const cs::PoolSynchronizer::NeighboursSetElemet& nh) const;
+    // neighbours private interfaces
+    bool isAddableNeighbour(cs::Sequence sequence) const;
+    bool isNeighbourExists(const cs::PublicKey& key) const;
+    bool isNeighbourExists(const Neighbour& neighbour) const;
+    Neighbour& addNeighbour(const cs::PublicKey& key);
+    Neighbour& addNeighbour(const Neighbour& neighbour);
+    Neighbour& getNeighbour(const cs::PublicKey& key);
+    Neighbour& getNeighbour(const Neighbour& element);
+    cs::Sequence neighboursMaxSequence() const;
 
+    void checkCachedBlocks();
     void synchroFinished();
-
-    ConnectionPtr getConnection(const NeighboursSetElemet& neighbour) const;
-
-    void printNeighbours(const std::string& funcName) const;
+    size_t nextIndex(size_t index) const;
 
 private:
-    enum class CounterType {
-        ROUND,
-        TIMER
-    };
-
     enum class SequenceRemovalAccuracy {
-        EXACT,
-        LOWER_BOUND,
-        UPPER_BOUND
+        Exact,
+        LowerBound,
+        UpperBound
     };
 
-    class NeighboursSetElemet {
+    class Neighbour {
     public:
-        explicit NeighboursSetElemet(uint8_t neighbourIndex, const cs::PublicKey& publicKey, uint8_t blockPoolsCount)
-        : neighbourIndex_(neighbourIndex)
-        , key_(publicKey)
-        , roundCounter_(0) {
+        Neighbour() = default;
+
+        explicit Neighbour(const cs::PublicKey& publicKey)
+        : key_(publicKey) {
+        }
+
+        explicit Neighbour(const cs::PublicKey& publicKey, cs::Sequence blockPoolsCount)
+        : key_(publicKey) {
             sequences_.reserve(blockPoolsCount);
         }
 
@@ -108,7 +116,7 @@ private:
             bool success = false;
 
             switch (accuracy) {
-                case SequenceRemovalAccuracy::EXACT: {
+                case SequenceRemovalAccuracy::Exact: {
                     auto it = std::find(sequences_.begin(), sequences_.end(), sequence);
                     if (it != sequences_.end()) {
                         sequences_.erase(it);
@@ -116,7 +124,7 @@ private:
                     }
                     break;
                 }
-                case SequenceRemovalAccuracy::LOWER_BOUND: {
+                case SequenceRemovalAccuracy::LowerBound: {
                     auto it = std::upper_bound(sequences_.begin(), sequences_.end(), sequence);
                     if (it != sequences_.begin()) {
                         sequences_.erase(sequences_.begin(), it);
@@ -124,7 +132,7 @@ private:
                     }
                     break;
                 }
-                case SequenceRemovalAccuracy::UPPER_BOUND: {
+                case SequenceRemovalAccuracy::UpperBound: {
                     auto it = std::lower_bound(sequences_.begin(), sequences_.end(), sequence);
                     if (it != sequences_.end()) {
                         sequences_.erase(it, sequences_.end());
@@ -142,52 +150,58 @@ private:
         inline void addSequences(const cs::Sequence sequence) {
             sequences_.push_back(sequence);
         }
+        inline void addSequences(cs::Sequence begin, cs::Sequence end) {
+            for (;begin <= end; ++begin) {
+                sequences_.push_back(begin);
+            }
+        }
+        inline void addSequences(const PoolsRequestedSequences& sequences) {
+            sequences_.insert(sequences_.end(), sequences.begin(), sequences.end());
+        }
+        inline void orderSequences() {
+            std::sort(std::begin(sequences_), std::end(sequences_));
+        }
         inline void reset() {
             resetSequences();
-            resetRoundCounter();
         }
         inline void resetSequences() {
             sequences_.clear();
         }
-        inline void resetRoundCounter() {
-            roundCounter_ = 0;
-        }
-        inline void setIndex(const uint8_t num) {
-            neighbourIndex_ = num;
-        }
         inline void setPublicKey(const cs::PublicKey& publicKey) {
             key_ = publicKey;
         }
-
-        inline uint8_t index() const {
-            return neighbourIndex_;
+        inline void setMaxSequence(cs::Sequence sequence) {
+            maxSequence_ = sequence;
         }
+
         inline const cs::PublicKey& publicKey() const {
             return key_;
         }
         inline const PoolsRequestedSequences& sequences() const {
             return sequences_;
         }
-        inline cs::RoundNumber roundCounter() const {
-            return roundCounter_;
+        inline cs::Sequence maxSequence() const {
+            return maxSequence_;
         }
 
-        inline void increaseRoundCounter() {
-            if (!sequences_.empty()) {
-                ++roundCounter_;
-            }
+        bool operator<(const Neighbour& other) const {
+            return maxSequence_ < other.maxSequence_;
         }
 
-        bool operator<(const NeighboursSetElemet& other) const {
-            if (sequences_.empty() || other.sequences_.empty()) {
-                return sequences_.size() > other.sequences_.size();
-            }
-
-            return sequences_.front() < other.sequences_.front();
+        bool operator>(const Neighbour& other) const {
+            return !((*this) < other);
         }
 
-        friend std::ostream& operator<<(std::ostream& os, const NeighboursSetElemet& el) {
-            os << "idx: " << cs::numeric_cast<int>(el.neighbourIndex_) << ", seqs:";
+        bool operator==(const Neighbour& other) const {
+            return key_ == other.key_;
+        }
+
+        bool operator!=(const Neighbour& other) const {
+            return !((*this) == other);
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const Neighbour& el) {
+            os << "seqs:";
 
             if (el.sequences_.empty()) {
                 os << " empty";
@@ -198,67 +212,51 @@ private:
                 }
             }
 
-            os << ", round counter: " << el.roundCounter_;
-
             return os;
         }
 
     private:
-        uint8_t neighbourIndex_;             // neighbour number
+        cs::Sequence maxSequence_ = 0;
         cs::PublicKey key_;                  // neighbour public key
         PoolsRequestedSequences sequences_;  // requested sequence
-        cs::RoundNumber roundCounter_;
     };
 
+protected:
+    std::vector<std::pair<cs::PublicKey, cs::Sequence>> neighbours() const;
+
 private:
-    Transport* transport_;
     BlockChain* blockChain_;
 
     // flag starting  syncronization
-    bool isSyncroStarted_ = false;
+    std::atomic<bool> isSyncroStarted_ = false;
+    std::atomic<bool> canRequestFreeBlocks = true;
 
     // [key] = sequence,
     // [value] =  packet counter
     // value: increase each new round
     std::map<cs::Sequence, cs::RoundNumber> requestedSequences_;
-
-    std::vector<NeighboursSetElemet> neighbours_;
+    std::vector<Neighbour> neighbours_;
 
     cs::Timer timer_;
-    cs::Timer roundSimulation_;
 
     friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType);
     friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::SequenceRemovalAccuracy);
 };
 
-inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::CounterType type) {
-    switch (type) {
-        case PoolSynchronizer::CounterType::ROUND:
-            os << "ROUND";
-            break;
-        case PoolSynchronizer::CounterType::TIMER:
-            os << "TIMER";
-            break;
-    }
-
-    return os;
-}
-
 inline std::ostream& operator<<(std::ostream& os, const PoolSynchronizer::SequenceRemovalAccuracy type) {
     switch (type) {
-        case PoolSynchronizer::SequenceRemovalAccuracy::EXACT:
-            os << "EXACT";
+        case PoolSynchronizer::SequenceRemovalAccuracy::Exact:
+            os << "Exact";
             break;
-        case PoolSynchronizer::SequenceRemovalAccuracy::LOWER_BOUND:
-            os << "LOWER_BOUND";
+        case PoolSynchronizer::SequenceRemovalAccuracy::LowerBound:
+            os << "LowerBound";
             break;
-        case PoolSynchronizer::SequenceRemovalAccuracy::UPPER_BOUND:
-            os << "UPPER_BOUND";
+        case PoolSynchronizer::SequenceRemovalAccuracy::UpperBound:
+            os << "UpperBound";
             break;
     }
 
     return os;
 }
 }  // namespace cs
-
 #endif  // POOLSYNCHRONIZER_HPP

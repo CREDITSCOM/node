@@ -37,7 +37,6 @@ private:
     std::string jpsData() const;
     void terminate(boost::process::pid_t pid);
 
-    const std::string jpsName_ = "jps";
     const std::string executorName_ = "contract-executor";
 };
 }

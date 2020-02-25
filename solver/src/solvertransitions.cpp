@@ -68,10 +68,10 @@ namespace cs
       // round table handler
       {pRTH, {{Event::SetNormal, pNormal}, {Event::SetTrusted, pTrusted1}}},
 
-      // BigBang handler, not useful for now due to Node implements BigBang handling
+      // Bootstrap handler, not useful for now due to Node implements Bootstrap handling
       {pBB, { defaultRT}},
 
-      // post-writing transition upon RoundTable && BigBang
+      // post-writing transition upon RoundTable && Bootstrap
       {pWriting, {defaultRT, defaultBB}}
     };
   }

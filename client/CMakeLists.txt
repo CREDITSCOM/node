@@ -56,6 +56,7 @@ target_include_directories(client PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include/cli
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 set_property(TARGET ${PROJECT_NAME} PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
+set_property(TARGET ${PROJECT_NAME} PROPERTY OUTPUT_NAME node)
 
 suppress_boost_cmake_warnings()
 configure_msvc_flags()

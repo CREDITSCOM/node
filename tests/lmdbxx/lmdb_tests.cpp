@@ -120,7 +120,7 @@ TEST(Lmdbxx, InsertAndRemove) {
     ASSERT_EQ(db->size(), 0);
 }
 
-TEST(Lmdbxx, LastPair) {
+TEST(Lmdbxx, FirstLastPair) {
     auto db = createDb();
     db->open();
 
@@ -146,6 +146,13 @@ TEST(Lmdbxx, LastPair) {
 
         ASSERT_TRUE(key == key2);
         ASSERT_TRUE(value == value2);
+    }
+
+    {
+        auto [key, value] = db->first<std::string, std::string>();
+
+        ASSERT_TRUE(key == key1);
+        ASSERT_TRUE(value == value1);
     }
 }
 

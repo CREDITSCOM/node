@@ -1,4 +1,3 @@
-/* Send blaming letters to @yrtimd */
 #include <iostream>
 #include <regex>
 #include <stdexcept>
@@ -28,11 +27,9 @@
 #include <unistd.h>
 #endif
 
-const NodeVersion NODE_VERSION = 453;
+const NodeVersion NODE_VERSION = 502;
 
 const std::string BLOCK_NAME_PARAMS = "params";
-const std::string BLOCK_NAME_SIGNAL_SERVER = "signal_server";
-const std::string BLOCK_NAME_START_NODE = "start_node";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
 const std::string BLOCK_NAME_HOST_OUTPUT = "host_output";
 const std::string BLOCK_NAME_HOST_ADDRESS = "host_address";
@@ -42,9 +39,8 @@ const std::string BLOCK_NAME_CONVEYER = "conveyer";
 const std::string BLOCK_NAME_EVENT_REPORTER = "event_report";
 const std::string BLOCK_NAME_DBSQL = "dbsql";
 
-const std::string PARAM_NAME_NODE_TYPE = "node_type";
-const std::string PARAM_NAME_BOOTSTRAP_TYPE = "bootstrap_type";
 const std::string PARAM_NAME_HOSTS_FILENAME = "hosts_filename";
+const std::string PARAM_NAME_INITIAL_TRUSTED = "init_trusted_filename";
 const std::string PARAM_NAME_USE_IPV6 = "ipv6";
 const std::string PARAM_NAME_MIN_NEIGHBOURS = "min_neighbours";
 const std::string PARAM_NAME_MAX_NEIGHBOURS = "max_neighbours";
@@ -52,23 +48,19 @@ const std::string PARAM_NAME_RESTRICT_NEIGHBOURS = "restrict_neighbours";
 const std::string PARAM_NAME_CONNECTION_BANDWIDTH = "connection_bandwidth";
 const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
 const std::string PARAM_NAME_ROUND_ELAPSE_TIME = "round_elapse_time";
-const std::string PARAM_NAME_BROADCAST_FILLING = "broadcast_filling_percents";
+const std::string PARAM_NAME_STORE_BLOCK_ELAPSE_TIME = "store_block_elapse_time";
 const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
 const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
 const std::string PARAM_NAME_COMPATIBLE_VERSION = "compatible_version";
+const std::string PARAM_NAME_TRAVERSE_NAT = "traverse_nat";
 
-const std::string PARAM_NAME_CONVEYER_SEND_CACHE = "send_cache_value";
-const std::string PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE = "max_resends_send_cache";
 const std::string PARAM_NAME_CONVEYER_MAX_PACKET_LIFETIME = "max_packet_life_time";
 
+const std::string PARAM_NAME_ID = "id";
 const std::string PARAM_NAME_IP = "ip";
 const std::string PARAM_NAME_PORT = "port";
 
-const std::string PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK = "one_reply_block";
-const std::string PARAM_NAME_POOL_SYNC_FAST_MODE = "fast_mode";
 const std::string PARAM_NAME_POOL_SYNC_POOLS_COUNT = "block_pools_count";
-const std::string PARAM_NAME_POOL_SYNC_ROUND_COUNT = "request_repeat_round_count";
-const std::string PARAM_NAME_POOL_SYNC_PACKET_COUNT = "neighbour_packets_count";
 const std::string PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ = "sequences_verification_frequency";
 
 const std::string PARAM_NAME_API_PORT = "port";
@@ -104,7 +96,6 @@ const std::string PARAM_NAME_EVENTS_REJECT_TRANSACTION = "reject_transaction";
 const std::string PARAM_NAME_EVENTS_REJECT_CONTRACT_EXECUTION = "reject_contract_execution";
 const std::string PARAM_NAME_EVENTS_REJECT_CONTRACT_CONSENSUS = "reject_contract_consensus";
 const std::string PARAM_NAME_EVENTS_ALARM_INVALID_BLOCK = "alarm_invalid_block";
-const std::string PARAM_NAME_EVENTS_BIG_BANG = "big_bang";
 
 const std::string PARAM_NAME_DBSQL_HOST = "host";
 const std::string PARAM_NAME_DBSQL_PORT = "port";
@@ -124,24 +115,25 @@ const std::string ARG_NAME_DISABLE_AUTO_SHUTDOWN = "disable-auto-shutdown";
 const uint32_t MIN_PASSWORD_LENGTH = 3;
 const uint32_t MAX_PASSWORD_LENGTH = 128;
 
-const std::map<std::string, NodeType> NODE_TYPES_MAP = {{"client", NodeType::Client}, {"router", NodeType::Router}};
-const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {
-    {"signal_server", BootstrapType::SignalServer},
-    {"list", BootstrapType::IpList},
-    {"start_node", BootstrapType::SignalServer}
-};
+const std::map<std::string, BootstrapType> BOOTSTRAP_TYPES_MAP = {{"list", BootstrapType::IpList}};
 
 static const size_t DEFAULT_NODE_KEY_ID = 0;
 static const double kTimeoutSeconds = 5;
+static std::regex ipv4Regex("^([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3})\\:([0-9]{1,5}) ([[:alnum:]]{32,})$");
+static std::regex ipv6Regex("^\\[([0-9a-z\\:\\.]+)\\]\\:([0-9]{1,5})$");
 
 static EndpointData readEndpoint(const boost::property_tree::ptree& config, const std::string& propName) {
     const boost::property_tree::ptree& epTree = config.get_child(propName);
 
     EndpointData result;
 
+    if (epTree.count(PARAM_NAME_ID)) {
+        result.id = epTree.get<std::string>(PARAM_NAME_ID);
+    }
+
     if (epTree.count(PARAM_NAME_IP)) {
         result.ipSpecified = true;
-        result.ip = ip::make_address(epTree.get<std::string>(PARAM_NAME_IP));
+        result.ip = epTree.get<std::string>(PARAM_NAME_IP);
     }
     else {
         result.ipSpecified = false;
@@ -153,23 +145,21 @@ static EndpointData readEndpoint(const boost::property_tree::ptree& config, cons
 }
 
 EndpointData EndpointData::fromString(const std::string& str) {
-    static std::regex ipv4Regex("^([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3})\\:([0-9]{1,5})$");
-    static std::regex ipv6Regex("^\\[([0-9a-z\\:\\.]+)\\]\\:([0-9]{1,5})$");
-
     std::smatch match;
     EndpointData result;
 
     if (std::regex_match(str, match, ipv4Regex)) {
-        result.ip = ip::make_address_v4(match[1]);
+        result.ip = match[1];
     }
     else if (std::regex_match(str, match, ipv6Regex)) {
-        result.ip = ip::make_address_v6(match[1]);
+        result.ip = match[1];
     }
     else {
         throw std::invalid_argument(str);
     }
 
     result.port = static_cast<uint16_t>(std::stoul(match[2]));
+    result.id = match[3];
 
     return result;
 }
@@ -212,6 +202,17 @@ void Config::swap(Config& config) {
     Config temp = std::move(config);
     config = std::move(*this);
     (*this) = std::move(temp);
+}
+
+void Config::updateKnownHosts(std::vector<cs::PeerData>& peers) const {
+  if (peers.empty()) return;
+
+  std::ofstream f(hostsFileName_);
+  if (!f.is_open()) return;
+
+  for (auto& p : peers) {
+    f << p.ip << ":" << p.port << " " << p.id << std::endl;
+  }
 }
 
 Config::Config(const ConveyerData& conveyerData)
@@ -291,7 +292,7 @@ static bool readPasswordFromCin(T& mem) {
     GetConsoleMode(hIn, &con_mode);
     SetConsoleMode(hIn, con_mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT));
 
-    while (ReadConsoleA(hIn, &ch, 1, &dwRead, NULL) && ch != RETURN) {
+    while (ReadConsoleA(hIn, &ch, 1, &dwRead, nullptr) && ch != RETURN) {
 #else
     const char BACKSPACE = 127;
     const char RETURN = 10;
@@ -468,7 +469,7 @@ void Config::showKeys(const std::string& pk58) {
     std::cout << "Seconds left:" << std::endl;
     std::clock_t start = std::clock();
     while (secondsPassed < kTimeoutSeconds) {
-        secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
+        secondsPassed = static_cast<double>(std::clock() - start) / CLOCKS_PER_SEC;
         if (prevSec < secondsPassed) {
             std::cout << static_cast<int>(kTimeoutSeconds - secondsPassed) << "\r" << std::flush;
             prevSec = secondsPassed + 1;
@@ -496,11 +497,13 @@ void Config::changePasswordOption(const std::string& pathToSk) {
     double prevSec = 0;
     std::clock_t start = std::clock();
     while (secondsPassed < kTimeoutSeconds) {
-        secondsPassed = (double)(std::clock() - start) / CLOCKS_PER_SEC;
+        secondsPassed = static_cast<double>(std::clock() - start) / CLOCKS_PER_SEC;
+
         if (prevSec < secondsPassed) {
             std::cout << static_cast<int>(kTimeoutSeconds - secondsPassed) << "\r" << std::flush;
             prevSec = secondsPassed + 1;
         }
+
         if (_kbhit()) {
             if (_getch() == 'p') {
                 std::cout << "Encrypting the private key file with new password..." << std::endl;
@@ -740,13 +743,17 @@ Config Config::readFromFile(const std::string& fileName) {
 
         result.ipv6_ = !(params.count(PARAM_NAME_USE_IPV6) && params.get<std::string>(PARAM_NAME_USE_IPV6) == "false");
 
+        if (params.count(PARAM_NAME_TRAVERSE_NAT)) {
+            result.traverseNAT_ = (params.get<std::string>(PARAM_NAME_TRAVERSE_NAT) == "true");
+        }
+
         result.minNeighbours_ = params.count(PARAM_NAME_MIN_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MIN_NEIGHBOURS) : DEFAULT_MIN_NEIGHBOURS;
         result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) : DEFAULT_MAX_NEIGHBOURS;
         result.restrictNeighbours_ = params.count(PARAM_NAME_RESTRICT_NEIGHBOURS) ? params.get<bool>(PARAM_NAME_RESTRICT_NEIGHBOURS) : false;
 
-        if (result.maxNeighbours_ > Neighbourhood::MaxNeighbours) {
+        if (result.maxNeighbours_ > Neighbourhood::kMaxNeighbours) {
             // see neighbourhood.hpp, some containers are of static size
-            result.maxNeighbours_ = Neighbourhood::MaxNeighbours;
+            result.maxNeighbours_ = Neighbourhood::kMaxNeighbours;
         }
 
         if (params.count(PARAM_NAME_COMPATIBLE_VERSION)) {
@@ -756,18 +763,7 @@ Config Config::readFromFile(const std::string& fileName) {
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
         result.observerWaitTime_ = params.count(PARAM_NAME_OBSERVER_WAIT_TIME) ? params.get<uint64_t>(PARAM_NAME_OBSERVER_WAIT_TIME) : DEFAULT_OBSERVER_WAIT_TIME;
         result.roundElapseTime_ = params.count(PARAM_NAME_ROUND_ELAPSE_TIME) ? params.get<uint64_t>(PARAM_NAME_ROUND_ELAPSE_TIME) : DEFAULT_ROUND_ELAPSE_TIME;
-
-        {
-            double percents = DEFAULT_BROADCAST_FILLING;
-            if (params.count(PARAM_NAME_BROADCAST_FILLING)) {
-                percents = params.get<double>(PARAM_NAME_BROADCAST_FILLING);
-                if (percents > 100.) percents = 100.;
-                if (percents < 10.) percents = 10.;
-            }
-            result.broadcastCoefficient_ = percents * 0.01;
-        }
-
-        result.nType_ = getFromMap(params.get<std::string>(PARAM_NAME_NODE_TYPE), NODE_TYPES_MAP);
+        result.storeBlockElapseTime_ = params.count(PARAM_NAME_STORE_BLOCK_ELAPSE_TIME) ? params.get<uint64_t>(PARAM_NAME_STORE_BLOCK_ELAPSE_TIME) : DEFAULT_STORE_BLOCK_ELAPSE_TIME;
 
         if (config.count(BLOCK_NAME_HOST_ADDRESS)) {
             result.hostAddressEp_ = readEndpoint(config, BLOCK_NAME_HOST_ADDRESS);
@@ -777,36 +773,50 @@ Config Config::readFromFile(const std::string& fileName) {
             result.symmetric_ = true;
         }
 
-        result.bType_ = getFromMap(params.get<std::string>(PARAM_NAME_BOOTSTRAP_TYPE), BOOTSTRAP_TYPES_MAP);
+        result.hostsFileName_ = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
 
-        if (result.bType_ == BootstrapType::SignalServer || result.nType_ == NodeType::Router) {
-            try {
-                result.signalServerEp_ = readEndpoint(config, BLOCK_NAME_START_NODE);
-            }
-            catch (std::exception&) {
-                result.signalServerEp_ = readEndpoint(config, BLOCK_NAME_SIGNAL_SERVER);
+        std::string initTrustedFileName;
+        try {
+            initTrustedFileName = params.get<std::string>(PARAM_NAME_INITIAL_TRUSTED);
+        } catch (...) {}
+
+        std::string line;
+
+        std::ifstream hostsFile;
+        hostsFile.exceptions(std::ifstream::failbit);
+        try {
+            hostsFile.open(result.hostsFileName_);
+        }
+        catch (std::ios_base::failure& fail) {
+            cserror() << "failed to open file " << result.hostsFileName_;
+            throw fail;
+        }
+        hostsFile.exceptions(std::ifstream::goodbit);
+
+        while (getline(hostsFile, line)) {
+            if (!line.empty()) {
+                result.bList_.push_back(EndpointData::fromString(line));
             }
         }
 
-        if (result.bType_ == BootstrapType::IpList) {
-            const auto hostsFileName = params.get<std::string>(PARAM_NAME_HOSTS_FILENAME);
+        if (result.bList_.empty()) {
+            throw std::length_error("No hosts specified");
+        }
 
-            std::string line;
+        hostsFile.close();
+        hostsFile.open(initTrustedFileName);
 
-            std::ifstream hostsFile;
-            hostsFile.exceptions(std::ifstream::failbit);
-            hostsFile.open(hostsFileName);
-            hostsFile.exceptions(std::ifstream::goodbit);
-
-            while (getline(hostsFile, line)) {
-                if (!line.empty()) {
-                    result.bList_.push_back(EndpointData::fromString(line));
-                }
+        cs::Bytes bytes;
+        while (getline(hostsFile, line)) {
+            if (!line.empty() && DecodeBase58(line, bytes)) {
+                cs::PublicKey key;
+                std::copy(bytes.begin(), bytes.end(), key.begin());
+                result.initialConfidants_.push_back(key);
             }
+        }
 
-            if (result.bList_.empty()) {
-                throw std::length_error("No hosts specified");
-            }
+        if (result.initialConfidants_.empty()) {
+            csdebug() << "No initial confidants specified.";
         }
 
         if (params.count(PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS) > 0) {
@@ -881,11 +891,7 @@ void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config)
 
     const boost::property_tree::ptree& data = config.get_child(block);
 
-    checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_ONE_REPLY_BLOCK, poolSyncData_.oneReplyBlock);
-    checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_FAST_MODE, poolSyncData_.isFastMode);
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_POOLS_COUNT, poolSyncData_.blockPoolsCount);
-    checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_ROUND_COUNT, poolSyncData_.requestRepeatRoundCount);
-    checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_PACKET_COUNT, poolSyncData_.neighbourPacketsCount);
     checkAndSaveValue(data, block, PARAM_NAME_POOL_SYNC_SEQ_VERIF_FREQ, poolSyncData_.sequencesVerificationFrequency);
 }
 
@@ -934,8 +940,6 @@ void Config::readConveyerData(const boost::property_tree::ptree& config) {
 
     const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_CONVEYER);
 
-    checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_SEND_CACHE, conveyerData_.sendCacheValue);
-    checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_MAX_RESENDS_SEND_CACHE, conveyerData_.maxResendsSendCache);
     checkAndSaveValue(data, BLOCK_NAME_CONVEYER, PARAM_NAME_CONVEYER_MAX_PACKET_LIFETIME, conveyerData_.maxPacketLifeTime);
 }
 
@@ -944,7 +948,9 @@ void Config::readEventsReportData(const boost::property_tree::ptree& config) {
         eventsReport_.on = false;
         return;
     }
+
     eventsReport_.on = false;
+
     try {
         eventsReport_.collector_ep = readEndpoint(config, BLOCK_NAME_EVENT_REPORTER);
         eventsReport_.on = true;
@@ -966,7 +972,6 @@ void Config::readEventsReportData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_REJECT_CONTRACT_EXECUTION, eventsReport_.reject_contract_execution);
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_REJECT_CONTRACT_CONSENSUS, eventsReport_.reject_contract_consensus);
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_ALARM_INVALID_BLOCK, eventsReport_.alarm_invalid_block);
-    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_BIG_BANG, eventsReport_.big_bang);
 }
 
 void Config::readDbSQLData(const boost::property_tree::ptree& config) {
@@ -1016,13 +1021,7 @@ bool Config::checkAndSaveValue(const boost::property_tree::ptree& data, const st
 }
 
 bool operator==(const EndpointData& lhs, const EndpointData& rhs) {
-#if !defined(BOOST_ASIO_NO_DEPRECATED)
-    boost::system::error_code ec;
-    auto result = lhs.ip.to_string(ec) == rhs.ip.to_string(ec);
-#else
-    auto result = lhs.ip.to_string() == rhs.ip.to_string();
-#endif
-    return result &&
+    return lhs.ip == rhs.ip &&
            lhs.port == rhs.port &&
            lhs.ipSpecified == rhs.ipSpecified;
 }
@@ -1032,11 +1031,7 @@ bool operator!=(const EndpointData& lhs, const EndpointData& rhs) {
 }
 
 bool operator==(const PoolSyncData& lhs, const PoolSyncData& rhs) {
-    return lhs.oneReplyBlock == rhs.oneReplyBlock &&
-           lhs.isFastMode == rhs.isFastMode &&
-           lhs.blockPoolsCount == rhs.blockPoolsCount &&
-           lhs.requestRepeatRoundCount && rhs.requestRepeatRoundCount &&
-           lhs.neighbourPacketsCount && rhs.neighbourPacketsCount &&
+    return lhs.blockPoolsCount == rhs.blockPoolsCount &&
            lhs.sequencesVerificationFrequency && rhs.sequencesVerificationFrequency;
 }
 
@@ -1071,9 +1066,7 @@ bool operator!=(const ApiData& lhs, const ApiData& rhs) {
 }
 
 bool operator==(const ConveyerData& lhs, const ConveyerData& rhs) {
-    return lhs.sendCacheValue == rhs.sendCacheValue &&
-           lhs.maxResendsSendCache == rhs.maxResendsSendCache &&
-           lhs.maxPacketLifeTime == rhs.maxPacketLifeTime;
+    return lhs.maxPacketLifeTime == rhs.maxPacketLifeTime;
 }
 
 bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs) {
@@ -1119,7 +1112,6 @@ bool operator==(const Config& lhs, const Config& rhs) {
         lhs.inputEp_ == rhs.inputEp_ &&
         lhs.twoSockets_ == rhs.twoSockets_ &&
         lhs.outputEp_ == rhs.outputEp_ &&
-        lhs.nType_ == rhs.nType_ &&
         lhs.ipv6_ == rhs.ipv6_ &&
         lhs.minNeighbours_ == rhs.minNeighbours_ &&
         lhs.maxNeighbours_ == rhs.maxNeighbours_ &&
@@ -1127,8 +1119,6 @@ bool operator==(const Config& lhs, const Config& rhs) {
         lhs.connectionBandwidth_ == rhs.connectionBandwidth_ &&
         lhs.symmetric_ == rhs.symmetric_ &&
         lhs.hostAddressEp_ == rhs.hostAddressEp_ &&
-        lhs.bType_ == rhs.bType_ &&
-        lhs.signalServerEp_ == rhs.signalServerEp_ &&
         lhs.bList_ == rhs.bList_ &&
         lhs.pathToDb_ == rhs.pathToDb_ &&
         lhs.publicKey_ == rhs.publicKey_ &&
@@ -1140,6 +1130,7 @@ bool operator==(const Config& lhs, const Config& rhs) {
         lhs.recreateIndex_ == rhs.recreateIndex_ &&
         lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
         lhs.roundElapseTime_ == rhs.roundElapseTime_ &&
+        lhs.storeBlockElapseTime_ == rhs.storeBlockElapseTime_ &&
         lhs.conveyerData_ == rhs.conveyerData_ &&
         lhs.minCompatibleVersion_ == rhs.minCompatibleVersion_ &&
         lhs.eventsReport_ == rhs.eventsReport_;

@@ -211,6 +211,8 @@ void cs::Executor::stop() {
         }
     }
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
     if (manager_.isExecutorProcessRunning()) {
         manager_.stopExecutorProcess();
     }
@@ -783,7 +785,7 @@ void cs::Executor::checkExecutorVersion() {
             notifyError();
         };
 
-        cs::Concurrent::run(terminate, cs::ConcurrentPolicy::Thread);
+        cs::Concurrent::run(cs::ConcurrentPolicy::Thread, terminate);
     }
 }
 
@@ -855,7 +857,7 @@ cs::Executor::Executor(const cs::ExecutorSettings::Types& types)
         cslog() << "Executor watcher thread finished";
     };
 
-    cs::Concurrent::run(watcher, cs::ConcurrentPolicy::Thread);
+    cs::Concurrent::run(cs::ConcurrentPolicy::Thread, watcher);
 }
 
 cs::Executor::~Executor() {
@@ -914,7 +916,7 @@ void cs::Executor::deleteAccessId(const general::AccessID& accessId) {
 
 std::optional<cs::Executor::OriginExecuteResult> cs::Executor::execute(const std::string& address, const executor::SmartContractBinary& smartContractBinary,
                                                                        std::vector<executor::MethodHeader>& methodHeader, bool isGetter, cs::Sequence explicitSequence, uint64_t time) {
-    constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
+    const uint64_t EXECUTION_TIME = Consensus::TimeSmartContract;
     OriginExecuteResult originExecuteRes{};
 
     if (!isConnected()) {

@@ -3,18 +3,24 @@
 
 #include <ContractExecutor.h>
 #include <base58.h>
+
 #include <cscrypto/cryptoconstants.hpp>
+
 #include <csdb/currency.hpp>
+
+#include <csnode/configholder.hpp>
 #include <csnode/datastream.hpp>
 #include <csnode/transactionsiterator.hpp>
 #include <csnode/eventreport.hpp>
 #include <csnode/fee.hpp>
+
 #include <lib/system/logger.hpp>
-#include <csnode/fee.hpp>
+
 #include <functional>
 #include <memory>
 #include <optional>
 #include <sstream>
+
 #include <serializer.hpp>
 
 namespace {
@@ -125,14 +131,14 @@ namespace cs {
 
 csdb::UserField SmartContractRef::to_user_field() const {
     cs::Bytes data;
-    cs::DataStream stream(data);
+    cs::ODataStream stream(data);
     stream << csdb::PoolHash{} /*for compatibility*/ << sequence << transaction;
     return csdb::UserField(stream.convert<std::string>());
 }
 
 void SmartContractRef::from_user_field(const csdb::UserField& fld) {
     std::string data = fld.value<std::string>();
-    cs::DataStream stream(data.c_str(), data.size());
+    cs::IDataStream stream(data.c_str(), data.size());
     csdb::PoolHash dummy; // for compatibility
     stream >> dummy >> sequence >> transaction;
     if (!stream.isValid() || stream.isAvailable(1)) {
@@ -182,7 +188,6 @@ void SmartContracts::QueueItem::add(const SmartContractRef& ref_contract, csdb::
 /*explicit*/
 SmartContracts::SmartContracts(BlockChain& blockchain, CallsQueueScheduler& calls_queue_scheduler)
 : scheduler(calls_queue_scheduler)
-, force_execution(false)
 , bc(blockchain)
 , executor_ready(true)
 , max_read_sequence(0)
@@ -201,7 +206,6 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
         exec_handler_ptr = connector_ptr->apiExecHandler();
     }
     node_id = id;
-    force_execution = pnode->alwaysExecuteContracts();
 }
 
 /*public*/
@@ -748,7 +752,7 @@ void SmartContracts::test_exe_queue(bool reading_db) {
 
         if (!reading_db) {
             // call to executor only if is trusted relatively to this contract
-            if (it->is_executor || force_execution) {
+            if (it->is_executor || cs::ConfigHolder::instance().config()->alwaysExecuteContracts()) {
                 // final decision to execute contract is here, based on executor availability
                 if (it->is_executor && !executor_ready && !test_executor_availability()) {
                     cslog() << kLogPrefix << "skip " << FormatRef(it->seq_enqueue) << ", execution is not allowed (executor is not connected)";
@@ -2392,7 +2396,7 @@ void SmartContracts::on_reject(const std::vector<Node::RefExecution>& reject_lis
                     if (it_state != known_contracts.cend()) {
                         const SmartContractRef& last_success_exe = it_state->second.ref_execute;
                         if (last_success_exe.sequence == sequence) {
-                            executions.remove_if([=](uint16_t n) { return n <= last_success_exe.transaction; });
+                            executions.remove_if([=](uint32_t n) { return n <= last_success_exe.transaction; });
                         }
                     }
                     cnt_ignored -= executions.size();
@@ -2932,7 +2936,7 @@ bool SmartContracts::dbcache_update(const BlockChain& blockchain, const csdb::Ad
         // test if new data is actually newer than stored data
         cs::Bytes current_data;
         if (blockchain.getContractData(abs_addr, current_data)) {
-            cs::DataStream stream(current_data.data(), current_data.size());
+            cs::IDataStream stream(current_data.data(), current_data.size());
             SmartContractRef current_ref;
             stream >> current_ref.sequence >> current_ref.transaction;
             if (current_ref.sequence > ref_start.sequence) {
@@ -2952,7 +2956,7 @@ bool SmartContracts::dbcache_update(const BlockChain& blockchain, const csdb::Ad
     }
 
     cs::Bytes data;
-    cs::DataStream stream(data);
+    cs::ODataStream stream(data);
     stream << ref_start.sequence << ref_start.transaction << state;
     return blockchain.updateContractData(abs_addr, data);
 }
@@ -2965,7 +2969,7 @@ bool SmartContracts::dbcache_read(const BlockChain& blockchain, const csdb::Addr
     if (!blockchain.getContractData(abs_addr, data)) {
         return false;
     }
-    cs::DataStream stream(data.data(), data.size());
+    cs::IDataStream stream(data.data(), data.size());
     stream >> ref_start.sequence >> ref_start.transaction >> state;
     // compatibility with obsolete format, possible the block hash has been read instead of contract state
     if (stream.isAvailable(sizeof(size_t)) && state.size() == cscrypto::kHashSize) {
@@ -3018,7 +3022,7 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
 
     cs::SmartContractRef ref;
     std::string state;
-    cs::DataStream stream(contract_data.data(), contract_data.size());
+    cs::IDataStream stream(contract_data.data(), contract_data.size());
     stream >> ref.sequence >> ref.transaction >> state;
 
     if (stream.isValid() && !stream.isAvailable(1)) {

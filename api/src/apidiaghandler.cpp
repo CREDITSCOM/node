@@ -12,12 +12,7 @@
 //extern std::string fromByteArray(const cs::PublicKey& key);
 template <typename TArr>
 std::string to_string(const TArr& ar) {
-    std::string res;
-    {
-        res.reserve(ar.size());
-        std::transform(ar.begin(), ar.end(), std::back_inserter<std::string>(res), [](uint8_t _) { return char(_); });
-    }
-    return res;
+    return std::string(ar.begin(), ar.end());
 }
 
 namespace api_diag {
@@ -32,13 +27,45 @@ namespace api_diag {
         : node_(node)
     {}
 
+    void APIDiagHandler::GetActiveNodes(ActiveNodesResult& _return) {
+        general::APIResponse resp;
+        resp.__set_code(kOk);
+        _return.__set_result(resp);
+
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        std::vector<api_diag::ServerNode> nodes;
+
+        auto task = [&]() {
+            node_.getKnownPeers(nodes);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+
+        _return.__set_nodes(nodes);
+    }
+
+    void APIDiagHandler::GetActiveTransactionsCount(ActiveTransactionsResult& _return) {
+        general::APIResponse resp;
+        resp.__set_code(kOk);
+        _return.__set_result(resp);
+        _return.__set_count(std::to_string(node_.getTotalTransactionsCount()));
+    }
+
+
     void APIDiagHandler::GetTransaction(GetTransactionResponse& _return, const TransactionId& id) {
 
         const auto t = node_.getBlockChain().loadTransaction(csdb::TransactionID(id.sequence, id.index));
         
         general::APIResponse resp;
         if (!t.is_valid()) {
-            resp.__set_code(1); // failed
+            resp.__set_code(kError); // failed
             resp.__set_message("unable to load rewuested transaction");
         }
         else {
@@ -196,15 +223,18 @@ namespace api_diag {
                             break;
                         case csdb::UserField::Type::Integer:
                             {
-                                int64_t v = fld.value<int64_t>();
+                                uint64_t v = fld.value<uint64_t>();
                                 fld_data.__set_integer(v);
                                 using namespace cs::trx_uf::sp;
                                 if (fid == delegated) {
-                                    if (v == de::legate) {
+                                    if (v == de::legate || v >= de::legate_min_utc) {
                                         tt = TT_Delegation;
                                     }
                                     else if (v == de::legated_withdraw) {
                                         tt = TT_RevokeDelegation;
+                                    }
+                                    else if (v == de::legated_release) {
+                                        tt = TT_Release;
                                     }
                                 }
                             }
@@ -242,6 +272,30 @@ namespace api_diag {
             _return.__set_transaction(data);
         }
         _return.__set_status(resp);
+    }
+
+    void APIDiagHandler::GetNodeInfo(NodeInfoRespone& _return, const NodeInfoRequest& request) {
+        general::APIResponse resp;
+        resp.__set_code(kOk);
+        _return.__set_result(resp);
+
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        api_diag::NodeInfo info;
+        
+        auto task = [&]() {
+            node_.getNodeInfo(request, info);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+
+        _return.__set_info(info);
     }
 
 }

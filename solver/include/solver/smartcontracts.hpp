@@ -410,6 +410,16 @@ public:
         return is_payable_target(t);
     }
 
+    size_t contracts_count() const {
+        cs::Lock lock(public_access_lock);
+        return known_contracts.size();
+    }
+
+    size_t contracts_queue_size() const {
+        cs::Lock lock(public_access_lock);
+        return exe_queue.size();
+    }
+
     bool executionAllowed();
 
     /**
@@ -475,9 +485,6 @@ public signals:
 
     // emits on every update of contract state both during reading db and getting block in real time
     SmartContractSignal contract_state_updated;
-
-    // flag to always execute contracts even in normal state
-    bool force_execution;
 
 public slots:
     // called when execute_async() completed

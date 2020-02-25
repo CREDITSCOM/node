@@ -68,7 +68,7 @@ const cs::PublicKey& SolverCore::getWriterPublicKey() const {
     return Zero::key;
 }
 
-bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
+bool SolverCore::checkNodeStake(const cs::PublicKey& sender) {
     if (cs::Conveyer::instance().currentRoundNumber() < Consensus::StartingDPOS) {
         csdebug() << "The DPOS doesn't work unless the roundNumber is less than " << Consensus::StartingDPOS;
         return true;
@@ -83,7 +83,7 @@ bool SolverCore::checkNodeCache(const cs::PublicKey& sender) {
 
 void SolverCore::addToGraylist(const cs::PublicKey & sender, uint32_t rounds) {
     if (grayList_.find(sender) == grayList_.cend()) {
-        grayList_.emplace(sender, rounds);
+        grayList_.emplace(sender, uint16_t(rounds));
         csdebug() << "Node " << cs::Utils::byteStreamToHex(sender.data(), sender.size()) << " is in gray list now";
         EventReport::sendGrayListUpdate(*pnode, sender, true /*added*/, rounds);
     }
@@ -102,7 +102,7 @@ void SolverCore::gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize
     }
 
     // DPOS check start -> comment if unnecessary
-    if (!checkNodeCache(sHash.sender)) {
+    if (!checkNodeStake(sHash.sender)) {
         csdebug() << "The sender's cash value is too low -> Don't allowed to be a confidant";
         return;
     }
@@ -112,8 +112,13 @@ void SolverCore::gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize
         csdebug() << "Stake value is lower than that in this node, trow this hash";
     }
     auto rNum = cs::Conveyer::instance().currentRoundNumber();
-    auto it = std::find_if(recv_hash.cbegin(), recv_hash.cend(), [sHash, rNum](const cs::StageHash& sh)
-    { return ((sHash.sender == sh.sender) && (sHash.realTrustedSize > sh.realTrustedSize) && (sHash.round == rNum)); });
+    bool isBootstrap = pnode->isBootstrapRound();
+    auto it = std::find_if(
+        recv_hash.cbegin(), recv_hash.cend(), 
+        [sHash, rNum, isBootstrap](const cs::StageHash& sh) {
+            return ((sHash.sender == sh.sender) && (isBootstrap || sHash.realTrustedSize > sh.realTrustedSize) && (sHash.round == rNum));
+        }
+    );
     if (it != recv_hash.cend()) {
         recv_hash.erase(it);
     }
@@ -139,7 +144,7 @@ void SolverCore::beforeNextRound() {
     if (!pstate) {
         return;
     }
-    pstate->onRoundEnd(*pcontext, false /*is_bigbang*/);
+    pstate->onRoundEnd(*pcontext, false /*isBootstrap*/);
 }
 
 void SolverCore::nextRound(bool updateRound) {
@@ -244,10 +249,6 @@ void SolverCore::gotStageTwoRequest(uint8_t requester, uint8_t required) {
 
 uint8_t SolverCore::currentStage3iteration() {
     return currentStage3iteration_;
-}
-
-bool SolverCore::isBlackListed(const cs::PublicKey pKey) {
-    return pnode->isBlackListed(pKey);
 }
 
 void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required, uint8_t iteration) {
@@ -499,6 +500,12 @@ void SolverCore::updateGrayList(cs::RoundNumber round) {
 void SolverCore::resetGrayList() {
     grayList_.clear();
     EventReport::sendGrayListUpdate(*pnode, Zero::key, false /*removed*/); // for 1 round clear, 1 is default
+}
+
+void SolverCore::getGrayListContentBase58(std::vector<std::string>& gray_list) const {
+    for (const auto& item : grayList_) {
+        gray_list.emplace_back(EncodeBase58(item.first.data(), item.first.data() + item.first.size()));
+    }
 }
 
 cs::Bytes SolverCore::getRealTrusted() {

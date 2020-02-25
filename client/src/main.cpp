@@ -169,8 +169,8 @@ int main(int argc, char* argv[]) {
         (argSeed, "enter with seed instead of keys")
         (argSetBCTop, po::value<uint64_t>(), "all blocks in blockchain with higher sequence will be removed")
         ("disable-auto-shutdown", "node will be prohibited to shutdown in case of fatal errors")
-        (argVersion, "show node version")
-        (argDBPath, po::value<std::string>(), "path to DB (default: \"db/\")")
+        ("version", "show node version")
+        ("db-path", po::value<std::string>(), "path to DB (default: \"db/\")")
         ("config-file", po::value<std::string>(), "path to configuration file (default: \"config.ini\")")
         ("public-key-file", po::value<std::string>(), "path to public key file (default: \"NodePublic.txt\")")
         ("private-key-file", po::value<std::string>(), "path to private key file (default: \"NodePrivate.txt\")")
@@ -277,8 +277,9 @@ int main(int argc, char* argv[]) {
 
     if (vm.count(argSetBCTop) > 0) {
         node.stop();
+        node.destroy();
         logger::cleanup();
-        std::_Exit(EXIT_SUCCESS);
+        return 0;
     }
 
     std::cout << "Running Node\n";
@@ -292,5 +293,5 @@ int main(int argc, char* argv[]) {
     logger::cleanup();
 
     std::cout << "Logger cleaned" << std::endl;
-    std::_Exit(EXIT_SUCCESS);
+    return 0;
 }

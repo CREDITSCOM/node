@@ -1,3 +1,5 @@
+#define TESTING
+
 #include "gtest/gtest.h"
 #include <csnode/transactionstail.hpp>
 
@@ -9,7 +11,7 @@ TEST(TransactionTail, BasicOperations) {
 
     uint64_t maxId = 0;
     uint64_t cnt = 0;
-    uint64_t lastAllowed = 0;
+//    uint64_t lastAllowed = 0;
     uint64_t maxHeap = 0;
     for (uint64_t j = 0; j < 10; ++j) {
         uint64_t deltaPlus = 1000;// std::rand() % 1000;

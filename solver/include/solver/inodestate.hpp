@@ -80,7 +80,7 @@ public:
     virtual void expired(SolverContext& context) = 0;
 
     /**
-     * @fn  virtual void INodeState::onRoundEnd(SolverContext& context, bool is_bigbang) = 0;
+     * @fn  virtual void INodeState::onRoundEnd(SolverContext& context, bool Bootstrap) = 0;
      *
      * @brief   Called on the current round end
      *
@@ -88,10 +88,10 @@ public:
      * @date    01.10.2018
      *
      * @param [in,out]  context     The context.
-     * @param           is_bigbang  True if round finished by bigbang, false if not (normal finish).
+     * @param           is_Bootstrap  True if round finished by Bootstrap, false if not (normal finish).
      */
 
-    virtual void onRoundEnd(SolverContext& context, bool is_bigbang) = 0;
+    virtual void onRoundEnd(SolverContext& context, bool isBootstrap) = 0;
 
     /**
      * @fn  virtual Result INodeState::onRoundTable(SolverContext& context, const cs::RoundNumber round) = 0;

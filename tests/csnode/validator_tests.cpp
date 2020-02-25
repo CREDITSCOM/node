@@ -21,7 +21,6 @@ TEST(TransactionsValidator, multi) {
     csdb::Address src = csdb::Address::from_public_key(bytes);
     DecodeBase58("G2GeLfwjg6XuvoWnZ7ssx9EPkEBqbYL3mw3fusgpzoBk", bytes);
     csdb::Address tgt = csdb::Address::from_public_key(bytes);
-    PrivKey privKey;
     DecodeBase58("4h6D57iTFE7883ZMMee7rW7LgLm6G46Jz4YVzrp91LfSxQGFxQnNF5QHqnrn4Q9KKVyXfRQJrCiM7rVtNHMPCcwM", bytes);
     ASSERT_TRUE(bytes.size() == 64);
     // basic transaction

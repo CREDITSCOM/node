@@ -79,7 +79,7 @@ namespace cs {
 
         message.reserve(expectedMessageSize);
 
-        cs::DataStream stream(message);
+        cs::ODataStream stream(message);
         stream << sender;
         stream << hash;
         stream << trustedCandidates;
@@ -112,7 +112,7 @@ namespace cs {
 
         message.reserve(stageBytesSize);
 
-        cs::DataStream stream(message);
+        cs::ODataStream stream(message);
         stream << sender;
         stream << signatures;
         stream << hashes;
@@ -140,7 +140,7 @@ namespace cs {
         message.clear();
         message.reserve(stageSize);
 
-        cs::DataStream stream(message);
+        cs::ODataStream stream(message);
         stream << sender;
         stream << writer;
         stream << iteration;
@@ -167,7 +167,7 @@ namespace cs {
             return false;
         }
         std::string a = " ";//fees
-        DataStream stream(message);
+        ODataStream stream(message);
         stream << sender;
         stream << id;
         //bad implementation
@@ -187,7 +187,7 @@ namespace cs {
     bool StageOneSmarts::fillFromBinary()
     {
         std::string a; //fees
-        DataStream stream(message.data(), message.size());
+        IDataStream stream(message.data(), message.size());
         stream >> sender; //is not larger than confidants number
         stream >> id; //is in the range of current smart IDs
         //bad implementation

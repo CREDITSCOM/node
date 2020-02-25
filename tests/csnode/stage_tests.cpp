@@ -32,7 +32,6 @@ TEST(StageTwo, Constructors) {
     //init_zero(fake):
     fake.sender = cs::InvalidSender;
     fake.signature.fill(0);
-    size_t cnt = 3;
     fake.hashes.resize(3, cs::Zero::hash);
     fake.signatures.resize(3, cs::Zero::signature);
 

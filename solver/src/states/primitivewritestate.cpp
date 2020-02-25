@@ -11,8 +11,8 @@ void PrimitiveWriteState::on(SolverContext& context) {
     SolverContext* pctx = &context;
 
     if (cs::Conveyer::instance().currentRoundNumber() == 0) {
-        csdebug() << name() << ": start track timeout " << Consensus::T_round << " ms to spawn first round";
-        context.scheduler().InsertOnce(Consensus::T_round,
+        csdebug() << name() << ": start track timeout " << Consensus::TimeRound << " ms to spawn first round";
+        context.scheduler().InsertOnce(Consensus::TimeRound,
                                        [pctx, this]() {
                                            csdebug() << name() << ": it is time to spawn first round";
                                            trusted_candidates.assign(Consensus::MinTrustedNodes, pctx->public_key());

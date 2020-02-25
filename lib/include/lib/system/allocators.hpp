@@ -13,6 +13,11 @@
 #include "logger.hpp"
 #include "utils.hpp"
 
+#ifdef __cpp_lib_memory_resource
+#include <memory_resource>
+#endif
+
+namespace cs {
 /* Now, RegionAllocator provides a basic allocation strategy, where we
    malloc() several memory pages of predefined size and a page can be
    reused if and only if all of its memory has been unuse()d.
@@ -73,31 +78,47 @@ using RegionPtr = Region::RegionPtr;
 
 class CompressedRegion {
 public:
-    using SizeType = Region::SizeType;
+    using SizeType = cs::Bytes::size_type;
     using BinarySizeType = size_t;
 
     CompressedRegion() = default;
+    CompressedRegion(const CompressedRegion&) = default;
+    CompressedRegion(CompressedRegion&&) = default;
 
-    explicit CompressedRegion(RegionPtr ptr, size_t binary)
+    CompressedRegion& operator=(const CompressedRegion&) = default;
+    CompressedRegion& operator=(CompressedRegion&&) = default;
+
+    ~CompressedRegion() = default;
+
+    template<typename T, typename = std::enable_if_t<std::is_same_v<T, cs::Bytes>>>
+    explicit CompressedRegion(T&& bytes, size_t binary)
     : binarySize_(binary)
-    , ptr_(std::move(ptr)) {
+    , bytes_(std::move(bytes)) {
     }
 
     size_t binarySize() const {
         return binarySize_;
     }
 
+    cs::Byte* data()  {
+        return bytes_.data();
+    }
+
     cs::Byte* data() const {
-        return static_cast<cs::Byte*>(ptr_->data());
+        return const_cast<cs::Byte*>(bytes_.data());
     }
 
     auto size() const {
-        return ptr_->size();
+        return bytes_.size();
+    }
+
+    const cs::Bytes& bytes() const {
+        return bytes_;
     }
 
 private:
     size_t binarySize_{};
-    RegionPtr ptr_;
+    cs::Bytes bytes_;
 };
 
 /* ActivePage points to a page with some free memory.
@@ -389,5 +410,23 @@ inline void TypedSlot<T>::unuse() {
         allocator_->remove(this);
     }
 }
+
+// size - default bytes buffer size
+template<size_t size>
+class PmrAllocator {
+#ifdef __cpp_lib_memory_resource
+public:
+    PmrAllocator():resource_(std::begin(buffer_), std::size(buffer_), std::pmr::new_delete_resource()) {}
+
+    std::pmr::monotonic_buffer_resource* resource() const {
+        return &resource_;
+    }
+
+private:
+    cs::Byte buffer_[size];
+    mutable std::pmr::monotonic_buffer_resource resource_;
+#endif
+};
+}   // namespace cs
 
 #endif  // ALLOCATORS_HPP

@@ -46,17 +46,17 @@ void TrustedPostStageState::on(SolverContext& context) {
                                     csdebug() << name() << ": direct request for absent stages-3";
                                     //request_stages(*pctx);
                                     // start subsequent track timeout for "wide" request
-                                    csdebug() << name() << ": start subsequent track timeout " << Consensus::T_stage_request << " ms to request neighbors about stages-3";
+                                    csdebug() << name() << ": start subsequent track timeout " << Consensus::TimeStageRequest << " ms to request neighbors about stages-3";
                                     timeout_request_neighbors.start(
-                                        pctx->scheduler(), Consensus::T_stage_request,
+                                        pctx->scheduler(), Consensus::TimeStageRequest,
                                         // timeout #2 handler:
                                         [pctx, this]() {
                                             csdebug() << name() << ": timeout for transition is expired, make requests to neighbors";
                                             request_stages_neighbors(*pctx);
                                             // timeout #3 handler
-                                            csdebug() << name() << ": start subsequent track timeout " << Consensus::T_stage_request << " ms to give up in receiving stages-3";
+                                            csdebug() << name() << ": start subsequent track timeout " << Consensus::TimeStageRequest << " ms to give up in receiving stages-3";
                                             timeout_force_transition.start(
-                                                pctx->scheduler(), Consensus::T_stage_request,
+                                                pctx->scheduler(), Consensus::TimeStageRequest,
                                                 [pctx, this]() {
                                                     csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound and recalculate the signatures";
                                                     mark_outbound_nodes(*pctx);

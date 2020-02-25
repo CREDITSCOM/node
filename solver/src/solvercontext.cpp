@@ -120,10 +120,6 @@ void SolverContext::spawn_next_round(cs::StageThree& st3) {
         return;
     }
 
-    if (st3.writer == st3.sender) {
-        core.pnode->sendConfidants(core.trusted_candidates);
-    }
-
     std::string tStamp;
 
     if (st3.writer != InvalidConfidantIndex) {
@@ -265,6 +261,10 @@ void SolverContext::send_liar_report(const cs::PublicKey& liar_key) {
 
 void SolverContext::send_consensus_failed_report() {
     EventReport::sendConsensusFailed(*core.pnode, core.getPublicKey());
+}
+
+bool SolverContext::is_round_duration_limited() const {
+    return true; // !core.pnode->isBootstrapRound();
 }
 
 }  // namespace cs

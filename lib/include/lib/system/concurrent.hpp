@@ -362,7 +362,7 @@ public:
 
     // runs function entity by concurrent policy
     template <typename Func>
-    static void run(Func&& function, cs::ConcurrentPolicy policy) {
+    static void run(cs::ConcurrentPolicy policy, Func&& function) {
         if (policy == cs::ConcurrentPolicy::ThreadPool) {
             Worker::execute(std::forward<Func>(function));
         }

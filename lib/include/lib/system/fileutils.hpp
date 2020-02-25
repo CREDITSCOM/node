@@ -15,6 +15,8 @@
 #include <fstream>
 
 #include <lib/system/common.hpp>
+#include <lib/system/reflection.hpp>
+#include <lib/system/console.hpp>
 
 namespace cs {
 class FileUtils {
@@ -23,8 +25,14 @@ public:
         namespace fs = boost::filesystem;
 
         fs::path p(path);
-        boost::system::error_code code;
-        const auto res = fs::is_directory(p, code);
+        bool res = false;
+
+        try {
+            res = fs::is_directory(p);
+        }
+        catch (const std::exception& e) {
+            cs::Console::writeLine(funcName(), ", ", e.what());
+        }
 
         return res;
     }
@@ -33,8 +41,14 @@ public:
         namespace fs = boost::filesystem;
 
         fs::path p(path);
-        boost::system::error_code code;
-        const auto res = fs::create_directory(p, code);
+        bool res = false;
+
+        try {
+            res = fs::create_directory(p);
+        }
+        catch (const std::exception& e) {
+            cs::Console::writeLine(funcName(), ", ", e.what());
+        }
 
         return res;
     }
@@ -57,6 +71,22 @@ public:
 
         boost::system::error_code code;
         return fs::exists(fileName, code);
+    }
+
+    static bool removePath(const std::string& pathName) {
+        namespace fs = boost::filesystem;
+
+        fs::path path(pathName);
+        bool res = false;
+
+        try {
+            res = fs::remove_all(path);
+        }
+        catch (const std::exception& e) {
+            cs::Console::writeLine(funcName(), ", ", e.what());
+        }
+
+        return res;
     }
 };
 }

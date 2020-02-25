@@ -19,19 +19,23 @@ public:
         Expired
     };
 
+    struct Result {
+        cs::DumbCv::Condition condition;
+        csdb::TransactionID id{};
+    };
+
     bool addCVInfo(const cs::Signature& signature);
-    void sendCvSignal(const cs::Signature& signature, Condition condition);
-    Condition waitCvSignal(const cs::Signature& signature);
-    void setTransactionId(const csdb::TransactionID& id);
-    csdb::TransactionID getTransactionId() const;
+    void sendCvSignal(const cs::Signature& signature, Condition condition, const csdb::TransactionID& id);
+    DumbCv::Result waitCvSignal(const cs::Signature& signature);
+
 private:
     struct CvInfo {
         std::condition_variable cv;
         std::atomic_bool condFlg{ false };
         std::atomic<Condition> condition { Condition::Success };
+        csdb::TransactionID id{};
     };
 
-    csdb::TransactionID id_{};
     std::map<cs::Signature, CvInfo> cvInfo_;
     std::mutex mutex_;
 };

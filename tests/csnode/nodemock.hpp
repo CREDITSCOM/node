@@ -95,7 +95,6 @@ public:
   MOCK_METHOD0(generateKeys, void());
   MOCK_METHOD0(checkKeysForSignature, bool());
 
-  MOCK_METHOD1(readRoundData, bool(bool));
   MOCK_METHOD0(onRoundStart, void());
 };
 

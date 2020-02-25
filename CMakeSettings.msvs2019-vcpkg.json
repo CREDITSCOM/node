@@ -17,7 +17,7 @@
       "cmakeCommandArgs": "-v",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "cmakeToolchain": "D:/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "cmakeToolchain": "${env.VCPKG_TOOLCHAIN}",
       "variables": [
         {
           "name": "CMAKE_VS_MSBUILD_COMMAND",

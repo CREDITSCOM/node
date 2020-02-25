@@ -11,41 +11,37 @@ bool cs::DumbCv::addCVInfo(const cs::Signature& signature) {
     return true;
 }
 
-void cs::DumbCv::sendCvSignal(const cs::Signature& signature, Condition condition) {
+void cs::DumbCv::sendCvSignal(const cs::Signature& signature, Condition condition, const csdb::TransactionID& id) {
     cs::Lock lock(mutex_);
 
     if (auto it = cvInfo_.find(signature); it != cvInfo_.end()) {
-        auto& [cv, flag, cond] = it->second;
+        auto& [cv, flag, cond, i] = it->second;
         cond = condition;
         flag = true;
+        i = id;
+
         cv.notify_one();
     }
 }
 
-cs::DumbCv::Condition cs::DumbCv::waitCvSignal(const cs::Signature& signature) {
-    bool isTimeOver = false;
-    Condition condition = cs::DumbCv::Condition::TimeOut;
+cs::DumbCv::Result cs::DumbCv::waitCvSignal(const cs::Signature& signature) {
+    Result result;
+    result.condition = cs::DumbCv::Condition::TimeOut;
+
     std::unique_lock lock(mutex_);
 
     if (auto it = cvInfo_.find(signature); it != cvInfo_.end()) {
-        isTimeOver = it->second.cv.wait_for(lock, std::chrono::seconds(kWaitTimeSec), [it]() -> bool {
+        it->second.cv.wait_for(lock, std::chrono::seconds(kWaitTimeSec), [it]() -> bool {
             return it->second.condFlg;
         });
 
         if (it->second.condFlg) {
-            condition = it->second.condition;
+            result.condition = it->second.condition;
+            result.id = it->second.id;
         }
 
         cvInfo_.erase(signature);
     }
 
-    return condition;
-}
-
-void cs::DumbCv::setTransactionId(const csdb::TransactionID& id) {
-    id_ = id;
-}
-
-csdb::TransactionID cs::DumbCv::getTransactionId() const {
-    return id_;
+    return result;
 }

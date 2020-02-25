@@ -299,8 +299,8 @@ public:
         return core.getRealTrusted();
     }
 
-    bool checkNodeCache(cs::PublicKey sender) const {
-        return core.checkNodeCache(sender);
+    bool checkNodeStake(cs::PublicKey sender) const {
+        return core.checkNodeStake(sender);
     }
 
     size_t stagesThree() const {
@@ -384,10 +384,6 @@ public:
             return (core.markUntrusted[sender]);
         }
         return 0;
-    }
-
-    bool isBlackListed(cs::PublicKey pKey) {
-        return core.isBlackListed(pKey);
     }
 
     /**
@@ -577,6 +573,8 @@ public:
     void send_silent_report(const cs::PublicKey& silent_key);
     void send_liar_report(const cs::PublicKey& liar_key);
     void send_consensus_failed_report();
+
+    bool is_round_duration_limited() const;
 
 private:
   SolverCore& core;

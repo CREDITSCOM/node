@@ -1,289 +1,89 @@
-/* Send blaming letters to @yrtimd */
 #ifndef NEIGHBOURHOOD_HPP
 #define NEIGHBOURHOOD_HPP
 
-#include <deque>
-#include <queue>
-#include <list>
+#include <functional>
+#include <mutex>
+#include <unordered_map>
+#include <unordered_set>
+#include <set>
 
-#include <boost/asio.hpp>
+#include <networkcommands.hpp>
+#include <packet.hpp>
 
-#include <lib/system/allocators.hpp>
-#include <lib/system/cache.hpp>
-#include <lib/system/common.hpp>
+#include <lib/system/signals.hpp>
 
-#include "packet.hpp"
-
-namespace ip = boost::asio::ip;
-
-class Network;
+class Node;
 class Transport;
-
-class BlockChain;
-
-const uint32_t MaxMessagesToKeep = 128;
-const uint32_t MaxResendTimes =
-#if defined(WEB_WALLET_NODE)
-8;
-#else
-4;
-#endif // !WEB_WALLET_NODE
-const uint32_t WarnsBeforeRefill = 8;
-
-struct Connection;
-struct RemoteNode {
-    __cacheline_aligned std::atomic<uint64_t> packets = {0};
-
-    __cacheline_aligned std::atomic<uint32_t> strikes = {0};
-    __cacheline_aligned std::atomic<bool> blackListed = {ATOMIC_FLAG_INIT};
-
-    void addStrike() {
-        strikes.fetch_add(1, std::memory_order_relaxed);
-    }
-
-    void setBlackListed(bool b) {
-        blackListed.store(b, std::memory_order_relaxed);
-    }
-
-    bool isBlackListed() {
-        return blackListed.load(std::memory_order_relaxed);
-    }
-
-    __cacheline_aligned std::atomic<Connection*> connection = {nullptr};
-};
-
-using RemoteNodePtr = MemPtr<TypedSlot<RemoteNode>>;
-
-struct Connection {
-    typedef uint64_t Id;
-
-    Connection() = default;
-
-    Connection(Connection&& rhs)
-    : id(rhs.id)
-    , version(rhs.version)
-    , lastBytesCount(rhs.lastBytesCount.load(std::memory_order_relaxed))
-    , lastPacketsCount(rhs.lastPacketsCount)
-    , attempts(rhs.attempts)
-    , key(rhs.key)
-    , in(std::move(rhs.in))
-    , specialOut(rhs.specialOut)
-    , out(std::move(rhs.out))
-    , node(std::move(rhs.node))
-    , isSignal(rhs.isSignal)
-    , connected(rhs.connected)
-    , msgRels(std::move(rhs.msgRels)) {
-    }
-
-    Connection(const Connection&) = delete;
-    ~Connection() {
-    }
-
-    const ip::udp::endpoint& getOut() const {
-        return specialOut ? out : in;
-    }
-
-    Id id = 0;
-    cs::Version version = 0;
-
-    static const uint32_t BytesLimit = 1 << 20;
-    mutable std::atomic<uint32_t> lastBytesCount = {0};
-
-    uint64_t lastPacketsCount = 0;
-    uint32_t attempts = 0;
-
-    cs::PublicKey key;
-    ip::udp::endpoint in;
-
-    bool specialOut = false;
-    ip::udp::endpoint out;
-
-    RemoteNodePtr node;
-
-    bool isSignal = false;
-    bool connected = false;
-
-    struct MsgRel {
-        uint32_t acceptOrder = 0;
-        bool needSend = true;
-    };
-
-    FixedHashMap<cs::Hash, MsgRel, uint16_t, MaxMessagesToKeep> msgRels;
-
-    cs::Sequence lastSeq = 0;
-
-    bool operator!=(const Connection& rhs) const {
-        return id != rhs.id || key != rhs.key || in != rhs.in || specialOut != rhs.specialOut || (specialOut && out != rhs.out) ||
-               version != rhs.version;
-    }
-};
-
-using ConnectionPtr = MemPtr<TypedSlot<Connection>>;
-using Connections = std::vector<ConnectionPtr>;
-
-struct Neighbour {
-    ConnectionPtr connection;
-    RemoteNodePtr remoteNode;
-
-    bool isValid() const {
-        return !connection.isNull() && !remoteNode.isNull();
-    }
-
-    operator bool() const {
-        return isValid();
-    }
-};
 
 class Neighbourhood {
 public:
-    const static inline uint32_t MinConnections = 1;
-    const static inline uint32_t MaxConnections = 1024;
-    const static inline uint32_t MaxNeighbours = 256;
-    const static inline uint32_t MinNeighbours = 3;
-    const static inline uint32_t MaxConnectAttempts = 64;
+    using NeighboursCallback = std::function<void(const cs::PublicKey&, cs::Sequence, cs::RoundNumber)>;
+    using NeighbourPingSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
-    explicit Neighbourhood(Transport*);
+    constexpr static uint32_t kMaxNeighbours = 16;
+    constexpr static uint32_t kMinNeighbours = 1;
 
-    void chooseNeighbours();
-    void sendByNeighbours(const Packet*, bool separate = false);
-    void sendByConfidant(Packet* pack, ConnectionPtr conn);
+    constexpr static std::chrono::seconds kPingInterval{2};
 
-    void establishConnection(const ip::udp::endpoint&);
-    ConnectionPtr addConfidant(const ip::udp::endpoint&);
-    void addSignalServer(const ip::udp::endpoint& in, const ip::udp::endpoint& out, RemoteNodePtr);
-    bool updateSignalServer(const ip::udp::endpoint& in);
+    Neighbourhood(Transport*, Node*);
 
-    void gotRegistration(Connection&&, RemoteNodePtr);
-    void gotConfirmation(const Connection::Id& my, const Connection::Id& real, const ip::udp::endpoint&, const cs::PublicKey&, RemoteNodePtr);
-    void gotRefusal(const Connection::Id&);
-    void gotBadPing(Connection::Id);
-
-    bool dropConnection(Connection::Id id);
-
-    void resendPackets();
-    void checkPending(const uint32_t maxNeighbours);
-    void checkSilent();
-    void checkNeighbours();
-
-    void refreshLimits();
-
-    bool canHaveNewConnection();
-
-    void neighbourHasPacket(RemoteNodePtr, const cs::Hash&);
-    void neighbourSentPacket(RemoteNodePtr, const cs::Hash&);
-    void neighbourSentRenounce(RemoteNodePtr, const cs::Hash&);
-
-    void redirectByNeighbours(const Packet*);
-
-    uint32_t size() const;
-    uint32_t getNeighboursCountWithoutSS() const;
-
-    // no thread safe
-    Connections getNeigbours() const;
-    Connections getNeighboursWithoutSS() const;
-    ConnectionPtr getRandomNeighbour();
-
-    // uses to iterate connections
-    std::unique_lock<std::mutex> getNeighboursLock() const;
-
-    // thread safe
-    void forEachNeighbour(std::function<void(ConnectionPtr)> func);
-    void forEachNeighbourWithoutSS(std::function<void(ConnectionPtr)> func);
-    bool forRandomNeighbour(std::function<void(ConnectionPtr)> func);
+    void setPermanentNeighbours(const std::set<cs::PublicKey>&);
+    
+    void processNeighbourMessage(const cs::PublicKey& sender, const Packet&);
+    void newPeerDiscovered(const cs::PublicKey&);
+    void peerDisconnected(const cs::PublicKey&);
 
     void pingNeighbours();
-    bool isPingDone();
-    bool validateConnectionId(RemoteNodePtr, const Connection::Id, const ip::udp::endpoint&, const cs::PublicKey&, const cs::Sequence);
 
-    ConnectionPtr getConnection(const RemoteNodePtr);
-    ConnectionPtr getNextRequestee(const cs::Hash&);
-    ConnectionPtr getNeighbour(const std::size_t number);
-    ConnectionPtr getNeighbourByKey(const cs::PublicKey&);
+    void forEachNeighbour(NeighboursCallback);
+    uint32_t getNeighboursCount() const;
+    bool contains(const cs::PublicKey& neighbour) const;
+    void add(const std::set<cs::PublicKey>&);
 
-    void registerDirect(const Packet*, ConnectionPtr);
-
-    bool canAddNeighbour() const;
+public signals:
+    NeighbourPingSignal neighbourPingReceived;
 
 private:
-    struct BroadPackInfo {
-        Packet pack;
+    template<class... Args>
+    static Packet formPacket(BaseFlags flags, NetworkCommand cmd, Args&&... args);
 
-        uint32_t attempts = 0;
-        bool sentLastTime = false;
-
-        Connection::Id receivers[MaxNeighbours];
-        Connection::Id* recEnd = receivers;
+    struct PeerInfo {
+        cs::Version nodeVersion = 0;
+        uint64_t uuid = 0;
+        cs::Sequence lastSeq = 0;
+        cs::RoundNumber roundNumber = 0;
+        bool permanent = false;
     };
 
-    struct DirectPackInfo {
-        Packet pack;
+    void sendVersionRequest(const cs::PublicKey& receiver);
+    void sendVersionReply(const cs::PublicKey& receiver);
+    void sendPing(const cs::PublicKey& receiver);
+    void sendPong(const cs::PublicKey& receiver);
 
-        ConnectionPtr receiver;
-        bool received = false;
+    void gotVersionReply(const cs::PublicKey&, const Packet&);
+    void gotPong(const cs::PublicKey&, const Packet&);
 
-        uint32_t attempts = 0;
-        std::chrono::time_point<std::chrono::system_clock> startTPoint;
-        std::chrono::time_point<std::chrono::system_clock> tpoint;
-        cs::Hash mixHash;
-    };
+    bool isLimitReached() const;
+    bool isCompatible(const PeerInfo&) const;
+    bool isPermanent(const cs::PublicKey&) const;
 
-    bool isNewConnectionAvailable() const;
-    bool dispatch(BroadPackInfo&, bool separate = false);
-    bool dispatch(DirectPackInfo&);
+    void addToCompatiblePool(const cs::PublicKey&);
+    void removeFromCompatiblePool(const cs::PublicKey&);
+    void addFromCompatiblePool();
 
-    ConnectionPtr getConnection(const ip::udp::endpoint&);
-
-    void connectNode(RemoteNodePtr, ConnectionPtr);
-    void disconnectNode(ConnectionPtr*);
-
-    bool enoughConnections() const;
+    void tryToAddNew(const cs::PublicKey&, const PeerInfo&);
+    bool remove(const cs::PublicKey&);
 
     Transport* transport_;
+    Node* node_;
 
-    TypedAllocator<Connection> connectionsAllocator_;
+    mutable std::mutex neighbourMutex_;
+    std::unordered_map<cs::PublicKey, PeerInfo> neighbours_;
 
-    mutable std::mutex nLockFlag_;
-    mutable std::mutex mLockFlag_;
+    mutable std::mutex peersMux_;
+    std::unordered_set<cs::PublicKey> compatiblePeers_;
 
-    std::deque<ConnectionPtr> neighbours_;
-    std::vector<ConnectionPtr> selection_;
-    std::vector<ConnectionPtr> confidants_;
-    FixedHashMap<ip::udp::endpoint, ConnectionPtr, uint16_t, MaxConnections> connections_;
-
-    struct SenderInfo {
-        uint32_t totalSenders = 0;
-        uint32_t reaskTimes = 0;
-        ConnectionPtr prioritySender;
-    };
-
-    FixedHashMap<cs::Hash, SenderInfo, uint16_t, MaxMessagesToKeep> msgSenders_;
-    FixedHashMap<cs::Hash, BroadPackInfo, uint32_t, MaxRememberPackets> msgBroads_;
-    FixedHashMap<cs::Hash, DirectPackInfo, uint32_t, MaxRememberPackets> msgDirects_;
-
-    class ResendQueue {
-    public:
-        ResendQueue(Neighbourhood *nh)
-        : packetsRef(0, [](const cs::Hash& h) { return getHashIndex<std::size_t, cs::Hash>(h); })
-        , nh(nh) {}
-
-        bool insert(Packet pack, ConnectionPtr conn);
-        void remove(const cs::Hash& hash, Connection* conn);
-        void resend();
-
-    private:
-        void makeMixHash(cs::Hash& hash, uint64_t id) {
-            *reinterpret_cast<uint64_t *>(hash.data()) += id;
-        }
-
-        static constexpr double resendTimeout = 2.; // 2 sec
-        static constexpr double resendPeriod = 0.2; // 0.2 sec
-        std::queue<DirectPackInfo, std::list<DirectPackInfo>> packets;
-        std::unordered_map<cs::Hash, DirectPackInfo *, std::size_t(*)(const cs::Hash&)>
-                packetsRef;
-
-        std::mutex qLock;
-        Neighbourhood* nh;
-    } resqueue;
+    mutable std::mutex permNeighbourMux_;
+    std::unordered_set<cs::PublicKey> permanentNeighbours_;
 };
-
 #endif  // NEIGHBOURHOOD_HPP

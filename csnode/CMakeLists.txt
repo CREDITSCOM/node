@@ -39,7 +39,6 @@ add_library(csnode
   include/csnode/blockchain.hpp
   include/csnode/cyclicbuffer.hpp
   include/csnode/node.hpp
-  include/csnode/packstream.hpp
   include/csnode/datastream.hpp
   include/csnode/nodecore.hpp
   include/csnode/conveyer.hpp
@@ -67,6 +66,9 @@ add_library(csnode
   include/csnode/multiwallets.hpp
   include/csnode/sendcachedata.hpp
   include/csnode/eventreport.hpp
+  include/csnode/idatastream.hpp
+  include/csnode/odatastream.hpp
+  include/csnode/poolcache.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -93,6 +95,7 @@ add_library(csnode
   src/multiwallets.cpp
   src/sendcachedata.cpp
   src/eventreport.cpp
+  src/poolcache.cpp
 )
 
 configure_msvc_flags()

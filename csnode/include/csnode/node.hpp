@@ -11,13 +11,13 @@
 
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
+
 #include <lib/system/timer.hpp>
 
 #include <net/neighbourhood.hpp>
 
 #include "blockchain.hpp"
 #include "confirmationlist.hpp"
-#include "packstream.hpp"
 #include "roundstat.hpp"
 
 class Transport;
@@ -73,9 +73,6 @@ public:
     void destroy();
 
     static void requestStop();
-    static bool autoShutdownEnabled() {
-        return autoShutdownEnabled_;
-    }
 
     bool isStopRequested() const {
         return stopRequested_;
@@ -84,13 +81,11 @@ public:
     std::string getSenderText(const cs::PublicKey& sender);
 
     // incoming requests processing
-    void getBigBang(const uint8_t* data, const size_t size, const cs::RoundNumber rNum);
-    void getRoundTableSS(const uint8_t* data, const size_t size, const cs::RoundNumber);
+    void getBootstrapTable(const uint8_t* data, const size_t size, const cs::RoundNumber);
     bool verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender);
     bool verifyPacketTransactions(cs::TransactionsPacket packet, const cs::PublicKey& sender);
     void getTransactionsPacket(const uint8_t* data, const std::size_t size, const cs::PublicKey& sender);
     void getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size);
-
 
     void addToBlackListCounter(const cs::PublicKey& key);
     void updateBlackListCounter();
@@ -127,7 +122,6 @@ public:
     void stageRequest(MsgTypes msgType, uint8_t respondent, uint8_t required, uint8_t iteration);
     void getStageRequest(const MsgTypes msgType, const uint8_t* data, const size_t size, const cs::PublicKey& requester);
     void sendStageReply(const uint8_t sender, const cs::Signature& signature, const MsgTypes msgType, const uint8_t requester, cs::Bytes& message);
-    void sendConfidants(const std::vector<cs::PublicKey>&);
 
     // smart-contracts consensus communicatioin
     void sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs::StageOneSmarts& stageOneInfo);
@@ -175,7 +169,6 @@ public:
     // called by solver, review required:
     bool tryResendRoundTable(const cs::PublicKey& target, const cs::RoundNumber rNum);
     void sendRoundTable(cs::RoundPackage& rPackage);
-    bool gotSSMessageVerify(const cs::Signature& sign, const cs::Byte* data, const size_t size);
 
     // transaction's pack syncro
     void getPacketHashesRequest(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey&);
@@ -184,10 +177,7 @@ public:
     void getEventReport(const uint8_t*, const std::size_t, const cs::RoundNumber, const cs::PublicKey& sender);
 
     bool checkCharacteristic(cs::RoundPackage& rPackage);
-
     void getCharacteristic(cs::RoundPackage& rPackage);
-
-    void createTestTransaction(int tType);
 
     void sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq);
 
@@ -212,9 +202,22 @@ public:
     // smarts consensus additional functions:
 
     // syncro send functions
-    void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target, std::size_t packCounter);
+    void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target);
 
-    void initCurrentRP();
+    /**
+     * Initializes the default round package as containing the default round table (default trusted
+     * nodes)
+     *
+     * @author  Alexander Avramenko
+     * @date    04.12.2019
+     *
+     * @param   confidants  The actual confidants set.
+     */
+
+    void initBootstrapRP(const std::set<cs::PublicKey>& confidants);
+    bool isBootstrapRound() const {
+        return isBootstrapRound_;
+    }
     void getUtilityMessage(const uint8_t* data, const size_t size);
     void becomeWriter();
 
@@ -226,8 +229,6 @@ public:
     MessageActions chooseMessageAction(const cs::RoundNumber, const MsgTypes, const cs::PublicKey);
 
     void updateConfigFromFile();
-
-    bool isBlackListed(const cs::PublicKey pKey);
 
     const cs::PublicKey& getNodeIdKey() const {
         return nodeIdKey_;
@@ -261,25 +262,43 @@ public:
         return solver_;
     }
 
-    void setDeltaTimeSS(long long timeSS) {
-        auto curTime = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        deltaTimeSS_ = curTime - timeSS;
-    }
-
-    long long getDeltaTimeSS() const {
-        return deltaTimeSS_;
-    }
-
-    long long timePassedSinceBB(long long receiveTime) {
-        auto curTime = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        return curTime - (receiveTime + getDeltaTimeSS());
-    }
-
-#ifdef NODE_API
+#if defined(NODE_API) // see client/include/params.hpp
     csconnector::connector* getConnector() {
         return api_.get();
     }
 #endif
+
+    size_t getTotalTransactionsCount() const {
+        return stat_.totalTransactions();
+    }
+
+    /**
+     * Gets known peers obtained by special discovery service. Caller MUST care about concurrency.
+     * One SHOULD make a call to this from CallsQueue or directly from processorRoutine
+     *
+     * @author  Alexander Avramenko
+     * @date    12.02.2020
+     *
+     * @param [in,out]  nodes   is a placeholder for requested information. Only actual if method
+     *  returns true. Caller should pass an empty vector to method, otherwise duplicated items are
+     *  possible.
+     *
+     */
+    
+    void getKnownPeers(std::vector<api_diag::ServerNode>& nodes);
+    void dumpKnownPeersToFile();
+
+    /**
+     * Gets node information. Caller MUST care about concurrency.
+     * One SHOULD make a call to this from CallsQueue or directly from processorRoutine
+     *
+     * @author  Alexander Avramenko
+     * @date    13.02.2020
+     *
+     * @param [in,out]  info    The information.
+     */
+
+    void getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info);
 
     template <typename T>
     using SmartsSignal = cs::Signal<void(T&, bool)>;
@@ -288,10 +307,6 @@ public:
 
     // args: [failed list, restart list]
     using RejectedSmartContractsSignal = cs::Signal<void(const std::vector<RefExecution>&)>;
-
-    bool alwaysExecuteContracts() {
-        return alwaysExecuteContracts_;
-    }
 
     void reportEvent(const cs::Bytes& bin_pack);
 
@@ -310,9 +325,8 @@ private slots:
 public slots:
     void processTimer();
     void onTransactionsPacketFlushed(const cs::TransactionsPacket& packet);
-    void onPingReceived(cs::Sequence sequence, const cs::PublicKey& sender);
-    // request specified target for set of sequences
-    void sendBlockRequest(const ConnectionPtr target, const cs::PoolsRequestedSequences& sequences, std::size_t packCounter);
+    void onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender);
+    void sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences);
     // request current trusted nodes for block with specific sequence
     void sendBlockRequestToConfidants(cs::Sequence sequence);
     void processSpecialInfo(const csdb::Pool& pool);
@@ -320,15 +334,19 @@ public slots:
     void deepBlockValidation(csdb::Pool block, bool* shouldStop);
     void sendBlockAlarmSignal(cs::Sequence seq);
     void onRoundTimeElapsed();
+    void onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
+    void onNeighbourRemoved(const cs::PublicKey& neighbour);
 
 private:
     bool init();
+    void initPoolSynchronizer();
+
     void setupNextMessageBehaviour();
+    void setupPoolSynchronizerBehaviour();
 
     bool sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& target);
     void sendRoundPackageToAll(cs::RoundPackage& rPackage);
 
-    bool readRoundData(cs::RoundTable& roundTable, bool bang);
     void reviewConveyerHashes();
 
     void processSync();
@@ -343,46 +361,24 @@ private:
 
     /// sending interace methods
 
-    // sends to specific target through all the network, not having its direct address
     template <typename... Args>
-    void sendToTargetBroadcast(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // to neighbor or not at all
-    template <typename... Args>
-    bool sendToNeighbour(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    void sendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     template <typename... Args>
-    void sendToNeighbour(const ConnectionPtr target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // directly to target or not at all
-    template <class... Args>
-    bool sendDirect(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // to confidants, returns actual sent count
-    template <class... Args>
-    uint32_t sendToConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // to confidants, returns actual sent count
-    template <class... Args>
-    uint32_t sendToList(const std::vector<cs::PublicKey>& listMembers, const cs::Byte listExeption, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    void sendDirect(const cs::PublicKeys& keys, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     template <class... Args>
-    bool sendToConfidant(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    void sendBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
-    // to neighbors
-    template <typename... Args>
-    bool sendToNeighbours(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
-
-    // broadcast
     template <class... Args>
-    void sendToBroadcast(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
+    void sendBroadcastIfNoConnection(const cs::PublicKey& target, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
-    template <typename... Args>
-    void sendToBroadcastImpl(const MsgTypes& msgType, const cs::RoundNumber round, Args&&... args);
+    template <class... Args>
+    void sendBroadcastIfNoConnection(const cs::PublicKeys& keys, const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
-    // write values to stream
-    template <typename... Args>
-    void writeDefaultStream(Args&&... args);
+    // to current confidants list
+    template <class... Args>
+    void sendConfidants(const MsgTypes msgType, const cs::RoundNumber round, Args&&... args);
 
     // TODO: C++ 17 static inline?
     static const csdb::Address genesisAddress_;
@@ -393,7 +389,6 @@ private:
     bool good_ = true;
 
     std::atomic_bool stopRequested_{ false };
-    static inline bool autoShutdownEnabled_;
 
     // file names for crypto public/private keys
     inline const static std::string privateKeyFileName_ = "NodePrivate.txt";
@@ -413,19 +408,12 @@ private:
     std::unique_ptr<csconnector::connector> api_;
 #endif
 
-    RegionAllocator allocator_;
-    RegionAllocator packStreamAllocator_;
-
     uint32_t startPacketRequestPoint_ = 0;
 
     // ms timeout
     static const uint32_t packetRequestStep_ = 450;
     static const size_t maxPacketRequestSize_ = 1000;
-    static const int64_t maxPingSynchroDelay_ = 30000;
-
-    // serialization/deserialization entities
-    cs::IPackStream istream_;
-    cs::OPackStream ostream_;
+    static const size_t kLastPoolSynchroDelay_ = 30000;
 
     cs::PoolSynchronizer* poolSynchronizer_;
 
@@ -461,7 +449,6 @@ private:
     std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
     std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
 
-    //std::vector<cs::Stage> smartStageTemporary_;
     // smart consensus IDs:
     std::vector<uint64_t> activeSmartConsensuses_;
 
@@ -477,10 +464,6 @@ private:
     cs::ConfirmationList confirmationList_;
     cs::RoundTableMessage currentRoundTableMessage_;
 
-    //expected rounds
-    std::vector<cs::RoundNumber> expectedRounds_;
-    cs::Bytes lastTrustedMask_;
-
     std::unique_ptr<cs::BlockValidator> blockValidator_;
     std::vector<cs::RoundPackage> roundPackageCache_;
 
@@ -491,16 +474,15 @@ private:
     std::map<cs::PublicKey, size_t> blackListCounter_;
     size_t lastRoundPackageTime_ = 0;
 
-    bool alwaysExecuteContracts_ = false;
-
     cs::config::Observer& observer_;
     cs::Compressor compressor_;
 
     std::string kLogPrefix_;
     std::map<uint16_t, cs::Command> changeableParams_;
-    cs::PublicKeys bootStrapNodes_;
+    cs::PublicKey globalPublicKey_;
 
-    long long deltaTimeSS_{};
+    std::set<cs::PublicKey> initialConfidants_;
+    bool isBootstrapRound_ = false;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

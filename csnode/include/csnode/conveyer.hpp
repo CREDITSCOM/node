@@ -64,6 +64,7 @@ public:
     ///
     /// @brief Adds packet to transactions block as monolith entity.
     /// @param packet Created from outside packet with transactions.
+    /// @warning Client should guarantee that packet has expired time, hash and sign
     ///
     void addContractPacket(TransactionsPacket& packet);
 
@@ -199,30 +200,6 @@ public:
     ///
     bool isSyncCompleted(cs::RoundNumber round) const;
 
-    // writer notifications
-
-    ///
-    /// @brief Returns confidants notifications to writer.
-    ///
-    const cs::Notifications& notifications() const;
-
-    ///
-    /// @brief Adds writer notification in bytes representation.
-    /// @param bytes Received from network notification bytes.
-    ///
-    void addNotification(const cs::Bytes& bytes);
-
-    ///
-    /// @brief Returns count of needed writer notifications.
-    ///
-    std::size_t neededNotificationsCount() const;
-
-    ///
-    /// @brief Returns current notifications check of needed count.
-    /// @param state Check state of notifications.
-    ///
-    bool isEnoughNotifications(NotificationState state) const;
-
     // characteristic meta
 
     ///
@@ -287,26 +264,12 @@ public:
     size_t packetQueueTransactionsCount() const;
 
     ///
-    /// @brief Returns current send cache size
-    ///
-    size_t sendCacheSize() const;
-
-    ///
     /// @brief Returns current packets table size
     ///
     size_t packetsTableSize() const;
 
     // sync, try do not use it :]
     std::unique_lock<cs::SharedMutex> lock() const;
-
-    ///
-    /// @brief Adds transactions packet hash to send cache, key will be current round.
-    /// @param hash, Rejected from consensus.
-    /// @return returns true, if hash does not exist at send cache and exists at hash table.
-    ///  returns false if hash exists at send cache or does not found at packets table.
-    ///
-    [[deprecated]]
-    bool addRejectedHashToCache(const cs::TransactionsPacketHash& hash);
 
 public signals:
     cs::PacketFlushSignal packetFlushed;
@@ -324,7 +287,7 @@ private slots:
     void onRoundChanged(cs::RoundNumber round);
 
 protected:
-    void addPacketToMeta(cs::RoundNumber round, cs::TransactionsPacket& packet);
+    void addPacketToMeta(cs::TransactionsPacket& packet);
     void changeRound(cs::RoundNumber round);
 
     // searches transactions packet at all conveyer cache
@@ -335,16 +298,6 @@ protected:
 
     // returns true if packet is found at cache, otherwise - false
     bool isPacketAtCache(const cs::TransactionsPacket& packet);
-
-    // returns true if hash is found at send cache, otherwise - false
-    bool isHashAtSendCache(cs::RoundNumber round, const cs::TransactionsPacketHash& hash);
-    bool isHashAtSendCache(const cs::TransactionsPacketHash& hash);
-
-    // checks send cache to resend hashes if they still exists
-    void checkSendCache();
-
-    // remove this hash from send cache
-    void removeHashFromSendCache(const cs::TransactionsPacketHash& hash);
 
 private:
     struct Impl;

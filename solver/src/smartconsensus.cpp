@@ -930,23 +930,23 @@ bool SmartConsensus::smartStageEnough(const std::vector<T>& smartStageStorage, c
 }
 
 void SmartConsensus::startTimer(int st) {
-    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " start track timeout " << Consensus::TimeStageRequest << " ms of stages-" << st << " received";
     timeoutStageCounter_ = st;
     timeout_request_stage.start(
-        psmarts_->getScheduler(), Consensus::T_stage_request,
+        psmarts_->getScheduler(), Consensus::TimeStageRequest,
         // timeout #1 handler:
         [this, st]() {
             csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " timeout for stages-" << st << " is expired, make requests";
             requestSmartStages(st);
             // start subsequent track timeout for "wide" request
-            csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " start subsequent track timeout " << Consensus::T_stage_request << " ms to request neighbors about stages-" << st;
-            timeout_request_neighbors.start(psmarts_->getScheduler(), Consensus::T_stage_request,
+            csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " start subsequent track timeout " << Consensus::TimeStageRequest << " ms to request neighbors about stages-" << st;
+            timeout_request_neighbors.start(psmarts_->getScheduler(), Consensus::TimeStageRequest,
                                             // timeout #2 handler:
                                             [this, st]() {
                                                 csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << ": timeout for requested stages-" << st << " is expired, make requests to neighbors";
                                                 requestSmartStagesNeighbors(st);
                                                 // timeout #3 handler
-                                                timeout_force_transition.start(psmarts_->getScheduler(), Consensus::T_stage_request,
+                                                timeout_force_transition.start(psmarts_->getScheduler(), Consensus::TimeStageRequest,
                                                                                [this, st]() {
                                                                                    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
                                                                                              << " timeout for transition is expired, mark silent nodes as no stage-" << st;
