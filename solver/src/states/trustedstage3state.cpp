@@ -82,14 +82,6 @@ void TrustedStage3State::on(SolverContext& context) {
 
         SolverContext* pctx = &context;
 
-        //blacklisted nodes stage-2 resolve
-        const auto& confidants = cs::Conveyer::instance().confidants();
-        for (uint8_t i = 0; i < static_cast<uint8_t>(confidants.size()); ++i) {
-            if (pctx->isBlackListed(confidants[i])) {
-                pctx->fake_stage2(i);
-            }
-        }
-
         auto dt = 2 * Consensus::TimeStageRequest;
         csdebug() << name() << ": start track timeout " << 0 << " ms of stages-2 received";
         timeout_request_stage.start(context.scheduler(), 0,  // no timeout

@@ -472,7 +472,7 @@ void Node::updateBlackListCounter() {
             it = blackListCounter_.erase(it);
             //TODO: make possible to uncomment this code
             //if (isBlackListed(it->first) {
-            //    transport_->unmarkNeighbourAsBlackListed(it->first);
+            //    transport_->revertBan(it->first);
             //}
         }
         else {

@@ -251,10 +251,6 @@ uint8_t SolverCore::currentStage3iteration() {
     return currentStage3iteration_;
 }
 
-bool SolverCore::isBlackListed(const cs::PublicKey pKey) {
-    return pnode->isBlackListed(pKey);
-}
-
 void SolverCore::gotStageThreeRequest(uint8_t requester, uint8_t required, uint8_t iteration) {
     csdebug() << "SolverCore: [" << static_cast<int>(requester) << "] asks for stage-3 of [" << static_cast<int>(required) << "] - iteration = " << static_cast<int>(iteration);
 
