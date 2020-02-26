@@ -3521,7 +3521,9 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
     }
     std::string msg;
     checkNodeVersion(pool.sequence(), msg);
-    cslog() << msg;
+    if (!msg.empty()) {
+        cslog() << msg;
+    }
 }
 
 void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
