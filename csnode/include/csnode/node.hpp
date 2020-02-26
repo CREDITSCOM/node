@@ -222,6 +222,7 @@ public:
     void becomeWriter();
 
     bool isPoolsSyncroStarted();
+    bool checkNodeVersion(cs::Sequence curSequence, std::string& msg);
 
     std::optional<cs::TrustedConfirmation> getConfirmation(cs::RoundNumber round) const;
 
@@ -482,6 +483,7 @@ private:
     std::string kLogPrefix_;
     std::map<uint16_t, cs::Command> changeableParams_;
     cs::PublicKey globalPublicKey_;
+    cs::NodeVersionChange nVersionChange_;
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;
