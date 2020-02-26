@@ -8,11 +8,13 @@ add_library(net
   include/net/networkcommands.hpp
   include/net/packet.hpp
   include/net/packetvalidator.hpp
+  include/net/packetsqueue.hpp
   include/net/transport.hpp
   src/neighbourhood.cpp
   src/networkcommands.cpp
   src/packet.cpp
   src/packetvalidator.cpp
+  src/packetsqueue.cpp
   src/transport.cpp
 )
 
