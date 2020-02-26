@@ -624,6 +624,11 @@ bool Node::canBeTrusted(bool critical) {
         }
     }
 
+    std::string msg;
+    if (!checkNodeVersion(getBlockChain().getLastSeq()+2, msg)) {
+        return false;
+    }
+
     if (cs::Conveyer::instance().currentRoundNumber() < Consensus::StartingDPOS) {
         csdebug() << "The DPOS doesn't work unless the roundNumber is less than " << Consensus::StartingDPOS;
         return true;
@@ -3425,6 +3430,34 @@ void Node::onStopRequested() {
 }
 
 
+bool Node::checkNodeVersion(cs::Sequence curSequence, std::string& msg) {
+    if (nVersionChange_.check == cs::CheckVersion::None) {
+        nVersionChange_.condition = false;
+        return true;
+    }
+    if (nVersionChange_.check == cs::CheckVersion::Full) {
+        msg =  "THIS NODE VERSION " + std::to_string(NODE_VERSION) + " IS OBSOLETTE AND IS TOTALLY NOT COMPATIBLE TO NEW NODE VERSION "
+            + std::to_string(nVersionChange_.minFullVersion) + ".\nSINCE POOL "
+            + std::to_string(nVersionChange_.seq) + " THIS NODE WILL NOT WORK. \nPLEASE UPDATE YOUR SOFTWARE!";
+        if (curSequence >= nVersionChange_.seq) {
+            cslog() << msg;
+            this->stop();
+        }
+        return !nVersionChange_.condition;
+    }
+    if (nVersionChange_.check == cs::CheckVersion::Normal) {
+        msg =  "THIS NODE VERSION " + std::to_string(NODE_VERSION) + " IS OBSOLETTE AND IS NOT FULLY COMPATIBLE TO NEW NODE VERSION " 
+            + std::to_string(nVersionChange_.minFullVersion) + ".\nSINCE POOL "
+            + std::to_string(nVersionChange_.seq) + " THIS NODE WILL NOT WORK IN CONSENSUS. \nPLEASE UPDATE YOUR SOFTWARE!";
+        if (curSequence >= nVersionChange_.seq) {
+            nVersionChange_.condition = true;
+        }
+        //nVersionChange_.condition = nVersionChange_.condition || nVersionChange_.seq < curSequence;
+    }
+    //nVersionChange_.condition = nVersionChange_.condition && (NODE_VERSION >= nVersionChange_.minFullVersion || nVersionChange_.seq < curSequence);
+    return !nVersionChange_.condition;
+}
+
 void Node::processSpecialInfo(const csdb::Pool& pool) {
     for (auto it : pool.transactions()) {
         if (getBlockChain().isSpecial(it)) {
@@ -3452,9 +3485,19 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                     transport_->setPermanentNeighbours(initialConfidants_);
                 }
             }
+
+            if (order == 5U) {
+                /*current ver < minCompatibleVersion                    - node stop working, 
+                minCompatibleVersion <= current ver  < minFullVersion   - node works only as normal,  
+                minFullVersion <= current ver                           - node workds with full functionality*/
+                stream >> nVersionChange_.seq >> nVersionChange_.minFullVersion >> nVersionChange_.minCompatibleVersion;
+                nVersionChange_.check = NODE_VERSION >= nVersionChange_.minFullVersion ? cs::CheckVersion::None : (NODE_VERSION < nVersionChange_.minCompatibleVersion ? cs::CheckVersion::Full : cs::CheckVersion::Normal);
+            }
         }
     }
-
+    std::string msg;
+    checkNodeVersion(pool.sequence(), msg);
+    cslog() << msg;
 }
 
 void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
