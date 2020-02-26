@@ -320,12 +320,15 @@ bool cs::PoolSynchronizer::showSyncronizationProgress(const cs::Sequence lastWri
     const float maxValue = 100.0f;
     const uint32_t syncStatus = static_cast<uint32_t>(std::min(((last / global) * maxValue), maxValue));
     const uint32_t remaining = static_cast<uint32_t>(global - last);
+    const std::size_t cachedSyncedBlocksSize = blockChain_->getCachedBlocksSizeSynced();
+    const std::size_t cachedCreatedBlocksSize = cachedBlocksSize - cachedSyncedBlocksSize;
 
     ProgressBar bar;
 
     cslog() << "\nSYNC: store " << WithDelimiters(lastWrittenSequence)
         << " (+ " << WithDelimiters(cachedBlocksSize)
-        << " in cache), remaining " << WithDelimiters(remaining);
+        << " in cache [synced: " << cachedSyncedBlocksSize << ", created: " << cachedCreatedBlocksSize << "]), "
+        << "remaining " << WithDelimiters(remaining);
     cslog() << "SYNC: " << bar.string(syncStatus) << "\n";
 
     return remaining == 0;

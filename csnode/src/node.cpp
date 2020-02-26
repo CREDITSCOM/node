@@ -113,7 +113,7 @@ Node::Node(cs::config::Observer& observer)
 }
 
 Node::~Node() {
-    std::cout << "Desturctor called\n";
+    std::cout << "Destructor called\n";
 
     sendingTimer_.stop();
 
@@ -472,7 +472,7 @@ void Node::updateBlackListCounter() {
             it = blackListCounter_.erase(it);
             //TODO: make possible to uncomment this code
             //if (isBlackListed(it->first) {
-            //    transport_->unmarkNeighbourAsBlackListed(it->first);
+            //    transport_->revertBan(it->first);
             //}
         }
         else {
@@ -1347,7 +1347,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
         for (auto& b: poolsBlock) {
             if (b.sequence() == last) {
                 cslog() << kLogPrefix_ << "get possible replacement for uncertain block " << WithDelimiters(last);
-                blockChain_.storeBlock(b, cs::PoolStoreType::Created);
+                blockChain_.storeBlock(b, cs::PoolStoreType::Synced);
             }
         }
     }

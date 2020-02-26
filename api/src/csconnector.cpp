@@ -257,9 +257,10 @@ void connector::stop() {
         cslog() << "API: stop public API";
         api_server->stop();
         api_server.reset();
-        if (api_thread.joinable()) {
-            api_thread.join();
-        }
+    }
+
+    if (api_thread.joinable()) {
+        api_thread.join();
     }
 #endif
 
@@ -268,9 +269,10 @@ void connector::stop() {
         cslog() << "API: stop executor API";
         execapi_server->stop();
         execapi_server.reset();
-        if (execapi_thread.joinable()) {
-            execapi_thread.join();
-        }
+    }
+
+    if (execapi_thread.joinable()) {
+        execapi_thread.join();
     }
 #endif
 
@@ -279,9 +281,10 @@ void connector::stop() {
         cslog() << "API: stop AJAX service";
         ajax_server->stop();
         ajax_server.reset();
-        if (ajax_thread.joinable()) {
-            ajax_thread.join();
-        }
+    }
+
+    if (ajax_thread.joinable()) {
+       ajax_thread.join();
     }
 #endif
 
@@ -289,9 +292,10 @@ void connector::stop() {
         cslog() << "API: stop diagnostic API";
         diag_server->stop();
         diag_server.reset();
-        if (diag_thread.joinable()) {
-            diag_thread.join();
-        }
+    }
+
+    if (diag_thread.joinable()) {
+       diag_thread.join();
     }
 
 }

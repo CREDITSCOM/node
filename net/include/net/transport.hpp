@@ -40,7 +40,7 @@ public:
     using BanList = std::vector<AddressAndPort>;
 
     explicit Transport(Node* node);
-    ~Transport() override = default;
+    ~Transport();
 
     void run();
     bool isGood() const { return good_; }

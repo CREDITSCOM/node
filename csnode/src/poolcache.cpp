@@ -107,26 +107,27 @@ std::vector<cs::PoolCache::Interval> cs::PoolCache::ranges() const {
         return intervals;
     }
 
-    auto adder = [&](cs::Sequence begin, cs::Sequence end) {
-        intervals.push_back(std::make_pair(begin, end));
-    };
+    if (sizeSynced() > 0) {
+        auto syncedInterval = createInterval(minSequence(), syncedIter->first);
 
-    auto start = minSequence();
-    auto max = maxSequence();
-    auto isFreeSpace = false;
+        if (!syncedInterval.empty()) {
+            intervals.insert(intervals.end(), std::begin(syncedInterval), std::end(syncedInterval));
+        }
+    }
 
-    for (auto value = minSequence(); value <= max; ++value) {
-        if (contains(value)) {
-            if (isFreeSpace) {
-                adder(start, value - 1);
-                isFreeSpace = false;
+    if (sizeCreated() > 0) {
+        auto i = std::as_const(syncedIter);
+        auto iter = (syncedIter == sequences_.end()) ? sequences_.begin() : i;
+        auto createdInterval = createInterval(std::next(iter)->first, maxSequence());
+
+        if (sizeSynced() > 0 && !createdInterval.empty()) {
+            if (syncedIter->first != std::next(syncedIter)->first) {
+                intervals.push_back(std::make_pair(syncedIter->first + 1, std::next(syncedIter)->first - 1));
             }
         }
-        else {
-            if (!isFreeSpace) {
-                start = value;
-                isFreeSpace = true;
-            }
+
+        if (!createdInterval.empty()) {
+            intervals.insert(intervals.end(), std::begin(createdInterval), std::end(createdInterval));
         }
     }
 
@@ -134,11 +135,23 @@ std::vector<cs::PoolCache::Interval> cs::PoolCache::ranges() const {
 }
 
 void cs::PoolCache::onInserted(const char* data, size_t size) {
-    if (type_ == cs::PoolStoreType::Synced) {
-        ++syncedPoolSize_;
+    auto [iter, ok] = sequences_.emplace(cs::Lmdb::convert<cs::Sequence>(data, size), type_);
+
+    if (!ok) {
+        return;
     }
 
-    sequences_.emplace(cs::Lmdb::convert<cs::Sequence>(data, size), type_);
+    if (type_ == cs::PoolStoreType::Synced) {
+        ++syncedPoolSize_;
+
+        if (syncedIter == sequences_.end()) {
+            syncedIter = iter;
+        }
+
+        if (iter->first > syncedIter->first) {
+            syncedIter = iter;
+        }
+    }
 }
 
 void cs::PoolCache::onRemoved(const char* data, size_t size) {
@@ -151,6 +164,10 @@ void cs::PoolCache::onRemoved(cs::Sequence sequence) {
     if (iter != sequences_.end()) {
         if (iter->second == cs::PoolStoreType::Synced) {
             --syncedPoolSize_;
+        }
+
+        if (iter == syncedIter) {
+            syncedIter = syncedPoolSize_ > 0 ? std::prev(syncedIter) : sequences_.end();
         }
 
         sequences_.erase(iter);
@@ -168,8 +185,36 @@ void cs::PoolCache::initialization() {
 
     db_.setMapSize(cs::Lmdb::Default1GbMapSize);
     db_.open();
+
+    syncedIter = sequences_.end();
 }
 
 cs::PoolStoreType cs::PoolCache::cachedType(cs::Sequence sequence) const {
     return sequences_.find(sequence)->second;
+}
+
+std::vector<cs::PoolCache::Interval> cs::PoolCache::createInterval(Sequence min, Sequence max) const {
+    std::vector<cs::PoolCache::Interval> intervals;
+
+    auto isFreeSpace = false;
+    auto adder = [&](cs::Sequence begin, cs::Sequence end) {
+        intervals.push_back(std::make_pair(begin, end));
+    };
+
+    for (auto value = min; value <= max; ++value) {
+        if (contains(value)) {
+            if (isFreeSpace) {
+                adder(min, value - 1);
+                isFreeSpace = false;
+            }
+        }
+        else {
+            if (!isFreeSpace) {
+                min = value;
+                isFreeSpace = true;
+            }
+        }
+    }
+
+    return intervals;
 }

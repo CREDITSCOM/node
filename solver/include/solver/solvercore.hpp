@@ -127,8 +127,6 @@ public:
         return grayList_.size();
     }
     void getGrayListContentBase58(std::vector<std::string>& gray_list) const;
-    bool isBlackListed(const cs::PublicKey pKey);
-
 
     bool isTransactionsInputAvailable();
 

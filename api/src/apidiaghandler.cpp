@@ -223,7 +223,7 @@ namespace api_diag {
                             break;
                         case csdb::UserField::Type::Integer:
                             {
-                                int64_t v = fld.value<int64_t>();
+                                uint64_t v = fld.value<uint64_t>();
                                 fld_data.__set_integer(v);
                                 using namespace cs::trx_uf::sp;
                                 if (fid == delegated) {
