@@ -71,16 +71,15 @@ bool PacketValidator::validateNodePacket(const Packet& packet) {
 
     // zero size packets && never cut packets
     switch (messageType) {
-        case MsgTypes::RoundTableRequest:  // old-round node may ask for round info
-            return true;
-        default:
+        case MsgTypes::RoundTableRequest:
             break;
-    }
-
-    // all other zero size packets cut
-    if (size == 0) {
-        cserror() << "Bad packet size of type " << Packet::messageTypeToString(messageType) << ", why is it zero?";
-        return false;
+        default:
+            // all other zero size packets cut
+            if (size == 0) {
+                cserror() << "Bad packet size of type " << Packet::messageTypeToString(messageType) << ", why is it zero?";
+                return false;
+            }
+            break;
     }
 
     // never cut packets
@@ -91,6 +90,9 @@ bool PacketValidator::validateNodePacket(const Packet& packet) {
         case MsgTypes::NodeStopRequest:
         case MsgTypes::RoundTable:
         case MsgTypes::BootstrapTable:
+        case MsgTypes::RoundTableReply:
+        case MsgTypes::RoundPackRequest:  // old-round node may ask for round info
+        case MsgTypes::EmptyRoundPack:
             return true;
         default:
             break;
@@ -104,6 +106,7 @@ bool PacketValidator::validateNodePacket(const Packet& packet) {
 
     // packets which validator may cut
     switch (messageType) {
+        case MsgTypes::RoundTableRequest: // consensus message
         case MsgTypes::BlockHash:
         case MsgTypes::HashReply:
         case MsgTypes::TransactionPacket:
@@ -122,9 +125,6 @@ bool PacketValidator::validateNodePacket(const Packet& packet) {
         case MsgTypes::SmartSecondStageRequest:
         case MsgTypes::SmartThirdStageRequest:
         case MsgTypes::RejectedContracts:
-        case MsgTypes::RoundTableReply:
-        case MsgTypes::RoundPackRequest:
-        case MsgTypes::EmptyRoundPack:
         case MsgTypes::StateRequest:
         case MsgTypes::StateReply:
         case MsgTypes::BlockAlarm:

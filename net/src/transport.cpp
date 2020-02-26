@@ -132,25 +132,9 @@ void Transport::OnMessageReceived(const net::NodeId& id, net::ByteVector&& data)
         return;
     }
 
-    if (pack.size() + bytesToHandle_ > kMaxBytesToHandle) {
-        // remove all unhandled packets
-        std::lock_guard g(inboxMux_);
-        inboxQueue_.clear();
-        bytesToHandle_ = 0;
-        // continue with empty queue
-        //return;
-    }
-    bytesToHandle_ += pack.size();
-
     {
         std::lock_guard g(inboxMux_);
-
-        if (inboxQueue_.size() >= kMaxPacketsToHandle) {
-            inboxQueue_.clear();
-            bytesToHandle_ = pack.size();
-            // continue with empty queue
-        }
-        inboxQueue_.emplace_back(std::make_pair(publicKey, std::move(pack)));
+        inboxQueue_.push(publicKey, std::move(pack));
     }
 
     newPacketsReceived_.notify_one();
@@ -228,15 +212,17 @@ void Transport::processorRoutine() {
         });
 
         while (!inboxQueue_.empty()) {
-            Packet pack(std::move(inboxQueue_.front().second));
-            cs::PublicKey sender(inboxQueue_.front().first);
-            inboxQueue_.pop_front();
-            bytesToHandle_ -= pack.size();
+            PacketsQueue::SenderAndPacket senderAndPack;
+            try {
+                senderAndPack = inboxQueue_.pop();
+            } catch (...) {
+              continue;
+            }
 
             lock.unlock();
 
             process();
-            processNodeMessage(sender, pack);
+            processNodeMessage(senderAndPack.first, senderAndPack.second);
 
             lock.lock();
         }

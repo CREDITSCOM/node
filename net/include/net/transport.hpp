@@ -22,6 +22,7 @@
 
 #include "neighbourhood.hpp"
 #include "packet.hpp"
+#include "packetsqueue.hpp"
 
 inline volatile std::sig_atomic_t gSignalStatus = 0;
 
@@ -112,11 +113,7 @@ private:
 
     std::condition_variable newPacketsReceived_;
     std::mutex inboxMux_;
-    std::list<std::pair<cs::PublicKey, Packet>> inboxQueue_;
-
-    constexpr static size_t kMaxPacketsToHandle = 1ul << 17; // 131_072
-    constexpr static size_t kMaxBytesToHandle = 1ul << 29; // 536_870_912 bytes
-    std::atomic<size_t> bytesToHandle_ = 0;
+    PacketsQueue inboxQueue_;
 
     Neighbourhood neighbourhood_;
     std::thread processorThread_;
