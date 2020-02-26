@@ -63,6 +63,12 @@ enum SpoilingConsts : Byte {
     SpoilByPublicKey,
 };
 
+enum CheckVersion : Byte {
+    None,
+    Normal,
+    Full,
+};
+
 enum class PoolStoreType : cs::Byte {
     Created,
     Synced
@@ -130,6 +136,14 @@ struct TimeMoney {
     TimeMoney(uint64_t t, csdb::Amount am);
     uint64_t time;
     csdb::Amount amount;
+};
+
+struct NodeVersionChange {
+    CheckVersion check = CheckVersion::None;
+    bool condition = false;
+    cs::Sequence seq;
+    uint32_t minFullVersion;
+    uint32_t minCompatibleVersion;
 };
 // transactions user fields
 namespace trx_uf {

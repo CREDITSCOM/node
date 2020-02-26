@@ -21,6 +21,8 @@ namespace api_diag {
 
         void GetNodeInfo(NodeInfoRespone& _return, const NodeInfoRequest& request) override;
 
+        void SetRawData(general::APIResponse& _return, const std::string& data) override;
+
     private:
         Node& node_;
     };
