@@ -334,9 +334,9 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
 
     cs::IDataStream in(data, size);
     cs::RoundTable roundTable;
-    cs::Bytes bin;
-    in >> bin;
-    cs::IDataStream stream(bin.data(), bin.size());
+    cs::Bytes payload;
+    in >> payload;
+    cs::IDataStream stream(payload.data(), payload.size());
 
     uint8_t confSize = 0;
     stream >> confSize;
@@ -350,14 +350,38 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
     cs::ConfidantsKeys confidants;
     confidants.reserve(confSize);
 
+    bool unknown = false;
     for (int i = 0; i < confSize; ++i) {
         cs::PublicKey key;
         stream >> key;
         confidants.push_back(std::move(key));
+        if (initialConfidants_.find(key) == initialConfidants_.cend()) {
+            unknown = true;
+        }
+    }
+
+    if (unknown) {
+        cs::Signature sig;
+        stream >> sig;
+        if (!stream.isValid()) {
+            cswarning() << "malformed bootstrap round table, ignore";
+        }
+        const size_t signed_subdata_len = 1 + size_t(confSize) * cscrypto::kPublicKeySize;
+        const size_t signed_buf_len = sizeof(cs::RoundNumber) + signed_subdata_len;
+        cs::Bytes buf;
+        buf.reserve(signed_buf_len);
+        auto* ptr = reinterpret_cast<const uint8_t*>(&rNum);
+        std::copy(ptr, ptr + sizeof(cs::RoundNumber), std::back_inserter(buf));
+        ptr = payload.data();
+        std::copy(ptr, ptr + signed_subdata_len, std::back_inserter(buf));
+        if (!cscrypto::verifySignature(sig, cs::PacketValidator::getBlockChainKey(), buf.data(), buf.size())) {
+            cswarning() << kLogPrefix_ << "failed to test bootstrap signature, drop";
+            return;
+        }
     }
 
     if (!stream.isValid() || confidants.size() < confSize) {
-        cswarning() << "Bad round table format, ignoring";
+        cswarning() << "Bad round table format, ignore";
         return;
     }
     subRound_ = 1;
@@ -3604,6 +3628,13 @@ void Node::onRoundTimeElapsed() {
     transport_->forEachNeighbour(std::move(callback));
     initBootstrapRP(actualConfidants);
 
+    cslog() << "NODE> Bootstrap available nodes [" << actualConfidants.size() << "]:";
+    for (const auto& item : actualConfidants) {
+        const auto beg = item.data();
+        const auto end = beg + item.size();
+        cslog() << "NODE> " << " - " << EncodeBase58(beg, end) << (item == own_key ? " (me)" : "");
+    }
+
     if (actualConfidants.size() < Consensus::MinTrustedNodes) {
         cslog() << "Not enough confidants with max sequence " << maxGlobalBlock
             << " (" << actualConfidants.size() << ", min " << Consensus::MinTrustedNodes
@@ -3625,13 +3656,6 @@ void Node::onRoundTimeElapsed() {
 
     // do not increment, only "mark" default round start
     subRound_ = 1;
-
-    cslog() << "NODE> Bootstrap available nodes [" << actualConfidants.size() << "]:";
-    for (const auto& item : actualConfidants) {
-        const auto beg = item.data();
-        const auto end = beg + item.size();
-        cslog() << "NODE> " << " - " << EncodeBase58(beg, end) << (item == own_key ? " (me)" : "");
-    }
 
     if (*actualConfidants.cbegin() == own_key) {
 
@@ -3666,6 +3690,58 @@ void Node::onRoundTimeElapsed() {
         const auto end = beg + actualConfidants.cbegin()->size();
         cslog() << "Wait for " << EncodeBase58(beg, end) << " to start round...";
     }
+}
+
+bool Node::bootstrap(const cs::Bytes& bytes, cs::RoundNumber round) {
+    std::set<cs::PublicKey> confidants;
+    cs::IDataStream input(bytes.data(), bytes.size());
+    uint8_t boot_cnt = 0;
+    input >> boot_cnt;
+    const size_t req_len = 1 + size_t(boot_cnt) * cscrypto::kPublicKeySize + cscrypto::kSignatureSize;
+    if (bytes.size() != req_len) {
+        csdebug() << kLogPrefix_ << "malformed bootstrap packet, drop";
+        return false;
+    }
+    for (size_t i = 0; i < size_t(boot_cnt); ++i) {
+        cs::PublicKey key;
+        input >> key;
+        confidants.insert(key);
+    }
+    cs::Signature sig;
+    input >> sig;
+
+    cslog() << "NODE> Bootstrap available nodes [" << confidants.size() << "]:";
+    for (const auto& item : confidants) {
+        const auto beg = item.data();
+        const auto end = beg + item.size();
+        cslog() << "NODE> " << " - " << EncodeBase58(beg, end);
+    }
+
+    initBootstrapRP(confidants);
+    cs::RoundPackage rp;
+    cs::RoundTable rt;
+    rt.round = std::max(getBlockChain().getLastSeq() + 1, round);
+    for (auto& key : confidants) {
+        rt.confidants.push_back(key);
+    }
+    rp.updateRoundTable(rt);
+    roundPackageCache_.push_back(rp);
+
+    cslog() << "Bootstrap round " << rt.round << "...";
+
+    auto& conveyer = cs::Conveyer::instance();
+    conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
+
+    sendBroadcast(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bytes);
+    if (!isBootstrapRound_) {
+        isBootstrapRound_ = true;
+        cslog() << "NODE> Bootstrap on, sending bootstrap table";
+    }
+
+    onRoundStart(roundPackageCache_.back().roundTable(), true);
+    reviewConveyerHashes();
+
+    return true;
 }
 
 void Node::getKnownPeers(std::vector<api_diag::ServerNode>& nodes) {
