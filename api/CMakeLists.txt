@@ -3,7 +3,7 @@
 project(csconnector)
 
 # turn off optimization for this project in RelWithDebInfo only
-configure_msvc_no_optimization()
+# configure_msvc_no_optimization()
 
 add_subdirectory(api_gen)
 add_subdirectory(executor_gen)

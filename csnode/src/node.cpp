@@ -3560,12 +3560,12 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     /*constexpr*/ const bool collectRejectedInfo = cs::ConfigHolder::instance().config()->isCompatibleVersion();
     const char* kLogPrefix = (collectRejectedInfo ? "NODE> skip block validation: " : "NODE> stop block validation: ");
 
-    if (block.sequence() <= 27020000) {
+    if (block.sequence() <= 29'200'000) {
         if (getBlockChain().uuid() == uuidMainNet) {
             // valid blocks
             return;
         }
-        if (block.sequence() <= 5504545) {
+        if (block.sequence() <= 5'504'545) {
             if (getBlockChain().uuid() == uuidTestNet) {
                 // valid blocks
                 return;
