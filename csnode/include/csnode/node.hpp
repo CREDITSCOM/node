@@ -340,6 +340,8 @@ public slots:
     void onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
     void onNeighbourRemoved(const cs::PublicKey& neighbour);
 
+    bool canSaveSmartStages(cs::Sequence seq, cs::PublicKey key);
+
 private:
     bool init();
     void initPoolSynchronizer();
@@ -443,10 +445,6 @@ private:
     std::vector<cs::Bytes> stageTwoMessage_;
     std::vector<cs::Bytes> stageThreeMessage_;
     bool stageThreeSent_ = false;
-
-    std::vector<cs::Bytes> smartStageOneMessage_;
-    std::vector<cs::Bytes> smartStageTwoMessage_;
-    std::vector<cs::Bytes> smartStageThreeMessage_;
 
     std::vector<cs::StageOneSmarts> smartStageOneStorage_;
     std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
