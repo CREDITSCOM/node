@@ -90,10 +90,10 @@ struct ConveyerData {
 
 struct EventsReportData {
     // event reports collector address
-    EndpointData collector_ep;
+    std::string collector_id;
 
     // general on/off
-    bool on = false;
+    bool is_active = false;
 
     // report filters, only actual if on is true
 

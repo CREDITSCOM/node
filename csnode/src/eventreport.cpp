@@ -71,7 +71,7 @@ std::string Running::to_string(Status s) {
 /*static*/
 void EventReport::sendRejectTransactions(Node& node, const cs::Bytes& rejected) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on || !config.reject_transaction) {
+    if (!config.is_active || !config.reject_transaction) {
         return;
     }
 
@@ -95,7 +95,7 @@ void EventReport::sendRejectTransactions(Node& node, const cs::Bytes& rejected) 
 /*static*/
 void EventReport::sendRejectContractExecution(Node& node, const cs::SmartContractRef& ref, Reject::Reason reason) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on || !config.reject_contract_execution) {
+    if (!config.is_active || !config.reject_contract_execution) {
         return;
     }
 
@@ -157,7 +157,7 @@ EventReport::Id EventReport::getId(const cs::Bytes& bin_pack) {
 /*static*/
 void EventReport::sendGrayListUpdate(Node& node, const cs::PublicKey& key, bool added, uint32_t count_rounds /*= 1*/) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on) {
+    if (!config.is_active) {
         return;
     }
     if (added) {
@@ -221,7 +221,7 @@ bool EventReport::parseListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key,
 /*static*/
 void EventReport::sendInvalidBlockAlarm(Node& node, const cs::PublicKey& source, cs::Sequence sequence) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on || !config.alarm_invalid_block) {
+    if (!config.is_active || !config.alarm_invalid_block) {
         return;
     }
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize + sizeof(sequence);
@@ -250,7 +250,7 @@ bool EventReport::parseInvalidBlockAlarm(const cs::Bytes& bin_pack, cs::PublicKe
 /*static*/
 void EventReport::sendConsensusProblem(Node& node, Id problem_id, const cs::PublicKey& problem_source) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on) {
+    if (!config.is_active) {
         return;
     }
     switch (problem_id) {
@@ -307,7 +307,7 @@ EventReport::Id EventReport::parseConsensusProblem(const cs::Bytes& bin_pack, cs
 /*static*/
 void EventReport::sendContractsProblem(Node& node, Id problem_id, const cs::PublicKey& problem_source, const ContractConsensusId& consensus_id) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on) {
+    if (!config.is_active) {
         return;
     }
     switch (problem_id) {
