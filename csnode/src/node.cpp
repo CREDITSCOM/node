@@ -2174,9 +2174,33 @@ void Node::sendSmartStageOne(const cs::ConfidantsKeys& smartConfidants, const cs
     csmeta(csdebug) << "done";
 }
 
-void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender) {
-    csdebug() << __func__ << ": starting";
+bool Node::canSaveSmartStages(cs::Sequence seq, cs::PublicKey key) {
+    cs::Sequence curSequence = getBlockChain().getLastSeq();
 
+    if (curSequence + 1 < cs::Conveyer::instance().currentRoundNumber()) {
+        return false;
+    }
+
+    if (seq <= getBlockChain().getLastSeq()) {
+        auto pool = getBlockChain().loadBlock(seq);
+        if (pool.is_valid()) {
+            auto it = std::find(pool.confidants().cbegin(), pool.confidants().cend(), key);
+            if (it != pool.confidants().cend()) {
+                return true;
+            }
+        }
+        return false;
+    }
+    csdebug() << "Strange situation: better save for any sake";
+    return true;
+}
+
+void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender) {
+    if (!canBeTrusted(true)) {
+        return;
+    }
+    csdebug() << __func__ << ": starting";
+    
     cs::IDataStream stream(data, size);
 
     cs::StageOneSmarts stage;
@@ -2205,11 +2229,11 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
                     << "Smart#: {" << block << '.' << transaction << '}';
     csdebug() << "Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
 
-    if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), stage.id) == activeSmartConsensuses_.cend()) {
-        csdebug() << "The SmartConsensus {" << block << '.' << transaction << "} is not active now, storing the stage";
-        smartStageOneStorage_.push_back(stage);
-        return;
-    }
+    //if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), stage.id) == activeSmartConsensuses_.cend() && canSaveSmartStages(block, nodeIdKey_)) {
+    //    csdebug() << "The SmartConsensus {" << block << '.' << transaction << "} is not active now, storing the stage";
+    //    smartStageOneStorage_.push_back(stage);
+    //    return;
+    //}
 
     emit gotSmartStageOne(stage, false);
 }
@@ -2246,6 +2270,9 @@ void Node::sendSmartStageTwo(const cs::ConfidantsKeys& smartConfidants, cs::Stag
 }
 
 void Node::getSmartStageTwo(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender) {
+    if (!canBeTrusted(true)) {
+        return;
+    }
     csmeta(csdebug);
 
     csdebug() << "NODE> Getting SmartStage Two from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
@@ -2309,6 +2336,9 @@ void Node::sendSmartStageThree(const cs::ConfidantsKeys& smartConfidants, cs::St
 }
 
 void Node::getSmartStageThree(const uint8_t* data, const size_t size, const cs::RoundNumber, const cs::PublicKey& sender) {
+    if (!canBeTrusted(true)) {
+        return;
+    }
     csmeta(csdetails) << "started";
     csunused(sender);
 
@@ -3876,9 +3906,9 @@ void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeI
         cache_size.__set_stage3(stageThreeMessage_.size());
         state.__set_consensusMessage(cache_size);
 
-        cache_size.__set_stage1(smartStageOneMessage_.size());
-        cache_size.__set_stage2(smartStageTwoMessage_.size());
-        cache_size.__set_stage3(smartStageThreeMessage_.size());
+        //cache_size.__set_stage1(smartStageOneMessage_.size());
+        //cache_size.__set_stage2(smartStageTwoMessage_.size());
+        //cache_size.__set_stage3(smartStageThreeMessage_.size());
         state.__set_contractsMessage(cache_size);
 
         cache_size.__set_stage1(smartStageOneStorage_.size());
