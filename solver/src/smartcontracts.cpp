@@ -1606,14 +1606,15 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
 
     const auto seq = block.sequence();
     for (auto& item : exe_queue) {
-        if (item.status != SmartContractStatus::Running && item.status != SmartContractStatus::Finished) {
-            continue;
-        }
-        // smart is in executor or is under smart-consensus
-        // unconditional timeout, actual for both Finished and Running items
-        if (seq > item.seq_start && seq - item.seq_start >= Consensus::MaxRoundsCancelContract) {
+        // unconditionally cancel (and as well remove) over-MaxRoundsCancelContract items from queue
+        if (seq > item.seq_start&& seq - item.seq_start >= Consensus::MaxRoundsCancelContract) {
             update_status(item, seq, SmartContractStatus::Canceled, reading_db);
             // goto next item in exe_queue
+            continue;
+        }
+
+        if (item.status != SmartContractStatus::Running && item.status != SmartContractStatus::Finished) {
+            // nothing to do with idle, waiting or canceled items in queue
             continue;
         }
 
