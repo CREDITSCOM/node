@@ -950,7 +950,7 @@ void Node::getBlockAlarm(const uint8_t* data, const std::size_t size, const cs::
 
 void Node::reportEvent(const cs::Bytes& bin_pack) {
     const auto& conf = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!conf.on) {
+    if (!conf.is_active) {
         return;
     }
     cs::Bytes message;
@@ -966,8 +966,8 @@ void Node::reportEvent(const cs::Bytes& bin_pack) {
     cs::PublicKey receiver;
     {
         cs::Bytes publicKey;
-        if (!DecodeBase58(conf.collector_ep.id, publicKey)) {
-            cserror() << "Wrong collector id.";
+        if (!DecodeBase58(conf.collector_id, publicKey)) {
+            cserror() << "Wrong events collector id in config, unable to send report";
             return;
         }
         std::copy(publicKey.begin(), publicKey.end(), receiver.begin());
@@ -975,7 +975,7 @@ void Node::reportEvent(const cs::Bytes& bin_pack) {
 
     transport_->sendDirect(formPacket(BaseFlags::Signed, MsgTypes::EventReport, cs::Conveyer::instance().currentRoundNumber(), sig, message),
                            receiver);
-    csmeta(csdebug) << "event report -> " << conf.collector_ep.ip << ':' << conf.collector_ep.port;
+    csmeta(csdebug) << "event report (id=" << uint32_t(EventReport::getId(bin_pack)) << ") -> " << conf.collector_id;
 }
 
 void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
