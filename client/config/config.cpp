@@ -84,6 +84,8 @@ const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MIN = "executor_commit_min"
 const std::string PARAM_NAME_EXECUTOR_VERSION_COMMIT_MAX = "executor_commit_max";
 const std::string PARAM_NAME_JPS_COMMAND_LINE = "jps_command";
 
+const std::string PARAM_NAME_EVENTS_ACTIVE = "active";
+const std::string PARAM_NAME_EVENTS_COLLECTOR_ID = "collector";
 const std::string PARAM_NAME_EVENTS_CONSENSUS_LIAR = "consensus_liar";
 const std::string PARAM_NAME_EVENTS_CONSENSUS_SILENT = "consensus_silent";
 const std::string PARAM_NAME_EVENTS_CONSENSUS_FAILED = "consensus_failed";
@@ -944,22 +946,24 @@ void Config::readConveyerData(const boost::property_tree::ptree& config) {
 }
 
 void Config::readEventsReportData(const boost::property_tree::ptree& config) {
-    if (!config.count(BLOCK_NAME_EVENT_REPORTER)) {
-        eventsReport_.on = false;
-        return;
-    }
-
-    eventsReport_.on = false;
-
-    try {
-        eventsReport_.collector_ep = readEndpoint(config, BLOCK_NAME_EVENT_REPORTER);
-        eventsReport_.on = true;
-    }
-    catch (std::exception&) {
+    if (config.count(BLOCK_NAME_EVENT_REPORTER) == 0) {
+        eventsReport_.is_active = false;
         return;
     }
 
     const boost::property_tree::ptree& data = config.get_child(BLOCK_NAME_EVENT_REPORTER);
+    checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_ACTIVE, eventsReport_.is_active);
+    if (!eventsReport_.is_active) {
+        return;
+    }
+
+    if (data.count(PARAM_NAME_EVENTS_COLLECTOR_ID)) {
+        eventsReport_.collector_id = data.get<std::string>(PARAM_NAME_EVENTS_COLLECTOR_ID);
+    }
+    if (eventsReport_.collector_id.empty()) {
+        eventsReport_.is_active = false;
+        return;
+    }
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_CONSENSUS_LIAR, eventsReport_.consensus_liar);
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_CONSENSUS_SILENT, eventsReport_.consensus_silent);
     checkAndSaveValue(data, BLOCK_NAME_EVENT_REPORTER, PARAM_NAME_EVENTS_CONSENSUS_FAILED, eventsReport_.consensus_failed);
@@ -1074,7 +1078,7 @@ bool operator!=(const ConveyerData& lhs, const ConveyerData& rhs) {
 }
 
 bool operator==(const EventsReportData& lhs, const EventsReportData rhs) {
-    return lhs.on == rhs.on &&
+    return lhs.is_active == rhs.is_active &&
         lhs.add_to_gray_list == rhs.add_to_gray_list &&
         lhs.alarm_invalid_block == rhs.alarm_invalid_block &&
         lhs.consensus_failed == rhs.consensus_failed &&
@@ -1087,7 +1091,7 @@ bool operator==(const EventsReportData& lhs, const EventsReportData rhs) {
         lhs.reject_contract_consensus == rhs.reject_contract_consensus &&
         lhs.reject_contract_execution == rhs.reject_contract_execution &&
         lhs.reject_transaction == rhs.reject_transaction &&
-        lhs.collector_ep == rhs.collector_ep;
+        lhs.collector_id == rhs.collector_id;
 }
 
 bool operator!=(const EventsReportData& lhs, const EventsReportData& rhs) {
