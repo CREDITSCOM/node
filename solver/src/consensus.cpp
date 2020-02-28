@@ -95,7 +95,7 @@ const unsigned int Consensus::MaxRoundsCancelContract = 100;
  * After that 5 rounds (MaxRoundsCancelContract - MaxRoundsExecuteContract) remains to complete consensus and put timeout new_state
  * into chain, otherwise  contract is assumed failed unconditionally
  */
-const unsigned int Consensus::MaxRoundsExecuteContract = 95;
+const unsigned int Consensus::MaxRoundsExecuteContract = 10;
 
 /** @brief True to disable, false to enable the trusted request to become trusted next round again */
 const bool Consensus::DisableTrustedRequestNextRound = false;
