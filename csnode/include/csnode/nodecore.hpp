@@ -63,13 +63,24 @@ enum SpoilingConsts : Byte {
     SpoilByPublicKey,
 };
 
+enum CheckVersion : Byte {
+    None,
+    Normal,
+    Full,
+};
+
+enum class PoolStoreType : cs::Byte {
+    Created,
+    Synced
+};
+
 // all info about round
 struct Characteristic {
     cs::Bytes mask;
 };
 
 struct RoundTable {
-    cs::Bytes toBinary();
+    cs::Bytes toBinary() const;
     RoundNumber round = 0;
     ConfidantsKeys confidants;
     PacketsHashes hashes;
@@ -89,6 +100,12 @@ struct PoolSyncMeta {
     csdb::Pool pool;
     cs::Signature signature;
     cs::PublicKey sender;
+};
+
+struct Command{
+    cs::RoundNumber rNum;
+    size_t intParam;
+    cs::Bytes data;
 };
 
 using PoolMetaMap = std::map<cs::Sequence, cs::PoolSyncMeta>;
@@ -115,16 +132,33 @@ struct RoundTableMessage {
     cs::PublicKey sender;
 };
 
+struct TimeMoney {
+    TimeMoney(uint64_t t, csdb::Amount am);
+    uint64_t time;
+    csdb::Amount amount;
+};
+
+struct NodeVersionChange {
+    CheckVersion check = CheckVersion::None;
+    bool condition = false;
+    cs::Sequence seq;
+    uint32_t minFullVersion;
+    uint32_t minCompatibleVersion;
+};
 // transactions user fields
 namespace trx_uf {
     // delegation transaction fields
     namespace sp { //specific
         // delegation
-        constexpr csdb::user_field_id_t delegated = 5; // value: 0 - delegation, 1 - withdraw delegation
-        namespace dele {
-            constexpr uint32_t gate = 1;
-            constexpr uint32_t gated_withdraw = 2;
+        constexpr csdb::user_field_id_t delegated = 5; // value: 1 - delegation, 2 - withdraw delegation
+        constexpr csdb::user_field_id_t managing = 7;
+        namespace de {
+            constexpr uint64_t legate = 1;
+            constexpr uint64_t legated_withdraw = 2;
+            constexpr uint64_t legated_release = 3;
+            constexpr uint64_t legate_min_utc = 4;
         }
+
         // count of user fields
         constexpr size_t Count = 1;
     }
@@ -139,7 +173,7 @@ struct Zero {
     inline static cs::Hash hash;
     inline static cs::Signature signature;
     inline static cs::PublicKey key;
-
+	inline static uint64_t timeStamp;
     Zero();
 };
 }  // namespace cs

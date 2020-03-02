@@ -23,6 +23,8 @@
 #include <memory>
 #include <thread>
 
+#include <apidiaghandler.hpp>
+
 #ifdef PROFILE_API
 #include <profiler/profilerprocessor.hpp>
 #include <profiler/profilereventhandler.hpp>
@@ -31,12 +33,14 @@
 namespace cs {
 class TransactionsPacket;
 }
+class Node;
 
 namespace csconnector {
 class connector {
 public:
     using ApiHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<api::APIHandler>;
     using ApiExecHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<apiexec::APIEXECHandler>;
+    using DiagHandlerPtr = ::apache::thrift::stdcxx::shared_ptr<api_diag::APIDiagHandler>;
 
 #ifdef PROFILE_API
     using ApiProcessor = cs::ProfilerProcessor;
@@ -44,7 +48,7 @@ public:
     using ApiProcessor = ::api::APIProcessor;
 #endif
 
-    explicit connector(BlockChain& m_blockchain, cs::SolverCore* solver);
+    explicit connector(Node& node);
     ~connector();
 
     connector(const connector&) = delete;
@@ -74,33 +78,45 @@ public slots:
 
 public:
     void run();
+    void stop();
 
     // interface
     ApiHandlerPtr apiHandler() const;
     ApiExecHandlerPtr apiExecHandler() const;
 
+    constexpr static inline int8_t platform() {
+        return api_diag::platform();
+    }
+
 private:
     cs::Executor& executor_;
     ApiHandlerPtr api_handler;
     ApiExecHandlerPtr apiexec_handler;
+    DiagHandlerPtr diag_handler;
 
-    ::apache::thrift::stdcxx::shared_ptr<ApiProcessor> p_api_processor;
-    ::apache::thrift::stdcxx::shared_ptr<::apiexec::APIEXECProcessor> p_apiexec_processor;
+    ::apache::thrift::stdcxx::shared_ptr<ApiProcessor> api_processor;
+    ::apache::thrift::stdcxx::shared_ptr<::apiexec::APIEXECProcessor> apiexec_processor;
+    ::apache::thrift::stdcxx::shared_ptr<::api_diag::API_DIAGProcessor> diag_processor;
+
 #ifdef BINARY_TCP_API
-    ::apache::thrift::server::TThreadedServer server;
-    std::thread thread;
-    uint16_t server_port;
+    std::thread api_thread;
+    std::shared_ptr<::apache::thrift::server::TThreadedServer> api_server;
 #endif
+
 #ifdef AJAX_IFACE
-    ::apache::thrift::server::TThreadedServer ajax_server;
     std::thread ajax_thread;
-    uint16_t ajax_server_port;
+    std::shared_ptr<::apache::thrift::server::TThreadedServer> ajax_server;
 #endif
+
 #ifdef BINARY_TCP_EXECAPI
-    ::apache::thrift::server::TThreadedServer exec_server;
-    std::thread exec_thread;
-    uint16_t exec_server_port;
+    std::thread execapi_thread;
+    std::shared_ptr<::apache::thrift::server::TThreadedServer> execapi_server;
 #endif
+
+    std::thread diag_thread;
+    std::shared_ptr<::apache::thrift::server::TThreadedServer> diag_server;
+
+    std::atomic_bool stop_flag;
 };
 }  // namespace csconnector
 

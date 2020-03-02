@@ -166,7 +166,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << " SMART confidants (" << smartConfidants_.size() << "), proposed fee(s): " << strFees;
 
-    // pack_.transactions(0).user_field(1) = 0;
+    // pack_.transactions(0).user_field(cs::trx_uf::ordinary::Text) = 0;
 
     currentSmartTransactionPack_ = tmpPacket;//pack;
 
@@ -617,9 +617,10 @@ void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) 
         if (!cscrypto::verifySignature(stageFrom.packageSignature, smartConfidants().at(stageFrom.sender), hash.data(), hash.size())) {
             cslog() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
             << " ____ The signature is not valid";
-            return;  // returns this function if the signature of smartco
+            return false;  // returns this function if the signature of smartco
         }
         smartStageThreeStorage_.at(stageFrom.sender) = stageFrom;
+        return true;
     };
 
     if (!smartConfidantExist(stage.sender)) {
@@ -664,11 +665,15 @@ void SmartConsensus::addSmartStageThree(cs::StageThreeSmarts& stage, bool send) 
         }
     }
     else {
-        smartStageThreeStorage_.at(stage.sender) = stage;
+        smartStageThreeStorage_.at(stage.sender) = stage; // this should be our stage so check isn't necessary 
         for (auto& it : smartStageThreeTempStorage_) {
-            lambda(it, finalSmartTransactionPack_.hash().toBinary());
-            csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " <-- SMART-Stage-3 [" << static_cast<int>(stage.sender)
-                      << "] = " << smartStage3StorageSize();
+            if (lambda(it, finalSmartTransactionPack_.hash().toBinary())) {
+                csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " <-- SMART-Stage-3 [" << static_cast<int>(it.sender)
+                    << "] = " << smartStage3StorageSize();
+                if (smartStageThreeEnough()) {
+                    break;
+                }
+            }
         }
     }
 
@@ -921,27 +926,27 @@ bool SmartConsensus::smartStageEnough(const std::vector<T>& smartStageStorage, c
     }
     csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
         << ' ' << funcName << " completed " << stageSize << " of " << cSize;
-    return stageSize == cSize;
+    return stageSize >= cSize;
 }
 
 void SmartConsensus::startTimer(int st) {
-    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " start track timeout " << Consensus::T_stage_request << " ms of stages-" << st << " received";
+    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " start track timeout " << Consensus::TimeStageRequest << " ms of stages-" << st << " received";
     timeoutStageCounter_ = st;
     timeout_request_stage.start(
-        psmarts_->getScheduler(), Consensus::T_stage_request,
+        psmarts_->getScheduler(), Consensus::TimeStageRequest,
         // timeout #1 handler:
         [this, st]() {
             csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " timeout for stages-" << st << " is expired, make requests";
             requestSmartStages(st);
             // start subsequent track timeout for "wide" request
-            csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " start subsequent track timeout " << Consensus::T_stage_request << " ms to request neighbors about stages-" << st;
-            timeout_request_neighbors.start(psmarts_->getScheduler(), Consensus::T_stage_request,
+            csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << " start subsequent track timeout " << Consensus::TimeStageRequest << " ms to request neighbors about stages-" << st;
+            timeout_request_neighbors.start(psmarts_->getScheduler(), Consensus::TimeStageRequest,
                                             // timeout #2 handler:
                                             [this, st]() {
                                                 csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ } << ": timeout for requested stages-" << st << " is expired, make requests to neighbors";
                                                 requestSmartStagesNeighbors(st);
                                                 // timeout #3 handler
-                                                timeout_force_transition.start(psmarts_->getScheduler(), Consensus::T_stage_request,
+                                                timeout_force_transition.start(psmarts_->getScheduler(), Consensus::TimeStageRequest,
                                                                                [this, st]() {
                                                                                    csdebug() << kLogPrefix << FormatRef{ smartRoundNumber_, smartTransaction_ }
                                                                                              << " timeout for transition is expired, mark silent nodes as no stage-" << st;

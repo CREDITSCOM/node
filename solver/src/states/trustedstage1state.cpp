@@ -33,7 +33,7 @@ void TrustedStage1State::on(SolverContext& context) {
     min_time_expired = false;
 
     SolverContext* pctx = &context;
-    auto dt = Consensus::T_min_stage1;
+    auto dt = Consensus::TimeMinStage1;
     csdebug() << name() << ": start track min time " << dt << " ms to get hashes";
 
     cs::Timer::singleShot(dt, cs::RunPolicy::CallQueuePolicy, [this, pctx]() {
@@ -66,11 +66,17 @@ void TrustedStage1State::on(SolverContext& context) {
 void TrustedStage1State::finalizeStage(SolverContext& context) {
     
     //if(context.own_conf_number() == 1 && cs::Conveyer::instance().currentRoundNumber() > 10) {
-    //    stage.roundTimeStamp = std::to_string(std::stoll(cs::Utils::currentTimestamp()) + 10000); 
+    //    stage.roundTimeStamp = std::to_string(cs::Utils::currentTimestamp() + 10000ULL); 
     //} 
     //else {
-    uint64_t lastTimeStamp = std::atoll(context.blockchain().getLastTimeStamp().c_str());
-    uint64_t currentTimeStamp = std::atoll(cs::Utils::currentTimestamp().c_str());
+    uint64_t lastTimeStamp = 0;
+    try {
+        lastTimeStamp = std::stoull(context.blockchain().getLastTimeStamp().c_str());
+    }
+    catch (...) {
+        csdebug() << name() << __func__ << ": blockchain tmestamp was announced as zero";
+    }
+    uint64_t currentTimeStamp = cs::Utils::currentTimestamp();
     if (currentTimeStamp < lastTimeStamp) {
         currentTimeStamp = lastTimeStamp + 1;
     }
@@ -80,7 +86,7 @@ void TrustedStage1State::finalizeStage(SolverContext& context) {
     stage.messageHash = cscrypto::calculateHash(stage.message.data(), stage.message.size());
     cs::Bytes messageToSign;
     messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
-    cs::DataStream signStream(messageToSign);
+    cs::ODataStream signStream(messageToSign);
     signStream << cs::Conveyer::instance().currentRoundNumber();
     signStream << context.subRound();
     signStream << stage.messageHash;
@@ -142,6 +148,7 @@ Result TrustedStage1State::onSyncTransactions(SolverContext& context, cs::RoundN
             if (conveyer.currentRoundNumber() + 2 >= element.second.expiredRound()) {
                 continue;
             }
+
             const cs::PacketsHashes& hashes = roundTable.hashes;
             continueFlag = false;
             if (std::find(hashes.cbegin(), hashes.cend(), element.first) == hashes.cend()) {
@@ -210,8 +217,8 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
         else {
             csdebug() << hString << ": hash is OK, but dupplicated: not added remains: " << stage.trustedCandidates.size();
         }
-        //TODO: print hashMask string
-        if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes) {
+        // candidates does not include own hash, so (MinTrustedNodes - 1) will be enough to proceed next stage
+        if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes - 1) {
             if (likeMineHashes >= cs::Conveyer::instance().confidantsCount() / 2) {
                 enough_hashes = true;
                 bool other_conditions = transactions_checked && min_time_expired;

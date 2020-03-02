@@ -33,7 +33,7 @@ public:
     template<typename T>
     CompressedRegion compress(const T& entity) {
         cs::Bytes bytes;
-        cs::DataStream stream(bytes);
+        cs::ODataStream stream(bytes);
 
         stream << entity;
 
@@ -42,29 +42,29 @@ public:
 
         const auto maxSize = LZ4_compressBound(binSize);
 
-        auto region = allocator_.allocateNext(static_cast<uint32_t>(byteSizeof_ + maxSize));
-        const int compressedSize = LZ4_compress_default(data, static_cast<char*>(region->data()) + byteSizeof_, binSize,
-                                                        cs::numeric_cast<int>(region->size()) - byteSizeof_);
+        cs::Bytes region(static_cast<size_t>(byteSizeof_ + maxSize));
+        const int compressedSize = LZ4_compress_default(data, reinterpret_cast<char*>(region.data()) + byteSizeof_, binSize,
+                                                        cs::numeric_cast<int>(region.size()) - byteSizeof_);
 
         CompressedRegion::SizeType size = 0;
 
         if (!compressedSize) {
-            std::copy(data, data + binSize, static_cast<char*>(region->data()) + byteSizeof_);
+            std::copy(data, data + binSize, reinterpret_cast<char*>(region.data()) + byteSizeof_);
             size = static_cast<uint32_t>(binSize + byteSizeof_);
         }
         else {
             size = static_cast<uint32_t>(compressedSize + byteSizeof_);
         }
 
-        region->setSize(size);
-        *(static_cast<cs::Byte*>(region->data())) = compressedSize ? Compression::Compressed : Compression::None;
+        *(static_cast<cs::Byte*>(region.data())) = compressedSize ? Compression::Compressed : Compression::None;
+        region.resize(size);
 
-        return CompressedRegion { region, static_cast<size_t>(binSize) };
+        return CompressedRegion { std::move(region), static_cast<size_t>(binSize) };
     }
 
     // try to decompress data, returns object if serializable
     template<typename T>
-    T decompress(CompressedRegion region) {
+    T decompress(const CompressedRegion& region) {
         const auto compression = checkCompression(region.data(), region.size());
 
         cs::Bytes bytes;
@@ -89,7 +89,7 @@ public:
             size = region.size() - static_cast<size_t>(byteSizeof_);
         }
 
-        cs::DataStream stream(data, size);
+        cs::IDataStream stream(data, size);
 
         T result;
         stream >> result;
@@ -98,7 +98,6 @@ public:
     }
 
 private:
-    RegionAllocator allocator_;
     static inline int byteSizeof_ = sizeof(cs::Byte);
 };
 

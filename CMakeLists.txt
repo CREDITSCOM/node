@@ -3,18 +3,20 @@ cmake_minimum_required(VERSION 3.12)
 project(node)
 
 if (NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/berkeleydb/.git OR
-    NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/googletest/.git OR
-    NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/thrift/.git OR
-    NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/thrift-interface-definitions/.git)
-  message(FATAL_ERROR "Git submodules not initialized, execute:\n  git submodule update --init")
+        NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/googletest/.git OR
+        NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/thrift/.git OR
+        NOT EXISTS ${CMAKE_SOURCE_DIR}/third-party/thrift-interface-definitions/.git)
+    message(FATAL_ERROR "Git submodules not initialized, execute:\n  git submodule update --init")
 endif()
 
 if (MSVC)
-  add_definitions(-DNOMINMAX)
-  add_definitions(-D_WIN32_WINNT=0x0601)
-  add_definitions(-D_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING)
-  add_definitions(-D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
-  add_definitions(-D_ENABLE_EXTENDED_ALIGNED_STORAGE)
+    add_definitions(-DNOMINMAX)
+    add_definitions(-D_WIN32_WINNT=0x0601)
+    add_definitions(-D_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING)
+    add_definitions(-D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
+    add_definitions(-D_ENABLE_EXTENDED_ALIGNED_STORAGE)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
 endif()
 
 option(LEVELDB_BUILD_TESTS "" OFF)
@@ -25,8 +27,8 @@ IF(DBSQL)
     ADD_DEFINITIONS(-DDBSQL)
 ENDIF(DBSQL)
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
 endif()
 
 if (MSVC)
@@ -54,14 +56,20 @@ if (MSVC)
 
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /INCREMENTAL:NO /LTCG")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /INCREMENTAL:NO /LTCG")
-  set(CMAKE_EXE_LINKER_FLAGS_RELMONITOR "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} /OUT:${RELMONITOR_OUTDIR}client_monitor.exe /PDB:${RELMONITOR_OUTDIR}client_monitor.pdb")
-  set(CMAKE_EXE_LINKER_FLAGS_RELWALLET "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} /OUT:${RELWALLET_OUTDIR}client_wallet.exe /PDB:${RELWALLET_OUTDIR}client_wallet.pdb")
+  set(CMAKE_SHARED_LINKER_FLAGS_RELMONITOR "${CMAKE_SHARED_LINKER_FLAGS}")
+  set(CMAKE_SHARED_LINKER_FLAGS_RELWALLET "${CMAKE_SHARED_LINKER_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS_RELMONITOR "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} /OUT:${RELMONITOR_OUTDIR}node_monitor.exe /PDB:${RELMONITOR_OUTDIR}node_monitor.pdb")
+  set(CMAKE_EXE_LINKER_FLAGS_RELWALLET "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} /OUT:${RELWALLET_OUTDIR}node_wallet.exe /PDB:${RELWALLET_OUTDIR}node_wallet.pdb")
 
   message(STATUS "CMAKE_CXX_FLAGS_DEBUG = ${CMAKE_CXX_FLAGS_DEBUG}")
   message(STATUS "CMAKE_CXX_FLAGS_RELEASE = ${CMAKE_CXX_FLAGS_RELEASE}")
   message(STATUS "CMAKE_CXX_FLAGS_RELWITHDEBINFO = ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
   message(STATUS "CMAKE_CXX_FLAGS_RELMONITOR = ${CMAKE_CXX_FLAGS_RELMONITOR}")
   message(STATUS "CMAKE_CXX_FLAGS_RELWALLET = ${CMAKE_CXX_FLAGS_RELWALLET}")
+
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /ignore:4075")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /ignore:4075")
+  set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /ignore:4075")
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unknown-pragmas -pedantic")
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
@@ -81,17 +89,16 @@ endif()
 add_definitions(-DUSE_STD_THREAD)
 
 if (MSVC)
-  MARK_AS_ADVANCED(
-    CMAKE_CXX_FLAGS_RELMONITOR
-    CMAKE_C_FLAGS_RELMONITOR
-    CMAKE_EXE_LINKER_FLAGS_RELMONITOR
-    CMAKE_CXX_FLAGS_RELWALLET
-    CMAKE_C_FLAGS_RELWALLET
-    CMAKE_EXE_LINKER_FLAGS_RELWALLET
-  )
+    MARK_AS_ADVANCED(
+        CMAKE_CXX_FLAGS_RELMONITOR
+        CMAKE_C_FLAGS_RELMONITOR
+        CMAKE_EXE_LINKER_FLAGS_RELMONITOR
+        CMAKE_CXX_FLAGS_RELWALLET
+        CMAKE_C_FLAGS_RELWALLET
+        CMAKE_EXE_LINKER_FLAGS_RELWALLET
+        )
 
-  option(BUILD_COMPILER "" OFF)
-
+    option(BUILD_COMPILER "" OFF)
 endif(MSVC)
 
 option(ENABLE_TESTS "Enable tests" OFF)
@@ -113,53 +120,53 @@ option(WITH_LIBEVENT "" OFF)
 option(WITH_OPENSSL "" OFF)
 option(WITH_GPROF "" OFF)
 
-if(NOT MSVC AND WITH_GPROF)
+if (NOT MSVC AND WITH_GPROF)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
 endif()
 
 macro(configure_msvc_runtime)
-  if(MSVC)
-    # Default to statically-linked runtime.
-    if("${MSVC_RUNTIME}" STREQUAL "")
-      set(MSVC_RUNTIME "static")
-    endif()
-    # Set compiler options.
-    set(variables
-      CMAKE_C_FLAGS_DEBUG
-      CMAKE_C_FLAGS_MINSIZEREL
-      CMAKE_C_FLAGS_RELEASE
-      CMAKE_C_FLAGS_RELWITHDEBINFO
-      CMAKE_C_FLAGS_RELMONITOR
-      CMAKE_C_FLAGS_RELWALLET
-      CMAKE_CXX_FLAGS_DEBUG
-      CMAKE_CXX_FLAGS_MINSIZEREL
-      CMAKE_CXX_FLAGS_RELEASE
-      CMAKE_CXX_FLAGS_RELMONITOR
-      CMAKE_CXX_FLAGS_RELWALLET
-      CMAKE_CXX_FLAGS_RELWITHDEBINFO
-    )
-    if(${MSVC_RUNTIME} STREQUAL "static")
-      message(STATUS
-        "MSVC -> forcing use of statically-linked runtime."
-      )
-      foreach(variable ${variables})
-        if(${variable} MATCHES "/MD")
-          string(REGEX REPLACE "/MD" "/MT" ${variable} "${${variable}}")
+    if (MSVC)
+        # Default to statically-linked runtime.
+        if ("${MSVC_RUNTIME}" STREQUAL "")
+            set(MSVC_RUNTIME "static")
         endif()
-      endforeach()
-    else()
-      message(STATUS
-        "MSVC -> forcing use of dynamically-linked runtime."
-      )
-      foreach(variable ${variables})
-        if(${variable} MATCHES "/MT")
-          string(REGEX REPLACE "/MT" "/MD" ${variable} "${${variable}}")
+        # Set compiler options.
+        set(variables
+            CMAKE_C_FLAGS_DEBUG
+            CMAKE_C_FLAGS_MINSIZEREL
+            CMAKE_C_FLAGS_RELEASE
+            CMAKE_C_FLAGS_RELWITHDEBINFO
+            CMAKE_C_FLAGS_RELMONITOR
+            CMAKE_C_FLAGS_RELWALLET
+            CMAKE_CXX_FLAGS_DEBUG
+            CMAKE_CXX_FLAGS_MINSIZEREL
+            CMAKE_CXX_FLAGS_RELEASE
+            CMAKE_CXX_FLAGS_RELMONITOR
+            CMAKE_CXX_FLAGS_RELWALLET
+            CMAKE_CXX_FLAGS_RELWITHDEBINFO
+            )
+        if (${MSVC_RUNTIME} STREQUAL "static")
+            message(STATUS
+                "MSVC -> forcing use of statically-linked runtime."
+                )
+            foreach (variable ${variables})
+                if (${variable} MATCHES "/MD")
+                    string(REGEX REPLACE "/MD" "/MT" ${variable} "${${variable}}")
+                endif ()
+            endforeach()
+        else()
+            message(STATUS
+                "MSVC -> forcing use of dynamically-linked runtime."
+                )
+            foreach (variable ${variables})
+                if (${variable} MATCHES "/MT")
+                    string(REGEX REPLACE "/MT" "/MD" ${variable} "${${variable}}")
+                endif()
+            endforeach()
         endif()
-      endforeach()
     endif()
-  endif()
 endmacro()
 
 macro(suppress_boost_cmake_warnings)
@@ -177,9 +184,9 @@ macro(configure_msvc_flags)
     endif()
 endmacro()
 
-macro(match_and_replace build_type from to)
-    if ("${${build_type}}" MATCHES ${from})
-        string(REGEX REPLACE ${from} ${to} ${build_type} ${${build_type}})
+macro(match_and_replace type from to)
+    if ("${${type}}" MATCHES ${from})
+        string(REGEX REPLACE ${from} ${to} ${type} ${${type}})
     endif()
 endmacro()
 
@@ -197,6 +204,18 @@ macro(configure_msvc_no_optimization)
     endif()
 endmacro()
 
+macro(configure_third_party_compiler_flags)
+    if (MSVC)
+        if ("${CMAKE_CXX_FLAGS}" MATCHES "([/-]W[1-4])")
+            message("Other Flags /W detected, replace it to suppress third party warnings")
+            match_and_replace(CMAKE_CXX_FLAGS "([/-]W[0-4])" "/W0")
+            match_and_replace(CMAKE_C_FLAGS "([/-]W[0-4])" "/W0")
+        else()
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W0")
+        endif()
+    endif()
+endmacro()
+
 configure_msvc_runtime()
 
 add_subdirectory(third-party)
@@ -206,6 +225,7 @@ add_subdirectory(net)
 if(DBSQL)
   add_subdirectory(dbsql)
 endif()
+add_subdirectory(p2p)
 add_subdirectory(csnode)
 add_subdirectory(cscrypto)
 add_subdirectory(csdb)

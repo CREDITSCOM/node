@@ -6,7 +6,9 @@
 
 cs::config::Observer::Observer(Config& config, boost::program_options::variables_map& map)
 : config_(config)
-, map_(map) {
+, map_(map)
+, publicKey_(config.getMyPublicKey())
+, privateKey_(config.getMyPrivateKey()) {
     thread_ = std::thread(&Observer::eventLoop, this);
 }
 
@@ -48,6 +50,9 @@ void cs::config::Observer::eventLoop() {
         Config config = Config::read(map_);
 
         if (config.isGood()) {
+            config.publicKey_ = publicKey_;
+            config.privateKey_ = privateKey_;
+
             if (config_ != config) {
                 emit configChanged(config, config_);
                 config_ = std::move(config);

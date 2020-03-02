@@ -7,6 +7,7 @@
 #include <csnode/walletsstate.hpp>
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
+#include <net/packetvalidator.hpp>
 
 namespace {
 const char* kLogPrefix = "Validator: ";
@@ -209,7 +210,19 @@ bool IterValidator::checkTransactionSignature(SolverContext& context, const csdb
     if (!SmartContracts::is_new_state(transaction) && !smartSourceTransaction) {
         if (src.is_wallet_id()) {
             auto pub = context.blockchain().getAddressByType(src, BlockChain::AddressType::PublicKey);
+            if (context.blockchain().isSpecial(transaction)) {
+                const auto& starter_key = cs::PacketValidator::getBlockChainKey();
+                if (pub.public_key() != starter_key) {
+                    return false;
+                }
+            }
             return transaction.verify_signature(pub.public_key());
+        }
+        if (context.blockchain().isSpecial(transaction)) {
+            const auto& starter_key = cs::PacketValidator::getBlockChainKey();
+            if (src.public_key() != starter_key) {
+                return false;
+            }
         }
         return transaction.verify_signature(src.public_key());
     }
@@ -296,10 +309,18 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
             return "Transaction's source doesn't exist in blockchain.";
         case kContractViolation:
             return "Contract execution violations detected";
-        case kTransactionProhibited:
-            return "Transaction of such type is prohibited for this account or target account";
         case kNoDelegate:
+            return "This account has no valid account";
+        case kTransactionProhibited:
+            return "Such kind of transactions is prohibited for this recipient";
+        case kNoDelegateTarget:
             return "No such delegate in your list";
+        case  kNoDelegateSource:
+            return "Target account doesn't have you as source";
+        case kNoDelegatedAmountToWithdraw:
+            return "Target account doesn't have delegated amount that could be withdrawn";
+        case kInsufficientDelegatedBalance:
+            return "Previously delegated amount is not as much as you demand to withdraw";
         case kDifferentDelegatedAmount:
             return "This account has another delegation amount from your account";
         case kAmountTooLow:
@@ -312,7 +333,7 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
 bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const BlockChain& bc, SmartContracts& sc, csdb::AmountCommission* countedFeePtr, RejectCode* rcPtr) {
     RejectCode rc = kAllCorrect;
 
-    BlockChain::WalletData wallet;
+    BlockChain::WalletData sWallet;
     BlockChain::WalletData tWallet;
     csdb::AmountCommission countedFee;
 
@@ -321,51 +342,76 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
     }
 
     if (!rc) {
-        if (sc.is_known_smart_contract(t.source()) || sc.is_known_smart_contract(t.target())) {
+        if (cs::SmartContracts::is_executable(t) || sc.is_known_smart_contract(t.source()) || sc.is_known_smart_contract(t.target())) {
             if (sc.test_violations(t) != cs::SmartContracts::Violations::None) {
                 rc = kContractViolation;
             }
         }
     }
 
-    if (!rc && !bc.findWalletData(t.source(), wallet)) {
+    if (!rc && !bc.findWalletData(t.source(), sWallet)) {
         rc = kSourceDoesNotExists;
     }
 
     csdb::UserField fld;
     fld = t.user_field(trx_uf::sp::delegated);
-    bool notCheck = false;
+    bool wDel = true;
     if (fld.is_valid()) {
         if (t.amount() < Consensus::MinStakeDelegated) {
             rc = kAmountTooLow;
         }
         auto flagg = fld.value<uint64_t>();
         switch(flagg) {
-            case trx_uf::sp::dele::gate:
-                
+        case trx_uf::sp::de::legate:            
                 if (!rc) {
-                    if (bc.findWalletData(t.target(), tWallet)) {
-                        if (tWallet.delegated_ > csdb::Amount{ 0 }) {
-                            rc = kTransactionProhibited;
-                        }
+                    if (sc.is_known_smart_contract(t.target())) {
+                        rc = kTransactionProhibited; 
                     }
                 }
                 break;
-            case trx_uf::sp::dele::gated_withdraw:
+        case trx_uf::sp::de::legated_withdraw:
+            wDel = false;
                 if (!rc) {
                     if (bc.findWalletData(t.target(), tWallet)) {
                         auto tKey = bc.getCacheUpdater().toPublicKey(t.target());
-                        auto it = wallet.delegats_.find(tKey);
-                        if (it == wallet.delegats_.end()) {
-                            rc = kNoDelegate;
+                        auto itSource = sWallet.delegateTargets_->find(tKey);
+                        if (itSource == sWallet.delegateTargets_->end()) {
+                            rc = kNoDelegateTarget;//you don't contain target among your delegats
                         }
                         else {
-                            if (tWallet.delegated_ != wallet.delegats_[tKey]) {
-                                rc = kNoDelegate;
+                            auto sKey = bc.getCacheUpdater().toPublicKey(t.source());
+                            auto itTarget = tWallet.delegateSources_->find(sKey);
+                            if (itTarget == tWallet.delegateSources_->end()) {
+                                rc = kNoDelegateSource;//target account doesn't contain you as source
                             }
                             else {
-                                if (tWallet.delegated_ != t.amount()) {
-                                    rc = kDifferentDelegatedAmount;
+                                auto itt = std::find_if(itTarget->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == 0U;});
+                                if (itt == itTarget->second.cend()) {
+                                    rc = kNoDelegatedAmountToWithdraw;//target account doesn't contain delegated amount that could be withdrawn
+                                }
+                                else {
+                                    auto its = std::find_if(itSource->second.begin(), itSource->second.end(), [](cs::TimeMoney& tm) {return tm.time == 0U; });
+                                    if (its == itSource->second.cend()) {
+                                        rc = kNoDelegatedAmountToWithdraw;//target account doesn't contain delegated amount that could be withdrawn
+                                    }
+                                    else {
+                                        if (itt->amount != its->amount) {
+                                            rc = kDifferentDelegatedAmount;//target and source have different delegate records 
+                                        }
+                                        else {
+                                            if (itt->amount < t.amount()) {
+                                                rc = kInsufficientDelegatedBalance;//previously delegated amount is not as much as you demand to withdraw
+                                            }
+                                            else {
+                                                if (sWallet.balance_ < csdb::Amount{ 0 } +t.max_fee().to_double()) {
+                                                    rc = kInsufficientBalance;
+                                                }
+                                                else {
+                                                    wDel = true;
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -376,15 +422,17 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
                 }
                 break;
             default:
-                if (!rc) {
-                    notCheck = true;
+                if (!rc && flagg >= trx_uf::sp::de::legate_min_utc) {
+                    if (sc.is_known_smart_contract(t.target())) {
+                        rc = kTransactionProhibited;
+                    }
                 }
                 break;
 
         }
     }
 
-    if (!rc && wallet.balance_ < (t.amount() + t.max_fee().to_double())) {
+    if ((!rc && !(sWallet.balance_ >= (t.amount() + t.max_fee().to_double())) && !wDel)) {
         rc = kInsufficientBalance;
     }
 

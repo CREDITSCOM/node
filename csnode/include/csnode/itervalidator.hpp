@@ -55,9 +55,13 @@ public:
         kSourceDoesNotExists,
         kTooLarge,
         kContractViolation,
-        kTransactionProhibited,
         kNoDelegate,
+        kTransactionProhibited,
+        kNoDelegateSource,
+        kNoDelegateTarget,
         kDifferentDelegatedAmount,
+        kNoDelegatedAmountToWithdraw,
+        kInsufficientDelegatedBalance,
         kAmountTooLow
     };
 

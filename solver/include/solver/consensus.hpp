@@ -7,19 +7,19 @@
 class Consensus {
 public:
     /** @brief   Set the flag to log solver-with-state messages to console*/
-    constexpr static bool Log = true;
+    const static bool Log;
 
     /** @brief   True if re-select write node on timeout is enabled*/
-    constexpr static bool ReSelectWriteOnTimeout = false;
+    const static bool ReSelectWriteOnTimeout;
 
-    /** @brief   True if write node may to reduce desired count of hashes on big bang and spawn next round immediately*/
-    constexpr static bool ReduceMinHashesOnBigBang = false;
-
-    /** @brief   The default state timeout */
-    constexpr static unsigned int DefaultStateTimeout = 5000;
+    /** @brief   True if write node may to reduce desired count of hashes on bootstrap and spawn next round immediately*/
+    const static bool ReduceMinHashesOnBootstrap;
 
     /** @brief   The default state timeout */
-    constexpr static uint64_t DefaultTimeStampRange = 30000;
+    const static unsigned int DefaultStateTimeout;
+
+    /** @brief   The default state timeout */
+    const static uint64_t DefaultTimeStampRange;
 
     /** @brief   Stage One minimum size */
     constexpr static uint64_t StageOneMinimumSize = 110;
@@ -44,99 +44,99 @@ public:
 
     /** @brief   Maximum time in msec to wait new round after consensus achieved, after that waiting trusted nodes
      * activates */
-    constexpr static unsigned int PostConsensusTimeout = 60000;
+    const static unsigned int PostConsensusTimeout;
 
     /** @brief   Maximum round duration when the transaction input is allowed - used to avoid BlackList */
-    constexpr static size_t MaxRoundDuration = 300000;
+    const static size_t MaxRoundDuration;
 
     /** @brief   The minimum trusted nodes to start consensus */
-    constexpr static unsigned int MinTrustedNodes = 3;
+    const static unsigned int MinTrustedNodes = 4;
 
     /** @brief   The maximum trusted nodes to take part in consensus */
-    constexpr static unsigned int MaxTrustedNodes = 25;
+    const static unsigned int MaxTrustedNodes = 25;
 
     /** @brief   The minimum cash for trusted nodes to participate consensus */
-    constexpr static csdb::Amount MinStakeValue = csdb::Amount{50000};
+    const static csdb::Amount MinStakeValue;
 
     /** @brief   The minimum stake to be delegated to another node */
     constexpr static csdb::Amount MinStakeDelegated = csdb::Amount{ 5 };
 
     /** @brief   The round when DPOS starts working */
-    constexpr static uint64_t StartingDPOS = 10'000ULL;
+    const static uint64_t StartingDPOS;
 
     /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
-    constexpr static uint8_t GeneralNotSelected = 100;
+    const static uint8_t GeneralNotSelected;
 
     /** @brief   The return value is the maximum allowed time interval (in milliseconds) for collectiong hashes */
-    constexpr static uint64_t MaxTimeStampDelta = 1000 * 60 * 3;
+    const static uint64_t MaxTimeStampDelta;
 
     /** @brief   Min duration (msec) to collect hashes in stage-1 of consensus */
-    constexpr static uint32_t T_min_stage1 = 500;
+    const static uint32_t TimeMinStage1;
 
     /** @brief   Number of rounds to prevent node from consensus participation */
-    constexpr static uint32_t GrayListPunishment = 1000;
+    const static uint32_t GrayListPunishment;
 
-	/** @brief   Number of node working rounds to start checking roundPackage creating speed */
-	constexpr static uint64_t SpeedCheckRound = 1000;
+    /** @brief   Number of node working rounds to start checking roundPackage ctreating speed */
+    const static uint64_t SpeedCheckRound;
 
     /** @brief   Max duration (msec) of the whole round (SolverCore on the 1st round) */
-    constexpr static uint32_t T_round = 2000;
+    const static uint32_t TimeRound;
 
     /** @brief   Max timeout (msec) to wait stages (Trusted-2,3) */
-    constexpr static uint32_t T_stage_request = 2000;
+    const static uint32_t TimeStageRequest;
 
     /** @brief   Max subround delta */
-    constexpr static uint8_t MaxSubroundDelta = 10;
+    const static uint8_t MaxSubroundDelta;
 
     /** @brief   Max subround delta */
-    constexpr static uint64_t MaxRoundTimerFree = 5;
+    const static uint64_t MaxRoundTimerFree;
 
     /** @brief   Max timeout (msec) to execute smart contract */
-    constexpr static uint32_t T_smart_contract = 60000;
+    const static uint32_t TimeSmartContract;
 
-    /** @brief   Max time to collect transactions (PermanentWrite, SolverCore on BigBang) */
-    constexpr static uint32_t T_coll_trans = 500;
+    /** @brief   Max time to collect transactions (PermanentWrite, SolverCore on Bootstrap) */
+    const static uint32_t TimeCollTrans;
 
     /** @brief   Max hashes count to include in stage one data */
-    constexpr static size_t MaxStageOneHashes = 100;
+    const static size_t MaxStageOneHashes;
 
     /** @brief   Max distance of Utility message */
-    constexpr static size_t UtilityMessageRoundInterval = 50;
+    const static size_t UtilityMessageRoundInterval;
 
     /** @brief   Black list counter - max number of penalty points to get to the black list */
-    constexpr static size_t BlackListCounterMaxValue = 100000;
+    const static size_t BlackListCounterMaxValue;
 
     /** @brief   Black list counter - amount of penalty points for one mistake */
-    constexpr static size_t BlackListCounterSinglePenalty = 10000;
+    const static size_t BlackListCounterSinglePenalty;
 
     /** @brief   Max transaction size */
-    constexpr static size_t MaxTransactionSize = 100 * 1024;
+    const static size_t MaxTransactionSize;
 
     /** @brief   Max hashes count to include in stage one data */
-    constexpr static size_t MaxStageOneTransactions = 1000;
+    const static size_t MaxStageOneTransactions;
 
     /** @brief   Max transaction's size to include in stage one data */
-    constexpr static size_t MaxPreliminaryBlockSize = 1 * 1024 * 1024;
+    const static size_t MaxPreliminaryBlockSize;
 
     /** @brief   Max transactions count in smart contract execution result, both new state and emitted ones */
-    constexpr static size_t MaxContractResultTransactions = 100;
+    const static size_t MaxContractResultTransactions;
 
     /** @brief   Max transactions in the packet, the sender won't be accused for, if all them are invalid */
-    constexpr static size_t AccusalPacketSize = 10;
+    const static size_t AccusalPacketSize;
 
     /** @brief   Max count of rounds to execute smart contract. After that contract is assumed failed unconditionally */
-    constexpr static unsigned int MaxRoundsCancelContract = 100;
+    const static unsigned int MaxRoundsCancelContract;
 
     /** @brief The maximum count of rounds to store in chain new_state transaction. If contract still is "in the executor" timeout is fixed.
      * After that, 90 rounds (MaxRoundsCancelContract - MaxRoundsExecuteContract) still remains to complete consensus and put empty new_state
      * into chain, otherwise  contract is assumed failed unconditionally
      */
-    constexpr static unsigned int MaxRoundsExecuteContract = 10;
+    const static unsigned int MaxRoundsExecuteContract;
 
     /** @brief True to disable, false to enable the trusted request to become trusted next round again */
-    constexpr static bool DisableTrustedRequestNextRound = false;
+    const static bool DisableTrustedRequestNextRound;
 
     /** The max contract's state size in bytes to synchronize it between node via conveyer. Otherwise, every node must get new state
     itself or make individual request to dedicated trusted nodes*/
-    constexpr static size_t MaxContractStateSizeToSync = 8192;
+    const static size_t MaxContractStateSizeToSync;
 };

@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <tuple>
 
 #include <cscrypto/cscrypto.hpp>
 #include <csdb/address.hpp>
@@ -28,6 +29,9 @@ namespace cs {
 
 class WalletsIds;
 
+using Delegations = std::vector<std::tuple<cs::PublicKey, cs::PublicKey, csdb::TransactionID>>;
+using DelegationsTiming = std::map<uint64_t, Delegations>;
+
 class WalletsCache {
 public:
     WalletsCache(WalletsIds& walletsIds);
@@ -43,7 +47,8 @@ public:
     struct WalletData {
         csdb::Amount balance_;
         csdb::Amount delegated_;
-        std::map<cs::PublicKey, csdb::Amount> delegats_; 
+        std::shared_ptr<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>> delegateSources_;
+        std::shared_ptr<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>> delegateTargets_;
         TransactionsTail trxTail_;
         uint64_t transNum_ = 0;
         csdb::TransactionID lastTransaction_;
@@ -74,6 +79,7 @@ private:
     std::list<csdb::TransactionID> smartPayableTransactions_;
     std::map< csdb::Address, std::list<csdb::TransactionID> > canceledSmarts_;
     std::unordered_map<PublicKey, WalletData> wallets_;
+    DelegationsTiming currentDelegations_;
 
 #ifdef MONITOR_NODE
     std::map<PublicKey, TrustedData> trusted_info_;
@@ -83,6 +89,7 @@ private:
 using WalletUpdateSignal = cs::Signal<void(const PublicKey&, const WalletsCache::WalletData&)>;
 using FinishedUpdateFromDB = cs::Signal<void(const std::unordered_map<PublicKey, WalletsCache::WalletData>&)>;
 
+
 class WalletsCache::Updater {
 public:
     Updater(WalletsCache& data);
@@ -91,6 +98,10 @@ public:
                        const cs::ConfidantsKeys& confidants,
                        const BlockChain& blockchain,
                        bool inverse = false); // inverse all operations
+
+    void cleanObsoletteDelegations(uint64_t time);
+    void cleanDelegationsFromCache(uint64_t delTime, Delegations& value);
+    bool removeSingleDelegation(uint64_t delTime, PublicKey& first, PublicKey& second, csdb::TransactionID id);
 
     const WalletData* findWallet(const PublicKey&) const;
     const WalletData* findWallet(const csdb::Address&) const;
@@ -120,6 +131,7 @@ public signals:
 private:
     WalletData& getWalletData(const PublicKey&);
     WalletData& getWalletData(const csdb::Address&);
+    DelegationsTiming& getCurrentDelegations();
 
     double load(const csdb::Transaction& tr, const BlockChain& blockchain, bool inverse);
 
@@ -165,6 +177,10 @@ inline const WalletsCache::WalletData* WalletsCache::Updater::findWallet(const c
 
 inline WalletsCache::WalletData& WalletsCache::Updater::getWalletData(const PublicKey& key) {
     return data_.wallets_[key];
+}
+
+inline DelegationsTiming& WalletsCache::Updater::getCurrentDelegations() {
+    return data_.currentDelegations_;
 }
 
 inline WalletsCache::WalletData& WalletsCache::Updater::getWalletData(const csdb::Address& addr) {

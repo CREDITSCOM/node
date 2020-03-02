@@ -71,7 +71,7 @@ std::string Running::to_string(Status s) {
 /*static*/
 void EventReport::sendRejectTransactions(Node& node, const cs::Bytes& rejected) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on || !config.reject_transaction) {
+    if (!config.is_active || !config.reject_transaction) {
         return;
     }
 
@@ -83,7 +83,7 @@ void EventReport::sendRejectTransactions(Node& node, const cs::Bytes& rejected) 
     }
     if (!resume.empty()) {
         cs::Bytes bin_pack;
-        cs::DataStream stream(bin_pack);
+        cs::ODataStream stream(bin_pack);
         stream << Id::RejectTransactions << uint8_t(resume.size());
         for (const auto& item : resume) {
             stream << item.first << item.second;
@@ -95,12 +95,12 @@ void EventReport::sendRejectTransactions(Node& node, const cs::Bytes& rejected) 
 /*static*/
 void EventReport::sendRejectContractExecution(Node& node, const cs::SmartContractRef& ref, Reject::Reason reason) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on || !config.reject_contract_execution) {
+    if (!config.is_active || !config.reject_contract_execution) {
         return;
     }
 
     cs::Bytes bin_pack;
-    cs::DataStream out(bin_pack);
+    cs::ODataStream out(bin_pack);
     out << Id::RejectContractExecution << ref.sequence << ref.transaction << reason;
     node.reportEvent(bin_pack);
 }
@@ -111,7 +111,7 @@ std::map<Reject::Reason, uint16_t> EventReport::parseReject(const cs::Bytes& bin
     if (bin_pack.empty()) {
         return resume;
     }
-    cs::DataStream stream(bin_pack.data(), bin_pack.size());
+    cs::IDataStream stream(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     stream >> id;
     if (id == Id::RejectTransactions) {
@@ -135,7 +135,7 @@ bool EventReport::parseRejectContractExecution(const cs::Bytes& bin_pack, cs::Sm
     if (bin_pack.empty()) {
         return false;
     }
-    cs::DataStream stream(bin_pack.data(), bin_pack.size());
+    cs::IDataStream stream(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     stream >> id;
     if (id == Id::RejectContractExecution) {
@@ -157,7 +157,7 @@ EventReport::Id EventReport::getId(const cs::Bytes& bin_pack) {
 /*static*/
 void EventReport::sendGrayListUpdate(Node& node, const cs::PublicKey& key, bool added, uint32_t count_rounds /*= 1*/) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on) {
+    if (!config.is_active) {
         return;
     }
     if (added) {
@@ -184,7 +184,7 @@ void EventReport::sendListUpdate(Node& node, const cs::PublicKey& key, bool adde
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize + sizeof(count_rounds);
     cs::Bytes bin_pack;
     bin_pack.reserve(len);
-    cs::DataStream stream(bin_pack);
+    cs::ODataStream stream(bin_pack);
     stream << (added ? Id::AddToList : Id::EraseFromList) << key;
     // send zero value is senseless
     if (count_rounds > 0) {
@@ -198,7 +198,7 @@ bool EventReport::parseListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key,
     if (bin_pack.empty()) {
         return false;
     }
-    cs::DataStream stream(bin_pack.data(), bin_pack.size());
+    cs::IDataStream stream(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     stream >> id;
     if (id == Id::AddToList || id == Id::EraseFromList) {
@@ -221,12 +221,13 @@ bool EventReport::parseListUpdate(const cs::Bytes& bin_pack, cs::PublicKey& key,
 /*static*/
 void EventReport::sendInvalidBlockAlarm(Node& node, const cs::PublicKey& source, cs::Sequence sequence) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on || !config.alarm_invalid_block) {
+    if (!config.is_active || !config.alarm_invalid_block) {
         return;
     }
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize + sizeof(sequence);
-    cs::Bytes bin_pack(len);
-    cs::DataStream out(bin_pack);
+    cs::Bytes bin_pack;
+    bin_pack.reserve(len);
+    cs::ODataStream out(bin_pack);
     out << Id::AlarmInvalidBlock << source << sequence;
     node.reportEvent(bin_pack);
 }
@@ -236,7 +237,7 @@ bool EventReport::parseInvalidBlockAlarm(const cs::Bytes& bin_pack, cs::PublicKe
     if (bin_pack.empty()) {
         return false;
     }
-    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    cs::IDataStream in(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     in >> id;
     if (id != Id::AlarmInvalidBlock) {
@@ -249,7 +250,7 @@ bool EventReport::parseInvalidBlockAlarm(const cs::Bytes& bin_pack, cs::PublicKe
 /*static*/
 void EventReport::sendConsensusProblem(Node& node, Id problem_id, const cs::PublicKey& problem_source) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on) {
+    if (!config.is_active) {
         return;
     }
     switch (problem_id) {
@@ -273,8 +274,9 @@ void EventReport::sendConsensusProblem(Node& node, Id problem_id, const cs::Publ
         return;
     }
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize;
-    cs::Bytes bin_pack(len);
-    cs::DataStream out(bin_pack);
+    cs::Bytes bin_pack;
+    bin_pack.reserve(len);
+    cs::ODataStream out(bin_pack);
     out << problem_id << problem_source;
     node.reportEvent(bin_pack);
 }
@@ -284,7 +286,7 @@ EventReport::Id EventReport::parseConsensusProblem(const cs::Bytes& bin_pack, cs
     if (bin_pack.empty()) {
         return Id::None;
     }
-    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    cs::IDataStream in(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     in >> id;
     switch(id) {
@@ -305,7 +307,7 @@ EventReport::Id EventReport::parseConsensusProblem(const cs::Bytes& bin_pack, cs
 /*static*/
 void EventReport::sendContractsProblem(Node& node, Id problem_id, const cs::PublicKey& problem_source, const ContractConsensusId& consensus_id) {
     const auto& config = cs::ConfigHolder::instance().config()->getEventsReportData();
-    if (!config.on) {
+    if (!config.is_active) {
         return;
     }
     switch (problem_id) {
@@ -330,8 +332,9 @@ void EventReport::sendContractsProblem(Node& node, Id problem_id, const cs::Publ
     }
     constexpr size_t len = sizeof(EventReport::Id) + cscrypto::kPublicKeySize
         + sizeof(consensus_id.round) + sizeof(consensus_id.transaction) + sizeof(consensus_id.iteration);
-    cs::Bytes bin_pack(len);
-    cs::DataStream out(bin_pack);
+    cs::Bytes bin_pack;
+    bin_pack.reserve(len);
+    cs::ODataStream out(bin_pack);
     out << problem_id << problem_source << consensus_id.round << consensus_id.transaction << consensus_id.iteration;
     node.reportEvent(bin_pack);
 }
@@ -341,7 +344,7 @@ EventReport::Id EventReport::parseContractsProblem(const cs::Bytes& bin_pack, cs
     if (bin_pack.empty()) {
         return Id::None;
     }
-    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    cs::IDataStream in(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     in >> id;
     switch (id) {
@@ -361,8 +364,9 @@ EventReport::Id EventReport::parseContractsProblem(const cs::Bytes& bin_pack, cs
 
 /*static*/ void EventReport::sendRunningStatus(Node& node, Running::Status status) {
     constexpr size_t len = sizeof(EventReport::Id) + sizeof(Running::Status);
-    cs::Bytes bin_pack(len);
-    cs::DataStream out(bin_pack);
+    cs::Bytes bin_pack;
+    bin_pack.reserve(len);
+    cs::ODataStream out(bin_pack);
     out << Id::RunningStatus << status;
     node.reportEvent(bin_pack);
 }
@@ -372,7 +376,7 @@ bool EventReport::parseRunningStatus(const cs::Bytes& bin_pack, Running::Status&
     if (bin_pack.empty()) {
         return false;
     }
-    cs::DataStream in(bin_pack.data(), bin_pack.size());
+    cs::IDataStream in(bin_pack.data(), bin_pack.size());
     Id id = Id::None;
     in >> id;
     if (id != Id::RunningStatus) {

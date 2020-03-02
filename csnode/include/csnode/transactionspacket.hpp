@@ -172,7 +172,6 @@ public:  // Interface
     ///
     bool addTransaction(const csdb::Transaction& transaction);
 
-
     ///
     /// @brief Adds state transaction to packet
     /// @param transaction Any transaction to add

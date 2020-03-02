@@ -18,7 +18,6 @@ namespace
 }
 
 namespace cs {
-
 void TrustedStage3State::on(SolverContext& context) {
     DefaultStateBehavior::on(context);
     if (!context.realTrustedChanged()) {
@@ -41,7 +40,7 @@ void TrustedStage3State::on(SolverContext& context) {
             return;
         }
         else {
-            cswarning() << name() << "the stage can't finish successfully, waiting for Big Bang";
+            cswarning() << name() << "the stage can't finish successfully, waiting for Bootstrap round";
             context.fail_stage3();
             return;
         }
@@ -75,49 +74,43 @@ void TrustedStage3State::on(SolverContext& context) {
         }
     }
 
-    // 3 subsequent timeouts:
-    //  - request stages-2 from origins
-    //  - request stages-2 from anyone
-    //  - create fake stages-2 from outbound nodes and force to next state
+    if (context.is_round_duration_limited()) {
+        // 3 subsequent timeouts:
+        //  - request stages-2 from origins
+        //  - request stages-2 from anyone
+        //  - create fake stages-2 from outbound nodes and force to next state
 
-    SolverContext* pctx = &context;
+        SolverContext* pctx = &context;
 
-    //blacklisted nodes stage-2 resolve
-    const auto& confidants = cs::Conveyer::instance().confidants();
-    for (uint8_t i = 0; i < static_cast<uint8_t>(confidants.size()); ++i) {
-        if (pctx->isBlackListed(confidants[i])) {
-            pctx->fake_stage2(i);
-        }
+        auto dt = 2 * Consensus::TimeStageRequest;
+        csdebug() << name() << ": start track timeout " << 0 << " ms of stages-2 received";
+        timeout_request_stage.start(context.scheduler(), 0,  // no timeout
+                                    // timeout #1 handler:
+            [pctx, this, dt]() {
+                csdebug() << name() << ": (now) skip direct requests for absent stages-2";
+                // request_stages(*pctx);
+                // start subsequent track timeout for "wide" request
+                csdebug() << name() << ": start subsequent track timeout " << dt << " ms to request neighbors about stages-2";
+                timeout_request_neighbors.start(pctx->scheduler(), dt,
+                    // timeout #2 handler:
+                    [pctx, this, dt]() {
+                        csdebug() << name() << ": timeout for transition is expired, make requests to neighbors";
+                        request_stages_neighbors(*pctx);
+                        cs::RoundNumber rnum = cs::Conveyer::instance().currentRoundNumber();
+                        // timeout #3 handler
+                        csdebug() << name() << ": start subsequent track timeout " << dt << " ms to mark silent nodes";
+                        timeout_force_transition.start(
+                            pctx->scheduler(), dt,
+                            [pctx, this, rnum, dt]() {
+                                csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
+                                mark_outbound_nodes(*pctx, rnum);
+                            },
+                            true /*replace if exists*/, TIMER_BASE_ID + 3);
+                    },
+                    true /*replace if exists*/, TIMER_BASE_ID + 2);
+            },
+            true /*replace if exists*/, TIMER_BASE_ID + 1);
     }
-
-    auto dt = 2 * Consensus::T_stage_request;
-    csdebug() << name() << ": start track timeout " << 0 << " ms of stages-2 received";
-    timeout_request_stage.start(context.scheduler(), 0,  // no timeout
-                                // timeout #1 handler:
-                                [pctx, this, dt]() {
-                                    csdebug() << name() << ": (now) skip direct requests for absent stages-2";
-                                    // request_stages(*pctx);
-                                    // start subsequent track timeout for "wide" request
-                                    csdebug() << name() << ": start subsequent track timeout " << dt << " ms to request neighbors about stages-2";
-                                    timeout_request_neighbors.start(pctx->scheduler(), dt,
-                                                                    // timeout #2 handler:
-                                                                    [pctx, this, dt]() {
-                                                                        csdebug() << name() << ": timeout for transition is expired, make requests to neighbors";
-                                                                        request_stages_neighbors(*pctx);
-                                                                        cs::RoundNumber rnum = cs::Conveyer::instance().currentRoundNumber();
-                                                                        // timeout #3 handler
-                                                                        csdebug() << name() << ": start subsequent track timeout " << dt << " ms to mark silent nodes";
-                                                                        timeout_force_transition.start(
-                                                                            pctx->scheduler(), dt,
-                                                                            [pctx, this, rnum, dt]() {
-                                                                                csdebug() << name() << ": timeout for transition is expired, mark silent nodes as outbound";
-                                                                                mark_outbound_nodes(*pctx, rnum);
-                                                                            },
-                                                                            true /*replace if exists*/, TIMER_BASE_ID + 3);
-                                                                    },
-                                                                    true /*replace if exists*/, TIMER_BASE_ID + 2);
-                                },
-                                true /*replace if exists*/, TIMER_BASE_ID + 1);
 }
 
 void TrustedStage3State::off(SolverContext& /*context*/) {
@@ -212,7 +205,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
                         cs::Bytes toVerify;
                         size_t messageSize = sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash);
                         toVerify.reserve(messageSize);
-                        cs::DataStream stream(toVerify);
+                        cs::ODataStream stream(toVerify);
                         stream << cs::Conveyer::instance().currentRoundNumber() << context.subRound();  // Attention!!! the uint32_t type
                         stream << it.hashes[j];
 
@@ -237,7 +230,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
                 if (tCandSize > 0) {
                     for (size_t outer = 0; outer < tCandSize - 1; outer++) {
                         // DPOS check start -> comment if unnecessary
-                        if (!context.checkNodeCache(ptrStage1->trustedCandidates.at(outer))) {
+                        if (!context.checkNodeStake(ptrStage1->trustedCandidates.at(outer))) {
                             cslog() << name() << ": [" << static_cast<int>(it.sender) << "] marked as untrusted (low-value candidates)";
                             context.mark_untrusted(it.sender);
                             break;
@@ -271,7 +264,7 @@ Result TrustedStage3State::onStage2(SolverContext& context, const cs::StageTwo&)
                 csdebug() << "\t==> [" << static_cast<int>(stage.writer) << "]";
             }
             else {
-                cslog() << "\tconsensus failed waiting for BigBang";
+                cslog() << "\tconsensus failed waiting for Bootstrap";
                 return Result::Failure;
             }
         }
@@ -305,7 +298,7 @@ Result TrustedStage3State::finalizeStageThree(SolverContext& context) {
         csdebug() << "\t==> [" << static_cast<int>(stage.writer) << "]";
     }
     else {
-        cslog() << "\tconsensus failed: waiting for BigBang";
+        cslog() << "\tconsensus failed: waiting for Bootstrap";
         context.send_consensus_failed_report();
         return Result::Failure;
     }
@@ -594,7 +587,7 @@ bool TrustedStage3State::take_urgent_decision(SolverContext& context) {
     int cnt = std::min(static_cast<int>(context.cnt_trusted()), (int)Consensus::MaxTrustedNodes);
     int cnt_active = cnt - static_cast<int>(std::count(stage.realTrustedMask.cbegin(), stage.realTrustedMask.cend(), InvalidConfidantIndex));
     if (cnt_active * 2 < cnt + 1) {
-        cswarning() << name() << ": not enough active confidants to make a decision, BigBang required";
+        cswarning() << name() << ": not enough active confidants to make a decision, Bootstrap required";
         return false;
     }
     int idx_writer = k % cnt_active;

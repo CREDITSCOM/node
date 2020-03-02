@@ -25,6 +25,12 @@ set(THRIFT_GENERATED_FILES
   ${THRIFT_GEN_DIR}/apiexec_constants.h
   ${THRIFT_GEN_DIR}/apiexec_types.cpp
   ${THRIFT_GEN_DIR}/apiexec_types.h
+  ${THRIFT_GEN_DIR}/API_DIAG.cpp
+  ${THRIFT_GEN_DIR}/API_DIAG.h
+  ${THRIFT_GEN_DIR}/apidiag_constants.cpp
+  ${THRIFT_GEN_DIR}/apidiag_constants.h
+  ${THRIFT_GEN_DIR}/apidiag_types.cpp
+  ${THRIFT_GEN_DIR}/apidiag_types.h
   )
 
 # Вызов thrift compiler лучше добавлять в фазу сборки - иначе
@@ -40,6 +46,11 @@ add_custom_command(
     -out ${THRIFT_GEN_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/thrift-interface-definitions/apiexec.thrift
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/thrift-interface-definitions/apiexec.thrift
+  
+  COMMAND thrift-compiler -r -gen cpp:no_skeleton,pure_enums,moveable_types
+    -out ${THRIFT_GEN_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/thrift-interface-definitions/apidiag.thrift
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/thrift-interface-definitions/apidiag.thrift
   )
 
 add_library(csconnector_gen

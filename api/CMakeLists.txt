@@ -2,6 +2,9 @@
 
 project(csconnector)
 
+# turn off optimization for this project in RelWithDebInfo only
+# configure_msvc_no_optimization()
+
 add_subdirectory(api_gen)
 add_subdirectory(executor_gen)
 add_subdirectory(variant_gen)
@@ -31,6 +34,8 @@ add_library(csconnector
     include/executor.hpp
     src/executor.cpp
     include/serializer.hpp
+    include/apidiaghandler.hpp
+    src/apidiaghandler.cpp
 )
 
 target_link_libraries (csconnector PUBLIC csdb csnode lib csconnector_gen csconnector_executor_gen variant_gen)

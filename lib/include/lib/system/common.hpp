@@ -33,11 +33,30 @@ using BytesView = cscrypto::BytesView;
 template <std::size_t size>
 using ByteArray = cscrypto::ByteArray<size>;
 
+#ifdef __cpp_lib_memory_resource
+using PmrBytes = std::pmr::vector<cs::Byte>;
+#else
+using PmrBytes = cs::Bytes;
+#endif
+
 // common data structures
 using PublicKey = cscrypto::PublicKey;
 using Signature = cscrypto::Signature;
 using Hash = cscrypto::Hash;
 using PrivateKey = cscrypto::PrivateKey;
+
+constexpr static int8_t OS_UNSPECIFIED = int8_t(-1);
+
+struct PeerData {
+    // encoded to base58 NodeId
+    std::string id;
+    // p2p public address
+    std::string ip;
+    // p2p port
+    uint16_t port = 0;
+    int16_t version = 0;
+    int8_t platform = OS_UNSPECIFIED;
+};
 
 using ConfidantSignature = std::pair<Byte, Signature>;
 using BlockSignatures = std::vector<ConfidantSignature>;

@@ -2,6 +2,7 @@
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
+#include <lib/system/concurrent.hpp>
 
 #include <configholder.hpp>
 
@@ -16,8 +17,8 @@ RoundStat::RoundStat()
 , nodeStartRound_(0)
 , startSkipRounds_(2)
 , lastRoundMs_(0)
-, roundElapseSetting_(cs::ConfigHolder::instance().config()->roundElapseTime())
-, roundElapseTimePoint_(std::chrono::steady_clock::now()) {
+, roundElapseTimePoint_(std::chrono::steady_clock::now())
+, storeBlockElapseTimePoint_(std::chrono::steady_clock::now()) {
 }
 
 void RoundStat::onRoundStart(RoundNumber round, bool skipLogs) {
@@ -69,7 +70,7 @@ void RoundStat::onRoundStart(RoundNumber round, bool skipLogs) {
                 os << aveRoundMs_ << "ms";
             }
 
-            os << ", " << WithDelimiters(totalAcceptedTransactions_) << " stored transactions.";
+            os << ", " << WithDelimiters(uint64_t(totalAcceptedTransactions_)) << " stored transactions.";
             cslog() << os.str();
         }
     }
@@ -85,11 +86,16 @@ void RoundStat::onStoreBlock(csdb::Pool block) {
     totalAcceptedTransactions_ += block.transactions_count();
 }
 
-size_t RoundStat::aveTime() {
+size_t RoundStat::uptimeMs() const {
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(steady_clock::now() - startPointMs_).count();
+}
+
+size_t RoundStat::aveRoundMs() const {
     return aveRoundMs_;
 }
 
-size_t RoundStat::nodeStartRound() {
+size_t RoundStat::nodeStartRound() const {
     return nodeStartRound_;
 }
 
@@ -101,9 +107,9 @@ void RoundStat::resetLastRoundMs() {
     lastRoundMs_.store(0, std::memory_order_release);
 }
 
-bool RoundStat::isCurrentRoundTooLong(size_t long_duration_ms /*= kMaxRoundDelay*/) const {
+bool RoundStat::isCurrentRoundTooLong(size_t longDurationMs) const {
     auto ms = lastRoundMs();
-    return ms >= long_duration_ms;
+    return ms >= longDurationMs;
 }
 
 void RoundStat::onPingReceived(cs::Sequence, const cs::PublicKey&) {
@@ -116,19 +122,52 @@ void RoundStat::onPingReceived(cs::Sequence, const cs::PublicKey&) {
     point = now;
 }
 
+void RoundStat::checkPing(cs::Sequence sequence, const PublicKey& key) {
+    static std::chrono::steady_clock::time_point point = std::chrono::steady_clock::now();
+    static std::pair<cs::PublicKey, cs::Sequence> maxSequenceNeighbour{};
+
+    if (maxSequenceNeighbour.second < sequence) {
+        maxSequenceNeighbour = std::make_pair(key, sequence);
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    checkPingDelta_ += std::chrono::duration_cast<std::chrono::milliseconds>(now - point);
+
+    if (RoundStat::kMaxPingSynchroDelay <= checkPingDelta_.count()) {
+        checkPingDelta_ = std::chrono::milliseconds(0);
+        emit pingChecked(maxSequenceNeighbour.second, maxSequenceNeighbour.first);
+    }
+
+    point = now;
+}
+
 void RoundStat::onRoundChanged() {
-    cs::Lock lock(roundElapseMutex_);
+    cs::Lock lock(statsElapseMutex_);
     roundElapseTimePoint_ = std::chrono::steady_clock::now();
 }
 
+void RoundStat::onBlockStored() {
+    {
+        cs::Lock lock(statsElapseMutex_);
+        storeBlockElapseTimePoint_ = std::chrono::steady_clock::now();
+    }
+
+    checkPingDelta_ = std::chrono::milliseconds(0);
+}
+
 void RoundStat::onMainThreadIterated() {
+    checkRoundElapse();
+    checkStoreBlockElapse();
+}
+
+void RoundStat::checkRoundElapse() {
     std::chrono::steady_clock::time_point point;
     uint64_t limit = 0;
 
     {
-        cs::Lock lock(roundElapseMutex_);
+        cs::Lock lock(statsElapseMutex_);
         point = roundElapseTimePoint_;
-        limit = roundElapseSetting_;
+        limit = cs::ConfigHolder::instance().config()->roundElapseTime();
     }
 
     auto duration = std::chrono::steady_clock::now() - point;
@@ -138,13 +177,41 @@ void RoundStat::onMainThreadIterated() {
         return;
     }
 
-    emit roundTimeElapsed();
+    cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, [this] {
+        emit roundTimeElapsed();
+    });
 
     {
         // reset time point to tick next time after limit
-        cs::Lock lock(roundElapseMutex_);
+        cs::Lock lock(statsElapseMutex_);
         roundElapseTimePoint_ = std::chrono::steady_clock::now();
     }
 }
 
+void RoundStat::checkStoreBlockElapse() {
+    std::chrono::steady_clock::time_point point;
+    uint64_t limit = 0;
+
+    {
+        cs::Lock lock(statsElapseMutex_);
+        point = storeBlockElapseTimePoint_;
+        limit = cs::ConfigHolder::instance().config()->storeBlockElapseTime();
+    }
+
+    auto duration = std::chrono::steady_clock::now() - point;
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+
+    if (limit > static_cast<uint64_t>(ms)) {
+        return;
+    }
+
+    cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, [this] {
+        emit storeBlockTimeElapsed();
+    });
+
+    {
+        cs::Lock lock(statsElapseMutex_);
+        storeBlockElapseTimePoint_ = std::chrono::steady_clock::now();
+    }
+}
 }  // namespace cs

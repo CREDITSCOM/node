@@ -29,7 +29,7 @@ cs::Bytes from_hex(Iterator beg, Iterator end) {
     cs::Bytes res;
     res.reserve(std::distance(beg, end) / 2);
     for (Iterator it = beg;;) {
-        uint8_t hi, lo;
+        uint8_t hi = 0, lo = 0;
 
         if (it == end || !digit_from_hex(*it++, hi))
             break;

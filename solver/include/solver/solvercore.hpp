@@ -118,13 +118,15 @@ public:
     void realTrustedChangedSet(bool);
     void realTrustedSetValue(cs::Byte position, cs::Byte value);
     void realTrustedSet(cs::Bytes realTrusted);
-    bool checkNodeCache(const cs::PublicKey& sender);
+    bool checkNodeStake(const cs::PublicKey& sender);
     void addToGraylist(const cs::PublicKey& sender, uint32_t rounds);
     void updateGrayList(cs::RoundNumber round);
     bool isInGrayList(cs::PublicKey key);
     void resetGrayList();
-    bool isBlackListed(const cs::PublicKey pKey);
-
+    size_t grayListSize() const {
+        return grayList_.size();
+    }
+    void getGrayListContentBase58(std::vector<std::string>& gray_list) const;
 
     bool isTransactionsInputAvailable();
 

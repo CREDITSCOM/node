@@ -22,3 +22,6 @@
 [submodule "third-party/nameof"]
 	path = third-party/nameof
 	url = https://github.com/Neargye/nameof.git
+[submodule "p2p"]
+	path = p2p
+	url = https://github.com/SychevS/p2p.git

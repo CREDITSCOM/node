@@ -27,7 +27,7 @@ public:
     void expired(SolverContext& /*context*/) override {
     }
 
-    void onRoundEnd(SolverContext& /*context*/, bool /*is_bingbang*/) override {
+    void onRoundEnd(SolverContext& /*context*/, bool /*is_sootstrap*/) override {
     }
 
     /**

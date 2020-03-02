@@ -34,6 +34,9 @@ private:
     Config& config_;
     boost::program_options::variables_map& map_;
 
+    cs::PublicKey publicKey_{};
+    cs::PrivateKey privateKey_{};
+
     std::atomic<bool> isObserved_ = { false };
     std::mutex mutex_;
     std::condition_variable variable_;

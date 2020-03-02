@@ -6,6 +6,11 @@ Zero::Zero() {
     hash.fill(0);
     signature.fill(0);
     key.fill(0);
+    timeStamp = 0U;
+}
+TimeMoney::TimeMoney(uint64_t t, csdb::Amount am) {
+    time = t;
+    amount = am;
 }
 }  // namespace cs
 
@@ -34,12 +39,12 @@ std::size_t std::hash<cs::TransactionsPacketHash>::operator()(const cs::Transact
     return hash;
 }
 
-cs::Bytes cs::RoundTable::toBinary(){
+cs::Bytes cs::RoundTable::toBinary() const {
     cs::Bytes bytes;
-    cs::DataStream tth(bytes);
+    cs::ODataStream stream(bytes);
 
-    tth << round;
-    tth << confidants;
+    stream << round;
+    stream << confidants;
 
     return bytes;
 }

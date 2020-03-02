@@ -112,7 +112,7 @@ TransactionsPacket::TransactionsPacket(TransactionsPacket&& packet)
 , transactions_(std::move(packet.transactions_))
 , stateTransactions_(std::move(packet.stateTransactions_))
 , signatures_(std::move(packet.signatures_))
-, expiredRound_(packet.expiredRound()){
+, expiredRound_(packet.expiredRound_) {
     packet.hash_ = TransactionsPacketHash();
     packet.transactions_.clear();
 }
@@ -163,7 +163,7 @@ size_t TransactionsPacket::transactionsCount() const noexcept {
     return transactions_.size();
 }
 
-RoundNumber TransactionsPacket::expiredRound() const noexcept {
+cs::RoundNumber TransactionsPacket::expiredRound() const noexcept {
     return expiredRound_;
 }
 

@@ -3,7 +3,6 @@
 #include <solver/smartcontracts.hpp>
 #include "clientconfigmock.hpp"
 #include "gtest/gtest.h"
-#include "networkmock.hpp"
 #include "nodemock.hpp"
 #include "solvermock.hpp"
 #include "transportmock.hpp"

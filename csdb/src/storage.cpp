@@ -170,7 +170,7 @@ private:
         >
     > PoolCache;
     PoolCache pools_cache;
-    static const size_t cacheSize = 10000;
+    static const size_t cacheSize = 1000;
 
     void pools_cache_insert(const cs::Sequence& seq, const PoolHash &hash, const Pool &pool) {
         if (pools_cache.size() == cacheSize) {
@@ -400,19 +400,25 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
 
     if (opt.newBlockchainTop != cs::kWrongSequence) {
         auto seqToRemove = static_cast<uint32_t>(opt.newBlockchainTop + 1);
-		auto seqLast = seqToRemove;
+        auto seqLast = seqToRemove;
         {
-		    Database::IteratorPtr it = d->db->new_iterator();
-		    it->seek_to_last();
-		    if (it->is_valid()) {
-			    auto key = it->key();
-			    if (key != std::numeric_limits<uint32_t>::max()) {
-				    seqLast = key;
-			    }
-		    }
+            Database::IteratorPtr it = d->db->new_iterator();
+            it->seek_to_last();
+            if (it->is_valid()) {
+                auto key = it->key();
+                if (key != std::numeric_limits<uint32_t>::max()) {
+                    seqLast = key;
+                }
+            }
         }
 
-		cslog() << "start remove " << seqLast - seqToRemove + 1 << " blocks: " << seqToRemove << " .. " << seqLast;
+        auto blocksCount = (seqLast >= seqToRemove) ? (seqLast - seqToRemove + 1) : 0;
+        if(seqToRemove <= seqLast) {
+            cslog() << "start remove " << blocksCount << " blocks: " << seqToRemove << " .. " << seqLast;
+        }
+        else {
+            cslog() << "nothing to remove over " << opt.newBlockchainTop << ", current last block is " << seqLast;
+        }
 
         while (seqToRemove <= seqLast) {
             cs::Bytes poolBinary;
@@ -421,29 +427,30 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
             }
             auto hash = csdb::Pool::hash_from_binary(std::move(poolBinary));
             if (hash.is_empty()) {
-				// try remove another way, using next block's previous hash
-				cs::Bytes next_block_bytes;
-				const uint32_t next_seq = uint32_t(seqToRemove);
-				if (!d->db->get(next_seq, &next_block_bytes)) {
-					// cannot, sorry
-					return false;
-				}
-				size_t dummy = 0;
-				auto next_pool = csdb::Pool::meta_from_binary(std::move(next_block_bytes), dummy);
-				if (!next_pool.is_valid()) {
-					// cannot, sorry
-					return false;
-				}
-				if (!d->db->remove(next_pool.previous_hash().to_binary())) {
-					// cannot repair, sorry
-					return false;
-				}
+                // try remove another way, using next block's previous hash
+                cs::Bytes next_block_bytes;
+                const uint32_t next_seq = uint32_t(seqToRemove);
+                if (!d->db->get(next_seq, &next_block_bytes)) {
+                    // cannot, sorry
+                    return false;
+                }
+                size_t dummy = 0;
+                auto next_pool = csdb::Pool::meta_from_binary(std::move(next_block_bytes), dummy);
+                if (!next_pool.is_valid()) {
+                    // cannot, sorry
+                    return false;
+                }
+                if (!d->db->remove(next_pool.previous_hash().to_binary())) {
+                    // cannot repair, sorry
+                    return false;
+                }
                 continue;
             }
             if (!d->db->remove(hash.to_binary())) {
                 break;
             }
-			cslog() << "block " << seqToRemove - 1 << " is removed";
+
+            cslog() << "block " << seqToRemove - 1 << " is removed";
         }
 
         return true;
@@ -748,9 +755,8 @@ Pool Storage::pool_remove_last() {
         return Pool{};
     }
 
-	size_t dummy = 0;
-	// need only previous_hash to discover:
-	res = Pool::meta_from_binary(std::move(data), dummy);
+	// need full block content to discover:
+	res = Pool::from_binary(std::move(data));
     if (!res.is_valid()) {
         d->set_last_error(DataIntegrityError, "%s: Error decoding pool meta [hash: %s]", funcName(), last_hash().to_string().c_str());
 		return Pool{};

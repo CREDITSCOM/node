@@ -1,19 +1,11 @@
-#include <lz4.h>
+#include <packet.hpp>
 
 #include <lib/system/utils.hpp>
-#include "packet.hpp"
-#include "transport.hpp"  // for NetworkCommand
-
-RegionAllocator Message::allocator_;
-
-enum Lengths {
-    FragmentedHeader = 36
-};
 
 const char* Packet::messageTypeToString(MsgTypes messageType) {
     switch (messageType) {
-        case RoundTableSS:
-            return "RoundTableSS";
+        case BootstrapTable:
+            return "BootstrapTable";
         case Transactions:
             return "Transactions";
         case FirstTransaction:
@@ -68,8 +60,6 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
             return "SmartThirdStageRequest";
         case HashReply:
             return "HashReply";
-        case BigBang:
-            return "BigBang";
         case NodeStopRequest:
             return "NodeStopRequest";
         case RejectedContracts:
@@ -87,197 +77,13 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
     }
 }
 
-const cs::Hash& Packet::getHeaderHash() const {
-    if (!headerHashed_) {
-        headerHash_ = generateHash(static_cast<const char*>(region_->data()) + Offsets::FragmentsNum, Lengths::FragmentedHeader);
-        headerHashed_ = true;
-    }
-
-    return headerHash_;
-}
-
 bool Packet::isHeaderValid() const {
-    if (isFragmented()) {
-        if (isNetwork()) {
-            cserror() << "Network packet is fragmented";
-            return false;
-        }
-
-        const auto& frNum = getFragmentsNum();
-        const auto& frId = getFragmentId();
-
-        if (!hasValidFragmentation()) {
-            cserror() << "Packet " << Packet::messageTypeToString(this->getType()) << " has invalid header: frId(" << frId << ") >= frNum(" << frNum << ")";
-            return false;
-        }
-    }
-
-    if (size() <= getHeadersLength()) {
-        cserror() << "Packet size (" << size() << ") <= header length (" << getHeadersLength() << ")" << (isNetwork() ? ", network" : "") << (isFragmented() ? ", fragmeted" : "")
-                  << ", type " << Packet::messageTypeToString(getType()) << "(" << static_cast<int>(getType()) << ")";
+    if (size() < getHeadersLength()) {
+        cserror() << "Packet size (" << size() << ") < header length (" << getHeadersLength() << ")";
         return false;
     }
 
     return true;
-}
-
-uint32_t Packet::getHeadersLength() const {
-    if (!headersLength_) {
-        headersLength_ = calculateHeadersLength();
-    }
-
-    return headersLength_;
-}
-
-uint32_t Packet::calculateHeadersLength() const {
-    uint32_t length = sizeof(BaseFlags);  // Flags
-
-    if (isFragmented()) {
-        length += sizeof(uint16_t) + sizeof(uint16_t);  // Min fragments & all fragments
-    }
-
-    if (!isNetwork()) {
-        length += kPublicKeyLength + sizeof(getId());  // Sender key + ID
-
-        if (!isBroadcast() && !isDirect()) {
-            length += kPublicKeyLength;  // Receiver key
-        }
-    }
-
-    return length;
-}
-
-void Packet::recalculateHeadersLength() {
-    headersLength_ = calculateHeadersLength();
-}
-
-MessagePtr PacketCollector::getMessage(const Packet& pack, bool& newFragmentedMsg) {
-    if (!pack.isFragmented()) {
-        return MessagePtr();
-    }
-
-    if (!pack.hasValidFragmentation()) {
-        return MessagePtr();
-    }
-
-    newFragmentedMsg = false;
-
-    MessagePtr* msgPtr;
-    MessagePtr msg;
-
-    {
-        cs::Lock l(mLock_);
-        msgPtr = &map_.tryStore(pack.getHeaderHash());
-    }
-
-    if (!*msgPtr) {  // First time
-        *msgPtr = msg = msgAllocator_.emplace();
-        msg->packetsLeft_ = pack.getFragmentsNum();
-        msg->packetsTotal_ = pack.getFragmentsNum();
-        msg->packets_.resize(msg->packetsTotal_);
-        msg->headerHash_ = pack.getHeaderHash();
-        newFragmentedMsg = true;
-    }
-    else {
-        msg = *msgPtr;
-        if (msg->packets_.size() == 0) {
-            msg->packets_.resize(msg->packetsTotal_);
-        }
-    }
-
-    {
-        cs::Lock lock(msg->pLock_);
-        auto& goodPlace = msg->packets_[pack.getFragmentId()]; // valid fragmentation has already been tested
-        if (!goodPlace) {
-            msg->maxFragment_ = std::max(pack.getFragmentsNum(), msg->maxFragment_);
-            --msg->packetsLeft_;
-            goodPlace = pack;
-        }
-
-        if (msg->packetsTotal_ >= 20) {
-            if (msg->packetsLeft_ != 0) {
-                // the 1st fragment contains full info:
-                if (pack.getFragmentId() == 0) {
-                    csdetails() << "COLLECT> recv pack " << Packet::messageTypeToString(pack.getType()) << " of " << msg->packetsTotal_ << ", round " << pack.getRoundNum();
-                }
-                csdetails() << "COLLECT> ready " << msg->packetsTotal_ - msg->packetsLeft_ << " / " << msg->packetsTotal_;
-            }
-            else {
-                csdetails() << "COLLECT> done (" << msg->packetsTotal_ << ") " << Packet::messageTypeToString(msg->getFirstPack().getType()) << ", round "
-                            << msg->getFirstPack().getRoundNum();
-            }
-        }
-    }
-    return msg;
-}
-
-void PacketCollector::dropMessage(MessagePtr msg) {
-    (*msg)->packetsLeft_ = (*msg)->packetsTotal_;
-    (*msg)->packets_.clear();
-}
-
-/* WARN: All the cases except FRAG + COMPRESSED have bugs in them */
-void Message::composeFullData() const {
-    if (getFirstPack().isFragmented()) {
-        uint32_t headersLength = packets_[0].getHeadersLength();
-        uint32_t totalSize = headersLength;
-
-        for (auto& pack: packets_) {
-            totalSize += static_cast<uint32_t>((pack.size() - headersLength));
-        }
-
-        fullData_ = allocator_.allocateNext(totalSize);
-        uint8_t* data = static_cast<uint8_t*>(fullData_->data());
-        for (auto pack = packets_.begin(), end = packets_.end(); pack != end; ++pack) {
-            uint32_t headerSize = static_cast<uint32_t>((pack == packets_.begin()) ? 0 : headersLength);
-
-            uint32_t cSize = cs::numeric_cast<uint32_t>(pack->size()) - headerSize;
-            auto source = (reinterpret_cast<const char*>(pack->data())) + headerSize;
-
-            std::copy(source, source + cSize, data);
-            data += cSize;
-        }
-    }
-}
-
-class PacketFlags {
-public:
-    PacketFlags(const Packet& packet)
-    : packet_(packet) {
-    }
-
-    std::ostream& operator()(std::ostream& os) const {
-        uint8_t n = 0;
-
-        if (packet_.isNetwork()) {
-            os << "net";
-            ++n;
-        }
-
-        if (packet_.isFragmented()) {
-            os << (n ? ", " : "") << "fragmented(" << packet_.getFragmentsNum() << ")";
-            ++n;
-        }
-
-        if (packet_.isCompressed()) {
-            os << (n ? ", " : "") << "compressed";
-            ++n;
-        }
-
-        if (packet_.isDirect()) {
-            os << (n ? ", " : "") << "neighbors";
-            ++n;
-        }
-
-        return os;
-    }
-
-private:
-    const Packet& packet_;
-};
-
-std::ostream& operator<<(std::ostream& os, const PacketFlags& packetFlags) {
-    return packetFlags(os);
 }
 
 std::ostream& operator<<(std::ostream& os, const Packet& packet) {
@@ -288,31 +94,23 @@ std::ostream& operator<<(std::ostream& os, const Packet& packet) {
 
     if (packet.isNetwork()) {
         const uint8_t* data = packet.getMsgData();
-        os << Transport::networkCommandToString(static_cast<NetworkCommand>(*data)) << "(" << int(*data) << "), ";
-        os << "flags: " << PacketFlags(packet);
-        return os;
-    } else {
-        os << "MessageType: " << Packet::messageTypeToString(packet.getType()) << ", ";
+        os << networkCommandToString(static_cast<NetworkCommand>(*data))
+           << "(" << int(*data) << "), ";
     }
 
-    if (packet.isFragmented()) {
-        if (packet.getFragmentId() == 0) {
-            os << Packet::messageTypeToString(packet.getType()) << "(" << packet.getType() << "), ";
-            os << "round " << packet.getRoundNum() << ", ";
-        }
-        else {
-            os << "fragment id: " << packet.getFragmentId() << ", ";
-        }
+    std::string flags = "Packet:\n Flags:";
+
+    if (packet.isNetwork()) {
+        flags += " network";
     }
 
-    os << "flags: " << PacketFlags(packet);
-    os << ", id: " << packet.getId() << std::endl;
-    os << "Sender:\t\t" << cs::Utils::byteStreamToHex(packet.getSender().data(), packet.getSender().size());
-
-    if (!packet.isBroadcast()) {
-        os << std::endl;
-        os << "Addressee:\t" << cs::Utils::byteStreamToHex(packet.getAddressee().data(), packet.getAddressee().size());
+    if (packet.isCompressed()) {
+        flags += " compressed";
     }
 
-    return os;
+    if (packet.isSigned()) {
+        flags += " signed";
+    }
+
+    return os << flags << std::endl;
 }

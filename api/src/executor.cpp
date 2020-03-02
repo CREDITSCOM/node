@@ -211,6 +211,8 @@ void cs::Executor::stop() {
         }
     }
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
     if (manager_.isExecutorProcessRunning()) {
         manager_.stopExecutorProcess();
     }
@@ -400,8 +402,9 @@ std::optional<cs::Executor::ExecuteResult> cs::Executor::executeTransaction(cons
             // add arg[1]
             str_val.clear();
 
-            if (smart.user_field(1).is_valid()) {
-                str_val = smart.user_field(1).value<std::string>();
+            using namespace cs::trx_uf;
+            if (smart.user_field(ordinary::Text).is_valid()) {
+                str_val = smart.user_field(ordinary::Text).value<std::string>();
             }
 
             general::Variant& var1 = header.params.emplace_back(::general::Variant{});
@@ -540,8 +543,9 @@ std::optional<cs::Executor::ExecuteResult> cs::Executor::reexecuteContract(cs::E
         // add arg[1]
         str_val.clear();
 
-        if (contract.transaction.user_field(1).is_valid()) {
-            str_val = contract.transaction.user_field(1).value<std::string>();
+        using namespace cs::trx_uf;
+        if (contract.transaction.user_field(ordinary::Text).is_valid()) {
+            str_val = contract.transaction.user_field(ordinary::Text).value<std::string>();
         }
 
         general::Variant& var1 = header.params.emplace_back(::general::Variant{});
@@ -781,7 +785,7 @@ void cs::Executor::checkExecutorVersion() {
             notifyError();
         };
 
-        cs::Concurrent::run(terminate, cs::ConcurrentPolicy::Thread);
+        cs::Concurrent::run(cs::ConcurrentPolicy::Thread, terminate);
     }
 }
 
@@ -853,7 +857,7 @@ cs::Executor::Executor(const cs::ExecutorSettings::Types& types)
         cslog() << "Executor watcher thread finished";
     };
 
-    cs::Concurrent::run(watcher, cs::ConcurrentPolicy::Thread);
+    cs::Concurrent::run(cs::ConcurrentPolicy::Thread, watcher);
 }
 
 cs::Executor::~Executor() {
@@ -886,8 +890,16 @@ uint64_t cs::Executor::generateAccessId(cs::Sequence explicitSequence, uint64_t 
     ++lastAccessId_;
     accessSequence_[lastAccessId_] = (explicitSequence != kUseLastSequence ? explicitSequence : blockchain_.getLastSeq());
 
-    if(time)
+    if (time) {
         executeTrxnsTime[lastAccessId_] = time;
+    }
+    else {
+        // try to get time from block
+        const csdb::Pool block = blockchain_.loadBlock(accessSequence_[lastAccessId_]);
+        if (block.is_valid()) {
+            executeTrxnsTime[lastAccessId_] = BlockChain::getBlockTime(block);
+        }
+    }
 
     return static_cast<uint64_t>(lastAccessId_);
 }
@@ -904,7 +916,7 @@ void cs::Executor::deleteAccessId(const general::AccessID& accessId) {
 
 std::optional<cs::Executor::OriginExecuteResult> cs::Executor::execute(const std::string& address, const executor::SmartContractBinary& smartContractBinary,
                                                                        std::vector<executor::MethodHeader>& methodHeader, bool isGetter, cs::Sequence explicitSequence, uint64_t time) {
-    constexpr uint64_t EXECUTION_TIME = Consensus::T_smart_contract;
+    const uint64_t EXECUTION_TIME = Consensus::TimeSmartContract;
     OriginExecuteResult originExecuteRes{};
 
     if (!isConnected()) {

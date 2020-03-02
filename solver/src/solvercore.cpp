@@ -175,7 +175,7 @@ void SolverCore::handleTransitions(Event evt) {
         return;
     }
     if (Event::BigBang == evt) {
-        cswarning() << log_prefix << "BigBang on";
+        cswarning() << log_prefix << "Bootstrap on";
     }
     const auto& variants = transitions[pstate];
     if (variants.empty()) {
@@ -406,7 +406,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         for (auto& it : deferredBlock_.transactions()) {
             tmpPool.add_transaction(it);
         }
-        tmpPool.add_user_field(0, justCreatedRoundPackage.poolMetaInfo().timestamp);
+        BlockChain::setTimestamp(tmpPool, justCreatedRoundPackage.poolMetaInfo().timestamp);
         for (auto& it : deferredBlock_.smartSignatures()) {
             tmpPool.add_smart_signature(it);
         }
@@ -433,6 +433,9 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
 
         deferredBlock_ = csdb::Pool{};
         deferredBlock_ = tmpPool;
+    }
+    if (pnode->isBootstrapRound()) {
+        BlockChain::setBootstrap(deferredBlock_, true);
     }
     deferredBlock_.to_byte_stream(binSize);
     csdetails() << log_prefix << "pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
@@ -472,14 +475,14 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
 
     cs::Bytes messageToSign;
     messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
-    cs::DataStream signStream(messageToSign);
+    cs::ODataStream signStream(messageToSign);
     signStream << justCreatedRoundPackage.roundTable().round;
     signStream << pnode->subRound();
     signStream << stage3.roundHash;
     stage3.roundSignature = cscrypto::generateSignature(private_key, stage3.roundHash.data(), stage3.roundHash.size());
 
     cs::Bytes trustedList;
-    cs::DataStream tStream(trustedList);
+    cs::ODataStream tStream(trustedList);
     tStream << justCreatedRoundPackage.roundTable().round;
     tStream << justCreatedRoundPackage.roundTable().confidants;
     stage3.trustedHash = cscrypto::calculateHash(trustedList.data(), trustedList.size());

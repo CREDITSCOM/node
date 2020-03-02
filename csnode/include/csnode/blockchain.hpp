@@ -16,11 +16,13 @@
 #include <csdb/amount_commission.hpp>
 #include <csdb/pool.hpp>
 #include <csdb/storage.hpp>
-
 #include <csdb/internal/types.hpp>
+
 #include <csnode/nodecore.hpp>
 #include <csnode/multiwallets.hpp>
 #include <csnode/walletsids.hpp>
+#include <csnode/poolcache.hpp>
+
 #include <roundpackage.hpp>
 
 #include <lib/system/concurrent.hpp>
@@ -81,6 +83,8 @@ public:
 
     static csdb::Address getAddressFromKey(const std::string&);
 
+    static uint64_t getBlockTime(const csdb::Pool& block) noexcept;
+
     // create/save block and related methods
 
     /**
@@ -101,7 +105,7 @@ public:
      *            for future use and will be recorded on time
      */
 
-    bool storeBlock(csdb::Pool& pool, bool bySync);
+    bool storeBlock(csdb::Pool& pool, cs::PoolStoreType type);
 
     /**
      * @fn    std::optional<csdb::Pool> BlockChain::createBlock(csdb::Pool pool);
@@ -122,6 +126,21 @@ public:
 
     void removeWalletsInPoolFromCache(const csdb::Pool& pool);
     void removeLastBlock();
+
+    /**
+     * Mark last block as compromised and handle the situation:
+     *  - store required parameters  
+     *  - make a request for proper block variant
+     *
+     * @author  Alexander Avramenko
+     * @date    31.01.2020
+     *
+     * @param   desired_hash    The desired hash of last block to request.
+     *
+     * @returns True if it succeeds, false if it fails.
+     */
+
+    bool compromiseLastBlock(const csdb::PoolHash& desired_hash);
 
     // updates fees in every transaction
     void setTransactionsFees(cs::TransactionsPacket& packet);
@@ -144,7 +163,16 @@ public:
     bool updateLastBlock(cs::RoundPackage& rPackage);
     bool updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom);
     bool deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::Pool& newPool);
+    bool isSpecial(const csdb::Transaction& t);
+    cs::Bytes checkForSpecialTransactions(const std::vector<csdb::Transaction>& trxs, cs::Sequence seq);
     cs::Sequence getLastSeq() const;
+
+    static inline const csdb::user_field_id_t kFieldTimestamp = 0;
+    static inline const csdb::user_field_id_t kFieldServiceInfo = 1;
+
+    static void setTimestamp(csdb::Pool& block, const std::string& timestamp);
+    static void setBootstrap(csdb::Pool& block, bool is_bootstrap);
+    static bool isBootstrap(const csdb::Pool& block);
 
     const cs::MultiWallets& multiWallets() const;
 
@@ -160,7 +188,7 @@ public:
      */
 
     std::size_t getCachedBlocksSize() const;
-
+    std::size_t getCachedBlocksSizeSynced() const;
     void clearBlockCache();
 
     // continuous interval from ... to
@@ -190,6 +218,11 @@ public:
      */
 
     void testCachedBlocks();
+    std::optional<SequenceInterval> getFreeSpaceBlocks() const;
+
+    bool isLastBlockUncertain() const {
+        return uncertainLastBlockFlag_;
+    }
 
 public signals:
 
@@ -207,6 +240,9 @@ public signals:
 
     /** @brief Alarm event. Block Isn't correct */
     cs::AlarmSignal alarmBadBlock;
+
+    /** @brief Alarm event. Uncertain that last block is valid */
+    cs::AlarmSignal uncertainBlock;
 
     const cs::ReadBlockSignal& readBlockEvent() const;
     const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;
@@ -250,6 +286,7 @@ public:
 
     size_t getSize() const;
     uint64_t getWalletsCountWithBalance();
+    uint64_t getWalletsCount() const;
     csdb::PoolHash getLastHash() const;
     csdb::PoolHash getHashBySequence(cs::Sequence seq) const;
     cs::Sequence getSequenceByHash(const csdb::PoolHash&) const;
@@ -265,7 +302,8 @@ public:
 
     void setBlocksToBeRemoved(cs::Sequence number);
 
-    void printWalletCaches();
+    std::string printWalletCaches();
+
 
 #ifdef MONITOR_NODE
     void iterateOverWriters(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::TrustedData&)>);
@@ -279,7 +317,7 @@ public:
     std::pair<cs::Sequence, uint32_t> getLastNonEmptyBlock();
     std::pair<cs::Sequence, uint32_t> getPreviousNonEmptyBlock(cs::Sequence);
     uint64_t getTransactionsCount() const {
-        return total_transactions_count_;
+        return totalTransactionsCount_;
     }
 
     const csdb::Address& getGenesisAddress() const;
@@ -309,6 +347,7 @@ private:
 
     // Thread unsafe
     bool finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys lastConfidants);
+    bool applyBlockToCaches(const csdb::Pool& pool);
 
     void onStartReadFromDB(cs::Sequence lastWrittenPoolSeq);
     void onReadFromDB(csdb::Pool block, bool* shouldStop);
@@ -317,12 +356,6 @@ private:
     bool updateWalletIds(const csdb::Pool& pool, cs::WalletsCache::Updater& updater);
     bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
 
-    void addNewWalletToPool(const csdb::Address& walletAddress, const csdb::Pool::NewWalletInfo::AddressId& addressId, csdb::Pool::NewWallets& newWallets);
-
-    bool updateFromNextBlock(const csdb::Pool& pool);
-
-    // returns true if new id was inserted
-    bool getWalletId(const WalletAddress& address, WalletId& id);
     bool findWalletData_Unsafe(WalletId id, WalletData& wallData) const;
 
     class TransactionsLoader;
@@ -339,6 +372,7 @@ private:
 
     const csdb::Address genesisAddress_;
     const csdb::Address startAddress_;
+
     std::unique_ptr<cs::WalletsIds> walletIds_;
     std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
     std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
@@ -346,14 +380,14 @@ private:
 
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
-    uint64_t total_transactions_count_ = 0;
+    uint64_t totalTransactionsCount_ = 0;
 
     struct NonEmptyBlockData {
         cs::Sequence poolSeq;
         uint32_t transCount = 0;
     };
-    std::map<cs::Sequence, NonEmptyBlockData> previousNonEmpty_;
 
+    std::map<cs::Sequence, NonEmptyBlockData> previousNonEmpty_;
     NonEmptyBlockData lastNonEmptyBlock_;
 
     /**
@@ -377,9 +411,11 @@ private:
     struct BlockMeta {
         csdb::Pool pool;
         // indicates that block has got by sync, so it is checked & tested in other way than ordinary ones
-        bool by_sync;
+        cs::PoolStoreType type;
     };
-    std::map<cs::Sequence, BlockMeta> cachedBlocks_;
+
+    mutable std::mutex cachedBlocksMutex_;
+    std::unique_ptr<cs::PoolCache> cachedBlocks_;
 
     // block storage to defer storing it in blockchain until confirmation from other nodes got
     // (idea is it is more easy not to store block immediately then to revert it after storing)
@@ -399,11 +435,33 @@ private:
         return 0;
     }
 
-    //uint64_t initUuid() const;
-
     // may be modified once in uuid() method:
-    mutable uint64_t uuid_ = 0;
+    mutable std::atomic<uint64_t> uuid_ = 0;
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
+    std::atomic_bool stop_ = false;
+
+    // support the ability to replace last deferred block by the alternative with the same content, anti-fork feature
+    // flag the last block is uncertain:
+    bool uncertainLastBlockFlag_ = false;
+    // sequence of uncertain block, if uncertainLastBlock_ == true
+    cs::Sequence uncertainSequence_ = 0;
+    // hash of uncertain block
+    csdb::PoolHash uncertainHash_;
+    // desired hash of block with the same (uncertain) sequence and the same content as the current (uncertain) block:
+    csdb::PoolHash desiredHash_;
+    // counter of successfully replaced uncertain blocks
+    size_t cntUncertainReplaced = 0;
+
+    void resetUncertainState() {
+        uncertainLastBlockFlag_ = false;
+        uncertainSequence_ = 0;
+        uncertainHash_ = csdb::PoolHash{};
+        desiredHash_ = csdb::PoolHash{};
+    }
+
+    // compare only state content: transactions, new wallets, sequence, round fee, user fields
+    // true if both pools are not valid, or both pools have equal state content
+    static bool testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs);
 };
 #endif  //  BLOCKCHAIN_HPP
