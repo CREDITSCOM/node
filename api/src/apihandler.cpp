@@ -1660,24 +1660,30 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, 
 
 void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<general::ByteCodeObject>& byteCodeObjects) {
     executor::GetContractMethodsResult executor_ret;
-
     if (byteCodeObjects.empty()) {
         return;
     }
-
     executor_.getContractMethods(executor_ret, byteCodeObjects);
     _return.code = executor_ret.status.code;
     _return.message = executor_ret.status.message;
-
-    for (size_t Count = 0; Count < executor_ret.methods.size(); Count++) {
-        _return.methods[Count].name = executor_ret.methods[Count].name;
-
-        for (size_t SubCount = 0; SubCount < executor_ret.methods[Count].arguments.size(); SubCount++) {
-            _return.methods[Count].arguments[SubCount].type = executor_ret.methods[Count].arguments[SubCount].type;
-            _return.methods[Count].arguments[SubCount].name = executor_ret.methods[Count].arguments[SubCount].name;
+    auto allMethods = executor_ret.methods;
+    for (auto met : allMethods) {
+        //_return.methods[Count].name = executor_ret.methods[Count].name;
+        //for (size_t SubCount = 0; SubCount < executor_ret.methods[Count].arguments.size(); SubCount++) {
+        //    _return.methods[Count].arguments[SubCount].type = executor_ret.methods[Count].arguments[SubCount].type;
+        //    _return.methods[Count].arguments[SubCount].name = executor_ret.methods[Count].arguments[SubCount].name;
+        //}
+        //_return.methods[Count].returnType = executor_ret.methods[Count].returnType;
+        ::general::MethodDescription method;
+        method.name = met.name;
+        method.returnType = met.returnType;
+        for (auto arg : met.arguments) {
+            ::general::MethodArgument argument;
+            argument.type = arg.type;
+            argument.name = arg.name;
+            method.arguments.push_back(argument);
         }
-
-        _return.methods[Count].returnType = executor_ret.methods[Count].returnType;
+        _return.methods.push_back(method);
     }
 }
 
