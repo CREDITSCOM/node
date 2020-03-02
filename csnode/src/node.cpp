@@ -3547,6 +3547,16 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 stream >> nVersionChange_.seq >> nVersionChange_.minFullVersion >> nVersionChange_.minCompatibleVersion;
                 nVersionChange_.check = NODE_VERSION >= nVersionChange_.minFullVersion ? cs::CheckVersion::None : (NODE_VERSION < nVersionChange_.minCompatibleVersion ? cs::CheckVersion::Full : cs::CheckVersion::Normal);
             }
+
+            if (order == 10U) {// transaction's packages life time
+
+            }
+
+            if (order == 11U) {// maxmum smart contract execution time
+                unsigned int maxContractExeTime;
+                stream >> maxContractExeTime;
+                Consensus::MaxRoundsExecuteContract = maxContractExeTime;
+            }
         }
     }
     std::string msg;

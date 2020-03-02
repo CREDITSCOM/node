@@ -131,7 +131,7 @@ public:
      * After that, 90 rounds (MaxRoundsCancelContract - MaxRoundsExecuteContract) still remains to complete consensus and put empty new_state
      * into chain, otherwise  contract is assumed failed unconditionally
      */
-    const static unsigned int MaxRoundsExecuteContract;
+    static unsigned int MaxRoundsExecuteContract;
 
     /** @brief True to disable, false to enable the trusted request to become trusted next round again */
     const static bool DisableTrustedRequestNextRound;
