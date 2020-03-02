@@ -2850,10 +2850,6 @@ bool Node::isTransactionsInputAvailable() {
         }
     }
     // default conditions: no sync and last block is near to current round
-    if (poolSynchronizer_->isSyncroStarted()) {
-        cslog() << "NODE> reject transaction: node is synchronizing now";
-        return false;
-    }
     const auto round = cs::Conveyer::instance().currentRoundNumber();
     const auto sequence = getBlockChain().getLastSeq();
     if(round < sequence || round - sequence >= cs::PoolSynchronizer::kRoundDifferentForSync) {
