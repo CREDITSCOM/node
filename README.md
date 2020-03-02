@@ -6,7 +6,7 @@
 
 [![Twitter](https://img.shields.io/twitter/follow/creditscom.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=creditscom)
 [![AGPL License](https://img.shields.io/github/license/CREDITSCOM/node.svg?color=green&label=License&style=plastic)](LICENSE)
-![Version](https://img.shields.io/github/tag/CREDITSCOM/node.svg?label=Versoin&style=plastic)
+![Version](https://img.shields.io/github/tag/CREDITSCOM/node.svg?label=Version&style=plastic)
 [![Build Status](http://89.111.33.166:8080/buildStatus/icon?job=lin-client-node&build=27)](http://89.111.33.166:8080/view/release-pipeline/job/lin-client-node/lastBuild/)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=CREDITSCOM_node&metric=alert_status)](https://sonarcloud.io/dashboard?id=CREDITSCOM_node)
 # Credits Node
