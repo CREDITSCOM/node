@@ -3710,12 +3710,19 @@ void Node::onRoundTimeElapsed() {
         cslog() << "NODE> " << " - " << EncodeBase58(beg, end) << (item == own_key ? " (me)" : "");
     }
 
+    if (actualConfidants.size() < initialConfidants_.size()) {
+        cslog() << "Num of confidants with max sequence " << maxGlobalBlock
+                << " (" << actualConfidants.size() << " is less than init trusted num "
+                << initialConfidants_.size() << ", start lookup...";
+
+        transport_->addToNeighbours(initialConfidants_);
+    }
+
     if (actualConfidants.size() < Consensus::MinTrustedNodes) {
         cslog() << "Not enough confidants with max sequence " << maxGlobalBlock
             << " (" << actualConfidants.size() << ", min " << Consensus::MinTrustedNodes
             << " required). Wait until syncro finished or more bootstrap nodes to start...";
 
-        transport_->addToNeighbours(initialConfidants_);
         return;
     }
 
