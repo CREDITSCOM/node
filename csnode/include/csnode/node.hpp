@@ -182,7 +182,7 @@ public:
     void sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq);
 
     void cleanConfirmationList(cs::RoundNumber rNum);
-
+    uint8_t calculateBootStrapWeight(cs::PublicKeys& confidants);
     // state syncro functions
     
     void sendStateRequest(const csdb::Address& contract_abs_addr, const cs::PublicKeys& confidants);
@@ -482,6 +482,7 @@ private:
     std::map<uint16_t, cs::Command> changeableParams_;
     cs::PublicKey globalPublicKey_;
     cs::NodeVersionChange nVersionChange_;
+    uint8_t bootStrapWeight_ = 0U;
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;

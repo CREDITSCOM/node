@@ -329,6 +329,26 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
     }
 }
 
+uint8_t Node::calculateBootStrapWeight(cs::PublicKeys& confidants) {
+    size_t confSize = confidants.size();
+    uint8_t currentWeight = 0U;
+    if (confSize > 8) {
+        return currentWeight;
+    }
+    auto it = initialConfidants_.cbegin();
+    auto itConfidants = confidants.cbegin();
+    --confSize;
+    for (auto it : initialConfidants_) {
+        if (std::equal(it.cbegin(), it.cend(), itConfidants->cbegin())) {
+            currentWeight += 1 << confSize;
+            ++itConfidants;
+        }
+        --confSize;
+    }
+    return currentWeight;
+}
+
+
 void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
     cslog() << "NODE> get Boot strap Round Table #" << rNum;
 
@@ -360,6 +380,8 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
         }
     }
 
+    uint8_t currentWeight = calculateBootStrapWeight(confidants);
+
     if (unknown) {
         cs::Signature sig;
         stream >> sig;
@@ -378,6 +400,10 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
             cswarning() << kLogPrefix_ << "failed to test bootstrap signature, drop";
             return;
         }
+        currentWeight == 255U;
+    }
+    if (currentWeight <= bootStrapWeight_) {
+        return;
     }
 
     if (!stream.isValid() || confidants.size() < confSize) {
@@ -3756,7 +3782,14 @@ void Node::onRoundTimeElapsed() {
         for (const auto& item : actualConfidants) {
             out << item; 
         }
-
+        cs::PublicKeys confs;
+        for (auto it : actualConfidants) {
+            confs.push_back(it);
+        }
+        uint8_t currentWeight = calculateBootStrapWeight(confs);
+        if (currentWeight > bootStrapWeight_) {
+            bootStrapWeight_ = currentWeight;
+        }
         // when we try to start rounds several times, we will not send duplicates
         auto random = std::random_device{}();
         out << random;
@@ -3819,6 +3852,11 @@ bool Node::bootstrap(const cs::Bytes& bytes, cs::RoundNumber round) {
 
     auto& conveyer = cs::Conveyer::instance();
     conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
+
+    uint8_t currentWeight = calculateBootStrapWeight(rt.confidants);
+    if (currentWeight > bootStrapWeight_) {
+        bootStrapWeight_ = currentWeight;
+    }
 
     sendBroadcast(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bytes);
     if (!isBootstrapRound_) {
