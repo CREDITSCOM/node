@@ -79,6 +79,10 @@ void Neighbourhood::sendPong(const cs::PublicKey& receiver) {
                                       node_->getBlockChain().getLastSeq(),
                                       cs::Conveyer::instance().currentRoundNumber()),
                            receiver);
+
+    if (isPermanent(receiver) && !contains(receiver)) {
+        sendVersionRequest(receiver);
+    }
 }
 
 void Neighbourhood::gotVersionReply(const cs::PublicKey& sender, const Packet& pack) {
