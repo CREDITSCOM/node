@@ -3798,6 +3798,7 @@ void Node::onRoundTimeElapsed() {
         conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
 
         sendBroadcast(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bin);
+        confirmationList_.remove(roundPackageCache_.back().roundTable().round);
         if (!isBootstrapRound_) {
             isBootstrapRound_ = true;
             cslog() << "NODE> Bootstrap on, sending bootstrap table";
@@ -3863,7 +3864,7 @@ bool Node::bootstrap(const cs::Bytes& bytes, cs::RoundNumber round) {
         isBootstrapRound_ = true;
         cslog() << "NODE> Bootstrap on, sending bootstrap table";
     }
-
+    confirmationList_.remove(roundPackageCache_.back().roundTable().round);
     onRoundStart(roundPackageCache_.back().roundTable(), true);
     reviewConveyerHashes();
 

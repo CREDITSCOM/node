@@ -425,7 +425,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
             confirmationMask = confirmation.value().mask;
             confirmations = confirmation.value().signatures;
         }
-        if (poolMetaInfo.sequenceNumber > 1) {
+        if (poolMetaInfo.sequenceNumber > 1 && !pnode->isBootstrapRound()) {
             tmpPool.add_number_confirmations(static_cast<uint8_t>(confirmationMask.size()));
             tmpPool.add_confirmation_mask(cs::Utils::maskToBits(confirmationMask));
             tmpPool.add_round_confirmations(confirmations);
@@ -438,7 +438,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         BlockChain::setBootstrap(deferredBlock_, true);
     }
     deferredBlock_.to_byte_stream(binSize);
-    csdetails() << log_prefix << "pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+    csdebug() << log_prefix << "pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
 
     size_t cnt_total = deferredBlock_.transactions_count();
     if (cnt_total > 0) {
