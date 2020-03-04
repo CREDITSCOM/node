@@ -425,7 +425,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
             confirmationMask = confirmation.value().mask;
             confirmations = confirmation.value().signatures;
         }
-        if (poolMetaInfo.sequenceNumber > 1) {
+        if (poolMetaInfo.sequenceNumber > 1 && !pnode->isBootstrapRound()) {
             tmpPool.add_number_confirmations(static_cast<uint8_t>(confirmationMask.size()));
             tmpPool.add_confirmation_mask(cs::Utils::maskToBits(confirmationMask));
             tmpPool.add_round_confirmations(confirmations);
