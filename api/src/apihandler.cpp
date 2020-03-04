@@ -345,6 +345,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     result.trxn.timeCreation = static_cast<int64_t>(transaction.get_time());
     result.trxn.poolNumber = static_cast<int64_t>(transaction.id().pool_seq());
 
+    bool is_contract_replenish = false;
+
     if (is_smart(transaction)) {
         auto sci = cs::Serializer::deserialize<api::SmartContractInvocation>(transaction.user_field(deploy::Code).value<std::string>());
         bool isToken = false;
@@ -446,6 +448,27 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     }
     else {
         result.trxn.type = api::TransactionType::TT_Transfer;
+
+        if (solver_.smart_contracts().is_payable_call(transaction)) {
+            is_contract_replenish = true;
+            result.trxn.type = api::TransactionType::TT_ContractReplenish;
+            auto smartResult = getSmartStatus(transaction.id());
+            SmartExecutionTransInfo eti;
+            eti.method = "payable";
+            general::Variant param;
+            general::Amount sum;
+            sum.__set_integral(transaction.amount().integral());
+            sum.__set_fraction(transaction.amount().fraction());
+            param.__set_v_amount(sum);
+            std::vector<general::Variant> params;
+            params.push_back(param);
+            eti.__set_params(params);
+            fillTransInfoWithOpData(smartResult, eti);
+            api::SmartTransInfo info;
+            info.__set_v_smartExecution(eti);
+            result.trxn.__set_smartInfo(info);
+        }
+
         auto ufd = transaction.user_field(ordinary::Text);
         if (ufd.is_valid()) {
             result.trxn.__set_userFields(ufd.value<std::string>());
@@ -485,7 +508,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     // fill ExtraFee
     // 1) find state transaction
     csdb::Transaction stateTrx;
-    if (is_smart(transaction)) {
+    if (is_smart(transaction) || is_contract_replenish) {
         auto opers = lockedReference(this->smart_operations);
         auto state_id = (*opers)[transaction.id()].stateTransaction;
         if (state_id.is_valid()) {
