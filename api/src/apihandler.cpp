@@ -468,6 +468,9 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
             info.__set_v_smartExecution(eti);
             result.trxn.__set_smartInfo(info);
         }
+        else if (solver_.smart_contracts().is_known_smart_contract(transaction.source())) {
+            result.trxn.type = api::TransactionType::TT_ContractEmitted;
+        }
 
         auto ufd = transaction.user_field(ordinary::Text);
         if (ufd.is_valid()) {
@@ -515,8 +518,9 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
             stateTrx = executor_.loadTransactionApi(state_id);
         }
     }
-    else if (is_smart_state(transaction))
+    else if (is_smart_state(transaction)) {
         stateTrx = transaction;
+    }
 
     if (!is_smart_state(stateTrx))
         return result;
