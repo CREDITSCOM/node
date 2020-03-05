@@ -470,6 +470,24 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         }
         else if (solver_.smart_contracts().is_known_smart_contract(transaction.source())) {
             result.trxn.type = api::TransactionType::TT_ContractEmitted;
+            // move backwards through trxs until new state has found
+            const auto seq = transaction.id().pool_seq();
+            for (auto idx = transaction.id().index() - 1; idx >= 0; --idx) {
+                const csdb::TransactionID id(seq, idx);
+                csdb::Transaction t = executor_.loadTransactionApi(id);
+                if (is_smart_state(t)) {
+                    csdb::UserField fld = t.user_field(cs::trx_uf::new_state::RefStart);
+                    if (fld.is_valid()) {
+                        cs::SmartContractRef ref(fld);
+                        api::SmartStateTransInfo sti;
+                        sti.startTransaction = convert_transaction_id(ref.getTransactionID());
+                        api::SmartTransInfo info;
+                        info.__set_v_smartState(sti);
+                        result.trxn.__set_smartInfo(info);
+                    }
+                    break;
+                }
+            }
         }
 
         auto ufd = transaction.user_field(ordinary::Text);
