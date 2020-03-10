@@ -335,7 +335,7 @@ uint8_t Node::calculateBootStrapWeight(cs::PublicKeys& confidants) {
     if (confSize > 8) {
         return currentWeight;
     }
-    auto it = initialConfidants_.cbegin();
+    //auto it = initialConfidants_.cbegin();
     auto itConfidants = confidants.cbegin();
     --confSize;
     for (auto it : initialConfidants_) {
@@ -400,7 +400,7 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
             cswarning() << kLogPrefix_ << "failed to test bootstrap signature, drop";
             return;
         }
-        currentWeight == 255U;
+        currentWeight = 255U;
     }
     if (currentWeight <= bootStrapWeight_) {
         return;
