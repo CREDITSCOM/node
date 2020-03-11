@@ -259,16 +259,28 @@ Reject::Reason TransactionsValidator::validateTransactionAsSource(SolverContext&
                 }
                 else {
                     auto itt = std::find_if(itTarget->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                    auto its = std::find_if(itSource->second.begin(), itTarget->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                    if (itt->amount != its->amount) {
-                        cserror() << kLogPrefix << "The sum of delegation is not properly set to the sender and target accounts";
+                    auto its = std::find_if(itSource->second.begin(), itSource->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+                    bool itt_found = itt != itTarget->second.end();
+                    bool its_found = its != itSource->second.end();
+                    if (its_found && itt_found) {
+                        if (itt->amount != its->amount) {
+                            cserror() << kLogPrefix << "The sum of delegation is not properly set to the sender and target accounts";
+                            return Reject::Reason::MalformedDelegation;
+                        }
+                        else {
+                            if (itt->amount < trx.amount()) {
+                                csdebug() << kLogPrefix << "The sum of delegation isn't enough for this transaction";
+                                return Reject::Reason::IncorrectSum;
+                            }
+                        }
+                    }
+                    else if (its_found != itt_found) {
+                        cserror() << kLogPrefix << "Delegation is corrupted, unable to proceed";
                         return Reject::Reason::MalformedDelegation;
                     }
                     else {
-                        if (itt->amount < trx.amount()) {
-                            csdebug() << kLogPrefix << "The sum of delegation isn't enough for this transaction";
-                            return Reject::Reason::IncorrectSum;
-                        }
+                        cserror() << kLogPrefix << "No delegation to withdraw found";
+                        return Reject::Reason::MalformedDelegation;
                     }
                 }
             }
