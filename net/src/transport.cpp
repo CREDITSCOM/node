@@ -39,6 +39,9 @@ net::Config createNetConfig(bool& good) {
     result.listen_address = !ep.ip.empty() ? ep.ip : net::kAllInterfaces;
     result.listen_port = ep.port ? ep.port : net::kDefaultPort;
     result.traverse_nat = config.traverseNAT();
+#ifdef MONITOR_NODE
+    result.full_net_discovery = true;
+#endif
 
     auto& customBootNodes = config.getIpList();
     if (customBootNodes.empty()) {
