@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <thread>
 
+#include <csconnector/csconnector.hpp>
 #include <cscrypto/cscrypto.hpp>
 
 #include <csnode/node.hpp>
@@ -30,6 +31,24 @@ net::NodeId toNodeId(const cs::PublicKey& key) {
     return ret;
 }
 
+uint64_t getHostData() {
+  auto platform = static_cast<uint8_t>(csconnector::connector::platform());
+  auto node_version = static_cast<uint16_t>(cs::ConfigHolder::instance().config()->getNodeVersion());
+
+  uint64_t user_data = 0;
+  user_data |= platform;
+  user_data |= (uint64_t(node_version) << 8);
+  return user_data;
+}
+
+uint8_t getPlatform(uint64_t user_data) {
+  return static_cast<uint8_t>(user_data);
+}
+
+uint16_t getVersion(uint64_t user_data) {
+  return static_cast<uint16_t>(user_data >> 8);
+}
+
 net::Config createNetConfig(bool& good) {
     auto config = *cs::ConfigHolder::instance().config();
     net::Config result(toNodeId(config.getMyPublicKey()));
@@ -42,6 +61,7 @@ net::Config createNetConfig(bool& good) {
 #ifdef MONITOR_NODE
     result.full_net_discovery = true;
 #endif
+    result.host_data = getHostData();
 
     auto& customBootNodes = config.getIpList();
     if (customBootNodes.empty()) {
@@ -390,6 +410,10 @@ void Transport::getKnownPeers(std::vector<cs::PeerData>& result) {
         peerData.id = EncodeBase58(ptr, ptr + p.id.size());
         peerData.ip = p.address.to_string();
         peerData.port = p.udp_port;
+        if (p.user_data) {
+          peerData.version = static_cast<decltype(peerData.version)>(getVersion(p.user_data));
+          peerData.platform = static_cast<decltype(peerData.platform)>(getPlatform(p.user_data));
+        }
 
         result.push_back(peerData);
     }
