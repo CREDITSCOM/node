@@ -2647,6 +2647,12 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         csmeta(cserror) << "Writers don't receive round table";
         return;
     }
+    cs::Conveyer& conveyer = cs::Conveyer::instance();
+    if (myLevel_ == Level::Confidant) {
+        if (rNum > (conveyer.currentRoundNumber()+1) && stat_.lastRoundMs() < Consensus::PostConsensusTimeout) {
+            return;
+        }
+    }
 
     cs::IDataStream stream(data, size);
 
@@ -2655,7 +2661,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     stream >> subRound;
 
     // sync state check
-    cs::Conveyer& conveyer = cs::Conveyer::instance();
+
 
     if (conveyer.currentRoundNumber() == rNum && subRound_ > subRound) {
         cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
