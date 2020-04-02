@@ -2648,7 +2648,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         return;
     }
     cs::Conveyer& conveyer = cs::Conveyer::instance();
-    if (myLevel_ == Level::Confidant) {
+    if (myLevel_ == Level::Confidant || !poolSynchronizer_->isSyncroStarted()) {
         if (rNum > (conveyer.currentRoundNumber()+1) && stat_.lastRoundMs() < Consensus::PostConsensusTimeout) {
             return;
         }
