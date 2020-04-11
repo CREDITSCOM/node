@@ -470,13 +470,13 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
         }
         else if (solver_.smart_contracts().is_known_smart_contract(transaction.source())) {
             result.trxn.type = api::TransactionType::TT_ContractEmitted;
-            // move backwards through trxs until new state has found
+            // move backwards through trxs until find the new state
             const auto seq = transaction.id().pool_seq();
-            for (auto idx = transaction.id().index() - 1; idx >= 0; --idx) {
-                const csdb::TransactionID id(seq, idx);
-                csdb::Transaction t = executor_.loadTransactionApi(id);
-                if (is_smart_state(t)) {
-                    csdb::UserField fld = t.user_field(cs::trx_uf::new_state::RefStart);
+            const auto idx = transaction.id().index();
+            const csdb::Pool block = executor_.loadBlockApi(seq);
+            for(auto revit = block.transactions().crbegin() + idx + 1; revit != block.transactions().crend(); ++revit) {
+                if (is_smart_state(*revit)) {
+                    csdb::UserField fld = revit->user_field(cs::trx_uf::new_state::RefStart);
                     if (fld.is_valid()) {
                         cs::SmartContractRef ref(fld);
                         api::SmartStateTransInfo sti;
