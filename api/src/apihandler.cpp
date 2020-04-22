@@ -788,7 +788,9 @@ void APIHandler::dumbTransactionFlow(api::TransactionFlowResult& _return, const 
             auto newTransactionId = result.id;
             _return.id.poolSeq = static_cast<int64_t>(newTransactionId.pool_seq());
             _return.id.index = static_cast<int32_t>(newTransactionId.index());
-
+            auto countedFee = result.fee;
+            _return.fee.fraction = countedFee.fraction();
+            _return.fee.integral = countedFee.integral();
             SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, getDelimitedTransactionSigHex(tr));
         }
         break;
@@ -935,6 +937,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
     return std::nullopt;
 }
 
+
 void APIHandler::checkTransactionsFlow(const cs::TransactionsPacket& packet, cs::DumbCv::Condition condition) {
     const auto& transactions = packet.transactions();
 
@@ -958,7 +961,7 @@ void APIHandler::checkTransactionsFlow(const cs::TransactionsPacket& packet, cs:
             });
         }
         else {
-            dumbCv_.sendCvSignal(transaction.signature(), condition, transaction.id());
+            dumbCv_.sendCvSignal(transaction.signature(), condition, transaction.id(), csdb::Amount(transaction.counted_fee().to_double()));
         }
     }
 }
@@ -1538,7 +1541,7 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
             updateSmartCachesTransaction(trx, pool.sequence());
         }
         else { // if dumb transaction
-            dumbCv_.sendCvSignal(trx.signature(), cs::DumbCv::Condition::Success, trx.id());
+            dumbCv_.sendCvSignal(trx.signature(), cs::DumbCv::Condition::Success, trx.id(), csdb::Amount(trx.counted_fee().to_double()));
         }
     }
 }

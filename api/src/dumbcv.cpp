@@ -11,15 +11,15 @@ bool cs::DumbCv::addCVInfo(const cs::Signature& signature) {
     return true;
 }
 
-void cs::DumbCv::sendCvSignal(const cs::Signature& signature, Condition condition, const csdb::TransactionID& id) {
+void cs::DumbCv::sendCvSignal(const cs::Signature& signature, Condition condition, const csdb::TransactionID& id, const csdb::Amount fee) {
     cs::Lock lock(mutex_);
 
     if (auto it = cvInfo_.find(signature); it != cvInfo_.end()) {
-        auto& [cv, flag, cond, i] = it->second;
+        auto& [cv, flag, cond, i, f] = it->second;
         cond = condition;
         flag = true;
         i = id;
-
+        f = fee;
         cv.notify_one();
     }
 }
@@ -38,6 +38,7 @@ cs::DumbCv::Result cs::DumbCv::waitCvSignal(const cs::Signature& signature) {
         if (it->second.condFlg) {
             result.condition = it->second.condition;
             result.id = it->second.id;
+            result.fee = it->second.fee;
         }
 
         cvInfo_.erase(signature);
