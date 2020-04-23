@@ -670,6 +670,11 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const general::
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
+void APIHandler::ActualFeeGet(AmountCommission& _return, const int32_t size) {
+    
+    _return.commission = AmountCommission().commission;/*fee::justFee(static_cast<size_t>(size));*/
+}
+
 api::SmartContractInvocation fetch_smart(const csdb::Transaction& tr) {
     if (tr.is_valid()) {
         const auto uf = tr.user_field(cs::trx_uf::deploy::Code);
