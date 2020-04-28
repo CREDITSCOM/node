@@ -15,6 +15,9 @@ const unsigned int Consensus::DefaultStateTimeout = 5000;
 /** @brief   The default state timeout */
 const uint64_t Consensus::DefaultTimeStampRange = 30000;
 
+/** @brief   Stage One maximum size */
+uint64_t Consensus::StageOneMaximumSize = 36000;
+
 /** @brief   Maximum time in msec to wait new round after consensus achieved, after that waiting trusted nodes
  * activates */
 const unsigned int Consensus::PostConsensusTimeout = 60000;
@@ -23,7 +26,7 @@ const unsigned int Consensus::PostConsensusTimeout = 60000;
 const size_t Consensus::MaxRoundDuration = 300000;
 
 /** @brief   The minimum cash for trusted nodes to participate consensus */
-const csdb::Amount Consensus::MinStakeValue = csdb::Amount{50000};
+csdb::Amount Consensus::MinStakeValue = csdb::Amount{50000};
 
 /** @brief   The round when DPOS starts working */
 const uint64_t Consensus::StartingDPOS = 10'000ULL;
@@ -35,10 +38,10 @@ const uint8_t Consensus::GeneralNotSelected = 100;
 const uint64_t Consensus::MaxTimeStampDelta = 1000 * 60 * 3;
 
 /** @brief   Min duration (msec) to collect hashes in stage-1 of consensus */
-const uint32_t Consensus::TimeMinStage1 = 500;
+uint32_t Consensus::TimeMinStage1 = 500;
 
 /** @brief   Number of rounds to prevent node from consensus participation */
-const uint32_t Consensus::GrayListPunishment = 1000;
+uint32_t Consensus::GrayListPunishment = 1000;
 
 /** @brief   Number of node working rounds to start checking roundPackage ctreating speed */
 const uint64_t Consensus::SpeedCheckRound = 1000;
@@ -62,7 +65,7 @@ const uint32_t Consensus::TimeSmartContract = 60000;
 const uint32_t Consensus::TimeCollTrans = 500;
 
 /** @brief   Max hashes count to include in stage one data */
-const size_t Consensus::MaxStageOneHashes = 100;
+size_t Consensus::MaxStageOneHashes = 100;
 
 /** @brief   Max distance of Utility message */
 const size_t Consensus::UtilityMessageRoundInterval = 50;
@@ -74,13 +77,13 @@ const size_t Consensus::BlackListCounterMaxValue = 100000;
 const size_t Consensus::BlackListCounterSinglePenalty = 10000;
 
 /** @brief   Max transaction size */
-const size_t Consensus::MaxTransactionSize = 100 * 1024;
+size_t Consensus::MaxTransactionSize = 100 * 1024;
 
 /** @brief   Max hashes count to include in stage one data */
-const size_t Consensus::MaxStageOneTransactions = 1000;
+size_t Consensus::MaxStageOneTransactions = 1000;
 
 /** @brief   Max transaction's size to include in stage one data */
-const size_t Consensus::MaxPreliminaryBlockSize = 1 * 1024 * 1024;
+size_t Consensus::MaxPreliminaryBlockSize = 1 * 1024 * 1024;
 
 /** @brief   Max transactions count in smart contract execution result, both new state and emitted ones */
 const size_t Consensus::MaxContractResultTransactions = 100;
