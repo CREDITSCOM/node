@@ -3581,11 +3581,70 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
 
             }
 
-            if (order == 11U) {// maxmum smart contract execution time
+            if (order == 11U) {// max round mum smart contract execution time
                 unsigned int maxContractExeTime;
                 stream >> maxContractExeTime;
                 Consensus::MaxRoundsExecuteContract = maxContractExeTime;
+                cslog() << "MaxRoundsExecuteContract changed to: " << Consensus::MaxRoundsExecuteContract;
             }
+
+            if (order == 21U) {// Stage One maximum size set
+                uint64_t value;
+                stream >> value;
+                Consensus::StageOneMaximumSize = value;
+                cslog() << "StageOneMaximumSize changed to: " << Consensus::StageOneMaximumSize;
+            }
+
+            if (order == 22U) {// Minimum stake size set
+                int32_t integral;
+                uint64_t fraction;;
+                stream >> integral >> fraction;
+                Consensus::MinStakeValue = csdb::Amount(integral,fraction);
+                cslog() << "MinStakeValue changed to: " << Consensus::MinStakeValue.to_string();
+            }
+
+            if (order == 23U) {// Stage One hashes collecting time set
+                uint32_t value;
+                stream >> value;
+                Consensus::TimeMinStage1 = value;
+                cslog() << "TimeMinStage1 changed to: " << Consensus::TimeMinStage1;
+            }
+
+            if (order == 24U) {// Gray list punishment set
+                uint32_t value;
+                stream >> value;
+                Consensus::GrayListPunishment = value;
+                cslog() << "GrayListPunishment changed to: " << Consensus::GrayListPunishment;
+            }
+
+            if (order == 25U) {// Stage One maximum hashes number set
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxStageOneHashes = value;
+                cslog() << "MaxStageOneHashes changed to: " << Consensus::MaxStageOneHashes;
+            }
+
+            if (order == 26U) {// Transaction max size set
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxTransactionSize = value;
+                cslog() << "MaxTransactionSize changed to: " << Consensus::MaxTransactionSize;
+            }
+
+            if (order == 27U) {// Stage One hashes maximum number set
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxStageOneTransactions = value;
+                cslog() << "MaxStageOneTransactions changed to: " << Consensus::MaxStageOneTransactions;
+            }
+
+            if (order == 28U) {// Stage One block maximum estimation size set
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxPreliminaryBlockSize = value;
+                cslog() << "MaxPreliminaryBlockSize changed to: " << Consensus::MaxPreliminaryBlockSize;
+            }
+
         }
     }
     std::string msg;
