@@ -219,14 +219,14 @@ Result TrustedStage1State::onHash(SolverContext& context, const csdb::PoolHash& 
         }
         // candidates does not include own hash, so (MinTrustedNodes - 1) will be enough to proceed next stage
         if (stage.trustedCandidates.size() >= Consensus::MinTrustedNodes - 1) {
-            if (likeMineHashes >= cs::Conveyer::instance().confidantsCount() / 2) {
-                enough_hashes = true;
-                bool other_conditions = transactions_checked && min_time_expired;
-                return (other_conditions ? Result::Finish : Result::Ignore);
-            }
-            else if(differentHashes >= cs::Conveyer::instance().confidantsCount() / 2){
-                context.askTrustedRound(cs::Conveyer::instance().currentRoundNumber(), differKeys);
-            }
+            //if (likeMineHashes >= cs::Conveyer::instance().confidantsCount() / 2) {
+            enough_hashes = true;
+            bool other_conditions = transactions_checked && min_time_expired;
+            return (other_conditions ? Result::Finish : Result::Ignore);
+            //}
+            //else if(differentHashes >= cs::Conveyer::instance().confidantsCount() / 2){
+            //    context.askTrustedRound(cs::Conveyer::instance().currentRoundNumber(), differKeys);
+            //}
         }
     }
     else {

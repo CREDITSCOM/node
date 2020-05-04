@@ -306,7 +306,9 @@ void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transact
 bool WalletsCache::Updater::setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp) {
     auto it = data_.wallets_.find(address);
     if (it != data_.wallets_.end()) {
-        it->second.createTime_ = p_timeStamp;
+        if (it->second.createTime_ == 0) {
+            it->second.createTime_ = p_timeStamp;
+        }
         emit walletUpdateEvent(it->first, it->second);
         return true;
     }

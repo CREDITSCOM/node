@@ -182,7 +182,7 @@ public:
     void sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq);
 
     void cleanConfirmationList(cs::RoundNumber rNum);
-
+    uint8_t calculateBootStrapWeight(cs::PublicKeys& confidants);
     // state syncro functions
     
     void sendStateRequest(const csdb::Address& contract_abs_addr, const cs::PublicKeys& confidants);
@@ -340,6 +340,8 @@ public slots:
     void onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
     void onNeighbourRemoved(const cs::PublicKey& neighbour);
 
+    bool canSaveSmartStages(cs::Sequence seq, cs::PublicKey key);
+
 private:
     bool init();
     void initPoolSynchronizer();
@@ -444,10 +446,6 @@ private:
     std::vector<cs::Bytes> stageThreeMessage_;
     bool stageThreeSent_ = false;
 
-    std::vector<cs::Bytes> smartStageOneMessage_;
-    std::vector<cs::Bytes> smartStageTwoMessage_;
-    std::vector<cs::Bytes> smartStageThreeMessage_;
-
     std::vector<cs::StageOneSmarts> smartStageOneStorage_;
     std::vector<cs::StageTwoSmarts> smartStageTwoStorage_;
     std::vector<cs::StageThreeSmarts> smartStageThreeStorage_;
@@ -484,6 +482,7 @@ private:
     std::map<uint16_t, cs::Command> changeableParams_;
     cs::PublicKey globalPublicKey_;
     cs::NodeVersionChange nVersionChange_;
+    uint8_t bootStrapWeight_ = 0U;
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;

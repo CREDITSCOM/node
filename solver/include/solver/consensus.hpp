@@ -25,7 +25,7 @@ public:
     constexpr static uint64_t StageOneMinimumSize = 110;
 
     /** @brief   Stage One maximum size */
-    constexpr static uint64_t StageOneMaximumSize = 36000;
+    static uint64_t StageOneMaximumSize;
 
     /** @brief   Stage Two minimum size */
     constexpr static uint64_t StageTwoMinimumSize = 350;
@@ -56,7 +56,7 @@ public:
     const static unsigned int MaxTrustedNodes = 25;
 
     /** @brief   The minimum cash for trusted nodes to participate consensus */
-    const static csdb::Amount MinStakeValue;
+    static csdb::Amount MinStakeValue;
 
     /** @brief   The minimum stake to be delegated to another node */
     constexpr static csdb::Amount MinStakeDelegated = csdb::Amount{ 5 };
@@ -71,10 +71,10 @@ public:
     const static uint64_t MaxTimeStampDelta;
 
     /** @brief   Min duration (msec) to collect hashes in stage-1 of consensus */
-    const static uint32_t TimeMinStage1;
+    static uint32_t TimeMinStage1;
 
     /** @brief   Number of rounds to prevent node from consensus participation */
-    const static uint32_t GrayListPunishment;
+    static uint32_t GrayListPunishment;
 
     /** @brief   Number of node working rounds to start checking roundPackage ctreating speed */
     const static uint64_t SpeedCheckRound;
@@ -98,7 +98,7 @@ public:
     const static uint32_t TimeCollTrans;
 
     /** @brief   Max hashes count to include in stage one data */
-    const static size_t MaxStageOneHashes;
+    static size_t MaxStageOneHashes;
 
     /** @brief   Max distance of Utility message */
     const static size_t UtilityMessageRoundInterval;
@@ -110,13 +110,13 @@ public:
     const static size_t BlackListCounterSinglePenalty;
 
     /** @brief   Max transaction size */
-    const static size_t MaxTransactionSize;
+    static size_t MaxTransactionSize;
 
     /** @brief   Max hashes count to include in stage one data */
-    const static size_t MaxStageOneTransactions;
+    static size_t MaxStageOneTransactions;
 
     /** @brief   Max transaction's size to include in stage one data */
-    const static size_t MaxPreliminaryBlockSize;
+    static size_t MaxPreliminaryBlockSize;
 
     /** @brief   Max transactions count in smart contract execution result, both new state and emitted ones */
     const static size_t MaxContractResultTransactions;
@@ -131,7 +131,7 @@ public:
      * After that, 90 rounds (MaxRoundsCancelContract - MaxRoundsExecuteContract) still remains to complete consensus and put empty new_state
      * into chain, otherwise  contract is assumed failed unconditionally
      */
-    const static unsigned int MaxRoundsExecuteContract;
+    static unsigned int MaxRoundsExecuteContract;
 
     /** @brief True to disable, false to enable the trusted request to become trusted next round again */
     const static bool DisableTrustedRequestNextRound;

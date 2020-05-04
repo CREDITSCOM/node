@@ -345,6 +345,8 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     result.trxn.timeCreation = static_cast<int64_t>(transaction.get_time());
     result.trxn.poolNumber = static_cast<int64_t>(transaction.id().pool_seq());
 
+    bool is_contract_replenish = false;
+
     if (is_smart(transaction)) {
         auto sci = cs::Serializer::deserialize<api::SmartContractInvocation>(transaction.user_field(deploy::Code).value<std::string>());
         bool isToken = false;
@@ -446,6 +448,48 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     }
     else {
         result.trxn.type = api::TransactionType::TT_Transfer;
+
+        if (solver_.smart_contracts().is_payable_call(transaction)) {
+            is_contract_replenish = true;
+            result.trxn.type = api::TransactionType::TT_ContractReplenish;
+            auto smartResult = getSmartStatus(transaction.id());
+            SmartExecutionTransInfo eti;
+            eti.method = "payable";
+            general::Variant param;
+            general::Amount sum;
+            sum.__set_integral(transaction.amount().integral());
+            sum.__set_fraction(transaction.amount().fraction());
+            param.__set_v_amount(sum);
+            std::vector<general::Variant> params;
+            params.push_back(param);
+            eti.__set_params(params);
+            fillTransInfoWithOpData(smartResult, eti);
+            api::SmartTransInfo info;
+            info.__set_v_smartExecution(eti);
+            result.trxn.__set_smartInfo(info);
+        }
+        else if (solver_.smart_contracts().is_known_smart_contract(transaction.source())) {
+            result.trxn.type = api::TransactionType::TT_ContractEmitted;
+            // move backwards through trxs until new state has found
+            const auto seq = transaction.id().pool_seq();
+            for (auto idx = transaction.id().index() - 1; idx >= 0; --idx) {
+                const csdb::TransactionID id(seq, idx);
+                csdb::Transaction t = executor_.loadTransactionApi(id);
+                if (is_smart_state(t)) {
+                    csdb::UserField fld = t.user_field(cs::trx_uf::new_state::RefStart);
+                    if (fld.is_valid()) {
+                        cs::SmartContractRef ref(fld);
+                        api::SmartStateTransInfo sti;
+                        sti.startTransaction = convert_transaction_id(ref.getTransactionID());
+                        api::SmartTransInfo info;
+                        info.__set_v_smartState(sti);
+                        result.trxn.__set_smartInfo(info);
+                    }
+                    break;
+                }
+            }
+        }
+
         auto ufd = transaction.user_field(ordinary::Text);
         if (ufd.is_valid()) {
             result.trxn.__set_userFields(ufd.value<std::string>());
@@ -485,15 +529,16 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     // fill ExtraFee
     // 1) find state transaction
     csdb::Transaction stateTrx;
-    if (is_smart(transaction)) {
+    if (is_smart(transaction) || is_contract_replenish) {
         auto opers = lockedReference(this->smart_operations);
         auto state_id = (*opers)[transaction.id()].stateTransaction;
         if (state_id.is_valid()) {
             stateTrx = executor_.loadTransactionApi(state_id);
         }
     }
-    else if (is_smart_state(transaction))
+    else if (is_smart_state(transaction)) {
         stateTrx = transaction;
+    }
 
     if (!is_smart_state(stateTrx))
         return result;
@@ -743,7 +788,9 @@ void APIHandler::dumbTransactionFlow(api::TransactionFlowResult& _return, const 
             auto newTransactionId = result.id;
             _return.id.poolSeq = static_cast<int64_t>(newTransactionId.pool_seq());
             _return.id.index = static_cast<int32_t>(newTransactionId.index());
-
+            auto countedFee = result.fee;
+            _return.fee.fraction = countedFee.fraction();
+            _return.fee.integral = countedFee.integral();
             SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, getDelimitedTransactionSigHex(tr));
         }
         break;
@@ -890,6 +937,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
     return std::nullopt;
 }
 
+
 void APIHandler::checkTransactionsFlow(const cs::TransactionsPacket& packet, cs::DumbCv::Condition condition) {
     const auto& transactions = packet.transactions();
 
@@ -913,7 +961,7 @@ void APIHandler::checkTransactionsFlow(const cs::TransactionsPacket& packet, cs:
             });
         }
         else {
-            dumbCv_.sendCvSignal(transaction.signature(), condition, transaction.id());
+            dumbCv_.sendCvSignal(transaction.signature(), condition, transaction.id(), csdb::Amount(transaction.counted_fee().to_double()));
         }
     }
 }
@@ -1493,7 +1541,7 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
             updateSmartCachesTransaction(trx, pool.sequence());
         }
         else { // if dumb transaction
-            dumbCv_.sendCvSignal(trx.signature(), cs::DumbCv::Condition::Success, trx.id());
+            dumbCv_.sendCvSignal(trx.signature(), cs::DumbCv::Condition::Success, trx.id(), csdb::Amount(trx.counted_fee().to_double()));
         }
     }
 }
@@ -1660,24 +1708,30 @@ void api::APIHandler::SmartMethodParamsGet(SmartMethodParamsGetResult& _return, 
 
 void APIHandler::ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<general::ByteCodeObject>& byteCodeObjects) {
     executor::GetContractMethodsResult executor_ret;
-
     if (byteCodeObjects.empty()) {
         return;
     }
-
     executor_.getContractMethods(executor_ret, byteCodeObjects);
     _return.code = executor_ret.status.code;
     _return.message = executor_ret.status.message;
-
-    for (size_t Count = 0; Count < executor_ret.methods.size(); Count++) {
-        _return.methods[Count].name = executor_ret.methods[Count].name;
-
-        for (size_t SubCount = 0; SubCount < executor_ret.methods[Count].arguments.size(); SubCount++) {
-            _return.methods[Count].arguments[SubCount].type = executor_ret.methods[Count].arguments[SubCount].type;
-            _return.methods[Count].arguments[SubCount].name = executor_ret.methods[Count].arguments[SubCount].name;
+    auto allMethods = executor_ret.methods;
+    for (auto met : allMethods) {
+        //_return.methods[Count].name = executor_ret.methods[Count].name;
+        //for (size_t SubCount = 0; SubCount < executor_ret.methods[Count].arguments.size(); SubCount++) {
+        //    _return.methods[Count].arguments[SubCount].type = executor_ret.methods[Count].arguments[SubCount].type;
+        //    _return.methods[Count].arguments[SubCount].name = executor_ret.methods[Count].arguments[SubCount].name;
+        //}
+        //_return.methods[Count].returnType = executor_ret.methods[Count].returnType;
+        ::general::MethodDescription method;
+        method.name = met.name;
+        method.returnType = met.returnType;
+        for (auto arg : met.arguments) {
+            ::general::MethodArgument argument;
+            argument.type = arg.type;
+            argument.name = arg.name;
+            method.arguments.push_back(argument);
         }
-
-        _return.methods[Count].returnType = executor_ret.methods[Count].returnType;
+        _return.methods.push_back(method);
     }
 }
 
