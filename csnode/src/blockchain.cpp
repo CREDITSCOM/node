@@ -750,7 +750,7 @@ void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address
             cslog() << "Can't get transaction from future";
             break;
         }
-        if (id.pool_seq() <= trIt->id().pool_seq() && id.index() < trIt->id().index()) {
+        if (id.pool_seq() <= trIt->id().pool_seq() || (id.pool_seq() == trIt->id().pool_seq() && id.index() < trIt->id().index())) {
             transactions.push_back(*trIt);
             transactions.back().set_time(getBlockTime(trIt.getPool()));
             cslog() << "Transaction added";

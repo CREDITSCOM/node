@@ -1247,23 +1247,22 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
     auto gq = generalQuery;
     auto queriesLimit = limitQueries(gq.queries.size(), MaxQueriesNumber);
     auto limit = int64_t(100);
-    cslog() << "Limit = " << limit;
+    cslog() << "Limit Queries = " << queriesLimit;
     uint16_t flagg = gq.flag;
     size_t cnt = 0;
     for (auto currentQuery : gq.queries)
     {
+        cslog() << "Limit Transactions = " << limit;
         if (queriesLimit == 0) {
             break;
         }
         cslog() << "Counter = " << cnt;
         const csdb::Address addr = BlockChain::getAddressFromKey(currentQuery.requestedAddress);
         BlockChain::Transactions transactions;
-       
-        if (limit > 0) {
-            //const int64_t offset = (_offset < 0) ? 0 : _offset;
-            csdb::TransactionID id(currentQuery.fromId.poolSeq, currentQuery.fromId.index);
-            blockchain_.getTransactionsUntill(transactions, addr, id, limit);
-        }
+
+        auto id = csdb::TransactionID(currentQuery.fromId.poolSeq, currentQuery.fromId.index);
+        blockchain_.getTransactionsUntill(transactions, addr, id, limit);
+
         cslog() << "Trx(" << cnt << ") = " << transactions.size();
         api::PublicKeyTransactions singleResponse;
         singleResponse.requestedAddress = currentQuery.requestedAddress;
