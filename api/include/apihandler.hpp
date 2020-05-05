@@ -81,7 +81,7 @@ public:
     void TransactionGet(api::TransactionGetResult& _return, const api::TransactionId& transactionId) override;
     void TransactionsGet(api::TransactionsGetResult& _return, const general::Address& address, const int64_t offset, const int64_t limit) override;
     void TransactionFlow(api::TransactionFlowResult& _return, const api::Transaction& transaction) override;
-
+    void FilteredTransactionsListGet(api::FilteredTransactionsListResult& _return, const api::TransactionsQuery& generalQuery) override;
     // Get list of pools from last one (head pool) to the first one.
     void PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t limit) override;
 
@@ -277,6 +277,7 @@ private:
 
     std::optional<std::string> checkTransaction(const ::api::Transaction&, csdb::Transaction& cTransaction);
     void checkTransactionsFlow(const cs::TransactionsPacket& packet, cs::DumbCv::Condition condition);
+    api::ShortTransaction convertTransactionToShort(csdb::Transaction tr);
 
     TokensMaster tm_;
 
@@ -290,6 +291,7 @@ private:
     cs::Sequence maxReadSequence{};
 
     std::optional<api::Delegated> getDelegated(const BlockChain::WalletData& wallet);
+    const size_t MaxQueriesNumber = 1000;
 
 private slots:
     void updateSmartCachesPool(const csdb::Pool& pool);

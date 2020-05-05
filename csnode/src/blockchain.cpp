@@ -740,6 +740,26 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
     }
 }
 
+void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address address, csdb::TransactionID id, size_t limit) {
+    cslog() << __func__;
+    size_t cnt = 0;
+    for (auto trIt = cs::TransactionsIterator(*this, address); trIt.isValid(); trIt.next()) {
+        cslog() << "Transaction found: " << trIt->id().pool_seq() << "." << trIt->id().index();
+        if (id.pool_seq() + 1 > cs::Conveyer::instance().currentRoundNumber() 
+            && id.pool_seq() > trIt->id().pool_seq()) {
+            cslog() << "Can't get transaction from future";
+            break;
+        }
+        if (id.pool_seq() <= trIt->id().pool_seq() && id.index() < trIt->id().index()) {
+            transactions.push_back(*trIt);
+            transactions.back().set_time(getBlockTime(trIt.getPool()));
+            cslog() << "Transaction added";
+        }
+        if (--limit == 0)
+            break;
+    }
+}
+
 bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletsCache::Updater& proc) {
     try {
         std::lock_guard lock(cacheMutex_);

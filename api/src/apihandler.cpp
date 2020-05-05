@@ -27,6 +27,10 @@ inline int64_t limitPage(int64_t value) {
     return std::clamp(value, int64_t(0), int64_t(100));
 }
 
+inline int64_t limitQueries(int64_t value, int64_t maxQueries) {
+    return std::clamp(value, int64_t(0), int64_t(maxQueries));
+}
+
 apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& solver, cs::Executor& executor)
 : executor_(executor)
 , blockchain_(blockchain)
@@ -763,6 +767,22 @@ csdb::Transaction APIHandler::makeTransaction(const Transaction& transaction) {
     return send_transaction;
 }
 
+api::ShortTransaction APIHandler::convertTransactionToShort(csdb::Transaction tr) {
+    api::ShortTransaction apiTr;
+    apiTr.amount = convertAmount(tr.amount().integral());
+    apiTr.amount.fraction = tr.amount().fraction();
+    apiTr.currency = DEFAULT_CURRENCY;// tr.currency();
+    apiTr.fee.commission = int16_t(tr.counted_fee().get_raw());
+    apiTr.id.poolSeq = tr.id().pool_seq();
+    apiTr.id.index = tr.id().index();
+    apiTr.source = fromByteArray(tr.source().public_key());
+    apiTr.target = fromByteArray(tr.target().public_key());
+    apiTr.timeCreation = tr.get_time();
+    //apiTr.type = tr.
+
+    return apiTr;
+}
+
 std::string getDelimitedTransactionSigHex(const csdb::Transaction& tr) {
     auto bs = fromByteArray(tr.to_byte_stream_for_sig());
     return std::string({' '}) + cs::Utils::byteStreamToHex(bs.data(), bs.length());
@@ -1219,6 +1239,46 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
         SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     }
 
+    return;
+}
+
+void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult& _return, const api::TransactionsQuery& generalQuery) {
+    cslog() << __func__;
+    auto gq = generalQuery;
+    auto queriesLimit = limitQueries(gq.queries.size(), MaxQueriesNumber);
+    auto limit = int64_t(100);
+    cslog() << "Limit = " << limit;
+    uint16_t flagg = gq.flag;
+    size_t cnt = 0;
+    for (auto currentQuery : gq.queries)
+    {
+        if (queriesLimit == 0) {
+            break;
+        }
+        cslog() << "Counter = " << cnt;
+        const csdb::Address addr = BlockChain::getAddressFromKey(currentQuery.requestedAddress);
+        BlockChain::Transactions transactions;
+       
+        if (limit > 0) {
+            //const int64_t offset = (_offset < 0) ? 0 : _offset;
+            csdb::TransactionID id(currentQuery.fromId.poolSeq, currentQuery.fromId.index);
+            blockchain_.getTransactionsUntill(transactions, addr, id, limit);
+        }
+        cslog() << "Trx(" << cnt << ") = " << transactions.size();
+        api::PublicKeyTransactions singleResponse;
+        singleResponse.requestedAddress = currentQuery.requestedAddress;
+        size_t tcnt = 0;
+        for (auto it : transactions) {
+            cslog() << "Converting tr(" << tcnt << ")";
+            singleResponse.transactions.push_back(convertTransactionToShort(it));
+        }
+        cslog() << "Conversion finished";
+        _return.queryResponse.push_back(singleResponse);// = convertTransactions(transactions);
+        ++cnt;
+        --queriesLimit;
+    }
+
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     return;
 }
 

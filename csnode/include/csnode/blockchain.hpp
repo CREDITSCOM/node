@@ -299,6 +299,7 @@ public:
     bool findWalletId(const WalletAddress& address, WalletId& id) const;
     // wallet transactions: pools cache + db search
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
+    void getTransactionsUntill(Transactions& transactions, csdb::Address address, csdb::TransactionID id, size_t limit);
 
     void setBlocksToBeRemoved(cs::Sequence number);
 
