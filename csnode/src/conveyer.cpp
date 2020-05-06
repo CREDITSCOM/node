@@ -66,7 +66,7 @@ inline const cs::ConveyerMeta* cs::ConveyerBase::Impl::validMeta() & {
 }
 
 cs::ConveyerBase::ConveyerBase() {
-    pimpl_ = std::make_unique<cs::ConveyerBase::Impl>(MaxQueueSize, MaxPacketTransactions, MaxPacketsPerRound, MetaCapacity);
+    pimpl_ = std::make_unique<cs::ConveyerBase::Impl>(Consensus::MaxQueueSize, Consensus::MaxPacketTransactions, Consensus::MaxPacketsPerRound, Consensus::MaxRoundsCancelContract);
     pimpl_->metaStorage.append(cs::ConveyerMetaStorage::Element());
 
     std::call_once(::onceFlag, &::setup, this);
