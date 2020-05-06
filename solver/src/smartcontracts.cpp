@@ -841,7 +841,7 @@ uint32_t SmartContracts::test_violations(const csdb::Transaction& tr) {
         const double avail_fee = tr.max_fee().to_double() - cs::fee::getFee(tr).to_double();
         if (avail_fee - cs::fee::getContractStateMinFee().to_double() < std::numeric_limits<double>::epsilon()) {
             csdebug() << kLogPrefix << "insufficient max fee in start transaction, prevalidation failed";
-            result += Reject::Reason::InsufficientMaxFee;
+            result += Violations::InsufficientMaxFee;
         }
     }
 
@@ -998,6 +998,12 @@ std::string SmartContracts::violations_message(uint32_t flags) {
     }
     if ((flags & Violations::MalformedCall) != 0) {
         os << "Malformed contract execution info";
+    }
+    if ((flags & Violations::InsufficientMaxFee) != 0) {
+        os << "Insufficient max fee to call contract";
+    }
+    if ((flags & Violations::InsufficientCallerFunds) != 0) {
+        os << "Insufficient caller balance";
     }
     return os.str();
 }
@@ -1607,7 +1613,7 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
     const auto seq = block.sequence();
     for (auto& item : exe_queue) {
         // unconditionally cancel (and as well remove) over-MaxRoundsCancelContract items from queue
-        if (seq > item.seq_start&& seq - item.seq_start >= Consensus::MaxRoundsCancelContract) {
+        if (item.seq_start > 0 && seq > item.seq_start && seq - item.seq_start >= Consensus::MaxRoundsCancelContract) {
             update_status(item, seq, SmartContractStatus::Canceled, reading_db);
             // goto next item in exe_queue
             continue;
