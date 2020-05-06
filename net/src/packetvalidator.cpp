@@ -1,4 +1,5 @@
 #include <base58.h>
+#include <consensus.hpp>
 
 #include <lib/system/logger.hpp>
 
@@ -32,13 +33,13 @@ constexpr static cs::RoundNumber packetTypeRoundTimeout(const MsgTypes type) {
         case MsgTypes::SecondSmartStage:
         case MsgTypes::ThirdSmartStage:
         case MsgTypes::RejectedContracts:
-            return 100;
+            return 100; //TODO exclude
         case MsgTypes::TransactionPacket:
         case MsgTypes::TransactionsPacketRequest:
         case MsgTypes::TransactionsPacketReply:
-            return cs::Conveyer::MetaCapacity;
+            return Consensus::MaxRoundsCancelContract;
         default:
-            return 5;
+            return 5; //TODO exclude
     }
 }
 

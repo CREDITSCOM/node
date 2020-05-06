@@ -36,15 +36,15 @@ public:
         GreaterEqual
     };
 
-    enum : unsigned int {
-        HashTablesStorageCapacity = 100, // equals to Consensus::MaxRoundsCancelContract to strongly prevent duplicated new_state transactions
-        MetaCapacity = HashTablesStorageCapacity,
+    //enum : unsigned int {
+    //    HashTablesStorageCapacity = 100, // equals to Consensus::MaxRoundsCancelContract to strongly prevent duplicated new_state transactions
+    //    MetaCapacity = HashTablesStorageCapacity,
 
-        // queue
-        MaxPacketTransactions = 100,
-        MaxPacketsPerRound = 10,
-        MaxQueueSize = 1000000
-    };
+    //    // queue
+    //    MaxPacketTransactions = 100,
+    //    MaxPacketsPerRound = 10,
+    //    MaxQueueSize = 1000000
+    //};
 
     void setPrivateKey(const cs::PrivateKey& privateKey);
 
