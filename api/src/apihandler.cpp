@@ -769,17 +769,17 @@ csdb::Transaction APIHandler::makeTransaction(const Transaction& transaction) {
 
 api::ShortTransaction APIHandler::convertTransactionToShort(csdb::Transaction tr) {
     api::ShortTransaction apiTr;
-    apiTr.amount = convertAmount(tr.amount().integral());
-    apiTr.amount.fraction = tr.amount().fraction();
-    apiTr.currency = DEFAULT_CURRENCY;// tr.currency();
-    apiTr.fee.commission = int16_t(tr.counted_fee().get_raw());
-    apiTr.id.poolSeq = tr.id().pool_seq();
-    apiTr.id.index = tr.id().index();
-    apiTr.source = fromByteArray(tr.source().public_key());
-    apiTr.target = fromByteArray(tr.target().public_key());
-    apiTr.timeCreation = tr.get_time();
-    //apiTr.type = tr.
-
+    auto sTr = convertTransaction(tr);
+    apiTr.amount = sTr.trxn.amount;
+    apiTr.currency = sTr.trxn.currency;
+    apiTr.fee = sTr.trxn.fee;
+    apiTr.id = sTr.id;
+    apiTr.source = sTr.trxn.source;
+    apiTr.target = sTr.trxn.target;
+    apiTr.timeCreation = sTr.trxn.timeCreation;
+    apiTr.type = sTr.trxn.type;
+    //auto extraFee = sTr.trxn.extraFee;
+    //auto executeResult = sTr.trxn;
     return apiTr;
 }
 
@@ -1272,7 +1272,34 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
             singleResponse.transactions.push_back(convertTransactionToShort(it));
         }
         cslog() << "Conversion finished";
-        _return.queryResponse.push_back(singleResponse);// = convertTransactions(transactions);
+
+        std::vector<csdb::Address> tokensList;
+        tm_.loadTokenInfo([&addr, &tokensList](const TokensMap& tokens, const HoldersMap& holders){
+            auto holderIt = holders.find(addr);
+            if (holderIt != holders.end()) { 
+                for (const auto& tokAddr : holderIt->second) {
+                    auto it = tokens.find(tokAddr);
+                    if (it == tokens.end()) {
+                        continue;
+                    }
+                    auto code = it->second.symbol;
+                    tokensList.push_back(tokAddr);
+                }
+            }
+        });
+        size_t offset = 0;
+        size_t singleLimit = 100;
+        for (auto itToken : tokensList) {
+            api::TokenTransfersResult transferResult;
+            api::SelectedTokenTransfers transfersList;
+            tokenTransactionsInternal(transferResult, *this, tm_, fromByteArray(itToken.public_key()), true, true, offset, singleLimit, addr);
+            transfersList.tokenAddress = fromByteArray(itToken.public_key());
+            for (auto it : transferResult.transfers) {
+                transfersList.transfers.push_back(it);
+            }
+            singleResponse.transfersList.push_back(transfersList);
+        }
+        _return.queryResponse.push_back(singleResponse);
         ++cnt;
         --queriesLimit;
     }

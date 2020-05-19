@@ -490,6 +490,7 @@ std::optional<api::SmartContractInvocation> SmartContracts::get_smart_contract_i
 }
 
 bool SmartContracts::is_payable_target(const csdb::Transaction& tr) {
+    //TODO: add here check for managing transaction
     csdb::Address abs_addr = absolute_address(tr.target());
     if (!in_known_contracts(abs_addr)) {
         return false;
