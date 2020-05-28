@@ -1246,14 +1246,14 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
     cslog() << __func__;
     auto gq = generalQuery;
     auto queriesLimit = limitQueries(gq.queries.size(), MaxQueriesNumber);
-    auto limit = int64_t(100);
+    auto limit = int64_t(1000);
     cslog() << "Limit Queries = " << queriesLimit;
     uint16_t flagg = gq.flag;
     size_t cnt = 0;
     for (auto currentQuery : gq.queries)
     {
         cslog() << "Limit Transactions = " << limit;
-        if (queriesLimit == 0) {
+        if (queriesLimit == 0 || limit ==0) {
             break;
         }
         cslog() << "Counter = " << cnt;
@@ -1261,19 +1261,23 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
         BlockChain::Transactions transactions;
 
         auto id = csdb::TransactionID(currentQuery.fromId.poolSeq, currentQuery.fromId.index);
-        blockchain_.getTransactionsUntill(transactions, addr, id, limit);
+        blockchain_.getTransactionsUntill(transactions, addr, id, limit, flagg);
 
         cslog() << "Trx(" << cnt << ") = " << transactions.size();
         api::PublicKeyTransactions singleResponse;
         singleResponse.requestedAddress = currentQuery.requestedAddress;
         size_t tcnt = 0;
         for (auto it : transactions) {
+            ++tcnt;
+            if (limit > 0) {
+                --limit;
+            }
             cslog() << "Converting tr(" << tcnt << ")";
             singleResponse.transactions.push_back(convertTransactionToShort(it));
         }
         cslog() << "Conversion finished";
 
-        std::vector<csdb::Address> tokensList;
+        std::vector<std::tuple<csdb::Address, std::string, std::string>> tokensList;
         tm_.loadTokenInfo([&addr, &tokensList](const TokensMap& tokens, const HoldersMap& holders){
             auto holderIt = holders.find(addr);
             if (holderIt != holders.end()) { 
@@ -1282,26 +1286,43 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
                     if (it == tokens.end()) {
                         continue;
                     }
-                    auto code = it->second.symbol;
-                    tokensList.push_back(tokAddr);
+                    tokensList.push_back(std::make_tuple(tokAddr, it->second.symbol, it->second.name));
                 }
             }
         });
+        cslog() << "Token List size: " << tokensList.size();
         size_t offset = 0;
-        size_t singleLimit = 100;
+        size_t singleLimit = 99;
+        std::vector<api::SelectedTokenTransfers> sumTransfers;
         for (auto itToken : tokensList) {
             api::TokenTransfersResult transferResult;
-            api::SelectedTokenTransfers transfersList;
-            tokenTransactionsInternal(transferResult, *this, tm_, fromByteArray(itToken.public_key()), true, true, offset, singleLimit, addr);
-            transfersList.tokenAddress = fromByteArray(itToken.public_key());
+            api::SelectedTokenTransfers transfersListLocal;
+            auto tAddr = fromByteArray(std::get<0>(itToken).public_key());
+            tokenTransactionsInternal(transferResult, *this, tm_, tAddr, true, true, offset, singleLimit, addr);
+            transfersListLocal.__set_tokenAddress(tAddr);
+            transfersListLocal.__set_tokenTiker(std::get<1>(itToken));
+            transfersListLocal.__set_tokenName(std::get<2>(itToken));
+            size_t token_cnt = 0;
+            cslog() << "Token start. Transfers found: " << transferResult.transfers.size();
             for (auto it : transferResult.transfers) {
-                transfersList.transfers.push_back(it);
+                ++token_cnt;
+                cslog() << "Adding transfer: " << token_cnt;
+                transfersListLocal.transfers.push_back(it);
             }
-            singleResponse.transfersList.push_back(transfersList);
+            sumTransfers.push_back(transfersListLocal);
+            cslog() << "Token finished: " << transfersListLocal.transfers.size() << " transfers, transferList# " << sumTransfers.size();
         }
-        _return.queryResponse.push_back(singleResponse);
-        ++cnt;
-        --queriesLimit;
+        if (sumTransfers.size() > 0) {
+            singleResponse.__set_transfersList(sumTransfers);
+        }
+
+        if (singleResponse.transactions.size() > 0 || singleResponse.transfersList.size() > 0) {
+            cslog() << "Single Response: trx: " << singleResponse.transactions.size() << ", " << singleResponse.transfersList.size();
+            _return.queryResponse.push_back(singleResponse);
+            ++cnt;
+            --queriesLimit;
+        }
+
     }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
@@ -1874,6 +1895,7 @@ void putTokenInfo(api::TokenInfo& ti, const general::Address& addr, const Token&
 template <typename ResultType>
 void APIHandler::tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensMaster& tm_, const general::Address& token, bool transfersOnly, bool filterByWallet, int64_t offset,
                                int64_t limit, const csdb::Address& wallet) {
+    cslog() << __func__;
     if (!validatePagination(_return, handler, offset, limit)) {
         return;
     }
@@ -1883,9 +1905,11 @@ void APIHandler::tokenTransactionsInternal(ResultType& _return, APIHandler& hand
     std::string code;
 
     tm_.loadTokenInfo([&addr, &tokenFound, &transfersOnly, &filterByWallet, &code, &wallet, &_return](const TokensMap& tm_, const HoldersMap&) {
+        cslog() << __func__ << ": load tokenInfo";
         auto it = tm_.find(addr);
         tokenFound = !(it == tm_.end());
         if (tokenFound) {
+            cslog() << __func__ << ": Tokens found";
             code = it->second.symbol;
             if (transfersOnly && !filterByWallet) {
                 _return.count = static_cast<int32_t>(it->second.transfersCount);
@@ -1909,7 +1933,7 @@ void APIHandler::tokenTransactionsInternal(ResultType& _return, APIHandler& hand
         handler.SetResponseStatus(_return.status, APIHandlerBase::APIRequestStatusType::FAILURE);
         return;
     }
-
+    cslog() << __func__ << ": Starting iterations";
     handler.iterateOverTokenTransactions(addr, [&](const csdb::Pool& pool, const csdb::Transaction& tr) {
         auto smart = fetch_smart(tr);
         if (transfersOnly && !TokensMaster::isTransfer(smart.method, smart.params)) {

@@ -740,23 +740,77 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
     }
 }
 
-void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address address, csdb::TransactionID id, size_t limit) {
+void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address address, csdb::TransactionID id, size_t limit, uint16_t flagg) {
     cslog() << __func__;
-    size_t cnt = 0;
+    //size_t cnt = 0;
+    cslog() << "Find at address: " << address.to_string();
     for (auto trIt = cs::TransactionsIterator(*this, address); trIt.isValid(); trIt.next()) {
-        cslog() << "Transaction found: " << trIt->id().pool_seq() << "." << trIt->id().index();
+        cslog() << "Transaction found: " << trIt->id().pool_seq() << "." << trIt->id().index() << ", adddr: " << trIt->target().to_string();
         if (id.pool_seq() + 1 > cs::Conveyer::instance().currentRoundNumber() 
             && id.pool_seq() > trIt->id().pool_seq()) {
             cslog() << "Can't get transaction from future";
             break;
         }
-        if (id.pool_seq() <= trIt->id().pool_seq() || (id.pool_seq() == trIt->id().pool_seq() && id.index() < trIt->id().index())) {
-            transactions.push_back(*trIt);
-            transactions.back().set_time(getBlockTime(trIt.getPool()));
-            cslog() << "Transaction added";
+        if (id.pool_seq() < trIt->id().pool_seq() || (id.pool_seq() == trIt->id().pool_seq() && id.index() < trIt->id().index())) {
+            bool added = false;
+            if (flagg == 1) {
+                bool match = false;
+                if (trIt->target().is_public_key())
+                {
+                    if (trIt->target().public_key() == address.public_key()) {
+                        match = true;
+                    }
+                }
+                if (trIt->target().is_wallet_id())
+                {
+                    csdb::Address pKey;
+                    findAddrByWalletId(trIt->target().wallet_id(), pKey);
+                    if (pKey.public_key() == address.public_key()) {
+                        match = true;
+                    }
+                }
+                if(match)
+                {
+                    transactions.push_back(*trIt);
+                    transactions.back().set_time(getBlockTime(trIt.getPool()));
+                    added = true;
+                }
+            }
+            if (flagg ==2){
+                bool match = false;
+                if (trIt->source().is_public_key())
+                {
+                    if (trIt->source().public_key() == address.public_key()) {
+                        match = true;
+                    }
+                }
+                if (trIt->source().is_wallet_id())
+                {
+                    csdb::Address pKey;
+                    findAddrByWalletId(trIt->source().wallet_id(), pKey);
+                    if (pKey.public_key() == address.public_key()) {
+                        match = true;
+                    }
+                }
+                if (match)
+                {
+                    transactions.push_back(*trIt);
+                    transactions.back().set_time(getBlockTime(trIt.getPool()));
+                    added = true;
+                }
+            }
+
+            if (flagg == 3) {
+                transactions.push_back(*trIt);
+                transactions.back().set_time(getBlockTime(trIt.getPool()));
+                added = true;
+                
+            }
+            cslog() << "Transaction " << (added ? "added: " : "not added:") << trIt->id().to_string();
+
         }
-        if (--limit == 0)
-            break;
+        //if (--limit == 0)
+        //    break;
     }
 }
 
