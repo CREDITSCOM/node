@@ -670,9 +670,8 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const general::
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
-void APIHandler::ActualFeeGet(AmountCommission& _return, const int32_t size) {
-    
-    _return.commission = AmountCommission().commission;/*fee::justFee(static_cast<size_t>(size));*/
+void APIHandler::ActualFeeGet(ActualFeeGetResult& _return, const int32_t size) {
+    _return.fee.__set_commission(cs::fee::justFee(static_cast<size_t>(size)).get_raw());
 }
 
 api::SmartContractInvocation fetch_smart(const csdb::Transaction& tr) {

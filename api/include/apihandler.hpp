@@ -111,7 +111,7 @@ public:
 
     void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<::general::ByteCodeObject>& byteCodeObjects) override;
 
-    void ActualFeeGet(AmountCommission& _return, const int32_t size) override;
+    void ActualFeeGet(ActualFeeGetResult& _return, const int32_t size) override;
 
     void addTokenResult(api::TokenTransfersResult& _return, const csdb::Address& token, const std::string& code, const csdb::Pool& pool, const csdb::Transaction& tr,
         const api::SmartContractInvocation& smart, const std::pair<csdb::Address, csdb::Address>& addrPair);
