@@ -578,6 +578,62 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     return result;
 }
 
+std::vector<api::ExtraFee> APIHandler::fillExtraFee(const csdb::Transaction& transaction)
+{
+    bool is_contract_replenish = false;
+    if (solver_.smart_contracts().is_payable_call(transaction)) {
+        is_contract_replenish = true;
+    }
+    std::vector<api::ExtraFee> extraFeeTotal;
+    // fill ExtraFee
+// 1) find state transaction
+    csdb::Transaction stateTrx;
+    if (is_smart(transaction) || is_contract_replenish) {
+        auto opers = lockedReference(this->smart_operations);
+        auto state_id = (*opers)[transaction.id()].stateTransaction;
+        if (state_id.is_valid()) {
+            stateTrx = executor_.loadTransactionApi(state_id);
+        }
+    }
+    else if (is_smart_state(transaction)) {
+        stateTrx = transaction;
+    }
+
+    if (!is_smart_state(stateTrx))
+        return extraFeeTotal;
+
+    // 2) fill ExtraFee for state transaction
+    auto pool = executor_.loadBlockApi(stateTrx.id().pool_seq());
+    auto transactions = pool.transactions();
+    ExtraFee extraFee;
+    extraFee.transactionId = convert_transaction_id(stateTrx.id());
+    // 2.1) counted_fee 
+    extraFee.sum = convertAmount(csdb::Amount(stateTrx.counted_fee().to_double()));
+    extraFee.comment = "contract state fee";
+    extraFeeTotal.push_back(extraFee);
+    // 2.2) execution fee
+    extraFee.sum = convertAmount(stateTrx.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>());
+    extraFee.comment = "contract execution fee";
+    extraFeeTotal.push_back(extraFee);
+
+    // 3) fill ExtraFee for extra transactions
+    auto trxIt = std::find_if(transactions.begin(), transactions.end(), [&stateTrx](const csdb::Transaction& ptrx) { return ptrx.id() == stateTrx.id(); });
+    if (trxIt != transactions.end()) {
+        for (auto trx = ++trxIt; trx != transactions.end(); ++trx) {
+            if (blockchain_.getAddressByType(trx->source(), BlockChain::AddressType::PublicKey) !=
+                blockchain_.getAddressByType(stateTrx.source(), BlockChain::AddressType::PublicKey)) // end find extra transactions
+                break;
+            extraFee.transactionId = convert_transaction_id(trx->id());
+            extraFee.sum = convertAmount(csdb::Amount(trx->counted_fee().to_double()));
+            extraFee.comment = "emitted trxs fee";
+            extraFeeTotal.push_back(extraFee);
+        }
+    }
+    return extraFeeTotal;
+}
+
+
+
 std::vector<api::SealedTransaction> APIHandler::convertTransactions(const std::vector<csdb::Transaction>& transactions) {
     std::vector<api::SealedTransaction> result;
     auto size = transactions.size();
@@ -672,6 +728,10 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const general::
     _return.transactions = convertTransactions(transactions);
     _return.total_trxns_count = static_cast<int32_t>(blockchain_.getTransactionsCount(addr));
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void APIHandler::ActualFeeGet(ActualFeeGetResult& _return, const int32_t size) {
+    _return.fee.__set_commission(cs::fee::justFee(static_cast<size_t>(size)).get_raw());
 }
 
 api::SmartContractInvocation fetch_smart(const csdb::Transaction& tr) {
@@ -1058,8 +1118,13 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
                 return;
             }
             _return.__isset.smart_contract_result = api_resp.__isset.results;
-            if (_return.__isset.smart_contract_result && !api_resp.results.empty())
+            if (_return.__isset.smart_contract_result && !api_resp.results.empty()) {
                 _return.__set_smart_contract_result(api_resp.results[0].ret_val);
+                auto eFee = fillExtraFee(send_transaction);
+                if (eFee.size() > 0) {
+                    _return.__set_extraFee(eFee);
+                }
+            }
         }
 
         SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);

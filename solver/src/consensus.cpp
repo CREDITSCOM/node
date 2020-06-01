@@ -29,7 +29,7 @@ const size_t Consensus::MaxRoundDuration = 300000;
 csdb::Amount Consensus::MinStakeValue = csdb::Amount{50000};
 
 /** @brief   The round when DPOS starts working */
-const uint64_t Consensus::StartingDPOS = 10'000ULL;
+const uint64_t Consensus::StartingDPOS = 100'000ULL;
 
 /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
 const uint8_t Consensus::GeneralNotSelected = 100;
