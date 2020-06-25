@@ -498,6 +498,7 @@ void SolverCore::updateGrayList(cs::RoundNumber round) {
 }
 
 void SolverCore::resetGrayList() {
+    csdebug() << "SolverCore: gray list is reset";
     grayList_.clear();
     EventReport::sendGrayListUpdate(*pnode, Zero::key, false /*removed*/); // for 1 round clear, 1 is default
 }

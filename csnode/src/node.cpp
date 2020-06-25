@@ -351,7 +351,7 @@ uint8_t Node::calculateBootStrapWeight(cs::PublicKeys& confidants) {
 
 void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
     cslog() << "NODE> get Boot strap Round Table #" << rNum;
-
+    solver_->resetGrayList();
     cs::IDataStream in(data, size);
     cs::RoundTable roundTable;
     cs::Bytes payload;
@@ -3704,7 +3704,7 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     if (smartPacks.size() != smartSignatures.size()) {
         // there was known accident in testnet only in block #2'651'597 that contains unsigned smart contract states packet
         //if (getBlockChain().uuid() == uuidTestNet) {
-        cserror() << kLogPrefix << "different size of smatrpackets and signatures in block " << WithDelimiters(block.sequence());
+        cserror() << kLogPrefix << "different size of smartpackets and signatures in block " << WithDelimiters(block.sequence());
         *check_failed = !collectRejectedInfo;
         return;
     }

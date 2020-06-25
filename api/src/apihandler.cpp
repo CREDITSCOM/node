@@ -578,11 +578,12 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     return result;
 }
 
-std::vector<api::ExtraFee> APIHandler::fillExtraFee(const csdb::Transaction& transaction)
-{
+std::vector<api::ExtraFee> APIHandler::fillExtraFee(const csdb::Transaction& transaction, const csdb::TransactionID transactionId){
+    cslog() << __func__;
     bool is_contract_replenish = false;
     if (solver_.smart_contracts().is_payable_call(transaction)) {
         is_contract_replenish = true;
+        cslog() << __func__ << ": contract replenish is true";
     }
     std::vector<api::ExtraFee> extraFeeTotal;
     // fill ExtraFee
@@ -590,32 +591,37 @@ std::vector<api::ExtraFee> APIHandler::fillExtraFee(const csdb::Transaction& tra
     csdb::Transaction stateTrx;
     if (is_smart(transaction) || is_contract_replenish) {
         auto opers = lockedReference(this->smart_operations);
-        auto state_id = (*opers)[transaction.id()].stateTransaction;
-        if (state_id.is_valid()) {
-            stateTrx = executor_.loadTransactionApi(state_id);
+        auto state_id = (*opers)[transactionId].stateTransaction;
+        cslog() << __func__ << ": find state trx: " << transactionId.to_string() << ", state tr id: " << state_id.to_string();
+        if (transactionId.is_valid()) {
+            stateTrx = executor_.loadTransactionApi(transactionId);
+            cslog() << __func__ << ": find state trx 2";
         }
     }
     else if (is_smart_state(transaction)) {
         stateTrx = transaction;
+        cslog() << __func__ << ": find state trx 3";
     }
-
+    cslog() << __func__ << ": go on...";
     if (!is_smart_state(stateTrx))
         return extraFeeTotal;
-
+    cslog() << __func__<< ": 1 done";
     // 2) fill ExtraFee for state transaction
     auto pool = executor_.loadBlockApi(stateTrx.id().pool_seq());
     auto transactions = pool.transactions();
     ExtraFee extraFee;
     extraFee.transactionId = convert_transaction_id(stateTrx.id());
+    cslog() << __func__ << ": 2 done";
     // 2.1) counted_fee 
     extraFee.sum = convertAmount(csdb::Amount(stateTrx.counted_fee().to_double()));
     extraFee.comment = "contract state fee";
     extraFeeTotal.push_back(extraFee);
+    cslog() << __func__ << ": 2.1 done";
     // 2.2) execution fee
     extraFee.sum = convertAmount(stateTrx.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>());
     extraFee.comment = "contract execution fee";
     extraFeeTotal.push_back(extraFee);
-
+    cslog() << __func__ << ": 2.2 done";
     // 3) fill ExtraFee for extra transactions
     auto trxIt = std::find_if(transactions.begin(), transactions.end(), [&stateTrx](const csdb::Transaction& ptrx) { return ptrx.id() == stateTrx.id(); });
     if (trxIt != transactions.end()) {
@@ -629,6 +635,7 @@ std::vector<api::ExtraFee> APIHandler::fillExtraFee(const csdb::Transaction& tra
             extraFeeTotal.push_back(extraFee);
         }
     }
+    cslog() << __func__ << ": 3 done: size:" << extraFeeTotal.size();
     return extraFeeTotal;
 }
 
@@ -1120,13 +1127,12 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
             _return.__isset.smart_contract_result = api_resp.__isset.results;
             if (_return.__isset.smart_contract_result && !api_resp.results.empty()) {
                 _return.__set_smart_contract_result(api_resp.results[0].ret_val);
-                auto eFee = fillExtraFee(send_transaction);
-                if (eFee.size() > 0) {
-                    _return.__set_extraFee(eFee);
-                }
             }
         }
-
+        //auto eFee = fillExtraFee(send_transaction, transactionId);
+        //if (!eFee.empty()) {
+        //    _return.__set_extraFee(eFee);
+        //}
         SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
         hashStateEntry->yield();
         return;
@@ -1186,7 +1192,10 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     if (! deploy && !retVal.empty()) {
         _return.__set_smart_contract_result(cs::Serializer::deserialize<::general::Variant>(std::move(retVal)));
     }
-    
+    auto eFee = fillExtraFee(send_transaction, newTransactionId);
+    if (!eFee.empty()) {
+        _return.__set_extraFee(eFee);
+    }
     _return.id.poolSeq = newTransactionId.pool_seq();
     _return.id.index = static_cast<int32_t>(newTransactionId.index());
 
