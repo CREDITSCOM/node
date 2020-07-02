@@ -476,7 +476,7 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
             result.trxn.type = api::TransactionType::TT_ContractEmitted;
             // move backwards through trxs until new state has found
             const auto seq = transaction.id().pool_seq();
-            for (auto idx = transaction.id().index() - 1; idx >= 0; --idx) {
+            for (int64_t idx = transaction.id().index() - 1; idx >= 0; --idx) {
                 const csdb::TransactionID id(seq, idx);
                 csdb::Transaction t = executor_.loadTransactionApi(id);
                 if (is_smart_state(t)) {

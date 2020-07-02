@@ -76,6 +76,12 @@ public:
     /** @brief   Number of rounds to prevent node from consensus participation */
     static uint32_t GrayListPunishment;
 
+    static size_t MaxPacketsPerRound;
+
+    static size_t MaxPacketTransactions;
+
+    static size_t MaxQueueSize;
+
     /** @brief   Number of node working rounds to start checking roundPackage ctreating speed */
     const static uint64_t SpeedCheckRound;
 

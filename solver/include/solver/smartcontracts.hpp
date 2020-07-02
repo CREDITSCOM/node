@@ -451,6 +451,10 @@ public:
         constexpr static uint32_t SubsequentCall = 32;
         // malformed contract execution
         constexpr static uint32_t MalformedCall = 64;
+        // insufficient fee to call contract
+        constexpr static uint32_t InsufficientMaxFee = 128;
+        // insufficient caller balance
+        constexpr static uint32_t InsufficientCallerFunds = 256;
     };
 
     static std::string violations_message(uint32_t flags);

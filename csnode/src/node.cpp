@@ -544,6 +544,9 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::Pub
 
     if (packet.signatures().size() == 1) {
         auto& transactions = packet.transactions();
+        if (transactions.size() > Consensus::MaxPacketTransactions) {
+            return false;
+        }
         for (auto& it : transactions) {
             if (cs::IterValidator::SimpleValidator::validate(it, getBlockChain(), solver_->smart_contracts())) {
                 ++sum;
@@ -1655,7 +1658,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
             return MessageActions::Drop;
         }
 
-        if (rNum > blockChain_.getLastSeq() + cs::Conveyer::HashTablesStorageCapacity) {
+        if (rNum > blockChain_.getLastSeq() + Consensus::MaxRoundsCancelContract) {
             // too many rounds behind the global round
             return MessageActions::Drop;
         }
@@ -3643,6 +3646,27 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 stream >> value;
                 Consensus::MaxPreliminaryBlockSize = value;
                 cslog() << "MaxPreliminaryBlockSize changed to: " << Consensus::MaxPreliminaryBlockSize;
+            }
+
+            if (order == 29U) {// API accepts MaxPacketsPerRound
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxPacketsPerRound = value;
+                cslog() << "MaxPacketsPerRound changed to: " << Consensus::MaxPacketsPerRound;
+            }
+
+            if (order == 30U) {// MaxPacketTransactions in one Conveyer packet
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxPacketTransactions = value;
+                cslog() << "MaxPacketTransactions changed to: " << Consensus::MaxPacketTransactions;
+            }
+
+            if (order == 31U) {// MaxQueueSize - if full no transactions
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxQueueSize = value;
+                cslog() << "MaxQueueSize changed to: " << Consensus::MaxQueueSize;
             }
 
         }
