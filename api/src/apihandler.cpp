@@ -1359,7 +1359,7 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
         BlockChain::Transactions transactions;
 
         auto id = csdb::TransactionID(currentQuery.fromId.poolSeq, currentQuery.fromId.index);
-        blockchain_.getTransactionsUntill(transactions, addr, id, limit, flagg);
+        blockchain_.getTransactionsUntill(transactions, addr, id, flagg);
 
         cslog() << "Trx(" << cnt << ") = " << transactions.size();
         api::PublicKeyTransactions singleResponse;
@@ -1451,7 +1451,9 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
                 trf.__set_extraFee(it.extraFee);
                 trf.userFields = it.userFields;
 
-                if (fromTr.pool_seq() < it.transaction.poolSeq || (fromTr.pool_seq() == it.transaction.poolSeq && fromTr.index() < it.transaction.index)) {
+                if (fromTr.pool_seq() < static_cast<uint64_t>(it.transaction.poolSeq) 
+                    || (fromTr.pool_seq() == static_cast<uint64_t>(it.transaction.poolSeq) 
+                    && fromTr.index() < static_cast<uint64_t>(it.transaction.index))) {
                     if (flagg == 1) {
                         if (it.receiver == currentQuery.requestedAddress) {
                             transfersListLocal.transfers.push_back(it);
@@ -1507,7 +1509,7 @@ void APIHandler::baseLoaded(const csdb::Pool& pool) {
             size_t tokenSize = tokens.size();
             cslog() << "tokens are loading(" << tokenSize << ")...";
             for (auto& tk : tokens) {
-                if (tokenSize > 100 && !(i++ % (tokenSize / 10)))
+                if (tokenSize > static_cast<size_t>(100) && !(i++ % (tokenSize / 10)))
                     cslog() << "loading tokens: " << 10 * (count++) << "%";
                 tm_.refreshTokenState(tk.first, cs::SmartContracts::get_contract_state(get_s_blockchain(), tk.first), true);
             }

@@ -740,7 +740,7 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
     }
 }
 
-void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address address, csdb::TransactionID id, size_t limit, uint16_t flagg) {
+void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address address, csdb::TransactionID id, uint16_t flagg) {
     cslog() << __func__;
     //size_t cnt = 0;
     cslog() << "Find at address: " << address.to_string();
