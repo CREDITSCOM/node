@@ -27,6 +27,10 @@ inline int64_t limitPage(int64_t value) {
     return std::clamp(value, int64_t(0), int64_t(100));
 }
 
+inline int64_t limitQueries(int64_t value, int64_t maxQueries) {
+    return std::clamp(value, int64_t(0), int64_t(maxQueries));
+}
+
 apiexec::APIEXECHandler::APIEXECHandler(BlockChain& blockchain, cs::SolverCore& solver, cs::Executor& executor)
 : executor_(executor)
 , blockchain_(blockchain)
@@ -574,6 +578,69 @@ api::SealedTransaction APIHandler::convertTransaction(const csdb::Transaction& t
     return result;
 }
 
+std::vector<api::ExtraFee> APIHandler::fillExtraFee(const csdb::Transaction& transaction, const csdb::TransactionID transactionId){
+    cslog() << __func__;
+    bool is_contract_replenish = false;
+    if (solver_.smart_contracts().is_payable_call(transaction)) {
+        is_contract_replenish = true;
+        cslog() << __func__ << ": contract replenish is true";
+    }
+    std::vector<api::ExtraFee> extraFeeTotal;
+    // fill ExtraFee
+// 1) find state transaction
+    csdb::Transaction stateTrx;
+    if (is_smart(transaction) || is_contract_replenish) {
+        auto opers = lockedReference(this->smart_operations);
+        auto state_id = (*opers)[transactionId].stateTransaction;
+        //cslog() << __func__ << ": looking for state trx of: " << transactionId.to_string() << ", state tr id: " << state_id.to_string();
+        if (state_id.is_valid()) {
+            stateTrx = executor_.loadTransactionApi(state_id);
+            //cslog() << __func__ << ": find state trx 2";
+        }
+    }
+    else if (is_smart_state(transaction)) {
+        stateTrx = transaction;
+        //cslog() << __func__ << ": find state trx 3";
+    }
+    //cslog() << __func__ << ": go on...";
+    if (!is_smart_state(stateTrx))
+        return extraFeeTotal;
+    //cslog() << __func__<< ": 1 done";
+    // 2) fill ExtraFee for state transaction
+    auto pool = executor_.loadBlockApi(stateTrx.id().pool_seq());
+    auto transactions = pool.transactions();
+    ExtraFee extraFee;
+    extraFee.transactionId = convert_transaction_id(stateTrx.id());
+    //cslog() << __func__ << ": 2 done";
+    // 2.1) counted_fee 
+    extraFee.sum = convertAmount(csdb::Amount(stateTrx.counted_fee().to_double()));
+    extraFee.comment = "contract state fee";
+    extraFeeTotal.push_back(extraFee);
+    //cslog() << __func__ << ": 2.1 done";
+    // 2.2) execution fee
+    extraFee.sum = convertAmount(stateTrx.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>());
+    extraFee.comment = "contract execution fee";
+    extraFeeTotal.push_back(extraFee);
+    //cslog() << __func__ << ": 2.2 done " << extraFee.comment << " :" << stateTrx.user_field(cs::trx_uf::new_state::Fee).value<csdb::Amount>().to_string();
+    // 3) fill ExtraFee for extra transactions
+    auto trxIt = std::find_if(transactions.begin(), transactions.end(), [&stateTrx](const csdb::Transaction& ptrx) { return ptrx.id() == stateTrx.id(); });
+    if (trxIt != transactions.end()) {
+        for (auto trx = ++trxIt; trx != transactions.end(); ++trx) {
+            if (blockchain_.getAddressByType(trx->source(), BlockChain::AddressType::PublicKey) !=
+                blockchain_.getAddressByType(stateTrx.source(), BlockChain::AddressType::PublicKey)) // end find extra transactions
+                break;
+            extraFee.transactionId = convert_transaction_id(trx->id());
+            extraFee.sum = convertAmount(csdb::Amount(trx->counted_fee().to_double()));
+            extraFee.comment = "emitted trxs fee";
+            extraFeeTotal.push_back(extraFee);
+        }
+    }
+    //cslog() << __func__ << ": 3 done: size:" << extraFeeTotal.size();
+    return extraFeeTotal;
+}
+
+
+
 std::vector<api::SealedTransaction> APIHandler::convertTransactions(const std::vector<csdb::Transaction>& transactions) {
     std::vector<api::SealedTransaction> result;
     auto size = transactions.size();
@@ -670,6 +737,10 @@ void APIHandler::TransactionsGet(TransactionsGetResult& _return, const general::
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
+void APIHandler::ActualFeeGet(ActualFeeGetResult& _return, const int32_t size) {
+    _return.fee.__set_commission(cs::fee::justFee(static_cast<size_t>(size)).get_raw());
+}
+
 api::SmartContractInvocation fetch_smart(const csdb::Transaction& tr) {
     if (tr.is_valid()) {
         const auto uf = tr.user_field(cs::trx_uf::deploy::Code);
@@ -763,6 +834,24 @@ csdb::Transaction APIHandler::makeTransaction(const Transaction& transaction) {
     return send_transaction;
 }
 
+api::ShortTransaction APIHandler::convertTransactionToShort(csdb::Transaction tr) {
+    api::ShortTransaction apiTr;
+    auto sTr = convertTransaction(tr);
+    apiTr.amount = sTr.trxn.amount;
+    apiTr.currency = sTr.trxn.currency;
+    apiTr.fee = sTr.trxn.fee;
+    apiTr.id = sTr.id;
+    apiTr.source = sTr.trxn.source;
+    apiTr.target = sTr.trxn.target;
+    apiTr.timeCreation = sTr.trxn.timeCreation;
+    apiTr.type = sTr.trxn.type;
+    apiTr.__set_userFields(sTr.trxn.userFields);
+    cslog() << __func__ << ": Found userField: " << sTr.trxn.userFields;
+    //auto extraFee = sTr.trxn.extraFee;
+    //auto executeResult = sTr.trxn;
+    return apiTr;
+}
+
 std::string getDelimitedTransactionSigHex(const csdb::Transaction& tr) {
     auto bs = fromByteArray(tr.to_byte_stream_for_sig());
     return std::string({' '}) + cs::Utils::byteStreamToHex(bs.data(), bs.length());
@@ -839,6 +928,24 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
             }
         }
         cTransaction.add_user_field(cs::trx_uf::deploy::Code, cs::Serializer::serialize(transaction.smartContract));
+        auto input_smart = transaction.__isset.smartContract ? transaction.smartContract : SmartContractInvocation{};
+        bool deploy = transaction.__isset.smartContract ? is_smart_deploy(input_smart) : false;
+        if (!deploy && !transaction.userFields.empty()) {
+            size_t s = transaction.userFields.size();
+            if (s != 0) {
+                cs::Bytes msg;
+                msg.resize(s);
+                std::copy(transaction.userFields.data(), transaction.userFields.data() + s, msg.data());
+                cs::IDataStream stream(msg.data(), msg.size());
+                cs::Byte flagg;
+                stream >> flagg;
+                if (flagg) {
+                    cTransaction.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
+                    cslog() << __func__ << ": Found userField: " << transaction.userFields;
+                }
+            }
+        }
+
     }
     else {
         if (!transaction.userFields.empty()) {
@@ -852,6 +959,7 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
                 stream >> flagg;
                 if (flagg) {
                     cTransaction.add_user_field(cs::trx_uf::ordinary::Text, transaction.userFields);
+                    cslog() << __func__ << ": Found userField: " << transaction.userFields;
                 }
                 else {
                     uint8_t cnt;
@@ -1038,10 +1146,14 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
                 return;
             }
             _return.__isset.smart_contract_result = api_resp.__isset.results;
-            if (_return.__isset.smart_contract_result && !api_resp.results.empty())
+            if (_return.__isset.smart_contract_result && !api_resp.results.empty()) {
                 _return.__set_smart_contract_result(api_resp.results[0].ret_val);
+            }
         }
-
+        //auto eFee = fillExtraFee(send_transaction, transactionId);
+        //if (!eFee.empty()) {
+        //    _return.__set_extraFee(eFee);
+        //}
         SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
         hashStateEntry->yield();
         return;
@@ -1101,7 +1213,13 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     if (! deploy && !retVal.empty()) {
         _return.__set_smart_contract_result(cs::Serializer::deserialize<::general::Variant>(std::move(retVal)));
     }
-    
+    auto trResult = dumbCv_.waitCvSignal(send_transaction.signature());
+    _return.fee.integral = trResult.fee.integral();
+    _return.fee.fraction = trResult.fee.fraction();
+    auto eFee = fillExtraFee(send_transaction, newTransactionId);
+    if (!eFee.empty()) {
+        _return.__set_extraFee(eFee);
+    }
     _return.id.poolSeq = newTransactionId.pool_seq();
     _return.id.index = static_cast<int32_t>(newTransactionId.index());
 
@@ -1219,6 +1337,160 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
         SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     }
 
+    return;
+}
+
+void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult& _return, const api::TransactionsQuery& generalQuery) {
+    cslog() << __func__;
+    auto gq = generalQuery;
+    auto queriesLimit = limitQueries(gq.queries.size(), MaxQueriesNumber);
+    auto limit = int64_t(1000);
+    cslog() << "Limit Queries = " << queriesLimit;
+    uint16_t flagg = gq.flag;
+    size_t cnt = 0;
+    for (auto currentQuery : gq.queries)
+    {
+        cslog() << "Limit Transactions = " << limit;
+        if (queriesLimit == 0 || limit ==0) {
+            break;
+        }
+        cslog() << "Counter = " << cnt;
+        const csdb::Address addr = BlockChain::getAddressFromKey(currentQuery.requestedAddress);
+        BlockChain::Transactions transactions;
+
+        auto id = csdb::TransactionID(currentQuery.fromId.poolSeq, currentQuery.fromId.index);
+        blockchain_.getTransactionsUntill(transactions, addr, id, limit, flagg);
+
+        cslog() << "Trx(" << cnt << ") = " << transactions.size();
+        api::PublicKeyTransactions singleResponse;
+        singleResponse.requestedAddress = currentQuery.requestedAddress;
+        size_t tcnt = 0;
+        for (auto it : transactions) {
+            ++tcnt;
+            if (limit > 0) {
+                --limit;
+            }
+            cslog() << "Converting tr(" << tcnt << ")";
+            singleResponse.transactions.push_back(convertTransactionToShort(it));
+        }
+        cslog() << "Conversion finished";
+
+        std::vector<std::tuple<csdb::Address, std::string, std::string>> tokensList;
+        tm_.loadTokenInfo([&addr, &tokensList](const TokensMap& tokens, const HoldersMap& holders){
+            auto holderIt = holders.find(addr);
+            if (holderIt != holders.end()) { 
+                for (const auto& tokAddr : holderIt->second) {
+                    auto it = tokens.find(tokAddr);
+                    if (it == tokens.end()) {
+                        continue;
+                    }
+                    tokensList.push_back(std::make_tuple(tokAddr, it->second.symbol, it->second.name));
+                }
+            }
+        });
+        cslog() << "Token List size: " << tokensList.size();
+        size_t offset = 0;
+        size_t singleLimit = 99;
+        std::vector<api::SelectedTokenTransfers> sumTransfers;
+        for (auto itToken : tokensList) {
+            api::TokenTransfersResult transferResult;
+            api::SelectedTokenTransfers transfersListLocal;
+            auto tAddr = fromByteArray(std::get<0>(itToken).public_key());
+            csdb::TransactionID fromTr(0, 0);
+            tokenTransactionsInternal(transferResult, *this, tm_, tAddr, true, true, offset, singleLimit, addr);
+            if (!currentQuery.tokensList.empty()) {
+                for (auto tmpIt : currentQuery.tokensList) {
+                    if (tmpIt.tokenAddress == tAddr) {
+                        fromTr = csdb::TransactionID(tmpIt.fromId.poolSeq, tmpIt.fromId.index);
+                    }
+                }
+            }
+            transfersListLocal.__set_tokenAddress(tAddr);
+            transfersListLocal.__set_tokenTiker(std::get<1>(itToken));
+            transfersListLocal.__set_tokenName(std::get<2>(itToken));
+            size_t token_cnt = 0;
+            cslog() << "Token start. Transfers found: " << transferResult.transfers.size();
+            for (auto it : transferResult.transfers) {
+                ++token_cnt;
+                cslog() << "Adding transfer: " << token_cnt;
+                api::TokenTransfer trf;
+                trf.amount = it.amount;
+                trf.code = it.code;
+                trf.initiator = it.initiator;
+                trf.receiver = it.receiver;
+                trf.sender = it.sender;
+                trf.state = it.state;
+                trf.time = it.time;
+                trf.token = it.token;
+                trf.transaction = it.transaction;
+
+                //_return.fee.integral = trResult.fee.integral();
+                //_return.fee.fraction = trResult.fee.fraction();
+                //auto tId = csdb::TransactionID(it.transaction.poolSeq, it.transaction.index);
+                //auto trState = executor_.loadTransactionApi(tId);
+                //if (!is_smart_state(trState)) {
+                //    cslog() << "Not state transaction";
+                //    continue;
+                //}
+                //csdb::UserField fld = trState.user_field(cs::trx_uf::new_state::RefStart);
+                //uint32_t index;
+                //cs::Sequence poolSeq;
+                //if (fld.is_valid()) {
+                //    cs::SmartContractRef ref(fld);
+                //    auto tmp = convert_transaction_id(ref.getTransactionID());
+                //    poolSeq = tmp.poolSeq;
+                //    index = tmp.index;
+                //}
+                //auto trInit = executor_.loadTransactionApi(csdb::TransactionID(poolSeq, index));
+                //trf.fee.commission = int16_t(trInit.counted_fee().get_raw());
+                //auto eFee = fillExtraFee(trInit, csdb::TransactionID(poolSeq, index));
+                //if (!eFee.empty()) {
+                //    trf.__set_extraFee(eFee);
+                //}
+                trf.fee = it.fee;
+                trf.__set_extraFee(it.extraFee);
+                trf.userFields = it.userFields;
+
+                if (fromTr.pool_seq() < it.transaction.poolSeq || (fromTr.pool_seq() == it.transaction.poolSeq && fromTr.index() < it.transaction.index)) {
+                    if (flagg == 1) {
+                        if (it.receiver == currentQuery.requestedAddress) {
+                            transfersListLocal.transfers.push_back(it);
+                        }
+                    }
+                    else if (flagg == 2) {
+                        if (it.sender == currentQuery.requestedAddress) {
+                            transfersListLocal.transfers.push_back(it);
+                        }
+                    }
+                    else if (flagg == 3) {
+                        transfersListLocal.transfers.push_back(it);
+                    }
+                    else {
+                        csdebug() << "Incompatible flag value in transaction filter";
+                    }
+                }
+                else {
+                    break;
+                }
+
+            }
+            sumTransfers.push_back(transfersListLocal);
+            //cslog() << "Token finished: " << transfersListLocal.transfers.size() << " transfers, transferList# " << sumTransfers.size();
+        }
+        if (sumTransfers.size() > 0) {
+            singleResponse.__set_transfersList(sumTransfers);
+        }
+
+        if (singleResponse.transactions.size() > 0 || singleResponse.transfersList.size() > 0) {
+            //cslog() << "Single Response: trx: " << singleResponse.transactions.size() << ", " << singleResponse.transfersList.size();
+            _return.queryResponse.push_back(singleResponse);
+            ++cnt;
+            --queriesLimit;
+        }
+
+    }
+
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     return;
 }
 
@@ -1747,7 +2019,15 @@ void APIHandler::addTokenResult(api::TokenTransfersResult& _return, const csdb::
     transfer.transaction.poolSeq = static_cast<int64_t>(tr.id().pool_seq());
     transfer.transaction.index = static_cast<int32_t>(tr.id().index());
     transfer.time = atoll(pool.user_field(0).value<std::string>().c_str());
-
+    transfer.fee.commission = int16_t(tr.counted_fee().get_raw());
+    auto eFee = fillExtraFee(tr, tr.id());
+    if (!eFee.empty()) {
+        transfer.__set_extraFee(eFee);
+    }
+    auto ufd = tr.user_field(cs::trx_uf::ordinary::Text);
+    if (ufd.is_valid()) {
+        transfer.__set_userFields(ufd.value<std::string>());
+    }
     auto opers = cs::lockedReference(this->smart_operations);
     transfer.state = static_cast<SmartOperationState>((*opers)[tr.id()].state);
 
@@ -1788,6 +2068,7 @@ void putTokenInfo(api::TokenInfo& ti, const general::Address& addr, const Token&
 template <typename ResultType>
 void APIHandler::tokenTransactionsInternal(ResultType& _return, APIHandler& handler, TokensMaster& tm_, const general::Address& token, bool transfersOnly, bool filterByWallet, int64_t offset,
                                int64_t limit, const csdb::Address& wallet) {
+    cslog() << __func__;
     if (!validatePagination(_return, handler, offset, limit)) {
         return;
     }
@@ -1797,9 +2078,11 @@ void APIHandler::tokenTransactionsInternal(ResultType& _return, APIHandler& hand
     std::string code;
 
     tm_.loadTokenInfo([&addr, &tokenFound, &transfersOnly, &filterByWallet, &code, &wallet, &_return](const TokensMap& tm_, const HoldersMap&) {
+        //cslog() << __func__ << ": load tokenInfo";
         auto it = tm_.find(addr);
         tokenFound = !(it == tm_.end());
         if (tokenFound) {
+            //cslog() << __func__ << ": Tokens found";
             code = it->second.symbol;
             if (transfersOnly && !filterByWallet) {
                 _return.count = static_cast<int32_t>(it->second.transfersCount);
@@ -1823,7 +2106,7 @@ void APIHandler::tokenTransactionsInternal(ResultType& _return, APIHandler& hand
         handler.SetResponseStatus(_return.status, APIHandlerBase::APIRequestStatusType::FAILURE);
         return;
     }
-
+    //cslog() << __func__ << ": Starting iterations";
     handler.iterateOverTokenTransactions(addr, [&](const csdb::Pool& pool, const csdb::Transaction& tr) {
         auto smart = fetch_smart(tr);
         if (transfersOnly && !TokensMaster::isTransfer(smart.method, smart.params)) {
