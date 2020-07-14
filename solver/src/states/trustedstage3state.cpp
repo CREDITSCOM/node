@@ -465,12 +465,15 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     csdebug() << name() << ": election table ready";
     size_t max_conf = 0;
     size_t eLiars = 0;
-    if (candidatesElection.size() < 4) {
+    if (candidatesElection.size() < 5) {
         max_conf = candidatesElection.size();
         csdebug() << name() << ": too few TRUSTED NODES, but we continue at the minimum ...";
     }
     else {
-        max_conf = static_cast<size_t>(4. + 1.85 * log(candidatesElection.size() / 4.));
+        max_conf = static_cast<size_t>(5. + 1.85 * log(candidatesElection.size() / 4.));
+        if (max_conf % 2 == 0) {
+            --max_conf;
+        }
         if (max_conf > Consensus::MaxTrustedNodes) {
             max_conf = Consensus::MaxTrustedNodes;
         }

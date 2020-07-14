@@ -3823,7 +3823,14 @@ void Node::onRoundTimeElapsed() {
                     };
 
     transport_->forEachNeighbour(std::move(callback));
+    if (actualConfidants.size() % 2 == 0) {
+        auto it = actualConfidants.end();
+        --it;
+        it = actualConfidants.erase(it);
+
+    }
     initBootstrapRP(actualConfidants);
+
 
     cslog() << "NODE> Bootstrap available nodes [" << actualConfidants.size() << "]:";
     for (const auto& item : actualConfidants) {
