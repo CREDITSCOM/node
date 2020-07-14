@@ -262,7 +262,7 @@ private:
 
     std::vector<api::SealedTransaction> convertTransactions(const std::vector<csdb::Transaction>& transactions);
 
-    std::vector<api::ExtraFee> APIHandler::fillExtraFee(const csdb::Transaction& transaction, const csdb::TransactionID transactionId);
+    std::vector<api::ExtraFee> fillExtraFee(const csdb::Transaction& transaction, const csdb::TransactionID transactionId);
 
     api::Pool convertPool(const csdb::Pool& pool);
 
