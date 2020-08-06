@@ -1345,23 +1345,19 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
     auto gq = generalQuery;
     auto queriesLimit = limitQueries(gq.queries.size(), MaxQueriesNumber);
     auto limit = int64_t(1000);
-    cslog() << "Limit Queries = " << queriesLimit;
     uint16_t flagg = gq.flag;
     size_t cnt = 0;
     for (auto currentQuery : gq.queries)
     {
-        cslog() << "Limit Transactions = " << limit;
         if (queriesLimit == 0 || limit ==0) {
             break;
         }
-        cslog() << "Counter = " << cnt;
         const csdb::Address addr = BlockChain::getAddressFromKey(currentQuery.requestedAddress);
         BlockChain::Transactions transactions;
 
         auto id = csdb::TransactionID(currentQuery.fromId.poolSeq, currentQuery.fromId.index);
         blockchain_.getTransactionsUntill(transactions, addr, id, flagg);
 
-        cslog() << "Trx(" << cnt << ") = " << transactions.size();
         api::PublicKeyTransactions singleResponse;
         singleResponse.requestedAddress = currentQuery.requestedAddress;
         size_t tcnt = 0;
@@ -1370,10 +1366,8 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
             if (limit > 0) {
                 --limit;
             }
-            cslog() << "Converting tr(" << tcnt << ")";
             singleResponse.transactions.push_back(convertTransactionToShort(it));
         }
-        cslog() << "Conversion finished";
 
         std::vector<std::tuple<csdb::Address, std::string, std::string>> tokensList;
         tm_.loadTokenInfo([&addr, &tokensList](const TokensMap& tokens, const HoldersMap& holders){
@@ -1388,7 +1382,6 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
                 }
             }
         });
-        cslog() << "Token List size: " << tokensList.size();
         size_t offset = 0;
         size_t singleLimit = 99;
         std::vector<api::SelectedTokenTransfers> sumTransfers;
@@ -1409,10 +1402,8 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
             transfersListLocal.__set_tokenTiker(std::get<1>(itToken));
             transfersListLocal.__set_tokenName(std::get<2>(itToken));
             size_t token_cnt = 0;
-            cslog() << "Token start. Transfers found: " << transferResult.transfers.size();
             for (auto it : transferResult.transfers) {
                 ++token_cnt;
-                cslog() << "Adding transfer: " << token_cnt;
                 api::TokenTransfer trf;
                 trf.amount = it.amount;
                 trf.code = it.code;
@@ -1423,30 +1414,6 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
                 trf.time = it.time;
                 trf.token = it.token;
                 trf.transaction = it.transaction;
-
-                //_return.fee.integral = trResult.fee.integral();
-                //_return.fee.fraction = trResult.fee.fraction();
-                //auto tId = csdb::TransactionID(it.transaction.poolSeq, it.transaction.index);
-                //auto trState = executor_.loadTransactionApi(tId);
-                //if (!is_smart_state(trState)) {
-                //    cslog() << "Not state transaction";
-                //    continue;
-                //}
-                //csdb::UserField fld = trState.user_field(cs::trx_uf::new_state::RefStart);
-                //uint32_t index;
-                //cs::Sequence poolSeq;
-                //if (fld.is_valid()) {
-                //    cs::SmartContractRef ref(fld);
-                //    auto tmp = convert_transaction_id(ref.getTransactionID());
-                //    poolSeq = tmp.poolSeq;
-                //    index = tmp.index;
-                //}
-                //auto trInit = executor_.loadTransactionApi(csdb::TransactionID(poolSeq, index));
-                //trf.fee.commission = int16_t(trInit.counted_fee().get_raw());
-                //auto eFee = fillExtraFee(trInit, csdb::TransactionID(poolSeq, index));
-                //if (!eFee.empty()) {
-                //    trf.__set_extraFee(eFee);
-                //}
                 trf.fee = it.fee;
                 trf.__set_extraFee(it.extraFee);
                 trf.userFields = it.userFields;
@@ -1468,7 +1435,6 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
                         transfersListLocal.transfers.push_back(it);
                     }
                     else {
-                        csdebug() << "Incompatible flag value in transaction filter";
                     }
                 }
                 else {
@@ -1477,14 +1443,12 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
 
             }
             sumTransfers.push_back(transfersListLocal);
-            //cslog() << "Token finished: " << transfersListLocal.transfers.size() << " transfers, transferList# " << sumTransfers.size();
         }
         if (sumTransfers.size() > 0) {
             singleResponse.__set_transfersList(sumTransfers);
         }
 
         if (singleResponse.transactions.size() > 0 || singleResponse.transfersList.size() > 0) {
-            //cslog() << "Single Response: trx: " << singleResponse.transactions.size() << ", " << singleResponse.transfersList.size();
             _return.queryResponse.push_back(singleResponse);
             ++cnt;
             --queriesLimit;
