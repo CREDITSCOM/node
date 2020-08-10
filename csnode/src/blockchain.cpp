@@ -740,6 +740,73 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
     }
 }
 
+void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address address, csdb::TransactionID id, uint16_t flagg) {
+    for (auto trIt = cs::TransactionsIterator(*this, address); trIt.isValid(); trIt.next()) {
+        if (id.pool_seq() + 1 > cs::Conveyer::instance().currentRoundNumber() 
+            && id.pool_seq() > trIt->id().pool_seq()) {
+            break;
+        }
+        if (id.pool_seq() < trIt->id().pool_seq() || (id.pool_seq() == trIt->id().pool_seq() && id.index() < trIt->id().index())) {
+            bool added = false;
+            if (flagg == 1) {
+                bool match = false;
+                if (trIt->target().is_public_key())
+                {
+                    if (trIt->target().public_key() == address.public_key()) {
+                        match = true;
+                    }
+                }
+                if (trIt->target().is_wallet_id())
+                {
+                    csdb::Address pKey;
+                    findAddrByWalletId(trIt->target().wallet_id(), pKey);
+                    if (pKey.public_key() == address.public_key()) {
+                        match = true;
+                    }
+                }
+                if(match)
+                {
+                    transactions.push_back(*trIt);
+                    transactions.back().set_time(getBlockTime(trIt.getPool()));
+                    added = true;
+                }
+            }
+            if (flagg ==2){
+                bool match = false;
+                if (trIt->source().is_public_key())
+                {
+                    if (trIt->source().public_key() == address.public_key()) {
+                        match = true;
+                    }
+                }
+                if (trIt->source().is_wallet_id())
+                {
+                    csdb::Address pKey;
+                    findAddrByWalletId(trIt->source().wallet_id(), pKey);
+                    if (pKey.public_key() == address.public_key()) {
+                        match = true;
+                    }
+                }
+                if (match)
+                {
+                    transactions.push_back(*trIt);
+                    transactions.back().set_time(getBlockTime(trIt.getPool()));
+                    added = true;
+                }
+            }
+
+            if (flagg == 3) {
+                transactions.push_back(*trIt);
+                transactions.back().set_time(getBlockTime(trIt.getPool()));
+                added = true;
+                
+            }
+        }
+        //if (--limit == 0)
+        //    break;
+    }
+}
+
 bool BlockChain::updateWalletIds(const csdb::Pool& pool, WalletsCache::Updater& proc) {
     try {
         std::lock_guard lock(cacheMutex_);

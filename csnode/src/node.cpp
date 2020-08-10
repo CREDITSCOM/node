@@ -351,7 +351,7 @@ uint8_t Node::calculateBootStrapWeight(cs::PublicKeys& confidants) {
 
 void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
     cslog() << "NODE> get Boot strap Round Table #" << rNum;
-
+    solver_->resetGrayList();
     cs::IDataStream in(data, size);
     cs::RoundTable roundTable;
     cs::Bytes payload;
@@ -544,6 +544,9 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::Pub
 
     if (packet.signatures().size() == 1) {
         auto& transactions = packet.transactions();
+        if (transactions.size() > Consensus::MaxPacketTransactions) {
+            return false;
+        }
         for (auto& it : transactions) {
             if (cs::IterValidator::SimpleValidator::validate(it, getBlockChain(), solver_->smart_contracts())) {
                 ++sum;
@@ -1655,7 +1658,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
             return MessageActions::Drop;
         }
 
-        if (rNum > blockChain_.getLastSeq() + cs::Conveyer::HashTablesStorageCapacity) {
+        if (rNum > blockChain_.getLastSeq() + Consensus::MaxRoundsCancelContract) {
             // too many rounds behind the global round
             return MessageActions::Drop;
         }
@@ -3645,6 +3648,27 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 cslog() << "MaxPreliminaryBlockSize changed to: " << Consensus::MaxPreliminaryBlockSize;
             }
 
+            if (order == 29U) {// API accepts MaxPacketsPerRound
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxPacketsPerRound = value;
+                cslog() << "MaxPacketsPerRound changed to: " << Consensus::MaxPacketsPerRound;
+            }
+
+            if (order == 30U) {// MaxPacketTransactions in one Conveyer packet
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxPacketTransactions = value;
+                cslog() << "MaxPacketTransactions changed to: " << Consensus::MaxPacketTransactions;
+            }
+
+            if (order == 31U) {// MaxQueueSize - if full no transactions
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxQueueSize = value;
+                cslog() << "MaxQueueSize changed to: " << Consensus::MaxQueueSize;
+            }
+
         }
     }
     std::string msg;
@@ -3704,7 +3728,7 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     if (smartPacks.size() != smartSignatures.size()) {
         // there was known accident in testnet only in block #2'651'597 that contains unsigned smart contract states packet
         //if (getBlockChain().uuid() == uuidTestNet) {
-        cserror() << kLogPrefix << "different size of smatrpackets and signatures in block " << WithDelimiters(block.sequence());
+        cserror() << kLogPrefix << "different size of smartpackets and signatures in block " << WithDelimiters(block.sequence());
         *check_failed = !collectRejectedInfo;
         return;
     }
@@ -3799,7 +3823,14 @@ void Node::onRoundTimeElapsed() {
                     };
 
     transport_->forEachNeighbour(std::move(callback));
+    if (actualConfidants.size() % 2 == 0) {
+        auto it = actualConfidants.end();
+        --it;
+        it = actualConfidants.erase(it);
+
+    }
     initBootstrapRP(actualConfidants);
+
 
     cslog() << "NODE> Bootstrap available nodes [" << actualConfidants.size() << "]:";
     for (const auto& item : actualConfidants) {

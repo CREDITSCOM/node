@@ -43,6 +43,12 @@ uint32_t Consensus::TimeMinStage1 = 500;
 /** @brief   Number of rounds to prevent node from consensus participation */
 uint32_t Consensus::GrayListPunishment = 1000;
 
+size_t Consensus::MaxPacketsPerRound = 1000;
+
+size_t Consensus::MaxPacketTransactions = 1000;
+
+size_t Consensus::MaxQueueSize = 1000000;
+
 /** @brief   Number of node working rounds to start checking roundPackage ctreating speed */
 const uint64_t Consensus::SpeedCheckRound = 1000;
 
