@@ -306,7 +306,9 @@ void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transact
 bool WalletsCache::Updater::setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp) {
     auto it = data_.wallets_.find(address);
     if (it != data_.wallets_.end()) {
-        it->second.createTime_ = p_timeStamp;
+        if (it->second.createTime_ == 0) {
+            it->second.createTime_ = p_timeStamp;
+        }
         emit walletUpdateEvent(it->first, it->second);
         return true;
     }
@@ -449,10 +451,10 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
             const csdb::Amount start_max_fee(initTransaction.max_fee().to_double());
             const csdb::Amount start_counted_fee(initTransaction.counted_fee().to_double());
             if (isCanceledSmart(start_target, start_id)) {
-                csdebug() << kLogPrefix << "(deprecated behaviour) timeout was detected in "
-                    << WithDelimiters(start_id.pool_seq() + Consensus::MaxRoundsCancelContract)
-                    << " for " << FormatRef(start_id.pool_seq(), (size_t )start_id.index())
-                    << " , then new_state found in " << WithDelimiters(tr.id().pool_seq());
+                csdebug() << kLogPrefix << "(deprecated behaviour) contract "
+                    << FormatRef(start_id.pool_seq(), (size_t )start_id.index())
+                    << " was canceled before , and now new_state is found in "
+                    << WithDelimiters(tr.id().pool_seq());
                 if (!inverse) {
                     wallData.balance_ -= initTransaction.amount();
                     wallData.balance_ -= start_max_fee;

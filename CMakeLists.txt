@@ -102,6 +102,7 @@ if (MSVC)
 endif(MSVC)
 
 option(ENABLE_TESTS "Enable tests" OFF)
+option(SKIP_SAMPLES "Skip samples" ON)
 option(WITH_BOOST_STATIC "" ON)
 option(BUILD_TESTING "" OFF)
 option(BUILD_TUTORIALS "" OFF)
@@ -232,6 +233,10 @@ add_subdirectory(csdb)
 add_subdirectory(solver)
 add_subdirectory(client)
 add_subdirectory(lmdbxx)
+
+if(NOT ${SKIP_SAMPLES})
+    add_subdirectory(samples)
+endif()
 
 if (${ENABLE_TESTS})
     enable_testing()

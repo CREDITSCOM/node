@@ -441,6 +441,7 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
     }
 
     if (!rc && !t.verify_signature(bc.getAddressByType(t.source(), BlockChain::AddressType::PublicKey).public_key())) {
+        csdebug() << "API: transaction wrong signature: " << cs::Utils::byteStreamToHex(t.to_byte_stream_for_sig());
         rc = kWrongSignature;
     }
 

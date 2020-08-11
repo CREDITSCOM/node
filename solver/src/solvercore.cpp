@@ -438,7 +438,7 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         BlockChain::setBootstrap(deferredBlock_, true);
     }
     deferredBlock_.to_byte_stream(binSize);
-    csdetails() << log_prefix << "pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+    csdebug() << log_prefix << "pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
 
     size_t cnt_total = deferredBlock_.transactions_count();
     if (cnt_total > 0) {

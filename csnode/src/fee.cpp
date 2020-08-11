@@ -63,6 +63,17 @@ csdb::AmountCommission getFee(const csdb::Transaction& t) {
     return csdb::AmountCommission(std::get<1>(feeLevels[feeLevels.size() - 1]) * k);
 }
 
+csdb::AmountCommission justFee(const size_t size) {
+    for (const auto& level : feeLevels) {
+        if (size < std::get<0>(level)) {
+            return csdb::AmountCommission(std::get<2>(level));
+        }
+    }
+
+    double k = static_cast<double>(size) / std::get<0>(feeLevels[feeLevels.size() - 1]);
+    return csdb::AmountCommission(std::get<1>(feeLevels[feeLevels.size() - 1]) * k);
+}
+
 csdb::AmountCommission getContractStateMinFee() {
     return csdb::AmountCommission(minContractStateFee()); // cheapest new state
 }

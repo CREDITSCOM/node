@@ -22,6 +22,11 @@ using Transactions = std::vector<csdb::Transaction>;
 void setCountedFees(Transactions&);
 
 ///
+/// @brief allows to obtain fee for the given transactions size
+/// @return fee depending of the transaction size
+///
+csdb::AmountCommission justFee(const size_t size);
+///
 /// @brief allows to estimate weather max fee is enough before consensus
 /// @return true if max fee >= countedFee
 ///

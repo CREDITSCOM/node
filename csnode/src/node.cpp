@@ -329,9 +329,29 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
     }
 }
 
+uint8_t Node::calculateBootStrapWeight(cs::PublicKeys& confidants) {
+    size_t confSize = confidants.size();
+    uint8_t currentWeight = 0U;
+    if (confSize > 8) {
+        return currentWeight;
+    }
+    //auto it = initialConfidants_.cbegin();
+    auto itConfidants = confidants.cbegin();
+    --confSize;
+    for (auto it : initialConfidants_) {
+        if (std::equal(it.cbegin(), it.cend(), itConfidants->cbegin())) {
+            currentWeight += 1 << confSize;
+            ++itConfidants;
+        }
+        --confSize;
+    }
+    return currentWeight;
+}
+
+
 void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum) {
     cslog() << "NODE> get Boot strap Round Table #" << rNum;
-
+    solver_->resetGrayList();
     cs::IDataStream in(data, size);
     cs::RoundTable roundTable;
     cs::Bytes payload;
@@ -360,6 +380,8 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
         }
     }
 
+    uint8_t currentWeight = calculateBootStrapWeight(confidants);
+
     if (unknown) {
         cs::Signature sig;
         stream >> sig;
@@ -378,6 +400,10 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
             cswarning() << kLogPrefix_ << "failed to test bootstrap signature, drop";
             return;
         }
+        currentWeight = 255U;
+    }
+    if (currentWeight <= bootStrapWeight_) {
+        return;
     }
 
     if (!stream.isValid() || confidants.size() < confSize) {
@@ -518,6 +544,9 @@ bool Node::verifyPacketTransactions(cs::TransactionsPacket packet, const cs::Pub
 
     if (packet.signatures().size() == 1) {
         auto& transactions = packet.transactions();
+        if (transactions.size() > Consensus::MaxPacketTransactions) {
+            return false;
+        }
         for (auto& it : transactions) {
             if (cs::IterValidator::SimpleValidator::validate(it, getBlockChain(), solver_->smart_contracts())) {
                 ++sum;
@@ -1629,7 +1658,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
             return MessageActions::Drop;
         }
 
-        if (rNum > blockChain_.getLastSeq() + cs::Conveyer::HashTablesStorageCapacity) {
+        if (rNum > blockChain_.getLastSeq() + Consensus::MaxRoundsCancelContract) {
             // too many rounds behind the global round
             return MessageActions::Drop;
         }
@@ -2621,6 +2650,12 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         csmeta(cserror) << "Writers don't receive round table";
         return;
     }
+    cs::Conveyer& conveyer = cs::Conveyer::instance();
+    if (myLevel_ == Level::Confidant || !poolSynchronizer_->isSyncroStarted()) {
+        if (rNum > (conveyer.currentRoundNumber()+1) && stat_.lastRoundMs() < Consensus::PostConsensusTimeout) {
+            return;
+        }
+    }
 
     cs::IDataStream stream(data, size);
 
@@ -2629,7 +2664,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     stream >> subRound;
 
     // sync state check
-    cs::Conveyer& conveyer = cs::Conveyer::instance();
+
 
     if (conveyer.currentRoundNumber() == rNum && subRound_ > subRound) {
         cswarning() << "NODE> round table SUBROUND is lesser then local one, ignore round table";
@@ -3544,6 +3579,96 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 stream >> nVersionChange_.seq >> nVersionChange_.minFullVersion >> nVersionChange_.minCompatibleVersion;
                 nVersionChange_.check = NODE_VERSION >= nVersionChange_.minFullVersion ? cs::CheckVersion::None : (NODE_VERSION < nVersionChange_.minCompatibleVersion ? cs::CheckVersion::Full : cs::CheckVersion::Normal);
             }
+
+            if (order == 10U) {// transaction's packages life time
+
+            }
+
+            if (order == 11U) {// max round mum smart contract execution time
+                unsigned int maxContractExeTime;
+                stream >> maxContractExeTime;
+                Consensus::MaxRoundsExecuteContract = maxContractExeTime;
+                cslog() << "MaxRoundsExecuteContract changed to: " << Consensus::MaxRoundsExecuteContract;
+            }
+
+            if (order == 21U) {// Stage One maximum size set
+                uint64_t value;
+                stream >> value;
+                Consensus::StageOneMaximumSize = value;
+                cslog() << "StageOneMaximumSize changed to: " << Consensus::StageOneMaximumSize;
+            }
+
+            if (order == 22U) {// Minimum stake size set
+                int32_t integral;
+                uint64_t fraction;;
+                stream >> integral >> fraction;
+                Consensus::MinStakeValue = csdb::Amount(integral,fraction);
+                cslog() << "MinStakeValue changed to: " << Consensus::MinStakeValue.to_string();
+            }
+
+            if (order == 23U) {// Stage One hashes collecting time set
+                uint32_t value;
+                stream >> value;
+                Consensus::TimeMinStage1 = value;
+                cslog() << "TimeMinStage1 changed to: " << Consensus::TimeMinStage1;
+            }
+
+            if (order == 24U) {// Gray list punishment set
+                uint32_t value;
+                stream >> value;
+                Consensus::GrayListPunishment = value;
+                cslog() << "GrayListPunishment changed to: " << Consensus::GrayListPunishment;
+            }
+
+            if (order == 25U) {// Stage One maximum hashes number set
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxStageOneHashes = value;
+                cslog() << "MaxStageOneHashes changed to: " << Consensus::MaxStageOneHashes;
+            }
+
+            if (order == 26U) {// Transaction max size set
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxTransactionSize = value;
+                cslog() << "MaxTransactionSize changed to: " << Consensus::MaxTransactionSize;
+            }
+
+            if (order == 27U) {// Stage One hashes maximum number set
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxStageOneTransactions = value;
+                cslog() << "MaxStageOneTransactions changed to: " << Consensus::MaxStageOneTransactions;
+            }
+
+            if (order == 28U) {// Stage One block maximum estimation size set
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxPreliminaryBlockSize = value;
+                cslog() << "MaxPreliminaryBlockSize changed to: " << Consensus::MaxPreliminaryBlockSize;
+            }
+
+            if (order == 29U) {// API accepts MaxPacketsPerRound
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxPacketsPerRound = value;
+                cslog() << "MaxPacketsPerRound changed to: " << Consensus::MaxPacketsPerRound;
+            }
+
+            if (order == 30U) {// MaxPacketTransactions in one Conveyer packet
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxPacketTransactions = value;
+                cslog() << "MaxPacketTransactions changed to: " << Consensus::MaxPacketTransactions;
+            }
+
+            if (order == 31U) {// MaxQueueSize - if full no transactions
+                uint64_t value;
+                stream >> value;
+                Consensus::MaxQueueSize = value;
+                cslog() << "MaxQueueSize changed to: " << Consensus::MaxQueueSize;
+            }
+
         }
     }
     std::string msg;
@@ -3603,7 +3728,7 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     if (smartPacks.size() != smartSignatures.size()) {
         // there was known accident in testnet only in block #2'651'597 that contains unsigned smart contract states packet
         //if (getBlockChain().uuid() == uuidTestNet) {
-        cserror() << kLogPrefix << "different size of smatrpackets and signatures in block " << WithDelimiters(block.sequence());
+        cserror() << kLogPrefix << "different size of smartpackets and signatures in block " << WithDelimiters(block.sequence());
         *check_failed = !collectRejectedInfo;
         return;
     }
@@ -3698,7 +3823,14 @@ void Node::onRoundTimeElapsed() {
                     };
 
     transport_->forEachNeighbour(std::move(callback));
+    if (actualConfidants.size() % 2 == 0) {
+        auto it = actualConfidants.end();
+        --it;
+        it = actualConfidants.erase(it);
+
+    }
     initBootstrapRP(actualConfidants);
+
 
     cslog() << "NODE> Bootstrap available nodes [" << actualConfidants.size() << "]:";
     for (const auto& item : actualConfidants) {
@@ -3746,6 +3878,14 @@ void Node::onRoundTimeElapsed() {
 
         for (const auto& item : actualConfidants) {
             out << item; 
+        }
+        cs::PublicKeys confs;
+        for (auto it : actualConfidants) {
+            confs.push_back(it);
+        }
+        uint8_t currentWeight = calculateBootStrapWeight(confs);
+        if (currentWeight > bootStrapWeight_) {
+            bootStrapWeight_ = currentWeight;
         }
         // when we try to start rounds several times, we will not send duplicates
         auto random = std::random_device{}();
@@ -3810,6 +3950,11 @@ bool Node::bootstrap(const cs::Bytes& bytes, cs::RoundNumber round) {
 
     auto& conveyer = cs::Conveyer::instance();
     conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
+
+    uint8_t currentWeight = calculateBootStrapWeight(rt.confidants);
+    if (currentWeight > bootStrapWeight_) {
+        bootStrapWeight_ = currentWeight;
+    }
 
     sendBroadcast(MsgTypes::BootstrapTable, roundPackageCache_.back().roundTable().round, bytes);
     if (!isBootstrapRound_) {

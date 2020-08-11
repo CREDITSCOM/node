@@ -22,10 +22,11 @@ public:
     struct Result {
         cs::DumbCv::Condition condition;
         csdb::TransactionID id{};
+        csdb::Amount fee{};
     };
 
     bool addCVInfo(const cs::Signature& signature);
-    void sendCvSignal(const cs::Signature& signature, Condition condition, const csdb::TransactionID& id);
+    void sendCvSignal(const cs::Signature& signature, Condition condition, const csdb::TransactionID& id, const csdb::Amount fee);
     DumbCv::Result waitCvSignal(const cs::Signature& signature);
 
 private:
@@ -34,6 +35,7 @@ private:
         std::atomic_bool condFlg{ false };
         std::atomic<Condition> condition { Condition::Success };
         csdb::TransactionID id{};
+        csdb::Amount fee{};
     };
 
     std::map<cs::Signature, CvInfo> cvInfo_;

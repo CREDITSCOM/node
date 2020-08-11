@@ -81,7 +81,7 @@ public:
     void TransactionGet(api::TransactionGetResult& _return, const api::TransactionId& transactionId) override;
     void TransactionsGet(api::TransactionsGetResult& _return, const general::Address& address, const int64_t offset, const int64_t limit) override;
     void TransactionFlow(api::TransactionFlowResult& _return, const api::Transaction& transaction) override;
-
+    void FilteredTransactionsListGet(api::FilteredTransactionsListResult& _return, const api::TransactionsQuery& generalQuery) override;
     // Get list of pools from last one (head pool) to the first one.
     void PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t limit) override;
 
@@ -110,6 +110,8 @@ public:
     void TransactionsStateGet(TransactionsStateGetResult& _return, const general::Address& address, const std::vector<int64_t>& v) override;
 
     void ContractAllMethodsGet(ContractAllMethodsGetResult& _return, const std::vector<::general::ByteCodeObject>& byteCodeObjects) override;
+
+    void ActualFeeGet(ActualFeeGetResult& _return, const int32_t size) override;
 
     void addTokenResult(api::TokenTransfersResult& _return, const csdb::Address& token, const std::string& code, const csdb::Pool& pool, const csdb::Transaction& tr,
         const api::SmartContractInvocation& smart, const std::pair<csdb::Address, csdb::Address>& addrPair);
@@ -260,6 +262,8 @@ private:
 
     std::vector<api::SealedTransaction> convertTransactions(const std::vector<csdb::Transaction>& transactions);
 
+    std::vector<api::ExtraFee> fillExtraFee(const csdb::Transaction& transaction, const csdb::TransactionID transactionId);
+
     api::Pool convertPool(const csdb::Pool& pool);
 
     api::Pool convertPool(const csdb::PoolHash& poolHash);
@@ -277,6 +281,7 @@ private:
 
     std::optional<std::string> checkTransaction(const ::api::Transaction&, csdb::Transaction& cTransaction);
     void checkTransactionsFlow(const cs::TransactionsPacket& packet, cs::DumbCv::Condition condition);
+    api::ShortTransaction convertTransactionToShort(csdb::Transaction tr);
 
     TokensMaster tm_;
 
@@ -290,6 +295,7 @@ private:
     cs::Sequence maxReadSequence{};
 
     std::optional<api::Delegated> getDelegated(const BlockChain::WalletData& wallet);
+    const size_t MaxQueriesNumber = 1000;
 
 private slots:
     void updateSmartCachesPool(const csdb::Pool& pool);
