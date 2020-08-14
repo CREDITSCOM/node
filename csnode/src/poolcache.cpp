@@ -183,7 +183,7 @@ void cs::PoolCache::initialization() {
     cs::Connector::connect(&db_.removed, this, static_cast<void(cs::PoolCache::*)(const char*, size_t)>(&cs::PoolCache::onRemoved));
     cs::Connector::connect(&db_.failed, this, &cs::PoolCache::onFailed);
 
-    db_.setMapSize(cs::Lmdb::DefaultMapSize);
+    db_.setMapSize(cs::Lmdb::Default1GbMapSize);
     db_.open();
 
     syncedIter = sequences_.end();
