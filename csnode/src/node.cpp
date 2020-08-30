@@ -1574,6 +1574,7 @@ void Node::onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender) {
     }
 }
 
+// thread safe slot (called from poolSynchronizer_)
 void Node::sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences) {
     const auto round = cs::Conveyer::instance().currentRoundNumber();
     csmeta(csdetails) << "Target out(): " << ", sequence from: " << sequences.front()
@@ -2652,7 +2653,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     }
     cs::Conveyer& conveyer = cs::Conveyer::instance();
     if (myLevel_ == Level::Confidant || !poolSynchronizer_->isSyncroStarted()) {
-        if (rNum > (conveyer.currentRoundNumber()+1) && stat_.lastRoundMs() < Consensus::PostConsensusTimeout) {
+        if (rNum > (conveyer.currentRoundNumber() + 1) && stat_.lastRoundMs() < Consensus::PostConsensusTimeout) {
             return;
         }
     }
@@ -2673,7 +2674,7 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     }
 
     if (isLastRPStakeFull(rNum)) {
-            return;
+        return;
     }
 
     cs::Bytes bytes;

@@ -20,7 +20,7 @@ uint64_t Consensus::StageOneMaximumSize = 36000;
 
 /** @brief   Maximum time in msec to wait new round after consensus achieved, after that waiting trusted nodes
  * activates */
-const unsigned int Consensus::PostConsensusTimeout = 60000;
+const unsigned int Consensus::PostConsensusTimeout = 10000;
 
 /** @brief   Maximum round duration when the transaction input is allowed - used to avoid BlackList */
 const size_t Consensus::MaxRoundDuration = 300000;
