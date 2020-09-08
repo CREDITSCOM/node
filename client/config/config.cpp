@@ -27,7 +27,7 @@
 #include <unistd.h>
 #endif
 
-const NodeVersion NODE_VERSION = 522;
+const NodeVersion NODE_VERSION = 523;
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";

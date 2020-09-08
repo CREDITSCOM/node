@@ -662,7 +662,12 @@ api::Pool APIHandler::convertPool(const csdb::Pool& pool) {
         assert(result.poolNumber >= 0);
         result.prevHash = fromByteArray(pool.previous_hash().to_binary());
         result.time = static_cast<int64_t>(BlockChain::getBlockTime(pool));
-
+        for (auto it : pool.confidants()) {
+            auto key = fromByteArray(cs::Bytes(it.begin(), it.end()));
+            result.confidants.push_back(key);
+        }
+        result.realTrusted = pool.realTrusted();
+        result.numberTrusted = pool.numberTrusted();
         result.transactionsCount = int32_t(pool.transactions_count());  // DO NOT EVER CREATE POOLS WITH
                                                                         // MORE THAN 2 BILLION
                                                                         // TRANSACTIONS, EVEN AT NIGHT
