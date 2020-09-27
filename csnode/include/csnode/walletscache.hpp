@@ -28,9 +28,7 @@ class Transaction;
 namespace cs {
 
 class WalletsIds;
-
-using Delegations = std::vector<std::tuple<cs::PublicKey, cs::PublicKey, csdb::TransactionID>>;
-using DelegationsTiming = std::map<uint64_t, Delegations>;
+class Staking;
 
 class WalletsCache {
 public:
@@ -79,7 +77,6 @@ private:
     std::list<csdb::TransactionID> smartPayableTransactions_;
     std::map< csdb::Address, std::list<csdb::TransactionID> > canceledSmarts_;
     std::unordered_map<PublicKey, WalletData> wallets_;
-    DelegationsTiming currentDelegations_;
 
 #ifdef MONITOR_NODE
     std::map<PublicKey, TrustedData> trusted_info_;
@@ -93,15 +90,13 @@ using FinishedUpdateFromDB = cs::Signal<void(const std::unordered_map<PublicKey,
 class WalletsCache::Updater {
 public:
     Updater(WalletsCache& data);
+    ~Updater();
 
     void loadNextBlock(const csdb::Pool& curr,
                        const cs::ConfidantsKeys& confidants,
                        const BlockChain& blockchain,
                        bool inverse = false); // inverse all operations
 
-    void cleanObsoletteDelegations(uint64_t time);
-    void cleanDelegationsFromCache(uint64_t delTime, Delegations& value);
-    bool removeSingleDelegation(uint64_t delTime, PublicKey& first, PublicKey& second, csdb::TransactionID id);
 
     const WalletData* findWallet(const PublicKey&) const;
     const WalletData* findWallet(const csdb::Address&) const;
@@ -131,7 +126,6 @@ public signals:
 private:
     WalletData& getWalletData(const PublicKey&);
     WalletData& getWalletData(const csdb::Address&);
-    DelegationsTiming& getCurrentDelegations();
 
     double load(const csdb::Transaction& tr, const BlockChain& blockchain, bool inverse);
 
@@ -161,6 +155,7 @@ private:
 #endif
 
     WalletsCache& data_;
+    std::unique_ptr<Staking> staking_;
 };
 
 inline const WalletsCache::WalletData* WalletsCache::Updater::findWallet(const PublicKey& key) const {
@@ -177,10 +172,6 @@ inline const WalletsCache::WalletData* WalletsCache::Updater::findWallet(const c
 
 inline WalletsCache::WalletData& WalletsCache::Updater::getWalletData(const PublicKey& key) {
     return data_.wallets_[key];
-}
-
-inline DelegationsTiming& WalletsCache::Updater::getCurrentDelegations() {
-    return data_.currentDelegations_;
 }
 
 inline WalletsCache::WalletData& WalletsCache::Updater::getWalletData(const csdb::Address& addr) {
