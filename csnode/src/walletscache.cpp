@@ -665,70 +665,13 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
     csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
     if (!inverse) {
         if (ufld.is_valid()) {
-            auto sKey = toPublicKey(tr.source());
-            if (wallData.delegateSources_ == nullptr) {
-                wallData.delegateSources_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
-            }
-            auto it = wallData.delegateSources_->find(sKey);
-            if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
-                cs::TimeMoney tm(cs::Zero::timeStamp, tr.amount());
-                if (it == wallData.delegateSources_->end()) {
-                    std::vector<cs::TimeMoney> firstElement;
-                    firstElement.push_back(tm);
-                    wallData.delegateSources_->emplace(sKey, firstElement);
-                }
-                else {
-                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                    if (itt == it->second.end()) {
-                        it->second.push_back(tm);
-                    }
-                    else {
-                        itt->amount += tr.amount();
-                    }
-                }
-                wallData.delegated_ += tr.amount();
-            }
-            else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
-                if (it != wallData.delegateSources_->end()) {
-                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                    if (itt != it->second.end()) {
-                        itt->amount -= tr.amount();
-                        wallData.delegated_ -= tr.amount();
-                        //removing empty records
-                        if (itt->amount == csdb::Amount{ 0 }) {
-                            it->second.erase(itt);
-                            if (it->second.size() == 0U) {
-                                wallData.delegateSources_->erase(sKey);
-                            }
-                        }
-                    }
-                }
-            }
-            else if (ufld.value<uint64_t>() >= trx_uf::sp::de::legate_min_utc) {
-                cs::TimeMoney tm(ufld.value<uint64_t>() , tr.amount());
-                if (it == wallData.delegateSources_->end()) {
-                    std::vector<cs::TimeMoney> firstElement;
-                    firstElement.push_back(tm);
-                    wallData.delegateSources_->emplace(sKey, firstElement);
-                }
-                else {
-                    it->second.push_back(tm);
-                }
-                wallData.delegated_ += tr.amount();
-                auto it2 = staking_->getCurrentDelegations().find(tm.time);
-                auto tKey = toPublicKey(tr.target());
-                if (it2 == staking_->getCurrentDelegations().end()) {
-                    Delegations deleg;
-                    deleg.push_back(std::make_tuple(sKey, tKey, tr.id()));
-                    staking_->getCurrentDelegations().emplace(tm.time, deleg);
-                }
-                else {
-                    staking_->getCurrentDelegations()[tm.time].push_back(std::make_tuple(sKey, tKey, tr.id()));
-                }
-            }
-            else {
-                cserror() << "WalletCache: error as target in delegations";
-            }
+            staking_->addDelegations(
+                ufld,
+                toPublicKey(tr.source()),
+                toPublicKey(tr.target()),
+                tr.amount(),
+                tr.id()
+            );
         }
         else {
             wallData.balance_ += tr.amount();
@@ -741,53 +684,16 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
     }
     else {
         if (ufld.is_valid()) {
-            auto sKey = toPublicKey(tr.source());
-            if (wallData.delegateSources_ == nullptr) {
-                wallData.delegateSources_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
-            }
-            auto it = wallData.delegateSources_->find(sKey);
-            if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
-                if (it != wallData.delegateSources_->end()) {
-                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                    if (itt != it->second.end()) {
-                        itt->amount -= tr.amount();
-                        wallData.delegated_ -= tr.amount();
-                        //removing empty records
-                        if (itt->amount == csdb::Amount{ 0 }) {
-                            it->second.erase(itt);
-                            if (it->second.size() == 0U) {
-                                wallData.delegateSources_->erase(sKey);
-                            }
-                        }
-                    }
-                }
-            }
-            else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
-                cs::TimeMoney tm(cs::Zero::timeStamp, tr.amount());
-                if (it == wallData.delegateSources_->end()) {
-                    std::vector<cs::TimeMoney> firstElement;
-                    firstElement.push_back(tm);
-                    wallData.delegateSources_->emplace(sKey, firstElement);
-                }
-                else {
-                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                    if (itt == it->second.end()) {
-                        it->second.push_back(tm);
-                    }
-                    else {
-                        itt->amount += tr.amount();
-                    }
-                }
-                wallData.delegated_ += tr.amount();
-            }
-            else {
-                cserror() << "WalletCache: error as target in delegations";
-            }
+            staking_->revertDelegations(
+                ufld,
+                toPublicKey(tr.source()),
+                toPublicKey(tr.target()),
+                tr.amount()
+            );
         }
         else {
             wallData.balance_ -= tr.amount();
         }
-
     }
 
     if (tr.source() != tr.target()) { // Already counted in loadTrxForSource
