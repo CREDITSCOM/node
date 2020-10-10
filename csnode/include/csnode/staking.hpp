@@ -39,7 +39,8 @@ public:
       const csdb::UserField&,
       const PublicKey& source,
       const PublicKey& target,
-      const csdb::Amount& amount
+      const csdb::Amount& amount,
+      const csdb::TransactionID&
   );
 
   const DelegationsTiming& getCurrentDelegations() const { return currentDelegations_; }

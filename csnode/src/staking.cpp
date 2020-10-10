@@ -201,7 +201,8 @@ void Staking::revertDelegations(
     const csdb::UserField& ufld,
     const PublicKey& sKey,
     const PublicKey& tKey,
-    const csdb::Amount& amount
+    const csdb::Amount& amount,
+    const csdb::TransactionID& trx_id
 ) {
     WalletsCache::WalletData& targetWallet = getWalletData_(tKey);
 
@@ -245,6 +246,23 @@ void Staking::revertDelegations(
         }
 
         targetWallet.delegated_ += amount;
+    }
+    else if (ufld.value<uint64_t>() >= trx_uf::sp::de::legate_min_utc) {
+        cs::TimeMoney tm(ufld.value<uint64_t>(), amount);
+        auto it = std::find_if(
+          timeMoneyVector.begin(),
+          timeMoneyVector.end(),
+          [&tm](const cs::TimeMoney& element) { return element.time == tm.time && element.amount == tm.amount; }
+        );
+        if (it != timeMoneyVector.end()) {
+          timeMoneyVector.erase(it);
+          targetWallet.delegated_ -= amount;
+          currentDelegations_[tm.time].erase(std::find(
+            currentDelegations_[tm.time].begin(),
+            currentDelegations_[tm.time].end(),
+            std::make_tuple(sKey, tKey, trx_id)
+          ));
+        }
     }
     else {
         cserror() << "Staking: error revertDelegations";

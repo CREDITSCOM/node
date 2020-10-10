@@ -688,7 +688,8 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
                 ufld,
                 toPublicKey(tr.source()),
                 toPublicKey(tr.target()),
-                tr.amount()
+                tr.amount(),
+                tr.id()
             );
         }
         else {
