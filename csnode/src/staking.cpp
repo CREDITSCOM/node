@@ -24,6 +24,22 @@ void Staking::cleanObsoletteDelegations(uint64_t time) {
         cleanDelegationsFromCache(delTime, it->second);
         it = currentDelegations_.erase(it);
     }
+
+    for (auto it = miningDelegations_.begin(); it != miningDelegations_.end(); ) {
+      it->second.erase(
+          std::remove_if(it->second.begin(), it->second.end(), [delTime](const auto& keyAndTimemoney) {
+              return keyAndTimemoney.second.time < delTime;
+          }),
+          it->second.end()
+      );
+
+      if (it->second.empty()) {
+        it = miningDelegations_.erase(it);
+      }
+      else {
+        ++it;
+      }
+    }
 }
 
 void Staking::cleanDelegationsFromCache(uint64_t delTime, Delegations& value) {
@@ -185,6 +201,9 @@ void Staking::addDelegations(
         timeMoneyVector.push_back(tm);
         targetWallet.delegated_ += amount;
         currentDelegations_[tm.time].push_back(std::make_tuple(sKey, tKey, trx_id));
+        if (tm.time >= kMinDelegationForMiningSeconds_) {
+          miningDelegations_[tKey].push_back({sKey, tm});
+        }
     }
     else {
         cserror() << "Staking: error in addDelegations, pool num: "

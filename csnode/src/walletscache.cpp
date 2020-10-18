@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <map>
 
 #include <blockchain.hpp>
 #include <csdb/amount_commission.hpp>
@@ -215,40 +216,69 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
         cslog() << kLogPrefix << "NO CONFIDANTS";
         return;
     }
-    auto realTrustedNumber = getRealTrustedNum(realTrusted);
-    csdb::Amount feeToEachConfidant = totalFee / realTrustedNumber;
+
+    csdb::Amount totalStake = 0;
+    std::map<PublicKey, csdb::Amount> confidantAndStake;
+
+    for (size_t i = 0; i < confidants.size() && i < realTrusted.size(); ++i) {
+        if (realTrusted[i] == kUntrustedMarker) {
+            continue;
+        }
+
+        auto& wallet = getWalletData(confidants[i]);
+        totalStake += wallet.balance_;
+        confidantAndStake[confidants[i]] += wallet.balance_;
+
+        auto miningDelegations = staking_->getMiningDelegations(confidants[i]);
+        if (!miningDelegations) {
+            continue;
+        }
+
+        for (auto& keyAndStake : *miningDelegations) {
+            confidantAndStake[keyAndStake.first] += keyAndStake.second.amount;
+            totalStake += keyAndStake.second.amount;
+        }
+    }
+
+    csdb::Amount feeWithMining = totalFee * 2;
+    csdb::Amount onePartOfFee = feeWithMining / totalStake;
     csdb::Amount payedFee = 0;
-    int32_t numPayedTrusted = 0;
-    for (size_t i = 0; i < confidants.size(); ++i) {
-        if (i < realTrusted.size() && realTrusted[i] != kUntrustedMarker) {
-            auto& walletData = getWalletData(confidants[i]);
-            if (!inverse) {
-                walletData.balance_ += feeToEachConfidant;
+    size_t numPayedTrusted = 0;
+
+    for (auto& confAndStake : confidantAndStake) {
+            auto& walletData = getWalletData(confAndStake.first);
+            csdb::Amount feeToPay = 0; 
+
+            if (numPayedTrusted == confidantAndStake.size() - 1) {
+                feeToPay = feeWithMining - payedFee;
             }
             else {
-                walletData.balance_ -= feeToEachConfidant;
+                feeToPay = onePartOfFee * confAndStake.second;
+            }
+
+            if (!inverse) {
+                walletData.balance_ += feeToPay;
+            }
+            else {
+                walletData.balance_ -= feeToPay;
             }
 
 #ifdef MONITOR_NODE
-            auto it_writer = data_.trusted_info_.find(confidants[i]);
+            auto it_writer = data_.trusted_info_.find(confAndStake.first);
             if (it_writer != data_.trusted_info_.end()) {
                 if (!inverse) {
-                    it_writer->second.totalFee += feeToEachConfidant;
+                    it_writer->second.totalFee += feeToPay;
                 }
                 else {
-                    it_writer->second.totalFee -= feeToEachConfidant;
+                    it_writer->second.totalFee -= feeToPay;
                 }
             }
 #endif
 
-            payedFee += feeToEachConfidant;
+            payedFee += feeToPay;
             ++numPayedTrusted;
-            if (numPayedTrusted == (realTrustedNumber - 1)) {
-                feeToEachConfidant = totalFee - payedFee;
-            }
 
-            emit walletUpdateEvent(confidants[i], walletData);
-        }
+            emit walletUpdateEvent(confAndStake.first, walletData);
     }
 }
 
