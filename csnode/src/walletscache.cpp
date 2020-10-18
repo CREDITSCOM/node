@@ -11,14 +11,6 @@
 
 namespace {
 const uint8_t kUntrustedMarker = 255;
-
-inline auto getRealTrustedNum(const std::vector<uint8_t>& realTrusted) {
-    auto res = std::count_if(realTrusted.begin(), realTrusted.end(),
-        [](uint8_t value) { return value != kUntrustedMarker; }
-    );
-    return static_cast<int32_t>(res);
-}
-
 const char* kLogPrefix = "WalletsCache: ";
 }  // namespace
 
@@ -289,40 +281,25 @@ void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transac
         csmeta(cswarning) << "transaction is not new state";
         return;
     }
+
     SmartContractRef smartRef(transaction.user_field(trx_uf::new_state::RefStart));
     if (!smartRef.is_valid()) {
         csmeta(cserror) << "incorrect reference to starter transaction in new state";
         return;
     }
+
     csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
     if (!pool.is_valid()) {
         csmeta(cserror) << "invalid pool";
         return;
     }
-    const ConfidantsKeys& confidants = pool.confidants();
-    std::vector<uint8_t> realTrusted = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
-    auto realTrustedNumber = getRealTrustedNum(realTrusted);
-    csdb::Amount feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>() / realTrustedNumber;
-    csdb::Amount payedFee = 0;
-    int32_t numPayedTrusted = 0;
-    for (size_t i = 0; i < confidants.size(); ++i) {
-        if (i < realTrusted.size() && realTrusted[i] != kUntrustedMarker) {
-            WalletData& walletData = getWalletData(confidants[i]);
-            if (!inverse) {
-                walletData.balance_ += feeToEachConfidant;
-            }
-            else {
-                walletData.balance_ -= feeToEachConfidant;
-            }
-            payedFee += feeToEachConfidant;
-            ++numPayedTrusted;
-            if (numPayedTrusted == (realTrustedNumber - 1)) {
-                feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>() - payedFee;
-            }
 
-            emit walletUpdateEvent(confidants[i], walletData);
-        }
-    }
+    fundConfidantsWalletsWithFee(
+        transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>(),
+        pool.confidants(),
+        cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()),
+        inverse
+    );
 }
 
 double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
