@@ -146,7 +146,7 @@ bool Staking::removeSingleDelegation(uint64_t delTime, PublicKey& first, PublicK
     return true;
 }
 
-void Staking::addDelegations(
+void Staking::addDelegationsForTarget(
     const csdb::UserField& ufld,
     const PublicKey& sKey,
     const PublicKey& tKey,
@@ -216,7 +216,7 @@ void Staking::addDelegations(
     }
 }
 
-void Staking::revertDelegations(
+void Staking::revertDelegationsForTarget(
     const csdb::UserField& ufld,
     const PublicKey& sKey,
     const PublicKey& tKey,

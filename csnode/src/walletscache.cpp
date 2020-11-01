@@ -672,7 +672,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
     csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
     if (!inverse) {
         if (ufld.is_valid()) {
-            staking_->addDelegations(
+            staking_->addDelegationsForTarget(
                 ufld,
                 toPublicKey(tr.source()),
                 toPublicKey(tr.target()),
@@ -691,7 +691,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
     }
     else {
         if (ufld.is_valid()) {
-            staking_->revertDelegations(
+            staking_->revertDelegationsForTarget(
                 ufld,
                 toPublicKey(tr.source()),
                 toPublicKey(tr.target()),

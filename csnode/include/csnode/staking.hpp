@@ -32,14 +32,14 @@ public:
     void cleanDelegationsFromCache(uint64_t delTime, Delegations& value);
     bool removeSingleDelegation(uint64_t delTime, PublicKey& first, PublicKey& second, csdb::TransactionID id);
 
-    void addDelegations(
+    void addDelegationsForTarget(
         const csdb::UserField&,
         const PublicKey& source,
         const PublicKey& target,
         const csdb::Amount& amount,
         const csdb::TransactionID&
     );
-    void revertDelegations(
+    void revertDelegationsForTarget(
         const csdb::UserField&,
         const PublicKey& source,
         const PublicKey& target,
