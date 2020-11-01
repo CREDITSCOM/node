@@ -87,7 +87,12 @@ void Staking::cleanDelegationsFromCache(uint64_t delTime, Delegations& value) {
     }
 }
 
-bool Staking::removeSingleDelegation(uint64_t delTime, PublicKey& first, PublicKey& second, csdb::TransactionID id) {
+bool Staking::removeSingleDelegation(
+    uint64_t delTime,
+    const PublicKey& first,
+    const PublicKey& second,
+    csdb::TransactionID id
+) {
     auto value = currentDelegations_.find(delTime);
     if (value == getCurrentDelegations().end()) {
         cserror() << "Delegated amount couldn't be removed. Could be database inconsistency";
@@ -291,6 +296,125 @@ void Staking::revertDelegationsForTarget(
 
     if (timeMoneyVector.empty()) {
         targetWallet.delegateSources_->erase(sKey);
+    }
+}
+
+void Staking::addDelegationsForSource(
+    const csdb::UserField& ufld,
+    const PublicKey& sKey,
+    const PublicKey& tKey,
+    const csdb::Amount& amount
+) {
+    auto& wallData = getWalletData_(sKey);
+    if (wallData.delegateTargets_ == nullptr) {
+        wallData.delegateTargets_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
+    }
+    auto it = wallData.delegateTargets_->find(tKey);
+    if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
+        wallData.balance_ -= amount;
+        cs::TimeMoney tm(cs::Zero::timeStamp, amount);
+        if (it == wallData.delegateTargets_->end()) {
+            std::vector<cs::TimeMoney> firstElement;
+            firstElement.push_back(tm);
+            wallData.delegateTargets_->emplace(tKey, firstElement);
+        }
+        else {
+            auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+            if (itt == it->second.end()) {
+                it->second.push_back(tm);
+            }
+            else {
+                itt->amount += amount;
+            }
+        }
+    }
+    else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
+        if (it != wallData.delegateTargets_->end()) {
+            auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+            if (itt != it->second.end()) {
+                itt->amount -= amount;
+                wallData.balance_ += amount;
+                //removing empty records
+                if (itt->amount == csdb::Amount{ 0 }) {
+                    it->second.erase(itt);
+                    if (it->second.size() == 0U) {
+                        wallData.delegateTargets_->erase(tKey);
+                    }
+                }
+            }
+        }
+    }
+    else if (ufld.value<uint64_t>() >= trx_uf::sp::de::legate_min_utc) {
+        cs::TimeMoney tm(ufld.value<uint64_t>() , amount);
+        wallData.balance_ -= amount;
+        if (it == wallData.delegateTargets_->end()) {
+            std::vector<cs::TimeMoney> firstElement;
+            firstElement.push_back(tm);
+            wallData.delegateTargets_->emplace(tKey, firstElement);
+        }
+        else {
+            it->second.push_back(tm);
+        }
+    }
+    else {
+        cserror() << "Staking: error addDelegationsForSource";
+    }
+}
+
+void Staking::revertDelegationsForSource(
+    const csdb::UserField& ufld,
+    const PublicKey& sKey,
+    const PublicKey& tKey,
+    const csdb::Amount& amount,
+    const csdb::TransactionID& trx_id
+) {
+    auto& wallData = getWalletData_(sKey);
+    if (wallData.delegateTargets_ == nullptr) {
+        wallData.delegateTargets_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
+    }
+    //delegate transaction(inverse)
+    auto it = wallData.delegateTargets_->find(tKey);
+    if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
+        if (it != wallData.delegateTargets_->end()) {
+            auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+            if (itt != it->second.end()) {
+                itt->amount -= amount;
+                wallData.balance_ += amount;
+                //removing empty records
+                if (itt->amount == csdb::Amount{ 0 }) {
+                    it->second.erase(itt);
+                    if (it->second.size() == 0U) {
+                        wallData.delegateTargets_->erase(tKey);
+                    }
+                }
+            }
+        }
+    }
+    //withdraw delegation (inverse)
+    else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
+        wallData.balance_ -= amount;
+        cs::TimeMoney tm(cs::Zero::timeStamp, amount);
+        if (it == wallData.delegateTargets_->end()) {
+            std::vector<cs::TimeMoney> firstElement;
+            firstElement.push_back(tm);
+            wallData.delegateTargets_->emplace(tKey, firstElement);
+        }
+        else {
+            auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
+            if (itt == it->second.end()) {
+                it->second.push_back(tm);
+            }
+            else {
+                itt->amount += amount;
+            }
+        }
+    }
+    else if (ufld.value<uint64_t>() >= trx_uf::sp::de::legate_min_utc) {
+        //nothing to do if time of this transacton is already finished
+        removeSingleDelegation(ufld.value<uint64_t>(), sKey, tKey, trx_id);
+    }
+    else {
+        cserror() << "Staking: error revertDelegationsForSource";
     }
 }
 } // namespace cs

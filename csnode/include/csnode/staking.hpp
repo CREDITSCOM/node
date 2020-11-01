@@ -30,7 +30,12 @@ public:
 
     void cleanObsoletteDelegations(uint64_t time);
     void cleanDelegationsFromCache(uint64_t delTime, Delegations& value);
-    bool removeSingleDelegation(uint64_t delTime, PublicKey& first, PublicKey& second, csdb::TransactionID id);
+    bool removeSingleDelegation(
+        uint64_t delTime,
+        const PublicKey& first,
+        const PublicKey& second,
+        csdb::TransactionID id
+    );
 
     void addDelegationsForTarget(
         const csdb::UserField&,
@@ -40,6 +45,20 @@ public:
         const csdb::TransactionID&
     );
     void revertDelegationsForTarget(
+        const csdb::UserField&,
+        const PublicKey& source,
+        const PublicKey& target,
+        const csdb::Amount& amount,
+        const csdb::TransactionID&
+    );
+
+    void addDelegationsForSource(
+        const csdb::UserField&,
+        const PublicKey& source,
+        const PublicKey& target,
+        const csdb::Amount& amount
+    );
+    void revertDelegationsForSource(
         const csdb::UserField&,
         const PublicKey& source,
         const PublicKey& target,
