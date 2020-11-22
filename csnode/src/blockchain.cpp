@@ -58,11 +58,6 @@ void BlockChain::subscribeToSignals() {
 
     cs::Connector::connect(&storage_.readingStoppedEvent(), trxIndex_.get(), &TransactionsIndex::onDbReadFinished);
     cs::Connector::connect(&storage_.readingStoppedEvent(), walletsCacheUpdater_.get(), &WalletsCache::Updater::onStopReadingFromDB);
-
-    cs::Connector::connect(&walletsCacheUpdater_->updateFromDBFinishedEvent, multiWallets_.get(), &MultiWallets::onDbReadFinished);
-    cs::Connector::connect(&walletsCacheUpdater_->updateFromDBFinishedEvent, [this](const auto&) {
-        cs::Connector::connect(&walletsCacheUpdater_->walletUpdateEvent, multiWallets_.get(), &MultiWallets::onWalletCacheUpdated);
-    });
 }
 
 bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
