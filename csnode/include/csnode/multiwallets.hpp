@@ -16,14 +16,7 @@ using namespace boost::multi_index;
 namespace cs {
 class MultiWallets {
 public:
-    struct InternalData {
-        PublicKey key;
-        csdb::Amount balance;
-        uint64_t transactionsCount;
-#ifdef MONITOR_NODE
-        uint64_t createTime;
-#endif
-    };
+    using InternalData = WalletsCache::WalletData;
 
     enum Tags {
         ByPublicKey,
@@ -63,13 +56,7 @@ public:
                                            shadowIterate<Order::Less>(bucket, offset, limit, capacity);
     }
 
-public slots:
-    void onDbReadFinished(const std::unordered_map<PublicKey, WalletsCache::WalletData>& data);
-    void onWalletCacheUpdated(const PublicKey& key, const WalletsCache::WalletData& data);
-
 protected:
-    InternalData map(const PublicKey& key, const WalletsCache::WalletData& data);
-
     template <Order order, typename Bucket>
     std::vector<InternalData> shadowIterate(Bucket& bucket, int64_t offset, int64_t limit, int64_t capacity) const {
         std::vector<InternalData> result;
@@ -100,14 +87,16 @@ protected:
     }
 
 private:
+    void onWalletCacheUpdated(const WalletsCache::WalletData& data);
+
     using Container = boost::multi_index_container<InternalData,
                         indexed_by<
-                            hashed_unique<member<InternalData, PublicKey, &InternalData::key>>,
-                            ordered_non_unique<member<InternalData, csdb::Amount, &InternalData::balance>, std::greater<csdb::Amount>>,
-                            ordered_non_unique<member<InternalData, uint64_t, &InternalData::transactionsCount>, std::greater<uint64_t>>
+                            hashed_unique<member<InternalData, PublicKey, &InternalData::key_>>,
+                            ordered_non_unique<member<InternalData, csdb::Amount, &InternalData::balance_>, std::greater<csdb::Amount>>,
+                            ordered_non_unique<member<InternalData, uint64_t, &InternalData::transNum_>, std::greater<uint64_t>>
 #ifdef MONITOR_NODE
                             ,
-                            ordered_non_unique<member<InternalData, uint64_t, &InternalData::createTime>, std::greater<uint64_t>>
+                            ordered_non_unique<member<InternalData, uint64_t, &InternalData::createTime_>, std::greater<uint64_t>>
 #endif
                         >
                       >;

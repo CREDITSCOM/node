@@ -2632,14 +2632,14 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
     for (const auto& data : result) {
         api::WalletInfo wi;
 
-        wi.address = std::string(data.key.begin(), data.key.end());
-        wi.balance.integral = data.balance.integral();
-        wi.balance.fraction = static_cast<int64_t>(data.balance.fraction());
-        wi.transactionsNumber = static_cast<int64_t>(data.transactionsCount);
+        wi.address = std::string(data.key_.begin(), data.key_.end());
+        wi.balance.integral = data.balance_.integral();
+        wi.balance.fraction = static_cast<int64_t>(data.balance_.fraction());
+        wi.transactionsNumber = static_cast<int64_t>(data.transNum_);
 #ifdef MONITOR_NODE
         wi.firstTransactionTime = static_cast<int64_t>(data.createTime);
 #endif
-        const csdb::Address addr = csdb::Address::from_public_key(data.key);
+        const csdb::Address addr = csdb::Address::from_public_key(data.key_);
         BlockChain::WalletData wallData{};
         if (blockchain_.findWalletData(addr, wallData)) {
             auto delegated = getDelegated(wallData);

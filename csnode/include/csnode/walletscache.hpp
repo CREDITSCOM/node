@@ -43,6 +43,7 @@ public:
     std::unique_ptr<Updater> createUpdater();
 
     struct WalletData {
+        PublicKey key_;
         csdb::Amount balance_;
         csdb::Amount delegated_;
         std::shared_ptr<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>> delegateSources_;
@@ -85,7 +86,6 @@ private:
 
 using WalletUpdateSignal = cs::Signal<void(const PublicKey&, const WalletsCache::WalletData&)>;
 using FinishedUpdateFromDB = cs::Signal<void(const std::unordered_map<PublicKey, WalletsCache::WalletData>&)>;
-
 
 class WalletsCache::Updater {
 public:
