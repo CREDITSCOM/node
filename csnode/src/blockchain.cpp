@@ -38,7 +38,6 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , startAddress_(startAddress)
 , walletIds_(new WalletsIds)
 , walletsCacheStorage_(new WalletsCache(*walletIds_))
-, multiWallets_(new MultiWallets())
 , cacheMutex_() {
     createCachesPath();
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
@@ -57,7 +56,6 @@ void BlockChain::subscribeToSignals() {
     cs::Connector::connect(&storage_.readingStartedEvent(), this, &BlockChain::onStartReadFromDB);
 
     cs::Connector::connect(&storage_.readingStoppedEvent(), trxIndex_.get(), &TransactionsIndex::onDbReadFinished);
-    cs::Connector::connect(&storage_.readingStoppedEvent(), walletsCacheUpdater_.get(), &WalletsCache::Updater::onStopReadingFromDB);
 }
 
 bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
@@ -507,7 +505,7 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
             }
         }
 
-        for (const auto it : pool.transactions()) {
+        for (const auto& it : pool.transactions()) {
             if (cs::SmartContracts::is_deploy(it)) {
                 if (!walletIds_->normal().remove(it.target())) {
                     cswarning() << kLogPrefix << "Contract address was not removed: " << it.target().to_string();
@@ -966,7 +964,7 @@ bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallDa
 
     std::lock_guard lock(cacheMutex_);
 
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(address.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(address.public_key());
     if (wallDataPtr) {
         wallData = *wallDataPtr;
         return true;
@@ -981,7 +979,7 @@ bool BlockChain::findWalletData(WalletId id, WalletData& wallData) const {
 
 bool BlockChain::findWalletData_Unsafe(WalletId id, WalletData& wallData) const {
     auto pubKey = getAddressByType(csdb::Address::from_wallet_id(id), AddressType::PublicKey);
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (wallDataPtr) {
         wallData = *wallDataPtr;
@@ -1698,7 +1696,7 @@ uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
     std::lock_guard lock(cacheMutex_);
 
     auto pubKey = getAddressByType(addr, AddressType::PublicKey);
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (!wallDataPtr) {
         return 0;
@@ -1711,7 +1709,7 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) co
     std::lock_guard lock(cacheMutex_);
 
     auto pubKey = getAddressByType(addr, AddressType::PublicKey);
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (!wallDataPtr) {
         return csdb::TransactionID();
@@ -1763,7 +1761,7 @@ cs::Sequence BlockChain::getLastSeq() const {
 }
 
 const MultiWallets& BlockChain::multiWallets() const {
-    return *(multiWallets_.get());
+    return walletsCacheStorage_->multiWallets();
 }
 
 void BlockChain::setBlocksToBeRemoved(cs::Sequence number) {

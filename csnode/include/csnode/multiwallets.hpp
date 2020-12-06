@@ -56,6 +56,8 @@ public:
                                            shadowIterate<Order::Less>(bucket, offset, limit, capacity);
     }
 
+    void iterate(std::function<bool(const PublicKey& key, const InternalData& data)> func);
+
 protected:
     template <Order order, typename Bucket>
     std::vector<InternalData> shadowIterate(Bucket& bucket, int64_t offset, int64_t limit, int64_t capacity) const {
@@ -86,8 +88,12 @@ protected:
         }
     }
 
+    bool getWalletData(InternalData&) const;
+
 private:
-    void onWalletCacheUpdated(const WalletsCache::WalletData& data);
+    friend WalletsCache::Updater;
+
+    void onWalletCacheUpdated(const InternalData& data);
 
     using Container = boost::multi_index_container<InternalData,
                         indexed_by<
@@ -100,6 +106,7 @@ private:
 #endif
                         >
                       >;
+
     mutable std::mutex mutex_;
     Container indexes_;
 };

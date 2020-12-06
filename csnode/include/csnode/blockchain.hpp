@@ -377,7 +377,6 @@ private:
     std::unique_ptr<cs::WalletsIds> walletIds_;
     std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
     std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
-    std::unique_ptr<cs::MultiWallets> multiWallets_;
 
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 

@@ -11,9 +11,16 @@ namespace {
 auto zeroTimeStampPredicate = [](cs::TimeMoney& tm) { return tm.time == cs::Zero::timeStamp; };
 } // namespace
 
-Staking::Staking(GetWalletDataCallback cb) : getWalletData_(cb) {
+Staking::Staking(
+    GetWalletDataCallback getCb,
+    WalletUpdatedCallback updateCb
+) : getWalletData_(getCb)
+  , updateCallback_(updateCb) {
     if (!getWalletData_) {
         throw std::runtime_error("Staking: nullptr in getWalletData_");
+    }
+    if (!updateCallback_) {
+        throw std::runtime_error("Staking: nullptr in updateCallback_");
     }
 }
 
@@ -44,8 +51,8 @@ void Staking::cleanObsoletteDelegations(uint64_t time) {
 
 void Staking::cleanDelegationsFromCache(uint64_t delTime, Delegations& value) {
     for (auto& it : value) {
-        auto& sourceWallData = getWalletData_(std::get<0>(it));
-        auto& targetWallData = getWalletData_(std::get<1>(it));
+        auto sourceWallData = getWalletData_(std::get<0>(it));
+        auto targetWallData = getWalletData_(std::get<1>(it));
         auto itt = sourceWallData.delegateTargets_->find(std::get<1>(it));
         auto its = targetWallData.delegateSources_->find(std::get<0>(it));
         if (itt != sourceWallData.delegateTargets_->end()) {
@@ -84,6 +91,9 @@ void Staking::cleanDelegationsFromCache(uint64_t delTime, Delegations& value) {
                 }
             }
         }
+
+        updateCallback_(sourceWallData);
+        updateCallback_(targetWallData);
     }
 }
 
@@ -105,8 +115,8 @@ bool Staking::removeSingleDelegation(
     }
 
     for (auto it : value->second) {
-        auto& sourceWallData = getWalletData_(first);
-        auto& targetWallData = getWalletData_(second);
+        auto sourceWallData = getWalletData_(first);
+        auto targetWallData = getWalletData_(second);
         auto itt = sourceWallData.delegateTargets_->find(second);
         auto its = targetWallData.delegateSources_->find(first);
         if (itt != sourceWallData.delegateTargets_->end()) {
@@ -147,6 +157,8 @@ bool Staking::removeSingleDelegation(
                 }
             }
         }
+        updateCallback_(sourceWallData);
+        updateCallback_(targetWallData);
     }
     return true;
 }
@@ -158,7 +170,7 @@ void Staking::addDelegationsForTarget(
     const csdb::Amount& amount,
     const csdb::TransactionID& trx_id
 ) {
-    WalletsCache::WalletData& targetWallet = getWalletData_(tKey);
+    WalletsCache::WalletData targetWallet = getWalletData_(tKey);
 
     if (targetWallet.delegateSources_ == nullptr) {
         targetWallet.delegateSources_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
@@ -219,6 +231,7 @@ void Staking::addDelegationsForTarget(
     if (timeMoneyVector.empty()) {
         targetWallet.delegateSources_->erase(sKey);
     }
+    updateCallback_(targetWallet);
 }
 
 void Staking::revertDelegationsForTarget(
@@ -228,7 +241,7 @@ void Staking::revertDelegationsForTarget(
     const csdb::Amount& amount,
     const csdb::TransactionID& trx_id
 ) {
-    WalletsCache::WalletData& targetWallet = getWalletData_(tKey);
+    WalletsCache::WalletData targetWallet = getWalletData_(tKey);
 
     if (targetWallet.delegateSources_ == nullptr) {
         targetWallet.delegateSources_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
@@ -297,6 +310,7 @@ void Staking::revertDelegationsForTarget(
     if (timeMoneyVector.empty()) {
         targetWallet.delegateSources_->erase(sKey);
     }
+    updateCallback_(targetWallet);
 }
 
 void Staking::addDelegationsForSource(
@@ -305,7 +319,7 @@ void Staking::addDelegationsForSource(
     const PublicKey& tKey,
     const csdb::Amount& amount
 ) {
-    auto& wallData = getWalletData_(sKey);
+    auto wallData = getWalletData_(sKey);
     if (wallData.delegateTargets_ == nullptr) {
         wallData.delegateTargets_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
     }
@@ -359,6 +373,7 @@ void Staking::addDelegationsForSource(
     else {
         cserror() << "Staking: error addDelegationsForSource";
     }
+    updateCallback_(wallData);
 }
 
 void Staking::revertDelegationsForSource(
@@ -368,7 +383,7 @@ void Staking::revertDelegationsForSource(
     const csdb::Amount& amount,
     const csdb::TransactionID& trx_id
 ) {
-    auto& wallData = getWalletData_(sKey);
+    auto wallData = getWalletData_(sKey);
     if (wallData.delegateTargets_ == nullptr) {
         wallData.delegateTargets_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
     }
@@ -416,5 +431,6 @@ void Staking::revertDelegationsForSource(
     else {
         cserror() << "Staking: error revertDelegationsForSource";
     }
+    updateCallback_(wallData);
 }
 } // namespace cs
