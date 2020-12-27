@@ -36,6 +36,7 @@ class WalletsIds;
 class Fee;
 class TransactionsIndex;
 class TransactionsPacket;
+class BlockChain_Serializer;
 
 /** @brief   The synchronized block signal emits when block is trying to be stored */
 using TryToStoreBlockSignal = cs::Signal<void(const csdb::Pool&, bool*)>;
@@ -463,5 +464,7 @@ private:
     // compare only state content: transactions, new wallets, sequence, round fee, user fields
     // true if both pools are not valid, or both pools have equal state content
     static bool testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs);
+
+    friend class cs::BlockChain_Serializer;
 };
 #endif  //  BLOCKCHAIN_HPP

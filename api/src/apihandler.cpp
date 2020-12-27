@@ -1721,7 +1721,7 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
             }();
 
             std::unique_lock lock(e.lock);
-            e.trid_queue.push_back(trxn.id().clone());
+            e.trid_queue.push_back(trxn.id());
             e.new_trxn_cv.notify_all();
         }
 
@@ -1737,11 +1737,11 @@ bool APIHandler::updateSmartCachesTransaction(csdb::Transaction trxn, cs::Sequen
         if (is_smart_deploy(smart)) {
             if (!smart.smartContractDeploy.byteCodeObjects.empty()) {
                 auto lockedSmartOrigin = lockedReference(this->smart_origin);
-                (*lockedSmartOrigin)[target_pk] = trxn.id().clone();
-                executor_.updateDeployTrxns(target_pk, trxn.id().clone());
+                (*lockedSmartOrigin)[target_pk] = trxn.id();
+                executor_.updateDeployTrxns(target_pk, trxn.id());
             }
             auto locked_deployed_by_creator = lockedReference(this->deployedByCreator_);
-            (*locked_deployed_by_creator)[source_pk].push_back(trxn.id().clone());
+            (*locked_deployed_by_creator)[source_pk].push_back(trxn.id());
         }
         return true;
     }

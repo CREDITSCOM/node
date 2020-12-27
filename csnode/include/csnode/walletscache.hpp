@@ -84,6 +84,8 @@ private:
 #ifdef MONITOR_NODE
     std::map<PublicKey, TrustedData> trusted_info_;
 #endif
+
+    friend class WalletsCache_Serializer;
 };
 
 class WalletsCache::Updater {

@@ -16,7 +16,7 @@ if(NOT APPLE)
 endif()
 set (BOOST_ALL_DYN_LINK OFF)
 
-find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem)
+find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem serialization)
 if (Boost_FOUND)
   # From the offical documentation:
   # Add include directories to the build. [...] If the SYSTEM option is given,
@@ -35,8 +35,10 @@ if (Boost_FOUND)
 endif ()
 
 add_library(csnode
+  include/csnode/address_serializer.hpp
   include/csnode/bitheap.hpp
   include/csnode/blockchain.hpp
+  include/csnode/blockchain_serializer.hpp
   include/csnode/cyclicbuffer.hpp
   include/csnode/node.hpp
   include/csnode/datastream.hpp
@@ -47,7 +49,9 @@ add_library(csnode
   include/csnode/transactionsindex.hpp
   include/csnode/transactionsiterator.hpp
   include/csnode/walletscache.hpp
+  include/csnode/walletscache_serializer.hpp
   include/csnode/walletsids.hpp
+  include/csnode/walletsids_serializer.hpp
   include/csnode/blockhashes.hpp
   include/csnode/poolsynchronizer.hpp
   include/csnode/fee.hpp
@@ -70,13 +74,18 @@ add_library(csnode
   include/csnode/odatastream.hpp
   include/csnode/poolcache.hpp
   include/csnode/staking.hpp
+  include/csnode/smartcontracts_serializer.hpp
+  include/csnode/tokens_serializer.hpp
   src/blockchain.cpp
+  src/blockchain_serializer.cpp
   src/node.cpp
   src/nodecore.cpp
   src/conveyer.cpp
   src/transactionspacket.cpp
   src/walletscache.cpp
+  src/walletscache_serializer.cpp
   src/walletsids.cpp
+  src/walletsids_serializer.cpp
   src/blockhashes.cpp
   src/poolsynchronizer.cpp
   src/fee.cpp
@@ -98,6 +107,8 @@ add_library(csnode
   src/eventreport.cpp
   src/poolcache.cpp
   src/staking.cpp
+  src/smartcontracts_serializer.cpp
+  src/tokens_serializer.cpp
 )
 
 configure_msvc_flags()

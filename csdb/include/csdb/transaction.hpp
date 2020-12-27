@@ -47,8 +47,9 @@ class Pool;
  * \ref cs::Sequence для пула, в который помещена транзакция.
  */
 class TransactionID {
-    SHARED_DATA_CLASS_DECLARE(TransactionID)
+//    SHARED_DATA_CLASS_DECLARE(TransactionID)
 public:
+    TransactionID();
     /// \deprecated Конструктор будет удалён в следующих версиях.
     TransactionID(cs::Sequence poolSeq, cs::Sequence index);
 
@@ -60,6 +61,11 @@ public:
 
     std::string to_string() const noexcept;
     cs::Bytes to_byte_stream() const noexcept;
+
+    inline void _update(cs::Sequence pool_seq, cs::Sequence index) {
+        pool_seq_ = pool_seq;
+        index_ = index;
+    }
 
     /**
      * @brief Получение идентификатора транзакции из строкового представления
@@ -79,6 +85,10 @@ public:
 private:
     void put(::csdb::priv::obstream&) const;
     bool get(::csdb::priv::ibstream&);
+
+    cs::Sequence pool_seq_;
+    cs::Sequence index_ = 0;
+
     friend class ::csdb::priv::obstream;
     friend class ::csdb::priv::ibstream;
     friend class Transaction;
