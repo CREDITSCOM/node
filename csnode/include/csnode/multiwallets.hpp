@@ -91,7 +91,7 @@ protected:
     bool getWalletData(InternalData&) const;
 
 private:
-    friend WalletsCache::Updater;
+    friend WalletsCache;
 
     void onWalletCacheUpdated(const InternalData& data);
 

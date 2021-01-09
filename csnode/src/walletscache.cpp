@@ -19,6 +19,17 @@ namespace cs {
 
 WalletsCache::WalletsCache(WalletsIds& walletsIds) : walletsIds_(walletsIds) {
     multiWallets_ = std::make_unique<MultiWallets>();
+    staking_ = std::make_unique<Staking>(
+      [this](const PublicKey& k) -> WalletData {
+          WalletData data;
+          data.key_ = k;
+          multiWallets_->getWalletData(data);
+          return data;
+      },
+      [this](const WalletsCache::WalletData& wallet) {
+          multiWallets_->onWalletCacheUpdated(wallet);
+      }
+    );
 }
 
 WalletsCache::~WalletsCache() = default;
@@ -32,15 +43,7 @@ std::unique_ptr<WalletsCache::Updater> WalletsCache::createUpdater() {
 }
 
 WalletsCache::Updater::Updater(WalletsCache& data)
-  : data_(data),
-    staking_(std::make_unique<Staking>(
-      [this](const PublicKey& k) -> WalletsCache::WalletData {
-        return getWalletData(k);
-      },
-      [this](const WalletsCache::WalletData& wallet) {
-        data_.multiWallets_->onWalletCacheUpdated(wallet);
-      }
-    )) {}
+  : data_(data) {}
 
 WalletsCache::Updater::~Updater() = default;
 
@@ -96,7 +99,7 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
                                      pool.realTrusted()), inverse);
     }
 
-    staking_->cleanObsoletteDelegations(BlockChain::getBlockTime(pool));
+    data_.staking_->cleanObsoletteDelegations(BlockChain::getBlockTime(pool));
 
 #ifdef MONITOR_NODE
     const auto& wrWall = pool.writer_public_key();
@@ -257,7 +260,7 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
         totalStake += wallet.balance_;
         confidantAndStake[confidants[i]] += wallet.balance_;
 
-        auto miningDelegations = staking_->getMiningDelegations(confidants[i]);
+        auto miningDelegations = data_.staking_->getMiningDelegations(confidants[i]);
         if (!miningDelegations) {
             continue;
         }
@@ -449,7 +452,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
         if (!inverse) {
             if (ufld.is_valid()) {
-                staking_->addDelegationsForSource(
+                data_.staking_->addDelegationsForSource(
                     ufld,
                     toPublicKey(tr.source()),
                     toPublicKey(tr.target()),
@@ -474,7 +477,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         }
         else {
             if (ufld.is_valid()) {
-                staking_->revertDelegationsForSource(
+                data_.staking_->revertDelegationsForSource(
                     ufld,
                     toPublicKey(tr.source()),
                     toPublicKey(tr.target()),
@@ -616,7 +619,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
     csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
     if (!inverse) {
         if (ufld.is_valid()) {
-            staking_->addDelegationsForTarget(
+            data_.staking_->addDelegationsForTarget(
                 ufld,
                 toPublicKey(tr.source()),
                 toPublicKey(tr.target()),
@@ -635,7 +638,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
     }
     else {
         if (ufld.is_valid()) {
-            staking_->revertDelegationsForTarget(
+            data_.staking_->revertDelegationsForTarget(
                 ufld,
                 toPublicKey(tr.source()),
                 toPublicKey(tr.target()),

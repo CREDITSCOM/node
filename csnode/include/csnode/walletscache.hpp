@@ -85,6 +85,8 @@ private:
     std::map<PublicKey, TrustedData> trusted_info_;
 #endif
 
+    std::unique_ptr<Staking> staking_;
+
     friend class WalletsCache_Serializer;
 };
 
@@ -148,7 +150,6 @@ private:
 #endif
 
     WalletsCache& data_;
-    std::unique_ptr<Staking> staking_;
 };
 
 inline double WalletsCache::Updater::load(const csdb::Transaction& t, const BlockChain& bc, bool inverse) {
