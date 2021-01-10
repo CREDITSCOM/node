@@ -4,6 +4,10 @@
 #include <boost/serialization/unordered_map.hpp>
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/map.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/utility.hpp>
+
+#include <lib/system/serialize_tuple.hpp>
 
 #include "address_serializer.hpp"
 
@@ -82,12 +86,48 @@ private:
         Amount totalFee;
     };
 #endif
+
+    class TimeMoney {
+        friend class boost::serialization::access;
+
+        template<class Archive>
+        void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
+            ar & time;
+            ar & amount;
+        }
+
+        uint64_t time;
+        Amount amount;
+    };
+
+    class Staking {
+        friend class boost::serialization::access;
+
+        template<class Archive>
+        void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
+            ar & currentDelegations;
+            ar & miningDelegations;
+        }
+
+        std::vector<std::tuple<
+            PublicKey,
+            PublicKey,
+            TransactionID>
+        > currentDelegations;
+
+        std::unordered_map<
+            PublicKey,
+            std::vector<std::pair<PublicKey, TimeMoney>>
+        > miningDelegations;
+    };
+
     std::list<TransactionID> *smartPayableTransactions_ = nullptr;
     std::map<csdb::Address, std::list<TransactionID>> *canceledSmarts_ = nullptr;
     std::unordered_map<PublicKey, WalletData> *wallets_ = nullptr;
 #ifdef MONITOR_NODE
     std::map<PublicKey, TrustedData> *trusted_info_ = nullptr;
 #endif
+    Staking *staking_ = nullptr;
 };
 } // namespace cs
 #endif // WALLETS_CACHE_SERIALIZER_HPP

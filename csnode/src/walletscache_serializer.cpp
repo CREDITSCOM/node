@@ -11,11 +11,12 @@ void WalletsCache_Serializer::bind(WalletsCache& wCache) {
     smartPayableTransactions_ =
         reinterpret_cast<decltype(smartPayableTransactions_)>(&wCache.smartPayableTransactions_);
     canceledSmarts_ = reinterpret_cast<decltype(canceledSmarts_)>(&wCache.canceledSmarts_);
-//    @TODO provide serialization for multiwallets and staking
+//    @TODO provide serialization for multiwallets
 //    wallets_ = reinterpret_cast<decltype(wallets_)>(&wCache.wallets_);
 #ifdef MONITOR_NODE
     trusted_info_ = reinterpret_cast<decltype(trusted_info_)>(&wCache.trusted_info_);
 #endif
+    staking_ = reinterpret_cast<decltype(staking_)>(&wCache.staking_);
 }
 
 void WalletsCache_Serializer::save() {
@@ -27,6 +28,7 @@ void WalletsCache_Serializer::save() {
 #ifdef MONITOR_NODE
     oa << *trusted_info_;
 #endif
+    oa << *staking_;
 }
 
 void WalletsCache_Serializer::load() {
@@ -38,5 +40,6 @@ void WalletsCache_Serializer::load() {
 #ifdef MONITOR_NODE
     ia >> *trusted_info_;
 #endif
+    ia >> *staking_;
 }
 }  // namespace cs
