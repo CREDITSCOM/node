@@ -6,6 +6,7 @@
 #include <boost/serialization/map.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/utility.hpp>
+#include <boost/serialization/split_member.hpp>
 
 #include <lib/system/serialize_tuple.hpp>
 
@@ -46,13 +47,38 @@ private:
         cs::Sequence index_;
     };
 
+    class TimeMoney {
+        friend class boost::serialization::access;
+
+        template<class Archive>
+        void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
+            ar & time;
+            ar & amount;
+        }
+
+        uint64_t time;
+        Amount amount;
+    };
+
     class WalletData {
         friend class boost::serialization::access;
         template<class Archive>
-        void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
+        void save(Archive &ar, [[maybe_unused]] const unsigned int version) const {
             ar & balance_;
             ar & delegated_;
-            ar & delegats_;
+
+            bool hasDelegateSources(delegateSources_);
+            ar & hasDelegateSources;
+            if (hasDelegateSources) {
+                ar & *delegateSources_;
+            }
+
+            bool hasDelegateTargets(delegateTargets_);
+            ar & hasDelegateTargets;
+            if (hasDelegateTargets) {
+                ar & *delegateTargets_;
+            }
+
             ar & trxTail_;
             ar & transNum_;
             ar & lastTransaction_;
@@ -61,9 +87,41 @@ private:
 #endif
         }
 
+        template<class Archive>
+        void load(Archive &ar, [[maybe_unused]] const unsigned int version) {
+            ar & balance_;
+            ar & delegated_;
+
+            bool hasDelegateSources;
+            ar & hasDelegateSources;
+            if (hasDelegateSources) {
+                decltype(delegateSources_)::element_type tmp;
+                ar & tmp;
+                delegateSources_ = std::make_shared<decltype(tmp)>(tmp);
+            }
+
+            bool hasDelegateTargets;
+            ar & hasDelegateTargets;
+            if (hasDelegateTargets) {
+                decltype(delegateTargets_)::element_type tmp;
+                ar & tmp;
+                delegateTargets_ = std::make_shared<decltype(tmp)>(tmp);
+            }
+
+            ar & trxTail_;
+            ar & transNum_;
+            ar & lastTransaction_;
+#ifdef MONITOR_NODE
+            ar & createTime_;
+#endif
+        }
+
+        BOOST_SERIALIZATION_SPLIT_MEMBER()
+
         Amount balance_;
         Amount delegated_;
-        std::map<cs::PublicKey, Amount> delegats_;
+        std::shared_ptr<std::map<PublicKey, std::vector<TimeMoney>>> delegateSources_;
+        std::shared_ptr<std::map<PublicKey, std::vector<TimeMoney>>> delegateTargets_;
         TransactionsTail trxTail_;
         uint64_t transNum_;
         TransactionID lastTransaction_;
@@ -86,19 +144,6 @@ private:
         Amount totalFee;
     };
 #endif
-
-    class TimeMoney {
-        friend class boost::serialization::access;
-
-        template<class Archive>
-        void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
-            ar & time;
-            ar & amount;
-        }
-
-        uint64_t time;
-        Amount amount;
-    };
 
     class Staking {
         friend class boost::serialization::access;
