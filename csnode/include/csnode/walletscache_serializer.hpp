@@ -8,9 +8,17 @@
 #include <boost/serialization/utility.hpp>
 #include <boost/serialization/split_member.hpp>
 
+#include <boost/multi_index/identity.hpp>
+#include <boost/multi_index/member.hpp>
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+
 #include <lib/system/serialize_tuple.hpp>
 
 #include "address_serializer.hpp"
+
+using namespace boost::multi_index;
 
 namespace cs {
 class WalletsCache;
@@ -33,6 +41,15 @@ private:
 
         int32_t integral_;
         uint64_t fraction_;
+
+    public:
+        bool operator<(const Amount& other) const noexcept {
+            return (integral_ < other.integral_) ? true : (integral_ > other.integral_) ? false : (fraction_ < other.fraction_);
+        }
+
+        bool operator>(const Amount& other) const noexcept {
+            return (integral_ > other.integral_) ? true : (integral_ < other.integral_) ? false : (fraction_ > other.fraction_);
+        }
     };
 #pragma pack(pop)
     class TransactionID {
@@ -64,6 +81,7 @@ private:
         friend class boost::serialization::access;
         template<class Archive>
         void save(Archive &ar, [[maybe_unused]] const unsigned int version) const {
+            ar & key_;
             ar & balance_;
             ar & delegated_;
 
@@ -89,6 +107,7 @@ private:
 
         template<class Archive>
         void load(Archive &ar, [[maybe_unused]] const unsigned int version) {
+            ar & key_;
             ar & balance_;
             ar & delegated_;
 
@@ -118,6 +137,8 @@ private:
 
         BOOST_SERIALIZATION_SPLIT_MEMBER()
 
+    public:
+        PublicKey key_;
         Amount balance_;
         Amount delegated_;
         std::shared_ptr<std::map<PublicKey, std::vector<TimeMoney>>> delegateSources_;
@@ -168,7 +189,21 @@ private:
 
     std::list<TransactionID> *smartPayableTransactions_ = nullptr;
     std::map<csdb::Address, std::list<TransactionID>> *canceledSmarts_ = nullptr;
-    std::unordered_map<PublicKey, WalletData> *wallets_ = nullptr;
+
+    using MultiWalletsContainer = boost::multi_index_container<
+        WalletData,
+        indexed_by<
+            hashed_unique<member<WalletData, PublicKey, &WalletData::key_>>,
+            ordered_non_unique<member<WalletData, Amount, &WalletData::balance_>, std::greater<Amount>>,
+            ordered_non_unique<member<WalletData, uint64_t, &WalletData::transNum_>, std::greater<uint64_t>>
+#ifdef MONITOR_NODE
+            ,
+            ordered_non_unique<member<WalletData, uint64_t, &WalletData::createTime_>, std::greater<uint64_t>>
+#endif
+        >
+    >;
+
+    MultiWalletsContainer *wallets_ = nullptr;
 #ifdef MONITOR_NODE
     std::map<PublicKey, TrustedData> *trusted_info_ = nullptr;
 #endif

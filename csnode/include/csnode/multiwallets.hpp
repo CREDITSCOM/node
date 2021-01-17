@@ -92,6 +92,7 @@ protected:
 
 private:
     friend WalletsCache;
+    friend class WalletsCache_Serializer;
 
     void onWalletCacheUpdated(const InternalData& data);
 
