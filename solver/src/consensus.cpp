@@ -28,7 +28,7 @@ const size_t Consensus::MaxRoundDuration = 300000;
 /** @brief   The minimum cash for trusted nodes to participate consensus */
 csdb::Amount Consensus::MinStakeValue = csdb::Amount{50000};
 
-csdb::Amount Consensus::MaxStakeValue = csdb::Amount{ 5000000 };;
+csdb::Amount Consensus::MaxStakeValue = csdb::Amount{ 500000 };
 
 /** @brief   The round when DPOS starts working */
 const uint64_t Consensus::StartingDPOS = 10'000ULL;
