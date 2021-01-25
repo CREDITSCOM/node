@@ -58,6 +58,9 @@ public:
     /** @brief   The minimum cash for trusted nodes to participate consensus */
     static csdb::Amount MinStakeValue;
 
+    /** @brief   The maximum cash, significent for trusted nodes to be elected to participate consensus */
+    static csdb::Amount MaxStakeValue;
+
     /** @brief   The minimum stake to be delegated to another node */
     constexpr static csdb::Amount MinStakeDelegated = csdb::Amount{ 5 };
 

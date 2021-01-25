@@ -40,7 +40,7 @@ public:
     };
 
     enum Flags : unsigned int {
-        DefaultEnvFlags = MDB_NOSYNC
+        DefaultEnvFlags = MDB_NOSYNC | MDB_WRITEMAP | MDB_MAPASYNC
     };
 
     explicit Lmdb(const std::string& path, const unsigned int flags = lmdb::env::default_flags);
