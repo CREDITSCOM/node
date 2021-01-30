@@ -740,7 +740,6 @@ void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address
             break;
         }
         if (id.pool_seq() < trIt->id().pool_seq() || (id.pool_seq() == trIt->id().pool_seq() && id.index() < trIt->id().index())) {
-            bool added = false;
             if (flagg == 1) {
                 bool match = false;
                 if (trIt->target().is_public_key())
@@ -761,7 +760,6 @@ void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address
                 {
                     transactions.push_back(*trIt);
                     transactions.back().set_time(getBlockTime(trIt.getPool()));
-                    added = true;
                 }
             }
             if (flagg ==2){
@@ -784,15 +782,12 @@ void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address
                 {
                     transactions.push_back(*trIt);
                     transactions.back().set_time(getBlockTime(trIt.getPool()));
-                    added = true;
                 }
             }
 
             if (flagg == 3) {
                 transactions.push_back(*trIt);
                 transactions.back().set_time(getBlockTime(trIt.getPool()));
-                added = true;
-                
             }
         }
         //if (--limit == 0)
