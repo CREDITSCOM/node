@@ -9,6 +9,7 @@
 
 #include <csconnector/csconnector.hpp>
 
+#include <csnode/caches_serialization_manager.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
 
@@ -486,6 +487,7 @@ private:
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;
+    cs::CachesSerializationManager cachesSerializationManager_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

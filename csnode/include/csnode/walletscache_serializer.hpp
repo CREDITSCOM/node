@@ -16,6 +16,8 @@
 
 #include <lib/system/serialize_tuple.hpp>
 
+#include <csnode/transactionstail.hpp>
+
 #include "address_serializer.hpp"
 
 using namespace boost::multi_index;

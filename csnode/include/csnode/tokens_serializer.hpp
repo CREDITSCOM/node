@@ -18,6 +18,8 @@ public:
     void load();
 
 private:
+    using HolderKey = csdb::Address;
+
     class Token {
         friend class boost::serialization::access;
         template<class Archive>
@@ -58,7 +60,6 @@ private:
     };
 
     using TokenId = csdb::Address;
-    using HolderKey = csdb::Address;
 
     using TokensMap = std::unordered_map<TokenId, Token>;
     using HoldersMap = std::unordered_map<HolderKey, std::set<TokenId>>;

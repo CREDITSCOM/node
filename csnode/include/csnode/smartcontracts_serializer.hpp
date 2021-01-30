@@ -14,6 +14,7 @@
 
 namespace cs {
 class SmartContracts;
+class SmartConsensus;
 
 class SmartContracts_Serializer {
 public:
@@ -35,6 +36,7 @@ private:
     };
 
     enum class PayableStatus : int {};
+    enum class SmartContractStatus : int {};
 
     class StateItem {
         friend class boost::serialization::access;
