@@ -20,9 +20,7 @@ public:
     void bind(SmartContracts&);
     void bind(WalletsCache&);
     void bind(WalletsIds&);
-#ifdef NODE_API
     void bind(TokensMaster&);
-#endif
 
     bool save();
     bool load();

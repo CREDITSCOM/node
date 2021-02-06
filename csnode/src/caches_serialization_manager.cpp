@@ -81,12 +81,12 @@ void CachesSerializationManager::bind(WalletsIds& wi) {
     pImpl_->bindFlags |= (1 << Impl::WalletsIdsBit);
 }
 
+void CachesSerializationManager::bind([[maybe_unused]] TokensMaster& tm) {
 #ifdef NODE_API
-void CachesSerializationManager::bind(TokensMaster& tm) {
     pImpl_->tokensMasterSerializer.bind(tm);
     pImpl_->bindFlags |= (1 << Impl::TokensMasterBit);
-}
 #endif
+}
 
 bool CachesSerializationManager::save() {
     if (!pImpl_->bindingsReady()) {

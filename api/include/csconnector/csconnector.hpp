@@ -30,6 +30,8 @@
 #include <profiler/profilereventhandler.hpp>
 #endif
 
+#include <csnode/caches_serialization_manager.hpp>
+
 namespace cs {
 class TransactionsPacket;
 }
@@ -48,7 +50,7 @@ public:
     using ApiProcessor = ::api::APIProcessor;
 #endif
 
-    explicit connector(Node& node);
+    explicit connector(Node& node, cs::CachesSerializationManager&);
     ~connector();
 
     connector(const connector&) = delete;

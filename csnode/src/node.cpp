@@ -139,7 +139,7 @@ bool Node::init() {
 #ifdef NODE_API
     std::cout << "Init API... ";
 
-    api_ = std::make_unique<csconnector::connector>(*this);
+    api_ = std::make_unique<csconnector::connector>(*this, cachesSerializationManager_);
 
     std::cout << "Done\n";
 
