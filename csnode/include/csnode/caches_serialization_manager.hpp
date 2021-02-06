@@ -16,16 +16,16 @@ public:
     CachesSerializationManager();
     ~CachesSerializationManager();
 
-    void bind(
-        BlockChain&,
-        SmartContracts&,
-        TokensMaster&,
-        WalletsCache&,
-        WalletsIds&
-    );
+    void bind(BlockChain&);
+    void bind(SmartContracts&);
+    void bind(WalletsCache&);
+    void bind(WalletsIds&);
+#ifdef NODE_API
+    void bind(TokensMaster&);
+#endif
 
-    void save();
-    void load();
+    bool save();
+    bool load();
 
 private:
     struct Impl;
