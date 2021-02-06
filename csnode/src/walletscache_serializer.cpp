@@ -20,6 +20,17 @@ void WalletsCache_Serializer::bind(WalletsCache& wCache) {
     staking_ = reinterpret_cast<decltype(staking_)>(wCache.staking_.get());
 }
 
+void WalletsCache_Serializer::clear() {
+    smartPayableTransactions_->clear();
+    canceledSmarts_->clear();
+    wallets_->clear();
+#ifdef MONITOR_NODE
+    trusted_info_->clear();
+#endif
+    staking_->currentDelegations.clear();
+    staking_->miningDelegations.clear();
+}
+
 void WalletsCache_Serializer::save() {
     std::ofstream ofs("walletscache.dat");
     boost::archive::text_oarchive oa(ofs);

@@ -13,6 +13,7 @@ public:
     void bind(BlockChain&);
     void save();
     void load();
+    void clear();
 
 private:
     struct NonEmptyBlockData {

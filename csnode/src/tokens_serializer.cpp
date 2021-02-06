@@ -12,6 +12,11 @@ void TokensMaster_Serializer::bind(TokensMaster& tokens) {
     holders_ = reinterpret_cast<decltype(holders_)>(&tokens.holders_);
 }
 
+void TokensMaster_Serializer::clear() {
+    tokens_->clear();
+    holders_->clear();
+}
+
 void TokensMaster_Serializer::save() {
     std::ofstream ofs("tokens.dat");
     boost::archive::text_oarchive oa(ofs);

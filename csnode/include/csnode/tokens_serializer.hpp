@@ -16,6 +16,7 @@ public:
     void bind(TokensMaster&);
     void save();
     void load();
+    void clear();
 
 private:
     using HolderKey = csdb::Address;

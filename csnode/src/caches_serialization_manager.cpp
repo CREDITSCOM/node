@@ -46,8 +46,6 @@ struct CachesSerializationManager::Impl {
     }
 
     void clear() {
-/* @TODO implement clear methods in serializers and uncomment
-
         blockchainSerializer.clear();
         smartContractsSerializer.clear();
 #ifdef NODE_API
@@ -55,7 +53,6 @@ struct CachesSerializationManager::Impl {
 #endif
         walletsCacheSerializer.clear();
         walletsIdsSerializer.clear();
-*/
     }
 };
 

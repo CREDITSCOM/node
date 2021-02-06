@@ -10,6 +10,14 @@ namespace cs {
 void BlockChain_Serializer::bind(BlockChain& bchain) {
     previousNonEmpty_ = reinterpret_cast<decltype(previousNonEmpty_)>(&bchain.previousNonEmpty_);
     lastNonEmptyBlock_ = reinterpret_cast<decltype(lastNonEmptyBlock_)>(&bchain.lastNonEmptyBlock_);
+    totalTransactionsCount_ = &bchain.totalTransactionsCount_;
+}
+
+void BlockChain_Serializer::clear() {
+    previousNonEmpty_->clear();
+    lastNonEmptyBlock_->poolSeq = 0;
+    lastNonEmptyBlock_->transCount = 0;
+    *totalTransactionsCount_ = 0;
 }
 
 void BlockChain_Serializer::save() {

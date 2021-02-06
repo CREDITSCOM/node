@@ -12,6 +12,11 @@ void WalletsIds_Serializer::bind(WalletsIds& ids) {
     nextId_ = &ids.nextId_;
 }
 
+void WalletsIds_Serializer::clear() {
+    data_->clear();
+    *nextId_ = 0;
+}
+
 void WalletsIds_Serializer::save() {
     std::ofstream ofs("walletsids.dat");
     boost::archive::text_oarchive oa(ofs);

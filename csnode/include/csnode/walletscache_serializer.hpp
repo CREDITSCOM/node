@@ -30,6 +30,7 @@ public:
     void bind(WalletsCache&);
     void save();
     void load();
+    void clear();
 
 private:
 #pragma pack(push, 1)
@@ -177,6 +178,7 @@ private:
             ar & miningDelegations;
         }
 
+    public:
         std::vector<std::tuple<
             PublicKey,
             PublicKey,

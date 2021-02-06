@@ -13,6 +13,7 @@ public:
     void bind(WalletsIds&);
     void save();
     void load();
+    void clear();
 
 private:
     using WalletId = csdb::internal::WalletId;

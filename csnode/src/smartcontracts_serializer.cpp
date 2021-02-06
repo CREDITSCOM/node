@@ -12,6 +12,11 @@ void SmartContracts_Serializer::bind(SmartContracts& contract) {
     exe_queue = reinterpret_cast<decltype(exe_queue)>(&contract.exe_queue);
 }
 
+void SmartContracts_Serializer::clear() {
+    known_contracts->clear();
+    exe_queue->clear();
+}
+
 void SmartContracts_Serializer::save() {
     std::ofstream ofs("walletsids.dat");
     boost::archive::text_oarchive oa(ofs);

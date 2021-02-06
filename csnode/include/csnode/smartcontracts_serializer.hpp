@@ -21,6 +21,7 @@ public:
     void bind(SmartContracts&);
     void save();
     void load();
+    void clear();
 
 private:
     class SmartContractRef {
