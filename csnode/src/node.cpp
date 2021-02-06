@@ -152,7 +152,7 @@ bool Node::init() {
 #endif  // NODE_API
 
     // must call prior to blockChain_.init():
-    solver_->init(nodeIdKey_, nodeIdPrivate_);
+    solver_->init(nodeIdKey_, nodeIdPrivate_, cachesSerializationManager_);
     solver_->startDefault();
 
     if (cs::ConfigHolder::instance().config()->newBlockchainTop()) {
