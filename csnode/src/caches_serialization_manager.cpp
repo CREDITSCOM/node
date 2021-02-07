@@ -142,4 +142,11 @@ bool CachesSerializationManager::load() {
     return true;
 }
 
+void CachesSerializationManager::clear() {
+    if (!pImpl_->bindingsReady()) {
+        return;
+    }
+    pImpl_->clear();
+}
+
 } // namespace cs

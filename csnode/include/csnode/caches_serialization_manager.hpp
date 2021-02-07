@@ -22,6 +22,8 @@ public:
     void bind(WalletsIds&);
     void bind(TokensMaster&);
 
+    void clear();
+
     bool save();
     bool load();
 
