@@ -61,6 +61,11 @@ void BlockChain::subscribeToSignals() {
 bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManPtr) {
     cslog() << "Try QUICK START...";
 
+    if (!serializationManPtr) {
+        cserror() << "NO SERIALIZATION MANAGER PROVIDED!";
+        return false;
+    }
+
     serializationManPtr_ = serializationManPtr;
 
     serializationManPtr_->bind(*this);
