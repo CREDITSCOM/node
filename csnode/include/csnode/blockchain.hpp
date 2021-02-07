@@ -22,6 +22,7 @@
 #include <csnode/multiwallets.hpp>
 #include <csnode/walletsids.hpp>
 #include <csnode/poolcache.hpp>
+#include <csnode/caches_serialization_manager.hpp>
 
 #include <roundpackage.hpp>
 
@@ -67,8 +68,11 @@ public:
                         bool recreateIndex = false);
     ~BlockChain();
 
-    bool init(const std::string& path,
-              cs::Sequence newBlockchainTop = cs::kWrongSequence);
+    bool init(
+      const std::string& path,
+      cs::CachesSerializationManager*,
+      cs::Sequence newBlockchainTop = cs::kWrongSequence
+    );
     // called immediately after object construction, better place to subscribe on signals
     void subscribeToSignals();
 
@@ -460,6 +464,10 @@ private:
         uncertainHash_ = csdb::PoolHash{};
         desiredHash_ = csdb::PoolHash{};
     }
+
+    bool tryQuickStart(cs::CachesSerializationManager*);
+
+    cs::CachesSerializationManager* serializationManPtr_ = nullptr;
 
     // compare only state content: transactions, new wallets, sequence, round fee, user fields
     // true if both pools are not valid, or both pools have equal state content

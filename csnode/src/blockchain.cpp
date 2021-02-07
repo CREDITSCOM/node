@@ -58,8 +58,34 @@ void BlockChain::subscribeToSignals() {
     cs::Connector::connect(&storage_.readingStoppedEvent(), trxIndex_.get(), &TransactionsIndex::onDbReadFinished);
 }
 
-bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
+bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManPtr) {
+    cslog() << "Try QUICK START...";
+
+    serializationManPtr_ = serializationManPtr;
+
+    serializationManPtr_->bind(*this);
+    serializationManPtr_->bind(*walletsCacheStorage_);
+    serializationManPtr_->bind(*walletIds_);
+
+    bool ok = serializationManPtr_->load();
+
+    if (ok) {
+        cslog() << "Caches for QUICK START loaded successfully!";
+    } else {
+        cswarning() << "Could not load caches for QUICK START, continue with slow start :(";
+    }
+
+    return ok;
+}
+
+bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* serializationManPtr, cs::Sequence newBlockchainTop) {
     cs::Connector::connect(&this->removeBlockEvent, trxIndex_.get(), &TransactionsIndex::onRemoveBlock);
+
+    bool successfullQuickStart = false;
+
+    if (newBlockchainTop != cs::kWrongSequence) {
+        successfullQuickStart = tryQuickStart(serializationManPtr);
+    }
 
     cslog() << kLogPrefix << "Trying to open DB...";
 

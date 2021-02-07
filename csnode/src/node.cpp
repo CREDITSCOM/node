@@ -156,13 +156,20 @@ bool Node::init() {
     solver_->startDefault();
 
     if (cs::ConfigHolder::instance().config()->newBlockchainTop()) {
-        if (!blockChain_.init(cs::ConfigHolder::instance().config()->getPathToDB(), cs::ConfigHolder::instance().config()->newBlockchainTopSeq())) {
+        if (!blockChain_.init(
+                cs::ConfigHolder::instance().config()->getPathToDB(),
+                &cachesSerializationManager_,
+                cs::ConfigHolder::instance().config()->newBlockchainTopSeq())
+        ) {
             return false;
         }
         return true;
     }
 
-    if (!blockChain_.init(cs::ConfigHolder::instance().config()->getPathToDB())) {
+    if (!blockChain_.init(
+            cs::ConfigHolder::instance().config()->getPathToDB(),
+            &cachesSerializationManager_)
+    ) {
         return false;
     }
 
