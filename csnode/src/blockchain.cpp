@@ -46,7 +46,21 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
     trxIndex_ = std::make_unique<cs::TransactionsIndex>(*this, cachesPath, recreateIndex);
 }
 
-BlockChain::~BlockChain() {}
+BlockChain::~BlockChain() {
+    if (!serializationManPtr_) {
+        csinfo() << "~Blockchain: no serialization manager provided to save caches for QUICK START.";
+        return;
+    }
+
+    csinfo() << "~Blockchain: try to save caches for QUICK START.";
+
+    if (serializationManPtr_->save()) {
+      csinfo() << "~Blockchain: caches for QUICK START saved successfully.";
+    }
+    else {
+      csinfo() << "~Blockchain: couldn't save caches for QUICK START.";
+    }
+}
 
 void BlockChain::subscribeToSignals() {
     // the order of two following calls matters
