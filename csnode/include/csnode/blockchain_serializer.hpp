@@ -1,5 +1,7 @@
 #ifndef BLOCKCHAIN_SERIALIZER_HPP
 #define BLOCKCHAIN_SERIALIZER_HPP
+#include <atomic>
+
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/map.hpp>
 
@@ -31,6 +33,8 @@ private:
     NonEmptyBlockData *lastNonEmptyBlock_;
 
     uint64_t *totalTransactionsCount_;
+    std::atomic<uint64_t> *uuid_;
+    std::atomic<Sequence> *lastSequence_;
 };
 }  // namespace cs
 #endif //  BLOCKCHAIN_SERIALIZER_HPP

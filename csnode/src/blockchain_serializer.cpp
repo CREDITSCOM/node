@@ -11,6 +11,8 @@ void BlockChain_Serializer::bind(BlockChain& bchain) {
     previousNonEmpty_ = reinterpret_cast<decltype(previousNonEmpty_)>(&bchain.previousNonEmpty_);
     lastNonEmptyBlock_ = reinterpret_cast<decltype(lastNonEmptyBlock_)>(&bchain.lastNonEmptyBlock_);
     totalTransactionsCount_ = &bchain.totalTransactionsCount_;
+    uuid_ = &bchain.uuid_;
+    lastSequence_ = &bchain.lastSequence_;
 }
 
 void BlockChain_Serializer::clear() {
@@ -25,6 +27,9 @@ void BlockChain_Serializer::save() {
     boost::archive::text_oarchive oa(ofs);
     oa << *previousNonEmpty_;
     oa << *lastNonEmptyBlock_;
+    oa << *totalTransactionsCount_;
+    oa << uuid_->load();
+    oa << lastSequence_->load();
 }
 
 void BlockChain_Serializer::load() {
@@ -32,5 +37,14 @@ void BlockChain_Serializer::load() {
     boost::archive::text_iarchive ia(ifs);
     ia >> *previousNonEmpty_;
     ia >> *lastNonEmptyBlock_;
+    ia >> *totalTransactionsCount_;
+
+    uint64_t uuid;
+    ia >> uuid;
+    uuid_->store(uuid);
+
+    Sequence lastSequence;
+    ia >> lastSequence;
+    lastSequence_->store(lastSequence);
 }
 }  // namespace cs
