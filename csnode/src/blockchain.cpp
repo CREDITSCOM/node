@@ -100,16 +100,26 @@ bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManP
 bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* serializationManPtr, cs::Sequence newBlockchainTop) {
     cs::Connector::connect(&this->removeBlockEvent, trxIndex_.get(), &TransactionsIndex::onRemoveBlock);
 
+    lastSequence_ = 0;
     bool successfulQuickStart = false;
 
     if (newBlockchainTop != cs::kWrongSequence) {
         successfulQuickStart = tryQuickStart(serializationManPtr);
     }
 
+    cs::Sequence firstBlockToReadInDatabase = 0;
+    if (successfulQuickStart) {
+        if (lastSequence_ != 0) {
+            firstBlockToReadInDatabase = lastSequence_ + 1;
+        }
+
+        csinfo() << "QUICK START! lastSequence_   is " << lastSequence_.load();
+        csinfo() << "QUICK START! first block to read in database is " << firstBlockToReadInDatabase;
+    }
+
     cslog() << kLogPrefix << "Trying to open DB...";
 
     size_t totalLoaded = 0;
-    lastSequence_ = 0;
     csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
         ++totalLoaded;
         if (progress.poolsProcessed % 1000 == 0) {
@@ -118,8 +128,14 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
         return false;
     };
 
-    if (!storage_.open(path, progress, newBlockchainTop)) {
+    if (!storage_.open(path, progress, newBlockchainTop, firstBlockToReadInDatabase)) {
         cserror() << kLogPrefix << "Couldn't open database at " << path;
+
+        if (serializationManPtr_) {
+          csinfo() << "Remove data for QUICK START";
+          // @TODO remove data for quick start
+        }
+
         return false;
     }
 

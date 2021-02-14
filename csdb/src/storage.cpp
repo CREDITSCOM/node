@@ -135,6 +135,7 @@ private:
     std::shared_ptr<Database> db = nullptr;
     PoolHash last_hash;     // Хеш последнего пула
     size_t count_pool = 0;  // Количество пулов транзакций в хранилище (первоночально заполняется в check)
+    cs::Sequence startSequence = 0;
 
     void set_last_error(Storage::Error error = Storage::NoError, const ::std::string& message = ::std::string());
     void set_last_error(Storage::Error error, const char* message, ...);
@@ -226,6 +227,7 @@ void Storage::priv::set_last_error(Storage::Error error, const char* message, ..
 bool Storage::priv::rescan(Storage::OpenCallback callback) {
     last_hash = {};
     count_pool = 0;
+    cs::Sequence last_seq_in_db = 0;
 
     Database::IteratorPtr it = db->new_iterator();
     assert(it);
@@ -235,6 +237,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
         cs::Bytes v = it->value();
         Pool p = Pool::from_binary(std::move(v));
         if (p.is_valid()) {
+            last_seq_in_db = p.sequence();
             emit start_reading_event(p.sequence());
         }
         else {
@@ -245,8 +248,35 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
         emit start_reading_event(0);
     }
 
+    if (startSequence > last_seq_in_db + 1) {
+        cserror() << "startSequence > last_seq_in_db + 1";
+        return false;
+    }
+
     Storage::OpenProgress progress{0};
-    for (it->seek_to_first(); it->is_valid(); it->next()) {
+
+    it->seek_to_first();
+
+    for (cs::Sequence i = 0; i < startSequence; ++i) {
+        it->next();
+        ++count_pool;
+        ++progress.poolsProcessed;
+
+        if (i == last_seq_in_db) {
+            cs::Bytes v = it->value();
+            Pool p = Pool::from_binary(std::move(v));
+            if (p.is_valid()) {
+                last_hash = p.hash();
+            }
+            else {
+                set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool %d.", count_pool);
+                cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
+                return false;
+            }
+        }
+    }
+
+    for (; it->is_valid(); it->next()) {
         cs::Bytes v = it->value();
 
         Pool p = Pool::from_binary(std::move(v));
@@ -433,6 +463,8 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
         return true;
     }
 
+    d->startSequence = opt.startSequence;
+
     if (!d->rescan(callback)) {
         d->db.reset();
         return false;
@@ -442,7 +474,12 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
     return true;
 }
 
-bool Storage::open(const ::std::string& path_to_base, OpenCallback callback, cs::Sequence newBlockchainTop) {
+bool Storage::open(
+    const ::std::string& path_to_base,
+    OpenCallback callback,
+    cs::Sequence newBlockchainTop,
+    cs::Sequence startReadFrom
+) {
     ::std::string path{path_to_base};
     if (path.empty()) {
         path = ::csdb::internal::app_data_path() + "/CREDITS";
@@ -453,7 +490,7 @@ bool Storage::open(const ::std::string& path_to_base, OpenCallback callback, cs:
 
     //d->write_thread = std::thread(&Storage::priv::write_routine, d.get());
 
-    return open(OpenOptions{db, newBlockchainTop}, callback);
+    return open(OpenOptions{db, newBlockchainTop, startReadFrom}, callback);
 }
 
 void Storage::close() {

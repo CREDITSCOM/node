@@ -20,6 +20,8 @@ void BlockChain_Serializer::clear() {
     lastNonEmptyBlock_->poolSeq = 0;
     lastNonEmptyBlock_->transCount = 0;
     *totalTransactionsCount_ = 0;
+    uuid_->store(0);
+    lastSequence_->store(0);
 }
 
 void BlockChain_Serializer::save() {
