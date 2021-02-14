@@ -227,9 +227,6 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     last_hash = {};
     count_pool = 0;
 
-    heads_t heads;
-    tails_t tails;
-
     Database::IteratorPtr it = db->new_iterator();
     assert(it);
 
@@ -270,7 +267,6 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
             return false;
         }
 
-        //update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
         progress.poolsProcessed++;
 
         if (callback != nullptr) {
@@ -283,25 +279,6 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     emit stop_reading_event();
 
     return true;
-
-#if 0
-    std::stringstream ss;
-    ss << "More than one chains or orphan chains. List follows:" << std::endl;
-    for (auto ith = heads.begin(); ith != heads.end(); ++ith) {
-        ss << "  " << ith->first.to_string() << " (length = " << ith->second.len_ << "): ";
-        if (ith->second.next_.is_empty()) {
-            ss << "Normal";
-        }
-        else {
-            ss << "Orphan";
-        }
-        ss << std::endl;
-    }
-    ss << std::ends;
-    set_last_error(Storage::ChainError, ss.str());
-
-    return false;
-#endif
 }
 
 void Storage::priv::write_routine() {

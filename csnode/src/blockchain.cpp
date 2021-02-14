@@ -100,10 +100,10 @@ bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManP
 bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* serializationManPtr, cs::Sequence newBlockchainTop) {
     cs::Connector::connect(&this->removeBlockEvent, trxIndex_.get(), &TransactionsIndex::onRemoveBlock);
 
-    bool successfullQuickStart = false;
+    bool successfulQuickStart = false;
 
     if (newBlockchainTop != cs::kWrongSequence) {
-        successfullQuickStart = tryQuickStart(serializationManPtr);
+        successfulQuickStart = tryQuickStart(serializationManPtr);
     }
 
     cslog() << kLogPrefix << "Trying to open DB...";
