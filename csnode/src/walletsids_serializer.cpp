@@ -15,6 +15,7 @@ void WalletsIds_Serializer::bind(WalletsIds& ids) {
 void WalletsIds_Serializer::clear() {
     data_->clear();
     *nextId_ = 0;
+    save();
 }
 
 void WalletsIds_Serializer::save() {

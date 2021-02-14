@@ -22,6 +22,7 @@ void BlockChain_Serializer::clear() {
     *totalTransactionsCount_ = 0;
     uuid_->store(0);
     lastSequence_->store(0);
+    save();
 }
 
 void BlockChain_Serializer::save() {

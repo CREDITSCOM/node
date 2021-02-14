@@ -29,6 +29,7 @@ void WalletsCache_Serializer::clear() {
 #endif
     staking_->currentDelegations.clear();
     staking_->miningDelegations.clear();
+    save();
 }
 
 void WalletsCache_Serializer::save() {

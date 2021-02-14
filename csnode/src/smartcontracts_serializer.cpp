@@ -15,6 +15,7 @@ void SmartContracts_Serializer::bind(SmartContracts& contract) {
 void SmartContracts_Serializer::clear() {
     known_contracts->clear();
     exe_queue->clear();
+    save();
 }
 
 void SmartContracts_Serializer::save() {

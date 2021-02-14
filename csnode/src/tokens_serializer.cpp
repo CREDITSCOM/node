@@ -15,6 +15,7 @@ void TokensMaster_Serializer::bind(TokensMaster& tokens) {
 void TokensMaster_Serializer::clear() {
     tokens_->clear();
     holders_->clear();
+    save();
 }
 
 void TokensMaster_Serializer::save() {

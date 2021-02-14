@@ -133,7 +133,7 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
 
         if (serializationManPtr_) {
           csinfo() << "Remove data for QUICK START";
-          // @TODO remove data for quick start
+          serializationManPtr_->clear();
         }
 
         return false;
