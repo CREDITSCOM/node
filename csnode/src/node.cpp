@@ -161,6 +161,9 @@ bool Node::init() {
                 &cachesSerializationManager_,
                 cs::ConfigHolder::instance().config()->newBlockchainTopSeq())
         ) {
+            csinfo() << "Remove data for QUICK START";
+            cachesSerializationManager_.clear();
+
             return false;
         }
         return true;
@@ -170,6 +173,9 @@ bool Node::init() {
             cs::ConfigHolder::instance().config()->getPathToDB(),
             &cachesSerializationManager_)
     ) {
+        csinfo() << "Remove data for QUICK START";
+        cachesSerializationManager_.clear();
+
         return false;
     }
 

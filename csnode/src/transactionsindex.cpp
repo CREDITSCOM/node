@@ -38,6 +38,10 @@ TransactionsIndex::TransactionsIndex(BlockChain& _bc, const std::string& _path, 
     init();
 }
 
+bool TransactionsIndex::recreate() const {
+    return recreate_;
+}
+
 void TransactionsIndex::onStartReadFromDb(Sequence _lastWrittenPoolSeq) {
     if (!recreate_ && lastIndexedPool_ != _lastWrittenPoolSeq) {
         recreate_ = true;

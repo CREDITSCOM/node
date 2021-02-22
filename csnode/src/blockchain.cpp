@@ -90,7 +90,12 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
     bool successfulQuickStart = false;
 
     if (newBlockchainTop == cs::kWrongSequence) {
-        successfulQuickStart = tryQuickStart(serializationManPtr);
+        if (trxIndex_->recreate()) {
+            cslog() << "Cannot use QUICK START, trxIndex has to be recreated";
+        }
+        else {
+            successfulQuickStart = tryQuickStart(serializationManPtr);
+        }
     }
 
     cs::Sequence firstBlockToReadInDatabase = 0;
@@ -102,11 +107,24 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
         csinfo() << "QUICK START! lastSequence_   is " << lastSequence_.load();
         csinfo() << "QUICK START! first block to read in database is " << firstBlockToReadInDatabase;
     }
+    else {
+        cslog() << "SLOW START...";
+    }
 
     cslog() << kLogPrefix << "Trying to open DB...";
 
     size_t totalLoaded = 0;
+    bool checkTrxIndexRecreate = true;
+
     csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
+        if (checkTrxIndexRecreate) {
+          checkTrxIndexRecreate = false;
+          if (trxIndex_->recreate() && successfulQuickStart) {
+              cslog() << "Blockchain: TrxIndex must be recreated, cancel QUICK START... Restart NODE, please";
+              return true;
+          }
+        }
+
         ++totalLoaded;
         if (progress.poolsProcessed % 1000 == 0) {
             std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << std::flush;
@@ -116,12 +134,6 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
 
     if (!storage_.open(path, progress, newBlockchainTop, firstBlockToReadInDatabase)) {
         cserror() << kLogPrefix << "Couldn't open database at " << path;
-
-        if (serializationManPtr_) {
-          csinfo() << "Remove data for QUICK START";
-          serializationManPtr_->clear();
-        }
-
         return false;
     }
 
