@@ -160,8 +160,8 @@ uint64_t BlockChain::uuid() const {
 
 void BlockChain::onStartReadFromDB(cs::Sequence lastWrittenPoolSeq) {
     if (lastWrittenPoolSeq > 0) {
-        cslog() << kLogPrefix << "start reading " << WithDelimiters(lastWrittenPoolSeq + 1)
-            << " blocks from DB, 0.." << WithDelimiters(lastWrittenPoolSeq);
+        cslog() << kLogPrefix << "start reading blocks from DB, " 
+                << "last is " << WithDelimiters(lastWrittenPoolSeq);
     }
 }
 

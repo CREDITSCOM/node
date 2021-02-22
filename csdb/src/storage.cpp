@@ -258,10 +258,6 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     it->seek_to_first();
 
     for (cs::Sequence i = 0; i < startSequence; ++i) {
-        it->next();
-        ++count_pool;
-        ++progress.poolsProcessed;
-
         if (i == last_seq_in_db) {
             cs::Bytes v = it->value();
             Pool p = Pool::from_binary(std::move(v));
@@ -269,8 +265,19 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
                 last_hash = p.hash();
             }
             else {
-                set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool %d.", count_pool);
+                set_last_error(Storage::DataIntegrityError, "Data integrity error: corrupted pool %d.", count_pool);
                 cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
+                return false;
+            }
+        }
+
+        it->next();
+        ++count_pool;
+        ++progress.poolsProcessed;
+
+        if (callback != nullptr) {
+            if (callback(progress)) {
+                set_last_error(Storage::UserCancelled);
                 return false;
             }
         }
@@ -306,8 +313,8 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
             }
         }
     }
-    emit stop_reading_event();
 
+    emit stop_reading_event();
     return true;
 }
 
