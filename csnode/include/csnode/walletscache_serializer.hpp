@@ -14,6 +14,7 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 
+#include <lib/system/common.hpp>
 #include <lib/system/serialize_tuple.hpp>
 
 #include <csnode/transactionstail.hpp>
@@ -169,27 +170,18 @@ private:
     };
 #endif
 
-    class Staking {
-        friend class boost::serialization::access;
+    using Delegations = std::vector<std::tuple<
+        PublicKey,
+        PublicKey,
+        TransactionID>
+    >;
 
-        template<class Archive>
-        void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
-            ar & currentDelegations;
-            ar & miningDelegations;
-        }
+    using CurrentDelegations = std::map<uint64_t, Delegations>;
 
-    public:
-        std::vector<std::tuple<
-            PublicKey,
-            PublicKey,
-            TransactionID>
-        > currentDelegations;
-
-        std::unordered_map<
-            PublicKey,
-            std::vector<std::pair<PublicKey, TimeMoney>>
-        > miningDelegations;
-    };
+    using MiningDelegations = std::unordered_map<
+        PublicKey,
+        std::vector<std::pair<PublicKey, TimeMoney>>
+    >;
 
     std::list<TransactionID> *smartPayableTransactions_ = nullptr;
     std::map<csdb::Address, std::list<TransactionID>> *canceledSmarts_ = nullptr;
@@ -211,7 +203,8 @@ private:
 #ifdef MONITOR_NODE
     std::map<PublicKey, TrustedData> *trusted_info_ = nullptr;
 #endif
-    Staking *staking_ = nullptr;
+    CurrentDelegations *currentDelegations_ = nullptr;
+    MiningDelegations *miningDelegations_ = nullptr;
 };
 } // namespace cs
 #endif // WALLETS_CACHE_SERIALIZER_HPP

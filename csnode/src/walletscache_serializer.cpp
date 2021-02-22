@@ -7,6 +7,7 @@
 #include <csnode/walletscache_serializer.hpp>
 
 #include <csnode/multiwallets.hpp>
+#include <csnode/staking.hpp>
 
 namespace cs {
 void WalletsCache_Serializer::bind(WalletsCache& wCache) {
@@ -17,7 +18,8 @@ void WalletsCache_Serializer::bind(WalletsCache& wCache) {
 #ifdef MONITOR_NODE
     trusted_info_ = reinterpret_cast<decltype(trusted_info_)>(&wCache.trusted_info_);
 #endif
-    staking_ = reinterpret_cast<decltype(staking_)>(wCache.staking_.get());
+    currentDelegations_ = reinterpret_cast<decltype(currentDelegations_)>(&wCache.staking_->currentDelegations_);
+    miningDelegations_ = reinterpret_cast<decltype(miningDelegations_)>(&wCache.staking_->miningDelegations_);
 }
 
 void WalletsCache_Serializer::clear() {
@@ -27,8 +29,8 @@ void WalletsCache_Serializer::clear() {
 #ifdef MONITOR_NODE
     trusted_info_->clear();
 #endif
-    staking_->currentDelegations.clear();
-    staking_->miningDelegations.clear();
+    currentDelegations_->clear();
+    miningDelegations_->clear();
     save();
 }
 
@@ -41,7 +43,8 @@ void WalletsCache_Serializer::save() {
 #ifdef MONITOR_NODE
     oa << *trusted_info_;
 #endif
-    oa << *staking_;
+    oa << *currentDelegations_;
+    oa << *miningDelegations_;
 }
 
 void WalletsCache_Serializer::load() {
@@ -53,6 +56,7 @@ void WalletsCache_Serializer::load() {
 #ifdef MONITOR_NODE
     ia >> *trusted_info_;
 #endif
-    ia >> *staking_;
+    ia >> *currentDelegations_;
+    ia >> *miningDelegations_;
 }
 }  // namespace cs

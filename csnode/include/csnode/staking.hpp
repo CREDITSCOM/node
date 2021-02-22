@@ -12,6 +12,7 @@
 #include <csdb/user_field.hpp>
 #include <csnode/nodecore.hpp>
 #include <csnode/walletscache.hpp>
+#include <csnode/walletscache_serializer.hpp>
 #include <lib/system/common.hpp>
 
 namespace cs {
@@ -82,6 +83,8 @@ private:
     MiningDelegations miningDelegations_;
     GetWalletDataCallback getWalletData_;
     WalletUpdatedCallback updateCallback_;
+
+    friend class WalletsCache_Serializer;
 };
 
 } // namespace cs
