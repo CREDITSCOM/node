@@ -58,9 +58,7 @@ void BlockChain::subscribeToSignals() {
     cs::Connector::connect(&storage_.readingStoppedEvent(), trxIndex_.get(), &TransactionsIndex::onDbReadFinished);
 }
 
-bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManPtr) {
-    cslog() << "Try QUICK START...";
-
+bool BlockChain::bindSerializationManToCaches(cs::CachesSerializationManager* serializationManPtr) {
     if (!serializationManPtr) {
         cserror() << "NO SERIALIZATION MANAGER PROVIDED!";
         return false;
@@ -71,6 +69,16 @@ bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManP
     serializationManPtr_->bind(*this);
     serializationManPtr_->bind(*walletsCacheStorage_);
     serializationManPtr_->bind(*walletIds_);
+
+    return true;
+}
+
+bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManPtr) {
+    cslog() << "Try QUICK START...";
+
+    if (!bindSerializationManToCaches(serializationManPtr)) {
+        return false;
+    }
 
     bool ok = serializationManPtr_->load();
 
@@ -92,6 +100,7 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
     if (newBlockchainTop == cs::kWrongSequence) {
         if (trxIndex_->recreate()) {
             cslog() << "Cannot use QUICK START, trxIndex has to be recreated";
+            bindSerializationManToCaches(serializationManPtr);
         }
         else {
             successfulQuickStart = tryQuickStart(serializationManPtr);
@@ -121,6 +130,7 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
           checkTrxIndexRecreate = false;
           if (trxIndex_->recreate() && successfulQuickStart) {
               cslog() << "Blockchain: TrxIndex must be recreated, cancel QUICK START... Restart NODE, please";
+              trxIndex_->invalidate();
               return true;
           }
         }

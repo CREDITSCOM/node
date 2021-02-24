@@ -466,6 +466,7 @@ private:
     }
 
     bool tryQuickStart(cs::CachesSerializationManager*);
+    bool bindSerializationManToCaches(cs::CachesSerializationManager*);
 
     cs::CachesSerializationManager* serializationManPtr_ = nullptr;
 
