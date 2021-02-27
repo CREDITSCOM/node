@@ -27,6 +27,8 @@ public:
     // called when next block is read from database
     void onReadBlock(csdb::Pool block, bool* shouldStop);
 
+    void onStopReadingFromDb(uint64_t totalTransactions);
+
     // called when next block is stored
     void onStoreBlock(csdb::Pool block);
 

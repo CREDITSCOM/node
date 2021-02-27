@@ -90,6 +90,7 @@ Node::Node(cs::config::Observer& observer)
     solver_->subscribeToSignals();
     // continue with subscriptions
     cs::Connector::connect(&blockChain_.readBlockEvent(), &stat_, &cs::RoundStat::onReadBlock);
+    cs::Connector::connect(&blockChain_.stopReadingBlocksEvent, &stat_, &cs::RoundStat::onStopReadingFromDb);
     cs::Connector::connect(&blockChain_.readBlockEvent(), this, &Node::validateBlock);
     cs::Connector::connect(&blockChain_.readBlockEvent(), &executor, &cs::Executor::onReadBlock);
     cs::Connector::connect(&blockChain_.storeBlockEvent, &stat_, &cs::RoundStat::onStoreBlock);

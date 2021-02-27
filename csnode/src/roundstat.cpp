@@ -82,6 +82,10 @@ void RoundStat::onReadBlock(csdb::Pool block, bool* /*shouldStop*/) {
     totalAcceptedTransactions_ += block.transactions_count();
 }
 
+void RoundStat::onStopReadingFromDb(uint64_t totalTransactions) {
+    totalAcceptedTransactions_ = totalTransactions;
+}
+
 void RoundStat::onStoreBlock(csdb::Pool block) {
     totalAcceptedTransactions_ += block.transactions_count();
 }

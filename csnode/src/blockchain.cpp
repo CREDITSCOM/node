@@ -162,7 +162,7 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
         writeGenesisBlock();
     }
     else {
-        if (!postInitFromDB()) {
+        if (!postInitFromDB(successfulQuickStart)) {
             return false;
         }
     }
@@ -233,7 +233,7 @@ inline void BlockChain::updateNonEmptyBlocks(const csdb::Pool& pool) {
     }
 }
 
-bool BlockChain::postInitFromDB() {
+bool BlockChain::postInitFromDB(bool successfulQuickStart) {
     auto func = [](const cs::PublicKey& key, const WalletData& wallet) {
         double bal = wallet.balance_.to_double();
         if (bal < -std::numeric_limits<double>::min()) {
@@ -244,6 +244,9 @@ bool BlockChain::postInitFromDB() {
         return true;
     };
     walletsCacheStorage_->iterateOverWallets(func);
+    if (successfulQuickStart) {
+        emit stopReadingBlocksEvent(totalTransactionsCount_);
+    }
     return true;
 }
 
