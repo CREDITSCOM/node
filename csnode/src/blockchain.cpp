@@ -159,6 +159,9 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
             cserror() << "failed!!! Delete the Database!!! It will be restored from nothing...";
             return false;
         }
+        if (successfulQuickStart) {
+            serializationManPtr_->clear();
+        }
         writeGenesisBlock();
     }
     else {
