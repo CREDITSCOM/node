@@ -7,6 +7,8 @@
 
 #include <lib/system/common.hpp>
 
+#include <cscrypto/cscrypto.hpp>
+
 class BlockChain;
 
 namespace cs {
@@ -16,6 +18,8 @@ public:
     void save();
     void load();
     void clear();
+
+    ::cscrypto::Hash hash();
 
 private:
     struct NonEmptyBlockData {
