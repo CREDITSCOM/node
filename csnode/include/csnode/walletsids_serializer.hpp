@@ -5,6 +5,8 @@
 #include <boost/serialization/array.hpp>
 #include <boost/serialization/set.hpp>
 
+#include <cscrypto/cscrypto.hpp>
+
 namespace cs {
 class WalletsIds;
 
@@ -14,6 +16,8 @@ public:
     void save();
     void load();
     void clear();
+
+    ::cscrypto::Hash hash();
 
 private:
     using WalletId = csdb::internal::WalletId;
