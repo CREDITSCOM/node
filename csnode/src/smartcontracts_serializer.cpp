@@ -1,4 +1,5 @@
 #include <fstream>
+#include <sstream>
 
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -23,6 +24,20 @@ void SmartContracts_Serializer::save() {
     boost::archive::text_oarchive oa(ofs);
     oa << *known_contracts;
     oa << *exe_queue;
+}
+
+::cscrypto::Hash SmartContracts_Serializer::hash() {
+    std::ostringstream ofs;
+    {
+      boost::archive::text_oarchive oa(ofs);
+      oa << *known_contracts;
+      oa << *exe_queue;
+    }
+    auto data = ofs.str();
+    return ::cscrypto::calculateHash(
+      (const ::cscrypto::Byte*)data.data(),
+      data.size()
+    );
 }
 
 void SmartContracts_Serializer::load() {
