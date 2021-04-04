@@ -1,4 +1,5 @@
 #include <fstream>
+#include <sstream>
 
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -45,6 +46,26 @@ void WalletsCache_Serializer::save() {
 #endif
     oa << *currentDelegations_;
     oa << *miningDelegations_;
+}
+
+::cscrypto::Hash WalletsCache_Serializer::hash() {
+    std::ostringstream ofs;
+    {
+      boost::archive::text_oarchive oa(ofs);
+      oa << *smartPayableTransactions_;
+      oa << *canceledSmarts_;
+      oa << *wallets_;
+#ifdef MONITOR_NODE
+      oa << *trusted_info_;
+#endif
+      oa << *currentDelegations_;
+      oa << *miningDelegations_;
+    }
+    auto data = ofs.str();
+    return ::cscrypto::calculateHash(
+        (const ::cscrypto::Byte*)data.data(),
+        data.size()
+    );
 }
 
 void WalletsCache_Serializer::load() {

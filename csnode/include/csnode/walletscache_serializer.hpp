@@ -18,6 +18,7 @@
 #include <lib/system/serialize_tuple.hpp>
 
 #include <csnode/transactionstail.hpp>
+#include <cscrypto/cscrypto.hpp>
 
 #include "address_serializer.hpp"
 
@@ -32,6 +33,8 @@ public:
     void save();
     void load();
     void clear();
+
+    ::cscrypto::Hash hash();
 
 private:
 #pragma pack(push, 1)
