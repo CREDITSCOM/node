@@ -8,6 +8,7 @@
 #include <csnode/walletsids.hpp>
 #include <lib/system/logger.hpp>
 #include <solver/smartcontracts.hpp>
+#include <solver/consensus.hpp>
 
 namespace {
 const uint8_t kUntrustedMarker = 255;
@@ -211,12 +212,13 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
 
     csdb::Amount totalStake = 0;
     std::map<PublicKey, csdb::Amount> confidantAndStake;
+    int32_t realTrustedNumber = 0;
 
     for (size_t i = 0; i < confidants.size() && i < realTrusted.size(); ++i) {
         if (realTrusted[i] == kUntrustedMarker) {
             continue;
         }
-
+        ++realTrustedNumber;
         auto& wallet = getWalletData(confidants[i]);
         totalStake += wallet.balance_;
         confidantAndStake[confidants[i]] += wallet.balance_;
@@ -231,9 +233,8 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
             totalStake += keyAndStake.second.amount;
         }
     }
-
-    csdb::Amount feeWithMining = totalFee * 2;
-    csdb::Amount onePartOfFee = feeWithMining / totalStake;
+    csdb::Amount feeWithMining = totalFee  + totalFee * Consensus::miningCoefficient + Consensus::blockReward;
+    csdb::Amount onePartOfFee = Consensus::stakingOn ? feeWithMining / totalStake : feeWithMining/realTrustedNumber;
     csdb::Amount payedFee = 0;
     size_t numPayedTrusted = 0;
 
@@ -245,7 +246,7 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
                 feeToPay = feeWithMining - payedFee;
             }
             else {
-                feeToPay = onePartOfFee * confAndStake.second;
+                feeToPay = Consensus::stakingOn ? onePartOfFee * confAndStake.second : onePartOfFee;
             }
 
             if (!inverse) {
