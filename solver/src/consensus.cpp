@@ -124,4 +124,4 @@ bool Consensus::stakingOn = false;
 
 bool Consensus::miningOn = false;
 
-cs::RoundNumber syncroChangeRound = 0;
+cs::RoundNumber Consensus::syncroChangeRound = 18446744073709551615;

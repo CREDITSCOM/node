@@ -15,7 +15,7 @@ public:
     bool empty() const;
     SenderAndPacket pop();
     void push(const cs::PublicKey&, Packet&&);
-
+    void clear();
 private:
     enum class Priority {
         kFirst,

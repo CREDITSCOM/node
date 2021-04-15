@@ -87,6 +87,7 @@ void BlockHashes::onDbFailed(const LmdbException& exception) {
 }
 
 void BlockHashes::initialization() {
+    csinfo() << "blockHashes initialization started";
     cs::Connector::connect(&seqDb_.failed, this, &BlockHashes::onDbFailed);
     cs::Connector::connect(&hashDb_.failed, this, &BlockHashes::onDbFailed);
 
@@ -94,6 +95,9 @@ void BlockHashes::initialization() {
     hashDb_.setMapSize(cs::Lmdb::DefaultMapSize);
 
     seqDb_.open();
+    csinfo() << "seqDb opened successfully";
     hashDb_.open();
+    csinfo() << "hashDb opened successfully";
+
 }
 }  // namespace cs

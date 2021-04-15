@@ -39,7 +39,11 @@ public:
 
     using AddressAndPort = std::pair<std::string, uint16_t>;
     using BanList = std::vector<AddressAndPort>;
-
+    enum ProcSpeed {
+        setDefault,
+        increase,
+        decrease
+    };
     explicit Transport(Node* node);
     ~Transport();
 
@@ -58,6 +62,7 @@ public:
     void revertBan(const cs::PublicKey&);
     void clearBanList();
     void getBanList(BanList&) const;
+    void clearInbox();
 
     // neighbours interface
     void setPermanentNeighbours(const std::set<cs::PublicKey>&);

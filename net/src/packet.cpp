@@ -72,6 +72,8 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
             return "StateReply";
         case EmptyRoundPack:
             return "EmptyRoundPack";
+        case SyncroMsg:
+            return "SyncroMsg";
         default:
             return "Unknown";
     }
