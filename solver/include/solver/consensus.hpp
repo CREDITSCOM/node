@@ -153,4 +153,6 @@ public:
     static bool stakingOn;
 
     static bool miningOn;
+
+    static cs::RoundNumber syncroChangeRound;
 };

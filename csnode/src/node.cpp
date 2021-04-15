@@ -1372,7 +1372,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     sendReply();
 }
 
-void Node::getBlockReply(const uint8_t* data, const size_t size) {
+void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
     bool isSyncOn = poolSynchronizer_->isSyncroStarted();
     bool isBlockchainUncertain = blockChain_.isLastBlockUncertain();
 
@@ -1407,7 +1407,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     }
 
     if (isSyncOn) {
-        poolSynchronizer_->getBlockReply(std::move(poolsBlock));
+        poolSynchronizer_->getBlockReply(std::move(poolsBlock), sender);
     }
 }
 

@@ -111,7 +111,7 @@ void PoolSynchronizer::syncLastPool() {
     emit sendRequest(target, PoolsRequestedSequences{blockChain_->getLastSeq() + 1});
 }
 
-void PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
+void PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::PublicKey& sender) {
     csdebug() << "SYNC: Get Block Reply <<<<<<< : count: " << poolsBlock.size()
               << ", seqs: [" << poolsBlock.front().sequence()
               << ", " << poolsBlock.back().sequence() << "]";

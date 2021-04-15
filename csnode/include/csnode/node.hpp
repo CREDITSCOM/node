@@ -192,7 +192,19 @@ public:
 
     // syncro get functions
     void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
-    void getBlockReply(const uint8_t*, const size_t);
+    void getBlockReply(const uint8_t*, const size_t, const cs::PublicKey& sender);
+
+    void sendSyncroMessage(cs::Byte msg, const cs::PublicKey& target);
+    void getSyncroMessage(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+
+    // syncro log functions
+    void addSynchroRequestsLog(const cs::PublicKey& sender, cs::Sequence seq, cs::SyncroMessage msg);
+    bool checkSynchroRequestsLog(const cs::PublicKey& sender, cs::Sequence seq);
+    bool changeSynchroRequestsLog(const cs::PublicKey& sender, cs::SyncroMessage msg);
+    void updateSynchroRequestsLog();
+    bool removeSynchroRequestsLog(const cs::PublicKey& sender);
+
+
 
     // transaction's pack syncro
     void sendTransactionsPacket(const cs::TransactionsPacket& packet);
@@ -486,6 +498,10 @@ private:
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;
+
+    size_t notInRound_ = 0;
+    std::map<cs::PublicKey, std::tuple<cs::Sequence, cs::SyncroMessage, uint64_t>> synchroRequestsLog_;
+
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

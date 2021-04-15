@@ -123,3 +123,5 @@ csdb::Amount Consensus::miningCoefficient = csdb::Amount{ 0 };
 bool Consensus::stakingOn = false; 
 
 bool Consensus::miningOn = false;
+
+cs::RoundNumber syncroChangeRound = 0;
