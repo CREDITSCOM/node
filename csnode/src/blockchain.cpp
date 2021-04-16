@@ -38,7 +38,6 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , startAddress_(startAddress)
 , walletIds_(new WalletsIds)
 , walletsCacheStorage_(new WalletsCache(*walletIds_))
-, multiWallets_(new MultiWallets())
 , cacheMutex_() {
     createCachesPath();
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
@@ -47,7 +46,21 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
     trxIndex_ = std::make_unique<cs::TransactionsIndex>(*this, cachesPath, recreateIndex);
 }
 
-BlockChain::~BlockChain() {}
+BlockChain::~BlockChain() {
+    if (!serializationManPtr_) {
+        csinfo() << "~Blockchain: no serialization manager provided to save caches for QUICK START.";
+        return;
+    }
+
+    csinfo() << "~Blockchain: try to save caches for QUICK START.";
+
+    if (serializationManPtr_->save()) {
+      csinfo() << "~Blockchain: caches for QUICK START saved successfully.";
+    }
+    else {
+      csinfo() << "~Blockchain: couldn't save caches for QUICK START.";
+    }
+}
 
 void BlockChain::subscribeToSignals() {
     // the order of two following calls matters
@@ -57,21 +70,56 @@ void BlockChain::subscribeToSignals() {
     cs::Connector::connect(&storage_.readingStartedEvent(), this, &BlockChain::onStartReadFromDB);
 
     cs::Connector::connect(&storage_.readingStoppedEvent(), trxIndex_.get(), &TransactionsIndex::onDbReadFinished);
-    cs::Connector::connect(&storage_.readingStoppedEvent(), walletsCacheUpdater_.get(), &WalletsCache::Updater::onStopReadingFromDB);
-
-    cs::Connector::connect(&walletsCacheUpdater_->updateFromDBFinishedEvent, multiWallets_.get(), &MultiWallets::onDbReadFinished);
-    cs::Connector::connect(&walletsCacheUpdater_->updateFromDBFinishedEvent, [this](const auto&) {
-        cs::Connector::connect(&walletsCacheUpdater_->walletUpdateEvent, multiWallets_.get(), &MultiWallets::onWalletCacheUpdated);
-    });
 }
 
-bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
+bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManPtr) {
+    cslog() << "Try QUICK START...";
+
+    if (!serializationManPtr) {
+        cserror() << "NO SERIALIZATION MANAGER PROVIDED!";
+        return false;
+    }
+
+    serializationManPtr_ = serializationManPtr;
+
+    serializationManPtr_->bind(*this);
+    serializationManPtr_->bind(*walletsCacheStorage_);
+    serializationManPtr_->bind(*walletIds_);
+
+    bool ok = serializationManPtr_->load();
+
+    if (ok) {
+        cslog() << "Caches for QUICK START loaded successfully!";
+    } else {
+        cswarning() << "Could not load caches for QUICK START, continue with slow start :(";
+    }
+
+    return ok;
+}
+
+bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* serializationManPtr, cs::Sequence newBlockchainTop) {
     cs::Connector::connect(&this->removeBlockEvent, trxIndex_.get(), &TransactionsIndex::onRemoveBlock);
+
+    lastSequence_ = 0;
+    bool successfulQuickStart = false;
+
+    if (newBlockchainTop != cs::kWrongSequence) {
+        successfulQuickStart = tryQuickStart(serializationManPtr);
+    }
+
+    cs::Sequence firstBlockToReadInDatabase = 0;
+    if (successfulQuickStart) {
+        if (lastSequence_ != 0) {
+            firstBlockToReadInDatabase = lastSequence_ + 1;
+        }
+
+        csinfo() << "QUICK START! lastSequence_   is " << lastSequence_.load();
+        csinfo() << "QUICK START! first block to read in database is " << firstBlockToReadInDatabase;
+    }
 
     cslog() << kLogPrefix << "Trying to open DB...";
 
     size_t totalLoaded = 0;
-    lastSequence_ = 0;
     csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
         ++totalLoaded;
         if (progress.poolsProcessed % 1000 == 0) {
@@ -80,8 +128,14 @@ bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
         return false;
     };
 
-    if (!storage_.open(path, progress, newBlockchainTop)) {
+    if (!storage_.open(path, progress, newBlockchainTop, firstBlockToReadInDatabase)) {
         cserror() << kLogPrefix << "Couldn't open database at " << path;
+
+        if (serializationManPtr_) {
+          csinfo() << "Remove data for QUICK START";
+          serializationManPtr_->clear();
+        }
+
         return false;
     }
 
@@ -512,7 +566,7 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
             }
         }
 
-        for (const auto it : pool.transactions()) {
+        for (const auto& it : pool.transactions()) {
             if (cs::SmartContracts::is_deploy(it)) {
                 if (!walletIds_->normal().remove(it.target())) {
                     cswarning() << kLogPrefix << "Contract address was not removed: " << it.target().to_string();
@@ -747,7 +801,6 @@ void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address
             break;
         }
         if (id.pool_seq() < trIt->id().pool_seq() || (id.pool_seq() == trIt->id().pool_seq() && id.index() < trIt->id().index())) {
-            bool added = false;
             if (flagg == 1) {
                 bool match = false;
                 if (trIt->target().is_public_key())
@@ -768,7 +821,6 @@ void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address
                 {
                     transactions.push_back(*trIt);
                     transactions.back().set_time(getBlockTime(trIt.getPool()));
-                    added = true;
                 }
             }
             if (flagg ==2){
@@ -791,15 +843,12 @@ void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address
                 {
                     transactions.push_back(*trIt);
                     transactions.back().set_time(getBlockTime(trIt.getPool()));
-                    added = true;
                 }
             }
 
             if (flagg == 3) {
                 transactions.push_back(*trIt);
                 transactions.back().set_time(getBlockTime(trIt.getPool()));
-                added = true;
-                
             }
         }
         //if (--limit == 0)
@@ -972,7 +1021,7 @@ bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallDa
 
     std::lock_guard lock(cacheMutex_);
 
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(address.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(address.public_key());
     if (wallDataPtr) {
         wallData = *wallDataPtr;
         return true;
@@ -987,7 +1036,7 @@ bool BlockChain::findWalletData(WalletId id, WalletData& wallData) const {
 
 bool BlockChain::findWalletData_Unsafe(WalletId id, WalletData& wallData) const {
     auto pubKey = getAddressByType(csdb::Address::from_wallet_id(id), AddressType::PublicKey);
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (wallDataPtr) {
         wallData = *wallDataPtr;
@@ -1736,7 +1785,7 @@ uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
     std::lock_guard lock(cacheMutex_);
 
     auto pubKey = getAddressByType(addr, AddressType::PublicKey);
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (!wallDataPtr) {
         return 0;
@@ -1749,7 +1798,7 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) co
     std::lock_guard lock(cacheMutex_);
 
     auto pubKey = getAddressByType(addr, AddressType::PublicKey);
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (!wallDataPtr) {
         return csdb::TransactionID();
@@ -1801,7 +1850,7 @@ cs::Sequence BlockChain::getLastSeq() const {
 }
 
 const MultiWallets& BlockChain::multiWallets() const {
-    return *(multiWallets_.get());
+    return walletsCacheStorage_->multiWallets();
 }
 
 void BlockChain::setBlocksToBeRemoved(cs::Sequence number) {

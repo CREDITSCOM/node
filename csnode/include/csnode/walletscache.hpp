@@ -29,10 +29,12 @@ namespace cs {
 
 class WalletsIds;
 class Staking;
+class MultiWallets;
 
 class WalletsCache {
 public:
     WalletsCache(WalletsIds& walletsIds);
+    ~WalletsCache();
 
     WalletsCache(const WalletsCache&) = delete;
     WalletsCache& operator=(const WalletsCache&) = delete;
@@ -43,8 +45,9 @@ public:
     std::unique_ptr<Updater> createUpdater();
 
     struct WalletData {
-        csdb::Amount balance_;
-        csdb::Amount delegated_;
+        PublicKey key_;
+        csdb::Amount balance_ = 0;
+        csdb::Amount delegated_ = 0;
         std::shared_ptr<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>> delegateSources_;
         std::shared_ptr<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>> delegateTargets_;
         TransactionsTail trxTail_;
@@ -67,25 +70,25 @@ public:
     void iterateOverWriters(const std::function<bool(const PublicKey&, const TrustedData&)>);
 #endif
 
-    uint64_t getCount() const {
-        return wallets_.size();
-    }
+    uint64_t getCount() const;
+
+    const MultiWallets& multiWallets() const { return *(multiWallets_.get()); }
 
 private:
     WalletsIds& walletsIds_;
 
     std::list<csdb::TransactionID> smartPayableTransactions_;
     std::map< csdb::Address, std::list<csdb::TransactionID> > canceledSmarts_;
-    std::unordered_map<PublicKey, WalletData> wallets_;
+    std::unique_ptr<MultiWallets> multiWallets_;
 
 #ifdef MONITOR_NODE
     std::map<PublicKey, TrustedData> trusted_info_;
 #endif
+
+    std::unique_ptr<Staking> staking_;
+
+    friend class WalletsCache_Serializer;
 };
-
-using WalletUpdateSignal = cs::Signal<void(const PublicKey&, const WalletsCache::WalletData&)>;
-using FinishedUpdateFromDB = cs::Signal<void(const std::unordered_map<PublicKey, WalletsCache::WalletData>&)>;
-
 
 class WalletsCache::Updater {
 public:
@@ -98,8 +101,8 @@ public:
                        bool inverse = false); // inverse all operations
 
 
-    const WalletData* findWallet(const PublicKey&) const;
-    const WalletData* findWallet(const csdb::Address&) const;
+    std::unique_ptr<WalletData> findWallet(const PublicKey&) const;
+    std::unique_ptr<WalletData> findWallet(const csdb::Address&) const;
 
     void invokeReplenishPayableContract(const csdb::Transaction&, bool inverse = false);
 
@@ -115,17 +118,9 @@ public:
 
     PublicKey toPublicKey(const csdb::Address&) const;
 
-    void onStopReadingFromDB() const {
-      emit updateFromDBFinishedEvent(data_.wallets_);
-    }
-
-public signals:
-    WalletUpdateSignal walletUpdateEvent;
-    FinishedUpdateFromDB updateFromDBFinishedEvent;
-
 private:
-    WalletData& getWalletData(const PublicKey&);
-    WalletData& getWalletData(const csdb::Address&);
+    WalletData getWalletData(const PublicKey&);
+    WalletData getWalletData(const csdb::Address&);
 
     double load(const csdb::Transaction& tr, const BlockChain& blockchain, bool inverse);
 
@@ -155,28 +150,7 @@ private:
 #endif
 
     WalletsCache& data_;
-    std::unique_ptr<Staking> staking_;
 };
-
-inline const WalletsCache::WalletData* WalletsCache::Updater::findWallet(const PublicKey& key) const {
-    auto it = data_.wallets_.find(key);
-    if (it == data_.wallets_.end()) {
-        return nullptr;
-    }
-    return &(it->second);
-}
-
-inline const WalletsCache::WalletData* WalletsCache::Updater::findWallet(const csdb::Address& addr) const {
-    return findWallet(toPublicKey(addr));
-}
-
-inline WalletsCache::WalletData& WalletsCache::Updater::getWalletData(const PublicKey& key) {
-    return data_.wallets_[key];
-}
-
-inline WalletsCache::WalletData& WalletsCache::Updater::getWalletData(const csdb::Address& addr) {
-    return data_.wallets_[toPublicKey(addr)];
-}
 
 inline double WalletsCache::Updater::load(const csdb::Transaction& t, const BlockChain& bc, bool inverse) {
     loadTrxForTarget(t, inverse);

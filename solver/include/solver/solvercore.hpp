@@ -12,6 +12,7 @@
 #include <csdb/pool.hpp>
 #include <csnode/transactionspacket.hpp>
 #include <csnode/roundpackage.hpp>
+#include <csnode/caches_serialization_manager.hpp>
 
 #include <algorithm>
 #include <array>
@@ -76,7 +77,11 @@ public:
     // Solver "public" interface,
     // below are the "required" methods to be implemented by Solver-compatibility issue:
     void subscribeToSignals();
-    void init(const cs::PublicKey& pub, const cs::PrivateKey& priv);
+    void init(
+        const cs::PublicKey& pub,
+        const cs::PrivateKey& priv,
+        cs::CachesSerializationManager&
+    );
     void gotConveyerSync(cs::RoundNumber rNum);
     void gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize);
 

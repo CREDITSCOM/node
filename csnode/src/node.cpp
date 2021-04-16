@@ -139,7 +139,7 @@ bool Node::init() {
 #ifdef NODE_API
     std::cout << "Init API... ";
 
-    api_ = std::make_unique<csconnector::connector>(*this);
+    api_ = std::make_unique<csconnector::connector>(*this, cachesSerializationManager_);
 
     std::cout << "Done\n";
 
@@ -152,17 +152,24 @@ bool Node::init() {
 #endif  // NODE_API
 
     // must call prior to blockChain_.init():
-    solver_->init(nodeIdKey_, nodeIdPrivate_);
+    solver_->init(nodeIdKey_, nodeIdPrivate_, cachesSerializationManager_);
     solver_->startDefault();
 
     if (cs::ConfigHolder::instance().config()->newBlockchainTop()) {
-        if (!blockChain_.init(cs::ConfigHolder::instance().config()->getPathToDB(), cs::ConfigHolder::instance().config()->newBlockchainTopSeq())) {
+        if (!blockChain_.init(
+                cs::ConfigHolder::instance().config()->getPathToDB(),
+                &cachesSerializationManager_,
+                cs::ConfigHolder::instance().config()->newBlockchainTopSeq())
+        ) {
             return false;
         }
         return true;
     }
 
-    if (!blockChain_.init(cs::ConfigHolder::instance().config()->getPathToDB())) {
+    if (!blockChain_.init(
+            cs::ConfigHolder::instance().config()->getPathToDB(),
+            &cachesSerializationManager_)
+    ) {
         return false;
     }
 

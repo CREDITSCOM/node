@@ -9,6 +9,7 @@
 
 #include <csconnector/csconnector.hpp>
 
+#include <csnode/caches_serialization_manager.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
 
@@ -507,6 +508,7 @@ private:
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;
+    cs::CachesSerializationManager cachesSerializationManager_;
 
     size_t notInRound_ = 0;
     std::map<cs::PublicKey, std::tuple<cs::Sequence, cs::SyncroMessage, uint64_t>> synchroRequestsLog_;

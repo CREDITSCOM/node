@@ -35,7 +35,7 @@ constexpr const bool kStrictRead = false; // use default Thrift value
 constexpr const bool kStrictWrite = true; // use default Thrift value
 constexpr const uint32_t kTestConfigPortPeriod_sec = 10;
 
-connector::connector(Node& node)
+connector::connector(Node& node, cs::CachesSerializationManager& serializationMan)
 : executor_(cs::Executor::instance())
 , api_handler(make_shared<api::APIHandler>(node.getBlockChain(), *node.getSolver(), executor_))
 , apiexec_handler(make_shared<apiexec::APIEXECHandler>(node.getBlockChain(), *node.getSolver(), executor_))
@@ -45,6 +45,9 @@ connector::connector(Node& node)
 , diag_processor(make_shared<api_diag::API_DIAGProcessor>(diag_handler))
 , stop_flag(false)
 {
+#ifdef NODE_API
+    serializationMan.bind(api_handler->tm_);
+#endif
 
 #ifdef BINARY_TCP_EXECAPI
 

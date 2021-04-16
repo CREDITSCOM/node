@@ -34,6 +34,7 @@ add_library(lib
   include/lib/system/lockfreechanger.hpp
   include/lib/system/dynamicbuffer.hpp
   include/lib/system/pmrfactory.hpp
+  include/lib/system/serialize_tuple.hpp
 )
 
 if (MSVC)

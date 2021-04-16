@@ -22,6 +22,7 @@
 #include <csnode/multiwallets.hpp>
 #include <csnode/walletsids.hpp>
 #include <csnode/poolcache.hpp>
+#include <csnode/caches_serialization_manager.hpp>
 
 #include <roundpackage.hpp>
 
@@ -36,6 +37,7 @@ class WalletsIds;
 class Fee;
 class TransactionsIndex;
 class TransactionsPacket;
+class BlockChain_Serializer;
 
 /** @brief   The synchronized block signal emits when block is trying to be stored */
 using TryToStoreBlockSignal = cs::Signal<void(const csdb::Pool&, bool*)>;
@@ -66,8 +68,11 @@ public:
                         bool recreateIndex = false);
     ~BlockChain();
 
-    bool init(const std::string& path,
-              cs::Sequence newBlockchainTop = cs::kWrongSequence);
+    bool init(
+      const std::string& path,
+      cs::CachesSerializationManager*,
+      cs::Sequence newBlockchainTop = cs::kWrongSequence
+    );
     // called immediately after object construction, better place to subscribe on signals
     void subscribeToSignals();
 
@@ -377,7 +382,6 @@ private:
     std::unique_ptr<cs::WalletsIds> walletIds_;
     std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
     std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
-    std::unique_ptr<cs::MultiWallets> multiWallets_;
 
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
@@ -461,8 +465,14 @@ private:
         desiredHash_ = csdb::PoolHash{};
     }
 
+    bool tryQuickStart(cs::CachesSerializationManager*);
+
+    cs::CachesSerializationManager* serializationManPtr_ = nullptr;
+
     // compare only state content: transactions, new wallets, sequence, round fee, user fields
     // true if both pools are not valid, or both pools have equal state content
     static bool testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs);
+
+    friend class cs::BlockChain_Serializer;
 };
 #endif  //  BLOCKCHAIN_HPP

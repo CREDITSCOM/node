@@ -24,9 +24,10 @@ using MiningDelegations = std::unordered_map<PublicKey, std::vector<std::pair<Pu
 
 class Staking {
 public:
-    using GetWalletDataCallback = std::function<WalletsCache::WalletData&(const PublicKey&)>;
+    using GetWalletDataCallback = std::function<WalletsCache::WalletData(const PublicKey&)>;
+    using WalletUpdatedCallback = std::function<void(const WalletsCache::WalletData&)>;
 
-    Staking(GetWalletDataCallback cb);
+    Staking(GetWalletDataCallback, WalletUpdatedCallback);
 
     void cleanObsoletteDelegations(uint64_t time);
     void cleanDelegationsFromCache(uint64_t delTime, Delegations& value);
@@ -80,6 +81,7 @@ private:
     DelegationsTiming currentDelegations_;
     MiningDelegations miningDelegations_;
     GetWalletDataCallback getWalletData_;
+    WalletUpdatedCallback updateCallback_;
 };
 
 } // namespace cs

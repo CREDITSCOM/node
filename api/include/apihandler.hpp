@@ -217,7 +217,7 @@ private:
         }
         SmartOperation(const SmartOperation& rhs)
         : state(rhs.state)
-        , stateTransaction(rhs.stateTransaction.clone())
+        , stateTransaction(rhs.stateTransaction)
         , hasRetval(rhs.hasRetval)
         , returnsBool(rhs.returnsBool)
         , boolResult(rhs.boolResult) {
