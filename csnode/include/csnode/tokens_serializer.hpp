@@ -6,6 +6,8 @@
 #include <boost/serialization/map.hpp>
 #include <boost/serialization/set.hpp>
 
+#include <cscrypto/cscrypto.hpp>
+
 #include "address_serializer.hpp"
 
 class TokensMaster;
@@ -17,6 +19,8 @@ public:
     void save();
     void load();
     void clear();
+
+    ::cscrypto::Hash hash();
 
 private:
     using HolderKey = csdb::Address;

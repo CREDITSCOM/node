@@ -1,4 +1,5 @@
 #include <fstream>
+#include <sstream>
 
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -23,6 +24,20 @@ void WalletsIds_Serializer::save() {
     boost::archive::text_oarchive oa(ofs);
     oa << *data_;
     oa << *nextId_;
+}
+
+::cscrypto::Hash WalletsIds_Serializer::hash() {
+    std::ostringstream ofs;
+    {
+      boost::archive::text_oarchive oa(ofs);
+      oa << *data_;
+      oa << *nextId_;
+    }
+    auto data = ofs.str();
+    return ::cscrypto::calculateHash(
+        (const ::cscrypto::Byte*)data.data(),
+        data.size()
+    );
 }
 
 void WalletsIds_Serializer::load() {

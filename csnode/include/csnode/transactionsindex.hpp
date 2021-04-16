@@ -27,6 +27,8 @@ public:
     void invalidate();
     void close();
 
+    bool recreate() const;
+
     Sequence getPrevTransBlock(const csdb::Address& _addr, Sequence _curr) const;
 
 public slots:

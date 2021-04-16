@@ -46,21 +46,7 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
     trxIndex_ = std::make_unique<cs::TransactionsIndex>(*this, cachesPath, recreateIndex);
 }
 
-BlockChain::~BlockChain() {
-    if (!serializationManPtr_) {
-        csinfo() << "~Blockchain: no serialization manager provided to save caches for QUICK START.";
-        return;
-    }
-
-    csinfo() << "~Blockchain: try to save caches for QUICK START.";
-
-    if (serializationManPtr_->save()) {
-      csinfo() << "~Blockchain: caches for QUICK START saved successfully.";
-    }
-    else {
-      csinfo() << "~Blockchain: couldn't save caches for QUICK START.";
-    }
-}
+BlockChain::~BlockChain() {}
 
 void BlockChain::subscribeToSignals() {
     // the order of two following calls matters
@@ -72,9 +58,7 @@ void BlockChain::subscribeToSignals() {
     cs::Connector::connect(&storage_.readingStoppedEvent(), trxIndex_.get(), &TransactionsIndex::onDbReadFinished);
 }
 
-bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManPtr) {
-    cslog() << "Try QUICK START...";
-
+bool BlockChain::bindSerializationManToCaches(cs::CachesSerializationManager* serializationManPtr) {
     if (!serializationManPtr) {
         cserror() << "NO SERIALIZATION MANAGER PROVIDED!";
         return false;
@@ -85,6 +69,16 @@ bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManP
     serializationManPtr_->bind(*this);
     serializationManPtr_->bind(*walletsCacheStorage_);
     serializationManPtr_->bind(*walletIds_);
+
+    return true;
+}
+
+bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManPtr) {
+    cslog() << "Try QUICK START...";
+
+    if (!bindSerializationManToCaches(serializationManPtr)) {
+        return false;
+    }
 
     bool ok = serializationManPtr_->load();
 
@@ -103,8 +97,14 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
     lastSequence_ = 0;
     bool successfulQuickStart = false;
 
-    if (newBlockchainTop != cs::kWrongSequence) {
-        successfulQuickStart = tryQuickStart(serializationManPtr);
+    if (newBlockchainTop == cs::kWrongSequence) {
+        if (trxIndex_->recreate()) {
+            cslog() << "Cannot use QUICK START, trxIndex has to be recreated";
+            bindSerializationManToCaches(serializationManPtr);
+        }
+        else {
+            successfulQuickStart = tryQuickStart(serializationManPtr);
+        }
     }
 
     cs::Sequence firstBlockToReadInDatabase = 0;
@@ -116,11 +116,25 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
         csinfo() << "QUICK START! lastSequence_   is " << lastSequence_.load();
         csinfo() << "QUICK START! first block to read in database is " << firstBlockToReadInDatabase;
     }
+    else {
+        cslog() << "SLOW START...";
+    }
 
     cslog() << kLogPrefix << "Trying to open DB...";
 
     size_t totalLoaded = 0;
+    bool checkTrxIndexRecreate = true;
+
     csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
+        if (checkTrxIndexRecreate) {
+          checkTrxIndexRecreate = false;
+          if (trxIndex_->recreate() && successfulQuickStart) {
+              cslog() << "Blockchain: TrxIndex must be recreated, cancel QUICK START... Restart NODE, please";
+              trxIndex_->invalidate();
+              return true;
+          }
+        }
+
         ++totalLoaded;
         if (progress.poolsProcessed % 1000 == 0) {
             std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << std::flush;
@@ -130,12 +144,6 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
 
     if (!storage_.open(path, progress, newBlockchainTop, firstBlockToReadInDatabase)) {
         cserror() << kLogPrefix << "Couldn't open database at " << path;
-
-        if (serializationManPtr_) {
-          csinfo() << "Remove data for QUICK START";
-          serializationManPtr_->clear();
-        }
-
         return false;
     }
 
@@ -151,10 +159,13 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
             cserror() << "failed!!! Delete the Database!!! It will be restored from nothing...";
             return false;
         }
+        if (successfulQuickStart) {
+            serializationManPtr_->clear();
+        }
         writeGenesisBlock();
     }
     else {
-        if (!postInitFromDB()) {
+        if (!postInitFromDB(successfulQuickStart)) {
             return false;
         }
     }
@@ -174,8 +185,8 @@ uint64_t BlockChain::uuid() const {
 
 void BlockChain::onStartReadFromDB(cs::Sequence lastWrittenPoolSeq) {
     if (lastWrittenPoolSeq > 0) {
-        cslog() << kLogPrefix << "start reading " << WithDelimiters(lastWrittenPoolSeq + 1)
-            << " blocks from DB, 0.." << WithDelimiters(lastWrittenPoolSeq);
+        cslog() << kLogPrefix << "start reading blocks from DB, " 
+                << "last is " << WithDelimiters(lastWrittenPoolSeq);
     }
 }
 
@@ -225,7 +236,7 @@ inline void BlockChain::updateNonEmptyBlocks(const csdb::Pool& pool) {
     }
 }
 
-bool BlockChain::postInitFromDB() {
+bool BlockChain::postInitFromDB(bool successfulQuickStart) {
     auto func = [](const cs::PublicKey& key, const WalletData& wallet) {
         double bal = wallet.balance_.to_double();
         if (bal < -std::numeric_limits<double>::min()) {
@@ -236,6 +247,9 @@ bool BlockChain::postInitFromDB() {
         return true;
     };
     walletsCacheStorage_->iterateOverWallets(func);
+    if (successfulQuickStart) {
+        emit stopReadingBlocksEvent(totalTransactionsCount_);
+    }
     return true;
 }
 
@@ -967,6 +981,20 @@ void BlockChain::close() {
     cs::Connector::disconnect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     blockHashes_->close();
     trxIndex_->close();
+
+    if (!serializationManPtr_) {
+        csinfo() << "Blockchain: no serialization manager provided to save caches for QUICK START.";
+        return;
+    }
+
+    csinfo() << "Blockchain: try to save caches for QUICK START.";
+
+    if (serializationManPtr_->save()) {
+      csinfo() << "Blockchain: caches for QUICK START saved successfully.";
+    }
+    else {
+      csinfo() << "~Blockchain: couldn't save caches for QUICK START.";
+    }
 }
 
 bool BlockChain::getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const {

@@ -7,6 +7,7 @@
 #include <boost/serialization/map.hpp>
 
 #include <csnode/transactionspacket.hpp>
+#include <cscrypto/cscrypto.hpp>
 #include <csdb/transaction.hpp>
 #include <lib/system/common.hpp>
 
@@ -22,6 +23,8 @@ public:
     void save();
     void load();
     void clear();
+
+    ::cscrypto::Hash hash();
 
 private:
     class SmartContractRef {

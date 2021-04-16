@@ -1,4 +1,5 @@
 #include <fstream>
+#include <sstream>
 
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -33,6 +34,23 @@ void BlockChain_Serializer::save() {
     oa << *totalTransactionsCount_;
     oa << uuid_->load();
     oa << lastSequence_->load();
+}
+
+::cscrypto::Hash BlockChain_Serializer::hash() {
+    std::ostringstream ofs;
+    {
+      boost::archive::text_oarchive oa(ofs);
+      oa << *previousNonEmpty_;
+      oa << *lastNonEmptyBlock_;
+      oa << *totalTransactionsCount_;
+      oa << uuid_->load();
+      oa << lastSequence_->load();
+    }
+    auto data = ofs.str();
+    return ::cscrypto::calculateHash(
+      (const ::cscrypto::Byte*)data.data(),
+      data.size()
+    );
 }
 
 void BlockChain_Serializer::load() {

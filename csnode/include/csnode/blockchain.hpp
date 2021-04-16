@@ -50,6 +50,7 @@ using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using AlarmSignal = cs::Signal<void(const cs::Sequence)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
 using StartReadingBlocksSignal = csdb::BlockReadingStartedSingal;
+using StopReadingBlocksSignal = cs::Signal<void(uint64_t totalTransactions)>;
 }  // namespace cs
 
 class BlockChain {
@@ -252,6 +253,8 @@ public signals:
     const cs::ReadBlockSignal& readBlockEvent() const;
     const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;
 
+    cs::StopReadingBlocksSignal stopReadingBlocksEvent;
+
 public slots:
 
     // subscription is placed in SmartContracts constructor
@@ -357,7 +360,7 @@ private:
 
     void onStartReadFromDB(cs::Sequence lastWrittenPoolSeq);
     void onReadFromDB(csdb::Pool block, bool* shouldStop);
-    bool postInitFromDB();
+    bool postInitFromDB(bool successfulQuickStart);
 
     bool updateWalletIds(const csdb::Pool& pool, cs::WalletsCache::Updater& updater);
     bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
@@ -466,6 +469,7 @@ private:
     }
 
     bool tryQuickStart(cs::CachesSerializationManager*);
+    bool bindSerializationManToCaches(cs::CachesSerializationManager*);
 
     cs::CachesSerializationManager* serializationManPtr_ = nullptr;
 
