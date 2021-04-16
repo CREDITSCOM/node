@@ -61,7 +61,6 @@ void WaitingState::on(SolverContext &context) {
         return;
     }
 
-    // TODO: value = (Consensus::PostConsensusTimeout * "own number in "writing" queue")
     const uint32_t value = sendRoundTableDelayMs_ * writingQueueNumber_;
 
     if (Consensus::Log) {
