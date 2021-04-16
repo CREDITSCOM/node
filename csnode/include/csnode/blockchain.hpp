@@ -84,7 +84,7 @@ public:
     static csdb::Address getAddressFromKey(const std::string&);
 
     static uint64_t getBlockTime(const csdb::Pool& block) noexcept;
-
+    static std::string poolInfo(const csdb::Pool& pool);
     // create/save block and related methods
 
     /**
@@ -120,7 +120,7 @@ public:
      * @return    The new recorded block if ok, otherwise nullopt.
      */
 
-    std::optional<csdb::Pool> createBlock(csdb::Pool pool) {
+    std::optional<csdb::Pool> createBlock(csdb::Pool& pool) {
         return recordBlock(pool, true);
     }
 

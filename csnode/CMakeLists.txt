@@ -69,6 +69,7 @@ add_library(csnode
   include/csnode/idatastream.hpp
   include/csnode/odatastream.hpp
   include/csnode/poolcache.hpp
+  include/csnode/staking.hpp
   src/blockchain.cpp
   src/node.cpp
   src/nodecore.cpp
@@ -96,6 +97,7 @@ add_library(csnode
   src/sendcachedata.cpp
   src/eventreport.cpp
   src/poolcache.cpp
+  src/staking.cpp
 )
 
 configure_msvc_flags()

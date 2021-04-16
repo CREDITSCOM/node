@@ -58,6 +58,7 @@ enum MsgTypes : uint8_t {
     EmptyRoundPack,
     BlockAlarm,
     EventReport,
+    SyncroMsg,
     NodeStopRequest = 255
 };
 

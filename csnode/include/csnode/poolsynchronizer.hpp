@@ -21,10 +21,13 @@ public:
 
     void sync(RoundNumber roundNum, RoundNumber difference = kRoundDifferentForSync);
     void syncLastPool();
-    void getBlockReply(PoolsBlock&& poolsBlock);
+    void getBlockReply(PoolsBlock&& poolsBlock, const cs::PublicKey& sender);
     bool isSyncroStarted() const;
 
+    cs::Sequence getMaxNeighbourSequence();
     static const RoundNumber kRoundDifferentForSync = values::kDefaultMetaStorageMaxSize;
+    void getSyncroMessage(const cs::PublicKey& sender, SyncroMessage msg);
+
 
 public signals:
     PoolSynchronizerRequestSignal sendRequest;
@@ -41,6 +44,12 @@ private slots:
 private:
     void sendBlockRequest();
     void sendBlock(const PublicKey& neighbour, const PoolsRequestedSequences& sequences);
+
+    void addSynchroLog(const cs::PublicKey& sender, cs::PoolsRequestedSequences& sequences, SyncroMessage msg);
+    bool changeSynchroLog(const cs::PublicKey& sender, SyncroMessage msg);
+    void updateSynchroLog();
+    bool removeSynchroLog(const cs::PublicKey& sender);
+    bool checkSynchroLog(const cs::PublicKey& sender);
 
     bool showSyncronizationProgress(Sequence lastWrittenSequence) const;
 
@@ -59,6 +68,7 @@ private:
     Sequence maxRequestedSequence_ = kWrongSequence;
     std::unordered_map<PublicKey, Sequence> neighbours_;
 
+    std::map<cs::PublicKey, std::tuple<cs::PoolsRequestedSequences, SyncroMessage, uint64_t>> synchroLog_;
     Timer timer_;
 };
 }  // namespace cs

@@ -154,6 +154,7 @@ public:
     // static Pool from_byte_stream(const char* data, size_t size);
     char* to_byte_stream(uint32_t&);
     cs::Bytes to_byte_stream_for_sig();
+    cs::Bytes to_binary_updated() const;
 
     Pool meta_from_byte_stream(const char*, size_t);
     static Pool from_lz4_byte_stream(size_t);

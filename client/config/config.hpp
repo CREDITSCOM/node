@@ -293,6 +293,10 @@ public:
         return dbSQLData_;
     }
 
+    bool isStakinOn(cs::RoundNumber round);
+    bool isMiningOn(cs::RoundNumber round);
+
+
 private:
     static Config readFromFile(const std::string& fileName);
 
@@ -363,6 +367,10 @@ private:
     ConveyerData conveyerData_;
 
     EventsReportData eventsReport_;
+
+    std::vector<std::pair<cs::RoundNumber, cs::RoundNumber>> stakingRoundRanges_;
+
+    std::vector<std::pair<cs::RoundNumber, cs::RoundNumber>> miningRoundRanges_;
 
     friend bool operator==(const Config&, const Config&);
     friend class cs::config::Observer;

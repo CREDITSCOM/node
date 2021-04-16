@@ -931,7 +931,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     if (isBootstrapRound()) {
         BlockChain::setBootstrap(pool.value(), true);
     }
-    blockChain_.addNewWalletsToPool(pool.value());
+    //blockChain_.addNewWalletsToPool(pool.value());
     if (!blockChain_.storeBlock(pool.value(), cs::PoolStoreType::Created)) {
         cserror() << "NODE> failed to store block in BlockChain";
     }
@@ -1328,6 +1328,134 @@ void Node::sendPacketHashesReply(const cs::PacketsVector& packets, const cs::Rou
     sendDirect(target, MsgTypes::TransactionsPacketReply, round, packets);
 }
 
+void Node::sendSyncroMessage(cs::Byte msg, const cs::PublicKey& target) {
+    csdebug() << __func__;
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+        return;
+    }
+    sendDirect(target, MsgTypes::SyncroMsg, cs::Conveyer::instance().currentRoundNumber(), msg);
+}
+
+void Node::getSyncroMessage(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+    //csdebug() << __func__;
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+        return;
+    }
+    cs::Byte msg;
+    cs::IDataStream stream(data, size);
+    stream >> msg;
+    poolSynchronizer_->getSyncroMessage(sender, static_cast<cs::SyncroMessage>(msg));
+}
+
+void Node::addSynchroRequestsLog(const cs::PublicKey& sender, cs::Sequence seq, cs::SyncroMessage msg) {
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+        return;
+    }
+    //csdebug() << __func__;
+    synchroRequestsLog_.emplace(sender, std::make_tuple(seq, msg, cs::Utils::currentTimestamp()));
+    //csdebug() << __func__ << " -> " << synchroRequestsLog_.size() << ": key " << cs::Utils::byteStreamToHex(sender) << " as " << static_cast<int>(msg) << " at " << std::get<2>(synchroRequestsLog_[sender]);
+}
+
+bool Node::changeSynchroRequestsLog(const cs::PublicKey& sender, cs::SyncroMessage msg) {
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+        return true;
+    }
+    //csdebug() << __func__;
+    if (synchroRequestsLog_.find(sender) == synchroRequestsLog_.end()) {
+        return false;
+    }
+    synchroRequestsLog_[sender] = std::make_tuple(std::get<0>(synchroRequestsLog_[sender]), msg, cs::Utils::currentTimestamp());
+    //csdebug() << __func__ << " -> " << synchroRequestsLog_.size() << ": key " << cs::Utils::byteStreamToHex(sender) << " changed to " << static_cast<int>(msg) << " at " << std::get<2>(synchroRequestsLog_[sender]);
+    return true;
+}
+
+void Node::updateSynchroRequestsLog() {
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+        return;
+    }
+    //csdebug() << __func__ << ": initial size: " << synchroRequestsLog_.size();
+    auto timeNow = cs::Utils::currentTimestamp();
+    auto it = synchroRequestsLog_.begin();
+    bool erasedData = false;
+    int cnt = 0;
+    while (it != synchroRequestsLog_.end()) {
+        if (cnt > 100) {
+            csdebug() << "break used to leave dead loop: synchroRequestsLog_.size() = " << synchroRequestsLog_.size();
+            break;
+        }
+
+        auto msg = std::get<1>(it->second);
+        auto timeEvent = std::get<2>(it->second);
+        //csdebug() << cs::Utils::byteStreamToHex(it->first) << ": " << std::get<0>(it->second) << ", time: " << timeEvent << ", status: " << static_cast<int>(msg);
+        switch (msg) {
+        case cs::SyncroMessage::Sent:
+            if (timeNow > timeEvent + 5000) {
+                csdebug() << __func__ << " -> " << synchroRequestsLog_.size() << ": key " << cs::Utils::byteStreamToHex(it->first) << " removed more than 5s after sent";
+                it = synchroRequestsLog_.erase(it);
+                erasedData = true;
+
+            }
+            break;
+        case cs::SyncroMessage::AwaitAnswer:
+            break;
+            //case cs::SyncroMessage::DuplicatedRequest:
+            //case cs::SyncroMessage::IncorrectRequest:
+            //case cs::SyncroMessage::NoAnswer:
+            //case cs::SyncroMessage::NoSuchBlocks:
+        default:
+            //csdebug() << __func__ << " -> " << synchroRequestsLog_.size() << ": key " << cs::Utils::byteStreamToHex(it->first) << " removed";
+            it = synchroRequestsLog_.erase(it);
+            erasedData = true;
+
+        }
+        if (!erasedData) {
+            ++it;
+        }
+        ++cnt;
+    }
+    //csdebug() << __func__ << " -> " << synchroRequestsLog_.size();
+}
+
+bool Node::removeSynchroRequestsLog(const cs::PublicKey& sender) {
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+        return true;
+    }
+    //csdebug() << __func__ << ": " << synchroRequestsLog_.size();
+    auto it = synchroRequestsLog_.find(sender);
+    if (it == synchroRequestsLog_.end()) {
+        //csdebug() << __func__ << ": no such key";
+        return false;
+    }
+    //csdebug() << __func__ << " -> " << synchroRequestsLog_.size() << ": key " << cs::Utils::byteStreamToHex(sender) << " removed";
+    it = synchroRequestsLog_.erase(it);
+    return true;
+}
+
+bool Node::checkSynchroRequestsLog(const cs::PublicKey& sender, cs::Sequence seq) {
+
+    updateSynchroRequestsLog();
+    //csdebug() << __func__ << ": size = " << synchroRequestsLog_.size();
+    if (synchroRequestsLog_.find(sender) != synchroRequestsLog_.end()) {
+        cs::Sequence maxSeq = 0;
+        for (auto it : synchroRequestsLog_) {
+            if (it.first != sender) {
+                continue;
+            }
+            auto curSeq = std::get<0>(it.second);
+            if (curSeq > maxSeq) {
+                maxSeq = curSeq;
+            }
+        }
+        if (maxSeq >= seq) {
+            csdebug() << __func__ << ": key " << cs::Utils::byteStreamToHex(sender) << " is false";
+            return false;
+        }
+    }
+    csdebug() << __func__ << ": key " << cs::Utils::byteStreamToHex(sender) << " is true";
+    return true;
+}
+
+
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
     csmeta(csdebug);
 
@@ -1336,17 +1464,28 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     cs::IDataStream stream(data, size);
     stream >> sequences;
 
-    csdebug() << "NODE> got request for " << sequences.size() << " block(s) from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
-
     if (sequences.empty()) {
         csmeta(cserror) << "Sequences size is 0";
+        sendSyncroMessage(cs::SyncroMessage::IncorrectRequest, sender);
         return;
     }
+
+    if (!checkSynchroRequestsLog(sender, sequences.back())) {
+        csdebug() << __func__ << ": Dupplicate request";
+        sendSyncroMessage(cs::SyncroMessage::DuplicatedRequest, sender);
+        return;
+    }
+
+    csdebug() << "NODE> got request for " << sequences.size() << " block(s) from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+
 
     if (sequences.front() > blockChain_.getLastSeq()) {
         csdebug() << "NODE> Get block request> The requested block: " << sequences.front() << " is beyond my last block";
+        sendSyncroMessage(cs::SyncroMessage::NoSuchBlocks, sender);
         return;
     }
+    addSynchroRequestsLog(sender, sequences.back(), cs::SyncroMessage::AwaitAnswer);
+    sendSyncroMessage(cs::SyncroMessage::AwaitAnswer, sender);
 
     const std::size_t reserveSize = sequences.size();
 
@@ -1372,7 +1511,9 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     sendReply();
 }
 
-void Node::getBlockReply(const uint8_t* data, const size_t size) {
+void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
+    csinfo() << __func__ << " from " << cs::Utils::byteStreamToHex(sender);
+
     bool isSyncOn = poolSynchronizer_->isSyncroStarted();
     bool isBlockchainUncertain = blockChain_.isLastBlockUncertain();
 
@@ -1407,7 +1548,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
     }
 
     if (isSyncOn) {
-        poolSynchronizer_->getBlockReply(std::move(poolsBlock));
+        poolSynchronizer_->getBlockReply(std::move(poolsBlock), sender);
     }
 }
 
@@ -1427,6 +1568,8 @@ void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey&
     }
 
     auto region = compressor_.compress(poolsBlock);
+    changeSynchroRequestsLog(target, cs::SyncroMessage::Sent);
+
     sendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), region);
 }
 
@@ -1617,6 +1760,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         case MsgTypes::StateReply:
         case MsgTypes::BlockAlarm:
         case MsgTypes::EventReport:
+        case MsgTypes::SyncroMsg:
             return MessageActions::Process;
 
         default:
@@ -2645,6 +2789,11 @@ bool Node::isLastRPStakeFull(cs::RoundNumber rNum) {
 
 void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
     csdebug() << "NODE> get round table R-" << WithDelimiters(rNum) << " from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    if (poolSynchronizer_->getMaxNeighbourSequence() > rNum + 10) {
+        csdebug() << "The processed packets are usually obsolette - try to clear transport module caches";
+        transport_->clearInbox();
+    }
+
     csmeta(csdetails) << "started";
 
     if (myLevel_ == Level::Writer) {
@@ -2706,9 +2855,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     processSync();
 
-    if (poolSynchronizer_->isSyncroStarted()) {
-        getCharacteristic(rPackage);
-    }
+    //if (poolSynchronizer_->isSyncroStarted()) {
+    //    getCharacteristic(rPackage);
+    //}
 
     rPackage.setSenderNode(sender);
     bool updateRound = false;
@@ -3695,7 +3844,7 @@ void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
     processSpecialInfo(block);
 }
 
-void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_failed should be FALSE of the block is ok 
+void Node::deepBlockValidation(const csdb::Pool& block, bool* check_failed) {//check_failed should be FALSE of the block is ok 
     *check_failed = false;
     const auto seq = block.sequence();
     if (seq == 0) {
