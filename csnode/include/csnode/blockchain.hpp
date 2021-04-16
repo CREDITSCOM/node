@@ -84,7 +84,7 @@ public:
     static csdb::Address getAddressFromKey(const std::string&);
 
     static uint64_t getBlockTime(const csdb::Pool& block) noexcept;
-
+    static std::string poolInfo(const csdb::Pool& pool);
     // create/save block and related methods
 
     /**

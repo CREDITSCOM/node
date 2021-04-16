@@ -1452,6 +1452,9 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
         }
 
         setTransactionsFees(pool);
+        if (type == cs::PoolStoreType::Created) {
+            addNewWalletsToPool(pool);
+        }
 
         //validate block to prevent bc from saving invalid instances:
         bool check_failed = false;
@@ -1503,6 +1506,15 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
 
     // cache always successful
     return true;
+}
+
+std::string BlockChain::poolInfo(const csdb::Pool& pool) {
+    std::string res = "";
+    res += "seq: " + std::to_string(pool.sequence());
+    res += ", trxs: " + std::to_string(pool.transactions().size());
+    res += ", sigs: " + std::to_string(pool.signatures().size());
+    //res += ", hash: " + pool.hash().to_string();
+    return res;
 }
 
 void BlockChain::testCachedBlocks() {

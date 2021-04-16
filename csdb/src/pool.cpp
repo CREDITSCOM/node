@@ -385,7 +385,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
 		size_t cnt;
 
 		if (!get_meta(is, cnt)) {
-			csmeta(cswarning) << "get meta is failed";
+            csmeta(cswarning) << "get meta is failed: size =" << is.size();
 			return false;
 		}
 
@@ -905,6 +905,13 @@ bool Pool::compose() {
 
 cs::Bytes Pool::to_binary() const noexcept {
     return d->binary_representation_;
+}
+
+cs::Bytes Pool::to_binary_updated() const {
+    ::csdb::priv::obstream os;
+    d->put(os, false);
+    cs::Bytes result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
+    return result;
 }
 
 /*static*/

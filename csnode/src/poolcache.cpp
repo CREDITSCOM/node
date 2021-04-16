@@ -1,6 +1,7 @@
 #include <poolcache.hpp>
 
 #include <csdb/pool.hpp>
+#include <lib/system/utils.hpp>
 
 static const std::string dbPath = "/poolcachedb";
 
@@ -14,7 +15,13 @@ cs::PoolCache::~PoolCache() {
 }
 
 void cs::PoolCache::insert(const csdb::Pool& pool, PoolStoreType type) {
-    insert(pool.sequence(), pool.to_binary(), type);
+    cs::Bytes pBin = (type == PoolStoreType::Created ? pool.to_binary_updated() : pool.to_binary());
+    insert(pool.sequence(), pBin, type);
+    //if (type == PoolStoreType::Created)
+    //{
+    //    csdebug() << "created pool (" << pool.sequence() << "): " << cs::Utils::byteStreamToHex(pBin);
+    //}
+
 }
 
 void cs::PoolCache::insert(cs::Sequence sequence, const cs::Bytes& bytes, cs::PoolStoreType type) {
@@ -57,6 +64,7 @@ std::optional<cs::PoolCache::Data> cs::PoolCache::value(cs::Sequence sequence) c
     Data data { csdb::Pool::from_binary(std::move(bytes)), cachedType(sequence) };
 
     if (data.pool.sequence() != sequence) {
+        csdebug() << __func__ << ": data size = " << bytes.size() << ", content = " << cs::Utils::byteStreamToHex(bytes);
         return std::nullopt;
     }
 

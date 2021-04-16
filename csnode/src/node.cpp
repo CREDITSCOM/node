@@ -931,7 +931,7 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     if (isBootstrapRound()) {
         BlockChain::setBootstrap(pool.value(), true);
     }
-    blockChain_.addNewWalletsToPool(pool.value());
+    //blockChain_.addNewWalletsToPool(pool.value());
     if (!blockChain_.storeBlock(pool.value(), cs::PoolStoreType::Created)) {
         cserror() << "NODE> failed to store block in BlockChain";
     }
@@ -1377,7 +1377,13 @@ void Node::updateSynchroRequestsLog() {
     auto timeNow = cs::Utils::currentTimestamp();
     auto it = synchroRequestsLog_.begin();
     bool erasedData = false;
+    int cnt = 0;
     while (it != synchroRequestsLog_.end()) {
+        if (cnt > 100) {
+            csdebug() << "break used to leave dead loop: synchroRequestsLog_.size() = " << synchroRequestsLog_.size();
+            break;
+        }
+
         auto msg = std::get<1>(it->second);
         auto timeEvent = std::get<2>(it->second);
         //csdebug() << cs::Utils::byteStreamToHex(it->first) << ": " << std::get<0>(it->second) << ", time: " << timeEvent << ", status: " << static_cast<int>(msg);
@@ -1405,6 +1411,7 @@ void Node::updateSynchroRequestsLog() {
         if (!erasedData) {
             ++it;
         }
+        ++cnt;
     }
     //csdebug() << __func__ << " -> " << synchroRequestsLog_.size();
 }
@@ -2848,9 +2855,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     processSync();
 
-    if (poolSynchronizer_->isSyncroStarted()) {
-        getCharacteristic(rPackage);
-    }
+    //if (poolSynchronizer_->isSyncroStarted()) {
+    //    getCharacteristic(rPackage);
+    //}
 
     rPackage.setSenderNode(sender);
     bool updateRound = false;
