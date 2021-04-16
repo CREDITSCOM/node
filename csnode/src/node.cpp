@@ -618,6 +618,17 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
         addToBlackList(sender, true);
     }
     cs::Bytes toHash = packet.toBinary(cs::TransactionsPacket::Serialization::Transactions);
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+        return;
+    }
+    if (orderedPackets_.find(packet.hash()) == orderedPackets_.end()) {
+        cswarning() << "Received transaction packet was not ordered";
+    }
+    else {
+        orderedPackets_.erase(packet.hash());
+    }
+    sendPacketHash(packet.hash());
+
 }
 
 void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size) {
@@ -1285,6 +1296,37 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
     sendBroadcast(MsgTypes::TransactionPacket, cs::Conveyer::instance().currentRoundNumber(), packet);
 }
 
+void Node::sendTransactionsPacketHash(const cs::TransactionsPacket& packet) {
+    if (packet.hash().isEmpty()) {
+        cswarning() << "Send transaction packet with empty hash failed";
+        return;
+    }
+    sendBroadcast(MsgTypes::TransactionPacketHash, cs::Conveyer::instance().currentRoundNumber(), packet.hash());
+}
+
+void Node::sendPacketHash(const cs::TransactionsPacketHash& hash) {
+    csdebug() << "NODE> Sending transaction's packet hash (only): " << cs::Utils::byteStreamToHex(hash.toBinary().data(), hash.size());
+    sendBroadcast(MsgTypes::TransactionPacketHash, cs::Conveyer::instance().currentRoundNumber(), hash);
+}
+
+void Node::getPacketHash(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+    cs::IDataStream stream(data, size);
+    cs::TransactionsPacketHash pHash;
+    stream >> pHash;
+    const cs::Conveyer& conveyer = cs::Conveyer::instance();
+    if (conveyer.isPacketAtMeta(pHash)) {
+        return;
+    }
+    if (orderedPackets_.find(pHash) != orderedPackets_.end()) {
+        return;
+    }
+    orderedPackets_.emplace(pHash, rNum);
+    cs::PacketsHashes pHashes;
+    pHashes.push_back(pHash);
+    sendPacketHashesRequest(pHashes, conveyer.currentRoundNumber(), 0);
+}
+
+
 void Node::sendPacketHashesRequest(const cs::PacketsHashes& hashes, const cs::RoundNumber round, uint32_t requestStep) {
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
 
@@ -1432,7 +1474,9 @@ bool Node::removeSynchroRequestsLog(const cs::PublicKey& sender) {
 }
 
 bool Node::checkSynchroRequestsLog(const cs::PublicKey& sender, cs::Sequence seq) {
-
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+        return true;
+    }
     updateSynchroRequestsLog();
     //csdebug() << __func__ << ": size = " << synchroRequestsLog_.size();
     if (synchroRequestsLog_.find(sender) != synchroRequestsLog_.end()) {
@@ -1701,7 +1745,14 @@ void Node::processTimer() {
 }
 
 void Node::onTransactionsPacketFlushed(const cs::TransactionsPacket& packet) {
-    CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+        CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacket, this, packet));
+    }
+    else {
+        CallsQueue::instance().insert(std::bind(&Node::sendTransactionsPacketHash, this, packet));
+    }
+
+
 }
 
 void Node::onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender) {
@@ -1750,6 +1801,7 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         case MsgTypes::ThirdSmartStage:
         case MsgTypes::NodeStopRequest:
         case MsgTypes::TransactionPacket:
+        case MsgTypes::TransactionPacketHash:
         case MsgTypes::TransactionsPacketRequest:
         case MsgTypes::TransactionsPacketReply:
         case MsgTypes::RoundTableRequest:
@@ -3442,6 +3494,17 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     badHashReplyCounter_.clear();
     badHashReplyCounter_.resize(roundTable.confidants.size());
+
+    auto checkOrdered = orderedPackets_.begin();
+    while (checkOrdered != orderedPackets_.end()) {
+        if (checkOrdered->second + 10 < roundTable.round) {
+            checkOrdered = orderedPackets_.erase(checkOrdered);
+        }
+        else {
+            ++checkOrdered;
+        }
+    }
+
 
     for (auto badHash : badHashReplyCounter_) {
         badHash = false;

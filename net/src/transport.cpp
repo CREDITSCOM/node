@@ -370,6 +370,8 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
             return node_->getEventReport(data, size, rNum, sender);
         case MsgTypes::SyncroMsg:
             return node_->getSyncroMessage(data, size, sender);
+        case MsgTypes::TransactionPacketHash:
+            return node_->getPacketHash(data, size, rNum, sender);
         default:
             break;
     }

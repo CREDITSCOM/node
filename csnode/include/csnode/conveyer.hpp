@@ -250,6 +250,7 @@ public:
     ///
     std::optional<cs::TransactionsPacket> findPacket(const cs::TransactionsPacketHash& hash, const cs::RoundNumber round) const;
 
+    bool isPacketAtMeta(const cs::TransactionsPacketHash& hash) const;
     ///
     /// @brief Returns existing of invalid transaction in meta storage.
     /// @param innerId of transaction to search equal transaction.

@@ -204,7 +204,9 @@ public:
     void updateSynchroRequestsLog();
     bool removeSynchroRequestsLog(const cs::PublicKey& sender);
 
-
+    void sendPacketHash(const cs::TransactionsPacketHash& hash);
+    void getPacketHash(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
+    void Node::sendTransactionsPacketHash(const cs::TransactionsPacket& packet);
 
     // transaction's pack syncro
     void sendTransactionsPacket(const cs::TransactionsPacket& packet);
@@ -501,7 +503,7 @@ private:
 
     size_t notInRound_ = 0;
     std::map<cs::PublicKey, std::tuple<cs::Sequence, cs::SyncroMessage, uint64_t>> synchroRequestsLog_;
-
+    std::map<cs::TransactionsPacketHash, cs::RoundNumber> orderedPackets_;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

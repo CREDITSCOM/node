@@ -74,6 +74,8 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
             return "EmptyRoundPack";
         case SyncroMsg:
             return "SyncroMsg";
+        case TransactionPacketHash:
+            return "TransactionPacketHash";
         default:
             return "Unknown";
     }
