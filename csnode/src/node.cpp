@@ -3837,7 +3837,7 @@ void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
     processSpecialInfo(block);
 }
 
-void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_failed should be FALSE of the block is ok 
+void Node::deepBlockValidation(const csdb::Pool& block, bool* check_failed) {//check_failed should be FALSE of the block is ok 
     *check_failed = false;
     const auto seq = block.sequence();
     if (seq == 0) {

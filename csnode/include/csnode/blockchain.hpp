@@ -120,7 +120,7 @@ public:
      * @return    The new recorded block if ok, otherwise nullopt.
      */
 
-    std::optional<csdb::Pool> createBlock(csdb::Pool pool) {
+    std::optional<csdb::Pool> createBlock(csdb::Pool& pool) {
         return recordBlock(pool, true);
     }
 

@@ -346,7 +346,7 @@ public slots:
     void sendBlockRequestToConfidants(cs::Sequence sequence);
     void processSpecialInfo(const csdb::Pool& pool);
     void validateBlock(const csdb::Pool& block, bool* shouldStop);
-    void deepBlockValidation(csdb::Pool block, bool* shouldStop);
+    void deepBlockValidation(const csdb::Pool& block, bool* shouldStop);
     void sendBlockAlarmSignal(cs::Sequence seq);
     void onRoundTimeElapsed();
     void onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
