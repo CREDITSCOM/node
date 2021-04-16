@@ -112,6 +112,7 @@ bool PacketValidator::validateNodePacket(const Packet& packet) {
         case MsgTypes::BlockHash:
         case MsgTypes::HashReply:
         case MsgTypes::TransactionPacket:
+        case MsgTypes::TransactionPacketHash:
         case MsgTypes::TransactionsPacketRequest:
         case MsgTypes::TransactionsPacketReply:
         case MsgTypes::FirstStage:
@@ -126,6 +127,8 @@ bool PacketValidator::validateNodePacket(const Packet& packet) {
         case MsgTypes::SmartFirstStageRequest:
         case MsgTypes::SmartSecondStageRequest:
         case MsgTypes::SmartThirdStageRequest:
+        case MsgTypes::TransactionsPacketBaseRequest:
+        case MsgTypes::TransactionsPacketBaseReply:
         case MsgTypes::RejectedContracts:
         case MsgTypes::StateRequest:
         case MsgTypes::StateReply:

@@ -52,6 +52,7 @@ private:
     bool checkSynchroLog(const cs::PublicKey& sender);
 
     bool showSyncronizationProgress(Sequence lastWrittenSequence) const;
+    void manageSyncBlocks(cs::PoolsBlock&& poolsBlock);
 
     std::vector<Sequence> getNeededSequences(
         const std::vector<BlockChain::SequenceInterval>& requiredBlocks,

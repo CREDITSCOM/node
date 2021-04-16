@@ -725,7 +725,11 @@ void Node::getPacketHashesRequest(const uint8_t* data, const std::size_t size, c
     cs::PacketsHashes hashes;
     stream >> hashes;
 
-    csdebug() << "NODE> Get request for " << hashes.size() << " packet hashes from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+    std::string sHashes;
+    csdebug() << "NODE> Get request for " << hashes.size() 
+        << " packet hashes: " << sHashes 
+        << " from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+
 
     if (hashes.empty()) {
         csmeta(cserror) << "Wrong hashes list requested";
@@ -1313,17 +1317,101 @@ void Node::getPacketHash(const uint8_t* data, const std::size_t size, const cs::
     cs::IDataStream stream(data, size);
     cs::TransactionsPacketHash pHash;
     stream >> pHash;
+    csdebug() << "get packetHash " << pHash.toString() << " from " << cs::Utils::byteStreamToHex(sender);
     const cs::Conveyer& conveyer = cs::Conveyer::instance();
     if (conveyer.isPacketAtMeta(pHash)) {
+        csdebug() << "packetHash " << pHash.toString() << " is in meta";
         return;
     }
     if (orderedPackets_.find(pHash) != orderedPackets_.end()) {
+        csdebug() << "packetHash " << pHash.toString() << " is ordered";
         return;
     }
     orderedPackets_.emplace(pHash, rNum);
     cs::PacketsHashes pHashes;
     pHashes.push_back(pHash);
-    sendPacketHashesRequest(pHashes, conveyer.currentRoundNumber(), 0);
+    //sendPacketHashesRequest(pHashes, conveyer.currentRoundNumber(), 0);
+    csdebug() << "sending packetHashesRequest " << pHash.toString() << " to " << cs::Utils::byteStreamToHex(sender);
+    sendPacketHashRequest(pHashes, sender, conveyer.currentRoundNumber());
+}
+
+void Node::sendPacketHashRequest(const cs::PacketsHashes& hashes, const cs::PublicKey& respondent, cs::RoundNumber round) {
+    sendDirect(respondent, MsgTypes::TransactionsPacketBaseRequest, round, hashes);
+}
+
+void Node::getPacketHashRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
+    cs::IDataStream stream(data, size);
+
+    cs::PacketsHashes hashes;
+    stream >> hashes;
+    std::string sHashes;
+    for (auto it : hashes) {
+        sHashes += it.toString() + ", ";
+    }
+    csdebug() << "NODE> Get request for " << hashes.size() << " packet hashes: " << sHashes << "from " << cs::Utils::byteStreamToHex(sender.data(), sender.size());
+
+    if (hashes.empty()) {
+        csmeta(cserror) << "Wrong hashes list requested";
+        return;
+    }
+
+    processPacketsBaseRequest(std::move(hashes), round, sender);
+}
+
+void Node::processPacketsBaseRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender) {
+    csdebug() << "NODE> Processing packets base request";
+
+    cs::PacketsVector packets;
+
+    const auto& conveyer = cs::Conveyer::instance();
+    std::unique_lock<cs::SharedMutex> lock = conveyer.lock();
+
+    for (const auto& hash : hashes) {
+        std::optional<cs::TransactionsPacket> packet = conveyer.findPacket(hash, round);
+
+        if (packet) {
+            packets.push_back(std::move(packet).value());
+        }
+    }
+
+    if (packets.empty()) {
+        csdebug() << "NODE> Cannot find packets in storage";
+    }
+    else {
+        csdebug() << "NODE> Found packets in storage: " << packets.size();
+        sendPacketHashesBaseReply(packets, round, sender);
+    }
+}
+
+void Node::sendPacketHashesBaseReply(const cs::PacketsVector& packets, const cs::RoundNumber round, const cs::PublicKey& target) {
+    if (packets.empty()) {
+        return;
+    }
+
+    csdebug() << "NODE> Base reply transaction packets: " << packets.size();
+    sendDirect(target, MsgTypes::TransactionsPacketBaseReply, round, packets);
+}
+
+void Node::getPacketHashesBaseReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
+    cs::IDataStream stream(data, size);
+
+    cs::PacketsVector packets;
+    stream >> packets;
+
+    if (packets.empty()) {
+        csmeta(cserror) << "Packet hashes reply, bad packets parsing";
+        return;
+    }
+
+    csdebug() << "NODE> Get base reply with " << packets.size() << " packet hashes from sender " << cs::Utils::byteStreamToHex(sender);
+    cs::Conveyer& conveyer = cs::Conveyer::instance();
+    for (auto&& packet : packets) {
+        packet.makeHash();
+        if (orderedPackets_.find(packet.hash()) != orderedPackets_.end()) {
+            conveyer.addExternalPacketToMeta(std::move(packet));
+        }
+
+    }
 }
 
 
@@ -1804,6 +1892,8 @@ Node::MessageActions Node::chooseMessageAction(const cs::RoundNumber rNum, const
         case MsgTypes::TransactionPacketHash:
         case MsgTypes::TransactionsPacketRequest:
         case MsgTypes::TransactionsPacketReply:
+        case MsgTypes::TransactionsPacketBaseRequest:
+        case MsgTypes::TransactionsPacketBaseReply:
         case MsgTypes::RoundTableRequest:
         case MsgTypes::RejectedContracts:
         case MsgTypes::RoundPackRequest:
@@ -3497,7 +3587,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     auto checkOrdered = orderedPackets_.begin();
     while (checkOrdered != orderedPackets_.end()) {
-        if (checkOrdered->second + 10 < roundTable.round) {
+        if (checkOrdered->second + cs::ConfigHolder::instance().config()->conveyerData().maxPacketLifeTime < roundTable.round) {
             checkOrdered = orderedPackets_.erase(checkOrdered);
         }
         else {

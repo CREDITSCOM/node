@@ -60,6 +60,8 @@ enum MsgTypes : uint8_t {
     EventReport,
     SyncroMsg,
     TransactionPacketHash,
+    TransactionsPacketBaseRequest,
+    TransactionsPacketBaseReply,
     NodeStopRequest = 255
 };
 

@@ -701,10 +701,15 @@ void cs::ConveyerBase::onRoundChanged(cs::RoundNumber round) {
     }
 }
 
+void cs::ConveyerBase::addExternalPacketToMeta(cs::TransactionsPacket&& packet) {
+    addPacketToMeta(packet);
+}
+
 void cs::ConveyerBase::addPacketToMeta(cs::TransactionsPacket& packet) {
     auto hash = packet.hash();
 
     if (!isPacketAtCache(packet)) {
+        csdebug() << "Adding packet with hash: " << hash.toString();
         pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
     }
     else {

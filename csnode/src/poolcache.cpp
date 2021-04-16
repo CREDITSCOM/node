@@ -61,7 +61,9 @@ cs::Sequence cs::PoolCache::maxSequence() const {
 
 std::optional<cs::PoolCache::Data> cs::PoolCache::value(cs::Sequence sequence) const {
     auto bytes = db_.value<cs::Bytes>(sequence);
-    Data data { csdb::Pool::from_binary(std::move(bytes)), cachedType(sequence) };
+    auto bType = cachedType(sequence);
+    Data data{ csdb::Pool::from_binary(std::move(bytes), bType != cs::PoolStoreType::Created), bType };
+
 
     if (data.pool.sequence() != sequence) {
         csdebug() << __func__ << ": data size = " << bytes.size() << ", content = " << cs::Utils::byteStreamToHex(bytes);

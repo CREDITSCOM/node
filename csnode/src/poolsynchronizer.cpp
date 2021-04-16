@@ -91,6 +91,7 @@ void PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber difference
         synchroFinished();
         return;
     }
+    csdebug() << "SYNC: before syncro start: " << (isSyncroStarted_ ? "Already started" : "Not yet");
 
     if (!isSyncroStarted_) {
         isSyncroStarted_ = true;
@@ -115,11 +116,7 @@ void PoolSynchronizer::syncLastPool() {
     emit sendRequest(target, PoolsRequestedSequences{blockChain_->getLastSeq() + 1});
 }
 
-void PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::PublicKey& sender) {
-    csdebug() << "SYNC: Get Block Reply <<<<<<< : count: " << poolsBlock.size()
-              << ", seqs: [" << poolsBlock.front().sequence()
-              << ", " << poolsBlock.back().sequence() << "]";
-    removeSynchroLog(sender);
+void PoolSynchronizer::manageSyncBlocks(cs::PoolsBlock&& poolsBlock) {
     cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
 
     const auto oldLastWrittenSequence = lastWrittenSequence;
@@ -152,6 +149,16 @@ void PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::Publ
             synchroFinished();
         }
     }
+}
+
+void PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::PublicKey& sender) {
+    csdebug() << "SYNC: Get Block Reply <<<<<<< : count: " << poolsBlock.size()
+        << ", seqs: [" << poolsBlock.front().sequence()
+        << ", " << poolsBlock.back().sequence() << "]";
+    removeSynchroLog(sender);
+    //std::thread sThread(&PoolSynchronizer::manageSyncBlocks, this, std::move(poolsBlock));;
+    //sThread.detach();
+    manageSyncBlocks(std::move(poolsBlock));
 }
 
 bool PoolSynchronizer::isSyncroStarted() const {

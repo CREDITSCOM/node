@@ -468,13 +468,13 @@ class Pool::priv : public ::csdb::internal::shared_data {
         binary_representation_ = std::move(bytes);
     }
 
-    void update_transactions() {
-        read_only_ = true;
+    void update_transactions(bool makeReadOnly = true) {
+        read_only_ = makeReadOnly;
 
         updateHash();
 
         for (size_t idx = 0; idx < transactions_.size(); ++idx) {
-            transactions_[idx].d->_update_id(sequence_, idx);
+            transactions_[idx].d->_update_id(sequence_, idx, makeReadOnly);
         }
     }
 
@@ -927,14 +927,14 @@ PoolHash Pool::hash_from_binary(cs::Bytes&& data) {
 }
 
 /*static*/
-Pool Pool::from_binary(cs::Bytes&& data) {
+Pool Pool::from_binary(cs::Bytes&& data, bool makeReadOnly) {
     std::unique_ptr<priv> p{new priv()};
     ::csdb::priv::ibstream is(data.data(), data.size());
     if (!p->get(is)) {
         return Pool();
     }
     p->update_binary_representation(std::move(data));
-    p->update_transactions();
+    p->update_transactions(makeReadOnly);
     return Pool(p.release());
 }
 

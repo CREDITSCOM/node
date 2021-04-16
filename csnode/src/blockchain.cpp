@@ -561,7 +561,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
     const auto& signatures = pool.signatures();
     const auto& realTrusted = pool.realTrusted();
     if (currentSequence > 1) {
-        csdebug() << kLogPrefix << "Finalize: starting confidants validation procedure:";
+        csdebug() << kLogPrefix << "Finalize: starting confidants validation procedure (#" << currentSequence << "):";
 
         cs::Bytes trustedToHash;
         cs::ODataStream tth(trustedToHash);
@@ -611,7 +611,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
         auto hash = pool.hash().to_binary();
         std::copy(hash.cbegin(), hash.cend(), tempHash.data());
         if (NodeUtils::checkGroupSignature(confidants, mask, signatures, tempHash)) {
-            csmeta(csdebug) << kLogPrefix << "The number of signatures is sufficient and all of them are OK!";
+            csmeta(csdebug) << kLogPrefix << "The number of signatures is sufficient and all of them are OK";
         }
         else {
             cswarning() << kLogPrefix << "Some of Pool Signatures aren't valid. The pool will not be written to DB. It will be automatically written, when we get proper data";
@@ -845,14 +845,14 @@ bool BlockChain::insertNewWalletId(const csdb::Address& newWallAddress, WalletId
     return true;
 }
 
-void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
+bool BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
     csdebug() << kLogPrefix << "store block #" << pool.sequence() << " add new wallets to pool";
 
     csdb::Pool::NewWallets* newWallets = pool.newWallets();
 
     if (!newWallets) {
         cserror() << kLogPrefix << "Pool is read-only";
-        return;
+        return false;
     }
 
     newWallets->clear();
@@ -884,6 +884,7 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
         }
         newWallets->emplace_back(csdb::Pool::NewWalletInfo{addrAndId.second.second, addrAndId.second.first});
     }
+    return true;
 }
 
 void BlockChain::tryFlushDeferredBlock() {
@@ -1191,7 +1192,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         lastSequence_ = deferredBlock_.sequence();
     }
 
-    csdetails() << kLogPrefix << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+    //csdetails() << kLogPrefix << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
     emit storeBlockEvent(pool);
     if constexpr (false && (pool.transactions_count() > 0 || pool.sequence() % 10 == 0)) {//log code
         std::string res = printWalletCaches() + "\nTransactions: \n";
@@ -1382,7 +1383,7 @@ bool BlockChain::isSpecial(const csdb::Transaction& t) {
 bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
     const auto lastSequence = getLastSeq();
     const auto poolSequence = pool.sequence();
-    csdebug() << csfunc() << "last #" << lastSequence << ", pool #" << poolSequence;
+    csdebug() << csfunc() << "last #" << lastSequence << ", current pool #" << poolSequence << (pool.is_read_only() ? " - Read-Only" : " - Normal");
 
     if (poolSequence < lastSequence) {
         // ignore
@@ -1398,6 +1399,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
     }
 
     if (poolSequence == lastSequence) {
+        csdebug() << kLogPrefix << "poolSequence == lastSequence";
         if (isLastBlockUncertain() && pool.sequence() == uncertainSequence_) {
             cslog() << kLogPrefix << "review replacement for uncertain block " << WithDelimiters(poolSequence);
             if (pool.hash() == desiredHash_) {
@@ -1451,9 +1453,11 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
             return false;
         }
 
-        setTransactionsFees(pool);
+        setTransactionsFees(pool, type);
         if (type == cs::PoolStoreType::Created) {
-            addNewWalletsToPool(pool);
+            if (!addNewWalletsToPool(pool)) {
+                csdebug() << kLogPrefix << "can't write a block without adding new wallets";
+            }
         }
 
         //validate block to prevent bc from saving invalid instances:
@@ -1500,8 +1504,11 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
     // cache block for future recording
     cachedBlocks_->insert(pool, type);
 
-    csdebug() << kLogPrefix << "cache block #" << poolSequence << " signed by " << pool.signatures().size()
+    csdebug() << kLogPrefix << "cache block #" << poolSequence << "("
+        << (pool.is_read_only() ? "Read-Only" : "Normal")
+        << ") signed by " << pool.signatures().size()
         << " nodes for future (" << cachedBlocks_->size() << " total)";
+
     cachedBlockEvent(poolSequence);
 
     // cache always successful
@@ -1553,6 +1560,10 @@ void BlockChain::testCachedBlocks() {
             if (!data.has_value()) {
                 cswarning() << "cached blocks returned not valid pool, stop testing cache";
                 break;
+            }
+
+            if (data.value().pool.is_read_only() && data.value().type == cs::PoolStoreType::Created) {
+                cswarning() << "created block from chache is read-only";
             }
 
             const bool ok = storeBlock(data.value().pool, data.value().type);
@@ -1633,7 +1644,7 @@ void BlockChain::clearBlockCache() {
 std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const {
     cs::Sequence seq = getLastSeq();
     const auto firstSequence = seq + 1;
-    const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
+    const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber()-1;
 
     if (firstSequence >= currentRoundNumber) {
         return std::vector<SequenceInterval>();
@@ -1651,14 +1662,19 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const 
     if (ranges.empty()) {
         return std::vector<SequenceInterval>{ {firstSequence, roundNumber} };
     }
-
+    bool emplaceLater = false;
     if (firstSequence < ranges.front().first) {
-        ranges.front().first = firstSequence;
+        ranges.emplace_back(firstSequence, cachedBlocks_->minSequence() - 1);
+        emplaceLater = true;
+    }
+    //TODO: this piece of code should be precisely examined
+    if (ranges.back().second < roundNumber) {
+        ranges.emplace_back(cachedBlocks_->maxSequence() + 1, roundNumber);
+    }
+    if (emplaceLater) {
+        ranges.emplace_back(firstSequence, cachedBlocks_->minSequence() - 1);
     }
 
-    if (ranges.back().second < roundNumber) {
-        ranges.back().second = roundNumber;
-    }
 
     return ranges;
 }
@@ -1667,7 +1683,12 @@ void BlockChain::setTransactionsFees(TransactionsPacket& packet) {
     fee::setCountedFees(packet.transactions());
 }
 
-void BlockChain::setTransactionsFees(csdb::Pool& pool) {
+void BlockChain::setTransactionsFees(csdb::Pool& pool, cs::PoolStoreType type) {
+    csdebug() << __func__;
+    if (pool.is_read_only() && type == cs::PoolStoreType::Created) {
+        cserror() << kLogPrefix << "Pool is read-only";
+        return;
+    }
     fee::setCountedFees(pool.transactions());
 }
 

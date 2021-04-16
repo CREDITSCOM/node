@@ -100,6 +100,8 @@ public:
     ///
     void setTable(const cs::RoundTable& table);
 
+    void addExternalPacketToMeta(cs::TransactionsPacket&& packet);
+
     ///
     /// @fn void ConveyerBase::updateRoundTable(const cs::RoundTable& table).
     ///

@@ -206,7 +206,14 @@ public:
 
     void sendPacketHash(const cs::TransactionsPacketHash& hash);
     void getPacketHash(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
-    void Node::sendTransactionsPacketHash(const cs::TransactionsPacket& packet);
+
+    void sendPacketHashRequest(const cs::PacketsHashes& hashes, const cs::PublicKey& respondent, cs::RoundNumber round);
+    void getPacketHashRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
+    void processPacketsBaseRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
+    void sendPacketHashesBaseReply(const cs::PacketsVector& packets, const cs::RoundNumber round, const cs::PublicKey& target);
+    void getPacketHashesBaseReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
+
+    void sendTransactionsPacketHash(const cs::TransactionsPacket& packet);
 
     // transaction's pack syncro
     void sendTransactionsPacket(const cs::TransactionsPacket& packet);
