@@ -641,7 +641,12 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
     else {
         orderedPackets_.erase(packet.hash());
     }
-    sendPacketHash(packet.hash());
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+    }
+    else {
+        sendPacketHash(packet.hash());
+    }
+    
 
 }
 
@@ -1305,7 +1310,7 @@ cs::ConfidantsKeys Node::retriveSmartConfidants(const cs::Sequence startSmartRou
     return confs;
 }
 
-void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
+void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) { //broadcast transaction's packet - deprecated
     if (packet.hash().isEmpty()) {
         cswarning() << "Send transaction packet with empty hash failed";
         return;
@@ -1314,7 +1319,7 @@ void Node::sendTransactionsPacket(const cs::TransactionsPacket& packet) {
     sendBroadcast(MsgTypes::TransactionPacket, cs::Conveyer::instance().currentRoundNumber(), packet);
 }
 
-void Node::sendTransactionsPacketHash(const cs::TransactionsPacket& packet) {
+void Node::sendTransactionsPacketHash(const cs::TransactionsPacket& packet) { //instead of packet
     if (packet.hash().isEmpty()) {
         cswarning() << "Send transaction packet with empty hash failed";
         return;
@@ -1322,12 +1327,15 @@ void Node::sendTransactionsPacketHash(const cs::TransactionsPacket& packet) {
     sendBroadcast(MsgTypes::TransactionPacketHash, cs::Conveyer::instance().currentRoundNumber(), packet.hash());
 }
 
-void Node::sendPacketHash(const cs::TransactionsPacketHash& hash) {
+void Node::sendPacketHash(const cs::TransactionsPacketHash& hash) { //
     csdebug() << "NODE> Sending transaction's packet hash (only): " << cs::Utils::byteStreamToHex(hash.toBinary().data(), hash.size());
     sendBroadcast(MsgTypes::TransactionPacketHash, cs::Conveyer::instance().currentRoundNumber(), hash);
 }
 
 void Node::getPacketHash(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender) {
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+        return;
+    }
     cs::IDataStream stream(data, size);
     cs::TransactionsPacketHash pHash;
     stream >> pHash;
@@ -1350,10 +1358,14 @@ void Node::getPacketHash(const uint8_t* data, const std::size_t size, const cs::
 }
 
 void Node::sendPacketHashRequest(const cs::PacketsHashes& hashes, const cs::PublicKey& respondent, cs::RoundNumber round) {
+    if (cs::Conveyer::instance().currentRoundNumber() < Consensus::syncroChangeRound) {
+        return;
+    }
     sendDirect(respondent, MsgTypes::TransactionsPacketBaseRequest, round, hashes);
 }
 
 void Node::getPacketHashRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender) {
+
     cs::IDataStream stream(data, size);
 
     cs::PacketsHashes hashes;
@@ -3984,6 +3996,13 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 stream >> value;
                 Consensus::MaxQueueSize = value;
                 cslog() << "MaxQueueSize changed to: " << Consensus::MaxQueueSize;
+            }
+
+            if (order == 33U) {// apply new global features
+                uint64_t value;
+                stream >> value;
+                Consensus::syncroChangeRound = value;
+                cslog() << "Changes will be aplied in round " << Consensus::syncroChangeRound;
             }
 
         }
