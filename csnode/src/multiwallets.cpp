@@ -1,5 +1,8 @@
 #include "csnode/multiwallets.hpp"
 #include "lib/system/common.hpp"
+#include "csnode/nodecore.hpp"
+#include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
 
 bool cs::MultiWallets::contains(const cs::PublicKey& key) const {
     cs::Lock lock(mutex_);
@@ -51,9 +54,13 @@ bool cs::MultiWallets::getWalletData(cs::MultiWallets::InternalData& data) const
 }
 
 void cs::MultiWallets::onWalletCacheUpdated(const cs::WalletsCache::WalletData& data) {
+    csdebug() << __func__;
     cs::Lock lock(mutex_);
     auto& byKey = indexes_.get<Tags::ByPublicKey>();
-
+    csdebug() << "Wallet updated: " 
+	    << cs::Utils::byteStreamToHex(data.key_)
+	    << ", balance: " << data.balance_.to_string() 
+	    << ", delegated: " << data.delegated_.to_string(); 
     if (auto iter = byKey.find(data.key_); iter != byKey.end()) {
         byKey.replace(iter, data);
     }
