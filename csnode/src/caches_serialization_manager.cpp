@@ -1,6 +1,8 @@
 #include <csnode/caches_serialization_manager.hpp>
 
 #include <exception>
+#include <fstream>
+#include <vector>
 
 #include <csnode/blockchain_serializer.hpp>
 #include <csnode/smartcontracts_serializer.hpp>
@@ -54,6 +56,31 @@ struct CachesSerializationManager::Impl {
         walletsCacheSerializer.clear();
         walletsIdsSerializer.clear();
     }
+
+    std::vector<uint8_t> getHashes() {
+      return {};
+    }
+
+    const std::string hashes_file = "quick_start_hashes.dat";
+
+    void saveHashes() {
+        auto hashes = getHashes();
+        std::ofstream f(hashes_file, std::ios::binary);
+        if (!f.write((const char*)hashes.data(), hashes.size())) {
+            cserror() << "CachesSerializationManager: cannot save hashes";
+        }
+    }
+
+    bool checkHashes() {
+        auto currentHashes = getHashes();
+        decltype(currentHashes) writtenHashes(currentHashes.size());
+        std::ifstream f(hashes_file, std::ios::binary);
+        if (!f.read((char*)writtenHashes.data(), writtenHashes.size())) {
+            cserror() << "CachesSerializationManager: cannot check hashes, reason invalid written hashes";
+            return false;
+        }
+        return currentHashes == writtenHashes;
+    }
 };
 
 CachesSerializationManager::CachesSerializationManager()
@@ -103,6 +130,7 @@ bool CachesSerializationManager::save() {
 #ifdef NODE_API
         pImpl_->tokensMasterSerializer.save();
 #endif
+        pImpl_->saveHashes();
     } catch (const std::exception& e) {
         cserror() << "CachesSerializationManager: error on save: "
                   << e.what();
@@ -129,6 +157,10 @@ bool CachesSerializationManager::load() {
 #ifdef NODE_API
         pImpl_->tokensMasterSerializer.load();
 #endif
+        if (!pImpl_->checkHashes()) {
+            cserror() << "CachesSerializationManager: invalid hashes on load";
+            return false;
+        }
     } catch (const std::exception& e) {
         cserror() << "CachesSerializationManager: error on load: "
                   << e.what();
