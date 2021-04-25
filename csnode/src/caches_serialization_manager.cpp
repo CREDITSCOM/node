@@ -57,28 +57,45 @@ struct CachesSerializationManager::Impl {
         walletsIdsSerializer.clear();
     }
 
-    std::vector<uint8_t> getHashes() {
-      return {};
+    template <class T>
+    void addHash(std::vector<uint8_t>& result, T& entity) {
+      auto hash = entity.hash();
+      result.insert(result.end(), hash.begin(), hash.end());
+    }
+
+    std::string getHashes() {
+      std::vector<uint8_t> result;
+
+      addHash(result, blockchainSerializer);
+      addHash(result, smartContractsSerializer);
+      addHash(result, walletsCacheSerializer);
+      addHash(result, walletsIdsSerializer);
+#ifdef NODE_API
+      addHash(result, tokensMasterSerializer);
+#endif
+
+      return cscrypto::helpers::bin2Hex(
+        result.data(),
+        result.size()
+      );
     }
 
     const std::string hashes_file = "quick_start_hashes.dat";
 
     void saveHashes() {
-        auto hashes = getHashes();
-        std::ofstream f(hashes_file, std::ios::binary);
-        if (!f.write((const char*)hashes.data(), hashes.size())) {
-            cserror() << "CachesSerializationManager: cannot save hashes";
-        }
+        std::ofstream f(hashes_file);
+        f << getHashes();
     }
 
     bool checkHashes() {
         auto currentHashes = getHashes();
-        decltype(currentHashes) writtenHashes(currentHashes.size());
-        std::ifstream f(hashes_file, std::ios::binary);
-        if (!f.read((char*)writtenHashes.data(), writtenHashes.size())) {
-            cserror() << "CachesSerializationManager: cannot check hashes, reason invalid written hashes";
-            return false;
-        }
+        std::ifstream f(hashes_file);
+        std::string writtenHashes;
+        f >> writtenHashes;
+        csinfo() << "current hashes is:\n"
+                 << currentHashes
+                 << ", written hases is:\n"
+                 << writtenHashes;
         return currentHashes == writtenHashes;
     }
 };
@@ -159,6 +176,7 @@ bool CachesSerializationManager::load() {
 #endif
         if (!pImpl_->checkHashes()) {
             cserror() << "CachesSerializationManager: invalid hashes on load";
+            pImpl_->clear();
             return false;
         }
     } catch (const std::exception& e) {
