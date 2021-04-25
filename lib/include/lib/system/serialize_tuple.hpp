@@ -1,10 +1,12 @@
 #pragma once
+
 #include <tuple>
+#include <cstddef>
 
 namespace boost {
 namespace serialization {
 
-template<uint N>
+template<size_t N>
 struct Serialize
 {
     template<class Archive, typename... Args>
