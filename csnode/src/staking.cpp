@@ -27,7 +27,7 @@ Staking::Staking(
 void Staking::cleanObsoletteDelegations(uint64_t time) {
     uint64_t delTime = time / 1000;
     auto it = currentDelegations_.begin();
-    while (it->first < delTime && it != getCurrentDelegations().end()) {
+    while (it != getCurrentDelegations().end() && it->first < delTime) {
         cleanDelegationsFromCache(delTime, it->second);
         it = currentDelegations_.erase(it);
     }
