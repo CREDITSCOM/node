@@ -4,7 +4,7 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/list.hpp>
-#include <boost/serialization/map.hpp>
+#include <boost/serialization/unordered_map.hpp>
 
 #include <csnode/transactionspacket.hpp>
 #include <cscrypto/cscrypto.hpp>
@@ -98,7 +98,7 @@ private:
         std::unique_ptr<SmartConsensus> pconsensus;
     };
 
-    std::map<csdb::Address, StateItem> *known_contracts = nullptr;
+    std::unordered_map<csdb::Address, StateItem> *known_contracts = nullptr;
     std::list<QueueItem> *exe_queue = nullptr;
 };
 }  // namespace cs
