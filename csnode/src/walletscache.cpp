@@ -369,6 +369,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
     // Otherwise (smartIniter = false) and wallData is tr.source()
 
     auto wallData = getWalletData(wallAddress);
+    bool alreadyUpdated = false;
 
     if (SmartContracts::is_executable(tr)) {
         if (!inverse) {
@@ -421,6 +422,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
             }
             else {
                 checkSmartWaitingForMoney(initTransaction, tr, inverse);
+                alreadyUpdated = true;
             }
         }
         auto wallData_s = getWalletData(tr.source());
@@ -449,7 +451,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         }
     }
 	//wallData = sources Account
-    bool alreadyUpdated = false;
+
     if (!smartIniter) {
         csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
         if (!inverse) {
@@ -460,7 +462,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                     toPublicKey(tr.target()),
                     tr.amount()
                 );
-		alreadyUpdated = true;
+                alreadyUpdated = true;
             }
             else {
                 wallData.balance_ -= tr.amount();
@@ -487,7 +489,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                     tr.amount(),
                     tr.id()
                 );
-		alreadyUpdated = true;
+		        alreadyUpdated = true;
             }
             else {
                 wallData.balance_ += tr.amount();
@@ -510,7 +512,7 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
     }
 
     if(!alreadyUpdated){
-	data_.multiWallets_->onWalletCacheUpdated(wallData);
+        data_.multiWallets_->onWalletCacheUpdated(wallData);
     }
     return tr.counted_fee().to_double();
 }
@@ -633,7 +635,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
                 tr.amount(),
                 tr.id()
             );
-	    alreadyUpdated = true;
+            alreadyUpdated = true;
         }
         else {
             wallData.balance_ += tr.amount();
@@ -653,7 +655,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
                 tr.amount(),
                 tr.id()
             );
-	    alreadyUpdated = true;
+            alreadyUpdated = true;
         }
         else {
             wallData.balance_ -= tr.amount();
