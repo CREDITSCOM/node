@@ -54,7 +54,7 @@ bool cs::MultiWallets::getWalletData(cs::MultiWallets::InternalData& data) const
 }
 
 void cs::MultiWallets::onWalletCacheUpdated(const cs::WalletsCache::WalletData& data) {
-    csdebug() << __func__;
+    //csdebug() << __func__;
     cs::Lock lock(mutex_);
     auto& byKey = indexes_.get<Tags::ByPublicKey>();
     csdebug() << "Wallet updated: " 
@@ -76,4 +76,14 @@ void cs::MultiWallets::iterate(std::function<bool(const PublicKey& key, const In
             break;
         }
     }
+}
+
+csdb::Amount cs::MultiWallets::checkWallets() {
+    cs::Lock lock(mutex_);
+    csdb::Amount total{ 0 };
+    for (auto it = indexes_.begin(); it != indexes_.end(); ++it) {
+        total += it->balance_;
+        total += it->delegated_;
+    }
+    return total;
 }
