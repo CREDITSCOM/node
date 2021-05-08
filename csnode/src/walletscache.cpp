@@ -465,12 +465,12 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
         if (!inverse) {
             if (ufld.is_valid()) {
-                data_.staking_->addDelegationsForSource(
-                    ufld,
-                    toPublicKey(tr.source()),
-                    toPublicKey(tr.target()),
-                    tr.amount()
-                );
+                //data_.staking_->addDelegationsForSource(
+                //    ufld,
+                //    toPublicKey(tr.source()),
+                //    toPublicKey(tr.target()),
+                //    tr.amount()
+                //);
                 //alreadyUpdated = true;
             }
             else {
@@ -491,13 +491,13 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         }
         else {
             if (ufld.is_valid()) {
-                data_.staking_->revertDelegationsForSource(
-                    ufld,
-                    toPublicKey(tr.source()),
-                    toPublicKey(tr.target()),
-                    tr.amount(),
-                    tr.id()
-                );
+                //data_.staking_->revertDelegationsForSource(
+                //    ufld,
+                //    toPublicKey(tr.source()),
+                //    toPublicKey(tr.target()),
+                //    tr.amount(),
+                //    tr.id()
+                //);
 		        //alreadyUpdated = true;
             }
             else {
@@ -522,6 +522,31 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
 
     if(!alreadyUpdated){
         data_.multiWallets_->onWalletCacheUpdated(wallData);
+    }
+
+    if (!smartIniter) {
+        csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
+        if (!inverse) {
+            if (ufld.is_valid()) {
+                data_.staking_->addDelegationsForSource(
+                    ufld,
+                    toPublicKey(tr.source()),
+                    toPublicKey(tr.target()),
+                    tr.amount()
+                );
+            }
+        }
+        else {
+            if (ufld.is_valid()) {
+                data_.staking_->revertDelegationsForSource(
+                    ufld,
+                    toPublicKey(tr.source()),
+                    toPublicKey(tr.target()),
+                    tr.amount(),
+                    tr.id()
+                );
+            }
+        }
     }
     return tr.counted_fee().to_double();
 }
@@ -637,14 +662,13 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
     bool alreadyUpdated = false;
     if (!inverse) {
         if (ufld.is_valid()) {
-            data_.staking_->addDelegationsForTarget(
-                ufld,
-                toPublicKey(tr.source()),
-                toPublicKey(tr.target()),
-                tr.amount(),
-                tr.id()
-            );
-            //alreadyUpdated = true;
+            //data_.staking_->addDelegationsForTarget(
+            //    ufld,
+            //    toPublicKey(tr.source()),
+            //    toPublicKey(tr.target()),
+            //    tr.amount(),
+            //    tr.id()
+            //);
         }
         else {
             wallData.balance_ += tr.amount();
@@ -657,14 +681,13 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
     }
     else {
         if (ufld.is_valid()) {
-            data_.staking_->revertDelegationsForTarget(
-                ufld,
-                toPublicKey(tr.source()),
-                toPublicKey(tr.target()),
-                tr.amount(),
-                tr.id()
-            );
-            //alreadyUpdated = true;
+            //data_.staking_->revertDelegationsForTarget(
+            //    ufld,
+            //    toPublicKey(tr.source()),
+            //    toPublicKey(tr.target()),
+            //    tr.amount(),
+            //    tr.id()
+            //);
         }
         else {
             wallData.balance_ -= tr.amount();
@@ -675,8 +698,30 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
         !inverse ? ++wallData.transNum_ : --wallData.transNum_;
     }
     
-    if(!alreadyUpdated){
-        data_.multiWallets_->onWalletCacheUpdated(wallData);
+    data_.multiWallets_->onWalletCacheUpdated(wallData);
+
+    if (!inverse) {
+        if (ufld.is_valid()) {
+            data_.staking_->addDelegationsForTarget(
+                ufld,
+                toPublicKey(tr.source()),
+                toPublicKey(tr.target()),
+                tr.amount(),
+                tr.id()
+            );
+            //alreadyUpdated = true;
+        }
+    }
+    else {
+        if (ufld.is_valid()) {
+            data_.staking_->revertDelegationsForTarget(
+                ufld,
+                toPublicKey(tr.source()),
+                toPublicKey(tr.target()),
+                tr.amount(),
+                tr.id()
+            );
+        }
     }
 }
 
