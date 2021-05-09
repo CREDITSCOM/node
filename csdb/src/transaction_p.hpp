@@ -57,9 +57,9 @@ class Transaction::priv : public ::csdb::internal::shared_data {
     , signature_(signature) {
     }
 
-    inline void _update_id(cs::Sequence pool_seq, cs::Sequence index) {
+    inline void _update_id(cs::Sequence pool_seq, cs::Sequence index, bool makeReadOnly = true) {
         id_._update(pool_seq, index);
-        read_only_ = true;
+        read_only_ = makeReadOnly;
     }
 
     priv clone() const {

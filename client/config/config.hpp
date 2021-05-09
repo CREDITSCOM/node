@@ -33,7 +33,7 @@ const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
 const uint32_t DEFAULT_STORE_BLOCK_ELAPSE_TIME = 1000 * 40; // ms
 
-const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 10; // rounds
+const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 30; // rounds
 
 using Port = short unsigned;
 
@@ -293,6 +293,10 @@ public:
         return dbSQLData_;
     }
 
+    bool isStakinOn(cs::RoundNumber round);
+    bool isMiningOn(cs::RoundNumber round);
+
+
 private:
     static Config readFromFile(const std::string& fileName);
 
@@ -363,6 +367,10 @@ private:
     ConveyerData conveyerData_;
 
     EventsReportData eventsReport_;
+
+    std::vector<std::pair<cs::RoundNumber, cs::RoundNumber>> stakingRoundRanges_;
+
+    std::vector<std::pair<cs::RoundNumber, cs::RoundNumber>> miningRoundRanges_;
 
     friend bool operator==(const Config&, const Config&);
     friend class cs::config::Observer;

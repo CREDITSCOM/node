@@ -215,7 +215,7 @@ void TransactionsIndex::onDbFailed(const LmdbException& e) {
 inline void TransactionsIndex::init() {
     Connector::connect(&db_->failed, this, &TransactionsIndex::onDbFailed);
 
-    db_->setMapSize(cs::Lmdb::DefaultMapSize);
+    db_->setMapSize(cs::Lmdb::Default1GbMapSize);
     db_->open();
 }
 

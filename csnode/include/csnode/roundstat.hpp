@@ -25,12 +25,12 @@ public:
     void onRoundStart(cs::RoundNumber round, bool skipLogs);
 
     // called when next block is read from database
-    void onReadBlock(csdb::Pool block, bool* shouldStop);
+    void onReadBlock(const csdb::Pool& block, bool* shouldStop);
 
     void onStopReadingFromDb(uint64_t totalTransactions);
 
     // called when next block is stored
-    void onStoreBlock(csdb::Pool block);
+    void onStoreBlock(const csdb::Pool& block);
 
     size_t totalTransactions() const {
         return totalAcceptedTransactions_;

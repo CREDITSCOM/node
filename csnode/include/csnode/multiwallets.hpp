@@ -56,6 +56,7 @@ public:
                                            shadowIterate<Order::Less>(bucket, offset, limit, capacity);
     }
 
+    csdb::Amount checkWallets();
     void iterate(std::function<bool(const PublicKey& key, const InternalData& data)> func);
 
 protected:

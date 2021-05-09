@@ -72,6 +72,7 @@ PacketsQueue::Priority PacketsQueue::getPriority(MsgTypes type) const {
         case MsgTypes::RejectedContracts:
         case MsgTypes::StateReply:
         case MsgTypes::BlockAlarm:
+        case MsgTypes::SyncroMsg:
             return Priority::kFirst;
         default:
             return Priority::kSecond;
@@ -93,4 +94,12 @@ bool PacketsQueue::shrink() {
   }
 
   return (numPackets() <= kMaxPacketsToHandle) && (numBytes() <= kMaxBytesToHandle);
+}
+
+void PacketsQueue::clear() {
+    secondPriorityQ_.clear();
+    secondQBytes_ = 0;
+    firstPriorityQ_.clear();
+    firstQBytes_ = 0;
+
 }

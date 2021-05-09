@@ -1,6 +1,4 @@
-build/
-build64/
-build_dbg/
+build*/
 .dir-locals.el
 /.vs
 out/

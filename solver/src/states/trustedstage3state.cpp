@@ -494,16 +494,44 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
         stakers.emplace_back(it.first, st);
     }
 
-    std::sort(stakers.begin(), stakers.end(), [](const StakeHolder &a, const StakeHolder &b) { return a.stake > b.stake; });
+    std::sort(stakers.begin(), stakers.end(), [](const StakeHolder& a, const StakeHolder& b) { return a.stake > b.stake; });
+    auto itSt = stakers.begin();
+    cs::PublicKeys aboveMax;
+    while (itSt != stakers.end()) {
+        if (itSt->stake >= Consensus::MaxStakeValue) {
+            aboveMax.push_back(itSt->key);
+            ++itSt;
+        }
+        else {
+            break;
+        }
+    }
+    csdebug() << "Above max :" << aboveMax.size();
+    std::mt19937 g;
+    g.seed(uint32_t(Conveyer::instance().currentRoundNumber()));
+    cs::Random::shuffle(aboveMax.begin(), aboveMax.end(), g);
 
     auto itStake = stakers.begin();
     size_t cnt = 0;
+    auto am = aboveMax.begin();
     while (itStake != stakers.end()) {
-        if(cnt < max_conf - eLiars) {
-            aboveThreshold.emplace_back(itStake->key);
+        if (cnt < max_conf - eLiars) {
+            if (am != aboveMax.end()) {
+                aboveThreshold.emplace_back(*am);
+                ++am;
+            }
+            else {
+                aboveThreshold.emplace_back(itStake->key);
+            }
         }
         else {
-            belowThreshold.emplace_back(itStake->key);
+            if (am != aboveMax.end()) {
+                belowThreshold.emplace_back(*am);
+                ++am;
+            }
+            else {
+                belowThreshold.emplace_back(itStake->key);
+            }
         }
         if (cnt == max_conf) {
             csdebug() << "-------------------------------------------------------------------";
@@ -514,8 +542,6 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     }
     csdebug() << "===================================================================";
 
-
-    std::mt19937 g;
     g.seed(uint32_t(Conveyer::instance().currentRoundNumber()));
     cs::Random::shuffle(belowThreshold.begin(), belowThreshold.end(), g);
     auto itt = belowThreshold.begin();
@@ -558,8 +584,6 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
     //    csdebug() << i << ". " << cs::Utils::byteStreamToHex(tmp.data(), tmp.size()) << " - " << static_cast<int>(candidatesElection.at(tmp));
     //}
 
-    g.seed(uint32_t(Conveyer::instance().currentRoundNumber()));
-    cs::Random::shuffle(aboveThreshold.begin(), aboveThreshold.end(), g);
     csdebug() << name() << ": final list of next round trusted:";
 
     if (aboveThreshold.size() >= Consensus::MinTrustedNodes) {  // Consensus::MinTrustedNodes) {
@@ -569,12 +593,12 @@ void TrustedStage3State::trusted_election(SolverContext& context) {
             next_round_trust.emplace_back(tmp);
             csdebug() << "\t" << cs::Utils::byteStreamToHex(tmp.data(), tmp.size());
         }
+        csdebug() << name() << ": end of trusted election";
     }
     else {
         cslog() << name() << ": cannot create list of trusted, too few candidates.";
     }
 
-    csdebug() << name() << ": end of trusted election";
 }
 
 bool TrustedStage3State::take_urgent_decision(SolverContext& context) {

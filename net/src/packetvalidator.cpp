@@ -86,6 +86,7 @@ bool PacketValidator::validateNodePacket(const Packet& packet) {
     switch (messageType) {
         case MsgTypes::BlockRequest:
         case MsgTypes::RequestedBlock:
+        case MsgTypes::SyncroMsg:
         case MsgTypes::Utility:
         case MsgTypes::NodeStopRequest:
         case MsgTypes::RoundTable:
@@ -93,6 +94,7 @@ bool PacketValidator::validateNodePacket(const Packet& packet) {
         case MsgTypes::RoundTableReply:
         case MsgTypes::RoundPackRequest:  // old-round node may ask for round info
         case MsgTypes::EmptyRoundPack:
+        case MsgTypes::BlockAlarm:
             return true;
         default:
             break;
@@ -110,6 +112,7 @@ bool PacketValidator::validateNodePacket(const Packet& packet) {
         case MsgTypes::BlockHash:
         case MsgTypes::HashReply:
         case MsgTypes::TransactionPacket:
+        case MsgTypes::TransactionPacketHash:
         case MsgTypes::TransactionsPacketRequest:
         case MsgTypes::TransactionsPacketReply:
         case MsgTypes::FirstStage:
@@ -124,10 +127,11 @@ bool PacketValidator::validateNodePacket(const Packet& packet) {
         case MsgTypes::SmartFirstStageRequest:
         case MsgTypes::SmartSecondStageRequest:
         case MsgTypes::SmartThirdStageRequest:
+        case MsgTypes::TransactionsPacketBaseRequest:
+        case MsgTypes::TransactionsPacketBaseReply:
         case MsgTypes::RejectedContracts:
         case MsgTypes::StateRequest:
         case MsgTypes::StateReply:
-        case MsgTypes::BlockAlarm:
         case MsgTypes::EventReport:
             return true;
 
