@@ -3,6 +3,7 @@
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/split_member.hpp>
 #include <boost/serialization/array.hpp>
+#include <boost/serialization/vector.hpp>
 #include <boost/serialization/set.hpp>
 
 #include <cscrypto/cscrypto.hpp>

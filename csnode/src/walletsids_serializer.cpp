@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 
@@ -33,7 +34,17 @@ void WalletsIds_Serializer::save() {
         ofs,
         boost::archive::no_header | boost::archive::no_codecvt
       );
-      oa << *data_;
+      auto& data_ref = data_->get<0>();
+      std::vector<Wallet> data(
+        data_ref.begin(),
+        data_ref.end()
+      );
+      std::sort(
+        data.begin(),
+        data.end(),
+        [](const Wallet& l, const Wallet& r) { return l.address < r.address; }
+      );
+      oa << data;
       oa << *nextId_;
     }
     auto data = ofs.str();
