@@ -29,9 +29,20 @@ void TokensMaster_Serializer::save() {
 ::cscrypto::Hash TokensMaster_Serializer::hash() {
     std::ostringstream ofs;
     {
-      boost::archive::text_oarchive oa(ofs);
-      oa << *tokens_;
-      oa << *holders_;
+      boost::archive::text_oarchive oa(
+        ofs,
+        boost::archive::no_header | boost::archive::no_codecvt
+      );
+      std::map<TokenId, Token> tmp_tokens(
+        tokens_->begin(),
+        tokens_->end()
+      );
+      std::map<HolderKey, std::set<TokenId>> tmp_holders(
+        holders_->begin(),
+        holders_->end()
+      );
+      oa << tmp_tokens;
+      oa << tmp_holders;
     }
     auto data = ofs.str();
     return ::cscrypto::calculateHash(

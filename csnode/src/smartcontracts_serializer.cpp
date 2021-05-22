@@ -29,8 +29,15 @@ void SmartContracts_Serializer::save() {
 ::cscrypto::Hash SmartContracts_Serializer::hash() {
     std::ostringstream ofs;
     {
-      boost::archive::text_oarchive oa(ofs);
-      oa << *known_contracts;
+      boost::archive::text_oarchive oa(
+        ofs,
+        boost::archive::no_header | boost::archive::no_codecvt
+      );
+      std::map<csdb::Address, StateItem> tmp(
+        known_contracts->begin(),
+        known_contracts->end()
+      );
+      oa << tmp;
       oa << *exe_queue;
     }
     auto data = ofs.str();

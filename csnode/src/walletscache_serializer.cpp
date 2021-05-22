@@ -51,15 +51,30 @@ void WalletsCache_Serializer::save() {
 ::cscrypto::Hash WalletsCache_Serializer::hash() {
     std::ostringstream ofs;
     {
-      boost::archive::text_oarchive oa(ofs);
+      boost::archive::text_oarchive oa(
+        ofs,
+        boost::archive::no_header | boost::archive::no_codecvt
+      );
       oa << *smartPayableTransactions_;
       oa << *canceledSmarts_;
-      oa << *wallets_;
+      auto& wallets_data = wallets_->get<1>();
+      std::vector<WalletData> tmp_wallets(
+        wallets_data.begin(),
+        wallets_data.end()
+      );
+      oa << tmp_wallets;
 #ifdef MONITOR_NODE
       oa << *trusted_info_;
 #endif
       oa << *currentDelegations_;
-      oa << *miningDelegations_;
+      std::map<
+        PublicKey,
+        std::vector<std::pair<PublicKey, TimeMoney>>
+      > tmp_miningDelegations(
+        miningDelegations_->begin(),
+        miningDelegations_->end()
+      );
+      oa << tmp_miningDelegations;
     }
     auto data = ofs.str();
     return ::cscrypto::calculateHash(

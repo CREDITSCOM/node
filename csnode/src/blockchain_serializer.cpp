@@ -39,7 +39,10 @@ void BlockChain_Serializer::save() {
 ::cscrypto::Hash BlockChain_Serializer::hash() {
     std::ostringstream ofs;
     {
-      boost::archive::text_oarchive oa(ofs);
+      boost::archive::text_oarchive oa(
+        ofs,
+        boost::archive::no_header | boost::archive::no_codecvt
+      );
       oa << *previousNonEmpty_;
       oa << *lastNonEmptyBlock_;
       oa << *totalTransactionsCount_;

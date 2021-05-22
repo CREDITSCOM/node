@@ -29,7 +29,10 @@ void WalletsIds_Serializer::save() {
 ::cscrypto::Hash WalletsIds_Serializer::hash() {
     std::ostringstream ofs;
     {
-      boost::archive::text_oarchive oa(ofs);
+      boost::archive::text_oarchive oa(
+        ofs,
+        boost::archive::no_header | boost::archive::no_codecvt
+      );
       oa << *data_;
       oa << *nextId_;
     }

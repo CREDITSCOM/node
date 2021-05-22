@@ -88,6 +88,7 @@ struct CachesSerializationManager::Impl {
     }
 
     bool checkHashes() {
+        csinfo() << "Start check hashes...";
         auto currentHashes = getHashes();
         std::ifstream f(hashes_file);
         std::string writtenHashes;
