@@ -148,6 +148,7 @@ bool SmartStateValidator::checkNewState(const csdb::Transaction& t) {
 }
 
 ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block) {
+
   auto prevHash = block.previous_hash();
   auto& prevBlock = getPrevBlock();
   
@@ -156,9 +157,16 @@ ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block
                                                           data.data() +
                                                           prevBlock.hashingLength()));
   if (prevHash != countedPrevHash) {
-      csfatal() << kLogPrefix << ": hash of block (" << prevBlock.sequence()
-          << ") hash != real prev pool's hash of (" << block.sequence() << ")";
-    return ErrorType::fatalError;      
+      cswarning() << kLogPrefix << ": hash " << countedPrevHash.to_string() << " of block (" << prevBlock.sequence()
+          << ") hash != real prev pool's hash " << prevHash.to_string() << " of (" << block.sequence() << ")";
+    if (getBlockChain().uuid() == 11024959585341937636ULL) {
+        if (block.sequence() < 56470000) {
+            return ErrorType::noError;
+        }
+    }
+    else {
+        return ErrorType::fatalError;
+    }
   }
   return ErrorType::noError;
 }
@@ -168,7 +176,14 @@ ValidationPlugin::ErrorType BlockNumValidator::validateBlock(const csdb::Pool& b
   if (block.sequence() - prevBlock.sequence() != kGapBtwNeighbourBlocks) {
     cserror() << kLogPrefix << "Current block's sequence is " << block.sequence()
               << ", previous block sequence is " << prevBlock.sequence();
-    return ErrorType::error;
+    if (getBlockChain().uuid() == 11024959585341937636ULL) {
+        if (block.sequence() < 56470000) {
+            return ErrorType::noError;
+        }
+    }
+    else {
+        return ErrorType::error;
+    }
   }
   return ErrorType::noError;
 }
