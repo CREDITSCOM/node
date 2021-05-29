@@ -85,14 +85,14 @@ struct CachesSerializationManager::Impl {
     }
 
     void saveHashes() {
-        std::ofstream f(kHashesFile);
+        std::ofstream f(std::filesystem::path(kQuickStartRoot) / kHashesFile);
         f << getHashes();
     }
 
     bool checkHashes() {
         csinfo() << "Start check hashes...";
         auto currentHashes = getHashes();
-        std::ifstream f(kHashesFile);
+        std::ifstream f(std::filesystem::path(kQuickStartRoot) / kHashesFile);
         std::string writtenHashes;
         f >> writtenHashes;
         csinfo() << "current hashes is:\n"
