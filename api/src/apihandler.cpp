@@ -2637,7 +2637,7 @@ void APIHandler::WalletsGet(WalletsGetResult& _return, int64_t _offset, int64_t 
         wi.balance.fraction = static_cast<int64_t>(data.balance_.fraction());
         wi.transactionsNumber = static_cast<int64_t>(data.transNum_);
 #ifdef MONITOR_NODE
-        wi.firstTransactionTime = static_cast<int64_t>(data.createTime);
+        wi.firstTransactionTime = static_cast<int64_t>(data.createTime_);
 #endif
         const csdb::Address addr = csdb::Address::from_public_key(data.key_);
         BlockChain::WalletData wallData{};

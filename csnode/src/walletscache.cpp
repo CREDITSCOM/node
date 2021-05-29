@@ -237,15 +237,14 @@ void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transact
 
 #ifdef MONITOR_NODE
 bool WalletsCache::Updater::setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp) {
-    auto it = data_.wallets_.find(address);
-    if (it != data_.wallets_.end()) {
-        if (it->second.createTime_ == 0) {
-            it->second.createTime_ = p_timeStamp;
-        }
-        emit walletUpdateEvent(it->first, it->second);
-        return true;
+
+    auto wData = getWalletData(address);
+
+    if (wData.createTime_ == 0) {
+        wData.createTime_ = p_timeStamp;
     }
-    return false;
+    data_.multiWallets_->onWalletCacheUpdated(wData);
+    return true;
 }
 #endif
 
