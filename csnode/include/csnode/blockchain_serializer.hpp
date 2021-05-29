@@ -1,6 +1,7 @@
 #ifndef BLOCKCHAIN_SERIALIZER_HPP
 #define BLOCKCHAIN_SERIALIZER_HPP
 #include <atomic>
+#include <filesystem>
 
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/map.hpp>
@@ -15,9 +16,9 @@ namespace cs {
 class BlockChain_Serializer {
 public:
     void bind(BlockChain&);
-    void save();
-    void load();
-    void clear();
+    void save(const std::filesystem::path& rootDir);
+    void load(const std::filesystem::path& rootDir);
+    void clear(const std::filesystem::path& rootDir);
 
     ::cscrypto::Hash hash();
 

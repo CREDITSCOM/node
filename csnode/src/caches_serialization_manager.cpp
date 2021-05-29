@@ -1,6 +1,7 @@
 #include <csnode/caches_serialization_manager.hpp>
 
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <vector>
 
@@ -22,6 +23,9 @@ struct CachesSerializationManager::Impl {
 #endif
     WalletsCache_Serializer   walletsCacheSerializer;
     WalletsIds_Serializer     walletsIdsSerializer;
+
+    const std::string kHashesFile = "quick_start_hashes.dat";
+    const std::string kQuickStartRoot = "qs";
 
     enum BindBits {
       BlockChainBit,
@@ -48,7 +52,7 @@ struct CachesSerializationManager::Impl {
     }
 
     void clear() {
-        blockchainSerializer.clear();
+        blockchainSerializer.clear(kQuickStartRoot);
         smartContractsSerializer.clear();
 #ifdef NODE_API
         tokensMasterSerializer.clear();
@@ -80,17 +84,15 @@ struct CachesSerializationManager::Impl {
       );
     }
 
-    const std::string hashes_file = "quick_start_hashes.dat";
-
     void saveHashes() {
-        std::ofstream f(hashes_file);
+        std::ofstream f(kHashesFile);
         f << getHashes();
     }
 
     bool checkHashes() {
         csinfo() << "Start check hashes...";
         auto currentHashes = getHashes();
-        std::ifstream f(hashes_file);
+        std::ifstream f(kHashesFile);
         std::string writtenHashes;
         f >> writtenHashes;
         csinfo() << "current hashes is:\n"
@@ -102,7 +104,12 @@ struct CachesSerializationManager::Impl {
 };
 
 CachesSerializationManager::CachesSerializationManager()
-    : pImpl_(std::make_unique<Impl>()) {}
+    : pImpl_(std::make_unique<Impl>()) {
+  if (!std::filesystem::exists(pImpl_->kQuickStartRoot)
+      || !std::filesystem::is_directory(pImpl_->kQuickStartRoot)) {
+    std::filesystem::create_directories(pImpl_->kQuickStartRoot);
+  }
+}
 
 CachesSerializationManager::~CachesSerializationManager() = default;
 
@@ -141,7 +148,7 @@ bool CachesSerializationManager::save() {
     }
 
     try {
-        pImpl_->blockchainSerializer.save();
+        pImpl_->blockchainSerializer.save(pImpl_->kQuickStartRoot);
         pImpl_->smartContractsSerializer.save();
         pImpl_->walletsCacheSerializer.save();
         pImpl_->walletsIdsSerializer.save();
@@ -168,7 +175,7 @@ bool CachesSerializationManager::load() {
     }
 
     try {
-        pImpl_->blockchainSerializer.load();
+        pImpl_->blockchainSerializer.load(pImpl_->kQuickStartRoot);
         pImpl_->smartContractsSerializer.load();
         pImpl_->walletsCacheSerializer.load();
         pImpl_->walletsIdsSerializer.load();

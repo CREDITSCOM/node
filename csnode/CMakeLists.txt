@@ -115,7 +115,7 @@ add_library(csnode
 
 configure_msvc_flags()
 
-target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 lmdbxx config ${Boost_LIBRARIES})
+target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 lmdbxx config ${Boost_LIBRARIES} stdc++fs)
 if(DBSQL)
 target_link_libraries (csnode dbsql)
 endif()

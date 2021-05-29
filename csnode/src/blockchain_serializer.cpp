@@ -8,6 +8,7 @@
 #include <csnode/blockchain_serializer.hpp>
 
 namespace cs {
+
 void BlockChain_Serializer::bind(BlockChain& bchain) {
     previousNonEmpty_ = reinterpret_cast<decltype(previousNonEmpty_)>(&bchain.previousNonEmpty_);
     lastNonEmptyBlock_ = reinterpret_cast<decltype(lastNonEmptyBlock_)>(&bchain.lastNonEmptyBlock_);
@@ -16,18 +17,18 @@ void BlockChain_Serializer::bind(BlockChain& bchain) {
     lastSequence_ = &bchain.lastSequence_;
 }
 
-void BlockChain_Serializer::clear() {
+void BlockChain_Serializer::clear(const std::filesystem::path& rootDir) {
     previousNonEmpty_->clear();
     lastNonEmptyBlock_->poolSeq = 0;
     lastNonEmptyBlock_->transCount = 0;
     *totalTransactionsCount_ = 0;
     uuid_->store(0);
     lastSequence_->store(0);
-    save();
+    save(rootDir);
 }
 
-void BlockChain_Serializer::save() {
-    std::ofstream ofs("blockchain.dat");
+void BlockChain_Serializer::save(const std::filesystem::path& rootDir) {
+    std::ofstream ofs(rootDir / "blockchain.dat");
     boost::archive::text_oarchive oa(ofs);
     oa << *previousNonEmpty_;
     oa << *lastNonEmptyBlock_;
@@ -56,8 +57,8 @@ void BlockChain_Serializer::save() {
     );
 }
 
-void BlockChain_Serializer::load() {
-    std::ifstream ifs("blockchain.dat");
+void BlockChain_Serializer::load(const std::filesystem::path& rootDir) {
+    std::ifstream ifs(rootDir / "blockchain.dat");
     boost::archive::text_iarchive ia(ifs);
     ia >> *previousNonEmpty_;
     ia >> *lastNonEmptyBlock_;
