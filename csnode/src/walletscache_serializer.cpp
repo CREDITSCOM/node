@@ -23,7 +23,7 @@ void WalletsCache_Serializer::bind(WalletsCache& wCache) {
     miningDelegations_ = reinterpret_cast<decltype(miningDelegations_)>(&wCache.staking_->miningDelegations_);
 }
 
-void WalletsCache_Serializer::clear() {
+void WalletsCache_Serializer::clear(const std::filesystem::path& rootDir) {
     smartPayableTransactions_->clear();
     canceledSmarts_->clear();
     wallets_->clear();
@@ -32,11 +32,11 @@ void WalletsCache_Serializer::clear() {
 #endif
     currentDelegations_->clear();
     miningDelegations_->clear();
-    save();
+    save(rootDir);
 }
 
-void WalletsCache_Serializer::save() {
-    std::ofstream ofs("walletscache.dat");
+void WalletsCache_Serializer::save(const std::filesystem::path& rootDir) {
+    std::ofstream ofs(rootDir / "walletscache.dat");
     boost::archive::text_oarchive oa(ofs);
     oa << *smartPayableTransactions_;
     oa << *canceledSmarts_;
@@ -83,8 +83,8 @@ void WalletsCache_Serializer::save() {
     );
 }
 
-void WalletsCache_Serializer::load() {
-    std::ifstream ifs("walletscache.dat");
+void WalletsCache_Serializer::load(const std::filesystem::path& rootDir) {
+    std::ifstream ifs(rootDir / "walletscache.dat");
     boost::archive::text_iarchive ia(ifs);
     ia >> *smartPayableTransactions_;
     ia >> *canceledSmarts_;

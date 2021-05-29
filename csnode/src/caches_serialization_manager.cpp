@@ -53,12 +53,12 @@ struct CachesSerializationManager::Impl {
 
     void clear() {
         blockchainSerializer.clear(kQuickStartRoot);
-        smartContractsSerializer.clear();
+        smartContractsSerializer.clear(kQuickStartRoot);
 #ifdef NODE_API
-        tokensMasterSerializer.clear();
+        tokensMasterSerializer.clear(kQuickStartRoot);
 #endif
-        walletsCacheSerializer.clear();
-        walletsIdsSerializer.clear();
+        walletsCacheSerializer.clear(kQuickStartRoot);
+        walletsIdsSerializer.clear(kQuickStartRoot);
     }
 
     template <class T>
@@ -149,11 +149,11 @@ bool CachesSerializationManager::save() {
 
     try {
         pImpl_->blockchainSerializer.save(pImpl_->kQuickStartRoot);
-        pImpl_->smartContractsSerializer.save();
-        pImpl_->walletsCacheSerializer.save();
-        pImpl_->walletsIdsSerializer.save();
+        pImpl_->smartContractsSerializer.save(pImpl_->kQuickStartRoot);
+        pImpl_->walletsCacheSerializer.save(pImpl_->kQuickStartRoot);
+        pImpl_->walletsIdsSerializer.save(pImpl_->kQuickStartRoot);
 #ifdef NODE_API
-        pImpl_->tokensMasterSerializer.save();
+        pImpl_->tokensMasterSerializer.save(pImpl_->kQuickStartRoot);
 #endif
         pImpl_->saveHashes();
     } catch (const std::exception& e) {
@@ -176,11 +176,11 @@ bool CachesSerializationManager::load() {
 
     try {
         pImpl_->blockchainSerializer.load(pImpl_->kQuickStartRoot);
-        pImpl_->smartContractsSerializer.load();
-        pImpl_->walletsCacheSerializer.load();
-        pImpl_->walletsIdsSerializer.load();
+        pImpl_->smartContractsSerializer.load(pImpl_->kQuickStartRoot);
+        pImpl_->walletsCacheSerializer.load(pImpl_->kQuickStartRoot);
+        pImpl_->walletsIdsSerializer.load(pImpl_->kQuickStartRoot);
 #ifdef NODE_API
-        pImpl_->tokensMasterSerializer.load();
+        pImpl_->tokensMasterSerializer.load(pImpl_->kQuickStartRoot);
 #endif
         if (!pImpl_->checkHashes()) {
             cserror() << "CachesSerializationManager: invalid hashes on load";

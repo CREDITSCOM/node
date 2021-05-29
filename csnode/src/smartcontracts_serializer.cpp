@@ -13,14 +13,14 @@ void SmartContracts_Serializer::bind(SmartContracts& contract) {
     exe_queue = reinterpret_cast<decltype(exe_queue)>(&contract.exe_queue);
 }
 
-void SmartContracts_Serializer::clear() {
+void SmartContracts_Serializer::clear(const std::filesystem::path& rootDir) {
     known_contracts->clear();
     exe_queue->clear();
-    save();
+    save(rootDir);
 }
 
-void SmartContracts_Serializer::save() {
-    std::ofstream ofs("smartcontracts.dat");
+void SmartContracts_Serializer::save(const std::filesystem::path& rootDir) {
+    std::ofstream ofs(rootDir / "smartcontracts.dat");
     boost::archive::text_oarchive oa(ofs);
     oa << *known_contracts;
     oa << *exe_queue;
@@ -47,8 +47,8 @@ void SmartContracts_Serializer::save() {
     );
 }
 
-void SmartContracts_Serializer::load() {
-    std::ifstream ifs("smartcontracts.dat");
+void SmartContracts_Serializer::load(const std::filesystem::path& rootDir) {
+    std::ifstream ifs(rootDir / "smartcontracts.dat");
     boost::archive::text_iarchive ia(ifs);
     ia >> *known_contracts;
     ia >> *exe_queue;
