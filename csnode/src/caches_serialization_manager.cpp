@@ -51,14 +51,23 @@ struct CachesSerializationManager::Impl {
         );
     }
 
-    void clear() {
-        blockchainSerializer.clear(kQuickStartRoot);
-        smartContractsSerializer.clear(kQuickStartRoot);
+    void clear(size_t version) {
+        std::filesystem::path p(kQuickStartRoot);
+        p /= std::to_string(version);
+
+        try {
+            blockchainSerializer.clear(p);
+            smartContractsSerializer.clear(p);
 #ifdef NODE_API
-        tokensMasterSerializer.clear(kQuickStartRoot);
+            tokensMasterSerializer.clear(p);
 #endif
-        walletsCacheSerializer.clear(kQuickStartRoot);
-        walletsIdsSerializer.clear(kQuickStartRoot);
+            walletsCacheSerializer.clear(p);
+            walletsIdsSerializer.clear(p);
+            std::filesystem::remove_all(p);
+        }
+        catch (const std::exception& e) {
+            cswarning() << "CachesSerializationManager: error on clear: " << e.what();
+        }
     }
 
     template <class T>
@@ -84,15 +93,23 @@ struct CachesSerializationManager::Impl {
       );
     }
 
-    void saveHashes() {
-        std::ofstream f(std::filesystem::path(kQuickStartRoot) / kHashesFile);
+    void saveHashes(size_t version) {
+        std::ofstream f(
+          std::filesystem::path(kQuickStartRoot) /
+          std::to_string(version) /
+          kHashesFile
+        );
         f << getHashes();
     }
 
-    bool checkHashes() {
+    bool checkHashes(size_t version) {
         csinfo() << "Start check hashes...";
         auto currentHashes = getHashes();
-        std::ifstream f(std::filesystem::path(kQuickStartRoot) / kHashesFile);
+        std::ifstream f(
+          std::filesystem::path(kQuickStartRoot) /
+          std::to_string(version) /
+          kHashesFile
+        );
         std::string writtenHashes;
         f >> writtenHashes;
         csinfo() << "current hashes is:\n"
@@ -140,7 +157,7 @@ void CachesSerializationManager::bind([[maybe_unused]] TokensMaster& tm) {
 #endif
 }
 
-bool CachesSerializationManager::save() {
+bool CachesSerializationManager::save(size_t version) {
     if (!pImpl_->bindingsReady()) {
         cserror() << "CachesSerializationManager: save error: "
                   << "bindings are not ready";
@@ -148,14 +165,20 @@ bool CachesSerializationManager::save() {
     }
 
     try {
-        pImpl_->blockchainSerializer.save(pImpl_->kQuickStartRoot);
-        pImpl_->smartContractsSerializer.save(pImpl_->kQuickStartRoot);
-        pImpl_->walletsCacheSerializer.save(pImpl_->kQuickStartRoot);
-        pImpl_->walletsIdsSerializer.save(pImpl_->kQuickStartRoot);
+        std::filesystem::path p(pImpl_->kQuickStartRoot);
+        p /= std::to_string(version);
+        if (!std::filesystem::exists(p) || !std::filesystem::is_directory(p)) {
+          std::filesystem::create_directories(p);
+        }
+
+        pImpl_->blockchainSerializer.save(p);
+        pImpl_->smartContractsSerializer.save(p);
+        pImpl_->walletsCacheSerializer.save(p);
+        pImpl_->walletsIdsSerializer.save(p);
 #ifdef NODE_API
-        pImpl_->tokensMasterSerializer.save(pImpl_->kQuickStartRoot);
+        pImpl_->tokensMasterSerializer.save(p);
 #endif
-        pImpl_->saveHashes();
+        pImpl_->saveHashes(version);
     } catch (const std::exception& e) {
         cserror() << "CachesSerializationManager: error on save: "
                   << e.what();
@@ -167,7 +190,7 @@ bool CachesSerializationManager::save() {
     return true;
 }
 
-bool CachesSerializationManager::load() {
+bool CachesSerializationManager::load(size_t version) {
     if (!pImpl_->bindingsReady()) {
         cserror() << "CachesSerializationManager: load error: "
                   << "bindings are not ready";
@@ -175,36 +198,39 @@ bool CachesSerializationManager::load() {
     }
 
     try {
-        pImpl_->blockchainSerializer.load(pImpl_->kQuickStartRoot);
-        pImpl_->smartContractsSerializer.load(pImpl_->kQuickStartRoot);
-        pImpl_->walletsCacheSerializer.load(pImpl_->kQuickStartRoot);
-        pImpl_->walletsIdsSerializer.load(pImpl_->kQuickStartRoot);
+        std::filesystem::path p(pImpl_->kQuickStartRoot);
+        p /= std::to_string(version);
+
+        pImpl_->blockchainSerializer.load(p);
+        pImpl_->smartContractsSerializer.load(p);
+        pImpl_->walletsCacheSerializer.load(p);
+        pImpl_->walletsIdsSerializer.load(p);
 #ifdef NODE_API
-        pImpl_->tokensMasterSerializer.load(pImpl_->kQuickStartRoot);
+        pImpl_->tokensMasterSerializer.load(p);
 #endif
-        if (!pImpl_->checkHashes()) {
+        if (!pImpl_->checkHashes(version)) {
             cserror() << "CachesSerializationManager: invalid hashes on load";
-            pImpl_->clear();
+            pImpl_->clear(version);
             return false;
         }
     } catch (const std::exception& e) {
         cserror() << "CachesSerializationManager: error on load: "
                   << e.what();
-        pImpl_->clear();
+        pImpl_->clear(version);
         return false;
     } catch (...) {
         cserror() << "CachesSerializationManager: unknown error on load";
-        pImpl_->clear();
+        pImpl_->clear(version);
         return false;
     }
     return true;
 }
 
-void CachesSerializationManager::clear() {
+void CachesSerializationManager::clear(size_t version) {
     if (!pImpl_->bindingsReady()) {
         return;
     }
-    pImpl_->clear();
+    pImpl_->clear(version);
 }
 
 } // namespace cs

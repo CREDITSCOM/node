@@ -22,10 +22,10 @@ public:
     void bind(WalletsIds&);
     void bind(TokensMaster&);
 
-    void clear();
+    void clear(size_t version = 0);
 
-    bool save();
-    bool load();
+    bool save(size_t version = 0);
+    bool load(size_t version = 0);
 
 private:
     struct Impl;
