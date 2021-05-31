@@ -1841,11 +1841,11 @@ namespace {
             out << conv.value;
             out << w.walletId_;
         }
-        const auto& confidants = block.confidants();
-        for (const auto& it : confidants) {
-            out << it;
-        }
-        out << block.previous_hash();
+        //const auto& confidants = block.confidants();
+        //for (const auto& it : confidants) {
+        //    out << it;
+        //}
+        //out << block.previous_hash();
     }
 }
 
