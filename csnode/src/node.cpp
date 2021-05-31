@@ -435,7 +435,9 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
     onRoundStart(roundTable, false);
     reviewConveyerHashes();
 
-    poolSynchronizer_->sync(rNum);
+    if (cs::ConfigHolder::instance().config()->isSyncOn()) {
+        poolSynchronizer_->sync(rNum);
+    }
 }
 
 bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
@@ -1513,6 +1515,9 @@ void Node::reviewConveyerHashes() {
 }
 
 void Node::processSync() {
+    if (!cs::ConfigHolder::instance().config()->isSyncOn()) {
+        return;
+    }
     const auto lastSequence = blockChain_.getLastSeq();
     const auto round = cs::Conveyer::instance().currentRoundNumber();
 
@@ -1522,6 +1527,21 @@ void Node::processSync() {
     else {
         poolSynchronizer_->sync(round, cs::PoolSynchronizer::kRoundDifferentForSync);
     }
+}
+
+void Node::specialSync(cs::Sequence finSeq, cs::PublicKey& source) {
+    csinfo() << "Will synchronize till " << finSeq;
+    poolSynchronizer_->syncTill(finSeq, source);
+    csinfo() << "Last blockchain sequence: " << getBlockChain().getLastSeq();
+}
+
+void Node::setTop(cs::Sequence finSeq) {
+    csinfo() << "Blockchain top will be: " << finSeq;
+    while (getBlockChain().getLastSeq() > finSeq) {
+        getBlockChain().removeLastBlock();
+    }
+
+    csinfo() << "Last blockchain sequence: " << getBlockChain().getLastSeq();
 }
 
 void Node::addToBlackList(const cs::PublicKey& key, bool isMarked) {
@@ -2703,7 +2723,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
 
-    processSync();
+    if (cs::ConfigHolder::instance().config()->isSyncOn()) {
+        processSync();
+    }
 
     if (poolSynchronizer_->isSyncroStarted()) {
         getCharacteristic(rPackage);

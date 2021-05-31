@@ -85,6 +85,7 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 }
 
 void cs::PoolSynchronizer::syncLastPool() {
+
     if (neighbours_.empty()) {
         csmeta(csdebug) << "no actual neighbours to request the last block";
         return;
@@ -244,6 +245,29 @@ void cs::PoolSynchronizer::onStoreBlockTimeElapsed() {
     if (isSyncroStarted()) {
         synchroFinished();
     }
+}
+
+void cs::PoolSynchronizer::trySource(cs::Sequence finSeq, cs::PublicKey& source) {
+    Neighbour neighbour(source);
+    auto exists = isNeighbourExists(neighbour);
+    if (exists) {
+        auto maxSeq = getNeighbour(neighbour).maxSequence();
+        if (maxSeq > finSeq) {
+            syncTill(finSeq, source);
+        }
+        else {
+            csinfo() << "Max Seq for this source Key will be " << maxSeq;
+            syncTill(maxSeq, source);
+        }
+    }
+    else {
+        csinfo() << "There is no neighbour with such key";
+    }
+
+}
+
+void cs::PoolSynchronizer::syncTill(cs::Sequence finSeq, cs::PublicKey& source) {
+
 }
 
 void cs::PoolSynchronizer::onPingReceived(cs::Sequence sequence, const cs::PublicKey& publicKey) {

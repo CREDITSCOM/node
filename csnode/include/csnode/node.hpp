@@ -204,6 +204,9 @@ public:
     // syncro send functions
     void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target);
 
+    void specialSync(cs::Sequence finSeq, cs::PublicKey& source);
+    void setTop(cs::Sequence finSeq);
+
     /**
      * Initializes the default round package as containing the default round table (default trusted
      * nodes)

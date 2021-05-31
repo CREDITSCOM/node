@@ -31,6 +31,9 @@ public:
 
     bool isSyncroStarted() const;
 
+    void syncTill(cs::Sequence finSeq, cs::PublicKey& source);
+    void trySource(cs::Sequence finSeq, cs::PublicKey& source);
+
     static const cs::RoundNumber kRoundDifferentForSync = cs::values::kDefaultMetaStorageMaxSize;
     static const size_t kFreeBlocksTimeoutMs = 10000;
     static const size_t kCachedBlocksLimit = 10000;
