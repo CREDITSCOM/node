@@ -14,6 +14,7 @@
 #include <csdb/pool.hpp>
 #include <cscrypto/cscrypto.hpp>
 #include <smartcontracts.hpp>
+#include <csnode/configholder.hpp>
 
 #include <base58.h>
 
@@ -160,7 +161,7 @@ ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block
       cswarning() << kLogPrefix << ": hash " << countedPrevHash.to_string() << " of block (" << prevBlock.sequence()
           << ") hash != real prev pool's hash " << prevHash.to_string() << " of (" << block.sequence() << ")";
     if (getBlockChain().uuid() == 11024959585341937636ULL) {
-        if (block.sequence() < 56470000) {
+        if (block.sequence() < cs::ConfigHolder::instance().config()->maxUncorrectedBlock()) {
             return ErrorType::noError;
         }
     }
