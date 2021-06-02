@@ -1,6 +1,7 @@
 #include <poolcache.hpp>
 
 #include <csdb/pool.hpp>
+#include <csnode/datastream.hpp>
 
 static const std::string dbPath = "/poolcachedb";
 
@@ -40,6 +41,13 @@ bool cs::PoolCache::contains(cs::Sequence sequence) const {
     return sequences_.find(sequence) != sequences_.end();
 }
 
+bool cs::PoolCache::contains(cs::Sequence sequence, csdb::PoolHash hash) const {
+    if (sequences_.find(sequence) != sequences_.end()) {
+        return sequences_.find(sequence) != sequences_.end();
+    }
+    return false;
+}
+
 bool cs::PoolCache::isEmpty() const {
     return sequences_.empty();
 }
@@ -52,16 +60,49 @@ cs::Sequence cs::PoolCache::maxSequence() const {
     return std::prev(sequences_.end())->first;
 }
 
-std::optional<cs::PoolCache::Data> cs::PoolCache::value(cs::Sequence sequence) const {
+std::vector<csdb::PoolHash> cs::PoolCache::getBlockHashes(cs::Sequence sequence) const {
     auto bytes = db_.value<cs::Bytes>(sequence);
-    Data data { csdb::Pool::from_binary(std::move(bytes)), cachedType(sequence) };
+    cs::IDataStream data(bytes.data(), bytes.size());
+    std::vector<csdb::PoolHash> hashes;
+    size_t cnt;
+    data >> cnt >> hashes;
+    return hashes;
+}
 
-    if (data.pool.sequence() != sequence) {
+std::optional<cs::PoolCache::Data> cs::PoolCache::value(cs::Sequence sequence)/* const*/ {
+    auto bytes = db_.value<cs::Bytes>(sequence);
+    cs::IDataStream data(bytes.data(), bytes.size());
+    std::vector<csdb::PoolHash> hashes;
+    size_t cnt;
+    PoolStoreType type;
+    data >> cnt >> hashes;
+    Data cacheData;
+    for (size_t i = 0; i < cnt; ++i) {
+        cs::Bytes bytesPool;
+        data >> bytesPool;
+        cacheData.pools.emplace(hashes[i], csdb::Pool::from_binary(std::move(bytesPool)));
+    }
+    if (cacheData.pools.cbegin()->second.sequence() != sequence) {
         return std::nullopt;
     }
+    cacheData.type = type;
 
-    return std::make_optional(std::move(data));
+    return std::make_optional(std::move(cacheData));
 }
+
+
+
+//std::optional<cs::PoolCache::Data> cs::PoolCache::value(cs::Sequence sequence) const {
+//    auto bytes = db_.value<cs::Bytes>(sequence);
+//
+//    Data data { csdb::Pool::from_binary(std::move(bytes)), cachedType(sequence) };
+//
+//    if (data.pool.sequence() != sequence) {
+//        return std::nullopt;
+//    }
+//
+//    return std::make_optional(std::move(data));
+//}
 
 std::optional<cs::PoolCache::Data> cs::PoolCache::pop(cs::Sequence sequence) {
     auto data = value(sequence);

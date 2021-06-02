@@ -1390,6 +1390,7 @@ bool BlockChain::isSpecial(const csdb::Transaction& t) {
 bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
     const auto lastSequence = getLastSeq();
     const auto poolSequence = pool.sequence();
+    
     csdebug() << csfunc() << "last #" << lastSequence << ", pool #" << poolSequence;
 
     if (poolSequence < lastSequence) {
@@ -1495,7 +1496,8 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
 
     cs::Lock lock(cachedBlocksMutex_);
 
-    if (cachedBlocks_->contains(poolSequence)) {
+    const auto poolHash = pool.hash();
+    if (cachedBlocks_->contains(poolSequence, poolHash)) {
         csdebug() << kLogPrefix << "ignore duplicated block #" << poolSequence << " in cache";
         // it is not error, so caller code nothing to do with it
         cachedBlockEvent(poolSequence);
@@ -1841,11 +1843,11 @@ namespace {
             out << conv.value;
             out << w.walletId_;
         }
-        //const auto& confidants = block.confidants();
-        //for (const auto& it : confidants) {
-        //    out << it;
-        //}
-        //out << block.previous_hash();
+        const auto& confidants = block.confidants();
+        for (const auto& it : confidants) {
+            out << it;
+        }
+        out << block.previous_hash();
     }
 }
 
