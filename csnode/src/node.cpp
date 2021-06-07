@@ -63,6 +63,7 @@ Node::Node(cs::config::Observer& observer)
 , stat_()
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this))
 , observer_(observer) {
+    status_ = cs::NodeStatus::ReadingBlocks;
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
 
     std::cout << "Start transport... ";
@@ -1595,6 +1596,7 @@ void Node::onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender) {
 }
 
 void Node::sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences) {
+    status_ = cs::NodeStatus::Synchronization;
     const auto round = cs::Conveyer::instance().currentRoundNumber();
     csmeta(csdetails) << "Target out(): " << ", sequence from: " << sequences.front()
                       << ", to: " << sequences.back() << ", round: " << round;
@@ -2861,7 +2863,6 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     
     // update sub round and max heighbours sequence
     subRound_ = rPackage.subRound();
-
     cs::PacketsHashes hashes = rPackage.roundTable().hashes;
     cs::PublicKeys confidants = rPackage.roundTable().confidants;
     cs::RoundTable roundTable;
@@ -3328,9 +3329,11 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     if (Level::Normal == myLevel_) {
         line1 << "NORMAL";
+        status_ = cs::NodeStatus::InRound;
     }
     else {
         line1 << "TRUSTED [" << cs::numeric_cast<int>(myConfidantIndex_) << "]";
+        status_ = cs::NodeStatus::Trusted;
     }
 
     line1 << ' ';
@@ -3566,6 +3569,10 @@ bool Node::checkNodeVersion(cs::Sequence curSequence, std::string& msg) {
     return !nVersionChange_.condition;
 }
 
+void Node::restoreSequence(cs::Sequence seq) {
+     
+}
+
 void Node::processSpecialInfo(const csdb::Pool& pool) {
     for (auto it : pool.transactions()) {
         if (getBlockChain().isSpecial(it)) {
@@ -3712,6 +3719,12 @@ void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
             /*| cs::BlockValidator::ValidationLevel::accountBalance*/,
         cs::BlockValidator::SeverityLevel::onlyFatalErrors)) {
         *shouldStop = true;
+        if (status_ == cs::NodeStatus::ReadingBlocks) {
+            getBlockChain().addIncorrectBlockNumber(block.sequence());
+            *shouldStop = false;
+        }
+        
+        
         return;
     }
     processSpecialInfo(block);

@@ -1871,3 +1871,7 @@ bool BlockChain::testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs) 
 
     return std::equal(l.cbegin(), l.cend(), r.cbegin());
 }
+
+void BlockChain::addIncorrectBlockNumber(cs::Sequence seq) {
+    incorrectBlocks_.push_back(seq);
+}

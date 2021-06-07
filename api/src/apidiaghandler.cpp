@@ -314,6 +314,11 @@ namespace api_diag {
             stream >> seq;
             node_.setTop(seq);
         }
+        if (order == 4U) {
+            cs::Sequence seq;
+            stream >> seq;
+            node_.restoreSequence(seq);
+        }
 
         _return.__set_code(kNotImplemented);
         _return.__set_message("Not implemented");

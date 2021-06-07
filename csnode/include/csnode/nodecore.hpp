@@ -74,6 +74,13 @@ enum class PoolStoreType : cs::Byte {
     Synced
 };
 
+enum NodeStatus : Byte {
+    ReadingBlocks,
+    Synchronization,
+    InRound,
+    Trusted
+};
+
 // all info about round
 struct Characteristic {
     cs::Bytes mask;

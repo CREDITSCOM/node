@@ -338,6 +338,7 @@ public:
      */
 
     void tryFlushDeferredBlock();
+    void addIncorrectBlockNumber(cs::Sequence seq);
 
 private:
     void createCachesPath();
@@ -441,6 +442,9 @@ private:
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
     std::atomic_bool stop_ = false;
+
+    std::vector<cs::Sequence> incorrectBlocks_;
+
 
     // support the ability to replace last deferred block by the alternative with the same content, anti-fork feature
     // flag the last block is uncertain:
