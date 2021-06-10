@@ -17,6 +17,24 @@ void cs::PoolCache::insert(const csdb::Pool& pool, PoolStoreType type) {
     insert(pool.sequence(), pool.to_binary(), type);
 }
 
+cs::Bytes cs::PoolCache::cacheDataToBytes(cs::PoolCache::Data cacheData) {
+    cs::Bytes bytes;
+    cs::ODataStream data(bytes);
+    std::vector<csdb::PoolHash> hashes;
+    size_t cnt = cacheData.pools.size();
+    data << cnt;
+    std::vector <cs::Bytes> poolsData;
+    for (auto it : cacheData.pools) {
+        hashes.push_back(it.first);
+        poolsData.push_back(it.second.to_binary());
+    }
+    data << hashes;
+    for (auto it : poolsData) {
+        data << it;
+    }
+    return bytes;
+}
+
 void cs::PoolCache::insert(cs::Sequence sequence, const cs::Bytes& bytes, cs::PoolStoreType type) {
     type_ = type;
     db_.insert(sequence, bytes);
@@ -38,6 +56,14 @@ void cs::PoolCache::remove(cs::Sequence from, cs::Sequence to) {
 
 bool cs::PoolCache::contains(cs::Sequence sequence) const {
     return sequences_.find(sequence) != sequences_.end();
+}
+
+bool cs::PoolCache::contains(cs::Sequence sequence, csdb::PoolHash hash) const {
+    if (sequences_.find(sequence) != sequences_.end()) {
+        auto hashes = getBlockHashes(sequence);
+        return std::find(hashes.begin(), hashes.end(), hash) != hashes.end();
+    }
+    return false;
 }
 
 bool cs::PoolCache::isEmpty() const {

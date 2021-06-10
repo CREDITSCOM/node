@@ -1551,7 +1551,8 @@ void BlockChain::testCachedBlocks() {
                 break;
             }
 
-            const bool ok = storeBlock(data.value().pool, data.value().type);
+            auto cachedPool = data.value().pools.begin()->second;
+            const bool ok = storeBlock(cachedPool, data.value().type);
 
             if (!ok) {
                 cserror() << kLogPrefix << "Failed to record cached block to chain, drop it & wait to request again";
