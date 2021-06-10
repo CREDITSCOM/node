@@ -28,6 +28,7 @@ const std::string DEFAULT_PATH_TO_PRIVATE_KEY = "NodePrivate.txt";
 
 const uint32_t DEFAULT_MIN_NEIGHBOURS = Neighbourhood::kMinNeighbours;
 const uint32_t DEFAULT_MAX_NEIGHBOURS = Neighbourhood::kMaxNeighbours;
+const uint64_t DEFAULT_MAX_UNCORRECTED_BLOCK = 0;
 const uint32_t DEFAULT_CONNECTION_BANDWIDTH = 1 << 19;
 const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
@@ -258,6 +259,10 @@ public:
         return sync_on_;
     }
 
+    uint64_t maxUncorrectedBlock() const {
+        return maxUncorrectedBlock_;
+    }
+
     bool traverseNAT() const {
         return traverseNAT_;
     }
@@ -332,7 +337,7 @@ private:
     uint32_t maxNeighbours_ = DEFAULT_MAX_NEIGHBOURS;
     bool restrictNeighbours_ = false;
     uint64_t connectionBandwidth_ = DEFAULT_CONNECTION_BANDWIDTH;
-
+    uint64_t maxUncorrectedBlock_ = DEFAULT_MAX_UNCORRECTED_BLOCK;
     bool symmetric_ = false;
 
     EndpointData hostAddressEp_;

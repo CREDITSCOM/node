@@ -54,6 +54,7 @@ const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
 const std::string PARAM_NAME_COMPATIBLE_VERSION = "compatible_version";
 const std::string PARAM_NAME_TRAVERSE_NAT = "traverse_nat";
 const std::string PARAM_NAME_SYNC_ON = "sync_on";
+const std::string PARAM_NAME_MAX_UNCORRECTED_BLOCK = "max_uncorrected_block";
 
 const std::string PARAM_NAME_CONVEYER_MAX_PACKET_LIFETIME = "max_packet_life_time";
 
@@ -762,6 +763,8 @@ Config Config::readFromFile(const std::string& fileName) {
         if (params.count(PARAM_NAME_COMPATIBLE_VERSION)) {
             result.compatibleVersion_ = params.get<bool>(PARAM_NAME_COMPATIBLE_VERSION);
         }
+        result.maxUncorrectedBlock_ = params.count(PARAM_NAME_MAX_UNCORRECTED_BLOCK) ? params.get<uint64_t>(PARAM_NAME_MAX_UNCORRECTED_BLOCK) : DEFAULT_MAX_UNCORRECTED_BLOCK;
+
 
         if (params.count(PARAM_NAME_SYNC_ON)) {
             result.sync_on_ = params.get<bool>(PARAM_NAME_SYNC_ON);

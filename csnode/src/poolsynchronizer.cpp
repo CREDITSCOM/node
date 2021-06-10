@@ -156,7 +156,7 @@ void cs::PoolSynchronizer::sendBlockRequest() {
 
     // remove unnecessary sequences
     removeExistingSequence(blockChain_->getLastSeq(), SequenceRemovalAccuracy::LowerBound);
-
+    bool sendRequest = false;
     for (auto& neighbour : neighbours_) {
         if (!getNeededSequences(neighbour)) {
             csmeta(csdetails) << "Neighbor: " << cs::Utils::byteStreamToHex(neighbour.publicKey()) << " is busy";
@@ -167,8 +167,14 @@ void cs::PoolSynchronizer::sendBlockRequest() {
             csmeta(csdetails) << "All sequences already requested";
             break;
         }
-
-        sendBlock(neighbour);
+        if (neighbour.maxSequence() >= cs::Conveyer::instance().currentRoundNumber() - MaxRoundDescrepancy) {
+            sendBlock(neighbour);
+            sendRequest = true;
+        }
+        
+    }
+    if (!sendRequest) {
+        csinfo() << "Can't send block request at the moment";
     }
 }
 
