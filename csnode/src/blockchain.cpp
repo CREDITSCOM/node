@@ -740,6 +740,13 @@ bool BlockChain::applyBlockToCaches(const csdb::Pool& pool) {
         return false;
     }
 
+    if (serializationManPtr_
+        && pool.sequence()
+        && pool.sequence() % 10000 == 0
+        && !serializationManPtr_->save(pool.sequence())) {
+        cserror() << "Cannot save caches with version " << pool.sequence();
+    }
+
     return true;
 }
 
