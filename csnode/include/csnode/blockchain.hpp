@@ -127,7 +127,7 @@ public:
 
     void removeWalletsInPoolFromCache(const csdb::Pool& pool);
     void removeLastBlock();
-
+    void showDBParams();
     /**
      * Mark last block as compromised and handle the situation:
      *  - store required parameters  
@@ -197,6 +197,8 @@ public:
     void cacheLastBlocks();
     void replaceCachedIncorrectBlock(const csdb::Pool& block);
     void getCachedMissedBlock(const csdb::Pool& block);
+    void badBlockIssue(const csdb::Pool& pool);
+    void lookForBadBlocks();
 
     std::vector<cs::Sequence>* getIncorrectBlockNumbers();
     // continuous interval from ... to
@@ -456,7 +458,8 @@ private:
     cs::Sequence blocksToBeRemoved_ = 0;
     std::atomic_bool stop_ = false;
 
-    std::vector<cs::Sequence> incorrectBlocks_;
+    std::vector<cs::Sequence> incorrectBlocks_;//blocks with wrong hashes (during db reading)
+    std::vector<cs::Sequence> badBlocks_;//blocks containing invalid transactions
     bool selectionFinished_ = true;
     csdb::PoolHash lastPrevHash_ = csdb::PoolHash();
     bool antiForkMode_ = false;

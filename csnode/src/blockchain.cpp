@@ -372,10 +372,10 @@ void BlockChain::removeLastBlock() {
         csmeta(cserror) << kLogPrefix << "Error! Removed pool is not valid";
 
 		if (remove_hash.is_empty()) {
-			cserror() << kLogPrefix << "storage is corrupted, storage rescan is required";
+			cserror() << kLogPrefix << "storage is corrupted, storage rescan is required, removed hash is empty";
 			return;
 		}
-
+        csinfo() << kLogPrefix << "pool to be deleted is not valid, trying to use repair_remove";
 		{
 			std::lock_guard lock(dbLock_);
 			if (!storage_.pool_remove_last_repair(remove_seq, remove_hash)) {
@@ -1473,6 +1473,12 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
         emit tryToStoreBlockEvent(pool, &check_failed);
         if (check_failed) {
             csdebug() << kLogPrefix << "The pool " << pool.sequence() << " is invalid, won't be stored";
+            if (lastSequence_ == poolSequence) {
+                --lastSequence_;
+                csdebug() << kLogPrefix << "Deleting defered block: " << deferredBlock_.sequence();
+                deferredBlock_ = csdb::Pool{};
+            }
+            badBlocks_.push_back(pool.sequence());
             emit alarmBadBlock(pool.sequence());
             return false;
         }
@@ -1889,37 +1895,51 @@ std::vector<cs::Sequence>* BlockChain::getIncorrectBlockNumbers() {
     return &incorrectBlocks_;
 }
 
+void BlockChain::showDBParams() {
+    csinfo() << "last seq = " << lastSequence_ << ", db size = " << storage_.size();
+}
+//while caching the blocks are put out of the storeage in the with sequence decrement
 void BlockChain::cacheLastBlocks() {
-    csinfo() << __func__;//we have to begin with good block
-    antiForkMode_ = true;
+    csinfo() << kLogPrefix << __func__;//we have to begin with good block
+    bool firstIteration = false;
+    if (!antiForkMode_) {
+        antiForkMode_ = true;
+        firstIteration = true;
+    }
+
     cs::Sequence lastSeq;
     while (!incorrectBlocks_.empty() || !selectionFinished_) {
+        csinfo() << kLogPrefix << "Starting blocks transferring cycle";
         auto lastBlock = getLastBlock();
         lastSeq = lastBlock.sequence();
-        if (incorrectBlocks_.back() != lastBlock.sequence() && selectionFinished_) {
-            if (lastBlock.is_valid()) {
-                cachedBlocks_->insert(lastBlock, cs::PoolStoreType::Restored);
-            }
+        csinfo() << kLogPrefix << "now dealing with " << lastSeq;
+
+        if (incorrectBlocks_.back() < lastBlock.sequence()) {
+            csinfo() << kLogPrefix << "incorrect block sequence not reached";//and selFin == " << (selectionFinished_?"true":"false");
+        }
+        else if (incorrectBlocks_.back() == lastSeq) {
+            csinfo() << kLogPrefix << "Incorrect block reached, remove it form list";
+            incorrectBlocks_.pop_back();
         }
         else {
-            selectionFinished_ = false;
-            if (lastBlock.hash() == lastPrevHash_) {
-                if (lastBlock.is_valid()) {
-                    selectionFinished_ = true;
-                    cachedBlocks_->insert(lastBlock, cs::PoolStoreType::Restored);
-                }
-            }
-            else {
-                if (incorrectBlocks_.back() == lastSeq) {
-                    incorrectBlocks_.pop_back();
-                }
-                emittingRequest_ = 1;
-                emit orderNecessaryBlock(lastPrevHash_, lastSeq);
-                blocksToBeRemoved_ = 1;
-                removeLastBlock();
-                return;
-            }
+            csinfo() << kLogPrefix << "Incorrect block overjumped - hmm .. look though your code better";
         }
+
+        if (lastBlock.is_valid() && lastBlock.hash() == lastPrevHash_ || firstIteration) {
+            selectionFinished_ = true;
+            csinfo() << kLogPrefix << "caching block " << lastBlock.sequence();
+            cachedBlocks_->insert(lastBlock, cs::PoolStoreType::Restored);
+        }
+        else {
+            emittingRequest_ = 1;
+            selectionFinished_ = false;
+            csinfo() << kLogPrefix << "reached block with nonconsistant hash: orderNecessaryBlock";
+            emit orderNecessaryBlock(lastPrevHash_, lastSeq);
+            blocksToBeRemoved_ = 1;
+            removeLastBlock();
+            return;
+        }
+
         lastPrevHash_ = lastBlock.previous_hash();
         blocksToBeRemoved_ = 1;
         removeLastBlock();
@@ -1929,6 +1949,7 @@ void BlockChain::cacheLastBlocks() {
  }
 
 void BlockChain::replaceCachedIncorrectBlock(const csdb::Pool& block) {
+    csdebug() << kLogPrefix << __func__;
     lastPrevHash_ = block.previous_hash();
     cachedBlocks_->insert(block, cs::PoolStoreType::Synced);
     if (emittingRequest_ == 1) {
@@ -1939,9 +1960,14 @@ void BlockChain::replaceCachedIncorrectBlock(const csdb::Pool& block) {
         emittingRequest_ = 0;
         arrangeBlocksInCache();
     }
+    if (emittingRequest_ == 3) {
+        emittingRequest_ = 0;
+        badBlockIssue(block);
+    }
 }
 
 void BlockChain::arrangeBlocksInCache() {
+    csdebug() << kLogPrefix << __func__;
     if (!antiForkMode_ && cachedBlocks_->maxSequence() < getLastSeq() + 5ULL) {
         return;
     }
@@ -1984,7 +2010,50 @@ void BlockChain::arrangeBlocksInCache() {
     startingBchSeq_ = 0ULL;
 }
 
+void BlockChain::lookForBadBlocks() {
+    if (badBlocks_.empty()) {
+        return;
+    }
+    for (auto it : badBlocks_) {
+
+    }
+}
+
+void BlockChain::badBlockIssue(const csdb::Pool& pool) {
+    csdebug() << kLogPrefix << __func__ << ": "<<  pool.sequence();
+    if (!antiForkMode_ && cachedBlocks_->maxSequence() < getLastSeq() + 5ULL) {
+        csdebug() << kLogPrefix << "AntiForkMode is " << (antiForkMode_?"ON":"OFF") << ", cached blocks: "
+            << cachedBlocks_->maxSequence() << ", last seq: " << getLastSeq();
+        return;
+    }
+    cachedBlocks_->insert(pool, cs::PoolStoreType::Synced);
+    if (neededCacheSeq_ == 0ULL) {
+        csdebug() << kLogPrefix << "Initializing variables";
+        antiForkMode_ = true;
+        lastPrevHash_ = getLastHash();
+        startingBchSeq_ = getLastSeq();
+        neededCacheSeq_ = startingBchSeq_;
+    }
+    while (lastPrevHash_ == pool.previous_hash()) {
+        if (cachedBlocks_->contains(neededCacheSeq_) && cachedBlocks_->value(neededCacheSeq_).has_value()) {
+            csdb::Pool currentBlock = cachedBlocks_->value(neededCacheSeq_).value().pool;
+            if (cachedBlocks_->maxSequence() > neededCacheSeq_ && cachedBlocks_->contains(++neededCacheSeq_)) {
+                lastPrevHash_ = currentBlock.hash();
+            }
+        }
+
+        else {
+            emittingRequest_ = 3;
+            emit orderNecessaryBlock(lastPrevHash_, neededCacheSeq_);
+            return;
+        }
+
+    }
+    arrangeBlocksInCache();
+}
+
 void BlockChain::getCachedMissedBlock(const csdb::Pool& block) {
+    csdebug() << kLogPrefix << __func__;
     lastPrevHash_ = block.previous_hash();
     cachedBlocks_->insert(block, cs::PoolStoreType::Synced);
     cacheLastBlocks();

@@ -217,7 +217,7 @@ public:
 	 * \sa ::csdb::Pool::load
 	 */bool pool_remove_last_repair(cs::Sequence test_sequence, const csdb::PoolHash& test_hash);
 
-     bool Storage::pool_remove_(cs::Sequence testSequence);
+     bool pool_remove_(cs::Sequence testSequence);
 
     /**
      * @brief Получение транзакции по идентификатору.

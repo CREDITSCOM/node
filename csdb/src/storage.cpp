@@ -247,41 +247,58 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     else {
         emit start_reading_event(0);
     }
-
+    auto lastKey = it->key();
     Storage::OpenProgress progress{0};
-    for (it->seek_to_first(); it->is_valid(); it->next()) {
-        cs::Bytes v = it->value();
+    //for (it->seek_to_first(); it->is_valid(); it->next()) {
+    bool dbEndReached = false;
+    it->seek_to_first();
+    while (!dbEndReached) {
 
-        Pool p = Pool::from_binary(std::move(v));
-        if (!p.is_valid()) {
-            set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool %d.", count_pool);
-            cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
-            return false;
-        }
-        pools_cache_insert(p.sequence(), p.hash(), p);
+        while(it->is_valid()){
+            cs::Bytes v = it->value();
 
-        bool test_failed = false;
-        last_hash = p.hash();
-        count_pool++;
-
-        emit read_block_event(p, &test_failed);
-        if (test_failed) {
-            set_last_error(Storage::DataIntegrityError, "Data integrity error: client reported violation of logic in pool %d", p.sequence());
-            return false;
-        }
-
-        //update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
-        progress.poolsProcessed++;
-
-        if (callback != nullptr) {
-            if (callback(progress)) {
-                set_last_error(Storage::UserCancelled);
+            Pool p = Pool::from_binary(std::move(v));
+            if (!p.is_valid()) {
+                set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool %d.", count_pool);
+                cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
                 return false;
             }
+            pools_cache_insert(p.sequence(), p.hash(), p);
+
+            bool test_failed = false;
+            last_hash = p.hash();
+            if (count_pool != p.sequence()) {
+                csdebug() << "count_pool = " << count_pool << ", pool sequence = " << p.sequence();
+            }
+            count_pool++;
+
+            emit read_block_event(p, &test_failed);
+            if (test_failed) {
+                set_last_error(Storage::DataIntegrityError, "Data integrity error: client reported violation of logic in pool %d", p.sequence());
+                return false;
+            }
+
+            //update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
+            progress.poolsProcessed++;
+
+            if (callback != nullptr) {
+                if (callback(progress)) {
+                    set_last_error(Storage::UserCancelled);
+                    return false;
+                }
+            }
+            if (it->key() == lastKey) {
+                dbEndReached = true;
+            }
+            it->next();
         }
+        if (it->key() == lastKey) {
+            dbEndReached = true;
+        }
+        csdebug() << "DB element " << it->key() << " is not valid";
     }
     emit stop_reading_event();
-
+    csdebug() << "Total read: " << count_pool << ", last key = " << lastKey;
     return true;
 
 #if 0
@@ -736,6 +753,7 @@ Pool Storage::pool_load_meta(const PoolHash& hash, size_t& cnt) const {
 }
 
 Pool Storage::pool_remove_last() {
+    csdebug() << __func__ << ", db size: " << d->count_pool;
     if (!isOpen()) {
         d->set_last_error(NotOpen);
         return Pool{};
@@ -748,6 +766,7 @@ Pool Storage::pool_remove_last() {
         d->last_hash = res.previous_hash();
         return res;
     }
+    csinfo() << "Storage: pool not found in write queue";
 
     if (last_hash().is_empty()) {
         d->set_last_error(InvalidParameter, "%s: Empty hash passed", funcName());
@@ -756,6 +775,7 @@ Pool Storage::pool_remove_last() {
 
     cs::Bytes data;
     if (!d->db->get(last_hash().to_binary(), &data)) {
+        csdebug() << "Storage: No data with such hash";
         d->set_last_error(DatabaseError);
         return Pool{};
     }
@@ -780,6 +800,7 @@ Pool Storage::pool_remove_last() {
 }
 
 bool Storage::pool_remove_last_repair(cs::Sequence test_sequence, const csdb::PoolHash& test_hash) {
+    csinfo() << __func__ << ", db size: " << d->count_pool;
 	if (!isOpen()) {
 		d->set_last_error(NotOpen);
 		return false;
@@ -796,7 +817,7 @@ bool Storage::pool_remove_last_repair(cs::Sequence test_sequence, const csdb::Po
 
 	// test sequence
 	if (test_sequence + 1 != d->count_pool) {
-		d->set_last_error(InvalidParameter, "%s: incorrect last sequence passed", funcName());
+		d->set_last_error(InvalidParameter, "%s: incorrect last sequence passed: %i, storage size: %i", funcName(), test_sequence, d->count_pool);
 		return false;
 	}
 
@@ -838,7 +859,7 @@ bool Storage::pool_remove_last_repair(cs::Sequence test_sequence, const csdb::Po
 	d->set_last_error(DataIntegrityError, "%s: Error loading previous pool %d", funcName(), test_sequence - 1);
 	return false;
 }
-
+// not used
 bool Storage::pool_remove_(cs::Sequence testSequence) {
     if (!isOpen()) {
         d->set_last_error(NotOpen);

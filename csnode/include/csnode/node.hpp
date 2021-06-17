@@ -210,7 +210,15 @@ public:
 
     void specialSync(cs::Sequence finSeq, cs::PublicKey& source);
     void setTop(cs::Sequence finSeq);
-    void Node::restoreSequence(cs::Sequence seq);
+    bool checkKnownIssues(cs::Sequence seq);
+
+    void showNeighbours();
+    void setIdle();
+    void setWorking();
+    void showDbParams();
+    //void restoreSequence(cs::Sequence seq);
+
+    uint8_t requestKBAnswer(std::vector<std::string> choice);
 
     /**
      * Initializes the default round package as containing the default round table (default trusted
@@ -500,6 +508,7 @@ private:
     csdb::PoolHash neededHash_;
     cs::PublicKeys requestedKeys_;
     size_t goodAnswers_ = 0;
+    bool cacheLBs_ = false;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

@@ -24,20 +24,23 @@ public:
     void syncLastPool();
 
     // syncro get functions
-    void getBlockReply(cs::PoolsBlock&& poolsBlock);
-
+    void getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::PublicKey& sender);
+    void showNeighbours();
     // syncro send functions
     void sendBlockRequest();
+    void checkSpecialSyncProcess();
 
     bool isSyncroStarted() const;
+    cs::Sequence getTargetSequence();
 
-    void syncTill(cs::Sequence finSeq, cs::PublicKey& source);
+    void syncTill(cs::Sequence finSeq, const cs::PublicKey& source, bool newCall);
     void trySource(cs::Sequence finSeq, cs::PublicKey& source);
     cs::PublicKeys getNeededNeighbours(cs::Sequence seq);
 
     static const cs::RoundNumber kRoundDifferentForSync = cs::values::kDefaultMetaStorageMaxSize;
     static const size_t kFreeBlocksTimeoutMs = 10000;
     static const size_t kCachedBlocksLimit = 10000;
+    static const cs::RoundNumber kRoundDiscrepancy = 10ULL;
 
 public signals:
     PoolSynchronizerRequestSignal sendRequest;
@@ -69,6 +72,7 @@ private:
     void sendBlock(const Neighbour& neighbour, const PoolsRequestedSequences& sequeces);
 
     bool getNeededSequences(Neighbour& neighbour);
+    bool getNeededSequencesOnly(Neighbour& neighbour);
 
     void checkNeighbourSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
     void removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
@@ -240,9 +244,13 @@ private:
     // [value] =  packet counter
     // value: increase each new round
     std::map<cs::Sequence, cs::RoundNumber> requestedSequences_;
+    std::map<cs::PublicKey, cs::RoundNumber> requestedNodes_;
     std::vector<Neighbour> neighbours_;
 
     cs::Timer timer_;
+
+    cs::Sequence targetSequence_ = 0;
+
 
     friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType);
     friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::SequenceRemovalAccuracy);
