@@ -71,7 +71,15 @@ enum CheckVersion : Byte {
 
 enum class PoolStoreType : cs::Byte {
     Created,
-    Synced
+    Synced,
+    Restored
+};
+
+enum NodeStatus : Byte {
+    ReadingBlocks,
+    Synchronization,
+    InRound,
+    Trusted
 };
 
 // all info about round

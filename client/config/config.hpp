@@ -255,6 +255,10 @@ public:
         return compatibleVersion_;
     }
 
+    bool isSyncOn() const {
+        return sync_on_;
+    }
+
     uint64_t maxUncorrectedBlock() const {
         return maxUncorrectedBlock_;
     }
@@ -359,6 +363,7 @@ private:
     bool autoShutdownEnabled_ = true;
     bool compatibleVersion_ = true;
     bool traverseNAT_ = true;
+    bool sync_on_ = true;
     uint64_t newBlockchainTopSeq_;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;

@@ -41,6 +41,7 @@ class TransactionsPacket;
 using TryToStoreBlockSignal = cs::Signal<void(const csdb::Pool&, bool*)>;
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
 using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
+using OrderNecessaryBlockSignal = cs::Signal<void(csdb::PoolHash, cs::Sequence)>;
 
 /** @brief   The write block or remove block signal emits when block is flushed to disk */
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
@@ -156,6 +157,8 @@ public:
     // storage adaptor
     void close();
     bool getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const;
+    void arrangeBlocksInCache();
+
 
 public:
     std::string getLastTimeStamp() const;
@@ -191,6 +194,11 @@ public:
     std::size_t getCachedBlocksSizeSynced() const;
     void clearBlockCache();
 
+    void cacheLastBlocks();
+    void replaceCachedIncorrectBlock(const csdb::Pool& block);
+    void getCachedMissedBlock(const csdb::Pool& block);
+
+    std::vector<cs::Sequence>* getIncorrectBlockNumbers();
     // continuous interval from ... to
     using SequenceInterval = std::pair<cs::Sequence, cs::Sequence>;
 
@@ -225,6 +233,8 @@ public:
     }
 
 public signals:
+    //orderNecessaryBlock(&tryBlock, lastBlock.sequence());
+    cs::OrderNecessaryBlockSignal orderNecessaryBlock;
 
     /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
     cs::StoreBlockSignal storeBlockEvent;
@@ -282,6 +292,9 @@ public:
         return loadBlock(getLastSeq());
     }
 
+    bool isAntiForkModeOn() {
+        return antiForkMode_;
+    }
     // info
 
     size_t getSize() const;
@@ -338,6 +351,7 @@ public:
      */
 
     void tryFlushDeferredBlock();
+    void addIncorrectBlockNumber(cs::Sequence seq);
 
 private:
     void createCachesPath();
@@ -441,6 +455,15 @@ private:
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
     std::atomic_bool stop_ = false;
+
+    std::vector<cs::Sequence> incorrectBlocks_;
+    bool selectionFinished_ = true;
+    csdb::PoolHash lastPrevHash_ = csdb::PoolHash();
+    bool antiForkMode_ = false;
+    uint8_t emittingRequest_ = 0;
+    cs::Sequence neededCacheSeq_ = 0ULL;
+    cs::Sequence startingBchSeq_ = 0ULL;
+
 
     // support the ability to replace last deferred block by the alternative with the same content, anti-fork feature
     // flag the last block is uncertain:

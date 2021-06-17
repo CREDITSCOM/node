@@ -181,6 +181,8 @@ public:
 
     void sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq);
 
+    void tryResolveHashProblems();
+
     void cleanConfirmationList(cs::RoundNumber rNum);
     uint8_t calculateBootStrapWeight(cs::PublicKeys& confidants);
     // state syncro functions
@@ -192,7 +194,9 @@ public:
 
     // syncro get functions
     void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
-    void getBlockReply(const uint8_t*, const size_t);
+    void getBlockReply(const uint8_t*, const size_t, const cs::PublicKey& sender);
+    void sendNecessaryBlockRequest(csdb::PoolHash hash, cs::Sequence seq);
+    void getNecessaryBlockRequest(cs::PoolsBlock& pBlock, const cs::PublicKey& sender);
 
     // transaction's pack syncro
     void sendTransactionsPacket(const cs::TransactionsPacket& packet);
@@ -203,6 +207,10 @@ public:
 
     // syncro send functions
     void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target);
+
+    void specialSync(cs::Sequence finSeq, cs::PublicKey& source);
+    void setTop(cs::Sequence finSeq);
+    void Node::restoreSequence(cs::Sequence seq);
 
     /**
      * Initializes the default round package as containing the default round table (default trusted
@@ -486,6 +494,12 @@ private:
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;
+    cs::NodeStatus status_;
+
+    cs::Sequence neededSequence_ = 0ULL;
+    csdb::PoolHash neededHash_;
+    cs::PublicKeys requestedKeys_;
+    size_t goodAnswers_ = 0;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

@@ -162,7 +162,7 @@ ValidationPlugin::ErrorType HashValidator::validateBlock(const csdb::Pool& block
           << ") hash != real prev pool's hash " << prevHash.to_string() << " of (" << block.sequence() << ")";
     if (getBlockChain().uuid() == 11024959585341937636ULL) {
         if (block.sequence() < cs::ConfigHolder::instance().config()->maxUncorrectedBlock()) {
-            return ErrorType::noError;
+            return ErrorType::fatalError;
         }
     }
     else {

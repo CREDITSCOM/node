@@ -3,6 +3,7 @@
 #include <csnode/node.hpp>
 #include <csnode/blockchain.hpp>
 #include <csnode/walletsstate.hpp>
+#include <csnode/configholder.hpp>
 
 #include <csnode/blockvalidatorplugins.hpp>
 
@@ -49,7 +50,14 @@ bool BlockValidator::validateBlock(const csdb::Pool& block, ValidationFlags flag
         prevBlock_ = bc_.loadBlock(block.previous_hash());
         if (!prevBlock_.is_valid()) {
             cserror() << "BlockValidator: block " << block.sequence() - 1ULL << " with hash " << block.previous_hash().to_string() << " is not valid.";
-            return false;
+            if (bc_.uuid() == 11024959585341937636ULL) {
+                if (block.sequence() < cs::ConfigHolder::instance().config()->maxUncorrectedBlock()) {
+                    return false;
+                }
+            }
+            else {
+                return false;
+            }
         }
     }
 

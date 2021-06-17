@@ -62,13 +62,14 @@ Node::Node(cs::config::Observer& observer)
 , blockChain_(genesisAddress_, startAddress_, cs::ConfigHolder::instance().config()->recreateIndex())
 , stat_()
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this))
-, observer_(observer) {
+, observer_(observer)
+, status_(cs::NodeStatus::ReadingBlocks){
     solver_ = new cs::SolverCore(this, genesisAddress_, startAddress_);
 
     std::cout << "Start transport... ";
     transport_ = new Transport(this);
     std::cout << "Done\n";
-
+    status_ = cs::NodeStatus::Synchronization;
     poolSynchronizer_ = new cs::PoolSynchronizer(&blockChain_);
 
     cs::ExecutorSettings::set(cs::makeReference(blockChain_), cs::makeReference(solver_));
@@ -104,7 +105,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
     cs::Connector::connect(&blockChain_.storeBlockEvent, this, &Node::processSpecialInfo);
     cs::Connector::connect(&blockChain_.uncertainBlock, this, &Node::sendBlockRequestToConfidants);
-
+    cs::Connector::connect(&blockChain_.orderNecessaryBlock, this, &Node::sendNecessaryBlockRequest);
     initPoolSynchronizer();
     setupNextMessageBehaviour();
     setupPoolSynchronizerBehaviour();
@@ -197,6 +198,11 @@ bool Node::init() {
     cs::Connector::connect(&sendingTimer_.timeOut, this, &Node::processTimer);
     cs::Connector::connect(&cs::Conveyer::instance().packetFlushed, this, &Node::onTransactionsPacketFlushed);
     cs::Connector::connect(&poolSynchronizer_->sendRequest, this, &Node::sendBlockRequest);
+
+    
+    if (!getBlockChain().getIncorrectBlockNumbers()->empty()) {
+        tryResolveHashProblems();
+    }
 
     initBootstrapRP(initialConfidants_);
     EventReport::sendRunningStatus(*this, Running::Status::Run);
@@ -435,7 +441,9 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
     onRoundStart(roundTable, false);
     reviewConveyerHashes();
 
-    poolSynchronizer_->sync(rNum);
+    if (cs::ConfigHolder::instance().config()->isSyncOn()) {
+        poolSynchronizer_->sync(rNum);
+    }
 }
 
 bool Node::verifyPacketSignatures(cs::TransactionsPacket& packet, const cs::PublicKey& sender) {
@@ -1372,7 +1380,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     sendReply();
 }
 
-void Node::getBlockReply(const uint8_t* data, const size_t size) {
+void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
     bool isSyncOn = poolSynchronizer_->isSyncroStarted();
     bool isBlockchainUncertain = blockChain_.isLastBlockUncertain();
 
@@ -1392,6 +1400,11 @@ void Node::getBlockReply(const uint8_t* data, const size_t size) {
 
     if (poolsBlock.empty()) {
         cserror() << "NODE> Get block reply> No pools found";
+        return;
+    }
+
+    if (poolsBlock.size() == 1 && poolsBlock.back().sequence() == neededSequence_) {
+        getNecessaryBlockRequest(poolsBlock, sender);
         return;
     }
 
@@ -1513,6 +1526,9 @@ void Node::reviewConveyerHashes() {
 }
 
 void Node::processSync() {
+    if (!cs::ConfigHolder::instance().config()->isSyncOn()) {
+        return;
+    }
     const auto lastSequence = blockChain_.getLastSeq();
     const auto round = cs::Conveyer::instance().currentRoundNumber();
 
@@ -1522,6 +1538,21 @@ void Node::processSync() {
     else {
         poolSynchronizer_->sync(round, cs::PoolSynchronizer::kRoundDifferentForSync);
     }
+}
+
+void Node::specialSync(cs::Sequence finSeq, cs::PublicKey& source) {
+    csinfo() << "Will synchronize till " << finSeq;
+    poolSynchronizer_->syncTill(finSeq, source);
+    csinfo() << "Last blockchain sequence: " << getBlockChain().getLastSeq();
+}
+
+void Node::setTop(cs::Sequence finSeq) {
+    csinfo() << "Blockchain top will be: " << finSeq;
+    while (getBlockChain().getLastSeq() > finSeq) {
+        getBlockChain().removeLastBlock();
+    }
+
+    csinfo() << "Last blockchain sequence: " << getBlockChain().getLastSeq();
 }
 
 void Node::addToBlackList(const cs::PublicKey& key, bool isMarked) {
@@ -1575,6 +1606,7 @@ void Node::onPingChecked(cs::Sequence sequence, const cs::PublicKey& sender) {
 }
 
 void Node::sendBlockRequest(const cs::PublicKey& target, const cs::PoolsRequestedSequences& sequences) {
+    status_ = cs::NodeStatus::Synchronization;
     const auto round = cs::Conveyer::instance().currentRoundNumber();
     csmeta(csdetails) << "Target out(): " << ", sequence from: " << sequences.front()
                       << ", to: " << sequences.back() << ", round: " << round;
@@ -2703,7 +2735,9 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
 
-    processSync();
+    if (cs::ConfigHolder::instance().config()->isSyncOn()) {
+        processSync();
+    }
 
     if (poolSynchronizer_->isSyncroStarted()) {
         getCharacteristic(rPackage);
@@ -2839,7 +2873,6 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     
     // update sub round and max heighbours sequence
     subRound_ = rPackage.subRound();
-
     cs::PacketsHashes hashes = rPackage.roundTable().hashes;
     cs::PublicKeys confidants = rPackage.roundTable().confidants;
     cs::RoundTable roundTable;
@@ -3306,9 +3339,16 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
 
     if (Level::Normal == myLevel_) {
         line1 << "NORMAL";
+        if (getBlockChain().getLastSeq() + 1ULL == cs::Conveyer::instance().currentRoundNumber()) {
+            status_ = cs::NodeStatus::InRound;
+        }
+        else {
+            cs::NodeStatus::Synchronization;
+        }
     }
     else {
         line1 << "TRUSTED [" << cs::numeric_cast<int>(myConfidantIndex_) << "]";
+        status_ = cs::NodeStatus::Trusted;
     }
 
     line1 << ' ';
@@ -3544,6 +3584,10 @@ bool Node::checkNodeVersion(cs::Sequence curSequence, std::string& msg) {
     return !nVersionChange_.condition;
 }
 
+void Node::restoreSequence(cs::Sequence seq) {
+     //TODO: insert necessary code here
+}
+
 void Node::processSpecialInfo(const csdb::Pool& pool) {
     for (auto it : pool.transactions()) {
         if (getBlockChain().isSpecial(it)) {
@@ -3690,6 +3734,12 @@ void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
             /*| cs::BlockValidator::ValidationLevel::accountBalance*/,
         cs::BlockValidator::SeverityLevel::onlyFatalErrors)) {
         *shouldStop = true;
+        if (status_ == cs::NodeStatus::ReadingBlocks) {
+            getBlockChain().addIncorrectBlockNumber(block.sequence());
+            *shouldStop = false;
+        }
+        
+        
         return;
     }
     processSpecialInfo(block);
@@ -4109,5 +4159,78 @@ void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeI
         bootstrap_list.push_back(item.second);
     }
     info.__set_bootstrap(bootstrap_list);
+
+}
+
+void Node::tryResolveHashProblems() {
+    csinfo() << "NODE> This node db is corrupted. The problem blocks are:";
+    auto it = getBlockChain().getIncorrectBlockNumbers()->begin();
+    while(it != getBlockChain().getIncorrectBlockNumbers()->end()) {
+        csinfo() << *it;
+        ++it;
+    }
+    csinfo() << "NODE> Would you like node to resolve it (y), to continue as is (n) and to quit (q)?";
+    char letterKey;
+    while (true) {
+        std::cin >> letterKey;
+        if (letterKey != 'y' && letterKey != 'n' && letterKey != 'q') {
+            csinfo() << "NODE> You've chosen not correct letter. Try again.";
+        }
+        else {
+            break;
+        }
+    }
+
+    if (letterKey == 'y') {
+        csinfo() << "NODE> You've chosen to resolve incorrect blocks. Wait while the node will try to perform all possible variants";
+        //now we will try to eliminate the incorrect blocks from your db
+        getBlockChain().cacheLastBlocks();
+    }
+    else if (letterKey == 'n') {
+        csinfo() << "NODE> You've chosen go on as is. So, have a good work!";
+        //just continue the normal node work
+    }
+
+    else if (letterKey == 'q') {
+        csinfo() << "NODE> The node will quit now";
+        stopRequested_ = true;
+        stop();
+
+    }
+
+}
+
+void Node::sendNecessaryBlockRequest(csdb::PoolHash hash, cs::Sequence seq) {
+    neededHash_ = hash;
+    neededSequence_ = seq;
+    goodAnswers_ = 0;
+    const auto round = cs::Conveyer::instance().currentRoundNumber();
+    cs::PoolsRequestedSequences sequences;
+    sequences.push_back(seq);
+    requestedKeys_.clear();
+    requestedKeys_ = poolSynchronizer_->getNeededNeighbours(seq);
+    for (auto k : requestedKeys_) {
+        BaseFlags flags = static_cast<BaseFlags>(BaseFlags::Signed | BaseFlags::Compressed);
+        transport_->sendDirect(formPacket(flags, MsgTypes::BlockRequest, round, sequences), k);
+    }
+}
+
+void Node::getNecessaryBlockRequest(cs::PoolsBlock& pBlock, const cs::PublicKey& sender) {
+    auto it = std::find(requestedKeys_.begin(), requestedKeys_.end(), sender);
+    requestedKeys_.erase(it);
+    if (neededHash_== csdb::PoolHash() || pBlock.back().hash() == neededHash_) {
+        if (goodAnswers_ == 0) {
+            getBlockChain().replaceCachedIncorrectBlock(pBlock.back());
+        }
+        ++goodAnswers_;
+    }
+    else {
+        csinfo() << "Neighbour " << cs::Utils::byteStreamToHex(sender) << " hasn'r sent the proper block";
+
+    }
+    if (requestedKeys_.size() == 0 && goodAnswers_ == 0) {
+        csinfo() << "We have to find proper neighbours - current do not have valid chains";
+        //TODO - change neighbours
+    }
 
 }

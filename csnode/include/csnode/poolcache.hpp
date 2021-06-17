@@ -18,7 +18,7 @@ public:
     using Interval = std::pair<cs::Sequence, cs::Sequence>;
 
     struct Data {
-        std::map <csdb::PoolHash, csdb::Pool > pools;
+        csdb::Pool pool;
         cs::PoolStoreType type;
     };
 
@@ -37,8 +37,6 @@ public:
 
     // returns existance of sequence at db
     bool contains(cs::Sequence sequence) const;
-    bool contains(cs::Sequence sequence, csdb::PoolHash hash) const;
-    std::vector<csdb::PoolHash> getBlockHashes(cs::Sequence sequence) const;
     bool isEmpty() const;
 
     // check on isEmpty() before use it, or UB
@@ -46,7 +44,7 @@ public:
     cs::Sequence maxSequence() const;
 
     // returns value by key
-    std::optional<Data> value(cs::Sequence sequence) /*const*/;
+    std::optional<Data> value(cs::Sequence sequence) const;
 
     // returns pool and remove key sequence
     std::optional<Data> pop(cs::Sequence sequence);
@@ -74,7 +72,7 @@ private slots:
 private:
     void initialization();
     cs::PoolStoreType cachedType(cs::Sequence sequence) const;
-    
+
     std::vector<Interval> createInterval(cs::Sequence min, cs::Sequence max) const;
 
     size_t syncedPoolSize_ = 0;

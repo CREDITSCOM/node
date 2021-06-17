@@ -300,7 +300,7 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
         case MsgTypes::BlockRequest:
             return node_->getBlockRequest(data, size, sender);
         case MsgTypes::RequestedBlock:
-            return node_->getBlockReply(data, size);
+            return node_->getBlockReply(data, size, sender);
         case MsgTypes::Utility:
             return node_->getUtilityMessage(data, size);
         case MsgTypes::NodeStopRequest:

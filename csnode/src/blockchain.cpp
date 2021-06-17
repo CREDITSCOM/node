@@ -390,7 +390,10 @@ void BlockChain::removeLastBlock() {
         // just removed pool is valid
 
         if (!(remove_hash == pool.hash())) {
-            cswarning() << kLogPrefix << "Hashes cache is corrupted, storage rescan is requiredrequired: last: " << remove_hash.to_string() << ", pool: " << pool.hash().to_string();
+            cswarning() << kLogPrefix << "Hashes cache is corrupted, storage rescan is required: last: " 
+                << remove_hash.to_string() << ", pool: " << pool.hash().to_string() 
+                << ", total hashes: " << blockHashes_->size() 
+                << ", total pools: " << getLastSeq() + 1ULL;
             remove_hash = pool.hash();
         }
 
@@ -1454,6 +1457,9 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
                 csdebug() << kLogPrefix << "compromise own last block and cancel store operation";
             }
             else {
+                if (lastSequence + 5ULL < cs::Conveyer::instance().currentRoundNumber()) {
+                    arrangeBlocksInCache();
+                }
                 csdebug() << kLogPrefix << "remove own last block and cancel store operation";
                 removeLastBlock();
             }
@@ -1497,7 +1503,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
     cs::Lock lock(cachedBlocksMutex_);
 
     const auto poolHash = pool.hash();
-    if (cachedBlocks_->contains(poolSequence, poolHash)) {
+    if (cachedBlocks_->contains(poolSequence)) {
         csdebug() << kLogPrefix << "ignore duplicated block #" << poolSequence << " in cache";
         // it is not error, so caller code nothing to do with it
         cachedBlockEvent(poolSequence);
@@ -1553,7 +1559,8 @@ void BlockChain::testCachedBlocks() {
                 break;
             }
 
-            const bool ok = storeBlock(data.value().pool, data.value().type);
+            auto cachedPool = data.value().pool;
+            const bool ok = storeBlock(cachedPool, data.value().type);
 
             if (!ok) {
                 cserror() << kLogPrefix << "Failed to record cached block to chain, drop it & wait to request again";
@@ -1872,4 +1879,113 @@ bool BlockChain::testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs) 
     const cs::Hash r = cscrypto::calculateHash(rhs_bin.data(), rhs_bin.size());
 
     return std::equal(l.cbegin(), l.cend(), r.cbegin());
+}
+
+void BlockChain::addIncorrectBlockNumber(cs::Sequence seq) {
+    incorrectBlocks_.push_back(seq);
+}
+
+std::vector<cs::Sequence>* BlockChain::getIncorrectBlockNumbers() {
+    return &incorrectBlocks_;
+}
+
+void BlockChain::cacheLastBlocks() {
+    csinfo() << __func__;//we have to begin with good block
+    antiForkMode_ = true;
+    cs::Sequence lastSeq;
+    while (!incorrectBlocks_.empty() || !selectionFinished_) {
+        auto lastBlock = getLastBlock();
+        lastSeq = lastBlock.sequence();
+        if (incorrectBlocks_.back() != lastBlock.sequence() && selectionFinished_) {
+            if (lastBlock.is_valid()) {
+                cachedBlocks_->insert(lastBlock, cs::PoolStoreType::Restored);
+            }
+        }
+        else {
+            selectionFinished_ = false;
+            if (lastBlock.hash() == lastPrevHash_) {
+                if (lastBlock.is_valid()) {
+                    selectionFinished_ = true;
+                    cachedBlocks_->insert(lastBlock, cs::PoolStoreType::Restored);
+                }
+            }
+            else {
+                if (incorrectBlocks_.back() == lastSeq) {
+                    incorrectBlocks_.pop_back();
+                }
+                emittingRequest_ = 1;
+                emit orderNecessaryBlock(lastPrevHash_, lastSeq);
+                blocksToBeRemoved_ = 1;
+                removeLastBlock();
+                return;
+            }
+        }
+        lastPrevHash_ = lastBlock.previous_hash();
+        blocksToBeRemoved_ = 1;
+        removeLastBlock();
+    }
+    antiForkMode_ = false;
+    lastPrevHash_ = csdb::PoolHash();
+ }
+
+void BlockChain::replaceCachedIncorrectBlock(const csdb::Pool& block) {
+    lastPrevHash_ = block.previous_hash();
+    cachedBlocks_->insert(block, cs::PoolStoreType::Synced);
+    if (emittingRequest_ == 1) {
+        emittingRequest_ = 0;
+        cacheLastBlocks();
+    }
+    if (emittingRequest_ == 2) {
+        emittingRequest_ = 0;
+        arrangeBlocksInCache();
+    }
+}
+
+void BlockChain::arrangeBlocksInCache() {
+    if (!antiForkMode_ && cachedBlocks_->maxSequence() < getLastSeq() + 5ULL) {
+        return;
+    }
+    if (neededCacheSeq_ == 0ULL) {
+        antiForkMode_ = true;
+        neededCacheSeq_ = getLastSeq() + 4ULL;
+        startingBchSeq_ = getLastSeq();
+    }
+
+    while (neededCacheSeq_ > getLastSeq() || lastPrevHash_ != getLastHash()) {
+        if (cachedBlocks_->contains(neededCacheSeq_)) {
+            auto data = cachedBlocks_->value(neededCacheSeq_);
+            csdb::Pool currentCachedBlock;
+            if (data.has_value()) {
+                currentCachedBlock = data.value().pool;
+            }
+            else {
+                //TODO - think how to find the first synched block in cache !!!
+                csdebug() << "No valid synced block found in cache trying to order it: " << neededCacheSeq_;
+                emittingRequest_ = 2;
+                emit orderNecessaryBlock(lastPrevHash_, neededCacheSeq_);
+                return;
+            }
+            lastPrevHash_ = currentCachedBlock.previous_hash();
+        }
+        else {
+            csdebug() << "No synced block found in cache trying to order it :" << neededCacheSeq_;
+            emittingRequest_ = 2;
+            emit orderNecessaryBlock(lastPrevHash_, neededCacheSeq_);
+            return;
+        }
+
+        
+        --neededCacheSeq_;
+    }
+
+    antiForkMode_ = false;
+    lastPrevHash_ = csdb::PoolHash();
+    neededCacheSeq_ = 0ULL;
+    startingBchSeq_ = 0ULL;
+}
+
+void BlockChain::getCachedMissedBlock(const csdb::Pool& block) {
+    lastPrevHash_ = block.previous_hash();
+    cachedBlocks_->insert(block, cs::PoolStoreType::Synced);
+    cacheLastBlocks();
 }

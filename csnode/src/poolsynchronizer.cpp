@@ -21,7 +21,7 @@ cs::PoolSynchronizer::PoolSynchronizer(BlockChain* blockChain)
 }
 
 void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber difference) {
-    if (neighbours_.empty()) {
+    if (neighbours_.empty() || blockChain_->isAntiForkModeOn()) {
         return;
     }
 
@@ -85,6 +85,7 @@ void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber differ
 }
 
 void cs::PoolSynchronizer::syncLastPool() {
+
     if (neighbours_.empty()) {
         csmeta(csdebug) << "no actual neighbours to request the last block";
         return;
@@ -104,6 +105,9 @@ void cs::PoolSynchronizer::syncLastPool() {
 }
 
 void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
+    if (blockChain_->isAntiForkModeOn()) {
+        return;
+    }
     csmeta(csdebug) << "Get Block Reply <<<<<<< : count: " << poolsBlock.size() << ", seqs: ["
                     << poolsBlock.front().sequence() << ", " << poolsBlock.back().sequence() << "]";
 
@@ -140,6 +144,10 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
 }
 
 void cs::PoolSynchronizer::sendBlockRequest() {
+    if (blockChain_->isAntiForkModeOn()) {
+        csdebug() << "Anti-fork mode is on - no block requests";
+        return;
+    }
     if (neighbours_.empty()) {
         csmeta(csdebug) << "no actual neighbours to request required blocks";
         return;
@@ -175,6 +183,35 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     if (!sendRequest) {
         csinfo() << "Can't send block request at the moment";
     }
+}
+
+cs::PublicKeys cs::PoolSynchronizer::getNeededNeighbours(cs::Sequence seq) {
+    cs::PublicKeys pKeys;
+    if (neighbours_.empty()) {
+        csmeta(csdebug) << "no actual neighbours to request required blocks";
+        return pKeys;
+    }
+    bool sendRequest = false;
+    for (auto& neighbour : neighbours_) {
+        if (!getNeededSequences(neighbour)) {
+            csmeta(csdetails) << "Neighbor: " << cs::Utils::byteStreamToHex(neighbour.publicKey()) << " is busy";
+            continue;
+        }
+
+        if (neighbour.sequences().empty()) {
+            csmeta(csdetails) << "All sequences already requested";
+            break;
+        }
+        if (seq < neighbour.maxSequence() && neighbour.maxSequence() >= cs::Conveyer::instance().currentRoundNumber() - MaxRoundDescrepancy) {
+            pKeys.push_back(neighbour.publicKey());
+            sendRequest = true;
+        }
+
+    }
+    if (!sendRequest) {
+        csinfo() << "Can't send block request at the moment";
+    }
+    return pKeys;
 }
 
 bool cs::PoolSynchronizer::isSyncroStarted() const {
@@ -250,6 +287,29 @@ void cs::PoolSynchronizer::onStoreBlockTimeElapsed() {
     if (isSyncroStarted()) {
         synchroFinished();
     }
+}
+
+void cs::PoolSynchronizer::trySource(cs::Sequence finSeq, cs::PublicKey& source) {
+    Neighbour neighbour(source);
+    auto exists = isNeighbourExists(neighbour);
+    if (exists) {
+        auto maxSeq = getNeighbour(neighbour).maxSequence();
+        if (maxSeq > finSeq) {
+            syncTill(finSeq, source);
+        }
+        else {
+            csinfo() << "Max Seq for this source Key will be " << maxSeq;
+            syncTill(maxSeq, source);
+        }
+    }
+    else {
+        csinfo() << "There is no neighbour with such key";
+    }
+
+}
+
+void cs::PoolSynchronizer::syncTill(cs::Sequence finSeq, cs::PublicKey& source) {
+
 }
 
 void cs::PoolSynchronizer::onPingReceived(cs::Sequence sequence, const cs::PublicKey& publicKey) {
