@@ -210,7 +210,7 @@ public:
 
     void specialSync(cs::Sequence finSeq, cs::PublicKey& source);
     void setTop(cs::Sequence finSeq);
-    void Node::restoreSequence(cs::Sequence seq);
+    void restoreSequence(cs::Sequence seq);
 
     /**
      * Initializes the default round package as containing the default round table (default trusted

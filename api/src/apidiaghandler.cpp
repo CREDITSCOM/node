@@ -298,7 +298,7 @@ namespace api_diag {
         _return.__set_info(info);
     }
 
-    void APIDiagHandler::UserCommand(general::APIResponse& _return, const std::string& data) {
+    /*void APIDiagHandler::UserCommand(general::APIResponse& _return, const std::string& data) {
         std::vector<cs::Byte> msg(data.begin(), data.end());
         cs::IDataStream stream(msg.data(), msg.size());
         uint16_t order;
@@ -322,7 +322,7 @@ namespace api_diag {
 
         _return.__set_code(kNotImplemented);
         _return.__set_message("Not implemented");
-    }
+    }*/
 
     void APIDiagHandler::SetRawData(general::APIResponse& _return, const std::string& data) {
         const size_t min_len = sizeof(cs::RoundNumber) + 1 + Consensus::MinTrustedNodes * kPublicKeyLength + cscrypto::kSignatureSize;
