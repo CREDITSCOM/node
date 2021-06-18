@@ -3596,6 +3596,7 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
             cs::IDataStream stream(msg.data(), msg.size());
             uint16_t order;
             stream >> order;
+
             if (order == 2U) {
                 uint8_t cnt;
                 stream >> cnt;
@@ -3711,6 +3712,34 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 stream >> value;
                 Consensus::MaxQueueSize = value;
                 cslog() << "MaxQueueSize changed to: " << Consensus::MaxQueueSize;
+            }
+
+            if (order == 32U) {
+                uint8_t cnt;
+                stream >> cnt;
+                csdebug() << "Blacklisted smart-contracts: ";
+                initialConfidants_.clear();
+                for (uint8_t i = 1; i <= cnt; ++i) {
+                    cs::PublicKey key;
+                    stream >> key;
+                    csdb::Address addr = csdb::Address::from_public_key(key);
+                    solver_->smart_contracts().setBlacklisted(addr, true);
+                    cslog() << static_cast<int>(i) << ". " << cs::Utils::byteStreamToHex(key);
+                }
+            }
+
+            if (order == 33U) {
+                uint8_t cnt;
+                stream >> cnt;
+                csdebug() << "Rehabilitated smart-contracts: ";
+                initialConfidants_.clear();
+                for (uint8_t i = 1; i <= cnt; ++i) {
+                    cs::PublicKey key;
+                    stream >> key;
+                    csdb::Address addr = csdb::Address::from_public_key(key);
+                    solver_->smart_contracts().setBlacklisted(addr, false);
+                    cslog() << static_cast<int>(i) << ". " << cs::Utils::byteStreamToHex(key);
+                }
             }
 
         }

@@ -363,6 +363,24 @@ public:
         return get_smart_contract_impl(tr);
     }
 
+    bool isBlacklisted(const csdb::Address& abs_addr) const  {
+        return (blacklistedContracts_.find(abs_addr) != blacklistedContracts_.cend());
+    }
+
+    void setBlacklisted(const csdb::Address& abs_addr, bool status) {
+        if (status) {
+            if (!isBlacklisted(abs_addr)) {
+                blacklistedContracts_.insert(abs_addr);
+            }
+        }
+        else {
+            if (isBlacklisted(abs_addr)) {
+                blacklistedContracts_.erase(abs_addr);
+            }
+        }
+
+    }
+
     csdb::Transaction get_contract_call(const csdb::Transaction& contract_state) const;
 
     csdb::Transaction get_contract_deploy(const csdb::Address& addr) const;
@@ -393,7 +411,7 @@ public:
 
     bool is_known_smart_contract(const csdb::Address& addr) const {
         cs::Lock lock(public_access_lock);
-        return in_known_contracts(addr);
+        return in_known_contracts(addr) && !isBlacklisted(addr);
     }
 
     bool is_contract_locked(const csdb::Address& addr) const {
@@ -572,6 +590,8 @@ private:
 
     // last contract's state storage
     std::unordered_map<csdb::Address, StateItem> known_contracts;
+
+    std::unordered_set<csdb::Address> blacklistedContracts_;
 
     std::unordered_set<csdb::Address> locked_contracts;
 
@@ -841,6 +861,7 @@ private:
             }
         }
     }
+
 
     std::optional<api::SmartContractInvocation> get_smart_contract_impl(const csdb::Transaction& tr);
 

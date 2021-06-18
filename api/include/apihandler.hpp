@@ -291,6 +291,7 @@ private:
 
     std::condition_variable_any newBlockCv_;
     std::mutex dbLock_;
+    std::vector<std::string> unusedJavaLibs_;
 
     cs::Sequence maxReadSequence{};
 

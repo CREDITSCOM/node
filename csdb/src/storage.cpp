@@ -838,7 +838,7 @@ bool Storage::pool_remove_last_repair(cs::Sequence test_sequence, const csdb::Po
 	d->set_last_error(DataIntegrityError, "%s: Error loading previous pool %d", funcName(), test_sequence - 1);
 	return false;
 }
-
+// not used
 bool Storage::pool_remove_(cs::Sequence testSequence) {
     if (!isOpen()) {
         d->set_last_error(NotOpen);

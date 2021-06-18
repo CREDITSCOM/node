@@ -544,7 +544,7 @@ csdb::Transaction SmartContracts::get_transaction(const SmartContractRef& contra
 
 csdb::Transaction SmartContracts::get_deploy_transaction(const csdb::Address& abs_addr) const {
     auto it_state = known_contracts.find(abs_addr);
-    if (it_state != known_contracts.cend()) {
+    if (it_state != known_contracts.cend() && !isBlacklisted(abs_addr)) {
         const auto& contract = it_state->second;
         if (contract.deploy.is_valid()) {
             return contract.deploy;
