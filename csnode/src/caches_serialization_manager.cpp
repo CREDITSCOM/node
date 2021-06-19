@@ -1,5 +1,6 @@
 #include <csnode/caches_serialization_manager.hpp>
 
+#include <algorithm>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -120,7 +121,29 @@ struct CachesSerializationManager::Impl {
     }
 
     std::set<size_t> getVersions() {
-        return {};
+        std::set<size_t> result;
+
+        for (auto& p : std::filesystem::directory_iterator(kQuickStartRoot)) {
+            auto path = p.path().string();
+            if (path.empty()) {
+                continue;
+            }
+            std::replace(path.begin(), path.end(), '\\', '/');
+
+            if (path.back() == '/') {
+                path.pop_back();
+            }
+            auto stringVersion = path.substr(path.rfind('/'));
+
+            try {
+                result.insert(stoll(stringVersion));
+            }
+            catch (...) {
+                cserror() << "CachesSerializationManager: cannot get version from " << path;
+            }
+        }
+
+        return result;
     }
 
     bool loadVersion(size_t version) {
