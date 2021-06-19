@@ -118,6 +118,40 @@ struct CachesSerializationManager::Impl {
                  << writtenHashes;
         return currentHashes == writtenHashes;
     }
+
+    std::set<size_t> getVersions() {
+        return {};
+    }
+
+    bool loadVersion(size_t version) {
+        try {
+            std::filesystem::path p(kQuickStartRoot);
+            p /= std::to_string(version);
+
+            blockchainSerializer.load(p);
+            smartContractsSerializer.load(p);
+            walletsCacheSerializer.load(p);
+            walletsIdsSerializer.load(p);
+#ifdef NODE_API
+            tokensMasterSerializer.load(p);
+#endif
+            if (!checkHashes(version)) {
+                cserror() << "CachesSerializationManager: invalid hashes on load";
+                clear(version);
+                return false;
+            }
+        } catch (const std::exception& e) {
+            cserror() << "CachesSerializationManager: error on load: "
+                      << e.what();
+            clear(version);
+            return false;
+        } catch (...) {
+            cserror() << "CachesSerializationManager: unknown error on load";
+            clear(version);
+            return false;
+        }
+        return true;
+    }
 };
 
 CachesSerializationManager::CachesSerializationManager()
@@ -190,40 +224,30 @@ bool CachesSerializationManager::save(size_t version) {
     return true;
 }
 
-bool CachesSerializationManager::load(size_t version) {
+bool CachesSerializationManager::load() {
     if (!pImpl_->bindingsReady()) {
         cserror() << "CachesSerializationManager: load error: "
                   << "bindings are not ready";
         return false;
     }
 
-    try {
-        std::filesystem::path p(pImpl_->kQuickStartRoot);
-        p /= std::to_string(version);
-
-        pImpl_->blockchainSerializer.load(p);
-        pImpl_->smartContractsSerializer.load(p);
-        pImpl_->walletsCacheSerializer.load(p);
-        pImpl_->walletsIdsSerializer.load(p);
-#ifdef NODE_API
-        pImpl_->tokensMasterSerializer.load(p);
-#endif
-        if (!pImpl_->checkHashes(version)) {
-            cserror() << "CachesSerializationManager: invalid hashes on load";
-            pImpl_->clear(version);
-            return false;
-        }
-    } catch (const std::exception& e) {
-        cserror() << "CachesSerializationManager: error on load: "
-                  << e.what();
-        pImpl_->clear(version);
-        return false;
-    } catch (...) {
-        cserror() << "CachesSerializationManager: unknown error on load";
-        pImpl_->clear(version);
-        return false;
+    // try to load most recent version first
+    if (pImpl_->loadVersion(0)) {
+        return true;
     }
-    return true;
+
+    auto versions = pImpl_->getVersions();
+
+    // load versions starting from greatest numbers
+    for (auto it = versions.rbegin(); it != versions.rend(); ++it) {
+        if (pImpl_->loadVersion(*it)) {
+            csinfo() << "CachesSerializationManager: successfully load version " << *it;
+            return true;
+        }
+    }
+
+    cserror() << "CachesSerializationManager: no suitable version found";
+    return false;
 }
 
 void CachesSerializationManager::clear(size_t version) {

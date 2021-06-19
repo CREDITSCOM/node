@@ -25,7 +25,7 @@ public:
     void clear(size_t version = 0);
 
     bool save(size_t version = 0);
-    bool load(size_t version = 0);
+    bool load();
 
 private:
     struct Impl;
