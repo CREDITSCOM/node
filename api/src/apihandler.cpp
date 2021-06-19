@@ -59,8 +59,6 @@ APIHandler::APIHandler(BlockChain& blockchain, cs::SolverCore& _solver, cs::Exec
         firstTime = false;
     }
 #endif
-    unusedJavaLibs_.push_back("java.nio");
-    unusedJavaLibs_.push_back("java.io");
 }
 
 void APIHandler::run() {
@@ -1111,7 +1109,8 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
         csdb::Address deployer = blockchain_.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
         auto scKey = cs::SmartContracts::get_valid_smart_address(deployer, uint64_t(send_transaction.innerID()), input_smart.smartContractDeploy);
         size_t cnt = 0;
-        for (auto a : unusedJavaLibs_) {
+        auto unusedJavaLibs = solver_.smart_contracts().getUnusedJavaLibsList();
+        for (auto a : *unusedJavaLibs) {
             if (input_smart.smartContractDeploy.sourceCode.find(a)) {
                 ++cnt;
             }
@@ -2168,7 +2167,8 @@ std::vector<general::ByteCodeObject> APIHandler::getSmartByteCode(const csdb::Ad
 void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return, const std::string& sourceCode) {
     executor::CompileSourceCodeResult result;
     size_t cnt = 0ULL;
-    for (auto a : unusedJavaLibs_) {
+    auto unusedJavaLibs = solver_.smart_contracts().getUnusedJavaLibsList();
+    for (auto a : *unusedJavaLibs) {
         if (sourceCode.find(a)) {
             ++cnt;
         }

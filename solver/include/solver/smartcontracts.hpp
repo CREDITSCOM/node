@@ -357,6 +357,9 @@ public:
 
     static std::vector<cs::TransactionsPacket> grepNewStatesPacks(const BlockChain& storage, const std::vector<csdb::Transaction>& trxs);
 
+    void addUnusedJavaLib(std::string libname);
+    void removeUnusedJavaLib(std::string libname);
+    std::vector<std::string>* getUnusedJavaLibsList();
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
@@ -705,6 +708,7 @@ private:
     using execution_const_iterator = std::vector<ExecutionItem>::const_iterator;
 
     Node* pnode;
+    std::vector<std::string> unusedJavaLibs_;
 
     queue_const_iterator find_in_queue(const SmartContractRef& item) const {
         for (auto it = exe_queue.cbegin(); it != exe_queue.cend(); ++it) {

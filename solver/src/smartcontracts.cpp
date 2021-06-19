@@ -206,6 +206,8 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
         exec_handler_ptr = connector_ptr->apiExecHandler();
     }
     node_id = id;
+    unusedJavaLibs_.push_back("java.nio");
+    unusedJavaLibs_.push_back("java.io");
 }
 
 /*public*/
@@ -3199,6 +3201,23 @@ std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const Blo
         res.push_back(pack);
     }
     return res;
+}
+
+void SmartContracts::addUnusedJavaLib(std::string libname) {
+    auto it = std::find(unusedJavaLibs_.begin(), unusedJavaLibs_.end(), libname);
+    if (it == unusedJavaLibs_.end()) {
+        unusedJavaLibs_.push_back(libname);
+    }
+}
+void SmartContracts::removeUnusedJavaLib(std::string libname) {
+    auto it = std::find(unusedJavaLibs_.begin(), unusedJavaLibs_.end(), libname);
+    if (it != unusedJavaLibs_.end()) {
+        unusedJavaLibs_.erase(it);
+    }
+}
+
+std::vector<std::string>* SmartContracts::getUnusedJavaLibsList() {
+    return &unusedJavaLibs_;
 }
 
 }  // namespace cs
