@@ -1473,6 +1473,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
         emit tryToStoreBlockEvent(pool, &check_failed);
         if (check_failed) {
             csdebug() << kLogPrefix << "The pool " << pool.sequence() << " is invalid, won't be stored";
+            badBlockIssue(pool);
             emit alarmBadBlock(pool.sequence());
             return false;
         }
@@ -1939,6 +1940,10 @@ void BlockChain::replaceCachedIncorrectBlock(const csdb::Pool& block) {
         emittingRequest_ = 0;
         arrangeBlocksInCache();
     }
+    if (emittingRequest_ == 3) {
+        emittingRequest_ = 0;
+        badBlockIssue(block);
+    }
 }
 
 void BlockChain::arrangeBlocksInCache() {
@@ -1982,6 +1987,32 @@ void BlockChain::arrangeBlocksInCache() {
     lastPrevHash_ = csdb::PoolHash();
     neededCacheSeq_ = 0ULL;
     startingBchSeq_ = 0ULL;
+}
+
+void BlockChain::badBlockIssue(const csdb::Pool& pool) {
+    if (!antiForkMode_ && cachedBlocks_->maxSequence() < getLastSeq() + 5ULL) {
+        return;
+    }
+    cachedBlocks_->insert(pool, cs::PoolStoreType::Synced);
+    if (neededCacheSeq_ == 0ULL) {
+        antiForkMode_ = true;
+        lastPrevHash_ = getLastHash();
+        startingBchSeq_ = getLastSeq();
+        neededCacheSeq_ = startingBchSeq_ + 1ULL;
+    }
+    while (lastPrevHash_ == pool.previous_hash()) {
+        csdb::Pool currentBlock = cachedBlocks_->value(neededCacheSeq_).value().pool;
+        if (cachedBlocks_->maxSequence() > neededCacheSeq_ && cachedBlocks_->contains(++neededCacheSeq_)) {
+            lastPrevHash_ = currentBlock.hash();
+        }
+        else {
+            emittingRequest_ = 3;
+            emit orderNecessaryBlock(lastPrevHash_, neededCacheSeq_);
+            return;
+        }
+
+    }
+    arrangeBlocksInCache();
 }
 
 void BlockChain::getCachedMissedBlock(const csdb::Pool& block) {

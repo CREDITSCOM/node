@@ -69,7 +69,6 @@ Node::Node(cs::config::Observer& observer)
     std::cout << "Start transport... ";
     transport_ = new Transport(this);
     std::cout << "Done\n";
-    status_ = cs::NodeStatus::Synchronization;
     poolSynchronizer_ = new cs::PoolSynchronizer(&blockChain_);
 
     cs::ExecutorSettings::set(cs::makeReference(blockChain_), cs::makeReference(solver_));
@@ -3343,7 +3342,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
             status_ = cs::NodeStatus::InRound;
         }
         else {
-            cs::NodeStatus::Synchronization;
+            status_ = cs::NodeStatus::Synchronization;
         }
     }
     else {
@@ -3763,13 +3762,16 @@ void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
             /*| cs::BlockValidator::ValidationLevel::accountBalance*/,
         cs::BlockValidator::SeverityLevel::onlyFatalErrors)) {
         *shouldStop = true;
+        csdebug() << "NODE> Trying to add sequence " << block.sequence() << " to incorrect blocks list. NodeStatus: " 
+            << (status_ == cs::NodeStatus::ReadingBlocks ? "ReadingBlocks" : "Other");
         if (status_ == cs::NodeStatus::ReadingBlocks) {
             getBlockChain().addIncorrectBlockNumber(block.sequence());
+            csdebug() << "NODE> Sequence " << block.sequence() << " added";
             *shouldStop = false;
         }
-        
-        
-        return;
+        else {
+            return;
+        }
     }
     processSpecialInfo(block);
 }

@@ -197,6 +197,7 @@ public:
     void cacheLastBlocks();
     void replaceCachedIncorrectBlock(const csdb::Pool& block);
     void getCachedMissedBlock(const csdb::Pool& block);
+    void badBlockIssue(const csdb::Pool& pool);
 
     std::vector<cs::Sequence>* getIncorrectBlockNumbers();
     // continuous interval from ... to
