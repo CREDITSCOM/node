@@ -4232,6 +4232,7 @@ void Node::tryResolveHashProblems() {
 }
 
 void Node::sendNecessaryBlockRequest(csdb::PoolHash hash, cs::Sequence seq) {
+    csdebug() << __func__ << ": " << seq;
     neededHash_ = hash;
     neededSequence_ = seq;
     goodAnswers_ = 0;
@@ -4247,6 +4248,7 @@ void Node::sendNecessaryBlockRequest(csdb::PoolHash hash, cs::Sequence seq) {
 }
 
 void Node::getNecessaryBlockRequest(cs::PoolsBlock& pBlock, const cs::PublicKey& sender) {
+    csdebug() << __func__ << ": " << pBlock.back().sequence();
     auto it = std::find(requestedKeys_.begin(), requestedKeys_.end(), sender);
     requestedKeys_.erase(it);
     if (neededHash_== csdb::PoolHash() || pBlock.back().hash() == neededHash_) {
