@@ -3583,9 +3583,9 @@ bool Node::checkNodeVersion(cs::Sequence curSequence, std::string& msg) {
     return !nVersionChange_.condition;
 }
 
-void Node::restoreSequence(cs::Sequence seq) {
-     //TODO: insert necessary code here
-}
+//void Node::restoreSequence(cs::Sequence seq) {
+//     //TODO: insert necessary code here
+//}
 
 void Node::processSpecialInfo(const csdb::Pool& pool) {
     for (auto it : pool.transactions()) {
@@ -4193,6 +4193,31 @@ void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeI
 
 }
 
+uint8_t Node::requestKBAnswer(std::vector<std::string> choice) {
+    if (choice.size() < 2) {
+        return static_cast<uint8_t>(255);
+    }
+    csinfo() << "NODE> Choose the action for node to do:";
+    int cnt = 1;
+    for (auto it : choice) {
+        csinfo() << cnt++ << ". " << it;
+    }
+        
+    char letterKey;
+    size_t ia = 0;
+    while (true) {
+        std::cin >> letterKey;
+        ia = letterKey - '0';
+        if( ia > choice.size() || ia == 0){
+            csinfo() << "NODE> You've chosen not correct letter. Try again.";
+        }
+        else {
+            break;
+        }
+    }
+    return static_cast<uint8_t>(ia);
+}
+
 void Node::tryResolveHashProblems() {
     csinfo() << "NODE> This node db is corrupted. The problem blocks are:";
     auto it = getBlockChain().getIncorrectBlockNumbers()->begin();
@@ -4200,29 +4225,19 @@ void Node::tryResolveHashProblems() {
         csinfo() << *it;
         ++it;
     }
-    csinfo() << "NODE> Would you like node to resolve it (y), to continue as is (n) and to quit (q)?";
-    char letterKey;
-    while (true) {
-        std::cin >> letterKey;
-        if (letterKey != 'y' && letterKey != 'n' && letterKey != 'q') {
-            csinfo() << "NODE> You've chosen not correct letter. Try again.";
-        }
-        else {
-            break;
-        }
-    }
 
-    if (letterKey == 'y') {
+    uint8_t lKey = requestKBAnswer({"resolve incorrect blocks", "go as is", "quit"});
+    if (lKey == 1) {
         csinfo() << "NODE> You've chosen to resolve incorrect blocks. Wait while the node will try to perform all possible variants";
         //now we will try to eliminate the incorrect blocks from your db
         getBlockChain().cacheLastBlocks();
     }
-    else if (letterKey == 'n') {
+    else if (lKey == 2) {
         csinfo() << "NODE> You've chosen go on as is. So, have a good work!";
         //just continue the normal node work
     }
 
-    else if (letterKey == 'q') {
+    else if (lKey == 3) {
         csinfo() << "NODE> The node will quit now";
         stopRequested_ = true;
         stop();

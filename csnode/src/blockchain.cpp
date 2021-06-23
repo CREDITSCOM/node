@@ -1895,28 +1895,34 @@ void BlockChain::cacheLastBlocks() {
     antiForkMode_ = true;
     cs::Sequence lastSeq;
     while (!incorrectBlocks_.empty() || !selectionFinished_) {
+        csinfo() << kLogPrefix << "Starting blocks transferring cycle";
         auto lastBlock = getLastBlock();
         lastSeq = lastBlock.sequence();
         if (incorrectBlocks_.back() != lastBlock.sequence() && selectionFinished_) {
+            csinfo() << kLogPrefix << "incorrect block sequence not reached and selFin == " << (selectionFinished_?"true":"false");
             if (lastBlock.is_valid()) {
+                csinfo() << kLogPrefix << "caching block " << lastBlock.sequence();
                 cachedBlocks_->insert(lastBlock, cs::PoolStoreType::Restored);
             }
         }
         else {
+            csinfo() << kLogPrefix << "incorrect block sequence reached and selFin == " << (selectionFinished_ ? "true" : "false");;
             selectionFinished_ = false;
             if (lastBlock.hash() == lastPrevHash_) {
+                csinfo() << kLogPrefix << "reached condition when lastBlock.hash() == lastPrevHash_";
                 if (lastBlock.is_valid()) {
                     selectionFinished_ = true;
-                    csdebug() << kLogPrefix << "Add block " << lastBlock.sequence() << " to cache";
+                    csinfo() << kLogPrefix << "Add block " << lastBlock.sequence() << " to cache";
                     cachedBlocks_->insert(lastBlock, cs::PoolStoreType::Restored);
                 }
             }
             else {
                 if (incorrectBlocks_.back() == lastSeq) {
-                    csdebug() << kLogPrefix << "Incorrect block reached, remove it form list";
+                    csinfo() << kLogPrefix << "Incorrect block reached, remove it form list";
                     incorrectBlocks_.pop_back();
                 }
                 emittingRequest_ = 1;
+                csinfo() << kLogPrefix << "orderNecessaryBlock";
                 emit orderNecessaryBlock(lastPrevHash_, lastSeq);
                 blocksToBeRemoved_ = 1;
                 removeLastBlock();
