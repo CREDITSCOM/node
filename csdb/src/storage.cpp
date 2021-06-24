@@ -736,6 +736,7 @@ Pool Storage::pool_load_meta(const PoolHash& hash, size_t& cnt) const {
 }
 
 Pool Storage::pool_remove_last() {
+    csdebug() << __func__;
     if (!isOpen()) {
         d->set_last_error(NotOpen);
         return Pool{};
@@ -748,6 +749,7 @@ Pool Storage::pool_remove_last() {
         d->last_hash = res.previous_hash();
         return res;
     }
+    csinfo() << "Storage: pool not found in write queue";
 
     if (last_hash().is_empty()) {
         d->set_last_error(InvalidParameter, "%s: Empty hash passed", funcName());
@@ -756,6 +758,7 @@ Pool Storage::pool_remove_last() {
 
     cs::Bytes data;
     if (!d->db->get(last_hash().to_binary(), &data)) {
+        csdebug() << "Storage: No data with such hash";
         d->set_last_error(DatabaseError);
         return Pool{};
     }
@@ -796,7 +799,7 @@ bool Storage::pool_remove_last_repair(cs::Sequence test_sequence, const csdb::Po
 
 	// test sequence
 	if (test_sequence + 1 != d->count_pool) {
-		d->set_last_error(InvalidParameter, "%s: incorrect last sequence passed", funcName());
+		d->set_last_error(InvalidParameter, "%s: incorrect last sequence passed: %i, storage size: %i", funcName(), test_sequence, d->count_pool);
 		return false;
 	}
 

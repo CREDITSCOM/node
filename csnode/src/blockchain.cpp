@@ -372,10 +372,10 @@ void BlockChain::removeLastBlock() {
         csmeta(cserror) << kLogPrefix << "Error! Removed pool is not valid";
 
 		if (remove_hash.is_empty()) {
-			cserror() << kLogPrefix << "storage is corrupted, storage rescan is required";
+			cserror() << kLogPrefix << "storage is corrupted, storage rescan is required, removed hash is empty";
 			return;
 		}
-
+        csinfo() << kLogPrefix << "pool to be deleted is not valid, trying to use repair_remove";
 		{
 			std::lock_guard lock(dbLock_);
 			if (!storage_.pool_remove_last_repair(remove_seq, remove_hash)) {
