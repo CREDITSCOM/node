@@ -53,6 +53,7 @@ struct CachesSerializationManager::Impl {
     }
 
     void clear(size_t version) {
+        csinfo() << "CachesSerializationManager: try to clear version " << version;
         std::filesystem::path p(kQuickStartRoot);
         p /= std::to_string(version);
 
@@ -133,13 +134,14 @@ struct CachesSerializationManager::Impl {
             if (path.back() == '/') {
                 path.pop_back();
             }
-            auto stringVersion = path.substr(path.rfind('/'));
+            auto stringVersion = path.substr(path.rfind('/') + 1);
 
             try {
                 result.insert(stoll(stringVersion));
             }
             catch (...) {
-                cserror() << "CachesSerializationManager: cannot get version from " << path;
+                cserror() << "CachesSerializationManager: cannot get version from " << path
+                          << ", " << stringVersion;
             }
         }
 
@@ -147,6 +149,7 @@ struct CachesSerializationManager::Impl {
     }
 
     bool loadVersion(size_t version) {
+        csinfo() << "CachesSerializationManager: try to load version " << version;
         try {
             std::filesystem::path p(kQuickStartRoot);
             p /= std::to_string(version);
