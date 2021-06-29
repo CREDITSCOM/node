@@ -1898,37 +1898,33 @@ void BlockChain::cacheLastBlocks() {
         csinfo() << kLogPrefix << "Starting blocks transferring cycle";
         auto lastBlock = getLastBlock();
         lastSeq = lastBlock.sequence();
-        if (incorrectBlocks_.back() != lastBlock.sequence() && selectionFinished_) {
-            csinfo() << kLogPrefix << "incorrect block sequence not reached and selFin == " << (selectionFinished_?"true":"false");
-            if (lastBlock.is_valid()) {
-                csinfo() << kLogPrefix << "caching block " << lastBlock.sequence();
-                cachedBlocks_->insert(lastBlock, cs::PoolStoreType::Restored);
-            }
+
+        if (incorrectBlocks_.back() < lastBlock.sequence()) {
+            csinfo() << kLogPrefix << "incorrect block sequence not reached";//and selFin == " << (selectionFinished_?"true":"false");
+        }
+        else if (incorrectBlocks_.back() == lastSeq) {
+            csinfo() << kLogPrefix << "Incorrect block reached, remove it form list";
+            incorrectBlocks_.pop_back();
         }
         else {
-            csinfo() << kLogPrefix << "incorrect block sequence reached and selFin == " << (selectionFinished_ ? "true" : "false");;
-            selectionFinished_ = false;
-            if (lastBlock.hash() == lastPrevHash_) {
-                csinfo() << kLogPrefix << "reached condition when lastBlock.hash() == lastPrevHash_";
-                if (lastBlock.is_valid()) {
-                    selectionFinished_ = true;
-                    csinfo() << kLogPrefix << "Add block " << lastBlock.sequence() << " to cache";
-                    cachedBlocks_->insert(lastBlock, cs::PoolStoreType::Restored);
-                }
-            }
-            else {
-                if (incorrectBlocks_.back() == lastSeq) {
-                    csinfo() << kLogPrefix << "Incorrect block reached, remove it form list";
-                    incorrectBlocks_.pop_back();
-                }
-                emittingRequest_ = 1;
-                csinfo() << kLogPrefix << "orderNecessaryBlock";
-                emit orderNecessaryBlock(lastPrevHash_, lastSeq);
-                blocksToBeRemoved_ = 1;
-                removeLastBlock();
-                return;
-            }
+            csinfo() << kLogPrefix << "Incorrect block overjumped - hmm .. look though your code better";
         }
+
+        if (lastBlock.is_valid() && lastBlock.hash() == lastPrevHash_) {
+            selectionFinished_ = true;
+            csinfo() << kLogPrefix << "caching block " << lastBlock.sequence();
+            cachedBlocks_->insert(lastBlock, cs::PoolStoreType::Restored);
+        }
+        else {
+            emittingRequest_ = 1;
+            selectionFinished_ = false;
+            csinfo() << kLogPrefix << "reached block with nonconsistant hash: orderNecessaryBlock";
+            emit orderNecessaryBlock(lastPrevHash_, lastSeq);
+            blocksToBeRemoved_ = 1;
+            removeLastBlock();
+            return;
+        }
+
         lastPrevHash_ = lastBlock.previous_hash();
         blocksToBeRemoved_ = 1;
         removeLastBlock();

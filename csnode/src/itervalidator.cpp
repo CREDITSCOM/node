@@ -172,10 +172,12 @@ Reject::Reason IterValidator::deployAdditionalCheck(SolverContext& context, size
 		}
         size_t cnt = 0ULL;
         auto unusedJavaLibs = context.smart_contracts().getUnusedJavaLibsList();
-        for (auto a : *unusedJavaLibs) {
-            if (sci.value().smartContractDeploy.sourceCode.find(a)) {
+        auto it = unusedJavaLibs->begin();
+        while (it != unusedJavaLibs->end()) {
+            if (sci.value().smartContractDeploy.sourceCode.find(*it) != std::string::npos) {
                 ++cnt;
             }
+            ++it;
         }
         if (cnt > 0ULL) {
             return Reject::Reason::NotPermittedJavaLibs;

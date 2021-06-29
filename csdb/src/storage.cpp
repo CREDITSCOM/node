@@ -736,7 +736,7 @@ Pool Storage::pool_load_meta(const PoolHash& hash, size_t& cnt) const {
 }
 
 Pool Storage::pool_remove_last() {
-    csdebug() << __func__;
+    csdebug() << __func__ << ", db size: " << d->count_pool;
     if (!isOpen()) {
         d->set_last_error(NotOpen);
         return Pool{};
@@ -783,6 +783,7 @@ Pool Storage::pool_remove_last() {
 }
 
 bool Storage::pool_remove_last_repair(cs::Sequence test_sequence, const csdb::PoolHash& test_hash) {
+    csinfo() << __func__ << ", db size: " << d->count_pool;
 	if (!isOpen()) {
 		d->set_last_error(NotOpen);
 		return false;

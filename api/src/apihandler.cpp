@@ -1110,10 +1110,12 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
         auto scKey = cs::SmartContracts::get_valid_smart_address(deployer, uint64_t(send_transaction.innerID()), input_smart.smartContractDeploy);
         size_t cnt = 0;
         auto unusedJavaLibs = solver_.smart_contracts().getUnusedJavaLibsList();
-        for (auto a : *unusedJavaLibs) {
-            if (input_smart.smartContractDeploy.sourceCode.find(a)) {
+        auto it = unusedJavaLibs->begin();
+        while (it != unusedJavaLibs->end()) {
+            if (input_smart.smartContractDeploy.sourceCode.find(*it) != std::string::npos) {
                 ++cnt;
             }
+            ++it;
         }
         if (scKey != addr || cnt > 0) {
             _return.status.code = int8_t(ERROR_CODE);
@@ -2166,15 +2168,13 @@ std::vector<general::ByteCodeObject> APIHandler::getSmartByteCode(const csdb::Ad
 
 void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return, const std::string& sourceCode) {
     executor::CompileSourceCodeResult result;
-    size_t cnt = 0ULL;
     auto unusedJavaLibs = solver_.smart_contracts().getUnusedJavaLibsList();
-    for (auto a : *unusedJavaLibs) {
-        if (sourceCode.find(a)) {
-            ++cnt;
+    auto it = unusedJavaLibs->begin();
+    while(it != unusedJavaLibs->end()) {
+        if (sourceCode.find(*it) != std::string::npos) {
+            return;
         }
-    }
-    if (cnt > 0ULL) {
-        return;
+        ++it;
     }
 
     executor_.compileSourceCode(result, sourceCode);
