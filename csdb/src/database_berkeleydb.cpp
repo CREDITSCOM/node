@@ -428,6 +428,27 @@ public:
         assert(false);
     }
 
+    void seek(const uint32_t seq_no) final {
+        if (it_ == nullptr) {
+            return;
+        }
+
+        // storage wants to load blocks by 0-based index:
+        // 1 => pool[0], 2 => pool[1] etc.
+        Dbt_copy<uint32_t> key(seq_no + 1);
+        Dbt_safe value;
+
+        int ret = it_->get(&key, &value, DB_SET);
+        if (ret == 0) {
+            set_key(key);
+            set_value(value);
+            valid_ = true;
+        }
+        else {
+            valid_ = false;
+        }
+    }
+
     void next() override final {
         if (it_ == nullptr) {
             return;
