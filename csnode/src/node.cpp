@@ -202,6 +202,9 @@ bool Node::init() {
     if (!getBlockChain().getIncorrectBlockNumbers()->empty()) {
         tryResolveHashProblems();
     }
+    else {
+        csdebug() << "Loaded blockchaind database is correct\n";
+    }
 
     initBootstrapRP(initialConfidants_);
     EventReport::sendRunningStatus(*this, Running::Status::Run);
@@ -4256,9 +4259,11 @@ void Node::sendNecessaryBlockRequest(csdb::PoolHash hash, cs::Sequence seq) {
     sequences.push_back(seq);
     requestedKeys_.clear();
     requestedKeys_ = poolSynchronizer_->getNeededNeighbours(seq);
+    csdebug() << "Request sent to:";
     for (auto k : requestedKeys_) {
         BaseFlags flags = static_cast<BaseFlags>(BaseFlags::Signed | BaseFlags::Compressed);
         transport_->sendDirect(formPacket(flags, MsgTypes::BlockRequest, round, sequences), k);
+        csdebug() << cs::Utils::byteStreamToHex(k);
     }
 }
 

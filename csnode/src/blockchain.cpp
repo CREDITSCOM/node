@@ -1473,6 +1473,10 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
         emit tryToStoreBlockEvent(pool, &check_failed);
         if (check_failed) {
             csdebug() << kLogPrefix << "The pool " << pool.sequence() << " is invalid, won't be stored";
+            if (lastSequence_ == poolSequence) {
+                --lastSequence_;
+                deferredBlock_ = csdb::Pool{};
+            }
             badBlockIssue(pool);
             emit alarmBadBlock(pool.sequence());
             return false;
@@ -1996,10 +2000,10 @@ void BlockChain::arrangeBlocksInCache() {
 }
 
 void BlockChain::badBlockIssue(const csdb::Pool& pool) {
-    csdebug() << kLogPrefix << __func__;
+    csdebug() << kLogPrefix << __func__ << pool.sequence();
     if (!antiForkMode_ && cachedBlocks_->maxSequence() < getLastSeq() + 5ULL) {
         csdebug() << kLogPrefix << "AntiForkMode is " << (antiForkMode_?"ON":"OFF") << ", cached blocks: "
-            << cachedBlocks_->maxSequence() << ", last seq: " << getLastSeq() << " - EXIT";
+            << cachedBlocks_->maxSequence() << ", last seq: " << getLastSeq();
         return;
     }
     cachedBlocks_->insert(pool, cs::PoolStoreType::Synced);
