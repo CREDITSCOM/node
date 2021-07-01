@@ -135,8 +135,8 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
           }
         }
 
-        ++totalLoaded;
-        if (progress.poolsProcessed % 1000 == 0) {
+        totalLoaded = progress.poolsProcessed;
+        if (totalLoaded % 1000 == 0) {
             std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << std::flush;
         }
         return false;
