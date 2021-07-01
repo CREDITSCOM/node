@@ -6,6 +6,7 @@
 
 #include <csnode/conveyer.hpp>
 #include <csnode/configholder.hpp>
+#include <lib/system/random.hpp>
 
 cs::PoolSynchronizer::PoolSynchronizer(BlockChain* blockChain)
 : blockChain_(blockChain) {
@@ -164,7 +165,12 @@ void cs::PoolSynchronizer::sendBlockRequest() {
     // remove unnecessary sequences
     removeExistingSequence(blockChain_->getLastSeq(), SequenceRemovalAccuracy::LowerBound);
     bool sendRequest = false;
-    for (auto& neighbour : neighbours_) {
+    auto nbrs{ neighbours_ };
+    std::mt19937 g;
+    g.seed(uint32_t(Conveyer::instance().currentRoundNumber()));
+    cs::Random::shuffle(nbrs.begin(), nbrs.end(), g);
+    
+    for (auto& neighbour : nbrs) {
         if (!getNeededSequences(neighbour)) {
             csmeta(csdetails) << "Neighbor: " << cs::Utils::byteStreamToHex(neighbour.publicKey()) << " is busy";
             continue;
