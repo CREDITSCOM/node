@@ -4,6 +4,7 @@
 #include <mutex>
 #include <thread>
 
+#include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
 
@@ -28,12 +29,17 @@ private:
         bool workerReady = false;
         bool mainReady = false;
         bool error = false;
+        int signalCode = 0;
     };
 
     void waitForSignals();
     void doWork();
     bool startSignalThread();
     bool startWorkerThread();
+    void joinThreads();
+    bool startMonitoring();
+
+    void closeIO();
 
     ServiceOwner& owner_;
     const char* serviceName_;
@@ -51,8 +57,8 @@ inline Service::Service(ServiceOwner& owner, const char* serviceName)
     : owner_(owner), serviceName_(serviceName) {}
 
 inline bool Service::run() {
-    auto pid = ::fork();
 #ifndef DISABLE_DAEMON
+    auto pid = ::fork();
     switch (pid) {
         // child
         case 0 :
@@ -74,25 +80,27 @@ inline bool Service::run() {
     try {
         if (!startSignalThread() || !startWorkerThread()) {
             result = false;
-            lock_type lock(mux_);
-            threadsStatus_.mainReady = true;
-            cv_.notify_all();
         }
         else {
-            
+#ifndef DISABLE_DAEMON
+            setsid();
+            chdir("/");
+            closeIO();
+#endif // !DISABLE_DAEMON
+            {
+                lock_type lock(mux_);
+                threadsStatus_.mainReady = true;
+                cv_.notify_all();
+            }
+            result = startMonitoring();
         }
     }
     catch (...) {
+        joinThreads();
         result &= owner_.onException();
     }
 
-    if (signalThread_.joinable()) {
-        signalThread_.join();
-    }
-    if (workerThread_.joinable()) {
-        workerThread_.join();
-    }
-
+    joinThreads();
     return result;
 }
 
@@ -126,6 +134,52 @@ inline bool Service::startWorkerThread() {
     threadsStatus_.error = false;
 
     return !error;
+}
+
+inline void Service::joinThreads() {
+    if (signalThread_.joinable()) {
+        signalThread_.join();
+    }
+    if (workerThread_.joinable()) {
+        workerThread_.join();
+    }
+}
+
+inline void Service::closeIO() {
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+    close(STDIN_FILENO);
+    int devNull = open("/dev/null", O_RDWR);
+    if (devNull != -1) {
+        dup2(devNull, STDOUT_FILENO);
+        dup2(devNull, STDERR_FILENO);
+        dup2(devNull, STDIN_FILENO);
+        close(devNull);
+    }
+}
+
+inline bool Service::startMonitoring() {
+    bool result = true;
+    while (true) {
+        ThreadsStatus threadStatus;
+        {
+            lock_type lock(mux_);
+            cv_.wait(
+                lock,
+                [this]() {
+                    return threadsStatus_.signalReady || threadsStatus_.workerReady;
+                }
+            );
+            threadStatus = threadsStatus_;
+            threadsStatus_ = ThreadsStatus();
+        }
+        if (threadStatus.workerReady) {
+            result = !threadStatus.error;
+            pthread_kill(signalThread_.native_handle(), SIGTERM);
+            break;
+        }
+    }
+    return result;
 }
 
 } // namespace cs
