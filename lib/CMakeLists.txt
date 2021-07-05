@@ -35,6 +35,8 @@ add_library(lib
   include/lib/system/dynamicbuffer.hpp
   include/lib/system/pmrfactory.hpp
   include/lib/system/serialize_tuple.hpp
+  include/lib/system/service/service.hpp
+  include/lib/system/service/service_owner.hpp
 )
 
 if (MSVC)
