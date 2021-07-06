@@ -1475,9 +1475,10 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
             csdebug() << kLogPrefix << "The pool " << pool.sequence() << " is invalid, won't be stored";
             if (lastSequence_ == poolSequence) {
                 --lastSequence_;
+                csdebug() << kLogPrefix << "Deleting defered block: " << deferredBlock_.sequence();
                 deferredBlock_ = csdb::Pool{};
             }
-            badBlockIssue(pool);
+            badBlocks_.push_back(pool.sequence());
             emit alarmBadBlock(pool.sequence());
             return false;
         }
@@ -1999,8 +2000,17 @@ void BlockChain::arrangeBlocksInCache() {
     startingBchSeq_ = 0ULL;
 }
 
+void BlockChain::lookForBadBlocks() {
+    if (badBlocks_.empty()) {
+        return;
+    }
+    for (auto it : badBlocks_) {
+
+    }
+}
+
 void BlockChain::badBlockIssue(const csdb::Pool& pool) {
-    csdebug() << kLogPrefix << __func__ << pool.sequence();
+    csdebug() << kLogPrefix << __func__ << ": "<<  pool.sequence();
     if (!antiForkMode_ && cachedBlocks_->maxSequence() < getLastSeq() + 5ULL) {
         csdebug() << kLogPrefix << "AntiForkMode is " << (antiForkMode_?"ON":"OFF") << ", cached blocks: "
             << cachedBlocks_->maxSequence() << ", last seq: " << getLastSeq();
@@ -2008,11 +2018,11 @@ void BlockChain::badBlockIssue(const csdb::Pool& pool) {
     }
     cachedBlocks_->insert(pool, cs::PoolStoreType::Synced);
     if (neededCacheSeq_ == 0ULL) {
-        csdebug() << kLogPrefix << "Inicializing variables";
+        csdebug() << kLogPrefix << "Initializing variables";
         antiForkMode_ = true;
         lastPrevHash_ = getLastHash();
         startingBchSeq_ = getLastSeq();
-        neededCacheSeq_ = startingBchSeq_ + 1ULL;
+        neededCacheSeq_ = startingBchSeq_;
     }
     while (lastPrevHash_ == pool.previous_hash()) {
         if (cachedBlocks_->contains(neededCacheSeq_) && cachedBlocks_->value(neededCacheSeq_).has_value()) {

@@ -255,6 +255,11 @@ public:
         return compatibleVersion_;
     }
 
+    bool getForkGeneration() const{
+        return generateFork_;
+    }
+
+
     bool isSyncOn() const {
         return sync_on_;
     }
@@ -365,6 +370,7 @@ private:
     bool traverseNAT_ = true;
     bool sync_on_ = true;
     uint64_t newBlockchainTopSeq_;
+    bool generateFork_ = false;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
     uint64_t roundElapseTime_ = DEFAULT_ROUND_ELAPSE_TIME;
