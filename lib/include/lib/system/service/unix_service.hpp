@@ -160,6 +160,7 @@ inline void Service::closeIO() {
 
 inline bool Service::startMonitoring() {
     bool result = true;
+    bool paused = false;
     while (true) {
         ThreadsStatus threadStatus;
         {
@@ -177,6 +178,24 @@ inline bool Service::startMonitoring() {
             result = !threadStatus.error;
             pthread_kill(signalThread_.native_handle(), SIGTERM);
             break;
+        }
+        else if (threadStatus.signalReady) {
+            switch (threadStatus.signalCode) {
+                case SIGTERM :
+                    owner_.onStop();
+                    break;
+                case SIGHUP :
+                    owner_.onParamChange();
+                    break;
+                case SIGINT :
+                    if (paused) {
+                        owner_.onContinue();
+                    }
+                    else {
+                        owner_.onPause();
+                    }
+                    paused = !paused;
+            }
         }
     }
     return result;
