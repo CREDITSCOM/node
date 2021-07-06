@@ -78,8 +78,14 @@ inline bool Service::run() {
     bool result = true;
 
     try {
-        if (!startSignalThread() || !startWorkerThread()) {
+        if (!startSignalThread()) {
             result = false;
+        }
+        else if (!startWorkerThread()) {
+            result = false;
+            lock_type lock(mux_);
+            threadsStatus_.error = true;
+            cv_.notify_all();
         }
         else {
 #ifndef DISABLE_DAEMON
@@ -105,10 +111,61 @@ inline bool Service::run() {
 }
 
 inline void Service::waitForSignals() {
+    {
+        lock_type lock(mux_);
+        threadsStatus_.signalReady = true;
+        cv_.notify_all();
+        cv_.wait(lock, [this]() { return threadsStatus_.mainReady || threadsStatus_.error; });
+        if (threadsStatus_.error) {
+            return;
+        }
+    }
 
+    sigset_t allSignals, acceptedSignals;
+    sigfillset(&allSignals);
+    sigaddset(&acceptedSignals, SIGTERM);
+    sigaddset(&acceptedSignals, SIGHUP);
+    sigaddset(&acceptedSignals, SIGINT);
+
+    int receivedSignal = -1;
+
+    while (true) {
+        int rc = sigwait(&allSignals, &receivedSignal);
+
+        {
+            lock_type lock(mux_);
+            threadsStatus_.signalReady = true;
+            if (rc != 0) {
+                threadsStatus_.error = true;
+                cv_.notify_all();
+                break;
+            }
+            if (sigismember(&acceptedSignals, receivedSignal)) {
+                threadsStatus_.signalCode = receivedSignal;
+                cv_.notify_all();
+            }
+        }
+
+        if (receivedSignal == SIGTERM) {
+            break;
+        }
+    }
 }
 
 inline void Service::doWork() {
+    {
+        lock_type lock(mux_);
+        threadsStatus_.workerReady = true;
+        bool ok = owner_.onInit(serviceName_);
+        cv_.notify_all();
+
+        if (!ok) {
+            threadsStatus_.error = true;
+            return;
+        }
+
+        cv_.wait(lock, [this]() { return threadsStatus_.mainReady; });
+    }
 
 }
 
@@ -162,7 +219,7 @@ inline bool Service::startMonitoring() {
     bool result = true;
     bool paused = false;
     while (true) {
-        ThreadsStatus threadStatus;
+        ThreadsStatus threadsStatus;
         {
             lock_type lock(mux_);
             cv_.wait(
@@ -171,19 +228,19 @@ inline bool Service::startMonitoring() {
                     return threadsStatus_.signalReady || threadsStatus_.workerReady;
                 }
             );
-            threadStatus = threadsStatus_;
+            threadsStatus = threadsStatus_;
             threadsStatus_ = ThreadsStatus();
         }
-        if (threadStatus.workerReady) {
-            result = !threadStatus.error;
+        if (threadsStatus.workerReady) {
+            result = !threadsStatus.error;
             pthread_kill(signalThread_.native_handle(), SIGTERM);
             break;
         }
-        else if (threadStatus.signalReady) {
-            switch (threadStatus.signalCode) {
+        else if (threadsStatus.signalReady) {
+            switch (threadsStatus.signalCode) {
                 case SIGTERM :
                     owner_.onStop();
-                    break;
+                    return result;
                 case SIGHUP :
                     owner_.onParamChange();
                     break;
@@ -195,6 +252,11 @@ inline bool Service::startMonitoring() {
                         owner_.onPause();
                     }
                     paused = !paused;
+                default :
+                    if (threadsStatus.error) {
+                        owner_.onStop();
+                        return false;
+                    }
             }
         }
     }
