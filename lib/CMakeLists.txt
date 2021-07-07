@@ -37,6 +37,8 @@ add_library(lib
   include/lib/system/serialize_tuple.hpp
   include/lib/system/service/service.hpp
   include/lib/system/service/service_owner.hpp
+  include/lib/system/service/unix_service.hpp
+  include/lib/system/service/win_service.hpp
 )
 
 if (MSVC)
