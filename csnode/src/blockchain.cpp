@@ -1030,14 +1030,22 @@ bool BlockChain::checkForConsistency(csdb::Pool& pool) {
     }
     csdb::Pool tmp = pool.clone();
     if (!tmp.compose()) {
+        csinfo() << kLogPrefix << "Check for consistency: can't compose block";
         return false;
     }
+
     cs::Bytes checking = tmp.to_binary();
     csdb::Pool tmpCopy = csdb::Pool::from_binary(std::move(checking));
     if (tmpCopy.sequence() == 0) {
-        csinfo() << kLogPrefix << "Failed to create correct binary representation of block #" << pool.sequence();
+        csinfo() << kLogPrefix << "Check for consistency: Failed to create correct binary representation of block #" << pool.sequence();
         return false;
     }
+
+    if (tmpCopy.previous_hash() != getLastHash()) {
+        csinfo() << kLogPrefix << "Check for consistency: block hash in pool #" << pool.sequence() << " doesn't correspond to the last one";
+        return false;
+    }
+
     return true;
 
 }
@@ -1833,6 +1841,11 @@ namespace {
             out << conv.value;
             out << w.walletId_;
         }
+        const auto& confidants = block.confidants();
+        for (const auto& it : confidants) {
+            out << it;
+        }
+        out << block.previous_hash();
     }
 }
 

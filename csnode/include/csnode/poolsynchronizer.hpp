@@ -230,6 +230,7 @@ private:
     // flag starting  syncronization
     std::atomic<bool> isSyncroStarted_ = false;
     std::atomic<bool> canRequestFreeBlocks = true;
+    const cs::RoundNumber MaxRoundDescrepancy = 5;
 
     // [key] = sequence,
     // [value] =  packet counter
