@@ -17,7 +17,7 @@ public:
     virtual bool onPause() { return true; }
     virtual bool onContinue() { return true; }
     virtual bool onParamChange() { return true; }
-    virtual bool onException() { return true; }
+    virtual bool onException() noexcept { return true; }
 #ifdef WIN32
 #if (_WIN32_WINNT >= _WIN32_WINNT_WINXP)
     virtual bool onSessionChanged(int what, const char* info) { return true; }

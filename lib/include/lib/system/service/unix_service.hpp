@@ -111,6 +111,14 @@ inline bool Service::run() {
 }
 
 inline void Service::waitForSignals() {
+    sigset_t allSignals, acceptedSignals;
+    sigfillset(&allSignals);
+    sigaddset(&acceptedSignals, SIGTERM);
+    sigaddset(&acceptedSignals, SIGHUP);
+    sigaddset(&acceptedSignals, SIGINT);
+
+    int receivedSignal = -1;
+
     {
         lock_type lock(mux_);
         threadsStatus_.signalReady = true;
@@ -120,14 +128,6 @@ inline void Service::waitForSignals() {
             return;
         }
     }
-
-    sigset_t allSignals, acceptedSignals;
-    sigfillset(&allSignals);
-    sigaddset(&acceptedSignals, SIGTERM);
-    sigaddset(&acceptedSignals, SIGHUP);
-    sigaddset(&acceptedSignals, SIGINT);
-
-    int receivedSignal = -1;
 
     while (true) {
         int rc = sigwait(&allSignals, &receivedSignal);
@@ -165,8 +165,27 @@ inline void Service::doWork() {
         }
 
         cv_.wait(lock, [this]() { return threadsStatus_.mainReady; });
+
+        if (threadsStatus_.error) {
+            return;
+        }
     }
 
+    try {
+        bool ok = owner_.onRun(serviceName_);
+
+        lock_type lock(mux_);
+        threadsStatus_.workerReady = true;
+        threadsStatus_.error = threadsStatus_.error ? true : !ok;
+        cv_.notify_all();
+    }
+    catch (...) {
+        lock_type lock(mux_);
+        owner_.onException();
+        threadsStatus_.workerReady = true;
+        threadsStatus_.error = true;
+        cv_.notify_all();
+    }
 }
 
 inline bool Service::startSignalThread() {
