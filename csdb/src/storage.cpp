@@ -281,7 +281,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
         }
     }
     emit stop_reading_event();
-
+    csdebug() << "Total read: " << count_pool;
     return true;
 
 #if 0

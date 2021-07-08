@@ -204,6 +204,10 @@ bool Node::init() {
     }
     else {
         csdebug() << "Loaded blockchaind database is correct\n";
+        uint8_t lKey = requestKBAnswer({ "go as is", "quit" });
+        if (lKey == 2) {
+            stop();
+        }
     }
 
     initBootstrapRP(initialConfidants_);
