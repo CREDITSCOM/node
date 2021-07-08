@@ -3522,7 +3522,7 @@ bool Node::checkNodeVersion(cs::Sequence curSequence, std::string& msg) {
         return true;
     }
     if (nVersionChange_.check == cs::CheckVersion::Full) {
-        msg =  "THIS NODE VERSION " + std::to_string(NODE_VERSION) + " IS OBSOLETTE AND IS TOTALLY NOT COMPATIBLE TO NEW NODE VERSION "
+        msg =  "THIS NODE VERSION " + std::to_string(NODE_VERSION) + " IS OBSOLETE AND IS TOTALLY NOT COMPATIBLE TO NEW NODE VERSION "
             + std::to_string(nVersionChange_.minFullVersion) + ".\nSINCE POOL "
             + std::to_string(nVersionChange_.seq) + " THIS NODE WILL NOT WORK. \nPLEASE UPDATE YOUR SOFTWARE!";
         if (curSequence >= nVersionChange_.seq) {
@@ -3532,7 +3532,7 @@ bool Node::checkNodeVersion(cs::Sequence curSequence, std::string& msg) {
         return !nVersionChange_.condition;
     }
     if (nVersionChange_.check == cs::CheckVersion::Normal) {
-        msg =  "THIS NODE VERSION " + std::to_string(NODE_VERSION) + " IS OBSOLETTE AND IS NOT FULLY COMPATIBLE TO NEW NODE VERSION " 
+        msg =  "THIS NODE VERSION " + std::to_string(NODE_VERSION) + " IS OBSOLETE AND IS NOT FULLY COMPATIBLE TO NEW NODE VERSION " 
             + std::to_string(nVersionChange_.minFullVersion) + ".\nSINCE POOL "
             + std::to_string(nVersionChange_.seq) + " THIS NODE WILL NOT WORK IN CONSENSUS. \nPLEASE UPDATE YOUR SOFTWARE!";
         if (curSequence >= nVersionChange_.seq) {
