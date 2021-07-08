@@ -18,7 +18,7 @@ public:
     virtual bool onContinue() { return true; }
     virtual bool onParamChange() { return true; }
     virtual bool onException() noexcept { return true; }
-#ifdef WIN32
+#ifdef _WIN32
 #if (_WIN32_WINNT >= _WIN32_WINNT_WINXP)
     virtual bool onSessionChanged(int what, const char* info) { return true; }
     virtual bool onDeviceEvent(int what, const char* info) { return true; }
@@ -26,7 +26,7 @@ public:
 #if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
     virtual bool onPreshutdown() { return true; }
 #endif // _WIN32_WINNT >= _WIN32_WINNT_VISTA
-#endif // WIN32
+#endif // _WIN32
 
     virtual ~ServiceOwner() = default;
 };
