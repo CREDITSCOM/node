@@ -74,20 +74,62 @@ private:
 
 class Service {
 public:
-    Service(ServiceOwner&, const char* serviceName = nullptr);
+    Service(ServiceOwner&, const char* serviceName);
 
     bool run();
 
 private:
+    static Service*& instance();
+    static void __stdcall serviceMain(DWORD ac, LPSTR* av) {
+        instance()->start(ac, av);
+    }
+
+    void start(DWORD ac, LPSTR* av);
+
     ServiceOwner& owner_;
     const char* serviceName_;
+    WinEvent event_;
+    SERVICE_STATUS status_;
+    SERVICE_STATUS_HANDLE statusHandler_;
 };
 
 Service::Service(ServiceOwner& owner, const char* serviceName)
-    : owner_(owner), serviceName_(serviceName) {}
+    : owner_(owner), serviceName_(serviceName), statusHandler_(nullptr) {}
 
 bool Service::run() {
+    if (serviceName_ == nullptr) {
+        return false;
+    }
+#ifdef DISABLE_DAEMON
+    try {
+        if (!owner_.onInit(serviceName_)) {
+            return false;
+        }
+        if (!owner_.onRun(serviceName_)) {
+            return false;
+        }
+    }
+    catch (...) {
+        return owner_.onException();
+    }
     return true;
+#endif // DISABLE_DAEMON
+    SERVICE_TABLE_ENTRYA serviceTable;
+    serviceTable.lpServiceName = const_cast<char*>(serviceName_);
+    serviceTable.lpServiceProc = &Service::serviceMain;
+    instance() = this;
+    bool result = StartServiceCtrlDispatcherA(&serviceTable);
+    instance() = nullptr;
+    return result;
+}
+
+Service*& Service::instance() {
+    static Service* ptr = nullptr;
+    return ptr;
+}
+
+void Service::start(DWORD ac, LPSTR* av) {
+
 }
 
 } // namespace cs
