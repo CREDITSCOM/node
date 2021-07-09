@@ -129,7 +129,25 @@ Service*& Service::instance() {
 }
 
 void Service::start(DWORD ac, LPSTR* av) {
+    status_.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+    status_.dwControlsAccepted = SERVICE_ACCEPT_STOP
+                               | SERVICE_ACCEPT_SHUTDOWN
+#if _WIN32_WINNT >= _WIN32_WINNT_VISTA
+                               | SERVICE_ACCEPT_PRESHUTDOWN
+#endif // _WIN32_WINNT >= WIN32_WINNT_VISTA
+                               | SERVICE_ACCEPT_PAUSE_CONTINUE
+#if _WIN32_WINNT >= _WIN32_WINNT_WINXP
+                               | SERVICE_ACCEPT_SESSIONCHANGE
+#endif // _WIN32_WINNT >= WIN32_WINNT_WINXP
+                               | SERVICE_ACCEPT_PARAMCHANGE;
+    status_.dwWin32ExitCode = NO_ERROR;
+    status_.dwServiceSpecificExitCode = NO_ERROR;
+    status_.dwCheckPoint = 0;
+    status_.dwWaitHint = 0;
 
+    event_.makeSignaled();
+
+    // statusHandler_ = RegisterServiceCtrlHandlerExA(serviceName_, )
 }
 
 } // namespace cs
