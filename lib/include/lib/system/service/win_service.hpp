@@ -90,10 +90,11 @@ private:
         LPVOID data,
         LPVOID context
     ) {
-
+        auto this_ = reinterpret_cast<Service*>(context);
+        this_->onExtendedServiceControlEvent(code, type, data);
     }
 
-    DWORD onExtededServiceControlEvent(DWORD code, DWORD type, LPVOID data);
+    DWORD onExtendedServiceControlEvent(DWORD code, DWORD type, LPVOID data);
     DWORD onEvent(DWORD code);
 
     bool setStatus(
@@ -196,6 +197,30 @@ inline void Service::start(DWORD ac, LPSTR* av) {
     }
 
     this->setStatus(SERVICE_STOPPED, errorCode, status_.dwServiceSpecificExitCode);
+}
+
+inline DWORD Service::onExtendedServiceControlEvent(DWORD code, DWORD type, LPVOID data) {
+
+}
+
+inline DWORD Service::onEvent(DWORD code) {
+
+}
+
+inline bool Service::setStatus(
+    DWORD id,
+    DWORD ecode,
+    DWORD speccode,
+    DWORD checkPoint,
+    DWORD hint
+) {
+    status_.dwCurrentState = id;
+    status_.dwWin32ExitCode = (speccode != 0 ? ERROR_SERVICE_SPECIFIC_ERROR : ecode);
+    status_.dwServiceSpecificExitCode = speccode;
+    status_.dwCheckPoint = checkPoint;
+    status_.dwWaitHint = hint;
+
+    return SetServiceStatus(statusHandler_, &status_);
 }
 
 } // namespace cs
