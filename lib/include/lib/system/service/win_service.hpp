@@ -84,6 +84,26 @@ private:
         instance()->start(ac, av);
     }
 
+    static DWORD __stdcall onExtendedServiceControlEventAdapter(
+        DWORD code,
+        DWORD type,
+        LPVOID data,
+        LPVOID context
+    ) {
+
+    }
+
+    DWORD onExtededServiceControlEvent(DWORD code, DWORD type, LPVOID data);
+    DWORD onEvent(DWORD code);
+
+    bool setStatus(
+        DWORD id,
+        DWORD ecode = 0,
+        DWORD speccode = 0,
+        DWORD checkPoint = 0,
+        DWORD hint = 0
+    );
+
     void start(DWORD ac, LPSTR* av);
 
     ServiceOwner& owner_;
@@ -93,10 +113,10 @@ private:
     SERVICE_STATUS_HANDLE statusHandler_;
 };
 
-Service::Service(ServiceOwner& owner, const char* serviceName)
+inline Service::Service(ServiceOwner& owner, const char* serviceName)
     : owner_(owner), serviceName_(serviceName), statusHandler_(nullptr) {}
 
-bool Service::run() {
+inline bool Service::run() {
     if (serviceName_ == nullptr) {
         return false;
     }
@@ -123,12 +143,12 @@ bool Service::run() {
     return result;
 }
 
-Service*& Service::instance() {
+inline Service*& Service::instance() {
     static Service* ptr = nullptr;
     return ptr;
 }
 
-void Service::start(DWORD ac, LPSTR* av) {
+inline void Service::start(DWORD ac, LPSTR* av) {
     status_.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
     status_.dwControlsAccepted = SERVICE_ACCEPT_STOP
                                | SERVICE_ACCEPT_SHUTDOWN
@@ -147,7 +167,35 @@ void Service::start(DWORD ac, LPSTR* av) {
 
     event_.makeSignaled();
 
-    // statusHandler_ = RegisterServiceCtrlHandlerExA(serviceName_, )
+    statusHandler_ = RegisterServiceCtrlHandlerExA(
+        serviceName_,
+        &Service::onExtendedServiceControlEventAdapter,
+        this
+    );
+
+    int errorCode = 0;
+
+    if (!statusHandler_) {
+        errorCode = int(GetLastError());
+    }
+    else {
+        try {
+            errorCode = owner_.onInit(serviceName_) ? 0 : -1;
+            if (errorCode == 0) {
+                setStatus(SERVICE_RUNNING);
+                errorCode = owner_.onRun(serviceName_) ? 0 : -1;
+                event_.wait();
+            }
+        }
+        catch (...) {
+            bool ok = owner_.onException();
+            if (errorCode == 0) {
+                errorCode = ok ? 0 : -1;
+            }
+        }
+    }
+
+    this->setStatus(SERVICE_STOPPED, errorCode, status_.dwServiceSpecificExitCode);
 }
 
 } // namespace cs
