@@ -20,8 +20,8 @@ public:
     virtual bool onException() noexcept { return true; }
 #ifdef _WIN32
 #if (_WIN32_WINNT >= _WIN32_WINNT_WINXP)
-    virtual bool onSessionChanged(int what, const char* info) { return true; }
-    virtual bool onDeviceEvent(int what, const char* info) { return true; }
+    virtual bool onSessionChanged(int what, void* info) { return true; }
+    virtual bool onDeviceEvent(int what, void* info) { return true; }
 #endif // _WIN32_WINNT >= _WIN32_WINNT_WINXP
 #if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
     virtual bool onPreshutdown() { return true; }

@@ -110,7 +110,7 @@ private:
     ServiceOwner& owner_;
     const char* serviceName_;
     WinEvent event_;
-    SERVICE_STATUS status_;
+    SERVICE_STATUS status_{};
     SERVICE_STATUS_HANDLE statusHandler_;
 };
 
@@ -199,8 +199,29 @@ inline void Service::start(DWORD ac, LPSTR* av) {
     this->setStatus(SERVICE_STOPPED, errorCode, status_.dwServiceSpecificExitCode);
 }
 
-inline DWORD Service::onExtendedServiceControlEvent(DWORD code, DWORD type, LPVOID data) {
+inline DWORD Service::onExtendedServiceControlEvent(DWORD code, DWORD what, LPVOID info) {
+    DWORD ecode = onEvent(code);
+#if (_WIN32_WINNT >= 0x0501)
+    if (ecode == ERROR_CALL_NOT_IMPLEMENTED) {
+        try {
+            switch (code) {
+                case SERVICE_CONTROL_SESSIONCHANGE:
+                    ecode = NO_ERROR;
+                    setStatus(SERVICE_RUNNING);
+                    owner_.onSessionChanged(what, info);
+                    break;
+                case SERVICE_CONTROL_DEVICEEVENT:
+                    ecode = NO_ERROR;
+                    owner_.onDeviceEvent(what, info);
 
+            }
+        }
+        catch (...) {
+            owner_.onException();
+        }
+    }
+#endif // _WIN32_WINNT >= 0x0501
+    return ecode;
 }
 
 inline DWORD Service::onEvent(DWORD code) {
