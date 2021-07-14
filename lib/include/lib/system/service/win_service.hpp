@@ -225,7 +225,49 @@ inline DWORD Service::onExtendedServiceControlEvent(DWORD code, DWORD what, LPVO
 }
 
 inline DWORD Service::onEvent(DWORD code) {
-
+    DWORD errorCode = NO_ERROR;
+    try {
+        switch (code) {
+            case SERVICE_CONTROL_SHUTDOWN:
+            case SERVICE_CONTROL_STOP:
+                setStatus(SERVICE_STOP_PENDING);
+                event_.makeNonSignaled();
+                owner_.onStop();
+                event_.makeSignaled();
+                break;
+#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
+            case SERVICE_CONTROL_PRESHUTDOWN:
+                setStatus(SERVICE_STOP_PENDING);
+                event_.makeNonSignaled();
+                owner_.onPreshutdown();
+                event_.makeSignaled();
+                break;
+#endif // _WIN32_WINNT >= _WIN32_WINNT_VISTA
+            case SERVICE_CONTROL_PAUSE:
+                setStatus(SERVICE_PAUSE_PENDING);
+                owner_.onPause();
+                setStatus(SERVICE_PAUSED);
+                break;
+            case SERVICE_CONTROL_CONTINUE:
+                setStatus(SERVICE_CONTINUE_PENDING);
+                owner_.onContinue();
+                setStatus(SERVICE_RUNNING);
+                break;
+            case SERVICE_CONTROL_PARAMCHANGE:
+                setStatus(SERVICE_RUNNING);
+                owner_.onParamChange();
+                break;
+            case SERVICE_CONTROL_INTERROGATE:
+                setStatus(status_.dwCurrentState);
+                break;
+            default:
+                errorCode = ERROR_CALL_NOT_IMPLEMENTED;
+        }
+    }
+    catch (...) {
+        owner_.onException();
+    }
+    return errorCode;
 }
 
 inline bool Service::setStatus(
