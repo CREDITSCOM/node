@@ -91,7 +91,7 @@ private:
         LPVOID context
     ) {
         auto this_ = reinterpret_cast<Service*>(context);
-        this_->onExtendedServiceControlEvent(code, type, data);
+        return this_->onExtendedServiceControlEvent(code, type, data);
     }
 
     DWORD onExtendedServiceControlEvent(DWORD code, DWORD type, LPVOID data);
