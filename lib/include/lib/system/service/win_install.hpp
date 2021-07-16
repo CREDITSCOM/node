@@ -108,4 +108,35 @@ inline std::error_code installService(
     return std::error_code();
 }
 
+inline std::error_code uninstallService(const std::string& name) {
+    if (name.empty()) {
+        return std::make_error_code(std::errc::invalid_argument);
+    }
+    
+    helpers::ScmHandler scmHandler(OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT));
+    if (!scmHandler.isOpen()) {
+        return std::error_code(static_cast<int>(GetLastError()), std::system_category());
+    }
+
+    helpers::ScmHandler serviceHandler(
+        OpenServiceA(
+            scmHandler,
+            name.c_str(),
+            SERVICE_STOP|DELETE
+        )
+    );
+    if (!serviceHandler.isOpen()) {
+        return std::error_code(static_cast<int>(GetLastError()), std::system_category());
+    }
+
+    SERVICE_STATUS serviceStatus;
+    ControlService(serviceHandler, SERVICE_CONTROL_STOP, &serviceStatus);
+    Sleep(500);
+    if (!DeleteService(serviceHandler)) {
+        return std::error_code(static_cast<int>(GetLastError()), std::system_category());
+    }
+
+    return std::error_code();
+}
+
 } // namespace cs
