@@ -39,6 +39,7 @@ add_library(lib
   include/lib/system/service/service_owner.hpp
   include/lib/system/service/unix_service.hpp
   include/lib/system/service/win_service.hpp
+  include/lib/system/service/win_install.hpp
 )
 
 if (MSVC)
