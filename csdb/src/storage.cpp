@@ -247,41 +247,55 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     else {
         emit start_reading_event(0);
     }
-
+    auto lastKey = it->key();
     Storage::OpenProgress progress{0};
-    for (it->seek_to_first(); it->is_valid(); it->next()) {
-        cs::Bytes v = it->value();
+    //for (it->seek_to_first(); it->is_valid(); it->next()) {
+    bool dbEndReached = false;
+    it->seek_to_first();
+    while (!dbEndReached) {
 
-        Pool p = Pool::from_binary(std::move(v));
-        if (!p.is_valid()) {
-            set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool %d.", count_pool);
-            cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
-            return false;
-        }
-        pools_cache_insert(p.sequence(), p.hash(), p);
+        while(it->is_valid()){
+            cs::Bytes v = it->value();
 
-        bool test_failed = false;
-        last_hash = p.hash();
-        count_pool++;
-
-        emit read_block_event(p, &test_failed);
-        if (test_failed) {
-            set_last_error(Storage::DataIntegrityError, "Data integrity error: client reported violation of logic in pool %d", p.sequence());
-            return false;
-        }
-
-        //update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
-        progress.poolsProcessed++;
-
-        if (callback != nullptr) {
-            if (callback(progress)) {
-                set_last_error(Storage::UserCancelled);
+            Pool p = Pool::from_binary(std::move(v));
+            if (!p.is_valid()) {
+                set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool %d.", count_pool);
+                cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
                 return false;
             }
+            pools_cache_insert(p.sequence(), p.hash(), p);
+
+            bool test_failed = false;
+            last_hash = p.hash();
+            count_pool++;
+
+            emit read_block_event(p, &test_failed);
+            if (test_failed) {
+                set_last_error(Storage::DataIntegrityError, "Data integrity error: client reported violation of logic in pool %d", p.sequence());
+                return false;
+            }
+
+            //update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
+            progress.poolsProcessed++;
+
+            if (callback != nullptr) {
+                if (callback(progress)) {
+                    set_last_error(Storage::UserCancelled);
+                    return false;
+                }
+            }
+            if (it->key() == lastKey) {
+                dbEndReached = true;
+            }
+            it->next();
         }
+        if (it->key() == lastKey) {
+            dbEndReached = true;
+        }
+        csdebug() << "DB element " << it->key() << " is not valid";
     }
     emit stop_reading_event();
-    csdebug() << "Total read: " << count_pool;
+    csdebug() << "Total read: " << count_pool << ", last key = " << lastKey;
     return true;
 
 #if 0
