@@ -34,13 +34,14 @@ private:
 
 inline std::error_code installService(
     const std::string& name,
+    const std::string& binaryPath,
     const std::string& params = std::string(),
     DWORD startupType = SERVICE_AUTO_START,
     DWORD errorControl = SERVICE_ERROR_NORMAL,
     LPSTR dependencies = nullptr,
     BOOL enableAutoRestartAfterFail = FALSE
 ) {
-    if (name.empty()) {
+    if (name.empty() || binaryPath.empty()) {
         return std::make_error_code(std::errc::invalid_argument);
     }
 
@@ -50,7 +51,7 @@ inline std::error_code installService(
     }
 
     std::string startCommand;
-    startCommand = "\"" + name + "\"";
+    startCommand = "\"" + binaryPath + "\"";
     if (!params.empty()) {
         startCommand += " " + params;
     }
