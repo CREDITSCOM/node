@@ -502,6 +502,7 @@ private:
     csdb::PoolHash neededHash_;
     cs::PublicKeys requestedKeys_;
     size_t goodAnswers_ = 0;
+    bool cacheLBs_ = false;
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

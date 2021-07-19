@@ -1895,15 +1895,22 @@ std::vector<cs::Sequence>* BlockChain::getIncorrectBlockNumbers() {
     return &incorrectBlocks_;
 }
 
+//while caching the blocks are put out of the storeage in the with sequence decrement
 void BlockChain::cacheLastBlocks() {
     csinfo() << kLogPrefix << __func__;//we have to begin with good block
-    antiForkMode_ = true;
+    bool firstIteration = false;
+    if (!antiForkMode_) {
+        antiForkMode_ = true;
+        firstIteration = true;
+    }
+
     cs::Sequence lastSeq;
     while (!incorrectBlocks_.empty() || !selectionFinished_) {
         csinfo() << kLogPrefix << "Starting blocks transferring cycle";
         auto lastBlock = getLastBlock();
         lastSeq = lastBlock.sequence();
         csinfo() << kLogPrefix << "now dealing with " << lastSeq;
+
         if (incorrectBlocks_.back() < lastBlock.sequence()) {
             csinfo() << kLogPrefix << "incorrect block sequence not reached";//and selFin == " << (selectionFinished_?"true":"false");
         }
@@ -1915,7 +1922,7 @@ void BlockChain::cacheLastBlocks() {
             csinfo() << kLogPrefix << "Incorrect block overjumped - hmm .. look though your code better";
         }
 
-        if (lastBlock.is_valid() && lastBlock.hash() == lastPrevHash_) {
+        if (lastBlock.is_valid() && lastBlock.hash() == lastPrevHash_ || firstIteration) {
             selectionFinished_ = true;
             csinfo() << kLogPrefix << "caching block " << lastBlock.sequence();
             cachedBlocks_->insert(lastBlock, cs::PoolStoreType::Restored);

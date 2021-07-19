@@ -3403,7 +3403,12 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     csdebug() << line2.str();
 
     solver_->nextRound(updateRound);
-
+    if (cacheLBs_) {
+        getBlockChain().cacheLastBlocks();
+        if (getBlockChain().getIncorrectBlockNumbers()->empty()) {
+            cacheLBs_ = false;
+        }
+    }
     if (!sendingTimer_.isRunning()) {
         csdebug() << "NODE> Transaction timer started";
         sendingTimer_.start(cs::TransactionsPacketInterval);
@@ -4238,7 +4243,7 @@ void Node::tryResolveHashProblems() {
     if (lKey == 1) {
         csinfo() << "NODE> You've chosen to resolve incorrect blocks. Wait while the node will try to perform all possible variants";
         //now we will try to eliminate the incorrect blocks from your db
-        getBlockChain().cacheLastBlocks();
+        cacheLBs_ = true;//getBlockChain().cacheLastBlocks();
     }
     else if (lKey == 2) {
         csinfo() << "NODE> You've chosen go on as is. So, have a good work!";
