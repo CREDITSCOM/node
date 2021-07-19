@@ -135,11 +135,13 @@ inline bool Service::run() {
     }
     return true;
 #endif // DISABLE_DAEMON
-    SERVICE_TABLE_ENTRYA serviceTable;
-    serviceTable.lpServiceName = const_cast<char*>(serviceName_);
-    serviceTable.lpServiceProc = &Service::serviceMain;
+    SERVICE_TABLE_ENTRYA serviceTable[2];
+    serviceTable[0].lpServiceName = const_cast<char*>(serviceName_);
+    serviceTable[0].lpServiceProc = &Service::serviceMain;
+    serviceTable[1].lpServiceName = nullptr;
+    serviceTable[1].lpServiceProc = nullptr;
     instance() = this;
-    bool result = StartServiceCtrlDispatcherA(&serviceTable);
+    bool result = StartServiceCtrlDispatcherA(serviceTable);
     instance() = nullptr;
     return result;
 }
