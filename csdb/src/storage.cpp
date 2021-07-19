@@ -267,6 +267,9 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
 
             bool test_failed = false;
             last_hash = p.hash();
+            if (count_pool != p.sequence()) {
+                csdebug() << "count_pool = " << count_pool << ", pool sequence = " << p.sequence();
+            }
             count_pool++;
 
             emit read_block_event(p, &test_failed);

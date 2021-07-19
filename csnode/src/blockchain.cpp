@@ -1903,7 +1903,7 @@ void BlockChain::cacheLastBlocks() {
         csinfo() << kLogPrefix << "Starting blocks transferring cycle";
         auto lastBlock = getLastBlock();
         lastSeq = lastBlock.sequence();
-
+        csinfo() << kLogPrefix << "now dealing with " << lastSeq;
         if (incorrectBlocks_.back() < lastBlock.sequence()) {
             csinfo() << kLogPrefix << "incorrect block sequence not reached";//and selFin == " << (selectionFinished_?"true":"false");
         }
