@@ -6,3 +6,5 @@
 #else
 #include "unix_service.hpp"
 #endif
+
+#include "service_owner.hpp"
