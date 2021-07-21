@@ -2,22 +2,13 @@
 
 #include "stdafx.h"
 
-#include <iomanip>
 #include <iostream>
 
-#ifdef WIN32
-#include <csignal>
-#endif
-
-#include <csnode/node.hpp>
 #include <csnode/configholder.hpp>
 
 #include <lib/system/logger.hpp>
 
-#include <net/transport.hpp>
-
 #include <params.hpp>
-#include <observer.hpp>
 #include <version.hpp>
 
 #include <sys/types.h>
@@ -36,122 +27,22 @@
 #endif
 #endif  // _MSC_VER
 
-#ifdef BUILD_WITH_GPROF
-void sigUsr1Handler(int sig) {
-    std::cerr << "Exiting on SIGUSR1\n";
-    auto _mcleanup = (void (*)(void))dlsym(RTLD_DEFAULT, "_mcleanup");
-    if (_mcleanup == NULL) {
-        std::cerr << "Unable to find gprof exit hook\n";
-    }
-    else {
-        _mcleanup();
-    }
-    _exit(0);
-}
-#endif
-
 const uint32_t CLOSE_TIMEOUT_SECONDS = 10;
 
 void panic() {
-    cserror() << "Couldn't continue due to critical errors. The node will be closed in " << CLOSE_TIMEOUT_SECONDS << " seconds...";
-    std::this_thread::sleep_for(std::chrono::seconds(CLOSE_TIMEOUT_SECONDS));
-    exit(1);
+    cserror() << "Couldn't continue due to critical errors. "
+              << "The node will be closed in "
+              << CLOSE_TIMEOUT_SECONDS << " seconds...";
+    std::this_thread::sleep_for(
+        std::chrono::seconds(CLOSE_TIMEOUT_SECONDS)
+    );
+    exit(EXIT_FAILURE);
 }
-
-inline void mouseSelectionDisable() {
-#if defined(WIN32) && !defined(_DEBUG)
-    DWORD prevMode = 0;
-    HANDLE hConsole = GetStdHandle(STD_INPUT_HANDLE);
-    GetConsoleMode(hConsole, &prevMode);
-    SetConsoleMode(hConsole, prevMode & static_cast<unsigned long>(~ENABLE_QUICK_EDIT_MODE));
-#endif
-}
-
-#ifndef WIN32
-extern "C" void sigHandler(int sig) {
-    gSignalStatus = 1;
-    Node::requestStop();
-    std::cout << "+++++++++++++++++ >>> Signal received!!! <<< +++++++++++++++++++++++++" << std::endl;
-    switch (sig) {
-        case SIGINT:
-            cswarning() << "Signal SIGINT received, exiting";
-            break;
-        case SIGTERM:
-            cswarning() << "Signal SIGTERM received, exiting";
-            break;
-        case SIGHUP:
-            cswarning() << "Signal SIGHUP received, exiting";
-            break;
-        default:
-            cswarning() << "Unknown signal received!!!";
-            break;
-    }
-}
-
-void installSignalHandler() {
-    if (SIG_ERR == signal(SIGTERM, sigHandler)) {
-        // Handle error
-        cserror() << "Error to set SIGTERM!";
-        _exit(EXIT_FAILURE);
-    }
-    if (SIG_ERR == signal(SIGINT, sigHandler)) {
-        cserror() << "Error to set SIGINT!";
-        _exit(EXIT_FAILURE);
-    }
-    if (SIG_ERR == signal(SIGHUP, sigHandler)) {
-        cserror() << "Error to set SIGHUP!";
-        _exit(EXIT_FAILURE);
-    }
-}
-#else
-BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
-    gSignalStatus = 1;
-    Node::requestStop();
-    std::cout << "+++++++++++++++++ >>> Signal received!!! <<< +++++++++++++++++++++++++" << std::endl;
-    switch (fdwCtrlType) {
-            // Handle the CTRL-C signal.
-        case CTRL_C_EVENT:
-            cswarning() << "Ctrl-C event\n\n";
-            return TRUE;
-
-        // CTRL-CLOSE: confirm that the user wants to exit.
-        case CTRL_CLOSE_EVENT:
-            cswarning() << "Ctrl-Close event\n\n";
-            return TRUE;
-
-            // Pass other signals to the next handler.
-        case CTRL_BREAK_EVENT:
-            cswarning() << "Ctrl-Break event\n\n";
-            return TRUE;
-
-        case CTRL_LOGOFF_EVENT:
-            cswarning() << "Ctrl-Logoff event\n\n";
-            return FALSE;
-
-        case CTRL_SHUTDOWN_EVENT:
-            cswarning() << "Ctrl-Shutdown event\n\n";
-            return FALSE;
-
-        default:
-            return FALSE;
-    }
-}
-#endif  // !WIN32
 
 int main(int argc, char* argv[]) {
-#ifdef WIN32
-    if (!SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
-        std::cout << "\nERROR: Could not set control handler" << std::flush;
-        return EXIT_FAILURE;
-    }
-#else
-    installSignalHandler();
-#endif  // WIN32
-    mouseSelectionDisable();
-#if BUILD_WITH_GPROF
-    signal(SIGUSR1, sigUsr1Handler);
-#endif
+#ifdef DISABLE_DAEMON
     std::ios_base::sync_with_stdio(false);
+#endif // DISABLE_DAEMON
 
     const char* argHelp = "help";
     const char* argVersion = "version";
@@ -219,14 +110,19 @@ int main(int argc, char* argv[]) {
         return EXIT_SUCCESS;
     }
 
-    // test db directory, exit if user did not rename old kDeprecatedDBPath and expect to use it as default one
+    // test db directory, exit if user did not
+    // rename old kDeprecatedDBPath and expect
+    // to use it as default one
     if (vm.count(argDBPath) == 0) {
         // arg is not set, so default dir is not "db_test"
         struct stat info;
         if (stat(kDeprecatedDBPath, &info) == 0) {
             if (info.st_mode & S_IFDIR) {
-                cslog() << "Deprecated blockchain path \'" << kDeprecatedDBPath
-                    << "\' is in current directory. Please rename it to \'db\' to use it as default storage, or rename to any other not to use at all, then restart your node again";
+                cslog() << "Deprecated blockchain path \'"
+                        << kDeprecatedDBPath
+                        << "\' is in current directory. Please rename it to \'db\' to "
+                        << "use it as default storage, or rename to any other not to "
+                        << "use at all, then restart your node again";
                 return EXIT_FAILURE;
             }
         } 
@@ -267,31 +163,14 @@ int main(int argc, char* argv[]) {
 
     cs::config::Observer observer(config, vm);
     cs::ConfigHolder::instance().setConfig(config);
-    cs::Connector::connect(&observer.configChanged, &cs::ConfigHolder::instance(), &cs::ConfigHolder::onConfigChanged);
+    cs::Connector::connect(
+        &observer.configChanged,
+        &cs::ConfigHolder::instance(),
+        &cs::ConfigHolder::onConfigChanged
+    );
 
-    Node node(observer);
-
-    if (!node.isGood()) {
-        panic();
-    }
-
-    if (vm.count(argSetBCTop) > 0) {
-        node.stop();
-        node.destroy();
-        logger::cleanup();
-        return 0;
-    }
-
-    std::cout << "Running Node\n";
-    node.run();
-
-    cswarning() << "+++++++++++++>>> NODE ATTEMPT TO STOP! <<<++++++++++++++++++++++";
-    node.destroy();
-
-    cswarning() << "Exiting Main Function";
-
+    cs::Peer peer("credits_node", observer, vm.count(argSetBCTop) > 0);
+    int result = peer.executeProtocol();
     logger::cleanup();
-
-    std::cout << "Logger cleaned" << std::endl;
-    return 0;
+    return result;
 }

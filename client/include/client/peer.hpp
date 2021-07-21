@@ -4,12 +4,13 @@
 
 #include <lib/system/service/service.hpp>
 #include <csnode/node.hpp>
+#include <observer.hpp>
 
 namespace cs {
 
 class Peer : public ServiceOwner {
 public:
-    Peer(const char* serviceName);
+    Peer(const char* serviceName, config::Observer&, bool onlyInit);
     int executeProtocol();
 
 protected:
@@ -24,6 +25,8 @@ protected:
 private:
     Service service_;
     std::unique_ptr<Node> node_;
+    config::Observer& observer_;
+    const bool onlyInit_;
 };
 
 } // namespace cs
