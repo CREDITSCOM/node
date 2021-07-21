@@ -1,11 +1,11 @@
+#include <peer.hpp>
+
 #include "stdafx.h"
 
 #include <iomanip>
 #include <iostream>
-#ifndef WIN32
-#include <signal.h>
-#include <unistd.h>
-#else
+
+#ifdef WIN32
 #include <csignal>
 #endif
 
