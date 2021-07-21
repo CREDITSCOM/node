@@ -271,6 +271,7 @@ inline bool Service::startMonitoring() {
                         owner_.onPause();
                     }
                     paused = !paused;
+                    break;
                 default :
                     if (threadsStatus.error) {
                         owner_.onStop();
