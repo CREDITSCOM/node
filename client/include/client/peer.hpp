@@ -18,9 +18,6 @@ protected:
     bool onInit(const char* serviceName) override;
     bool onRun(const char* serviceName) override;
     bool onStop() override;
-#ifndef _WIN32
-    bool onFork(const char* serviceName, pid_t) override;
-#endif // !_WIN32
 
 private:
     Service service_;

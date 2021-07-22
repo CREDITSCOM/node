@@ -100,34 +100,33 @@ bool Peer::onInit(const char*) {
         return false;        
     }
 
+    cslog() << "Node initialized successfully";
+
     return true;
 }
 
 bool Peer::onRun(const char*) {
-    if (onlyInit_) {
+    if (!onlyInit_) {
+        cslog() << "Running Node";
+        node_->run();
+    }
+    else {
         cslog() << "Stop after initialization";
         node_->stop();
-        node_->destroy();
-        return true;
     }
 
-    cslog() << "Running Node";
-    node_->run();
+    cslog() << "Node stopped";
     cslog() << "Destroying Node";
     node_->destroy();
+    node_.reset(nullptr);
     return true;
 }
 
 bool Peer::onStop() {
+    cslog() << "STOP REQUESTED!";
     gSignalStatus = 1;
     Node::requestStop();
     return true;
 }
-
-#ifndef _WIN32
-bool Peer::onFork(const char*, pid_t) {
-    return true;
-}
-#endif // !_WIN32
 
 } // namespace cs
