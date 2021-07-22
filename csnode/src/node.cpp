@@ -204,7 +204,7 @@ bool Node::init() {
     }
     else {
         csdebug() << "Loaded blockchaind database is correct\n";
-        uint8_t lKey = requestKBAnswer({ "resolve incorrect blocks", "go as is", "quit" });
+        uint8_t lKey = requestKBAnswer({ "go as is", "quit" });
         if (lKey == 1) {}
         else {
             stop();
@@ -1427,7 +1427,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
     }
 
     if (isSyncOn) {
-        poolSynchronizer_->getBlockReply(std::move(poolsBlock));
+        poolSynchronizer_->getBlockReply(std::move(poolsBlock), sender);
     }
 }
 
@@ -1560,6 +1560,22 @@ void Node::setTop(cs::Sequence finSeq) {
     }
 
     csinfo() << "Last blockchain sequence: " << getBlockChain().getLastSeq();
+}
+
+void Node::showNeighbours() {
+    poolSynchronizer_->showNeighbours();
+}
+
+void Node::setIdle() {
+
+}
+
+void Node::setWorking() {
+
+}
+
+void Node::showDbParams() {
+    getBlockChain().showDBParams();
 }
 
 void Node::addToBlackList(const cs::PublicKey& key, bool isMarked) {
@@ -2741,12 +2757,13 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
 
     cs::RoundNumber storedRound = conveyer.currentRoundNumber();
     conveyer.setRound(rNum);
+    bool iMode = cs::ConfigHolder::instance().config()->isIdleMode();
 
-    if (cs::ConfigHolder::instance().config()->isSyncOn()) {
+    if (cs::ConfigHolder::instance().config()->isSyncOn() && !iMode) {
         processSync();
     }
 
-    if (poolSynchronizer_->isSyncroStarted()) {
+    if (poolSynchronizer_->isSyncroStarted() && !iMode) {
         getCharacteristic(rPackage);
     }
 
@@ -2894,7 +2911,10 @@ void Node::performRoundPackage(cs::RoundPackage& rPackage, const cs::PublicKey& 
     cs::Conveyer::instance().setTable(roundTable);
 
     // create pool by previous round, then change conveyer state.
-    getCharacteristic(rPackage);
+    if (!cs::ConfigHolder::instance().config()->isIdleMode()) {
+        getCharacteristic(rPackage);
+    }
+
 
     lastRoundPackageTime_ = cs::Utils::currentTimestamp();
 

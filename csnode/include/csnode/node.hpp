@@ -210,6 +210,11 @@ public:
 
     void specialSync(cs::Sequence finSeq, cs::PublicKey& source);
     void setTop(cs::Sequence finSeq);
+
+    void showNeighbours();
+    void setIdle();
+    void setWorking();
+    void showDbParams();
     //void restoreSequence(cs::Sequence seq);
 
     uint8_t requestKBAnswer(std::vector<std::string> choice);

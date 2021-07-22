@@ -264,6 +264,10 @@ public:
         return sync_on_;
     }
 
+    bool isIdleMode() const {
+        return idleMode_;
+    }
+
     uint64_t maxUncorrectedBlock() const {
         return maxUncorrectedBlock_;
     }
@@ -371,6 +375,7 @@ private:
     bool sync_on_ = true;
     uint64_t newBlockchainTopSeq_;
     bool generateFork_ = false;
+    bool idleMode_ = false;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
     uint64_t roundElapseTime_ = DEFAULT_ROUND_ELAPSE_TIME;

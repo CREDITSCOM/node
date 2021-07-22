@@ -56,6 +56,7 @@ const std::string PARAM_NAME_TRAVERSE_NAT = "traverse_nat";
 const std::string PARAM_NAME_SYNC_ON = "sync_on";
 const std::string PARAM_NAME_MAX_UNCORRECTED_BLOCK = "max_uncorrected_block";
 const std::string PARAM_NAME_GENERATE_FORK = "generate_fork";
+const std::string PARAM_NAME_IDLE_MODE = "idle_mode";
 
 const std::string PARAM_NAME_CONVEYER_MAX_PACKET_LIFETIME = "max_packet_life_time";
 
@@ -770,6 +771,10 @@ Config Config::readFromFile(const std::string& fileName) {
 
         if (params.count(PARAM_NAME_SYNC_ON)) {
             result.sync_on_ = params.get<bool>(PARAM_NAME_SYNC_ON);
+        }
+
+        if (params.count(PARAM_NAME_IDLE_MODE)) {
+            result.idleMode_ = params.get<bool>(PARAM_NAME_IDLE_MODE);
         }
 
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;

@@ -1895,6 +1895,9 @@ std::vector<cs::Sequence>* BlockChain::getIncorrectBlockNumbers() {
     return &incorrectBlocks_;
 }
 
+void BlockChain::showDBParams() {
+    csdebug() << "last seq = " << lastSequence_ << ", db size = " << storage_.size();
+}
 //while caching the blocks are put out of the storeage in the with sequence decrement
 void BlockChain::cacheLastBlocks() {
     csinfo() << kLogPrefix << __func__;//we have to begin with good block

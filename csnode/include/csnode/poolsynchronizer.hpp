@@ -24,14 +24,14 @@ public:
     void syncLastPool();
 
     // syncro get functions
-    void getBlockReply(cs::PoolsBlock&& poolsBlock);
-
+    void getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::PublicKey& sender);
+    void showNeighbours();
     // syncro send functions
     void sendBlockRequest();
 
     bool isSyncroStarted() const;
 
-    void syncTill(cs::Sequence finSeq, cs::PublicKey& source);
+    void syncTill(cs::Sequence finSeq, const cs::PublicKey& source);
     void trySource(cs::Sequence finSeq, cs::PublicKey& source);
     cs::PublicKeys getNeededNeighbours(cs::Sequence seq);
 
@@ -243,6 +243,9 @@ private:
     std::vector<Neighbour> neighbours_;
 
     cs::Timer timer_;
+
+    cs::Sequence targetSequence_ = 0;
+
 
     friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::CounterType);
     friend std::ostream& operator<<(std::ostream&, const PoolSynchronizer::SequenceRemovalAccuracy);

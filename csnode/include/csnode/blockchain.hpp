@@ -127,7 +127,7 @@ public:
 
     void removeWalletsInPoolFromCache(const csdb::Pool& pool);
     void removeLastBlock();
-
+    void showDBParams();
     /**
      * Mark last block as compromised and handle the situation:
      *  - store required parameters  

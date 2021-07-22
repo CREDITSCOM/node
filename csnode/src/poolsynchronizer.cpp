@@ -22,7 +22,17 @@ cs::PoolSynchronizer::PoolSynchronizer(BlockChain* blockChain)
 }
 
 void cs::PoolSynchronizer::sync(cs::RoundNumber roundNum, cs::RoundNumber difference) {
-    if (neighbours_.empty() || blockChain_->isAntiForkModeOn()) {
+    if (neighbours_.empty()){
+        return;
+    }
+
+    if (blockChain_->isAntiForkModeOn()) {
+        csinfo() << "Don't sync - anti-fork mode on";
+        return;
+    }
+
+    if (cs::ConfigHolder::instance().config()->isIdleMode()) {
+        csinfo() << "Don't sync - idle mode on";
         return;
     }
 
@@ -105,7 +115,7 @@ void cs::PoolSynchronizer::syncLastPool() {
     emit sendRequest(target, PoolsRequestedSequences { lastWrittenSequence + 1});
 }
 
-void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
+void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::PublicKey& sender) {
     if (blockChain_->isAntiForkModeOn()) {
         return;
     }
@@ -135,6 +145,10 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock) {
         }
     }
 
+    if (targetSequence_ != 0ULL) {
+        cs::Sequence tSeq = targetSequence_;
+        syncTill(tSeq, sender);
+    }
     if (oldCachedBlocksSize != blockChain_->getCachedBlocksSize() || oldLastWrittenSequence != lastWrittenSequence) {
         const bool isFinished = showSyncronizationProgress(lastWrittenSequence);
 
@@ -314,8 +328,47 @@ void cs::PoolSynchronizer::trySource(cs::Sequence finSeq, cs::PublicKey& source)
 
 }
 
-void cs::PoolSynchronizer::syncTill(cs::Sequence finSeq, cs::PublicKey& source) {
+void cs::PoolSynchronizer::showNeighbours() {
+    csinfo() << "Current Neighbours:";
+    for (auto it : neighbours_) {
+        csinfo() << cs::Utils::byteStreamToHex(it.publicKey()) << "  " << it.maxSequence();
+    }
+}
 
+void cs::PoolSynchronizer::syncTill(cs::Sequence finSeq, const cs::PublicKey& source) {
+    if (!cs::ConfigHolder::instance().config()->isIdleMode()) {
+        csinfo() << "The node is not in IDLE MODE, cant't run such type of syncro";
+    }
+
+    auto it = neighbours_.begin();
+    while (it != neighbours_.end()) {
+        if (it->publicKey() == source) {
+            break;
+        }
+        ++it;
+    }
+
+
+    if (it == neighbours_.end()) {
+        csinfo() << "No neighbour with such key: " << cs::Utils::byteStreamToHex(source);
+        return;
+    }
+    else {
+        if (it->maxSequence() < finSeq) {
+            csinfo() << "Mentioned neighbour doesn't has such sequence: " << finSeq << ", max is " << it->maxSequence();
+            return;
+        }
+        targetSequence_ = finSeq;
+        if (!getNeededSequences(*it)) {
+            csmeta(csdetails) << "Neighbor: " << cs::Utils::byteStreamToHex(it->publicKey()) << " is busy";
+        }
+        if (it->maxSequence() >= cs::Conveyer::instance().currentRoundNumber() - MaxRoundDescrepancy) {
+            sendBlock(*it);
+        }
+        return;
+    }
+
+    targetSequence_ = 0ULL;
 }
 
 void cs::PoolSynchronizer::onPingReceived(cs::Sequence sequence, const cs::PublicKey& publicKey) {

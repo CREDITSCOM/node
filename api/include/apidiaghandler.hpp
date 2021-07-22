@@ -23,8 +23,8 @@ namespace api_diag {
 
         void SetRawData(general::APIResponse& _return, const std::string& data) override;
 
-/*        void UserCommand(general::APIResponse& _return, const std::string& data) override;
-*/
+        void UserCommand(general::APIResponse& _return, const std::string& data) override;
+
     private:
         Node& node_;
     };
