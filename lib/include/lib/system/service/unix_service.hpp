@@ -78,6 +78,12 @@ inline bool Service::run() {
     bool result = true;
 
     try {
+#ifndef DISABLE_DAEMON
+            setsid();
+//          uncomment if necessary 
+//          chdir("/");
+            closeIO();
+#endif // !DISABLE_DAEMON
         if (!startSignalThread()) {
             result = false;
         }
@@ -88,11 +94,6 @@ inline bool Service::run() {
             cv_.notify_all();
         }
         else {
-#ifndef DISABLE_DAEMON
-            setsid();
-            chdir("/");
-            closeIO();
-#endif // !DISABLE_DAEMON
             {
                 lock_type lock(mux_);
                 threadsStatus_.mainReady = true;
