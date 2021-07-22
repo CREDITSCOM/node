@@ -30,6 +30,7 @@ public:
     void sendBlockRequest();
 
     bool isSyncroStarted() const;
+    cs::Sequence getTargetSequence();
 
     void syncTill(cs::Sequence finSeq, const cs::PublicKey& source);
     void trySource(cs::Sequence finSeq, cs::PublicKey& source);

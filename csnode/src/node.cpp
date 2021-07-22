@@ -1391,7 +1391,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
     bool isSyncOn = poolSynchronizer_->isSyncroStarted();
     bool isBlockchainUncertain = blockChain_.isLastBlockUncertain();
 
-    if (!isSyncOn && !isBlockchainUncertain) {
+    if (!isSyncOn && !isBlockchainUncertain && poolSynchronizer_->getTargetSequence() == 0ULL) {
         csdebug() << "NODE> Get block reply> Pool sync has already finished";
         return;
     }
@@ -1426,7 +1426,7 @@ void Node::getBlockReply(const uint8_t* data, const size_t size, const cs::Publi
         }
     }
 
-    if (isSyncOn) {
+    if (isSyncOn || poolSynchronizer_->getTargetSequence() != 0ULL) {
         poolSynchronizer_->getBlockReply(std::move(poolsBlock), sender);
     }
 }

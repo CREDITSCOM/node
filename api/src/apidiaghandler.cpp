@@ -322,11 +322,11 @@ namespace api_diag {
             node_.setIdle();
         }
 
-        if (order == 5U) {
+        if (order == 6U) {
             node_.setWorking();
         }
 
-        if (order == 5U) {
+        if (order == 7U) {
             node_.showDbParams();
         }
 

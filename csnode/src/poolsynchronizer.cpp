@@ -115,20 +115,36 @@ void cs::PoolSynchronizer::syncLastPool() {
     emit sendRequest(target, PoolsRequestedSequences { lastWrittenSequence + 1});
 }
 
+cs::Sequence cs::PoolSynchronizer::getTargetSequence() {
+    return targetSequence_;
+}
+
 void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::PublicKey& sender) {
     if (blockChain_->isAntiForkModeOn()) {
         return;
     }
     csmeta(csdebug) << "Get Block Reply <<<<<<< : count: " << poolsBlock.size() << ", seqs: ["
-                    << poolsBlock.front().sequence() << ", " << poolsBlock.back().sequence() << "]";
+                    << poolsBlock.front().sequence() << ", " << poolsBlock.back().sequence() << "]" 
+                    << " from " << EncodeBase58(sender.data(), sender.data() + sender.size());
 
     cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
     const cs::Sequence oldLastWrittenSequence = lastWrittenSequence;
     const std::size_t oldCachedBlocksSize = blockChain_->getCachedBlocksSize();
 
+    auto it = neighbours_.begin();
+    while (it != neighbours_.end()) {
+        if (it->publicKey() == sender) {
+            break;
+        }
+        ++it;
+    }
+    if (it->sequences().front() == poolsBlock.front().sequence() && it->sequences().back() == poolsBlock.back().sequence()) {
+        it->resetSequences();
+    }
+
     for (auto& pool : poolsBlock) {
         const auto sequence = pool.sequence();
-
+        
         if (lastWrittenSequence > sequence) {
             continue;
         }
@@ -339,7 +355,7 @@ void cs::PoolSynchronizer::syncTill(cs::Sequence finSeq, const cs::PublicKey& so
     if (!cs::ConfigHolder::instance().config()->isIdleMode()) {
         csinfo() << "The node is not in IDLE MODE, cant't run such type of syncro";
     }
-
+    removeExistingSequence(blockChain_->getLastSeq(), SequenceRemovalAccuracy::LowerBound);
     auto it = neighbours_.begin();
     while (it != neighbours_.end()) {
         if (it->publicKey() == source) {
@@ -350,7 +366,7 @@ void cs::PoolSynchronizer::syncTill(cs::Sequence finSeq, const cs::PublicKey& so
 
 
     if (it == neighbours_.end()) {
-        csinfo() << "No neighbour with such key: " << cs::Utils::byteStreamToHex(source);
+        csinfo() << "No neighbour with such key: " << EncodeBase58(source.data(), source.data() + source.size());
         return;
     }
     else {
@@ -358,17 +374,24 @@ void cs::PoolSynchronizer::syncTill(cs::Sequence finSeq, const cs::PublicKey& so
             csinfo() << "Mentioned neighbour doesn't has such sequence: " << finSeq << ", max is " << it->maxSequence();
             return;
         }
-        targetSequence_ = finSeq;
+        if (blockChain_->getLastSeq() >= finSeq) {
+            targetSequence_ = 0ULL;
+            requestedSequences_.clear();
+            return;
+        }
+        else {
+            targetSequence_ = finSeq;
+        }
+        
         if (!getNeededSequences(*it)) {
-            csmeta(csdetails) << "Neighbor: " << cs::Utils::byteStreamToHex(it->publicKey()) << " is busy";
+            csmeta(csdetails) << "Neighbor: " << EncodeBase58(it->publicKey().data(), it->publicKey().data() + it->publicKey().size()) << " is busy";
+            return;
         }
         if (it->maxSequence() >= cs::Conveyer::instance().currentRoundNumber() - MaxRoundDescrepancy) {
             sendBlock(*it);
         }
-        return;
     }
 
-    targetSequence_ = 0ULL;
 }
 
 void cs::PoolSynchronizer::onPingReceived(cs::Sequence sequence, const cs::PublicKey& publicKey) {
@@ -488,7 +511,7 @@ void cs::PoolSynchronizer::sendBlock(const Neighbour& neighbour) {
     }
 
     cslog() << "SYNC: requesting for " << sequences.size() << " blocks [" << sequences.front() << ", " << sequences.back()
-        << "] from " << cs::Utils::byteStreamToHex(neighbour.publicKey());
+        << "] from " << EncodeBase58(neighbour.publicKey().data(), neighbour.publicKey().data() + neighbour.publicKey().size());
 
     emit sendRequest(neighbour.publicKey(), sequences);
 }
