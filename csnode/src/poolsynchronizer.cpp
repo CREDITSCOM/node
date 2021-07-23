@@ -154,6 +154,11 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
             continue;
         }
 
+        if (targetSequence_ > 0ULL && pool.sequence() > targetSequence_) {
+            targetSequence_ = 0ULL;
+            break;
+        }
+
         //TODO: temp switch off testing confirmations in block received by sync; until fix blocks assembled by init trusted on network restart (issue CP-47)
         if (blockChain_->storeBlock(pool, cs::PoolStoreType::Synced)) {
             blockChain_->testCachedBlocks();
@@ -163,7 +168,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
 
     if (targetSequence_ != 0ULL) {
         cs::Sequence tSeq = targetSequence_;
-        syncTill(tSeq, sender);
+        syncTill(tSeq, sender, false);
     }
     if (oldCachedBlocksSize != blockChain_->getCachedBlocksSize() || oldLastWrittenSequence != lastWrittenSequence) {
         const bool isFinished = showSyncronizationProgress(lastWrittenSequence);
@@ -331,11 +336,11 @@ void cs::PoolSynchronizer::trySource(cs::Sequence finSeq, cs::PublicKey& source)
     if (exists) {
         auto maxSeq = getNeighbour(neighbour).maxSequence();
         if (maxSeq > finSeq) {
-            syncTill(finSeq, source);
+            syncTill(finSeq, source, false);
         }
         else {
             csinfo() << "Max Seq for this source Key will be " << maxSeq;
-            syncTill(maxSeq, source);
+            syncTill(maxSeq, source, false);
         }
     }
     else {
@@ -351,10 +356,14 @@ void cs::PoolSynchronizer::showNeighbours() {
     }
 }
 
-void cs::PoolSynchronizer::syncTill(cs::Sequence finSeq, const cs::PublicKey& source) {
+void cs::PoolSynchronizer::syncTill(cs::Sequence finSeq, const cs::PublicKey& source, bool newCall) {
     if (!cs::ConfigHolder::instance().config()->isIdleMode()) {
         csinfo() << "The node is not in IDLE MODE, cant't run such type of syncro";
     }
+    if (newCall) {
+        requestedSequences_.clear();
+    }
+
     removeExistingSequence(blockChain_->getLastSeq(), SequenceRemovalAccuracy::LowerBound);
     auto it = neighbours_.begin();
     while (it != neighbours_.end()) {
@@ -383,7 +392,7 @@ void cs::PoolSynchronizer::syncTill(cs::Sequence finSeq, const cs::PublicKey& so
             targetSequence_ = finSeq;
         }
         
-        if (!getNeededSequences(*it)) {
+        if (!getNeededSequencesOnly(*it)) {
             csmeta(csdetails) << "Neighbor: " << EncodeBase58(it->publicKey().data(), it->publicKey().data() + it->publicKey().size()) << " is busy";
             return;
         }
@@ -537,6 +546,32 @@ void cs::PoolSynchronizer::sendBlock(const cs::PoolSynchronizer::Neighbour& neig
     }
 }
 
+bool cs::PoolSynchronizer::getNeededSequencesOnly(Neighbour& neighbour) {
+    if (targetSequence_ <= blockChain_->getLastSeq()) {
+        csinfo() << "Target sequence reached: " << blockChain_->getLastSeq();
+        return false;
+    }
+    const std::vector<BlockChain::SequenceInterval> requiredBlocks = blockChain_->getRequiredBlocks();
+    auto it = requiredBlocks.begin();
+    size_t lCnt = 0ULL;
+    while(it != requiredBlocks.end()) {
+        if (it->first <= targetSequence_ || it->second < targetSequence_) {
+            for (auto seq = it->first; 
+                seq <= targetSequence_ 
+                    && seq < it->second 
+                    && lCnt <= cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
+                ++seq) {
+                neighbour.addSequences(seq);
+                requestedSequences_.emplace(seq, cs::Conveyer::instance().currentRoundNumber());
+                ++lCnt;
+            }
+
+        }
+        ++it;
+    }
+    return true;
+}
+
 bool cs::PoolSynchronizer::getNeededSequences(Neighbour& neighbour) {
     const bool isLastPacket = isLastRequest();
 
@@ -613,6 +648,9 @@ bool cs::PoolSynchronizer::getNeededSequences(Neighbour& neighbour) {
     neighbour.resetSequences();
 
     for (std::size_t i = 0; i < cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount; ++i) {
+        if (targetSequence_ > 0ULL && sequence > targetSequence_) {
+            break;
+        }
         ++sequence;
 
         // max sequence

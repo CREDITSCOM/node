@@ -32,7 +32,7 @@ public:
     bool isSyncroStarted() const;
     cs::Sequence getTargetSequence();
 
-    void syncTill(cs::Sequence finSeq, const cs::PublicKey& source);
+    void syncTill(cs::Sequence finSeq, const cs::PublicKey& source, bool newCall);
     void trySource(cs::Sequence finSeq, cs::PublicKey& source);
     cs::PublicKeys getNeededNeighbours(cs::Sequence seq);
 
@@ -70,6 +70,7 @@ private:
     void sendBlock(const Neighbour& neighbour, const PoolsRequestedSequences& sequeces);
 
     bool getNeededSequences(Neighbour& neighbour);
+    bool cs::PoolSynchronizer::getNeededSequencesOnly(Neighbour& neighbour);
 
     void checkNeighbourSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
     void removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);

@@ -1549,7 +1549,7 @@ void Node::processSync() {
 
 void Node::specialSync(cs::Sequence finSeq, cs::PublicKey& source) {
     csinfo() << "Will synchronize till " << finSeq;
-    poolSynchronizer_->syncTill(finSeq, source);
+    poolSynchronizer_->syncTill(finSeq, source, true);
     csinfo() << "Last blockchain sequence: " << getBlockChain().getLastSeq();
 }
 
