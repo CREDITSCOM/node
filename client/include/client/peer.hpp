@@ -24,6 +24,7 @@ protected:
     bool onInit(const char* serviceName) override;
     bool onRun(const char* serviceName) override;
     bool onStop() override;
+    bool onPause() override;
 
 private:
     Service                               service_;

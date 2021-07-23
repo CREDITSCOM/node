@@ -142,4 +142,9 @@ bool Peer::onStop() {
     return true;
 }
 
+bool Peer::onPause() {
+    cslog() << "PAUSE REQUESTED! CALL STOP REQUEST!";
+    return onStop();
+}
+
 } // namespace cs
