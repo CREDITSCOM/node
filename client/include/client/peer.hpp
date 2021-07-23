@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include <params.hpp>
 #include <lib/system/service/service.hpp>
 #include <csnode/node.hpp>
 #include <observer.hpp>
