@@ -1,12 +1,12 @@
 #include <peer.hpp>
+#include <cmdlineargs.hpp>
 
 #include "stdafx.h"
 
 #include <iostream>
 
-#include <csnode/configholder.hpp>
-
 #include <lib/system/logger.hpp>
+#include <csnode/configholder.hpp>
 
 #include <params.hpp>
 #include <version.hpp>
@@ -40,25 +40,18 @@ void panic() {
 }
 
 int main(int argc, char* argv[]) {
+    const char* kDeprecatedDBPath = "test_db";
 #ifdef DISABLE_DAEMON
     std::ios_base::sync_with_stdio(false);
 #endif // DISABLE_DAEMON
 
-    const char* argHelp = "help";
-    const char* argVersion = "version";
-    const char* argDBPath = "db-path";
-    const char* argSeed = "seed";
-    const char* argDumpKeys = "dumpkeys";
-    const char* argSetBCTop = "set-bc-top";
-    const char* kDeprecatedDBPath = "test_db";
-
     using namespace boost::program_options;
     options_description desc("Allowed options");
     desc.add_options()
-        (argHelp, "produce this message")
+        (cmdline::argHelp, "produce this message")
         ("recreate-index", "recreate index.db")
-        (argSeed, "enter with seed instead of keys")
-        (argSetBCTop, po::value<uint64_t>(), "all blocks in blockchain with higher sequence will be removed")
+        (cmdline::argSeed, "enter with seed instead of keys")
+        (cmdline::argSetBCTop, po::value<uint64_t>(), "all blocks in blockchain with higher sequence will be removed")
         ("disable-auto-shutdown", "node will be prohibited to shutdown in case of fatal errors")
         ("version", "show node version")
         ("db-path", po::value<std::string>(), "path to DB (default: \"db/\")")
@@ -89,13 +82,13 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (vm.count(argHelp) > 0) {
+    if (vm.count(cmdline::argHelp) > 0) {
         cslog() << desc;
         return EXIT_SUCCESS;
     }
 
     // in case of version option print info and exit
-    if (vm.count(argVersion) > 0) {
+    if (vm.count(cmdline::argVersion) > 0) {
         cslog() << "Node version is " << Config::getNodeVersion();
 #ifdef MONITOR_NODE
         cslog() << "Monitor version";
@@ -113,7 +106,7 @@ int main(int argc, char* argv[]) {
     // test db directory, exit if user did not
     // rename old kDeprecatedDBPath and expect
     // to use it as default one
-    if (vm.count(argDBPath) == 0) {
+    if (vm.count(cmdline::argDBPath) == 0) {
         // arg is not set, so default dir is not "db_test"
         struct stat info;
         if (stat(kDeprecatedDBPath, &info) == 0) {
@@ -139,7 +132,7 @@ int main(int argc, char* argv[]) {
         panic();
     }
 
-    if (vm.count(argSeed) == 0) {
+    if (vm.count(cmdline::argSeed) == 0) {
         if (!config.readKeys(vm)) {
             return EXIT_FAILURE;
         }
@@ -150,8 +143,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (vm.count(argDumpKeys) > 0) {
-        auto fName = vm[argDumpKeys].as<std::string>();
+    if (vm.count(cmdline::argDumpKeys) > 0) {
+        auto fName = vm[cmdline::argDumpKeys].as<std::string>();
         if (fName.size() > 0) {
             config.dumpJSONKeys(fName);
             cslog() << "Keys dumped to " << fName;
@@ -159,18 +152,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    logger::initialize(config.getLoggerSettings());
-
-    cs::config::Observer observer(config, vm);
-    cs::ConfigHolder::instance().setConfig(config);
-    cs::Connector::connect(
-        &observer.configChanged,
-        &cs::ConfigHolder::instance(),
-        &cs::ConfigHolder::onConfigChanged
-    );
-
-    cs::Peer peer("credits_node", observer, vm.count(argSetBCTop) > 0);
+    cs::Peer peer("credits_node", config, vm);
     int result = peer.executeProtocol();
-    logger::cleanup();
     return result;
 }

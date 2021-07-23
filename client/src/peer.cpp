@@ -1,6 +1,8 @@
 #include <peer.hpp>
 
 #include <net/transport.hpp>
+#include <csnode/configholder.hpp>
+#include <cmdlineargs.hpp>
 
 #ifdef WIN32
 #include <csignal>
@@ -68,12 +70,12 @@ namespace cs {
 
 Peer::Peer(
     const char* serviceName,
-    config::Observer& observer,
-    bool onlyInit
+    Config& config,
+    boost::program_options::variables_map& vm
 )
     : service_(static_cast<ServiceOwner&>(*this), serviceName)
-    , observer_(observer)
-    , onlyInit_(onlyInit) {}
+    , config_(config)
+    , vm_(vm) {}
 
 int Peer::executeProtocol() {
     bool ok = service_.run();
@@ -95,7 +97,17 @@ bool Peer::onInit(const char*) {
     signal(SIGUSR1, sigUsr1Handler);
 #endif
 
-    node_ = std::make_unique<Node>(observer_);
+    logger::initialize(config_.getLoggerSettings());
+    observer_ = std::make_unique<config::Observer>(config_, vm_);
+    cs::ConfigHolder::instance().setConfig(config_);
+    cs::Connector::connect(
+        &observer_->configChanged,
+        &cs::ConfigHolder::instance(),
+        &cs::ConfigHolder::onConfigChanged
+    );
+
+
+    node_ = std::make_unique<Node>(*observer_);
     if (!node_->isGood()) {
         return false;        
     }
@@ -106,7 +118,7 @@ bool Peer::onInit(const char*) {
 }
 
 bool Peer::onRun(const char*) {
-    if (!onlyInit_) {
+    if (vm_.count(cmdline::argSetBCTop) == 0) {
         cslog() << "Running Node";
         node_->run();
     }
@@ -119,6 +131,7 @@ bool Peer::onRun(const char*) {
     cslog() << "Destroying Node";
     node_->destroy();
     node_.reset(nullptr);
+    logger::cleanup();
     return true;
 }
 

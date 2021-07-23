@@ -6,11 +6,17 @@
 #include <csnode/node.hpp>
 #include <observer.hpp>
 
+#include <boost/program_options.hpp>
+
 namespace cs {
 
 class Peer : public ServiceOwner {
 public:
-    Peer(const char* serviceName, config::Observer&, bool onlyInit);
+    Peer(
+        const char* serviceName,
+        Config&,
+        boost::program_options::variables_map&
+    );
     int executeProtocol();
 
 protected:
@@ -20,10 +26,11 @@ protected:
     bool onStop() override;
 
 private:
-    Service service_;
-    std::unique_ptr<Node> node_;
-    config::Observer& observer_;
-    const bool onlyInit_;
+    Service                               service_;
+    std::unique_ptr<Node>                 node_;
+    std::unique_ptr<config::Observer>     observer_;
+    Config&                               config_;
+    boost::program_options::variables_map vm_;
 };
 
 } // namespace cs
