@@ -79,11 +79,17 @@ Peer::Peer(
 
 int Peer::executeProtocol() {
     bool ok = service_.run();
+    if (!ok) {
+#ifdef _WIN32
+        auto ecode = std::error_code(static_cast<int>(GetLastError()), std::system_category());
+        cserror() << "Cannot run service, last error: " << ecode.message();
+#endif // _WIN32
+    }
     return ok ? 0 : -1;
 }
 
 bool Peer::onInit(const char*) {
-#ifdef WIN32
+#if defined(WIN32) && defined(DISABLE_DAEMON)
     if (!SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
         cslog() << "\nERROR: Could not set control handler";
         return false;
@@ -91,7 +97,7 @@ bool Peer::onInit(const char*) {
 #ifndef _DEBUG
     mouseSelectionDisable();
 #endif // !_DEBUG
-#endif  // WIN32
+#endif  // WIN32 && DISABLE_DAEMON
 
 #if BUILD_WITH_GPROF
     signal(SIGUSR1, sigUsr1Handler);
@@ -109,6 +115,7 @@ bool Peer::onInit(const char*) {
 
     node_ = std::make_unique<Node>(*observer_);
     if (!node_->isGood()) {
+        cserror() << "Node is not good after init";
         return false;        
     }
 

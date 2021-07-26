@@ -42,6 +42,7 @@ void panic() {
 
 int main(int argc, char* argv[]) {
     const char* kDeprecatedDBPath = "test_db";
+    const char* kServiceName = "credits_node";
 #ifdef DISABLE_DAEMON
     std::ios_base::sync_with_stdio(false);
 #endif // DISABLE_DAEMON
@@ -130,7 +131,7 @@ int main(int argc, char* argv[]) {
 #ifdef _WIN32
     if (vm.count(cmdline::argInstall) > 0) {
         auto path = std::filesystem::current_path() / "node.exe";
-        auto ecode = cs::installService("credits_node", path.string());
+        auto ecode = cs::installService(kServiceName, path.string());
         if (!ecode) {
             cslog() << "Service 'credits_node' installed successfully.";
             return EXIT_SUCCESS;
@@ -142,7 +143,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (vm.count(cmdline::argUninstall) > 0) {
-        auto ecode = cs::uninstallService("credits_node");
+        auto ecode = cs::uninstallService(kServiceName);
         if (!ecode) {
             cslog() << "Service 'credits_node' uninstalled successfully.";
             return EXIT_SUCCESS;
@@ -185,7 +186,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    cs::Peer peer("credits_node", config, vm);
+    cs::Peer peer(kServiceName, config, vm);
     int result = peer.executeProtocol();
     return result;
 }
