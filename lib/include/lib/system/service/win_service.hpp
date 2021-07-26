@@ -27,7 +27,7 @@ public:
 
     bool makeNonSignaled() {
         if (eventHandler_ == nullptr) {
-            lastError_ = -1;
+            lastError_ = static_cast<DWORD>(-1);
             return false;
         }
 
@@ -41,7 +41,7 @@ public:
 
     bool makeSignaled() {
         if (eventHandler_ == nullptr) {
-            lastError_ = -1;
+            lastError_ = static_cast<DWORD>(-1);
             return false;
         }
 
@@ -55,7 +55,7 @@ public:
 
     bool wait() {
         if (eventHandler_ == nullptr) {
-            lastError_ = -1;
+            lastError_ = static_cast<DWORD>(-1);
             return false;
         }
 
@@ -151,7 +151,7 @@ inline Service*& Service::instance() {
     return ptr;
 }
 
-inline void Service::start(DWORD ac, LPSTR* av) {
+inline void Service::start(DWORD, LPSTR*) {
     status_.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
     status_.dwControlsAccepted = SERVICE_ACCEPT_STOP
                                | SERVICE_ACCEPT_SHUTDOWN
