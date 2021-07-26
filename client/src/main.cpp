@@ -4,6 +4,7 @@
 #include "stdafx.h"
 
 #include <iostream>
+#include <filesystem>
 
 #include <lib/system/logger.hpp>
 #include <csnode/configholder.hpp>
@@ -59,7 +60,12 @@ int main(int argc, char* argv[]) {
         ("public-key-file", po::value<std::string>(), "path to public key file (default: \"NodePublic.txt\")")
         ("private-key-file", po::value<std::string>(), "path to private key file (default: \"NodePrivate.txt\")")
         ("dumpkeys", po::value<std::string>(), "dump your public and private keys into a JSON file with the specified name (UNENCRYPTED!)")
-        ("encryptkey", "encrypts the private key with password upon startup (if not yet encrypted)");
+        ("encryptkey", "encrypts the private key with password upon startup (if not yet encrypted)")
+#ifdef _WIN32
+        (cmdline::argInstall, "install 'credits_node' service")
+        (cmdline::argUninstall, "uninstall 'credits_node' service")
+#endif
+        ;
 
     variables_map vm;
     try {
@@ -120,6 +126,33 @@ int main(int argc, char* argv[]) {
             }
         } 
     }
+
+#ifdef _WIN32
+    if (vm.count(cmdline::argInstall) > 0) {
+        auto path = std::filesystem::current_path() / "node.exe";
+        auto ecode = cs::installService("credits_node", path.string());
+        if (!ecode) {
+            cslog() << "Service 'credits_node' installed successfully.";
+            return EXIT_SUCCESS;
+        }
+        cserror() << "Error while installing service 'credits_node': "
+                    << ecode.message()
+                    << ", value: " << ecode.value();
+        return EXIT_FAILURE;
+    }
+
+    if (vm.count(cmdline::argUninstall) > 0) {
+        auto ecode = cs::uninstallService("credits_node");
+        if (!ecode) {
+            cslog() << "Service 'credits_node' uninstalled successfully.";
+            return EXIT_SUCCESS;
+        }
+        cserror() << "Error while uninstalling service 'credits_node': "
+            << ecode.message()
+            << ", value: " << ecode.value();
+        return EXIT_FAILURE;
+    }
+#endif
 
     if (!cscrypto::cryptoInit()) {
         std::cout << "Couldn't initialize the crypto library" << std::endl;
