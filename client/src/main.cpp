@@ -63,8 +63,13 @@ int main(int argc, char* argv[]) {
         ("dumpkeys", po::value<std::string>(), "dump your public and private keys into a JSON file with the specified name (UNENCRYPTED!)")
         ("encryptkey", "encrypts the private key with password upon startup (if not yet encrypted)")
 #ifdef _WIN32
-        (cmdline::argInstall, "install 'credits_node' service")
+        (cmdline::argInstall,
+            po::value<std::string>(),
+            "install 'credits_node' service with specified working directory")
         (cmdline::argUninstall, "uninstall 'credits_node' service")
+#ifndef DISABLE_DAEMON
+        (cmdline::argWorkDir, po::value<std::string>(), "set working directory")
+#endif
 #endif
         ;
 
@@ -131,7 +136,11 @@ int main(int argc, char* argv[]) {
 #ifdef _WIN32
     if (vm.count(cmdline::argInstall) > 0) {
         auto path = std::filesystem::current_path() / "node.exe";
-        auto ecode = cs::installService(kServiceName, path.string());
+        std::string params = "--";
+        params += cmdline::argWorkDir;
+        params += "=";
+        params += vm[cmdline::argInstall].as<std::string>();
+        auto ecode = cs::installService(kServiceName, path.string(), params);
         if (!ecode) {
             cslog() << "Service 'credits_node' installed successfully.";
             return EXIT_SUCCESS;
@@ -159,6 +168,16 @@ int main(int argc, char* argv[]) {
         std::cout << "Couldn't initialize the crypto library" << std::endl;
         panic();
     }
+
+#if defined(_WIN32) && !defined(DISABLE_DAEMON) 
+    if (vm.count(cmdline::argWorkDir) == 0) {
+        panic();
+    }
+    std::string currentDir = vm[cmdline::argWorkDir].as<std::string>();
+    if (!SetCurrentDirectory(currentDir.c_str())) {
+        panic();
+    }
+#endif
 
     auto config = Config::read(vm);
 
