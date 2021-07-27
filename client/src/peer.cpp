@@ -82,7 +82,7 @@ int Peer::executeProtocol() {
     if (!ok) {
 #ifdef _WIN32
         auto ecode = std::error_code(static_cast<int>(GetLastError()), std::system_category());
-        cserror() << "Cannot run service, last error: " << ecode.message();
+        cslog() << "Cannot run service, last error: " << ecode.message();
 #endif // _WIN32
     }
     return ok ? 0 : -1;
