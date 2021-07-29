@@ -233,7 +233,7 @@ void Transport::clearInbox() {
 void Transport::processorRoutine() {
     constexpr size_t kRoutineWaitTimeMs = 50;
 
-    while (!node_->isStopRequested()) {
+    while (Transport::gSignalStatus == 0) {
         process();
 
         std::unique_lock lock(inboxMux_);
