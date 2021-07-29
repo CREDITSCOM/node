@@ -132,6 +132,7 @@ bool Node::init() {
     auto& initConfidants = cs::ConfigHolder::instance().config()->getInitialConfidants();
     initialConfidants_ = decltype(initialConfidants_)(initConfidants.begin(), initConfidants.end());
 
+
     if (initialConfidants_.find(solver_->getPublicKey()) != initialConfidants_.end()) {
         transport_->setPermanentNeighbours(initialConfidants_);
     }
@@ -3750,7 +3751,6 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 uint8_t cnt;
                 stream >> cnt;
                 csdebug() << "Blacklisted smart-contracts: ";
-                initialConfidants_.clear();
                 for (uint8_t i = 1; i <= cnt; ++i) {
                     cs::PublicKey key;
                     stream >> key;
@@ -3899,6 +3899,7 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
 void Node::onRoundTimeElapsed() {
     solver_->resetGrayList();
     const cs::PublicKey& own_key = solver_->getPublicKey();
+
     if (initialConfidants_.find(own_key) == initialConfidants_.end()) {
         cslog() << "Waiting for next round...";
 

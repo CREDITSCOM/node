@@ -132,16 +132,23 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
     const std::size_t oldCachedBlocksSize = blockChain_->getCachedBlocksSize();
 
     auto it = neighbours_.begin();
+    
     while (it != neighbours_.end()) {
         if (it->publicKey() == sender) {
             break;
         }
         ++it;
     }
-    if (it->sequences().front() == poolsBlock.front().sequence() && it->sequences().back() == poolsBlock.back().sequence()) {
+    
+    if (it == neighbours_.end()) {
+        csdebug() << "Getting block reply from non neighbour";
+        return;
+    }
+    
+    if (targetSequence_ > 0ULL && it->sequences().front() == poolsBlock.front().sequence() && it->sequences().back() == poolsBlock.back().sequence()) {
         it->resetSequences();
     }
-
+    
     for (auto& pool : poolsBlock) {
         const auto sequence = pool.sequence();
         
@@ -165,11 +172,12 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
             lastWrittenSequence = blockChain_->getLastSeq();
         }
     }
-
+    
     if (targetSequence_ != 0ULL) {
         cs::Sequence tSeq = targetSequence_;
         syncTill(tSeq, sender, false);
     }
+    
     if (oldCachedBlocksSize != blockChain_->getCachedBlocksSize() || oldLastWrittenSequence != lastWrittenSequence) {
         const bool isFinished = showSyncronizationProgress(lastWrittenSequence);
 
@@ -352,7 +360,7 @@ void cs::PoolSynchronizer::trySource(cs::Sequence finSeq, cs::PublicKey& source)
 void cs::PoolSynchronizer::showNeighbours() {
     csinfo() << "Current Neighbours:";
     for (auto it : neighbours_) {
-        csinfo() << cs::Utils::byteStreamToHex(it.publicKey()) << "  " << it.maxSequence();
+        csinfo() << EncodeBase58(it.publicKey().data(), it.publicKey().data() + it.publicKey().size()) << "  " << it.maxSequence();
     }
 }
 
