@@ -30,6 +30,7 @@ protected:
     bool onRun(const char* serviceName) override;
     bool onStop() override;
     bool onPause() override;
+    bool onContinue() override;
 
 private:
     Service                                service_;
