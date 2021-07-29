@@ -12,3 +12,4 @@ js-client/js/*
 /CMakeLists.txt.user.4.10-pre1
 /p2p
 /build*
+*.swp

@@ -1,10 +1,13 @@
 #ifndef SMARTCONTRACTS_SERIALIZER_HPP
 #define SMARTCONTRACTS_SERIALIZER_HPP
+#include <filesystem>
+
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/unordered_map.hpp>
+#include <boost/serialization/map.hpp>
 
 #include <csnode/transactionspacket.hpp>
 #include <cscrypto/cscrypto.hpp>
@@ -20,9 +23,9 @@ class SmartConsensus;
 class SmartContracts_Serializer {
 public:
     void bind(SmartContracts&);
-    void save();
-    void load();
-    void clear();
+    void save(const std::filesystem::path& rootDir);
+    void load(const std::filesystem::path& rootDir);
+    void clear(const std::filesystem::path& rootDir);
 
     ::cscrypto::Hash hash();
 

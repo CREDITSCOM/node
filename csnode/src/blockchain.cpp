@@ -135,8 +135,8 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
           }
         }
 
-        ++totalLoaded;
-        if (progress.poolsProcessed % 1000 == 0) {
+        totalLoaded = progress.poolsProcessed;
+        if (totalLoaded % 1000 == 0) {
             std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << std::flush;
         }
         return false;
@@ -738,6 +738,13 @@ bool BlockChain::applyBlockToCaches(const csdb::Pool& pool) {
     catch (...) {
         cserror() << "apply block to caches, unexpected exception";
         return false;
+    }
+
+    if (serializationManPtr_
+        && pool.sequence()
+        && pool.sequence() % kQuickStartSaveCachesInterval == 0
+        && !serializationManPtr_->save(pool.sequence())) {
+        cserror() << "Cannot save caches with version " << pool.sequence();
     }
 
     return true;

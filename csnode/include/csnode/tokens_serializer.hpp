@@ -1,5 +1,7 @@
 #ifndef TOKENS_SERIALIZER_HPP
 #define TOKENS_SERIALIZER_HPP
+#include <filesystem>
+
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/unordered_map.hpp>
 #include <boost/serialization/string.hpp>
@@ -16,9 +18,9 @@ namespace cs {
 class TokensMaster_Serializer {
 public:
     void bind(TokensMaster&);
-    void save();
-    void load();
-    void clear();
+    void save(const std::filesystem::path& rootDir);
+    void load(const std::filesystem::path& rootDir);
+    void clear(const std::filesystem::path& rootDir);
 
     ::cscrypto::Hash hash();
 

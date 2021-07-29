@@ -1,5 +1,7 @@
 #ifndef WALLETS_CACHE_SERIALIZER_HPP
 #define WALLETS_CACHE_SERIALIZER_HPP
+#include <filesystem>
+
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/unordered_map.hpp>
 #include <boost/serialization/list.hpp>
@@ -30,9 +32,9 @@ class WalletsCache;
 class WalletsCache_Serializer {
 public:
     void bind(WalletsCache&);
-    void save();
-    void load();
-    void clear();
+    void save(const std::filesystem::path& rootDir);
+    void load(const std::filesystem::path& rootDir);
+    void clear(const std::filesystem::path& rootDir);
 
     ::cscrypto::Hash hash();
 

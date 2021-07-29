@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 
@@ -13,14 +14,14 @@ void WalletsIds_Serializer::bind(WalletsIds& ids) {
     nextId_ = &ids.nextId_;
 }
 
-void WalletsIds_Serializer::clear() {
+void WalletsIds_Serializer::clear(const std::filesystem::path& rootDir) {
     data_->clear();
     *nextId_ = 0;
-    save();
+    save(rootDir);
 }
 
-void WalletsIds_Serializer::save() {
-    std::ofstream ofs("walletsids.dat");
+void WalletsIds_Serializer::save(const std::filesystem::path& rootDir) {
+    std::ofstream ofs(rootDir / "walletsids.dat");
     boost::archive::text_oarchive oa(ofs);
     oa << *data_;
     oa << *nextId_;
@@ -29,8 +30,21 @@ void WalletsIds_Serializer::save() {
 ::cscrypto::Hash WalletsIds_Serializer::hash() {
     std::ostringstream ofs;
     {
-      boost::archive::text_oarchive oa(ofs);
-      oa << *data_;
+      boost::archive::text_oarchive oa(
+        ofs,
+        boost::archive::no_header | boost::archive::no_codecvt
+      );
+      auto& data_ref = data_->get<0>();
+      std::vector<Wallet> data(
+        data_ref.begin(),
+        data_ref.end()
+      );
+      std::sort(
+        data.begin(),
+        data.end(),
+        [](const Wallet& l, const Wallet& r) { return l.address < r.address; }
+      );
+      oa << data;
       oa << *nextId_;
     }
     auto data = ofs.str();
@@ -40,8 +54,8 @@ void WalletsIds_Serializer::save() {
     );
 }
 
-void WalletsIds_Serializer::load() {
-    std::ifstream ifs("walletsids.dat");
+void WalletsIds_Serializer::load(const std::filesystem::path& rootDir) {
+    std::ifstream ifs(rootDir / "walletsids.dat");
     boost::archive::text_iarchive ia(ifs);
     ia >> *data_;
     ia >> *nextId_;

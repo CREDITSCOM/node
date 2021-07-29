@@ -115,7 +115,13 @@ add_library(csnode
 
 configure_msvc_flags()
 
-target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 lmdbxx config ${Boost_LIBRARIES})
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set (FSLIBRARY stdc++fs)
+else()
+    set (FSLIBRARY "")
+endif()
+
+target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 lmdbxx config ${Boost_LIBRARIES} ${FSLIBRARY})
 if(DBSQL)
 target_link_libraries (csnode dbsql)
 endif()

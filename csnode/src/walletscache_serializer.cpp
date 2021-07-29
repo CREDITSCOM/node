@@ -23,7 +23,7 @@ void WalletsCache_Serializer::bind(WalletsCache& wCache) {
     miningDelegations_ = reinterpret_cast<decltype(miningDelegations_)>(&wCache.staking_->miningDelegations_);
 }
 
-void WalletsCache_Serializer::clear() {
+void WalletsCache_Serializer::clear(const std::filesystem::path& rootDir) {
     smartPayableTransactions_->clear();
     canceledSmarts_->clear();
     wallets_->clear();
@@ -32,11 +32,11 @@ void WalletsCache_Serializer::clear() {
 #endif
     currentDelegations_->clear();
     miningDelegations_->clear();
-    save();
+    save(rootDir);
 }
 
-void WalletsCache_Serializer::save() {
-    std::ofstream ofs("walletscache.dat");
+void WalletsCache_Serializer::save(const std::filesystem::path& rootDir) {
+    std::ofstream ofs(rootDir / "walletscache.dat");
     boost::archive::text_oarchive oa(ofs);
     oa << *smartPayableTransactions_;
     oa << *canceledSmarts_;
@@ -51,15 +51,30 @@ void WalletsCache_Serializer::save() {
 ::cscrypto::Hash WalletsCache_Serializer::hash() {
     std::ostringstream ofs;
     {
-      boost::archive::text_oarchive oa(ofs);
+      boost::archive::text_oarchive oa(
+        ofs,
+        boost::archive::no_header | boost::archive::no_codecvt
+      );
       oa << *smartPayableTransactions_;
       oa << *canceledSmarts_;
-      oa << *wallets_;
+      auto& wallets_data = wallets_->get<1>();
+      std::vector<WalletData> tmp_wallets(
+        wallets_data.begin(),
+        wallets_data.end()
+      );
+      oa << tmp_wallets;
 #ifdef MONITOR_NODE
       oa << *trusted_info_;
 #endif
       oa << *currentDelegations_;
-      oa << *miningDelegations_;
+      std::map<
+        PublicKey,
+        std::vector<std::pair<PublicKey, TimeMoney>>
+      > tmp_miningDelegations(
+        miningDelegations_->begin(),
+        miningDelegations_->end()
+      );
+      oa << tmp_miningDelegations;
     }
     auto data = ofs.str();
     return ::cscrypto::calculateHash(
@@ -68,8 +83,8 @@ void WalletsCache_Serializer::save() {
     );
 }
 
-void WalletsCache_Serializer::load() {
-    std::ifstream ifs("walletscache.dat");
+void WalletsCache_Serializer::load(const std::filesystem::path& rootDir) {
+    std::ifstream ifs(rootDir / "walletscache.dat");
     boost::archive::text_iarchive ia(ifs);
     ia >> *smartPayableTransactions_;
     ia >> *canceledSmarts_;

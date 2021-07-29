@@ -255,32 +255,40 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
 
     Storage::OpenProgress progress{0};
 
-    it->seek_to_first();
+    bool slowStart = false;
 
-    for (cs::Sequence i = 0; i < startSequence; ++i) {
-        if (i == last_seq_in_db) {
-            cs::Bytes v = it->value();
-            Pool p = Pool::from_binary(std::move(v));
-            if (p.is_valid()) {
-                last_hash = p.hash();
-            }
-            else {
-                set_last_error(Storage::DataIntegrityError, "Data integrity error: corrupted pool %d.", count_pool);
-                cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
-                return false;
-            }
-        }
-
-        it->next();
-        ++count_pool;
-        ++progress.poolsProcessed;
-
+    if (startSequence > 0 && [&]() { it->seek(startSequence - 1); return it->is_valid(); }()) {
+        csinfo() << "Storage: quick start";
+        count_pool = startSequence - 1;
+        progress.poolsProcessed = count_pool;
         if (callback != nullptr) {
             if (callback(progress)) {
                 set_last_error(Storage::UserCancelled);
                 return false;
             }
         }
+    }
+    else {
+        csinfo() << "Storage: slow start";
+        it->seek_to_first();
+        slowStart = true;
+    }
+
+    if (count_pool == last_seq_in_db && !slowStart) {
+        cs::Bytes v = it->value();
+        Pool p = Pool::from_binary(std::move(v));
+        if (p.is_valid()) {
+            last_hash = p.hash();
+        }
+        else {
+            set_last_error(Storage::DataIntegrityError, "Data integrity error: corrupted pool %d.", count_pool);
+            cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
+            return false;
+        }
+    }
+
+    if (!slowStart) {
+        it->next();
     }
 
     for (; it->is_valid(); it->next()) {

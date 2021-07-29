@@ -478,5 +478,7 @@ private:
     static bool testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs);
 
     friend class cs::BlockChain_Serializer;
+
+    const size_t kQuickStartSaveCachesInterval = 10000;
 };
 #endif  //  BLOCKCHAIN_HPP

@@ -1,8 +1,11 @@
 #ifndef WALLET_IDS_SERIALIZER_HPP
 #define WALLET_IDS_SERIALIZER_HPP
+#include <filesystem>
+
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/split_member.hpp>
 #include <boost/serialization/array.hpp>
+#include <boost/serialization/vector.hpp>
 #include <boost/serialization/set.hpp>
 
 #include <cscrypto/cscrypto.hpp>
@@ -13,9 +16,9 @@ class WalletsIds;
 class WalletsIds_Serializer {
 public:
     void bind(WalletsIds&);
-    void save();
-    void load();
-    void clear();
+    void save(const std::filesystem::path& rootDir);
+    void load(const std::filesystem::path& rootDir);
+    void clear(const std::filesystem::path& rootDir);
 
     ::cscrypto::Hash hash();
 
