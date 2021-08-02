@@ -303,32 +303,32 @@ namespace api_diag {
         cs::IDataStream stream(msg.data(), msg.size());
         uint16_t order;
         stream >> order;
-        //if (order == 2U) {
-        //    cs::Sequence seq;
-        //    cs::PublicKey key;
-        //    stream >> seq >> key;
-        //    node_.specialSync(seq, key);
-        //}
-        //if (order == 3U) {
-        //    cs::Sequence seq;
-        //    stream >> seq;
-        //    node_.setTop(seq);
-        //}
-        //if (order == 4U) {
-        //    node_.showNeighbours();
-        //}
+        if (order == 2U) {
+            cs::Sequence seq;
+            cs::PublicKey key;
+            stream >> seq >> key;
+            node_.specialSync(seq, key);
+        }
+        if (order == 3U) {
+            cs::Sequence seq;
+            stream >> seq;
+            node_.setTop(seq);
+        }
+        if (order == 4U) {
+            node_.showNeighbours();
+        }
 
-        //if (order == 5U) {
-        //    node_.setIdle();
-        //}
+        if (order == 5U) {
+            node_.setIdle();
+        }
 
-        //if (order == 6U) {
-        //    node_.setWorking();
-        //}
+        if (order == 6U) {
+            node_.setWorking();
+        }
 
-        //if (order == 7U) {
-        //    node_.showDbParams();
-        //}
+        if (order == 7U) {
+            node_.showDbParams();
+        }
 
         _return.__set_code(kNotImplemented);
         _return.__set_message("Not implemented");

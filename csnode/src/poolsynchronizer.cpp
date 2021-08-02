@@ -119,6 +119,14 @@ cs::Sequence cs::PoolSynchronizer::getTargetSequence() {
     return targetSequence_;
 }
 
+void cs::PoolSynchronizer::checkSpecialSyncProcess() {
+    for (auto &it : requestedNodes_) {
+        if (it.second + kRoundDiscrepancy < cs::Conveyer::instance().currentRoundNumber()) {
+            syncTill(targetSequence_, it.first, true);
+        }
+    }
+}
+
 void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::PublicKey& sender) {
     if (blockChain_->isAntiForkModeOn()) {
         return;
@@ -130,7 +138,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
     cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
     const cs::Sequence oldLastWrittenSequence = lastWrittenSequence;
     const std::size_t oldCachedBlocksSize = blockChain_->getCachedBlocksSize();
-
+    csdebug() << "1: ";
     auto it = neighbours_.begin();
     
     while (it != neighbours_.end()) {
@@ -139,16 +147,16 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
         }
         ++it;
     }
-    
+    csdebug() << "2: ";
     if (it == neighbours_.end()) {
         csdebug() << "Getting block reply from non neighbour";
         return;
     }
-    
+    csdebug() << "3: ";
     if (targetSequence_ > 0ULL && it->sequences().front() == poolsBlock.front().sequence() && it->sequences().back() == poolsBlock.back().sequence()) {
         it->resetSequences();
     }
-    
+    csdebug() << "4: ";
     for (auto& pool : poolsBlock) {
         const auto sequence = pool.sequence();
         
@@ -162,6 +170,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
         }
 
         if (targetSequence_ > 0ULL && pool.sequence() > targetSequence_) {
+            csdebug() << "Target Sequence  st to 0";
             targetSequence_ = 0ULL;
             break;
         }
@@ -172,12 +181,14 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
             lastWrittenSequence = blockChain_->getLastSeq();
         }
     }
-    
+    csdebug() << "5: ";
     if (targetSequence_ != 0ULL) {
         cs::Sequence tSeq = targetSequence_;
+        auto el = requestedNodes_.find(sender);
+        requestedNodes_.erase(el);
         syncTill(tSeq, sender, false);
     }
-    
+    csdebug() << "6: ";
     if (oldCachedBlocksSize != blockChain_->getCachedBlocksSize() || oldLastWrittenSequence != lastWrittenSequence) {
         const bool isFinished = showSyncronizationProgress(lastWrittenSequence);
 
@@ -365,6 +376,7 @@ void cs::PoolSynchronizer::showNeighbours() {
 }
 
 void cs::PoolSynchronizer::syncTill(cs::Sequence finSeq, const cs::PublicKey& source, bool newCall) {
+    csdebug() << __func__;
     if (!cs::ConfigHolder::instance().config()->isIdleMode()) {
         csinfo() << "The node is not in IDLE MODE, cant't run such type of syncro";
     }
@@ -524,6 +536,7 @@ void cs::PoolSynchronizer::sendBlock(const Neighbour& neighbour) {
     for (const auto& sequence : sequences) {
         if (!requestedSequences_.count(sequence)) {
             requestedSequences_.emplace(std::make_pair(sequence, 0));
+            requestedNodes_.emplace(neighbour.publicKey(), cs::Conveyer::instance().currentRoundNumber());
         }
     }
 
@@ -548,7 +561,7 @@ void cs::PoolSynchronizer::sendBlock(const cs::PoolSynchronizer::Neighbour& neig
 
         for (const auto& s : seqs) {
             printFreeBlocks(key, s);
-
+            requestedNodes_.emplace(neighbour.publicKey(), cs::Conveyer::instance().currentRoundNumber());
             emit sendRequest(neighbour.publicKey(), s);
         }
     }

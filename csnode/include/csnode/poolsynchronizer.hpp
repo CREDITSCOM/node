@@ -28,6 +28,7 @@ public:
     void showNeighbours();
     // syncro send functions
     void sendBlockRequest();
+    void checkSpecialSyncProcess();
 
     bool isSyncroStarted() const;
     cs::Sequence getTargetSequence();
@@ -39,6 +40,7 @@ public:
     static const cs::RoundNumber kRoundDifferentForSync = cs::values::kDefaultMetaStorageMaxSize;
     static const size_t kFreeBlocksTimeoutMs = 10000;
     static const size_t kCachedBlocksLimit = 10000;
+    static const cs::RoundNumber kRoundDiscrepancy = 10ULL;
 
 public signals:
     PoolSynchronizerRequestSignal sendRequest;
@@ -242,6 +244,7 @@ private:
     // [value] =  packet counter
     // value: increase each new round
     std::map<cs::Sequence, cs::RoundNumber> requestedSequences_;
+    std::map<cs::PublicKey, cs::RoundNumber> requestedNodes_;
     std::vector<Neighbour> neighbours_;
 
     cs::Timer timer_;

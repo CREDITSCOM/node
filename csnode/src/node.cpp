@@ -2768,6 +2768,10 @@ void Node::getRoundTable(const uint8_t* data, const size_t size, const cs::Round
         getCharacteristic(rPackage);
     }
 
+    if (iMode && poolSynchronizer_->getTargetSequence() > 0ULL) {
+        poolSynchronizer_->checkSpecialSyncProcess();
+    }
+
     rPackage.setSenderNode(sender);
     bool updateRound = false;
     if (currentRoundPackage_.roundTable().round == 0) {//if normal or trusted  node that got RP has probably received a new RP with not full stake
