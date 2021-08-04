@@ -120,6 +120,7 @@ cs::Sequence cs::PoolSynchronizer::getTargetSequence() {
 }
 
 void cs::PoolSynchronizer::checkSpecialSyncProcess() {
+    csdebug() << __func__;
     for (auto &it : requestedNodes_) {
         if (it.second + kRoundDiscrepancy < cs::Conveyer::instance().currentRoundNumber()) {
             syncTill(targetSequence_, it.first, true);
@@ -185,7 +186,10 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
     if (targetSequence_ != 0ULL) {
         cs::Sequence tSeq = targetSequence_;
         auto el = requestedNodes_.find(sender);
-        requestedNodes_.erase(el);
+        if (el != requestedNodes_.end()) {
+            requestedNodes_.erase(el);
+        }
+
         syncTill(tSeq, sender, false);
     }
     csdebug() << "6: ";
@@ -580,7 +584,7 @@ bool cs::PoolSynchronizer::getNeededSequencesOnly(Neighbour& neighbour) {
             for (auto seq = it->first; 
                 seq <= targetSequence_ 
                     && seq < it->second 
-                    && lCnt <= cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
+                    && neighbour.sequences().size() < cs::ConfigHolder::instance().config()->getPoolSyncSettings().blockPoolsCount;
                 ++seq) {
                 neighbour.addSequences(seq);
                 requestedSequences_.emplace(seq, cs::Conveyer::instance().currentRoundNumber());

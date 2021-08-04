@@ -1346,7 +1346,6 @@ void Node::sendPacketHashesReply(const cs::PacketsVector& packets, const cs::Rou
 
 void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::PublicKey& sender) {
     csmeta(csdebug);
-
     cs::PoolsRequestedSequences sequences;
 
     cs::IDataStream stream(data, size);
