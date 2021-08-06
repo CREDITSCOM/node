@@ -3998,6 +3998,34 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 cslog() << "MaxQueueSize changed to: " << Consensus::MaxQueueSize;
             }
 
+            if (order == 32U) {
+                uint8_t cnt;
+                stream >> cnt;
+                csdebug() << "Blacklisted smart-contracts: ";
+                initialConfidants_.clear();
+                for (uint8_t i = 1; i <= cnt; ++i) {
+                    cs::PublicKey key;
+                    stream >> key;
+                    csdb::Address addr = csdb::Address::from_public_key(key);
+                    solver_->smart_contracts().setBlacklisted(addr, true);
+                    cslog() << static_cast<int>(i) << ". " << cs::Utils::byteStreamToHex(key);
+                }
+            }
+
+            if (order == 33U) {
+                uint8_t cnt;
+                stream >> cnt;
+                csdebug() << "Rehabilitated smart-contracts: ";
+                initialConfidants_.clear();
+                for (uint8_t i = 1; i <= cnt; ++i) {
+                    cs::PublicKey key;
+                    stream >> key;
+                    csdb::Address addr = csdb::Address::from_public_key(key);
+                    solver_->smart_contracts().setBlacklisted(addr, false);
+                    cslog() << static_cast<int>(i) << ". " << cs::Utils::byteStreamToHex(key);
+                }
+            }
+
             if (order == 33U) {// apply new global features
                 uint64_t value;
                 stream >> value;
@@ -4020,10 +4048,11 @@ void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
         return;
     }
     if (!blockValidator_->validateBlock(block,
-        cs::BlockValidator::ValidationLevel::hashIntergrity
+        cs::BlockValidator::ValidationLevel::hashIntergrity 
+            | cs::BlockValidator::ValidationLevel::blockNum
             /*| cs::BlockValidator::ValidationLevel::smartStates*/
             /*| cs::BlockValidator::ValidationLevel::accountBalance*/,
-        cs::BlockValidator::SeverityLevel::onlyFatalErrors)) {
+        cs::BlockValidator::SeverityLevel::greaterThanWarnings)) {
         *shouldStop = true;
         return;
     }

@@ -357,11 +357,32 @@ public:
 
     static std::vector<cs::TransactionsPacket> grepNewStatesPacks(const BlockChain& storage, const std::vector<csdb::Transaction>& trxs);
 
+    void addUnusedJavaLib(std::string libname);
+    void removeUnusedJavaLib(std::string libname);
+    std::vector<std::string>* getUnusedJavaLibsList();
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
     }
+
+    bool isBlacklisted(const csdb::Address& abs_addr) const {
+        return (blacklistedContracts_.find(abs_addr) != blacklistedContracts_.cend());
+    }
+
+    void setBlacklisted(const csdb::Address& abs_addr, bool status) {
+        if (status) {
+            if (!isBlacklisted(abs_addr)) {
+                blacklistedContracts_.insert(abs_addr);
+            }
+        }
+        else {
+            if (isBlacklisted(abs_addr)) {
+                blacklistedContracts_.erase(abs_addr);
+            }
+        }
+    }
+
 
     csdb::Transaction get_contract_call(const csdb::Transaction& contract_state) const;
 
@@ -393,7 +414,7 @@ public:
 
     bool is_known_smart_contract(const csdb::Address& addr) const {
         cs::Lock lock(public_access_lock);
-        return in_known_contracts(addr);
+        return in_known_contracts(addr) && !isBlacklisted(addr);
     }
 
     bool is_contract_locked(const csdb::Address& addr) const {
@@ -572,7 +593,7 @@ private:
 
     // last contract's state storage
     std::unordered_map<csdb::Address, StateItem> known_contracts;
-
+    std::unordered_set<csdb::Address> blacklistedContracts_;
     std::unordered_set<csdb::Address> locked_contracts;
 
     // contract replenish transactions stored during reading from DB on stratup
@@ -685,6 +706,7 @@ private:
     using execution_const_iterator = std::vector<ExecutionItem>::const_iterator;
 
     Node* pnode;
+    std::vector<std::string> unusedJavaLibs_;
 
     queue_const_iterator find_in_queue(const SmartContractRef& item) const {
         for (auto it = exe_queue.cbegin(); it != exe_queue.cend(); ++it) {

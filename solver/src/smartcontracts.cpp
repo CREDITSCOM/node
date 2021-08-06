@@ -206,6 +206,8 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
         exec_handler_ptr = connector_ptr->apiExecHandler();
     }
     node_id = id;
+    unusedJavaLibs_.push_back("java.nio");
+    unusedJavaLibs_.push_back("java.io");
 }
 
 /*public*/
@@ -544,7 +546,7 @@ csdb::Transaction SmartContracts::get_transaction(const SmartContractRef& contra
 
 csdb::Transaction SmartContracts::get_deploy_transaction(const csdb::Address& abs_addr) const {
     auto it_state = known_contracts.find(abs_addr);
-    if (it_state != known_contracts.cend()) {
+    if (it_state != known_contracts.cend() && !isBlacklisted(abs_addr)) {
         const auto& contract = it_state->second;
         if (contract.deploy.is_valid()) {
             return contract.deploy;
@@ -3201,5 +3203,21 @@ std::vector<cs::TransactionsPacket> SmartContracts::grepNewStatesPacks(const Blo
     return res;
 }
 
+void SmartContracts::addUnusedJavaLib(std::string libname) {
+    auto it = std::find(unusedJavaLibs_.begin(), unusedJavaLibs_.end(), libname);
+    if (it == unusedJavaLibs_.end()) {
+        unusedJavaLibs_.push_back(libname);
+    }
+}
+void SmartContracts::removeUnusedJavaLib(std::string libname) {
+    auto it = std::find(unusedJavaLibs_.begin(), unusedJavaLibs_.end(), libname);
+    if (it != unusedJavaLibs_.end()) {
+        unusedJavaLibs_.erase(it);
+    }
+}
+
+std::vector<std::string>* SmartContracts::getUnusedJavaLibsList() {
+    return &unusedJavaLibs_;
+}
 }  // namespace cs
 

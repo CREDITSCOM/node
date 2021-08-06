@@ -1083,6 +1083,9 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     auto input_smart = transaction.__isset.smartContract ? transaction.smartContract : SmartContractInvocation{};
     //auto send_transaction = makeTransaction(transaction);
     const auto smart_addr = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
+    if (solver_.smart_contracts().isBlacklisted(smart_addr)) {
+        return;
+    }
     bool deploy = transaction.__isset.smartContract ? is_smart_deploy(input_smart) : false;
 
     std::vector<general::ByteCodeObject> origin_bytecode;
@@ -1105,7 +1108,14 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
         csdb::Address addr = blockchain_.getAddressByType(send_transaction.target(), BlockChain::AddressType::PublicKey);
         csdb::Address deployer = blockchain_.getAddressByType(send_transaction.source(), BlockChain::AddressType::PublicKey);
         auto scKey = cs::SmartContracts::get_valid_smart_address(deployer, uint64_t(send_transaction.innerID()), input_smart.smartContractDeploy);
-        if (scKey != addr) {
+        size_t cnt = 0;
+        auto unusedJavaLibs = solver_.smart_contracts().getUnusedJavaLibsList();
+        for (auto a : *unusedJavaLibs) {
+            if (input_smart.smartContractDeploy.sourceCode.find(a)) {
+                ++cnt;
+            }
+        }
+        if (scKey != addr || cnt > 0) {
             _return.status.code = int8_t(ERROR_CODE);
             const auto data = scKey.public_key().data();
             std::string str = EncodeBase58(data, data + cscrypto::kPublicKeySize);
@@ -1886,6 +1896,9 @@ void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const int64_
 
 void APIHandler::WaitForSmartTransaction(api::TransactionId& _return, const general::Address& smart_public) {
     csdb::Address key = BlockChain::getAddressFromKey(smart_public);
+    if (solver_.smart_contracts().isBlacklisted(key)) {
+        return;
+    }
     decltype(smartLastTrxn_)::LockedType::iterator it;
     auto& entry = [&]() -> decltype(auto) {
         auto smartLastTrxn = lockedReference(this->smartLastTrxn_);
@@ -2127,7 +2140,9 @@ api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& a
     if (addr.is_wallet_id()) {
         abs_addr = blockchain_.getAddressByType(addr, BlockChain::AddressType::PublicKey);
     }
-
+    if (solver_.smart_contracts().isBlacklisted(addr)) {
+        return api::SmartContractInvocation{};
+    }
     const auto deploy = solver_.smart_contracts().get_contract_deploy(addr);
     if (deploy.is_valid()) {
         present = true;
@@ -2138,12 +2153,26 @@ api::SmartContractInvocation APIHandler::getSmartContract(const csdb::Address& a
 }
 
 std::vector<general::ByteCodeObject> APIHandler::getSmartByteCode(const csdb::Address& addr, bool& present) {
+    if (solver_.smart_contracts().isBlacklisted(addr)) {
+        return std::vector<general::ByteCodeObject>{};
+    }
     auto invocation = getSmartContract(addr, present);
     return present ? invocation.smartContractDeploy.byteCodeObjects : std::vector<general::ByteCodeObject>{};
 }
 
 void APIHandler::SmartContractCompile(api::SmartContractCompileResult& _return, const std::string& sourceCode) {
     executor::CompileSourceCodeResult result;
+    size_t cnt = 0ULL;
+    auto unusedJavaLibs = solver_.smart_contracts().getUnusedJavaLibsList();
+    for (auto a : *unusedJavaLibs) {
+        if (sourceCode.find(a)) {
+            ++cnt;
+        }
+    }
+    if (cnt > 0ULL) {
+        return;
+    }
+
     executor_.compileSourceCode(result, sourceCode);
 
     if (result.status.code) {

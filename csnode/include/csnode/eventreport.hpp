@@ -30,6 +30,7 @@ struct Reject {
         // contract related reasons:
         
         MalformedContractAddress,
+        NotPermittedJavaLibs,
         MalformedTransaction,
         ContractClosed,
         NewStateOutOfFee,
