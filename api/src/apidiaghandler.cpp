@@ -303,7 +303,7 @@ namespace api_diag {
         cs::IDataStream stream(msg.data(), msg.size());
         uint16_t order;
         stream >> order;
-        if (order == 2U) {
+ /*       if (order == 2U) {
             cs::Sequence seq;
             cs::PublicKey key;
             stream >> seq >> key;
@@ -328,7 +328,7 @@ namespace api_diag {
 
         if (order == 7U) {
             node_.showDbParams();
-        }
+        }*/
 
         _return.__set_code(kNotImplemented);
         _return.__set_message("Not implemented");

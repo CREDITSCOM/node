@@ -139,7 +139,6 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
     cs::Sequence lastWrittenSequence = blockChain_->getLastSeq();
     const cs::Sequence oldLastWrittenSequence = lastWrittenSequence;
     const std::size_t oldCachedBlocksSize = blockChain_->getCachedBlocksSize();
-    csdebug() << "1: ";
     auto it = neighbours_.begin();
     
     while (it != neighbours_.end()) {
@@ -148,16 +147,18 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
         }
         ++it;
     }
-    csdebug() << "2: ";
     if (it == neighbours_.end()) {
         csdebug() << "Getting block reply from non neighbour";
         return;
     }
-    csdebug() << "3: ";
-    if (targetSequence_ > 0ULL && it->sequences().front() == poolsBlock.front().sequence() && it->sequences().back() == poolsBlock.back().sequence()) {
-        it->resetSequences();
+
+    if (targetSequence_ > 0ULL && !it->sequences().empty()){
+        if (it->sequences().front() == poolsBlock.front().sequence() && it->sequences().back() == poolsBlock.back().sequence()) {
+            csdebug() << "resetting neighbours sequences: " << it->sequences().front() << " .. " << it->sequences().back();
+            it->resetSequences();
+        }
     }
-    csdebug() << "4: ";
+
     for (auto& pool : poolsBlock) {
         const auto sequence = pool.sequence();
         
@@ -182,7 +183,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
             lastWrittenSequence = blockChain_->getLastSeq();
         }
     }
-    csdebug() << "5: ";
+
     if (targetSequence_ != 0ULL) {
         cs::Sequence tSeq = targetSequence_;
         auto el = requestedNodes_.find(sender);
@@ -192,7 +193,7 @@ void cs::PoolSynchronizer::getBlockReply(cs::PoolsBlock&& poolsBlock, const cs::
 
         syncTill(tSeq, sender, false);
     }
-    csdebug() << "6: ";
+
     if (oldCachedBlocksSize != blockChain_->getCachedBlocksSize() || oldLastWrittenSequence != lastWrittenSequence) {
         const bool isFinished = showSyncronizationProgress(lastWrittenSequence);
 

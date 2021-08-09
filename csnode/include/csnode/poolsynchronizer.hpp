@@ -72,7 +72,7 @@ private:
     void sendBlock(const Neighbour& neighbour, const PoolsRequestedSequences& sequeces);
 
     bool getNeededSequences(Neighbour& neighbour);
-    bool cs::PoolSynchronizer::getNeededSequencesOnly(Neighbour& neighbour);
+    bool getNeededSequencesOnly(Neighbour& neighbour);
 
     void checkNeighbourSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);
     void removeExistingSequence(const cs::Sequence sequence, const SequenceRemovalAccuracy accuracy);

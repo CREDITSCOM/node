@@ -203,15 +203,7 @@ bool Node::init() {
     if (!getBlockChain().getIncorrectBlockNumbers()->empty()) {
         tryResolveHashProblems();
     }
-    else {
-        csdebug() << "Loaded blockchaind database is correct\n";
-        uint8_t lKey = requestKBAnswer({ "go as is", "quit" });
-        if (lKey == 1) {}
-        else {
-            stop();
-        }
-    }
-
+ 
     initBootstrapRP(initialConfidants_);
     EventReport::sendRunningStatus(*this, Running::Status::Run);
     globalPublicKey_.fill(0);
@@ -3812,6 +3804,30 @@ void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
     processSpecialInfo(block);
 }
 
+
+bool Node::checkKnownIssues(cs::Sequence seq) {
+    constexpr const uint64_t uuidTestNet = 5283967947175248524ull;
+    constexpr const uint64_t uuidMainNet = 11024959585341937636ull;
+    /*constexpr*/static const std::vector<cs::Sequence> knownIssues = {53885714ULL, 553134820ULL , 55764724ULL, 56100940ULL};
+
+    if (getBlockChain().uuid() == uuidMainNet) {
+        // valid blocks in all cases
+        if (seq <= 49'780'000 || std::find(knownIssues.begin(), knownIssues.end(), seq) != knownIssues.end()) {
+            return true;
+        }
+    }
+    if (getBlockChain().uuid() == uuidTestNet) {
+        // valid blocks in all cases
+        if (seq <= 36'190'000) {
+            return true;
+        }
+    }
+
+    return false;// blocks should be valitated
+
+
+}
+
 void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_failed should be FALSE of the block is ok 
     *check_failed = false;
     const auto seq = block.sequence();
@@ -3824,23 +3840,11 @@ void Node::deepBlockValidation(csdb::Pool block, bool* check_failed) {//check_fa
     auto smartPacks = cs::SmartContracts::grepNewStatesPacks(getBlockChain(), block.transactions());
     auto& smartSignatures = block.smartSignatures();
     size_t smartTrxCounter = 0;
-    
-    constexpr const uint64_t uuidTestNet = 5283967947175248524ull;
-    constexpr const uint64_t uuidMainNet = 11024959585341937636ull;
     /*constexpr*/ const bool collectRejectedInfo = cs::ConfigHolder::instance().config()->isCompatibleVersion();
     const char* kLogPrefix = (collectRejectedInfo ? "NODE> skip block validation: " : "NODE> stop block validation: ");
 
-    if (block.sequence() <= 49'780'000) {
-        if (getBlockChain().uuid() == uuidMainNet) {
-            // valid blocks
-            return;
-        }
-        if (block.sequence() <= 36'190'000) {
-            if (getBlockChain().uuid() == uuidTestNet) {
-                // valid blocks
-                return;
-            }
-        }
+    if(checkKnownIssues(block.sequence())) {
+        return;
     }
 
     if (smartPacks.size() != smartSignatures.size()) {

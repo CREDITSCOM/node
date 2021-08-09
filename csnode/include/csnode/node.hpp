@@ -210,6 +210,7 @@ public:
 
     void specialSync(cs::Sequence finSeq, cs::PublicKey& source);
     void setTop(cs::Sequence finSeq);
+    bool checkKnownIssues(cs::Sequence seq);
 
     void showNeighbours();
     void setIdle();
