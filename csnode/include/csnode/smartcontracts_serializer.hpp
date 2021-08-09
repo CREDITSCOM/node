@@ -63,7 +63,7 @@ private:
         csdb::Transaction deploy{};
         csdb::Transaction execute{};
         std::string state;
-        std::map<std::string, std::map<csdb::Address, std::string>> uses;
+        std::unordered_map<std::string, std::unordered_map<csdb::Address, std::string>> uses;
     };
 
     class ExecutionItem {
