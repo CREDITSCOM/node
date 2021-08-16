@@ -131,9 +131,11 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
     auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
     setWalletTime(wrWall, timeStamp);
 #endif
+/* @TODO optimize checkWallets - takes 96% of time during db loading
     if (!transactions.empty()) {
         csdebug() << "Finish block, total caches: " << data_.multiWallets_->checkWallets().to_string();
     }
+*/
 }
 
 void WalletsCache::Updater::invokeReplenishPayableContract(const csdb::Transaction& transaction, bool inverse /* = false */) {
