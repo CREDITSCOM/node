@@ -112,6 +112,11 @@ int main(int argc, char* argv[]) {
         cslog() << "Build SHA1: " << client::Version::GIT_SHA1;
         cslog() << "Date: " << client::Version::GIT_DATE;
         cslog() << "Subject: " << client::Version::GIT_COMMIT_SUBJECT;
+#ifdef DISABLE_DAEMON
+        cslog() << "Daemon: no";
+#else
+        cslog() << "Daemon: yes";
+#endif
         return EXIT_SUCCESS;
     }
 
