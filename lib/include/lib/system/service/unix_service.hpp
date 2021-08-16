@@ -70,7 +70,9 @@ inline bool Service::run() {
     }
 #endif // !DISABLE_DAEMON
     sigset_t signals;
-    sigfillset(&signals);
+    sigaddset(&signals, SIGTERM);
+    sigaddset(&signals, SIGINT);
+    sigaddset(&signals, SIGHUP);
     if (pthread_sigmask(SIG_BLOCK, &signals, nullptr) != 0) {
         return false;
     }
@@ -112,8 +114,7 @@ inline bool Service::run() {
 }
 
 inline void Service::waitForSignals() {
-    sigset_t allSignals, acceptedSignals;
-    sigfillset(&allSignals);
+    sigset_t acceptedSignals;
     sigaddset(&acceptedSignals, SIGTERM);
     sigaddset(&acceptedSignals, SIGHUP);
     sigaddset(&acceptedSignals, SIGINT);
@@ -131,7 +132,7 @@ inline void Service::waitForSignals() {
     }
 
     while (true) {
-        int rc = sigwait(&allSignals, &receivedSignal);
+        int rc = sigwait(&acceptedSignals, &receivedSignal);
 
         {
             lock_type lock(mux_);
