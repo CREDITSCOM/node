@@ -70,6 +70,7 @@ inline bool Service::run() {
     }
 #endif // !DISABLE_DAEMON
     sigset_t signals;
+    sigemptyset(&signals);
     sigaddset(&signals, SIGTERM);
     sigaddset(&signals, SIGINT);
     sigaddset(&signals, SIGHUP);
@@ -115,6 +116,7 @@ inline bool Service::run() {
 
 inline void Service::waitForSignals() {
     sigset_t acceptedSignals;
+    sigemptyset(&acceptedSignals);
     sigaddset(&acceptedSignals, SIGTERM);
     sigaddset(&acceptedSignals, SIGHUP);
     sigaddset(&acceptedSignals, SIGINT);
