@@ -135,11 +135,6 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
           }
         }
 
-        if (stop_) {
-            cslog() << "Blockchain: stop reading db, stop called";
-            return true;
-        }
-
         totalLoaded = progress.poolsProcessed;
         if (totalLoaded % 1000 == 0) {
             std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << std::flush;
