@@ -138,4 +138,5 @@ target_include_directories(${PROJECT_NAME} PUBLIC
                                          ${CMAKE_BINARY_DIR}/api/api_gen
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lmdbxx
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../client/config)
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../client/config
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../client/include)

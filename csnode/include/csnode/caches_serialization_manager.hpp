@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include <client/params.hpp>
+
 class BlockChain;
 class TokensMaster;
 

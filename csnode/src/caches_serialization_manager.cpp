@@ -82,11 +82,16 @@ struct CachesSerializationManager::Impl {
       std::vector<uint8_t> result;
 
       addHash(result, blockchainSerializer);
+      csdebug() << "Got blockchain hashes";
       addHash(result, smartContractsSerializer);
+      csdebug() << "Got smartcontracts hashes";
       addHash(result, walletsCacheSerializer);
+      csdebug() << "Got walletscache hashes";
       addHash(result, walletsIdsSerializer);
+      csdebug() << "Got walletids hashes";
 #ifdef NODE_API
       addHash(result, tokensMasterSerializer);
+      csdebug() << "Got tokensmaster hashes";
 #endif
 
       return cscrypto::helpers::bin2Hex(

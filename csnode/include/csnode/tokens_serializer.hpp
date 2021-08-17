@@ -9,6 +9,7 @@
 #include <boost/serialization/set.hpp>
 
 #include <cscrypto/cscrypto.hpp>
+#include <client/params.hpp>
 
 #include "address_serializer.hpp"
 
