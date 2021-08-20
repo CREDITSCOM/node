@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 
@@ -9,6 +10,10 @@
 
 #include <csnode/multiwallets.hpp>
 #include <csnode/staking.hpp>
+
+namespace {
+const std::string kTmpDataFile = "wcachedata.tmp";
+} // namespace
 
 namespace cs {
 void WalletsCache_Serializer::bind(WalletsCache& wCache) {
@@ -49,8 +54,8 @@ void WalletsCache_Serializer::save(const std::filesystem::path& rootDir) {
 }
 
 ::cscrypto::Hash WalletsCache_Serializer::hash() {
-    std::ostringstream ofs;
     {
+      std::ofstream ofs(kTmpDataFile);
       boost::archive::text_oarchive oa(
         ofs,
         boost::archive::no_header | boost::archive::no_codecvt
@@ -58,11 +63,9 @@ void WalletsCache_Serializer::save(const std::filesystem::path& rootDir) {
       oa << *smartPayableTransactions_;
       oa << *canceledSmarts_;
       auto& wallets_data = wallets_->get<1>();
-      std::vector<WalletData> tmp_wallets(
-        wallets_data.begin(),
-        wallets_data.end()
-      );
-      oa << tmp_wallets;
+      for (auto& wd : wallets_data) {
+          oa << wd;
+      }
 #ifdef MONITOR_NODE
       oa << *trusted_info_;
 #endif
@@ -76,11 +79,27 @@ void WalletsCache_Serializer::save(const std::filesystem::path& rootDir) {
       );
       oa << tmp_miningDelegations;
     }
-    auto data = ofs.str();
-    return ::cscrypto::calculateHash(
-        (const ::cscrypto::Byte*)data.data(),
-        data.size()
+
+    std::vector<uint8_t> buf(::cscrypto::kHashSize + (1 << 30), 0);
+    {
+      std::ifstream ifs(kTmpDataFile);
+      while (!ifs.eof()) {
+          ifs.read(
+            reinterpret_cast<char*>(buf.data() + ::cscrypto::kHashSize),
+            (1 << 30)
+          );
+          auto hash = ::cscrypto::calculateHash(buf.data(), buf.size());
+          std::copy(hash.begin(), hash.end(), buf.begin());
+      }
+    }
+    std::filesystem::remove(kTmpDataFile);
+    ::cscrypto::Hash result;
+    std::copy(
+      buf.begin(),
+      std::next(buf.begin(), ::cscrypto::kHashSize),
+      result.begin()
     );
+    return result;
 }
 
 void WalletsCache_Serializer::load(const std::filesystem::path& rootDir) {
