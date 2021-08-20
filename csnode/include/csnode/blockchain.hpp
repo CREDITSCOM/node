@@ -479,6 +479,6 @@ private:
 
     friend class cs::BlockChain_Serializer;
 
-    const size_t kQuickStartSaveCachesInterval = 10000;
+    const size_t kQuickStartSaveCachesInterval = 10'000'000;
 };
 #endif  //  BLOCKCHAIN_HPP
