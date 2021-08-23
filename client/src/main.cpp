@@ -67,11 +67,11 @@ int main(int argc, char* argv[]) {
             po::value<std::string>(),
             "install 'credits_node' service with specified working directory")
         (cmdline::argUninstall, "uninstall 'credits_node' service")
+#endif
 #ifndef DISABLE_DAEMON
         (cmdline::argWorkDir, po::value<std::string>(), "set working directory")
 #endif
-#endif
-        ;
+       ;
 
     variables_map vm;
     try {
@@ -174,14 +174,20 @@ int main(int argc, char* argv[]) {
         panic();
     }
 
-#if defined(_WIN32) && !defined(DISABLE_DAEMON) 
+#if !defined(DISABLE_DAEMON) 
     if (vm.count(cmdline::argWorkDir) == 0) {
+        cserror() << "Please pass " << cmdline::argWorkDir << " in daemon mode";
         panic();
     }
     std::string currentDir = vm[cmdline::argWorkDir].as<std::string>();
+#if defined(_WIN32)
     if (!SetCurrentDirectory(currentDir.c_str())) {
+        cserror() << "Cannot set working dir " << currentDir;
         panic();
     }
+#else
+    chdir(currentDir.c_str());
+#endif
 #endif
 
     auto config = Config::read(vm);

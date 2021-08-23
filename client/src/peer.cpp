@@ -1,5 +1,7 @@
 #include <peer.hpp>
 
+#include <fstream>
+
 #include <net/transport.hpp>
 #include <csnode/configholder.hpp>
 #include <cmdlineargs.hpp>
@@ -158,4 +160,30 @@ bool Peer::onContinue() {
     cslog() << "CONTINUE REQUESTED! CALL STOP REQUEST!";
     return onStop();
 }
+
+#ifndef _WIN32
+bool Peer::onFork(const char* serviceName, pid_t pid) {
+    switch (pid) {
+        case 0: // child process
+        {
+            std::string pidFileName = serviceName;
+            if (pidFileName.empty()) {
+                pidFileName = "credits_node";
+            }
+            pidFileName += ".pid";
+            std::ofstream pidFile(pidFileName);
+            if (!pidFile.is_open()) {
+                return false;
+            }
+            pidFile << long(getpid());
+            return pidFile.good();
+        }
+        case -1: // fork error
+            return false;
+        default: // parent process
+            break;
+    }
+    return true;
+}
+#endif
 } // namespace cs

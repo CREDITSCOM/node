@@ -31,6 +31,9 @@ protected:
     bool onStop() override;
     bool onPause() override;
     bool onContinue() override;
+#ifndef _WIN32
+    bool onFork(const char*, pid_t) override;
+#endif
 
 private:
     Service                                service_;

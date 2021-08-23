@@ -10,6 +10,6 @@ struct cmdline {
 #ifdef _WIN32
     static constexpr const char* argInstall   = "install";
     static constexpr const char* argUninstall = "uninstall";
-    static constexpr const char* argWorkDir   = "working_dir";
 #endif
+    static constexpr const char* argWorkDir   = "working_dir";
 };
