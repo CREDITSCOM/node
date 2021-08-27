@@ -77,6 +77,7 @@ add_library(csnode
   include/csnode/smartcontracts_serializer.hpp
   include/csnode/tokens_serializer.hpp
   include/csnode/caches_serialization_manager.hpp
+  include/csnode/serializers_helper.hpp
   src/blockchain.cpp
   src/blockchain_serializer.cpp
   src/node.cpp

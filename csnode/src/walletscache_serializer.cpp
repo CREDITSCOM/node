@@ -10,6 +10,7 @@
 
 #include <csnode/multiwallets.hpp>
 #include <csnode/staking.hpp>
+#include <csnode/serializers_helper.hpp>
 
 namespace {
 const std::string kTmpDataFile = "wcachedata.tmp";
@@ -80,25 +81,8 @@ void WalletsCache_Serializer::save(const std::filesystem::path& rootDir) {
       oa << tmp_miningDelegations;
     }
 
-    std::vector<uint8_t> buf(::cscrypto::kHashSize + (1 << 30), 0);
-    {
-      std::ifstream ifs(kTmpDataFile);
-      while (!ifs.eof()) {
-          ifs.read(
-            reinterpret_cast<char*>(buf.data() + ::cscrypto::kHashSize),
-            (1 << 30)
-          );
-          auto hash = ::cscrypto::calculateHash(buf.data(), buf.size());
-          std::copy(hash.begin(), hash.end(), buf.begin());
-      }
-    }
+    auto result = SerializersHelper::getHashFromFile(kTmpDataFile);
     std::filesystem::remove(kTmpDataFile);
-    ::cscrypto::Hash result;
-    std::copy(
-      buf.begin(),
-      std::next(buf.begin(), ::cscrypto::kHashSize),
-      result.begin()
-    );
     return result;
 }
 
