@@ -9,13 +9,14 @@ namespace cs {
 class SerializersHelper {
 public:
   static ::cscrypto::Hash getHashFromFile(const std::string& fileName) {
-      std::vector<uint8_t> buf(::cscrypto::kHashSize + (1 << 30), 0);
+      static const size_t kBufSize = 1 << 27;
+      std::vector<uint8_t> buf(::cscrypto::kHashSize + kBufSize, 0);
       {
         std::ifstream ifs(fileName);
         while (!ifs.eof()) {
             ifs.read(
               reinterpret_cast<char*>(buf.data() + ::cscrypto::kHashSize),
-              (1 << 30)
+              kBufSize
             );
             auto hash = ::cscrypto::calculateHash(buf.data(), buf.size());
             std::copy(hash.begin(), hash.end(), buf.begin());
