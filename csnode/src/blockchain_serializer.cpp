@@ -6,6 +6,11 @@
 
 #include <csnode/blockchain.hpp>
 #include <csnode/blockchain_serializer.hpp>
+#include <csnode/serializers_helper.hpp>
+
+namespace {
+const std::string& kDataFileName = "blockchain.dat";
+} // namespace
 
 namespace cs {
 
@@ -28,7 +33,7 @@ void BlockChain_Serializer::clear(const std::filesystem::path& rootDir) {
 }
 
 void BlockChain_Serializer::save(const std::filesystem::path& rootDir) {
-    std::ofstream ofs(rootDir / "blockchain.dat");
+    std::ofstream ofs(rootDir / kDataFileName);
     boost::archive::text_oarchive oa(ofs);
     oa << *previousNonEmpty_;
     oa << *lastNonEmptyBlock_;
@@ -38,23 +43,10 @@ void BlockChain_Serializer::save(const std::filesystem::path& rootDir) {
 }
 
 ::cscrypto::Hash BlockChain_Serializer::hash() {
-    std::ostringstream ofs;
-    {
-      boost::archive::text_oarchive oa(
-        ofs,
-        boost::archive::no_header | boost::archive::no_codecvt
-      );
-      oa << *previousNonEmpty_;
-      oa << *lastNonEmptyBlock_;
-      oa << *totalTransactionsCount_;
-      oa << uuid_->load();
-      oa << lastSequence_->load();
-    }
-    auto data = ofs.str();
-    return ::cscrypto::calculateHash(
-      (const ::cscrypto::Byte*)data.data(),
-      data.size()
-    );
+    save(".");
+    auto result = SerializersHelper::getHashFromFile(kDataFileName);
+    std::filesystem::remove(kDataFileName);
+    return result;
 }
 
 void BlockChain_Serializer::load(const std::filesystem::path& rootDir) {
