@@ -4297,12 +4297,18 @@ void Node::sendNecessaryBlockRequest(csdb::PoolHash hash, cs::Sequence seq) {
     sequences.push_back(seq);
     requestedKeys_.clear();
     requestedKeys_ = poolSynchronizer_->getNeededNeighbours(seq);
-    csdebug() << "Request sent to:";
-    for (auto k : requestedKeys_) {
-        BaseFlags flags = static_cast<BaseFlags>(BaseFlags::Signed | BaseFlags::Compressed);
-        transport_->sendDirect(formPacket(flags, MsgTypes::BlockRequest, round, sequences), k);
-        csdebug() << cs::Utils::byteStreamToHex(k);
+    if (!requestedKeys_.empty()) {
+        csdebug() << "Request sent to:";
+        for (auto k : requestedKeys_) {
+            BaseFlags flags = static_cast<BaseFlags>(BaseFlags::Signed | BaseFlags::Compressed);
+            transport_->sendDirect(formPacket(flags, MsgTypes::BlockRequest, round, sequences), k);
+            csdebug() << cs::Utils::byteStreamToHex(k);
+        }
     }
+    else {
+
+    }
+
 }
 
 void Node::getNecessaryBlockRequest(cs::PoolsBlock& pBlock, const cs::PublicKey& sender) {
