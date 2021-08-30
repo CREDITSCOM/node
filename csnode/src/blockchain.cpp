@@ -1457,9 +1457,9 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
                 csdebug() << kLogPrefix << "compromise own last block and cancel store operation";
             }
             else {
-                if (lastSequence + 5ULL < cs::Conveyer::instance().currentRoundNumber()) {
-                    arrangeBlocksInCache();
-                }
+//                if (lastSequence + 5ULL < cs::Conveyer::instance().currentRoundNumber()) {
+//                    arrangeBlocksInCache();
+//                }
                 csdebug() << kLogPrefix << "remove own last block and cancel store operation";
                 removeLastBlock();
             }
