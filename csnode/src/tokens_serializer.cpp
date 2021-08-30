@@ -6,6 +6,11 @@
 
 #include <tokens.hpp>
 #include <csnode/tokens_serializer.hpp>
+#include <csnode/serializers_helper.hpp>
+
+namespace {
+const std::string kDataFileName = "tokens.dat";
+} // namespace
 
 namespace cs {
 void TokensMaster_Serializer::bind(TokensMaster& tokens) {
@@ -20,39 +25,37 @@ void TokensMaster_Serializer::clear(const std::filesystem::path& rootDir) {
 }
 
 void TokensMaster_Serializer::save(const std::filesystem::path& rootDir) {
-    std::ofstream ofs(rootDir / "tokens.dat");
+    std::ofstream ofs(rootDir / kDataFileName);
     boost::archive::text_oarchive oa(ofs);
     oa << *tokens_;
     oa << *holders_;
 }
 
 ::cscrypto::Hash TokensMaster_Serializer::hash() {
-    std::ostringstream ofs;
     {
-      boost::archive::text_oarchive oa(
-        ofs,
-        boost::archive::no_header | boost::archive::no_codecvt
-      );
-      std::map<TokenId, Token> tmp_tokens(
-        tokens_->begin(),
-        tokens_->end()
-      );
-      std::map<HolderKey, std::set<TokenId>> tmp_holders(
-        holders_->begin(),
-        holders_->end()
-      );
-      oa << tmp_tokens;
-      oa << tmp_holders;
+        std::ofstream ofs(kDataFileName);
+        boost::archive::text_oarchive oa(
+          ofs,
+          boost::archive::no_header | boost::archive::no_codecvt
+        );
+        std::map<TokenId, Token> tmp_tokens(
+          tokens_->begin(),
+          tokens_->end()
+        );
+        std::map<HolderKey, std::set<TokenId>> tmp_holders(
+          holders_->begin(),
+          holders_->end()
+        );
+        oa << tmp_tokens;
+        oa << tmp_holders;
     }
-    auto data = ofs.str();
-    return ::cscrypto::calculateHash(
-        (const ::cscrypto::Byte*)data.data(),
-        data.size()
-    );
+    auto result = SerializersHelper::getHashFromFile(kDataFileName);
+    std::filesystem::remove(kDataFileName);
+    return result;
 }
 
 void TokensMaster_Serializer::load(const std::filesystem::path& rootDir) {
-    std::ifstream ifs(rootDir / "tokens.dat");
+    std::ifstream ifs(rootDir / kDataFileName);
     boost::archive::text_iarchive ia(ifs);
     ia >> *tokens_;
     ia >> *holders_;
