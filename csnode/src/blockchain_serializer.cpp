@@ -50,7 +50,7 @@ void BlockChain_Serializer::save(const std::filesystem::path& rootDir) {
 }
 
 void BlockChain_Serializer::load(const std::filesystem::path& rootDir) {
-    std::ifstream ifs(rootDir / "blockchain.dat");
+    std::ifstream ifs(rootDir / kDataFileName);
     boost::archive::text_iarchive ia(ifs);
     ia >> *previousNonEmpty_;
     ia >> *lastNonEmptyBlock_;
