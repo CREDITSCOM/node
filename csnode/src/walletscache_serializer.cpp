@@ -14,6 +14,7 @@
 
 namespace {
 const std::string kTmpDataFile = "wcachedata.tmp";
+const std::string kDataFileName = "walletscache.dat";
 } // namespace
 
 namespace cs {
@@ -42,7 +43,7 @@ void WalletsCache_Serializer::clear(const std::filesystem::path& rootDir) {
 }
 
 void WalletsCache_Serializer::save(const std::filesystem::path& rootDir) {
-    std::ofstream ofs(rootDir / "walletscache.dat");
+    std::ofstream ofs(rootDir / kDataFileName);
     boost::archive::text_oarchive oa(ofs);
     oa << *smartPayableTransactions_;
     oa << *canceledSmarts_;
@@ -87,7 +88,7 @@ void WalletsCache_Serializer::save(const std::filesystem::path& rootDir) {
 }
 
 void WalletsCache_Serializer::load(const std::filesystem::path& rootDir) {
-    std::ifstream ifs(rootDir / "walletscache.dat");
+    std::ifstream ifs(rootDir / kDataFileName);
     boost::archive::text_iarchive ia(ifs);
     ia >> *smartPayableTransactions_;
     ia >> *canceledSmarts_;
