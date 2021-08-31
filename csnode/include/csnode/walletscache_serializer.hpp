@@ -196,11 +196,11 @@ private:
         indexed_by<
             hashed_unique<member<WalletData, PublicKey, &WalletData::key_>>,
             ordered_non_unique<member<WalletData, Amount, &WalletData::balance_>, std::greater<Amount>>,
-            ordered_non_unique<member<WalletData, uint64_t, &WalletData::transNum_>, std::greater<uint64_t>>
+            ordered_non_unique<member<WalletData, uint64_t, &WalletData::transNum_>, std::greater<uint64_t>>,
 #ifdef MONITOR_NODE
-            ,
-            ordered_non_unique<member<WalletData, uint64_t, &WalletData::createTime_>, std::greater<uint64_t>>
+            ordered_non_unique<member<WalletData, uint64_t, &WalletData::createTime_>, std::greater<uint64_t>>,
 #endif
+            ordered_unique<member<WalletData, PublicKey, &WalletData::key_>>
         >
     >;
 

@@ -98,16 +98,16 @@ private:
     void onWalletCacheUpdated(const InternalData& data);
 
     using Container = boost::multi_index_container<InternalData,
-                        indexed_by<
-                            hashed_unique<member<InternalData, PublicKey, &InternalData::key_>>,
-                            ordered_non_unique<member<InternalData, csdb::Amount, &InternalData::balance_>, std::greater<csdb::Amount>>,
-                            ordered_non_unique<member<InternalData, uint64_t, &InternalData::transNum_>, std::greater<uint64_t>>
+        indexed_by<
+            hashed_unique<member<InternalData, PublicKey, &InternalData::key_>>,
+            ordered_non_unique<member<InternalData, csdb::Amount, &InternalData::balance_>, std::greater<csdb::Amount>>,
+            ordered_non_unique<member<InternalData, uint64_t, &InternalData::transNum_>, std::greater<uint64_t>>,
 #ifdef MONITOR_NODE
-                            ,
-                            ordered_non_unique<member<InternalData, uint64_t, &InternalData::createTime_>, std::greater<uint64_t>>
+            ordered_non_unique<member<InternalData, uint64_t, &InternalData::createTime_>, std::greater<uint64_t>>,
 #endif
-                        >
-                      >;
+            ordered_unique<member<InternalData, PublicKey, &InternalData::key_>>
+        >
+    >;
 
     mutable std::mutex mutex_;
     Container indexes_;

@@ -64,7 +64,13 @@ void WalletsCache_Serializer::save(const std::filesystem::path& rootDir) {
       );
       oa << *smartPayableTransactions_;
       oa << *canceledSmarts_;
-      auto& wallets_data = wallets_->get<1>();
+      const int sortedByPublicKeyIndex =
+#ifdef MONITOR_NODE
+      4;
+#else
+      3;
+#endif
+      auto& wallets_data = wallets_->get<sortedByPublicKeyIndex>();
       for (auto& wd : wallets_data) {
           oa << wd;
       }
