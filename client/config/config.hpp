@@ -258,6 +258,10 @@ public:
         return traverseNAT_;
     }
 
+    bool daemonMode() const {
+        return daemonMode_;
+    }
+
     uint64_t newBlockchainTopSeq() const {
         return newBlockchainTopSeq_;
     }
@@ -359,6 +363,8 @@ private:
     bool compatibleVersion_ = true;
     bool traverseNAT_ = true;
     uint64_t newBlockchainTopSeq_;
+
+    bool daemonMode_ = false;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
     uint64_t roundElapseTime_ = DEFAULT_ROUND_ELAPSE_TIME;
