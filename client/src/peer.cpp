@@ -75,7 +75,7 @@ Peer::Peer(
     Config& config,
     boost::program_options::variables_map& vm
 )
-    : service_(static_cast<ServiceOwner&>(*this), serviceName)
+    : service_(static_cast<ServiceOwner&>(*this), serviceName, config.daemonMode())
     , config_(config)
     , vm_(vm) {}
 
@@ -91,15 +91,17 @@ int Peer::executeProtocol() {
 }
 
 bool Peer::onInit(const char*) {
-#if defined(WIN32) && defined(DISABLE_DAEMON)
-    if (!SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
-        cslog() << "\nERROR: Could not set control handler";
-        return false;
-    }
+    if (config_.daemonMode() == false) {
+#if defined(WIN32)
+        if (!SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
+            cslog() << "\nERROR: Could not set control handler";
+            return false;
+        }
 #ifndef _DEBUG
-    mouseSelectionDisable();
+        mouseSelectionDisable();
 #endif // !_DEBUG
-#endif  // WIN32 && DISABLE_DAEMON
+#endif // WIN32
+    }
 
 #if BUILD_WITH_GPROF
     signal(SIGUSR1, sigUsr1Handler);
@@ -113,7 +115,6 @@ bool Peer::onInit(const char*) {
         &cs::ConfigHolder::instance(),
         &cs::ConfigHolder::onConfigChanged
     );
-
 
     node_ = std::make_unique<Node>(*observer_);
     if (!node_->isGood()) {

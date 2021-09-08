@@ -14,7 +14,11 @@ namespace cs {
 
 class Service {
 public:
-    Service(ServiceOwner&, const char* serviceName = nullptr);
+    Service(
+        ServiceOwner&,
+        const char* serviceName = nullptr,
+        bool daemonMode = false
+    );
 
     bool run();
 
@@ -43,6 +47,7 @@ private:
 
     ServiceOwner& owner_;
     const char* serviceName_;
+    const bool daemonMode_;
 
     thread_type signalThread_;
     thread_type workerThread_;
@@ -53,27 +58,29 @@ private:
     ThreadsStatus threadsStatus_;
 };
 
-inline Service::Service(ServiceOwner& owner, const char* serviceName)
-    : owner_(owner), serviceName_(serviceName) {}
+inline Service::Service(ServiceOwner& owner, const char* serviceName, bool daemonMode)
+    : owner_(owner), serviceName_(serviceName), daemonMode_(daemonMode) {}
 
 inline bool Service::run() {
-#ifndef DISABLE_DAEMON
-    auto pid = ::fork();
-    switch (pid) {
-        // child
-        case 0 :
-            if (!owner_.onFork(serviceName_, pid)) return false;
-            break;
-        // exit from parent or error
-        default :
-            return owner_.onFork(serviceName_, pid);
+    if (daemonMode_) {
+        auto pid = ::fork();
+        switch (pid) {
+            // child
+            case 0 :
+                if (!owner_.onFork(serviceName_, pid)) return false;
+                break;
+            // exit from parent or error
+            default :
+                return owner_.onFork(serviceName_, pid);
+        }
     }
-#endif // !DISABLE_DAEMON
+
     sigset_t signals;
     sigemptyset(&signals);
     sigaddset(&signals, SIGTERM);
     sigaddset(&signals, SIGINT);
     sigaddset(&signals, SIGHUP);
+
     if (pthread_sigmask(SIG_BLOCK, &signals, nullptr) != 0) {
         return false;
     }
@@ -81,12 +88,12 @@ inline bool Service::run() {
     bool result = true;
 
     try {
-#ifndef DISABLE_DAEMON
+        if (daemonMode_) {
             setsid();
-//          uncomment if necessary 
-//          chdir("/");
+            // uncomment if necessary 
+            // chdir("/");
             closeIO();
-#endif // !DISABLE_DAEMON
+        }
         if (!startSignalThread()) {
             result = false;
         }

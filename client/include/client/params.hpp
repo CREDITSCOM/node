@@ -11,9 +11,6 @@
 #define NODE_API
 #define AJAX_IFACE
 
-// uncomment this define if not service build is needed
-#define DISABLE_DAEMON
-
 #define AJAX_CONCURRENT_API_CLIENTS INT64_MAX
 #define BINARY_TCP_API
 #define BINARY_TCP_EXECAPI

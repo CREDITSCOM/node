@@ -43,9 +43,7 @@ void panic() {
 int main(int argc, char* argv[]) {
     const char* kDeprecatedDBPath = "test_db";
     const char* kServiceName = "credits_node";
-#ifdef DISABLE_DAEMON
     std::ios_base::sync_with_stdio(false);
-#endif // DISABLE_DAEMON
 
     using namespace boost::program_options;
     options_description desc("Allowed options");
@@ -68,10 +66,7 @@ int main(int argc, char* argv[]) {
             "install 'credits_node' service with specified working directory")
         (cmdline::argUninstall, "uninstall 'credits_node' service")
 #endif
-#ifndef DISABLE_DAEMON
-        (cmdline::argWorkDir, po::value<std::string>(), "set working directory")
-#endif
-       ;
+        (cmdline::argWorkDir, po::value<std::string>(), "set working directory");
 
     variables_map vm;
     try {
@@ -112,11 +107,6 @@ int main(int argc, char* argv[]) {
         cslog() << "Build SHA1: " << client::Version::GIT_SHA1;
         cslog() << "Date: " << client::Version::GIT_DATE;
         cslog() << "Subject: " << client::Version::GIT_COMMIT_SUBJECT;
-#ifdef DISABLE_DAEMON
-        cslog() << "Daemon: no";
-#else
-        cslog() << "Daemon: yes";
-#endif
         return EXIT_SUCCESS;
     }
 
@@ -174,21 +164,17 @@ int main(int argc, char* argv[]) {
         panic();
     }
 
-#if !defined(DISABLE_DAEMON) 
-    if (vm.count(cmdline::argWorkDir) == 0) {
-        cserror() << "Please pass " << cmdline::argWorkDir << " in daemon mode";
-        panic();
-    }
-    std::string currentDir = vm[cmdline::argWorkDir].as<std::string>();
+    if (vm.count(cmdline::argWorkDir) != 0) {
+        std::string currentDir = vm[cmdline::argWorkDir].as<std::string>();
 #if defined(_WIN32)
-    if (!SetCurrentDirectory(currentDir.c_str())) {
-        cserror() << "Cannot set working dir " << currentDir;
-        panic();
-    }
+        if (!SetCurrentDirectory(currentDir.c_str())) {
+            cserror() << "Cannot set working dir " << currentDir;
+            panic();
+        }
 #else
-    chdir(currentDir.c_str());
+        chdir(currentDir.c_str());
 #endif
-#endif
+    }
 
     auto config = Config::read(vm);
 

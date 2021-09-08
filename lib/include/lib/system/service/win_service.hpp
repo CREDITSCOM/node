@@ -74,7 +74,11 @@ private:
 
 class Service {
 public:
-    Service(ServiceOwner&, const char* serviceName);
+    Service(
+        ServiceOwner&,
+        const char* serviceName = nullptr,
+        bool daemonMode = false
+    );
 
     bool run();
 
@@ -109,32 +113,35 @@ private:
 
     ServiceOwner& owner_;
     const char* serviceName_;
+    const bool daemonMode_;
     WinEvent event_;
     SERVICE_STATUS status_{};
     SERVICE_STATUS_HANDLE statusHandler_;
 };
 
-inline Service::Service(ServiceOwner& owner, const char* serviceName)
-    : owner_(owner), serviceName_(serviceName), statusHandler_(nullptr) {}
+inline Service::Service(ServiceOwner& owner, const char* serviceName, bool daemonMode)
+    : owner_(owner), serviceName_(serviceName), daemonMode_(daemonMode), statusHandler_(nullptr) {}
 
 inline bool Service::run() {
     if (serviceName_ == nullptr) {
         return false;
     }
-#ifdef DISABLE_DAEMON
-    try {
-        if (!owner_.onInit(serviceName_)) {
-            return false;
+
+    if (daemonMode_ == false) {
+        try {
+            if (!owner_.onInit(serviceName_)) {
+                return false;
+            }
+            if (!owner_.onRun(serviceName_)) {
+                return false;
+            }
         }
-        if (!owner_.onRun(serviceName_)) {
-            return false;
+        catch (...) {
+            return owner_.onException();
         }
+        return true;
     }
-    catch (...) {
-        return owner_.onException();
-    }
-    return true;
-#endif // DISABLE_DAEMON
+
     SERVICE_TABLE_ENTRYA serviceTable[2];
     serviceTable[0].lpServiceName = const_cast<char*>(serviceName_);
     serviceTable[0].lpServiceProc = &Service::serviceMain;
