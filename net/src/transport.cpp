@@ -188,7 +188,7 @@ void Transport::sendDirect(Packet&& pack, const cs::PublicKey& receiver) {
 }
 
 void Transport::ban(const cs::PublicKey& key) {
-    host_.Ban(toNodeId(key));
+    //host_.Ban(toNodeId(key));
 }
 
 void Transport::revertBan(const cs::PublicKey& key) {

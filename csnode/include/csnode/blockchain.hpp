@@ -39,6 +39,7 @@ class TransactionsPacket;
 
 /** @brief   The synchronized block signal emits when block is trying to be stored */
 using TryToStoreBlockSignal = cs::Signal<void(const csdb::Pool&, bool*)>;
+using NeedStopSignal = cs::Signal<void(bool)>;
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
 using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using OrderNecessaryBlockSignal = cs::Signal<void(csdb::PoolHash, cs::Sequence)>;
@@ -152,7 +153,7 @@ public:
     void addNewWalletsToPool(csdb::Pool& pool);
     void updateLastTransactions(const std::vector<std::pair<cs::PublicKey, csdb::TransactionID>>&);
 
-    bool checkForConsistency(csdb::Pool & pool);
+    bool checkForConsistency(csdb::Pool & pool, bool isNew);
 
     // storage adaptor
     void close();
@@ -240,6 +241,8 @@ public signals:
 
     /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
     cs::StoreBlockSignal storeBlockEvent;
+
+    cs::NeedStopSignal stopNode;
 
     /** @brief The event storing synchronized block. Raised when the next incoming block is trying to be stored into chain */
     cs::TryToStoreBlockSignal tryToStoreBlockEvent;

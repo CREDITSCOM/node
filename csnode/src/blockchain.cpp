@@ -1021,7 +1021,7 @@ bool BlockChain::findAddrByWalletId(const WalletId id, csdb::Address& addr) cons
     return true;
 }
 
-bool BlockChain::checkForConsistency(csdb::Pool& pool) {
+bool BlockChain::checkForConsistency(csdb::Pool& pool, bool isNew) {
     if (pool.sequence() == 0) {
         return true;
     }
@@ -1032,7 +1032,7 @@ bool BlockChain::checkForConsistency(csdb::Pool& pool) {
         return false;
     }
     csdb::Pool tmp = pool.clone();
-    if (!tmp.compose()) {
+    if (isNew && !tmp.compose()) {
         csinfo() << kLogPrefix << "Check for consistency: can't compose block";
         return false;
     }
@@ -1044,7 +1044,11 @@ bool BlockChain::checkForConsistency(csdb::Pool& pool) {
         return false;
     }
 
-    if (tmpCopy.previous_hash() != getLastHash()) {
+    if (isNew && tmpCopy.previous_hash() != getLastHash()) {
+        csinfo() << kLogPrefix << "Check for consistency: block hash in pool #" << pool.sequence() << " doesn't correspond to the last one";
+        return false;
+    }
+    if (!isNew && tmpCopy.previous_hash() != loadBlock(tmpCopy.sequence() - 1ULL).hash()) {
         csinfo() << kLogPrefix << "Check for consistency: block hash in pool #" << pool.sequence() << " doesn't correspond to the last one";
         return false;
     }
@@ -1128,8 +1132,13 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     }
 
     pool.set_previous_hash(getLastHash());
-    if (!checkForConsistency(pool)) {
+    if (!checkForConsistency(pool, true)) {
         csdebug() << kLogPrefix << "Pool #" << pool_seq << " failed the consistency check";
+        return std::nullopt;
+    }
+    if (!checkForConsistency(deferredBlock_, false)) {
+        csdebug() << kLogPrefix << "Pool #" << deferredBlock_.sequence() << " failed the consistency check";
+        emit stopNode(true);
         return std::nullopt;
     }
 
@@ -1155,6 +1164,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
             }
             else {
                 csmeta(cserror) << kLogPrefix << "Couldn't save block: " << deferredBlock_.sequence();
+                return std::nullopt;
             }
         }
     }
@@ -1180,7 +1190,9 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
             lastConfidants = loadBlock(pool_seq - 1).confidants();
         }
     }
-
+    //if the block is not applied here, but the deferred block is already saved 
+    //we have situation when we try to save the deferred block anther time
+    //the pool counter was not incremented and we have to save this block again
     if (finalizeBlock(pool, isTrusted, lastConfidants)) {
         csdebug() << kLogPrefix << "The block is correct";
         if (!applyBlockToCaches(pool)) {
@@ -1189,11 +1201,11 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         }
     }
     else {
-        csdebug() << kLogPrefix << "the signatures of the block are incorrect";
+        csdebug() << kLogPrefix << "the signatures of the block are insufficient or incorrect";
         setBlocksToBeRemoved(1U);
         return std::nullopt;
     }
-
+    //========================================
     {
         cs::Lock lock(dbLock_);
 
@@ -1364,7 +1376,7 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
     std::copy(bytes.cbegin(), bytes.cend(), tempHash.data());
     if (NodeUtils::checkGroupSignature(tmp_clone.confidants(), rPackage.poolMetaInfo().realTrustedMask, rPackage.poolSignatures(), tempHash)) {
         csmeta(csdebug) << kLogPrefix << "The number of signatures is sufficient and all of them are OK!";
-        if (!checkForConsistency(tmp_clone)) {
+        if (!checkForConsistency(tmp_clone, true)) {
             csdebug() << kLogPrefix << "Replace the deferred block #" << tmp_clone.sequence() << ": consistency check failed";
             return false;
         }
@@ -1497,7 +1509,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
 
         // no need to perform removeLastBlock() as we've updated only wallet ids
         removeWalletsInPoolFromCache(pool);
-
+        //here the problem could arise if deferred the block is saved to db
         if (lastSequence_ == poolSequence) {
             --lastSequence_;
             deferredBlock_ = csdb::Pool{};

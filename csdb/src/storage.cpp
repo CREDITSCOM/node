@@ -529,7 +529,7 @@ bool Storage::pool_save(Pool pool) {
     const PoolHash hash = pool.hash();
 
     if (d->db->get(hash.to_binary())) {
-        d->set_last_error(InvalidParameter, "%s: Pool already pressent [hash: %s]", funcName(), hash.to_string().c_str());
+        d->set_last_error(InvalidParameter, "%s: Pool already present [hash: %s]", funcName(), hash.to_string().c_str());
         return false;
     }
 

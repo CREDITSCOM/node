@@ -102,6 +102,7 @@ Node::Node(cs::config::Observer& observer)
 
     cs::Connector::connect(&blockChain_.alarmBadBlock, this, &Node::sendBlockAlarmSignal);
     cs::Connector::connect(&blockChain_.tryToStoreBlockEvent, this, &Node::deepBlockValidation);
+    cs::Connector::connect(&blockChain_.stopNode, this, &Node::stop);
     cs::Connector::connect(&blockChain_.storeBlockEvent, this, &Node::processSpecialInfo);
     cs::Connector::connect(&blockChain_.uncertainBlock, this, &Node::sendBlockRequestToConfidants);
     cs::Connector::connect(&blockChain_.orderNecessaryBlock, this, &Node::sendNecessaryBlockRequest);
