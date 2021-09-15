@@ -290,6 +290,7 @@ public:
 
     csdb::Pool loadBlock(const csdb::PoolHash&) const;
     csdb::Pool loadBlock(const cs::Sequence sequence) const;
+    csdb::Pool loadBlockForSync(const cs::Sequence sequence) const;
     csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
     csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
     void iterateOverWallets(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::WalletData&)>);

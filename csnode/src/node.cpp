@@ -1367,7 +1367,7 @@ void Node::getBlockRequest(const uint8_t* data, const size_t size, const cs::Pub
     };
 
     for (auto& sequence : sequences) {
-        csdb::Pool pool = blockChain_.loadBlock(sequence);
+        csdb::Pool pool = blockChain_.loadBlockForSync(sequence);
 
         if (pool.is_valid()) {
             poolsBlock.push_back(std::move(pool));

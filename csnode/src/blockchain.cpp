@@ -314,6 +314,15 @@ csdb::Pool BlockChain::loadBlock(const cs::Sequence sequence) const {
     return storage_.pool_load(sequence);
 }
 
+csdb::Pool BlockChain::loadBlockForSync(const cs::Sequence sequence) const {
+    if (uncertainLastBlockFlag_ && uncertainSequence_ == sequence) {
+        return csdb::Pool{};
+    }
+    else {
+        return loadBlock(sequence);
+    }
+}
+
 csdb::Pool BlockChain::loadBlockMeta(const csdb::PoolHash& ph, size_t& cnt) const {
     std::lock_guard lock(dbLock_);
 
@@ -1138,12 +1147,42 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     }
     if (!checkForConsistency(deferredBlock_, false)) {
         csdebug() << kLogPrefix << "Pool #" << deferredBlock_.sequence() << " failed the consistency check";
-        emit stopNode(true);
+        //emit stopNode(true);
         return std::nullopt;
     }
 
     constexpr cs::Sequence NoSequence = std::numeric_limits<cs::Sequence>::max();
     cs::Sequence flushed_block_seq = NoSequence;
+
+    //if the block is not applied here, but the deferred block is already saved 
+//we have situation when we try to save the deferred block anther time
+//the pool counter was not incremented and we have to save this block again
+    cs::PublicKeys lastConfidants;
+    if (pool_seq > 1) {
+
+        cs::Lock lock(dbLock_);
+
+        if (deferredBlock_.sequence() + 1 == pool_seq) {
+            lastConfidants = deferredBlock_.confidants();
+        }
+        else {
+            lastConfidants = loadBlock(pool_seq - 1).confidants();
+        }
+    }
+
+    if (finalizeBlock(pool, isTrusted, lastConfidants)) {
+        csdebug() << kLogPrefix << "The block is correct";
+        if (!applyBlockToCaches(pool)) {
+            csdebug() << kLogPrefix << "failed to apply block to caches";
+            return std::nullopt;
+        }
+    }
+    else {
+        csdebug() << kLogPrefix << "the signatures of the block are insufficient or incorrect";
+        setBlocksToBeRemoved(1U);
+        return std::nullopt;
+    }
+    //========================================
 
     {
         cs::Lock lock(dbLock_);
@@ -1177,35 +1216,6 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
     }
 
 
-
-    cs::PublicKeys lastConfidants;
-    if (pool_seq > 1) {
-
-        cs::Lock lock(dbLock_);
-
-        if (deferredBlock_.sequence() + 1 == pool_seq) {
-            lastConfidants = deferredBlock_.confidants();
-        }
-        else {
-            lastConfidants = loadBlock(pool_seq - 1).confidants();
-        }
-    }
-    //if the block is not applied here, but the deferred block is already saved 
-    //we have situation when we try to save the deferred block anther time
-    //the pool counter was not incremented and we have to save this block again
-    if (finalizeBlock(pool, isTrusted, lastConfidants)) {
-        csdebug() << kLogPrefix << "The block is correct";
-        if (!applyBlockToCaches(pool)) {
-            csdebug() << kLogPrefix << "failed to apply block to caches";
-            return std::nullopt;
-        }
-    }
-    else {
-        csdebug() << kLogPrefix << "the signatures of the block are insufficient or incorrect";
-        setBlocksToBeRemoved(1U);
-        return std::nullopt;
-    }
-    //========================================
     {
         cs::Lock lock(dbLock_);
 
