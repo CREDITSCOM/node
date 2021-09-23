@@ -57,6 +57,7 @@ const std::string PARAM_NAME_SYNC_ON = "sync_on";
 const std::string PARAM_NAME_MAX_UNCORRECTED_BLOCK = "max_uncorrected_block";
 const std::string PARAM_NAME_GENERATE_FORK = "generate_fork";
 const std::string PARAM_NAME_IDLE_MODE = "idle_mode";
+const std::string PARAM_NAME_DAEMON_MODE = "daemon_mode";
 
 const std::string PARAM_NAME_CONVEYER_MAX_PACKET_LIFETIME = "max_packet_life_time";
 
@@ -751,6 +752,10 @@ Config Config::readFromFile(const std::string& fileName) {
 
         if (params.count(PARAM_NAME_TRAVERSE_NAT)) {
             result.traverseNAT_ = (params.get<std::string>(PARAM_NAME_TRAVERSE_NAT) == "true");
+        }
+
+        if (params.count(PARAM_NAME_DAEMON_MODE)) {
+            result.daemonMode_ = (params.get<std::string>(PARAM_NAME_DAEMON_MODE) == "true");
         }
 
         result.minNeighbours_ = params.count(PARAM_NAME_MIN_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MIN_NEIGHBOURS) : DEFAULT_MIN_NEIGHBOURS;

@@ -20,7 +20,7 @@ uint64_t Consensus::StageOneMaximumSize = 36000;
 
 /** @brief   Maximum time in msec to wait new round after consensus achieved, after that waiting trusted nodes
  * activates */
-const unsigned int Consensus::PostConsensusTimeout = 60000;
+const unsigned int Consensus::PostConsensusTimeout = 10000;
 
 /** @brief   Maximum round duration when the transaction input is allowed - used to avoid BlackList */
 const size_t Consensus::MaxRoundDuration = 300000;
@@ -114,3 +114,16 @@ const bool Consensus::DisableTrustedRequestNextRound = false;
 /** The max contract's state size in bytes to synchronize it between node via conveyer. Otherwise, every node must get new state
 itself or make individual request to dedicated trusted nodes*/
 const size_t Consensus::MaxContractStateSizeToSync = 8192;
+
+csdb::Amount Consensus::blockReward = csdb::Amount{ 0 };
+
+csdb::Amount Consensus::miningCoefficient = csdb::Amount{ 0 };
+
+//Attention! before turning it on you should add a table of rounds where staking is on 
+//to ensure that when the blocks will be rescanned from beginning the walletscache 
+//results to the synchronized with other nodes values
+bool Consensus::stakingOn = false; 
+
+bool Consensus::miningOn = false;
+
+cs::RoundNumber Consensus::syncroChangeRound = 8446744073709551615;

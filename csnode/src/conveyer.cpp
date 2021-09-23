@@ -701,10 +701,15 @@ void cs::ConveyerBase::onRoundChanged(cs::RoundNumber round) {
     }
 }
 
+void cs::ConveyerBase::addExternalPacketToMeta(cs::TransactionsPacket&& packet) {
+    addPacketToMeta(packet);
+}
+
 void cs::ConveyerBase::addPacketToMeta(cs::TransactionsPacket& packet) {
     auto hash = packet.hash();
 
     if (!isPacketAtCache(packet)) {
+        csdebug() << "Adding packet with hash: " << hash.toString();
         pimpl_->packetsTable.emplace(std::move(hash), std::move(packet));
     }
     else {
@@ -737,6 +742,25 @@ std::optional<cs::TransactionsPacket> cs::ConveyerBase::findPacketAtMeta(const c
 
     return std::nullopt;
 }
+
+bool cs::ConveyerBase::isPacketAtMeta(const cs::TransactionsPacketHash& hash) const {
+    auto iter = pimpl_->packetsTable.find(hash);
+
+    if (iter != pimpl_->packetsTable.end()) {
+        return true;
+    }
+
+    for (const auto& element : pimpl_->metaStorage) {
+        auto metaIter = element.meta.hashTable.find(hash);
+
+        if (metaIter != element.meta.hashTable.end()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 
 void cs::ConveyerBase::removeHashesFromTable(const cs::PacketsHashes& hashes) {
     for (const auto& hash : hashes) {

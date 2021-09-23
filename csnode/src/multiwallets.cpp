@@ -1,4 +1,8 @@
 #include "csnode/multiwallets.hpp"
+#include "lib/system/common.hpp"
+#include "csnode/nodecore.hpp"
+#include <lib/system/logger.hpp>
+#include <lib/system/utils.hpp>
 
 bool cs::MultiWallets::contains(const cs::PublicKey& key) const {
     cs::Lock lock(mutex_);
@@ -16,14 +20,14 @@ csdb::Amount cs::MultiWallets::balance(const cs::PublicKey& key) const {
     cs::Lock lock(mutex_);
 
     auto& keys = indexes_.get<Tags::ByPublicKey>();
-    return keys.find(key)->balance;
+    return keys.find(key)->balance_;
 }
 
 uint64_t cs::MultiWallets::transactionsCount(const cs::PublicKey& key) const {
     cs::Lock lock(mutex_);
 
     auto& keys = indexes_.get<Tags::ByPublicKey>();
-    return keys.find(key)->transactionsCount;
+    return keys.find(key)->transNum_;
 }
 
 #ifdef MONITOR_NODE
@@ -31,38 +35,55 @@ uint64_t cs::MultiWallets::createTime(const cs::PublicKey& key) const {
     cs::Lock lock(mutex_);
 
     auto& keys = indexes_.get<Tags::ByPublicKey>();
-    return keys.find(key)->createTime;
+    return keys.find(key)->createTime_;
 }
 #endif
 
-void cs::MultiWallets::onDbReadFinished(const std::unordered_map<cs::PublicKey, cs::WalletsCache::WalletData>& data) {
-    cs::Lock lock(mutex_);
+bool cs::MultiWallets::getWalletData(cs::MultiWallets::InternalData& data) const {
+  cs::Lock lock(mutex_);
 
-    for (const auto& [key, value] : data) {
-        auto mapped = map(key, value);
-        indexes_.insert(std::move(mapped));
-    }
+  auto& keys = indexes_.get<Tags::ByPublicKey>();
+
+  auto it = keys.find(data.key_);
+  if (it == keys.end()) {
+    return false;
+  }
+  
+  data = *it;
+  return true;
 }
 
-void cs::MultiWallets::onWalletCacheUpdated(const cs::PublicKey& key, const cs::WalletsCache::WalletData& data) {
-    auto mapped = map(key, data);
-
+void cs::MultiWallets::onWalletCacheUpdated(const cs::WalletsCache::WalletData& data) {
+    //csdebug() << __func__;
     cs::Lock lock(mutex_);
     auto& byKey = indexes_.get<Tags::ByPublicKey>();
-
-    if (auto iter = byKey.find(key); iter != byKey.end()) {
-        byKey.replace(iter, mapped);
+    csdebug() << "Wallet updated: " 
+	    << cs::Utils::byteStreamToHex(data.key_)
+	    << ", balance: " << data.balance_.to_string() 
+	    << ", delegated: " << data.delegated_.to_string(); 
+    if (auto iter = byKey.find(data.key_); iter != byKey.end()) {
+        byKey.replace(iter, data);
     }
     else {
-        indexes_.insert(mapped);
+        indexes_.insert(data);
     }
 }
 
-cs::MultiWallets::InternalData cs::MultiWallets::map(const cs::PublicKey& key, const cs::WalletsCache::WalletData& data) {
-    InternalData mapped { key, data.balance_, data.transNum_
-#ifdef MONITOR_NODE
-                                , data.createTime_
-#endif
-                        };
-    return mapped;
+void cs::MultiWallets::iterate(std::function<bool(const PublicKey& key, const InternalData& data)> func) {
+    cs::Lock lock(mutex_);
+    for (auto it = indexes_.begin(); it != indexes_.end(); ++it) {
+        if (!func(it->key_, *it)) {
+            break;
+        }
+    }
+}
+
+csdb::Amount cs::MultiWallets::checkWallets() {
+    cs::Lock lock(mutex_);
+    csdb::Amount total{ 0 };
+    for (auto it = indexes_.begin(); it != indexes_.end(); ++it) {
+        total += it->balance_;
+        total += it->delegated_;
+    }
+    return total;
 }

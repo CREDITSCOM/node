@@ -34,7 +34,7 @@ const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
 const uint32_t DEFAULT_STORE_BLOCK_ELAPSE_TIME = 1000 * 40; // ms
 
-const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 10; // rounds
+const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 30; // rounds
 
 using Port = short unsigned;
 
@@ -276,6 +276,10 @@ public:
         return traverseNAT_;
     }
 
+    bool daemonMode() const {
+        return daemonMode_;
+    }
+
     uint64_t newBlockchainTopSeq() const {
         return newBlockchainTopSeq_;
     }
@@ -310,6 +314,10 @@ public:
     const DbSQLData& getDbSQLData() const {
         return dbSQLData_;
     }
+
+    bool isStakinOn(cs::RoundNumber round);
+    bool isMiningOn(cs::RoundNumber round);
+
 
 private:
     static Config readFromFile(const std::string& fileName);
@@ -377,6 +385,8 @@ private:
     bool generateFork_ = false;
     bool idleMode_ = false;
 
+    bool daemonMode_ = false;
+
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
     uint64_t roundElapseTime_ = DEFAULT_ROUND_ELAPSE_TIME;
     uint64_t storeBlockElapseTime_ = DEFAULT_STORE_BLOCK_ELAPSE_TIME;
@@ -384,6 +394,10 @@ private:
     ConveyerData conveyerData_;
 
     EventsReportData eventsReport_;
+
+    std::vector<std::pair<cs::RoundNumber, cs::RoundNumber>> stakingRoundRanges_;
+
+    std::vector<std::pair<cs::RoundNumber, cs::RoundNumber>> miningRoundRanges_;
 
     friend bool operator==(const Config&, const Config&);
     friend class cs::config::Observer;

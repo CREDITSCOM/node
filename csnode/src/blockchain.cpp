@@ -38,7 +38,6 @@ BlockChain::BlockChain(csdb::Address genesisAddress, csdb::Address startAddress,
 , startAddress_(startAddress)
 , walletIds_(new WalletsIds)
 , walletsCacheStorage_(new WalletsCache(*walletIds_))
-, multiWallets_(new MultiWallets())
 , cacheMutex_() {
     createCachesPath();
     walletsCacheUpdater_ = walletsCacheStorage_->createUpdater();
@@ -57,30 +56,93 @@ void BlockChain::subscribeToSignals() {
     cs::Connector::connect(&storage_.readingStartedEvent(), this, &BlockChain::onStartReadFromDB);
 
     cs::Connector::connect(&storage_.readingStoppedEvent(), trxIndex_.get(), &TransactionsIndex::onDbReadFinished);
-    cs::Connector::connect(&storage_.readingStoppedEvent(), walletsCacheUpdater_.get(), &WalletsCache::Updater::onStopReadingFromDB);
-
-    cs::Connector::connect(&walletsCacheUpdater_->updateFromDBFinishedEvent, multiWallets_.get(), &MultiWallets::onDbReadFinished);
-    cs::Connector::connect(&walletsCacheUpdater_->updateFromDBFinishedEvent, [this](const auto&) {
-        cs::Connector::connect(&walletsCacheUpdater_->walletUpdateEvent, multiWallets_.get(), &MultiWallets::onWalletCacheUpdated);
-    });
 }
 
-bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
+bool BlockChain::bindSerializationManToCaches(cs::CachesSerializationManager* serializationManPtr) {
+    if (!serializationManPtr) {
+        cserror() << "NO SERIALIZATION MANAGER PROVIDED!";
+        return false;
+    }
+
+    serializationManPtr_ = serializationManPtr;
+
+    serializationManPtr_->bind(*this);
+    serializationManPtr_->bind(*walletsCacheStorage_);
+    serializationManPtr_->bind(*walletIds_);
+
+    return true;
+}
+
+bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManPtr) {
+    cslog() << "Try QUICK START...";
+
+    if (!bindSerializationManToCaches(serializationManPtr)) {
+        return false;
+    }
+
+    bool ok = serializationManPtr_->load();
+
+    if (ok) {
+        cslog() << "Caches for QUICK START loaded successfully!";
+    } else {
+        cswarning() << "Could not load caches for QUICK START, continue with slow start :(";
+    }
+
+    return ok;
+}
+
+bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* serializationManPtr, cs::Sequence newBlockchainTop) {
     cs::Connector::connect(&this->removeBlockEvent, trxIndex_.get(), &TransactionsIndex::onRemoveBlock);
+
+    lastSequence_ = 0;
+    bool successfulQuickStart = false;
+
+    if (newBlockchainTop == cs::kWrongSequence) {
+        if (trxIndex_->recreate()) {
+            cslog() << "Cannot use QUICK START, trxIndex has to be recreated";
+            bindSerializationManToCaches(serializationManPtr);
+        }
+        else {
+            successfulQuickStart = tryQuickStart(serializationManPtr);
+        }
+    }
+
+    cs::Sequence firstBlockToReadInDatabase = 0;
+    if (successfulQuickStart) {
+        if (lastSequence_ != 0) {
+            firstBlockToReadInDatabase = lastSequence_ + 1;
+        }
+
+        csinfo() << "QUICK START! lastSequence_   is " << lastSequence_.load();
+        csinfo() << "QUICK START! first block to read in database is " << firstBlockToReadInDatabase;
+    }
+    else {
+        cslog() << "SLOW START...";
+    }
 
     cslog() << kLogPrefix << "Trying to open DB...";
 
     size_t totalLoaded = 0;
-    lastSequence_ = 0;
+    bool checkTrxIndexRecreate = true;
+
     csdb::Storage::OpenCallback progress = [&](const csdb::Storage::OpenProgress& progress) {
-        ++totalLoaded;
-        if (progress.poolsProcessed % 1000 == 0) {
+        if (checkTrxIndexRecreate) {
+          checkTrxIndexRecreate = false;
+          if (trxIndex_->recreate() && successfulQuickStart) {
+              cslog() << "Blockchain: TrxIndex must be recreated, cancel QUICK START... Restart NODE, please";
+              trxIndex_->invalidate();
+              return true;
+          }
+        }
+
+        totalLoaded = progress.poolsProcessed;
+        if (totalLoaded % 1000 == 0) {
             std::cout << '\r' << WithDelimiters(progress.poolsProcessed) << std::flush;
         }
         return false;
     };
 
-    if (!storage_.open(path, progress, newBlockchainTop)) {
+    if (!storage_.open(path, progress, newBlockchainTop, firstBlockToReadInDatabase)) {
         cserror() << kLogPrefix << "Couldn't open database at " << path;
         return false;
     }
@@ -97,10 +159,13 @@ bool BlockChain::init(const std::string& path, cs::Sequence newBlockchainTop) {
             cserror() << "failed!!! Delete the Database!!! It will be restored from nothing...";
             return false;
         }
+        if (successfulQuickStart) {
+            serializationManPtr_->clear();
+        }
         writeGenesisBlock();
     }
     else {
-        if (!postInitFromDB()) {
+        if (!postInitFromDB(successfulQuickStart)) {
             return false;
         }
     }
@@ -120,8 +185,8 @@ uint64_t BlockChain::uuid() const {
 
 void BlockChain::onStartReadFromDB(cs::Sequence lastWrittenPoolSeq) {
     if (lastWrittenPoolSeq > 0) {
-        cslog() << kLogPrefix << "start reading " << WithDelimiters(lastWrittenPoolSeq + 1)
-            << " blocks from DB, 0.." << WithDelimiters(lastWrittenPoolSeq);
+        cslog() << kLogPrefix << "start reading blocks from DB, " 
+                << "last is " << WithDelimiters(lastWrittenPoolSeq);
     }
 }
 
@@ -171,7 +236,7 @@ inline void BlockChain::updateNonEmptyBlocks(const csdb::Pool& pool) {
     }
 }
 
-bool BlockChain::postInitFromDB() {
+bool BlockChain::postInitFromDB(bool successfulQuickStart) {
     auto func = [](const cs::PublicKey& key, const WalletData& wallet) {
         double bal = wallet.balance_.to_double();
         if (bal < -std::numeric_limits<double>::min()) {
@@ -182,6 +247,9 @@ bool BlockChain::postInitFromDB() {
         return true;
     };
     walletsCacheStorage_->iterateOverWallets(func);
+    if (successfulQuickStart) {
+        emit stopReadingBlocksEvent(totalTransactionsCount_);
+    }
     return true;
 }
 
@@ -524,7 +592,7 @@ void BlockChain::removeWalletsInPoolFromCache(const csdb::Pool& pool) {
             }
         }
 
-        for (const auto it : pool.transactions()) {
+        for (const auto& it : pool.transactions()) {
             if (cs::SmartContracts::is_deploy(it)) {
                 if (!walletIds_->normal().remove(it.target())) {
                     cswarning() << kLogPrefix << "Contract address was not removed: " << it.target().to_string();
@@ -573,7 +641,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
     const auto& signatures = pool.signatures();
     const auto& realTrusted = pool.realTrusted();
     if (currentSequence > 1) {
-        csdebug() << kLogPrefix << "Finalize: starting confidants validation procedure:";
+        csdebug() << kLogPrefix << "Finalize: starting confidants validation procedure (#" << currentSequence << "):";
 
         cs::Bytes trustedToHash;
         cs::ODataStream tth(trustedToHash);
@@ -623,7 +691,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
         auto hash = pool.hash().to_binary();
         std::copy(hash.cbegin(), hash.cend(), tempHash.data());
         if (NodeUtils::checkGroupSignature(confidants, mask, signatures, tempHash)) {
-            csmeta(csdebug) << kLogPrefix << "The number of signatures is sufficient and all of them are OK!";
+            csmeta(csdebug) << kLogPrefix << "The number of signatures is sufficient and all of them are OK";
         }
         else {
             cswarning() << kLogPrefix << "Some of Pool Signatures aren't valid. The pool will not be written to DB. It will be automatically written, when we get proper data";
@@ -682,6 +750,13 @@ bool BlockChain::applyBlockToCaches(const csdb::Pool& pool) {
     catch (...) {
         cserror() << "apply block to caches, unexpected exception";
         return false;
+    }
+
+    if (serializationManPtr_
+        && pool.sequence()
+        && pool.sequence() % kQuickStartSaveCachesInterval == 0
+        && !serializationManPtr_->save(pool.sequence())) {
+        cserror() << "Cannot save caches with version " << pool.sequence();
     }
 
     return true;
@@ -759,7 +834,6 @@ void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address
             break;
         }
         if (id.pool_seq() < trIt->id().pool_seq() || (id.pool_seq() == trIt->id().pool_seq() && id.index() < trIt->id().index())) {
-            bool added = false;
             if (flagg == 1) {
                 bool match = false;
                 if (trIt->target().is_public_key())
@@ -780,7 +854,6 @@ void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address
                 {
                     transactions.push_back(*trIt);
                     transactions.back().set_time(getBlockTime(trIt.getPool()));
-                    added = true;
                 }
             }
             if (flagg ==2){
@@ -803,15 +876,12 @@ void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address
                 {
                     transactions.push_back(*trIt);
                     transactions.back().set_time(getBlockTime(trIt.getPool()));
-                    added = true;
                 }
             }
 
             if (flagg == 3) {
                 transactions.push_back(*trIt);
                 transactions.back().set_time(getBlockTime(trIt.getPool()));
-                added = true;
-                
             }
         }
         //if (--limit == 0)
@@ -857,14 +927,14 @@ bool BlockChain::insertNewWalletId(const csdb::Address& newWallAddress, WalletId
     return true;
 }
 
-void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
+bool BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
     csdebug() << kLogPrefix << "store block #" << pool.sequence() << " add new wallets to pool";
 
     csdb::Pool::NewWallets* newWallets = pool.newWallets();
 
     if (!newWallets) {
         cserror() << kLogPrefix << "Pool is read-only";
-        return;
+        return false;
     }
 
     newWallets->clear();
@@ -896,6 +966,7 @@ void BlockChain::addNewWalletsToPool(csdb::Pool& pool) {
         }
         newWallets->emplace_back(csdb::Pool::NewWalletInfo{addrAndId.second.second, addrAndId.second.first});
     }
+    return true;
 }
 
 void BlockChain::tryFlushDeferredBlock() {
@@ -929,6 +1000,20 @@ void BlockChain::close() {
     cs::Connector::disconnect(&storage_.readBlockEvent(), this, &BlockChain::onReadFromDB);
     blockHashes_->close();
     trxIndex_->close();
+
+    if (!serializationManPtr_) {
+        csinfo() << "Blockchain: no serialization manager provided to save caches for QUICK START.";
+        return;
+    }
+
+    csinfo() << "Blockchain: try to save caches for QUICK START.";
+
+    if (serializationManPtr_->save()) {
+      csinfo() << "Blockchain: caches for QUICK START saved successfully.";
+    }
+    else {
+      csinfo() << "~Blockchain: couldn't save caches for QUICK START.";
+    }
 }
 
 bool BlockChain::getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const {
@@ -983,7 +1068,7 @@ bool BlockChain::findWalletData(const csdb::Address& address, WalletData& wallDa
 
     std::lock_guard lock(cacheMutex_);
 
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(address.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(address.public_key());
     if (wallDataPtr) {
         wallData = *wallDataPtr;
         return true;
@@ -998,7 +1083,7 @@ bool BlockChain::findWalletData(WalletId id, WalletData& wallData) const {
 
 bool BlockChain::findWalletData_Unsafe(WalletId id, WalletData& wallData) const {
     auto pubKey = getAddressByType(csdb::Address::from_wallet_id(id), AddressType::PublicKey);
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (wallDataPtr) {
         wallData = *wallDataPtr;
@@ -1224,7 +1309,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         lastSequence_ = deferredBlock_.sequence();
     }
 
-    csdetails() << kLogPrefix << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
+    //csdetails() << kLogPrefix << "Pool #" << deferredBlock_.sequence() << ": " << cs::Utils::byteStreamToHex(deferredBlock_.to_binary().data(), deferredBlock_.to_binary().size());
     emit storeBlockEvent(pool);
     if constexpr (false && (pool.transactions_count() > 0 || pool.sequence() % 10 == 0)) {//log code
         std::string res = printWalletCaches() + "\nTransactions: \n";
@@ -1432,6 +1517,7 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
     }
 
     if (poolSequence == lastSequence) {
+        csdebug() << kLogPrefix << "poolSequence == lastSequence";
         if (isLastBlockUncertain() && pool.sequence() == uncertainSequence_) {
             cslog() << kLogPrefix << "review replacement for uncertain block " << WithDelimiters(poolSequence);
             if (pool.hash() == desiredHash_) {
@@ -1488,7 +1574,12 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
             return false;
         }
 
-        setTransactionsFees(pool);
+        setTransactionsFees(pool, type);
+        if (type == cs::PoolStoreType::Created) {
+            if (!addNewWalletsToPool(pool)) {
+                csdebug() << kLogPrefix << "can't write a block without adding new wallets";
+            }
+        }
 
         //validate block to prevent bc from saving invalid instances:
         bool check_failed = false;
@@ -1541,12 +1632,24 @@ bool BlockChain::storeBlock(csdb::Pool& pool, cs::PoolStoreType type) {
     // cache block for future recording
     cachedBlocks_->insert(pool, type);
 
-    csdebug() << kLogPrefix << "cache block #" << poolSequence << " signed by " << pool.signatures().size()
+    csdebug() << kLogPrefix << "cache block #" << poolSequence << "("
+        << (pool.is_read_only() ? "Read-Only" : "Normal")
+        << ") signed by " << pool.signatures().size()
         << " nodes for future (" << cachedBlocks_->size() << " total)";
+
     cachedBlockEvent(poolSequence);
 
     // cache always successful
     return true;
+}
+
+std::string BlockChain::poolInfo(const csdb::Pool& pool) {
+    std::string res = "";
+    res += "seq: " + std::to_string(pool.sequence());
+    res += ", trxs: " + std::to_string(pool.transactions().size());
+    res += ", sigs: " + std::to_string(pool.signatures().size());
+    //res += ", hash: " + pool.hash().to_string();
+    return res;
 }
 
 void BlockChain::testCachedBlocks() {
@@ -1587,8 +1690,11 @@ void BlockChain::testCachedBlocks() {
                 break;
             }
 
-            auto cachedPool = data.value().pool;
-            const bool ok = storeBlock(cachedPool, data.value().type);
+            if (data.value().pool.is_read_only() && data.value().type == cs::PoolStoreType::Created) {
+                cswarning() << "created block from chache is read-only";
+            }
+
+            const bool ok = storeBlock(data.value().pool, data.value().type);
 
             if (!ok) {
                 cserror() << kLogPrefix << "Failed to record cached block to chain, drop it & wait to request again";
@@ -1666,7 +1772,7 @@ void BlockChain::clearBlockCache() {
 std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const {
     cs::Sequence seq = getLastSeq();
     const auto firstSequence = seq + 1;
-    const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber();
+    const auto currentRoundNumber = cs::Conveyer::instance().currentRoundNumber()-1;
 
     if (firstSequence >= currentRoundNumber) {
         return std::vector<SequenceInterval>();
@@ -1684,14 +1790,19 @@ std::vector<BlockChain::SequenceInterval> BlockChain::getRequiredBlocks() const 
     if (ranges.empty()) {
         return std::vector<SequenceInterval>{ {firstSequence, roundNumber} };
     }
-
+    bool emplaceLater = false;
     if (firstSequence < ranges.front().first) {
-        ranges.front().first = firstSequence;
+        ranges.emplace_back(firstSequence, cachedBlocks_->minSequence() - 1);
+        emplaceLater = true;
+    }
+    //TODO: this piece of code should be precisely examined
+    if (ranges.back().second < roundNumber) {
+        ranges.emplace_back(cachedBlocks_->maxSequence() + 1, roundNumber);
+    }
+    if (emplaceLater) {
+        ranges.emplace_back(firstSequence, cachedBlocks_->minSequence() - 1);
     }
 
-    if (ranges.back().second < roundNumber) {
-        ranges.back().second = roundNumber;
-    }
 
     return ranges;
 }
@@ -1700,7 +1811,12 @@ void BlockChain::setTransactionsFees(TransactionsPacket& packet) {
     fee::setCountedFees(packet.transactions());
 }
 
-void BlockChain::setTransactionsFees(csdb::Pool& pool) {
+void BlockChain::setTransactionsFees(csdb::Pool& pool, cs::PoolStoreType type) {
+    csdebug() << __func__;
+    if (pool.is_read_only() && type == cs::PoolStoreType::Created) {
+        cserror() << kLogPrefix << "Pool is read-only";
+        return;
+    }
     fee::setCountedFees(pool.transactions());
 }
 
@@ -1748,7 +1864,7 @@ uint32_t BlockChain::getTransactionsCount(const csdb::Address& addr) {
     std::lock_guard lock(cacheMutex_);
 
     auto pubKey = getAddressByType(addr, AddressType::PublicKey);
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (!wallDataPtr) {
         return 0;
@@ -1761,7 +1877,7 @@ csdb::TransactionID BlockChain::getLastTransaction(const csdb::Address& addr) co
     std::lock_guard lock(cacheMutex_);
 
     auto pubKey = getAddressByType(addr, AddressType::PublicKey);
-    const WalletData* wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
+    auto wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
 
     if (!wallDataPtr) {
         return csdb::TransactionID();
@@ -1813,7 +1929,7 @@ cs::Sequence BlockChain::getLastSeq() const {
 }
 
 const MultiWallets& BlockChain::multiWallets() const {
-    return *(multiWallets_.get());
+    return walletsCacheStorage_->multiWallets();
 }
 
 void BlockChain::setBlocksToBeRemoved(cs::Sequence number) {

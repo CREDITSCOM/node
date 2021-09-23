@@ -11,3 +11,4 @@ js-client/js/*
 /vscbuild
 /CMakeLists.txt.user.4.10-pre1
 /build*
+*.swp

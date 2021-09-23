@@ -60,6 +60,7 @@ public:
         virtual void seek_to_first() = 0;
         virtual void seek_to_last() = 0;
         virtual void seek(const cs::Bytes& key) = 0;
+        virtual void seek(const uint32_t sec_no) = 0;
         virtual void next() = 0;
         virtual void prev() = 0;
         virtual uint32_t key() const = 0;

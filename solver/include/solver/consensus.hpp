@@ -148,4 +148,14 @@ public:
     /** The max contract's state size in bytes to synchronize it between node via conveyer. Otherwise, every node must get new state
     itself or make individual request to dedicated trusted nodes*/
     const static size_t MaxContractStateSizeToSync;
+
+    static csdb::Amount blockReward;
+
+    static csdb::Amount miningCoefficient;
+
+    static bool stakingOn;
+
+    static bool miningOn;
+
+    static cs::RoundNumber syncroChangeRound;
 };

@@ -78,11 +78,15 @@ void RoundStat::onRoundStart(RoundNumber round, bool skipLogs) {
     resetLastRoundMs();
 }
 
-void RoundStat::onReadBlock(csdb::Pool block, bool* /*shouldStop*/) {
+void RoundStat::onReadBlock(const csdb::Pool& block, bool* /*shouldStop*/) {
     totalAcceptedTransactions_ += block.transactions_count();
 }
 
-void RoundStat::onStoreBlock(csdb::Pool block) {
+void RoundStat::onStopReadingFromDb(uint64_t totalTransactions) {
+    totalAcceptedTransactions_ = totalTransactions;
+}
+
+void RoundStat::onStoreBlock(const csdb::Pool& block) {
     totalAcceptedTransactions_ += block.transactions_count();
 }
 

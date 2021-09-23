@@ -366,7 +366,7 @@ public:
         return get_smart_contract_impl(tr);
     }
 
-    bool isBlacklisted(const csdb::Address& abs_addr) const  {
+    bool isBlacklisted(const csdb::Address& abs_addr) const {
         return (blacklistedContracts_.find(abs_addr) != blacklistedContracts_.cend());
     }
 
@@ -381,7 +381,6 @@ public:
                 blacklistedContracts_.erase(abs_addr);
             }
         }
-
     }
 
     csdb::Transaction get_contract_call(const csdb::Transaction& contract_state) const;
@@ -942,6 +941,8 @@ private:
     void net_request_contract_state(const csdb::Address& abs_addr);
 
     Reject::Reason prevalidate_inner(const cs::TransactionsPacket& pack);
+
+    friend class SmartContracts_Serializer;
 };
 
 }  // namespace cs

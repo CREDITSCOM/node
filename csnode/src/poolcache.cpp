@@ -1,7 +1,7 @@
 #include <poolcache.hpp>
 
 #include <csdb/pool.hpp>
-#include <csnode/datastream.hpp>
+#include <lib/system/utils.hpp>
 
 static const std::string dbPath = "/poolcachedb";
 
@@ -15,7 +15,13 @@ cs::PoolCache::~PoolCache() {
 }
 
 void cs::PoolCache::insert(const csdb::Pool& pool, PoolStoreType type) {
-    insert(pool.sequence(), pool.to_binary(), type);
+    cs::Bytes pBin = (type == PoolStoreType::Created ? pool.to_binary_updated() : pool.to_binary());
+    insert(pool.sequence(), pBin, type);
+    //if (type == PoolStoreType::Created)
+    //{
+    //    csdebug() << "created pool (" << pool.sequence() << "): " << cs::Utils::byteStreamToHex(pBin);
+    //}
+
 }
 
 void cs::PoolCache::insert(cs::Sequence sequence, const cs::Bytes& bytes, cs::PoolStoreType type) {
@@ -55,28 +61,17 @@ cs::Sequence cs::PoolCache::maxSequence() const {
 
 std::optional<cs::PoolCache::Data> cs::PoolCache::value(cs::Sequence sequence) const {
     auto bytes = db_.value<cs::Bytes>(sequence);
-    Data data{ csdb::Pool::from_binary(std::move(bytes)), cachedType(sequence) };
+    auto bType = cachedType(sequence);
+    Data data{ csdb::Pool::from_binary(std::move(bytes), bType != cs::PoolStoreType::Created), bType };
+
 
     if (data.pool.sequence() != sequence) {
+        csdebug() << __func__ << ": data size = " << bytes.size() << ", content = " << cs::Utils::byteStreamToHex(bytes);
         return std::nullopt;
     }
 
     return std::make_optional(std::move(data));
 }
-
-
-
-//std::optional<cs::PoolCache::Data> cs::PoolCache::value(cs::Sequence sequence) const {
-//    auto bytes = db_.value<cs::Bytes>(sequence);
-//
-//    Data data { csdb::Pool::from_binary(std::move(bytes)), cachedType(sequence) };
-//
-//    if (data.pool.sequence() != sequence) {
-//        return std::nullopt;
-//    }
-//
-//    return std::make_optional(std::move(data));
-//}
 
 std::optional<cs::PoolCache::Data> cs::PoolCache::pop(cs::Sequence sequence) {
     auto data = value(sequence);

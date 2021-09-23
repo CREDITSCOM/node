@@ -51,6 +51,10 @@ struct Token {
 using TokensMap = std::unordered_map<TokenId, Token>;
 using HoldersMap = std::unordered_map<HolderKey, std::set<TokenId>>;
 
+namespace cs {
+class TokensMaster_Serializer;
+}  // namespace cs
+
 class TokensMaster {
 public:
     TokensMaster(api::APIHandler*);
@@ -103,6 +107,8 @@ private:
     std::mutex dataMut_;
     TokensMap tokens_;
     HoldersMap holders_;
+
+    friend class cs::TokensMaster_Serializer;
 };
 
 #endif  // TOKENS_HPP

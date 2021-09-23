@@ -135,6 +135,7 @@ private:
     std::shared_ptr<Database> db = nullptr;
     PoolHash last_hash;     // Хеш последнего пула
     size_t count_pool = 0;  // Количество пулов транзакций в хранилище (первоночально заполняется в check)
+    cs::Sequence startSequence = 0;
 
     void set_last_error(Storage::Error error = Storage::NoError, const ::std::string& message = ::std::string());
     void set_last_error(Storage::Error error, const char* message, ...);
@@ -170,7 +171,7 @@ private:
         >
     > PoolCache;
     PoolCache pools_cache;
-    static const size_t cacheSize = 1000;
+    static const size_t cacheSize = 50;
 
     void pools_cache_insert(const cs::Sequence& seq, const PoolHash &hash, const Pool &pool) {
         if (pools_cache.size() == cacheSize) {
@@ -226,9 +227,7 @@ void Storage::priv::set_last_error(Storage::Error error, const char* message, ..
 bool Storage::priv::rescan(Storage::OpenCallback callback) {
     last_hash = {};
     count_pool = 0;
-
-    heads_t heads;
-    tails_t tails;
+    cs::Sequence last_seq_in_db = 0;
 
     Database::IteratorPtr it = db->new_iterator();
     assert(it);
@@ -238,6 +237,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
         cs::Bytes v = it->value();
         Pool p = Pool::from_binary(std::move(v));
         if (p.is_valid()) {
+            last_seq_in_db = p.sequence();
             emit start_reading_event(p.sequence());
         }
         else {
@@ -247,15 +247,52 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     else {
         emit start_reading_event(0);
     }
-    auto lastKey = it->key();
-    Storage::OpenProgress progress{0};
-    //for (it->seek_to_first(); it->is_valid(); it->next()) {
-    bool dbEndReached = false;
-    it->seek_to_first();
-    while (!dbEndReached) {
 
-        while(it->is_valid()){
-            cs::Bytes v = it->value();
+    if (startSequence > last_seq_in_db + 1) {
+        cserror() << "startSequence > last_seq_in_db + 1";
+        return false;
+    }
+
+    Storage::OpenProgress progress{0};
+
+    bool slowStart = false;
+
+    if (startSequence > 0 && [&]() { it->seek(startSequence - 1); return it->is_valid(); }()) {
+        csinfo() << "Storage: quick start";
+        count_pool = startSequence - 1;
+        progress.poolsProcessed = count_pool;
+        if (callback != nullptr) {
+            if (callback(progress)) {
+                set_last_error(Storage::UserCancelled);
+                return false;
+            }
+        }
+    }
+    else {
+        csinfo() << "Storage: slow start";
+        it->seek_to_first();
+        slowStart = true;
+    }
+
+    if (count_pool == last_seq_in_db && !slowStart) {
+        cs::Bytes v = it->value();
+        Pool p = Pool::from_binary(std::move(v));
+        if (p.is_valid()) {
+            last_hash = p.hash();
+        }
+        else {
+            set_last_error(Storage::DataIntegrityError, "Data integrity error: corrupted pool %d.", count_pool);
+            cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
+            return false;
+        }
+    }
+
+    if (!slowStart) {
+        it->next();
+    }
+
+    for (; it->is_valid(); it->next()) {
+        cs::Bytes v = it->value();
 
             Pool p = Pool::from_binary(std::move(v));
             if (!p.is_valid()) {
@@ -278,47 +315,18 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
                 return false;
             }
 
-            //update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
-            progress.poolsProcessed++;
+        progress.poolsProcessed++;
 
-            if (callback != nullptr) {
-                if (callback(progress)) {
-                    set_last_error(Storage::UserCancelled);
-                    return false;
-                }
+        if (callback != nullptr) {
+            if (callback(progress)) {
+                set_last_error(Storage::UserCancelled);
+                return false;
             }
-            if (it->key() == lastKey) {
-                dbEndReached = true;
-            }
-            it->next();
         }
-        if (it->key() == lastKey) {
-            dbEndReached = true;
-        }
-        csdebug() << "DB element " << it->key() << " is not valid";
     }
+
     emit stop_reading_event();
-    csdebug() << "Total read: " << count_pool << ", last key = " << lastKey;
     return true;
-
-#if 0
-    std::stringstream ss;
-    ss << "More than one chains or orphan chains. List follows:" << std::endl;
-    for (auto ith = heads.begin(); ith != heads.end(); ++ith) {
-        ss << "  " << ith->first.to_string() << " (length = " << ith->second.len_ << "): ";
-        if (ith->second.next_.is_empty()) {
-            ss << "Normal";
-        }
-        else {
-            ss << "Orphan";
-        }
-        ss << std::endl;
-    }
-    ss << std::ends;
-    set_last_error(Storage::ChainError, ss.str());
-
-    return false;
-#endif
 }
 
 void Storage::priv::write_routine() {
@@ -473,6 +481,8 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
         return true;
     }
 
+    d->startSequence = opt.startSequence;
+
     if (!d->rescan(callback)) {
         d->db.reset();
         return false;
@@ -482,7 +492,12 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
     return true;
 }
 
-bool Storage::open(const ::std::string& path_to_base, OpenCallback callback, cs::Sequence newBlockchainTop) {
+bool Storage::open(
+    const ::std::string& path_to_base,
+    OpenCallback callback,
+    cs::Sequence newBlockchainTop,
+    cs::Sequence startReadFrom
+) {
     ::std::string path{path_to_base};
     if (path.empty()) {
         path = ::csdb::internal::app_data_path() + "/CREDITS";
@@ -493,7 +508,7 @@ bool Storage::open(const ::std::string& path_to_base, OpenCallback callback, cs:
 
     //d->write_thread = std::thread(&Storage::priv::write_routine, d.get());
 
-    return open(OpenOptions{db, newBlockchainTop}, callback);
+    return open(OpenOptions{db, newBlockchainTop, startReadFrom}, callback);
 }
 
 void Storage::close() {

@@ -116,6 +116,16 @@ struct Command{
     cs::Bytes data;
 };
 
+enum SyncroMessage : uint8_t {
+    NoAnswer,
+    AwaitAnswer,
+    IncorrectRequest,
+    NoSuchBlocks,
+    DuplicatedRequest,
+    Sent
+};
+
+
 using PoolMetaMap = std::map<cs::Sequence, cs::PoolSyncMeta>;
 
 struct ConveyerMeta {

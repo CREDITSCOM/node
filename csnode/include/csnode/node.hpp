@@ -9,6 +9,7 @@
 
 #include <csconnector/csconnector.hpp>
 
+#include <csnode/caches_serialization_manager.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
 
@@ -195,6 +196,27 @@ public:
     // syncro get functions
     void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
     void getBlockReply(const uint8_t*, const size_t, const cs::PublicKey& sender);
+
+    void sendSyncroMessage(cs::Byte msg, const cs::PublicKey& target);
+    void getSyncroMessage(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+
+    // syncro log functions
+    void addSynchroRequestsLog(const cs::PublicKey& sender, cs::Sequence seq, cs::SyncroMessage msg);
+    bool checkSynchroRequestsLog(const cs::PublicKey& sender, cs::Sequence seq);
+    bool changeSynchroRequestsLog(const cs::PublicKey& sender, cs::SyncroMessage msg);
+    void updateSynchroRequestsLog();
+    bool removeSynchroRequestsLog(const cs::PublicKey& sender);
+
+    void sendPacketHash(const cs::TransactionsPacketHash& hash);
+    void getPacketHash(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
+
+    void sendPacketHashRequest(const cs::PacketsHashes& hashes, const cs::PublicKey& respondent, cs::RoundNumber round);
+    void getPacketHashRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
+    void processPacketsBaseRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
+    void sendPacketHashesBaseReply(const cs::PacketsVector& packets, const cs::RoundNumber round, const cs::PublicKey& target);
+    void getPacketHashesBaseReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
+
+    void sendTransactionsPacketHash(const cs::TransactionsPacket& packet);
     void sendNecessaryBlockRequest(csdb::PoolHash hash, cs::Sequence seq);
     void getNecessaryBlockRequest(cs::PoolsBlock& pBlock, const cs::PublicKey& sender);
 
@@ -350,7 +372,7 @@ public slots:
     void sendBlockRequestToConfidants(cs::Sequence sequence);
     void processSpecialInfo(const csdb::Pool& pool);
     void validateBlock(const csdb::Pool& block, bool* shouldStop);
-    void deepBlockValidation(csdb::Pool block, bool* shouldStop);
+    void deepBlockValidation(const csdb::Pool& block, bool* shouldStop);
     void sendBlockAlarmSignal(cs::Sequence seq);
     void onRoundTimeElapsed();
     void onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
@@ -502,6 +524,11 @@ private:
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;
+    cs::CachesSerializationManager cachesSerializationManager_;
+
+    size_t notInRound_ = 0;
+    std::map<cs::PublicKey, std::tuple<cs::Sequence, cs::SyncroMessage, uint64_t>> synchroRequestsLog_;
+    std::map<cs::TransactionsPacketHash, cs::RoundNumber> orderedPackets_;
     cs::NodeStatus status_;
 
     cs::Sequence neededSequence_ = 0ULL;

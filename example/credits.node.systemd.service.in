@@ -1,0 +1,16 @@
+[Unit]
+Description=Credits blockchain node service
+After=network-online.target syslog.target
+
+[Service]
+LimitCORE=infinity
+Type=forking
+EnvironmentFile=${ENV_FILE}
+User=${USER}
+Group=${GROUP}
+ExecStart=${CREDITSHOME}/bin/node --working_dir=${CREDITSHOME}
+PIDFile=${CREDITSHOME}/credits_node.pid
+Restart=on-abnormal
+
+[Install]
+WantedBy=multi-user.target

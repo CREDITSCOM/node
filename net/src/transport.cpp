@@ -223,10 +223,17 @@ void Transport::sendBroadcastIfNoConnection(Packet&& pack, const cs::PublicKey& 
     host_.SendBroadcastIfNoConnection(toNodeId(receiver), pack.moveData());
 }
 
+void Transport::clearInbox() {
+    {
+        std::lock_guard g(inboxMux_);
+        inboxQueue_.clear();
+    }
+}
+
 void Transport::processorRoutine() {
     constexpr size_t kRoutineWaitTimeMs = 50;
 
-    while (!node_->isStopRequested()) {
+    while (Transport::gSignalStatus == 0) {
         process();
 
         std::unique_lock lock(inboxMux_);
@@ -361,6 +368,14 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
             return node_->getBlockAlarm(data, size, rNum, sender);
         case MsgTypes::EventReport:
             return node_->getEventReport(data, size, rNum, sender);
+        case MsgTypes::SyncroMsg:
+            return node_->getSyncroMessage(data, size, sender);
+        case MsgTypes::TransactionPacketHash:
+            return node_->getPacketHash(data, size, rNum, sender);
+        case MsgTypes::TransactionsPacketBaseRequest:
+            return node_->getPacketHashRequest(data, size, rNum, sender);
+        case MsgTypes::TransactionsPacketBaseReply:
+            return node_->getPacketHashesBaseReply(data, size, rNum, sender);
         default:
             break;
     }

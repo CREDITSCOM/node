@@ -22,6 +22,7 @@
 #include <csnode/multiwallets.hpp>
 #include <csnode/walletsids.hpp>
 #include <csnode/poolcache.hpp>
+#include <csnode/caches_serialization_manager.hpp>
 
 #include <roundpackage.hpp>
 
@@ -36,6 +37,7 @@ class WalletsIds;
 class Fee;
 class TransactionsIndex;
 class TransactionsPacket;
+class BlockChain_Serializer;
 
 /** @brief   The synchronized block signal emits when block is trying to be stored */
 using TryToStoreBlockSignal = cs::Signal<void(const csdb::Pool&, bool*)>;
@@ -50,6 +52,7 @@ using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using AlarmSignal = cs::Signal<void(const cs::Sequence)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
 using StartReadingBlocksSignal = csdb::BlockReadingStartedSingal;
+using StopReadingBlocksSignal = cs::Signal<void(uint64_t totalTransactions)>;
 }  // namespace cs
 
 class BlockChain {
@@ -68,8 +71,11 @@ public:
                         bool recreateIndex = false);
     ~BlockChain();
 
-    bool init(const std::string& path,
-              cs::Sequence newBlockchainTop = cs::kWrongSequence);
+    bool init(
+      const std::string& path,
+      cs::CachesSerializationManager*,
+      cs::Sequence newBlockchainTop = cs::kWrongSequence
+    );
     // called immediately after object construction, better place to subscribe on signals
     void subscribeToSignals();
 
@@ -86,7 +92,7 @@ public:
     static csdb::Address getAddressFromKey(const std::string&);
 
     static uint64_t getBlockTime(const csdb::Pool& block) noexcept;
-
+    static std::string poolInfo(const csdb::Pool& pool);
     // create/save block and related methods
 
     /**
@@ -122,7 +128,7 @@ public:
      * @return    The new recorded block if ok, otherwise nullopt.
      */
 
-    std::optional<csdb::Pool> createBlock(csdb::Pool pool) {
+    std::optional<csdb::Pool> createBlock(csdb::Pool& pool) {
         return recordBlock(pool, true);
     }
 
@@ -146,11 +152,11 @@ public:
 
     // updates fees in every transaction
     void setTransactionsFees(cs::TransactionsPacket& packet);
-    void setTransactionsFees(csdb::Pool& pool);
+    void setTransactionsFees(csdb::Pool& pool, cs::PoolStoreType type = cs::PoolStoreType::Created);
     void setTransactionsFees(std::vector<csdb::Transaction>& transactions);
     void setTransactionsFees(std::vector<csdb::Transaction>& transactions, const cs::Bytes& characteristicMask);
 
-    void addNewWalletsToPool(csdb::Pool& pool);
+    bool addNewWalletsToPool(csdb::Pool& pool);
     void updateLastTransactions(const std::vector<std::pair<cs::PublicKey, csdb::TransactionID>>&);
 
     bool checkForConsistency(csdb::Pool & pool, bool isNew);
@@ -262,6 +268,8 @@ public signals:
     const cs::ReadBlockSignal& readBlockEvent() const;
     const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;
 
+    cs::StopReadingBlocksSignal stopReadingBlocksEvent;
+
 public slots:
 
     // subscription is placed in SmartContracts constructor
@@ -372,7 +380,7 @@ private:
 
     void onStartReadFromDB(cs::Sequence lastWrittenPoolSeq);
     void onReadFromDB(csdb::Pool block, bool* shouldStop);
-    bool postInitFromDB();
+    bool postInitFromDB(bool successfulQuickStart);
 
     bool updateWalletIds(const csdb::Pool& pool, cs::WalletsCache::Updater& updater);
     bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
@@ -397,7 +405,6 @@ private:
     std::unique_ptr<cs::WalletsIds> walletIds_;
     std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
     std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
-    std::unique_ptr<cs::MultiWallets> multiWallets_;
 
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
@@ -491,8 +498,17 @@ private:
         desiredHash_ = csdb::PoolHash{};
     }
 
+    bool tryQuickStart(cs::CachesSerializationManager*);
+    bool bindSerializationManToCaches(cs::CachesSerializationManager*);
+
+    cs::CachesSerializationManager* serializationManPtr_ = nullptr;
+
     // compare only state content: transactions, new wallets, sequence, round fee, user fields
     // true if both pools are not valid, or both pools have equal state content
     static bool testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs);
+
+    friend class cs::BlockChain_Serializer;
+
+    const size_t kQuickStartSaveCachesInterval = 10'000'000;
 };
 #endif  //  BLOCKCHAIN_HPP
