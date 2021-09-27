@@ -437,10 +437,3 @@ void Transport::getKnownPeers(std::vector<cs::PeerData>& result) {
 void Transport::addToNeighbours(const std::set<cs::PublicKey>& keys) {
     neighbourhood_.add(keys);
 }
-
-net::FragmentId Transport::GetFragmentId(const net::ByteVector& fragment) {
-  auto h = cscrypto::calculateHash(fragment.data(), fragment.size());
-  net::FragmentId id;
-  std::copy(h.begin(), h.end(), reinterpret_cast<uint8_t*>(id.GetPtr()));
-  return id;
-}

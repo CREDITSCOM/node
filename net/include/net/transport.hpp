@@ -93,10 +93,6 @@ protected:
     void OnNodeDiscovered(const net::NodeId&) override;
     void OnNodeRemoved(const net::NodeId&) override;
 
-    void OnFragmentFound(const net::FragmentId&, net::ByteVector&&) override {}
-    void OnFragmentNotFound(const net::FragmentId&) override {}
-    net::FragmentId GetFragmentId(const net::ByteVector&);
-
 private:
 // Postpone logic - beg
 // @TODO move to Node
