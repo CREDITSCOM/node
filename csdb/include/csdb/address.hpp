@@ -51,8 +51,8 @@ public:
     /**
      * @brief operator <
      *
-     * Оператор предназначен для возможности сортировок контейнеров класса или
-     * использования класса в качестве ключа.
+     * Operator is created to enable class container sorting or 
+     * using the class as a key
      */
     bool operator<(const Address &other) const noexcept;
     size_t calcHash() const noexcept;

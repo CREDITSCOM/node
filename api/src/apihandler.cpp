@@ -699,13 +699,13 @@ std::vector<api::SealedTransaction> APIHandler::extractTransactions(const csdb::
     std::vector<api::SealedTransaction> result;
 
     if (offset > transactionsCount) {
-        return result;  // если запрашиваемые // транзакций выходят за // пределы пула возвращаем пустой результат
+        return result;  // if the requested transactions are beyond the pool returns empty result
     }
 
-    transactionsCount -= offset;  // мы можем отдать все транзакции в пуле за вычетом смещения
+    transactionsCount -= offset;  // it can return all transactions of pool minus offset
 
     if (limit > transactionsCount) {
-        limit = transactionsCount;  // лимит уменьшается до реального количества // транзакций которые можно отдать
+        limit = transactionsCount;  // the limit is decreasing till the present transactions number
     }
 
     for (int64_t index = offset; index < (offset + limit); ++index) {
