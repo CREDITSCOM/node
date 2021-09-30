@@ -18,6 +18,7 @@ namespace ip = boost::asio::ip;
 
 using NodeVersion = cs::Version;
 extern const NodeVersion NODE_VERSION;
+extern const uint8_t MINOR_NODE_VERSION;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "db";
@@ -236,6 +237,11 @@ public:
     static NodeVersion getNodeVersion() {
         return NODE_VERSION;
     }
+    
+    static NodeVersion getMinorNodeVersion() {
+        return MINOR_NODE_VERSION;
+    }
+
 
     NodeVersion getMinCompatibleVersion() const {
         return minCompatibleVersion_;

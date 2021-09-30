@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
 
     // in case of version option print info and exit
     if (vm.count(cmdline::argVersion) > 0) {
-        cslog() << "Node version is " << Config::getNodeVersion();
+        cslog() << "Node version is " << Config::getNodeVersion() << "." << Config::getMinorNodeVersion();
 #ifdef MONITOR_NODE
         cslog() << "Monitor version";
 #endif
