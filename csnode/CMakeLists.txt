@@ -78,6 +78,7 @@ add_library(csnode
   include/csnode/tokens_serializer.hpp
   include/csnode/caches_serialization_manager.hpp
   include/csnode/serializers_helper.hpp
+  include/csnode/apihandler_serializer.hpp
   src/blockchain.cpp
   src/blockchain_serializer.cpp
   src/node.cpp
@@ -112,6 +113,7 @@ add_library(csnode
   src/smartcontracts_serializer.cpp
   src/tokens_serializer.cpp
   src/caches_serialization_manager.cpp
+  src/apihandler_serializer.cpp
 )
 
 configure_msvc_flags()
