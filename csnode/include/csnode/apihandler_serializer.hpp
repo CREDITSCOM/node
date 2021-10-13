@@ -45,11 +45,51 @@ private:
         cs::Sequence index_;
     };
 
+    struct SmartOperation {
+        enum class State : uint8_t {
+            Pending,
+            Success,
+            Failed
+        };
+
+        State state = State::Pending;
+        TransactionID stateTransaction;
+
+        bool hasRetval : 1;
+        bool returnsBool : 1;
+        bool boolResult : 1;
+
+        template<class Archive>
+        void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
+            ar & state;
+            ar & stateTransaction;
+
+            if (Archive::is_saving::value) {
+                bool tmp = hasRetval;
+                ar & tmp;
+                tmp = returnsBool;
+                ar & tmp;
+                tmp = boolResult;
+                ar & tmp;
+            }
+            else {
+                bool tmp;
+                ar & tmp;
+                hasRetval = tmp ? 1 : 0;
+                ar & tmp;
+                returnsBool = tmp ? 1 : 0;
+                ar & tmp;
+                boolResult = tmp ? 1 : 0;
+            }
+        }
+    };
+
+    // smart_trxns_queue, smartHashStateEntry, api::Pool
     SpinLockable<std::map<TransactionID, SmartOperation>>* smart_operations = nullptr;
     SpinLockable<std::map<cs::Sequence, std::vector<TransactionID>>>* smarts_pending = nullptr;
     SpinLockable<std::map<csdb::Address, TransactionID>>* smart_origin = nullptr;
     SpinLockable<std::map<csdb::Address, smart_trxns_queue>>* smartLastTrxn_ = nullptr;
-    SpinLockable<std::map<Signature, std::shared_ptr<smartHashStateEntry>>>* hashStateSL = nullptr;
+    SpinLockable<std::map<cs::Signature, std::shared_ptr<smartHashStateEntry>>>* hashStateSL = nullptr;
     SpinLockable<std::map<csdb::Address, std::vector<TransactionID>>>* deployedByCreator_ = nullptr;
     SpinLockable<std::map<cs::Sequence, api::Pool>>* poolCache = nullptr;
 
