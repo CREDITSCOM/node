@@ -2,8 +2,17 @@
 
 #include <filesystem>
 #include <map>
+#include <string>
 
+#include <boost/serialization/serialization.hpp>
+#include <boost/serialization/map.hpp>
+#include <boost/serialization/vector.hpp>
+
+#include <cscrypto/cscrypto.hpp>
 #include <lib/system/concurrent.hpp>
+#include <lib/system/common.hpp>
+
+#include "address_serializer.hpp"
 
 namespace api {
 
@@ -23,15 +32,28 @@ public:
     ::cscrypto::Hash hash();
 
 private:
-    cs::SpinLockable<std::map<csdb::TransactionID, SmartOperation>>* smart_operations;
-    cs::SpinLockable<std::map<cs::Sequence, std::vector<csdb::TransactionID>>>* smarts_pending;
-    cs::SpinLockable<std::map<csdb::Address, csdb::TransactionID>>* smart_origin;
-    cs::SpinLockable<std::map<csdb::Address, smart_trxns_queue>>* smartLastTrxn_;
-    cs::SpinLockable<std::map<cs::Signature, std::shared_ptr<smartHashStateEntry>>>* hashStateSL;
-    cs::SpinLockable<std::map<csdb::Address, std::vector<csdb::TransactionID>>>* deployedByCreator_;
-    cs::SpinLockable<std::map<cs::Sequence, api::Pool>>* poolCache;
+    class TransactionID {
+        friend class boost::serialization::access;
 
-    std::map<std::string, int64_t>* mExecuteCount_;
+        template<class Archive>
+        void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
+            ar & pool_seq_;
+            ar & index_;
+        }
+
+        cs::Sequence pool_seq_;
+        cs::Sequence index_;
+    };
+
+    SpinLockable<std::map<TransactionID, SmartOperation>>* smart_operations = nullptr;
+    SpinLockable<std::map<cs::Sequence, std::vector<TransactionID>>>* smarts_pending = nullptr;
+    SpinLockable<std::map<csdb::Address, TransactionID>>* smart_origin = nullptr;
+    SpinLockable<std::map<csdb::Address, smart_trxns_queue>>* smartLastTrxn_ = nullptr;
+    SpinLockable<std::map<Signature, std::shared_ptr<smartHashStateEntry>>>* hashStateSL = nullptr;
+    SpinLockable<std::map<csdb::Address, std::vector<TransactionID>>>* deployedByCreator_ = nullptr;
+    SpinLockable<std::map<cs::Sequence, api::Pool>>* poolCache = nullptr;
+
+    std::map<std::string, int64_t>* mExecuteCount_ = nullptr;
 };
 
 } // namespace cs
