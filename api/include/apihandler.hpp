@@ -15,6 +15,8 @@
 #include "dumbcv.hpp"
 #include "executor.hpp"
 
+#include <csnode/apihandler_serializer.hpp>
+
 namespace csconnector {
 class connector;
 }  // namespace csconnector
@@ -288,6 +290,7 @@ private:
     const uint8_t ERROR_CODE = 1;
 
     friend class ::csconnector::connector;
+    friend class ::cs::APIHandler_Serializer;
 
     std::condition_variable_any newBlockCv_;
     std::mutex dbLock_;
