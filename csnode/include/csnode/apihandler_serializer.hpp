@@ -84,14 +84,10 @@ private:
         }
     };
 
-    // smart_trxns_queue, smartHashStateEntry, api::Pool
-    SpinLockable<std::map<TransactionID, SmartOperation>>* smart_operations = nullptr;
-    SpinLockable<std::map<cs::Sequence, std::vector<TransactionID>>>* smarts_pending = nullptr;
-    SpinLockable<std::map<csdb::Address, TransactionID>>* smart_origin = nullptr;
-    SpinLockable<std::map<csdb::Address, smart_trxns_queue>>* smartLastTrxn_ = nullptr;
-    SpinLockable<std::map<cs::Signature, std::shared_ptr<smartHashStateEntry>>>* hashStateSL = nullptr;
-    SpinLockable<std::map<csdb::Address, std::vector<TransactionID>>>* deployedByCreator_ = nullptr;
-    SpinLockable<std::map<cs::Sequence, api::Pool>>* poolCache = nullptr;
+    SpinLockable<std::map<TransactionID, SmartOperation>>* smart_operations                  = nullptr;
+    SpinLockable<std::map<cs::Sequence, std::vector<TransactionID>>>* smarts_pending         = nullptr;
+    SpinLockable<std::map<csdb::Address, TransactionID>>* smart_origin                       = nullptr;
+    SpinLockable<std::map<csdb::Address, std::vector<TransactionID>>>* deployedByCreator_    = nullptr;
 
     std::map<std::string, int64_t>* mExecuteCount_ = nullptr;
 };
