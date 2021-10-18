@@ -2,6 +2,10 @@
 
 #include <csconnector/csconnector.hpp>
 
+namespace {
+const std::string kDataFileName = "apihandler.dat";
+} // namespace
+
 namespace cs {
 
 void APIHandler_Serializer::bind(api::APIHandler& apih) {
@@ -21,7 +25,19 @@ void APIHandler_Serializer::load(const std::filesystem::path& rootDir) {
 }
 
 void APIHandler_Serializer::clear(const std::filesystem::path& rootDir) {
+  auto clearHelper = [this](auto& entity) {
+    auto ref = lockedReference(entity);
+    ref->clear();
+  };
 
+  clearHelper(*smart_operations);
+  clearHelper(*smarts_pending);
+  clearHelper(*smart_origin);
+  clearHelper(*deployedByCreator_);
+
+  mExecuteCount_->clear();
+
+  save(rootDir);
 }
 
 ::cscrypto::Hash APIHandler_Serializer::hash() {
