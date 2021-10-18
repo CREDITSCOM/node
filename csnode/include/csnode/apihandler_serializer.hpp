@@ -33,6 +33,15 @@ public:
 
 private:
     class TransactionID {
+    public:
+        bool operator<(const TransactionID& other) const noexcept {
+            if (pool_seq_ == other.pool_seq_)
+                return index_ < other.index_;
+            else
+                return pool_seq_ < other.pool_seq_;
+        }
+
+    private:
         friend class boost::serialization::access;
 
         template<class Archive>
