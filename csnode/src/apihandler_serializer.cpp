@@ -39,7 +39,20 @@ void APIHandler_Serializer::save(const std::filesystem::path& rootDir) {
 }
 
 void APIHandler_Serializer::load(const std::filesystem::path& rootDir) {
+  std::ifstream ifs(rootDir / kDataFileName);
+  boost::archive::text_iarchive ia(ifs);
 
+  auto loadHelper = [&](auto& entity) {
+    auto ref = lockedReference(entity);
+    ia >> *ref;
+  };
+
+  loadHelper(*smart_operations);
+  loadHelper(*smarts_pending);
+  loadHelper(*smart_origin);
+  loadHelper(*deployedByCreator_);
+
+  ia >> *mExecuteCount_;
 }
 
 void APIHandler_Serializer::clear(const std::filesystem::path& rootDir) {
