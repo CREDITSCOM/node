@@ -6,6 +6,7 @@
 #include <boost/archive/text_iarchive.hpp>
 
 #include <csconnector/csconnector.hpp>
+#include <csnode/serializers_helper.hpp>
 
 namespace {
 const std::string kDataFileName = "apihandler.dat";
@@ -72,7 +73,10 @@ void APIHandler_Serializer::clear(const std::filesystem::path& rootDir) {
 }
 
 ::cscrypto::Hash APIHandler_Serializer::hash() {
-
+  save(".");
+  auto result = SerializersHelper::getHashFromFile(kDataFileName);
+  std::filesystem::remove(kDataFileName);
+  return result;
 }
 
 } // namespace cs
