@@ -23,60 +23,60 @@ void APIHandler_Serializer::bind(api::APIHandler& apih) {
 }
 
 void APIHandler_Serializer::save(const std::filesystem::path& rootDir) {
-  std::ofstream ofs(rootDir / kDataFileName);
-  boost::archive::text_oarchive oa(ofs);
+    std::ofstream ofs(rootDir / kDataFileName);
+    boost::archive::text_oarchive oa(ofs);
 
-  auto saveHelper = [&](auto& entity) {
-    auto ref = lockedReference(entity);
-    oa << *ref;
-  };
+    auto saveHelper = [&](auto& entity) {
+      auto ref = lockedReference(entity);
+      oa << *ref;
+    };
 
-  saveHelper(*smart_operations);
-  saveHelper(*smarts_pending);
-  saveHelper(*smart_origin);
-  saveHelper(*deployedByCreator_);
+    saveHelper(*smart_operations);
+    saveHelper(*smarts_pending);
+    saveHelper(*smart_origin);
+    saveHelper(*deployedByCreator_);
 
-  oa << *mExecuteCount_;
+    oa << *mExecuteCount_;
 }
 
 void APIHandler_Serializer::load(const std::filesystem::path& rootDir) {
-  std::ifstream ifs(rootDir / kDataFileName);
-  boost::archive::text_iarchive ia(ifs);
+    std::ifstream ifs(rootDir / kDataFileName);
+    boost::archive::text_iarchive ia(ifs);
 
-  auto loadHelper = [&](auto& entity) {
-    auto ref = lockedReference(entity);
-    ia >> *ref;
-  };
+    auto loadHelper = [&](auto& entity) {
+      auto ref = lockedReference(entity);
+      ia >> *ref;
+    };
 
-  loadHelper(*smart_operations);
-  loadHelper(*smarts_pending);
-  loadHelper(*smart_origin);
-  loadHelper(*deployedByCreator_);
+    loadHelper(*smart_operations);
+    loadHelper(*smarts_pending);
+    loadHelper(*smart_origin);
+    loadHelper(*deployedByCreator_);
 
-  ia >> *mExecuteCount_;
+    ia >> *mExecuteCount_;
 }
 
 void APIHandler_Serializer::clear(const std::filesystem::path& rootDir) {
-  auto clearHelper = [this](auto& entity) {
-    auto ref = lockedReference(entity);
-    ref->clear();
-  };
+    auto clearHelper = [this](auto& entity) {
+      auto ref = lockedReference(entity);
+      ref->clear();
+    };
 
-  clearHelper(*smart_operations);
-  clearHelper(*smarts_pending);
-  clearHelper(*smart_origin);
-  clearHelper(*deployedByCreator_);
+    clearHelper(*smart_operations);
+    clearHelper(*smarts_pending);
+    clearHelper(*smart_origin);
+    clearHelper(*deployedByCreator_);
 
-  mExecuteCount_->clear();
+    mExecuteCount_->clear();
 
-  save(rootDir);
+    save(rootDir);
 }
 
 ::cscrypto::Hash APIHandler_Serializer::hash() {
-  save(".");
-  auto result = SerializersHelper::getHashFromFile(kDataFileName);
-  std::filesystem::remove(kDataFileName);
-  return result;
+    save(".");
+    auto result = SerializersHelper::getHashFromFile(kDataFileName);
+    std::filesystem::remove(kDataFileName);
+    return result;
 }
 
 } // namespace cs
