@@ -9,7 +9,7 @@
 #include <csnode/serializers_helper.hpp>
 
 namespace {
-const std::string& kDataFileName = "blockchain.dat";
+const std::string kDataFileName = "blockchain.dat";
 } // namespace
 
 namespace cs {
