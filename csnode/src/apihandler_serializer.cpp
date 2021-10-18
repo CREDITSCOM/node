@@ -1,5 +1,10 @@
 #include <csnode/apihandler_serializer.hpp>
 
+#include <fstream>
+
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+
 #include <csconnector/csconnector.hpp>
 
 namespace {
@@ -17,7 +22,20 @@ void APIHandler_Serializer::bind(api::APIHandler& apih) {
 }
 
 void APIHandler_Serializer::save(const std::filesystem::path& rootDir) {
+  std::ofstream ofs(rootDir / kDataFileName);
+  boost::archive::text_oarchive oa(ofs);
 
+  auto saveHelper = [&](auto& entity) {
+    auto ref = lockedReference(entity);
+    oa << *ref;
+  };
+
+  saveHelper(*smart_operations);
+  saveHelper(*smarts_pending);
+  saveHelper(*smart_origin);
+  saveHelper(*deployedByCreator_);
+
+  oa << *mExecuteCount_;
 }
 
 void APIHandler_Serializer::load(const std::filesystem::path& rootDir) {
