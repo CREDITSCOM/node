@@ -11,6 +11,8 @@
 #include <csnode/tokens_serializer.hpp>
 #include <csnode/walletscache_serializer.hpp>
 #include <csnode/walletsids_serializer.hpp>
+#include <csnode/apihandler_serializer.hpp>
+#include <csconnector/csconnector.hpp>
 
 #include <lib/system/logger.hpp>
 
@@ -24,6 +26,7 @@ struct CachesSerializationManager::Impl {
 #endif
     WalletsCache_Serializer   walletsCacheSerializer;
     WalletsIds_Serializer     walletsIdsSerializer;
+    APIHandler_Serializer     apiHandlerSerializer;
 
     const std::string kHashesFile = "quick_start_hashes.dat";
     const std::string kQuickStartRoot = "qs";
@@ -34,7 +37,8 @@ struct CachesSerializationManager::Impl {
       WalletsCacheBit,
       WalletsIdsBit
 #ifdef NODE_API
-      ,TokensMasterBit
+      , TokensMasterBit
+      , APIHandlerBit
 #endif
     };
 
@@ -48,6 +52,7 @@ struct CachesSerializationManager::Impl {
             (bindFlags & (1 << WalletsIdsBit))
 #ifdef NODE_API
             && (bindFlags & (1 << TokensMasterBit))
+            && (bindFlags & (1 << APIHandlerBit))
 #endif
         );
     }
@@ -219,6 +224,13 @@ void CachesSerializationManager::bind([[maybe_unused]] TokensMaster& tm) {
 #ifdef NODE_API
     pImpl_->tokensMasterSerializer.bind(tm);
     pImpl_->bindFlags |= (1 << Impl::TokensMasterBit);
+#endif
+}
+
+void CachesSerializationManager::bind([[maybe_unused]] api::APIHandler& apih) {
+#ifdef NODE_API
+    pImpl_->apiHandlerSerializer.bind(apih);
+    pImpl_->bindFlags |= (1 << Impl::APIHandlerBit);
 #endif
 }
 

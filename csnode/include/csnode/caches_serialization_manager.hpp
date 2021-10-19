@@ -7,6 +7,12 @@
 class BlockChain;
 class TokensMaster;
 
+namespace api {
+
+class APIHandler;
+
+} // namespace api
+
 namespace cs {
 
 class SmartContracts;
@@ -23,6 +29,7 @@ public:
     void bind(WalletsCache&);
     void bind(WalletsIds&);
     void bind(TokensMaster&);
+    void bind(api::APIHandler&);
 
     void clear(size_t version = 0);
 
