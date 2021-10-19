@@ -67,6 +67,7 @@ struct CachesSerializationManager::Impl {
             smartContractsSerializer.clear(p);
 #ifdef NODE_API
             tokensMasterSerializer.clear(p);
+            apiHandlerSerializer.clear(p);
 #endif
             walletsCacheSerializer.clear(p);
             walletsIdsSerializer.clear(p);
@@ -97,6 +98,8 @@ struct CachesSerializationManager::Impl {
 #ifdef NODE_API
       addHash(result, tokensMasterSerializer);
       csdebug() << "Got tokensmaster hashes";
+      addHash(result, apiHandlerSerializer);
+      csdebug() << "Got apihandler hashes";
 #endif
 
       return cscrypto::helpers::bin2Hex(
@@ -170,6 +173,7 @@ struct CachesSerializationManager::Impl {
             walletsIdsSerializer.load(p);
 #ifdef NODE_API
             tokensMasterSerializer.load(p);
+            apiHandlerSerializer.load(p);
 #endif
             if (!checkHashes(version)) {
                 cserror() << "CachesSerializationManager: invalid hashes on load";
@@ -254,6 +258,7 @@ bool CachesSerializationManager::save(size_t version) {
         pImpl_->walletsIdsSerializer.save(p);
 #ifdef NODE_API
         pImpl_->tokensMasterSerializer.save(p);
+        pImpl_->apiHandlerSerializer.save(p);
 #endif
         pImpl_->saveHashes(version);
     } catch (const std::exception& e) {
