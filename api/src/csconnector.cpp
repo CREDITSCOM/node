@@ -47,6 +47,7 @@ connector::connector(Node& node, cs::CachesSerializationManager& serializationMa
 {
 #ifdef NODE_API
     serializationMan.bind(api_handler->tm_);
+    serializationMan.bind(*api_handler);
 #endif
 
 #ifdef BINARY_TCP_EXECAPI
