@@ -23,10 +23,10 @@ struct CachesSerializationManager::Impl {
     SmartContracts_Serializer smartContractsSerializer;
 #ifdef NODE_API
     TokensMaster_Serializer   tokensMasterSerializer;
+    APIHandler_Serializer     apiHandlerSerializer;
 #endif
     WalletsCache_Serializer   walletsCacheSerializer;
     WalletsIds_Serializer     walletsIdsSerializer;
-    APIHandler_Serializer     apiHandlerSerializer;
 
     const std::string kHashesFile = "quick_start_hashes.dat";
     const std::string kQuickStartRoot = "qs";
