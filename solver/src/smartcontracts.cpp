@@ -1034,7 +1034,20 @@ Reject::Reason SmartContracts::prevalidate(const BlockChain& bc, const cs::Trans
     size_t i = 0;
     size_t total_size = 0;
     for (const auto& t : pack.transactions()) {
-        const auto size = t.to_byte_stream().size();
+        auto size = t.to_byte_stream().size();
+        if (is_new_state(t)) {
+            csdb::UserField fld = t.user_field(cs::trx_uf::new_state::Value);
+            size_t state_size = std::numeric_limits<size_t>::max();
+            if (fld.is_valid()) {
+                std::string state = fld.value<std::string>();
+                state_size = state.size();
+
+            }
+            if (state_size > Consensus::MaxContractStateSizeToSync) {
+                size -= state_size;
+                size += sizeof(cs::Hash);
+            }
+        }
         if (size > Consensus::MaxTransactionSize) {
             csdebug() << kLogPrefix << "exceeded max transaction size, prevalidation failed";
             return Reject::Reason::LimitExceeded;
