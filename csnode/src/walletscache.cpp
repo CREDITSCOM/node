@@ -86,18 +86,18 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
                                           bool inverse /* = false */) {
     auto& transactions = pool.transactions();
     csdb::Amount totalAmountOfCountedFee = 0;
-    if (!transactions.empty()) {
-        csdebug() << "Start block: " << pool.sequence();
-    }
+    //if (!transactions.empty()) {
+    //    csdebug() << "Start block: " << pool.sequence();
+    //}
     for (auto itTrx = transactions.begin(); itTrx != transactions.end(); ++itTrx) {
-        csdebug() << "Start transaction: " << itTrx->id().to_string();
+        //csdebug() << "Start transaction: " << itTrx->id().to_string();
         totalAmountOfCountedFee += load(*itTrx, blockchain, inverse);
         if (SmartContracts::is_new_state(*itTrx)) {
-            csdebug() << "Start conf funding for execution";
+            //csdebug() << "Start conf funding for execution";
             fundConfidantsWalletsWithExecFee(*itTrx, blockchain, inverse);
-            csdebug() << "Finish conf funding for execution";
+            //csdebug() << "Finish conf funding for execution";
         }
-        csdebug() << "Finish transaction";
+        //csdebug() << "Finish transaction";
     }
 
     if (totalAmountOfCountedFee > csdb::Amount(0)) {

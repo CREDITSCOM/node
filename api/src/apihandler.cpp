@@ -1246,6 +1246,11 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
 }
 
 void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction) {
+    #ifdef MONITOR_NODE
+    _return.status.code = int8_t(ERROR_CODE);
+    _return.status.message = "Monitor node don't receive transactions";
+    return;
+    #endif
     _return.roundNum = static_cast<int32_t>(cs::Conveyer::instance().currentRoundTable().round); // possible overflow
     csdb::Transaction transactionToSend;
     if (auto errInfo = checkTransaction(transaction, transactionToSend); errInfo.has_value()) {
@@ -1261,6 +1266,11 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
+    #ifdef WEB_WALLET_NODE
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = "Node don't use such method";
+        return;
+    #endif
     cs::Sequence limit = static_cast<cs::Sequence>(limitPage(const_limit));
 
     uint64_t sequence = blockchain_.getLastSeq();
@@ -1275,6 +1285,11 @@ void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offs
 }
 
 void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const int64_t sequence, const int64_t offset, const int64_t const_limit) {
+    #ifdef WEB_WALLET_NODE
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = "Node don't use such method";
+        return;
+    #endif
     auto limit = limitPage(const_limit);
     csdb::Pool pool = executor_.loadBlockApi(cs::Sequence(sequence));
 
@@ -1286,6 +1301,11 @@ void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const i
 }
 
 void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const int64_t sequence, const int64_t index) {
+    #ifdef WEB_WALLET_NODE
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = "Node don't use such method";
+        return;
+    #endif
     csunused(index);
     csdb::Pool pool = executor_.loadBlockApi(cs::Sequence(sequence));
     _return.isFound = pool.is_valid();
@@ -1360,6 +1380,11 @@ void APIHandler::SmartContractGet(api::SmartContractGetResult& _return, const ge
 }
 
 void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult& _return, const api::TransactionsQuery& generalQuery) {
+    #ifdef MONITOR_NODE
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = "Node don't use such method";
+        return;
+    #endif
     cslog() << __func__;
     auto gq = generalQuery;
     auto queriesLimit = limitQueries(gq.queries.size(), MaxQueriesNumber);
@@ -1861,6 +1886,11 @@ void APIHandler::GetLastHash(api::PoolHash& _return) {
 }
 
 void APIHandler::PoolListGetStable(api::PoolListGetResult& _return, const int64_t sequence, const int64_t const_limit) {
+    #ifdef WEB_WALLET_NODE
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = "Node don't use such method";
+        return;
+    #endif
     auto limit = limitPage(const_limit);
     if (sequence < 0) {
         return;
@@ -2268,6 +2298,13 @@ void APIHandler::ExecuteCountGet(ExecuteCountGetResult& _return, const std::stri
 }
 
 void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const general::Address& address) {
+    #ifndef MONITOR_NODE
+        #ifndef WEB_WALLET_NODE
+            _return.status.code = int8_t(ERROR_CODE);
+            _return.status.message = "This node doesn't provide such info";
+            return;
+        #endif
+    #endif
     const csdb::Address addr = BlockChain::getAddressFromKey(address);
     tm_.loadTokenInfo([&_return, &addr](const TokensMap& tokens, const HoldersMap& holders) {
         auto holderIt = holders.find(addr);
@@ -2299,6 +2336,13 @@ void APIHandler::TokenBalancesGet(api::TokenBalancesResult& _return, const gener
 }
 
 void APIHandler::TokenTransfersGet(api::TokenTransfersResult& _return, const general::Address& token, int64_t offset, int64_t limit) {
+    #ifndef MONITOR_NODE
+        #ifndef WEB_WALLET_NODE
+            _return.status.code = int8_t(ERROR_CODE);
+            _return.status.message = "This node doesn't provide such info";
+            return;
+        #endif
+    #endif
     tokenTransactionsInternal(_return, *this, tm_, token, true, false, offset, limit);
 }
 
@@ -2436,6 +2480,13 @@ void APIHandler::TokenTransfersListGet(api::TokenTransfersResult& _return, int64
 }
 
 void APIHandler::TokenWalletTransfersGet(api::TokenTransfersResult& _return, const general::Address& token, const general::Address& address, int64_t offset, int64_t limit) {
+    #ifndef MONITOR_NODE
+        #ifndef WEB_WALLET_NODE
+            _return.status.code = int8_t(ERROR_CODE);
+            _return.status.message = "This node doesn't provide such info";
+            return;
+        #endif
+    #endif
     const csdb::Address wallet = BlockChain::getAddressFromKey(address);
     tokenTransactionsInternal(_return, *this, tm_, token, true, true, offset, limit, wallet);
 }
@@ -2445,6 +2496,13 @@ void APIHandler::TokenTransactionsGet(api::TokenTransactionsResult& _return, con
 }
 
 void APIHandler::TokenInfoGet(api::TokenInfoResult& _return, const general::Address& token) {
+    #ifndef MONITOR_NODE
+        #ifndef WEB_WALLET_NODE
+            _return.status.code = int8_t(ERROR_CODE);
+            _return.status.message = "This node doesn't provide such info";
+            return;
+        #endif
+    #endif
     bool found = false;
     const csdb::Address addr = BlockChain::getAddressFromKey(token);
     tm_.loadTokenInfo([&token, &addr, &found, &_return](const TokensMap& tm_, const HoldersMap&) {
@@ -2480,6 +2538,13 @@ static std::function<bool(const T&, const T&)> getComparator(const FieldType fie
 
 void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general::Address& token, int64_t offset, int64_t limit, const TokenHoldersSortField order,
                                  const bool desc) {
+    #ifndef MONITOR_NODE
+        #ifndef WEB_WALLET_NODE
+            _return.status.code = int8_t(ERROR_CODE);
+            _return.status.message = "This node doesn't provide such info";
+            return;
+        #endif
+    #endif
     if (!validatePagination(_return, *this, offset, limit)) {
         return;
     }
@@ -2537,6 +2602,13 @@ void APIHandler::TokenHoldersGet(api::TokenHoldersResult& _return, const general
 }
 
 void APIHandler::TokensListGet(api::TokensListResult& _return, int64_t offset, int64_t limit, const TokensListSortField order, const bool desc, const TokenFilters& filters) {
+    #ifndef MONITOR_NODE
+        #ifndef WEB_WALLET_NODE
+            _return.status.code = int8_t(ERROR_CODE);
+            _return.status.message = "This node doesn't provide such info";
+            return;
+        #endif
+    #endif
     if (!validatePagination(_return, *this, offset, limit)) {
         return;
     }

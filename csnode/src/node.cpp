@@ -4195,10 +4195,10 @@ void Node::deepBlockValidation(const csdb::Pool& block, bool* check_failed) {//c
     csdebug() << "NODE> SmartPacks = " << smartPacks.size();
     auto iSignatures = smartSignatures.begin();
     for (auto& it : smartPacks) {
-        csdebug() << "NODE> SmartSignatures(" << iSignatures->signatures.size() << ") for contract "<< iSignatures->smartConsensusPool << ":";
+        //csdebug() << "NODE> SmartSignatures(" << iSignatures->signatures.size() << ") for contract "<< iSignatures->smartConsensusPool << ":";
         for (auto p : iSignatures->signatures) {
             it.addSignature(p.first, p.second);
-            csdebug() << "NODE> " << static_cast<int>(p.first) << ". " << cs::Utils::byteStreamToHex(p.second.data(), 64);
+            //csdebug() << "NODE> " << static_cast<int>(p.first) << ". " << cs::Utils::byteStreamToHex(p.second.data(), 64);
         }
         smartTrxCounter += it.transactionsCount();
         csdebug() << "NODE> setting exp Round = " << iSignatures->smartConsensusPool + Consensus::MaxRoundsCancelContract;
