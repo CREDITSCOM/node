@@ -1340,6 +1340,105 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
     csinfo() << "State transaction: seq = " << _return.stateId.poolSeq << ", index = " << _return.stateId.index;
 }
 
+void APIHandler::WalletsListBalancesGet(api::AcceptedRequestId& _return, api::Addresses walletAddresses) {
+    _return.ids = ++requestId_;
+
+    std::thread t(&APIHandler::processBalancesRequest, this, walletAddresses, requestId_);
+    t.detach();
+
+    //csinfo() << "State transaction: seq = " << _return.stateId.poolSeq << ", index = " << _return.stateId.index;
+
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+}
+
+void APIHandler::processBalancesRequest(api::Addresses walletAddresses, uint64_t requestId) {
+    api::WalletBalanceResults result;
+    for (auto it : walletAddresses.addresses) {
+        const csdb::Address addr = BlockChain::getAddressFromKey(it);
+        api::WalletBalanceFull  bal;
+        bal.addresses = it;
+        BlockChain::WalletData wallData{};
+        if (!blockchain_.findWalletData(addr, wallData)) {
+            bal.balance.__set_integral(0);
+            bal.balance.__set_fraction(0ULL);
+            bal.notFound = true;
+            continue;
+        }
+        bal.notFound = false;
+        bal.balance.integral = wallData.balance_.integral();
+        bal.balance.fraction = static_cast<decltype(bal.balance.fraction)>(wallData.balance_.fraction());
+        std::optional<api::Delegated> delegated = getDelegated(wallData);
+        if (delegated.has_value()) {
+            bal.__set_delegated(delegated.value());
+        }
+        result.balances.push_back(bal);
+    }
+    {
+        wbLock_.lock();
+        if (walBalances_.find(requestId) == walBalances_.end()) {
+            walBalances_.emplace(requestId, result);
+        }
+        else {
+            cslog() << "Request Id already present in the results table, process terminated";
+        }
+        wbLock_.unlock();
+    }
+
+}
+
+void APIHandler::WalletsListBalancesResultGet(api::WalletBalanceResults& _return, int64_t requestId) {
+    auto it = walBalances_.find(requestId);
+    if (it != walBalances_.end()) {
+        {
+            wbLock_.lock();
+            _return = it->second;
+            walBalances_.erase(it);
+            wbLock_.unlock();
+        }
+        SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+    }
+    else {
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = "No such request Id";
+    }
+}
+
+void APIHandler::FilteredTrxsListGet(api::AcceptedRequestId& _return, api::TransactionsQuery generalQuery) {
+#ifdef MONITOR_NODE
+    _return.status.code = int8_t(ERROR_CODE);
+    _return.status.message = "Node don't use such method";
+    return;
+#endif
+    cslog() << __func__;
+    _return.ids = ++requestId_;
+
+    std::thread t(&APIHandler::filteredTrxsProcess, this, generalQuery, requestId_);
+    t.detach();
+
+    SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+
+}
+
+void APIHandler::FilteredTrxsListGetResult(api::FilteredTransactionsListResult& _return, int64_t requestId) {
+    auto it = ftRequests_.find(requestId);
+    if (it != ftRequests_.end()) {
+        {
+            wbLock_.lock();
+            _return = it->second;
+            ftRequests_.erase(it);
+            wbLock_.unlock();
+        }
+        SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
+    }
+    else {
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = "No such request Id";
+    }
+}
+
+void APIHandler::TransactionsListSend(api::SendTransactionResult& _return, api::TransactionsList transactions) {}
+void APIHandler::TransactionsListResultGet(api::TransactionsListFlowResult& _return, int64_t requestId) {}
+
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
     #ifdef WEB_WALLET_NODE
         _return.status.code = int8_t(ERROR_CODE);
@@ -1577,6 +1676,135 @@ void APIHandler::FilteredTransactionsListGet(api::FilteredTransactionsListResult
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
     return;
+}
+
+void APIHandler::filteredTrxsProcess(const api::TransactionsQuery& generalQuery, uint64_t requestId){
+
+    api::FilteredTransactionsListResult result;
+    auto gq = generalQuery;
+    auto queriesLimit = limitQueries(gq.queries.size(), MaxQueriesNumber);
+    auto limit = int64_t(1000);
+    uint16_t flagg = gq.flag;
+    size_t cnt = 0;
+    for (auto currentQuery : gq.queries)
+    {
+        if (queriesLimit == 0 || limit == 0) {
+            break;
+        }
+        const csdb::Address addr = BlockChain::getAddressFromKey(currentQuery.requestedAddress);
+        BlockChain::Transactions transactions;
+
+        auto id = csdb::TransactionID(currentQuery.fromId.poolSeq, currentQuery.fromId.index);
+        blockchain_.getTransactionsUntill(transactions, addr, id, flagg);
+
+        api::PublicKeyTransactions singleResponse;
+        singleResponse.requestedAddress = currentQuery.requestedAddress;
+        size_t tcnt = 0;
+        for (auto it : transactions) {
+            ++tcnt;
+            if (limit > 0) {
+                --limit;
+            }
+            singleResponse.transactions.push_back(convertTransactionToShort(it));
+        }
+
+        std::vector<std::tuple<csdb::Address, std::string, std::string>> tokensList;
+        tm_.loadTokenInfo([&addr, &tokensList](const TokensMap& tokens, const HoldersMap& holders) {
+            auto holderIt = holders.find(addr);
+            if (holderIt != holders.end()) {
+                for (const auto& tokAddr : holderIt->second) {
+                    auto it = tokens.find(tokAddr);
+                    if (it == tokens.end()) {
+                        continue;
+                    }
+                    tokensList.push_back(std::make_tuple(tokAddr, it->second.symbol, it->second.name));
+                }
+            }
+            });
+        size_t offset = 0;
+        size_t singleLimit = 99;
+        std::vector<api::SelectedTokenTransfers> sumTransfers;
+        for (auto itToken : tokensList) {
+            api::TokenTransfersResult transferResult;
+            api::SelectedTokenTransfers transfersListLocal;
+            auto tAddr = fromByteArray(std::get<0>(itToken).public_key());
+            csdb::TransactionID fromTr(0, 0);
+            tokenTransactionsInternal(transferResult, *this, tm_, tAddr, true, true, offset, singleLimit, addr);
+            if (!currentQuery.tokensList.empty()) {
+                for (auto tmpIt : currentQuery.tokensList) {
+                    if (tmpIt.tokenAddress == tAddr) {
+                        fromTr = csdb::TransactionID(tmpIt.fromId.poolSeq, tmpIt.fromId.index);
+                    }
+                }
+            }
+            transfersListLocal.__set_tokenAddress(tAddr);
+            transfersListLocal.__set_tokenTiker(std::get<1>(itToken));
+            transfersListLocal.__set_tokenName(std::get<2>(itToken));
+            size_t token_cnt = 0;
+            for (auto it : transferResult.transfers) {
+                ++token_cnt;
+                api::TokenTransfer trf;
+                trf.amount = it.amount;
+                trf.code = it.code;
+                trf.initiator = it.initiator;
+                trf.receiver = it.receiver;
+                trf.sender = it.sender;
+                trf.state = it.state;
+                trf.time = it.time;
+                trf.token = it.token;
+                trf.transaction = it.transaction;
+                trf.fee = it.fee;
+                trf.__set_extraFee(it.extraFee);
+                trf.userFields = it.userFields;
+
+                if (fromTr.pool_seq() < static_cast<uint64_t>(it.transaction.poolSeq)
+                    || (fromTr.pool_seq() == static_cast<uint64_t>(it.transaction.poolSeq)
+                        && fromTr.index() < static_cast<uint64_t>(it.transaction.index))) {
+                    if (flagg == 1) {
+                        if (it.receiver == currentQuery.requestedAddress) {
+                            transfersListLocal.transfers.push_back(it);
+                        }
+                    }
+                    else if (flagg == 2) {
+                        if (it.sender == currentQuery.requestedAddress) {
+                            transfersListLocal.transfers.push_back(it);
+                        }
+                    }
+                    else if (flagg == 3) {
+                        transfersListLocal.transfers.push_back(it);
+                    }
+                    else {
+                    }
+                }
+                else {
+                    break;
+                }
+
+            }
+            sumTransfers.push_back(transfersListLocal);
+        }
+        if (sumTransfers.size() > 0) {
+            singleResponse.__set_transfersList(sumTransfers);
+        }
+
+        if (singleResponse.transactions.size() > 0 || singleResponse.transfersList.size() > 0) {
+            result.queryResponse.push_back(singleResponse);
+            ++cnt;
+            --queriesLimit;
+        }
+
+    }
+
+    {
+        fltLock_.lock();
+        if (ftRequests_.find(requestId) == ftRequests_.end()) {
+            ftRequests_.emplace(requestId, result);
+        }
+        else {
+            cslog() << "Request Id already present in the results table, process terminated";
+        }
+        fltLock_.unlock();
+    }
 }
 
 void APIHandler::store_block_slot(const csdb::Pool& pool) {

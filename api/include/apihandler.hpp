@@ -83,8 +83,22 @@ public:
     void TransactionGet(api::TransactionGetResult& _return, const api::TransactionId& transactionId) override;
     void TransactionsGet(api::TransactionsGetResult& _return, const general::Address& address, const int64_t offset, const int64_t limit) override;
     void TransactionFlow(api::TransactionFlowResult& _return, const api::Transaction& transaction) override;
+
     void TransactionSend(api::SendTransactionResult& _return, const Transaction& transaction) override;
     void TransactionResultGet(api::TransactionFlowResult& _return, const int64_t requestId) override;
+
+    //requesting wallet's balances w/o getting results immediately
+    void WalletsListBalancesGet(api::AcceptedRequestId& _return, api::Addresses walletAddresses);
+    void WalletsListBalancesResultGet(api::WalletBalanceResults& _return, int64_t requestId);
+
+        //requesting filtered transaction's list w/o getting result immediately
+    void FilteredTrxsListGet(api::AcceptedRequestId& _return, api::TransactionsQuery generalQuery);
+    void FilteredTrxsListGetResult(api::FilteredTransactionsListResult& _return, int64_t requestId);
+
+        //sending transaction's list w/o getting results immediately
+    void TransactionsListSend(api::SendTransactionResult& _return, api::TransactionsList transactions);
+    void TransactionsListResultGet(api::TransactionsListFlowResult& _return, int64_t requestId);
+
     void FilteredTransactionsListGet(api::FilteredTransactionsListResult& _return, const api::TransactionsQuery& generalQuery) override;
     // Get list of pools from last one (head pool) to the first one.
     void PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t limit) override;
@@ -265,6 +279,9 @@ private:
     api::SealedTransaction convertTransaction(const csdb::Transaction& transaction);
 
     std::vector<api::SealedTransaction> convertTransactions(const std::vector<csdb::Transaction>& transactions);
+    
+    void filteredTrxsProcess(const api::TransactionsQuery& generalQuery, uint64_t requestId);
+    void processBalancesRequest(api::Addresses walletAddresses, uint64_t requestId);
 
     std::vector<api::ExtraFee> fillExtraFee(const csdb::Transaction& transaction, const csdb::TransactionID transactionId);
 
@@ -307,6 +324,11 @@ private:
     std::unordered_map<uint64_t, api::TransactionFlowResult> transactions_;
     std::mutex trxsLock_;
     std::unordered_map<uint64_t, api::FilteredTransactionsListResult> ftRequests_;
+    std::mutex fltLock_;
+    std::unordered_map<uint64_t, api::WalletBalanceResults> walBalances_;
+    std::mutex wbLock_;
+    std::unordered_map<uint64_t, api::TransactionsListFlowResult> trxLists_;
+    std::mutex tlMutex_;
     uint64_t requestId_ = 0;
 
 private slots:
