@@ -83,6 +83,8 @@ public:
     void TransactionGet(api::TransactionGetResult& _return, const api::TransactionId& transactionId) override;
     void TransactionsGet(api::TransactionsGetResult& _return, const general::Address& address, const int64_t offset, const int64_t limit) override;
     void TransactionFlow(api::TransactionFlowResult& _return, const api::Transaction& transaction) override;
+    void TransactionSend(api::SendTransactionResult& _return, const Transaction& transaction) override;
+    void TransactionResultGet(api::TransactionFlowResult& _return, const int64_t requestId) override;
     void FilteredTransactionsListGet(api::FilteredTransactionsListResult& _return, const api::TransactionsQuery& generalQuery) override;
     // Get list of pools from last one (head pool) to the first one.
     void PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t limit) override;
@@ -280,6 +282,8 @@ private:
     ::csdb::Transaction makeTransaction(const ::api::Transaction&);
     void dumbTransactionFlow(api::TransactionFlowResult& _return, const csdb::Transaction& tr);
     void smartTransactionFlow(api::TransactionFlowResult& _return, const ::api::Transaction&, csdb::Transaction& send_transaction);
+    void processTransaction(csdb::Transaction trx, uint64_t requestId);
+    void processSmartTransaction(const Transaction& transaction, csdb::Transaction transactionToSend, uint64_t requestId);
 
     std::optional<std::string> checkTransaction(const ::api::Transaction&, csdb::Transaction& cTransaction);
     void checkTransactionsFlow(const cs::TransactionsPacket& packet, cs::DumbCv::Condition condition);
@@ -299,6 +303,11 @@ private:
 
     std::optional<api::Delegated> getDelegated(const BlockChain::WalletData& wallet);
     const size_t MaxQueriesNumber = 1000;
+
+    std::unordered_map<uint64_t, api::TransactionFlowResult> transactions_;
+    std::mutex trxsLock_;
+    std::unordered_map<uint64_t, api::FilteredTransactionsListResult> ftRequests_;
+    uint64_t requestId_ = 0;
 
 private slots:
     void updateSmartCachesPool(const csdb::Pool& pool);

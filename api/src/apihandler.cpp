@@ -18,6 +18,8 @@
 #include "stdafx.h"
 #include "serializer.hpp"
 
+#include <thread>
+
 #include <base58.h>
 
 using namespace api;
@@ -1079,6 +1081,68 @@ void APIHandler::checkTransactionsFlow(const cs::TransactionsPacket& packet, cs:
     }
 }
 
+void APIHandler::TransactionSend(api::SendTransactionResult& _return, const Transaction& transaction) {
+#ifdef MONITOR_NODE
+    _return.status.code = int8_t(ERROR_CODE);
+    _return.status.message = "Monitor node don't receive transactions";
+    _return.requestId = 0;
+    return;
+#endif
+    _return.roundNum = static_cast<int32_t>(cs::Conveyer::instance().currentRoundTable().round); // possible overflow
+    csdb::Transaction transactionToSend;
+    if (auto errInfo = checkTransaction(transaction, transactionToSend); errInfo.has_value()) {
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = errInfo.value();
+        _return.requestId = 0;
+        return;
+    }
+
+    _return.requestId = ++requestId_;
+    if (!transaction.__isset.smartContract && !solver_.smart_contracts().is_payable_call(transactionToSend)) {
+        std::thread t1(&APIHandler::processTransaction, this, transactionToSend, requestId_);
+        t1.detach();
+    }
+
+    else {
+        std::thread t2(&APIHandler::processSmartTransaction, this, transaction, transactionToSend, requestId_);
+        t2.detach();
+    }
+    //csinfo() << "State transaction: seq = " << _return.stateId.poolSeq << ", index = " << _return.stateId.index;
+
+    _return.status.code = 0;
+    _return.status.message = "";
+
+}
+void APIHandler::TransactionResultGet(api::TransactionFlowResult& _return, int64_t requestId) {
+    auto it = transactions_.find(requestId);
+    if (it != transactions_.end()) {
+        _return = transactions_.at(requestId);
+        {
+            std::unique_lock lock(trxsLock_);
+            transactions_.erase(it);
+        }
+    }
+    else {
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = "Transaction not found in API answers";
+    }
+
+}
+
+void APIHandler::processTransaction(csdb::Transaction trx, uint64_t requestId) {
+    api::TransactionFlowResult returnTrx;
+    dumbTransactionFlow(returnTrx, trx);
+    {
+        std::unique_lock lock(trxsLock_);
+        transactions_.emplace(requestId, returnTrx);
+    }
+}
+
+void APIHandler::processSmartTransaction(const Transaction& transaction, csdb::Transaction transactionToSend, uint64_t requestId) {
+
+}
+
+
 void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const ::api::Transaction& transaction, csdb::Transaction& send_transaction) {
     auto input_smart = transaction.__isset.smartContract ? transaction.smartContract : SmartContractInvocation{};
     //auto send_transaction = makeTransaction(transaction);
@@ -1178,6 +1242,12 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
         return;
     }
 
+    if (!dumbCv_.addCVInfo(send_transaction.signature())) {
+        _return.status.code = int8_t(ERROR_CODE);
+        _return.status.message = "This transaction has been seen before";
+        return;
+    }
+
     cs::Conveyer::instance().addTransaction(send_transaction);
 
     cs::Hash hashState;
@@ -1239,8 +1309,12 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     if (!eFee.empty()) {
         _return.__set_extraFee(eFee);
     }
-    _return.id.poolSeq = newTransactionId.pool_seq();
-    _return.id.index = static_cast<int32_t>(newTransactionId.index());
+    _return.id.poolSeq = trResult.id.pool_seq();
+    _return.id.index = static_cast<int32_t>(trResult.id.index());
+    api::TransactionId tid;
+    tid.__set_poolSeq(newTransactionId.pool_seq());
+    tid.__set_index(static_cast<int32_t>(newTransactionId.index()));
+    _return.__set_stateId(tid);
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS, getDelimitedTransactionSigHex(send_transaction));
 }
@@ -1263,6 +1337,7 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
         dumbTransactionFlow(_return, transactionToSend);
     else
         smartTransactionFlow(_return, transaction, transactionToSend);
+    csinfo() << "State transaction: seq = " << _return.stateId.poolSeq << ", index = " << _return.stateId.index;
 }
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
@@ -1821,6 +1896,9 @@ void APIHandler::updateSmartCachesPool(const csdb::Pool& pool) {
     for (auto& trx : pool.transactions()) {
         if (is_smart(trx) || is_smart_state(trx) || solver_.smart_contracts().is_payable_call(trx)) {
             updateSmartCachesTransaction(trx, pool.sequence());
+            if (is_smart(trx)) {
+                dumbCv_.sendCvSignal(trx.signature(), cs::DumbCv::Condition::Success, trx.id(), csdb::Amount(trx.counted_fee().to_double()));
+            }
         }
         else { // if dumb transaction
             dumbCv_.sendCvSignal(trx.signature(), cs::DumbCv::Condition::Success, trx.id(), csdb::Amount(trx.counted_fee().to_double()));
