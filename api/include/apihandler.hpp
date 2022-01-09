@@ -88,16 +88,16 @@ public:
     void TransactionResultGet(api::TransactionFlowResult& _return, const int64_t requestId) override;
 
     //requesting wallet's balances w/o getting results immediately
-    void WalletsListBalancesGet(api::AcceptedRequestId& _return, api::Addresses walletAddresses);
-    void WalletsListBalancesResultGet(api::WalletBalanceResults& _return, int64_t requestId);
+    void WalletsListBalancesGet(api::AcceptedRequestId& _return, const api::Addresses& walletAddresses) override;
+    void WalletsListBalancesResultGet(api::WalletBalanceResults& _return, const int64_t requestId) override;
 
         //requesting filtered transaction's list w/o getting result immediately
-    void FilteredTrxsListGet(api::AcceptedRequestId& _return, api::TransactionsQuery generalQuery);
-    void FilteredTrxsListGetResult(api::FilteredTransactionsListResult& _return, int64_t requestId);
+    void FilteredTrxsListGet(api::AcceptedRequestId& _return, const api::TransactionsQuery& generalQuery) override;
+    void FilteredTrxsListGetResult(api::FilteredTransactionsListResult& _return, const int64_t requestId) override;
 
         //sending transaction's list w/o getting results immediately
-    void TransactionsListSend(api::SendTransactionResult& _return, api::TransactionsList transactions);
-    void TransactionsListResultGet(api::TransactionsListFlowResult& _return, int64_t requestId);
+    void TransactionsListSend(api::SendTransactionResult& _return, const api::TransactionsList& transactions) override;
+    void TransactionsListResultGet(api::TransactionsListFlowResult& _return, const int64_t requestId) override;
 
     void FilteredTransactionsListGet(api::FilteredTransactionsListResult& _return, const api::TransactionsQuery& generalQuery) override;
     // Get list of pools from last one (head pool) to the first one.
