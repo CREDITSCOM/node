@@ -2152,9 +2152,10 @@ void BlockChain::lookForBadBlocks() {
     if (badBlocks_.empty()) {
         return;
     }
-    for (auto it : badBlocks_) {
+    //TODO: explore bad blocks
+    //for (auto it : badBlocks_) {
 
-    }
+    //}
 }
 
 void BlockChain::badBlockIssue(const csdb::Pool& pool) {

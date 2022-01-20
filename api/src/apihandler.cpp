@@ -1340,7 +1340,7 @@ void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Tran
     csinfo() << "State transaction: seq = " << _return.stateId.poolSeq << ", index = " << _return.stateId.index;
 }
 
-void APIHandler::WalletsListBalancesGet(api::AcceptedRequestId& _return, api::Addresses& walletAddresses) {
+void APIHandler::WalletsListBalancesGet(api::AcceptedRequestId& _return, const api::Addresses& walletAddresses) {
     _return.ids = ++requestId_;
 
     std::thread t(&APIHandler::processBalancesRequest, this, walletAddresses, requestId_);
@@ -1353,7 +1353,7 @@ void APIHandler::WalletsListBalancesGet(api::AcceptedRequestId& _return, api::Ad
     //SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);
 }
 
-void APIHandler::processBalancesRequest(api::Addresses walletAddresses, uint64_t requestId) {
+void APIHandler::processBalancesRequest(const api::Addresses walletAddresses, uint64_t requestId) {
     api::WalletBalanceResults result;
     for (auto it : walletAddresses.addresses) {
         const csdb::Address addr = BlockChain::getAddressFromKey(it);
@@ -1405,7 +1405,7 @@ void APIHandler::WalletsListBalancesResultGet(api::WalletBalanceResults& _return
     }
 }
 
-void APIHandler::FilteredTrxsListGet(api::AcceptedRequestId& _return, api::TransactionsQuery& generalQuery) {
+void APIHandler::FilteredTrxsListGet(api::AcceptedRequestId& _return, const api::TransactionsQuery& generalQuery) {
 #ifdef MONITOR_NODE
     _return.status.code = int8_t(ERROR_CODE);
     _return.status.message = "Node don't use such method";
@@ -1438,7 +1438,7 @@ void APIHandler::FilteredTrxsListGetResult(api::FilteredTransactionsListResult& 
     }
 }
 
-void APIHandler::TransactionsListSend(api::SendTransactionResult& _return, api::TransactionsList& transactions) {}
+void APIHandler::TransactionsListSend(api::SendTransactionResult& _return, const api::TransactionsList& transactions) {}
 void APIHandler::TransactionsListResultGet(api::TransactionsListFlowResult& _return, int64_t requestId) {}
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {
