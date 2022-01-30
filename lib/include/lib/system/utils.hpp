@@ -21,7 +21,9 @@
 #ifdef _MSC_VER
 #include <intrin.h>
 #else
+#if !defined(__arm__) && !defined(__aarch64__)
 #include <x86intrin.h>
+#endif
 #endif
 
 #include <time.h>
