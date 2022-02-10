@@ -1,8 +1,10 @@
 #pragma once
 
 #include <memory>
+#include <set>
 
 #include <client/params.hpp>
+#include <lib/system/common.hpp>
 
 class BlockChain;
 class TokensMaster;
@@ -24,7 +26,7 @@ public:
     CachesSerializationManager();
     ~CachesSerializationManager();
 
-    void bind(BlockChain&);
+    void bind(BlockChain&, std::set<cs::PublicKey>& initialConfidants);
     void bind(SmartContracts&);
     void bind(WalletsCache&);
     void bind(WalletsIds&);

@@ -74,6 +74,7 @@ public:
     bool init(
       const std::string& path,
       cs::CachesSerializationManager*,
+      std::set<cs::PublicKey>& initialConfidants,
       cs::Sequence newBlockchainTop = cs::kWrongSequence
     );
     // called immediately after object construction, better place to subscribe on signals
@@ -498,8 +499,8 @@ private:
         desiredHash_ = csdb::PoolHash{};
     }
 
-    bool tryQuickStart(cs::CachesSerializationManager*);
-    bool bindSerializationManToCaches(cs::CachesSerializationManager*);
+    bool tryQuickStart(cs::CachesSerializationManager*, std::set<cs::PublicKey>& initialConfidants);
+    bool bindSerializationManToCaches(cs::CachesSerializationManager*, std::set<cs::PublicKey>& initialConfidants);
 
     cs::CachesSerializationManager* serializationManPtr_ = nullptr;
 

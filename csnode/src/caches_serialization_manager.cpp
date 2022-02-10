@@ -204,8 +204,8 @@ CachesSerializationManager::CachesSerializationManager()
 
 CachesSerializationManager::~CachesSerializationManager() = default;
 
-void CachesSerializationManager::bind(BlockChain& bc) {
-    pImpl_->blockchainSerializer.bind(bc);
+void CachesSerializationManager::bind(BlockChain& bc, std::set<cs::PublicKey>& initialConfidants) {
+    pImpl_->blockchainSerializer.bind(bc, initialConfidants);
     pImpl_->bindFlags |= (1 << Impl::BlockChainBit);
 }
 

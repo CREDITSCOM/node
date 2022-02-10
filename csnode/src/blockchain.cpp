@@ -58,7 +58,10 @@ void BlockChain::subscribeToSignals() {
     cs::Connector::connect(&storage_.readingStoppedEvent(), trxIndex_.get(), &TransactionsIndex::onDbReadFinished);
 }
 
-bool BlockChain::bindSerializationManToCaches(cs::CachesSerializationManager* serializationManPtr) {
+bool BlockChain::bindSerializationManToCaches(
+    cs::CachesSerializationManager* serializationManPtr,
+    std::set<cs::PublicKey>& initialConfidants
+) {
     if (!serializationManPtr) {
         cserror() << "NO SERIALIZATION MANAGER PROVIDED!";
         return false;
@@ -66,17 +69,20 @@ bool BlockChain::bindSerializationManToCaches(cs::CachesSerializationManager* se
 
     serializationManPtr_ = serializationManPtr;
 
-    serializationManPtr_->bind(*this);
+    serializationManPtr_->bind(*this, initialConfidants);
     serializationManPtr_->bind(*walletsCacheStorage_);
     serializationManPtr_->bind(*walletIds_);
 
     return true;
 }
 
-bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManPtr) {
+bool BlockChain::tryQuickStart(
+    cs::CachesSerializationManager* serializationManPtr,
+    std::set<cs::PublicKey>& initialConfidants
+) {
     cslog() << "Try QUICK START...";
 
-    if (!bindSerializationManToCaches(serializationManPtr)) {
+    if (!bindSerializationManToCaches(serializationManPtr, initialConfidants)) {
         return false;
     }
 
@@ -91,7 +97,12 @@ bool BlockChain::tryQuickStart(cs::CachesSerializationManager* serializationManP
     return ok;
 }
 
-bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* serializationManPtr, cs::Sequence newBlockchainTop) {
+bool BlockChain::init(
+    const std::string& path,
+    cs::CachesSerializationManager* serializationManPtr,
+    std::set<cs::PublicKey>& initialConfidants,
+    cs::Sequence newBlockchainTop
+  ) {
     cs::Connector::connect(&this->removeBlockEvent, trxIndex_.get(), &TransactionsIndex::onRemoveBlock);
 
     lastSequence_ = 0;
@@ -100,10 +111,10 @@ bool BlockChain::init(const std::string& path, cs::CachesSerializationManager* s
     if (newBlockchainTop == cs::kWrongSequence) {
         if (trxIndex_->recreate()) {
             cslog() << "Cannot use QUICK START, trxIndex has to be recreated";
-            bindSerializationManToCaches(serializationManPtr);
+            bindSerializationManToCaches(serializationManPtr, initialConfidants);
         }
         else {
-            successfulQuickStart = tryQuickStart(serializationManPtr);
+            successfulQuickStart = tryQuickStart(serializationManPtr, initialConfidants);
         }
     }
 

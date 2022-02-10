@@ -14,12 +14,13 @@ const std::string kDataFileName = "blockchain.dat";
 
 namespace cs {
 
-void BlockChain_Serializer::bind(BlockChain& bchain) {
+void BlockChain_Serializer::bind(BlockChain& bchain, std::set<cs::PublicKey>& initialConfidants) {
     previousNonEmpty_ = reinterpret_cast<decltype(previousNonEmpty_)>(&bchain.previousNonEmpty_);
     lastNonEmptyBlock_ = reinterpret_cast<decltype(lastNonEmptyBlock_)>(&bchain.lastNonEmptyBlock_);
     totalTransactionsCount_ = &bchain.totalTransactionsCount_;
     uuid_ = &bchain.uuid_;
     lastSequence_ = &bchain.lastSequence_;
+    initialConfidants_ = reinterpret_cast<decltype(initialConfidants_)>(&initialConfidants);
 }
 
 void BlockChain_Serializer::clear(const std::filesystem::path& rootDir) {
@@ -29,6 +30,7 @@ void BlockChain_Serializer::clear(const std::filesystem::path& rootDir) {
     *totalTransactionsCount_ = 0;
     uuid_->store(0);
     lastSequence_->store(0);
+    initialConfidants_->clear();
     save(rootDir);
 }
 
@@ -40,6 +42,7 @@ void BlockChain_Serializer::save(const std::filesystem::path& rootDir) {
     oa << *totalTransactionsCount_;
     oa << uuid_->load();
     oa << lastSequence_->load();
+    oa << *initialConfidants_;
 }
 
 ::cscrypto::Hash BlockChain_Serializer::hash() {
@@ -63,5 +66,6 @@ void BlockChain_Serializer::load(const std::filesystem::path& rootDir) {
     Sequence lastSequence;
     ia >> lastSequence;
     lastSequence_->store(lastSequence);
+    ia >> *initialConfidants_;
 }
 }  // namespace cs
