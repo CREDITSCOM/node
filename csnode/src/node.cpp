@@ -2165,7 +2165,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     csmeta(csdetails) << "started";
 
     if (myLevel_ != Level::Confidant) {
-        csdebug() << kLogPrefix_ << "ignore stage-1 as no confidant";
+        csdebug() << kLogPrefix_ << "ignore stage-1 as no confidant, stage sender: " << cs::Utils::byteStreamToHex(sender);
         return;
     }
 
@@ -2254,7 +2254,7 @@ void Node::getStageTwo(const uint8_t* data, const size_t size, const cs::PublicK
     csmeta(csdetails);
 
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
-        csdebug() << kLogPrefix_ << "Ignore StageTwo as no confidant";
+        csdebug() << kLogPrefix_ << "Ignore StageTwo as no confidant, stage sender: " << cs::Utils::byteStreamToHex(sender);
         return;
     }
 
@@ -2330,7 +2330,7 @@ void Node::getStageThree(const uint8_t* data, const size_t size, const cs::Publi
     csmeta(csdetails);
 
     if (myLevel_ != Level::Confidant && myLevel_ != Level::Writer) {
-        csdebug() << "NODE> ignore stage-3 as no confidant";
+        csdebug() << "NODE> ignore stage-3 as no confidant, stage sender: " << cs::Utils::byteStreamToHex(sender);
         return;
     }
 
