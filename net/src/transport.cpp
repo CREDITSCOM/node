@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <thread>
+#include <unordered_set>
 
 #include <csconnector/csconnector.hpp>
 #include <cscrypto/cscrypto.hpp>
@@ -419,6 +420,8 @@ void Transport::getKnownPeers(std::vector<cs::PeerData>& result) {
     std::vector<net::NodeEntrance> knownPeers;
     host_.GetKnownNodes(knownPeers);
 
+    std::unordered_set<std::string> uniqueIds;
+
     for (auto& p : knownPeers) {
         cs::PeerData peerData;
         auto ptr = reinterpret_cast<const uint8_t*>(p.id.GetPtr());
@@ -430,7 +433,18 @@ void Transport::getKnownPeers(std::vector<cs::PeerData>& result) {
           peerData.platform = static_cast<decltype(peerData.platform)>(getPlatform(p.user_data));
         }
 
-        result.push_back(peerData);
+        if (uniqueIds.insert(peerData.id).second) {
+          result.push_back(peerData);
+        }
+        else {
+          std::string errorMsg = "Transport::getKnownPeers: peer with duplicated id detected "
+                                 "in routing table. Id: ";
+          errorMsg += peerData.id;
+#ifdef MONITOR_NODE
+          errorMsg += ". MONITOR_NODE";
+#endif
+          cserror() << errorMsg;
+        }
     }
 }
 
