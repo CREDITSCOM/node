@@ -4146,7 +4146,7 @@ void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {
 bool Node::checkKnownIssues(cs::Sequence seq) {
     constexpr const uint64_t uuidTestNet = 5283967947175248524ull;
     constexpr const uint64_t uuidMainNet = 11024959585341937636ull;
-    /*constexpr*/static const std::vector<cs::Sequence> knownIssues = {53885714ULL, 553134820ULL , 55764724ULL, 56100940ULL};
+    /*constexpr*/static const std::vector<cs::Sequence> knownIssues = {49796878ULL, 53885714ULL, 553134820ULL , 55764724ULL, 56100940ULL};
 
     if (getBlockChain().uuid() == uuidMainNet) {
         // valid blocks in all cases
