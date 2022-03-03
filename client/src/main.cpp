@@ -52,6 +52,7 @@ int main(int argc, char* argv[]) {
         ("recreate-index", "recreate index.db")
         (cmdline::argSeed, "enter with seed instead of keys")
         (cmdline::argSetBCTop, po::value<uint64_t>(), "all blocks in blockchain with higher sequence will be removed")
+        (cmdline::argBalChange, po::value<std::string>(), "prints all changes in account balance in log file")
         ("disable-auto-shutdown", "node will be prohibited to shutdown in case of fatal errors")
         ("version", "show node version")
         ("db-path", po::value<std::string>(), "path to DB (default: \"db/\")")
@@ -176,7 +177,7 @@ int main(int argc, char* argv[]) {
 #endif
     }
 
-    auto config = Config::read(vm);
+    auto config = Config::read(vm, true);
 
     if (!config.isGood()) {
         panic();

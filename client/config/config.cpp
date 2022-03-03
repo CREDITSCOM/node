@@ -118,6 +118,7 @@ const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
 const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
 const std::string ARG_NAME_RECREATE_INDEX = "recreate-index";
 const std::string ARG_NAME_NEW_BC_TOP = "set-bc-top";
+const std::string ARG_NAME_BAL_CHANGE = "bal-change";
 const std::string ARG_NAME_DISABLE_AUTO_SHUTDOWN = "disable-auto-shutdown";
 
 const uint32_t MIN_PASSWORD_LENGTH = 3;
@@ -227,19 +228,41 @@ Config::Config(const ConveyerData& conveyerData)
 : conveyerData_(conveyerData) {
 }
 
-Config Config::read(po::variables_map& vm) {
+Config Config::read(po::variables_map& vm, bool atStart) {
     Config result = readFromFile(getArgFromCmdLine(vm, ARG_NAME_CONFIG_FILE, DEFAULT_PATH_TO_CONFIG));
 
     result.recreateIndex_ = vm.count(ARG_NAME_RECREATE_INDEX);
     result.autoShutdownEnabled_ = !vm.count(ARG_NAME_DISABLE_AUTO_SHUTDOWN);
     result.pathToDb_ = getArgFromCmdLine(vm, ARG_NAME_DB_PATH, DEFAULT_PATH_TO_DB);
 
-    if (vm.count(ARG_NAME_NEW_BC_TOP)) {
-        result.newBlockchainTop_ = true;
-        result.newBlockchainTopSeq_ =
-            vm[ARG_NAME_NEW_BC_TOP].as<decltype(result.newBlockchainTopSeq_)>();
-    }
+    if (atStart) {
+        if (vm.count(ARG_NAME_NEW_BC_TOP)) {
+            result.newBlockchainTop_ = true;
+            result.newBlockchainTopSeq_ =
+                vm[ARG_NAME_NEW_BC_TOP].as<decltype(result.newBlockchainTopSeq_)>();
+        }
 
+        if (vm.count(ARG_NAME_BAL_CHANGE)) {
+            result.showBalanceChangeAddress_ =
+                vm[ARG_NAME_BAL_CHANGE].as<decltype(result.showBalanceChangeAddress_)>();
+            cs::Bytes bytes;
+            if (!result.showBalanceChange_) {
+                if (DecodeBase58(result.showBalanceChangeAddress_, bytes)) {
+                    result.showBalanceChange_ = true;
+                    std::copy(bytes.begin(), bytes.end(), result.showBalanceChangeKey_.begin());
+                    csinfo() << "Balance changes of account " << result.showBalanceChangeAddress_ << " will be logged";
+                }
+                else {
+                    result.showBalanceChangeKey_.fill(0);
+                    csinfo() << "Balance changes account is set to " << cs::Utils::byteStreamToHex(result.showBalanceChangeKey_);
+                }
+            }
+        }
+        else {
+            result.showBalanceChangeKey_.fill(0);
+            csinfo() << "Balance changes account is set to " << cs::Utils::byteStreamToHex(result.showBalanceChangeKey_);
+        }
+    }
     return result;
 }
 

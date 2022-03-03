@@ -47,7 +47,7 @@ void cs::config::Observer::eventLoop() {
             break;
         }
 
-        Config config = Config::read(map_);
+        Config config = Config::read(map_, false);
 
         if (config.isGood()) {
             config.publicKey_ = publicKey_;

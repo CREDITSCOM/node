@@ -115,6 +115,8 @@ public:
                                         bool inverse = false);
 
     void updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>&);
+    void logOperation(const std::string& reason, const cs::PublicKey& key, const csdb::Amount& sum);
+
 
     PublicKey toPublicKey(const csdb::Address&) const;
 
@@ -150,6 +152,8 @@ private:
 #endif
 
     WalletsCache& data_;
+    cs::PublicKey showBalanceChangeKey_;
+    bool showBalanceChange_ = false;
 };
 
 inline double WalletsCache::Updater::load(const csdb::Transaction& t, const BlockChain& bc, bool inverse) {

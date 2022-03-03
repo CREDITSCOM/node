@@ -152,7 +152,7 @@ public:
     Config& operator=(const Config&) = default;
     Config& operator=(Config&&) = default;
 
-    static Config read(po::variables_map&);
+    static Config read(po::variables_map&, bool);
     
     const EndpointData& getInputEndpoint() const {
         return inputEp_;
@@ -324,6 +324,19 @@ public:
     bool isStakinOn(cs::RoundNumber round);
     bool isMiningOn(cs::RoundNumber round);
 
+    bool getBalanceChangeFlag() const {
+        return showBalanceChange_;
+    }
+
+    cs::PublicKey getBalanceChangeKey() const{
+        return showBalanceChangeKey_;
+    }
+
+    std::string getBalanceChangeAddress() const {
+        return showBalanceChangeAddress_;
+        ;
+    }
+
 
 private:
     static Config readFromFile(const std::string& fileName);
@@ -380,6 +393,7 @@ private:
     ApiData apiData_;
     DbSQLData dbSQLData_;
 
+    bool showBalanceChange_ = false;
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
     bool newBlockchainTop_ = false;
@@ -400,6 +414,9 @@ private:
     ConveyerData conveyerData_;
 
     EventsReportData eventsReport_;
+
+    cs::PublicKey showBalanceChangeKey_;
+    std::string showBalanceChangeAddress_;
 
     std::vector<std::pair<cs::RoundNumber, cs::RoundNumber>> stakingRoundRanges_;
 
