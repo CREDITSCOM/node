@@ -51,6 +51,30 @@ namespace api_diag {
         _return.__set_nodes(nodes);
     }
 
+    void APIDiagHandler::GetActiveTrustNodes(ActiveTrustNodesResult& _return) {
+        general::APIResponse resp;
+        resp.__set_code(kOk);
+        _return.__set_result(resp);
+
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        std::vector<api_diag::ServerTrustNode> nodes;
+
+        auto task = [&]() {
+            node_.getKnownPeersUpd(nodes);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+
+        _return.__set_nodes(nodes);
+    }
+
     void APIDiagHandler::GetActiveTransactionsCount(ActiveTransactionsResult& _return) {
         general::APIResponse resp;
         resp.__set_code(kOk);

@@ -10,6 +10,7 @@
 #include <atomic>
 #include <chrono>
 #include <mutex>
+#include <map>
 
 class Config;
 
@@ -17,6 +18,35 @@ namespace cs {
 constexpr size_t kMaxRoundDelay = 30000;
 
 using PingCheckSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
+
+struct NodeStat {
+    bool nodeOn;
+    std::string ip;
+    std::string version;
+    std::string platform;
+    uint64_t timeReg;
+    uint64_t timeActive;
+    uint64_t trustedDay;
+    uint64_t trustedMonth;
+    uint64_t trustedPrevMonth;
+    uint64_t trustedTotal;
+    uint64_t failedTrustedDay;
+    uint64_t failedTrustedMonth;
+    uint64_t failedTrustedPrevMonth;
+    uint64_t failedTrustedTotal;
+    uint64_t trustedADay;
+    uint64_t trustedAMonth;
+    uint64_t trustedAPrevMonth;
+    uint64_t trustedATotal;
+    uint64_t failedTrustedADay;
+    uint64_t failedTrustedAMonth;
+    uint64_t failedTrustedAPrevMonth;
+    uint64_t failedTrustedATotal;
+    csdb::Amount feeDay;
+    csdb::Amount feeMonth;
+    csdb::Amount feePrevMonth;
+    csdb::Amount feeTotal;
+};
 
 class RoundStat {
 public:
@@ -32,6 +62,8 @@ public:
     // called when next block is stored
     void onStoreBlock(const csdb::Pool& block);
 
+    void setNodeStatus(const cs::PublicKey key, bool status);
+
     size_t totalTransactions() const {
         return totalAcceptedTransactions_;
     }
@@ -46,6 +78,10 @@ public:
 
     void resetLastRoundMs();
     bool isCurrentRoundTooLong(size_t longDurationMs = kMaxRoundDelay) const;
+
+    const std::map<cs::PublicKey, cs::NodeStat> getNodes() const {
+        return  nodes_;
+    }
 
 public slots:
     void onPingReceived(cs::Sequence, const cs::PublicKey&);
@@ -63,6 +99,10 @@ public signals:
 private:
     void checkRoundElapse();
     void checkStoreBlockElapse();
+    void countTrustAndTrx(const csdb::Pool& block);
+
+    void dayChangeProcedure();
+    void monthChangeProcedure();
 
     static const int64_t kMaxPingSynchroDelay = 30000;
 
@@ -90,6 +130,9 @@ private:
     std::chrono::steady_clock::time_point storeBlockElapseTimePoint_;
 
     std::chrono::milliseconds checkPingDelta_{0};
+    std::map<cs::PublicKey, cs::NodeStat> nodes_;
+    int lastMonth_ = 0;
+    int lastDay_ = 0;
 };
 
 }  // namespace cs

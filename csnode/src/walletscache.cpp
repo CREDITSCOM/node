@@ -90,6 +90,10 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
     if (conf->getBalanceChangeFlag() && conf->getBalanceChangeKey() != cs::Zero::key) {
         showBalanceChange_ = true;
         showBalanceChangeKey_ = conf->getBalanceChangeKey();
+        //csdebug() << kLogPrefix << "Balance changes of account " << cs::Utils::byteStreamToHex(showBalanceChangeKey_) << " will be logged";
+    }
+    else {
+        //csdebug() << kLogPrefix << "No balance change info will be logged";
     }
 
     auto& transactions = pool.transactions();
@@ -110,8 +114,8 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
 
     if (totalAmountOfCountedFee > csdb::Amount(0)) {
         fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants,
-                                     cs::Utils::bitsToMask(pool.numberTrusted(),
-                                     pool.realTrusted()), inverse);
+                                     cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()), 
+                                     inverse);
     }
 
     data_.staking_->cleanObsoletteDelegations(BlockChain::getBlockTime(pool));

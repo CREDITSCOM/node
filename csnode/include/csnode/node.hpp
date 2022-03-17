@@ -326,6 +326,7 @@ public:
     
     void getKnownPeers(std::vector<api_diag::ServerNode>& nodes);
     void dumpKnownPeersToFile();
+    void Node::getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes);
 
     /**
      * Gets node information. Caller MUST care about concurrency.

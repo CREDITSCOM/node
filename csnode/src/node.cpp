@@ -1196,6 +1196,7 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             if (EventReport::parseRunningStatus(bin_pack, status)) {
                 csevent() << log_prefix << cs::Utils::byteStreamToHex(sender.data(), sender.size())
                     << " go to state " << Running::to_string(status);
+                stat_.setNodeStatus(sender, status == Running::Status::Stop);
             }
             else {
                 csevent() << log_prefix << "failed to parse invalid running status from "
@@ -4473,6 +4474,54 @@ void Node::getKnownPeers(std::vector<api_diag::ServerNode>& nodes) {
 
 }
 
+
+void Node::getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes) {
+    auto statNodes = stat_.getNodes();
+    for (auto it : statNodes) {
+        api_diag::ServerTrustNode node;
+        node.__set_ip(it.second.ip);
+        node.__set_publicKey(EncodeBase58(it.first.data(), it.first.data() + it.first.size()));
+        node.__set_timeActive(it.second.timeActive);
+        node.__set_timeRegistration(it.second.timeReg);
+        node.__set_platform(it.second.platform);
+        node.__set_version(it.second.version);
+        node.__set_failedTrustDay(it.second.failedTrustedDay);
+        node.__set_failedTrustMonth(it.second.failedTrustedMonth);
+        node.__set_failedTrustPrevMonth(it.second.failedTrustedMonth);
+        node.__set_failedTrustTotal(it.second.failedTrustedTotal);
+        node.__set_active(it.second.nodeOn);
+        node.__set_failedTrustedADay(it.second.failedTrustedADay);
+        node.__set_failedTrustedAMonth(it.second.failedTrustedAMonth);
+        node.__set_failedTrustedAPrevMonth(it.second.failedTrustedAPrevMonth);
+        node.__set_failedTrustedATotal(it.second.failedTrustedATotal);
+        general::Amount fDay;
+        fDay.__set_integral(it.second.feeDay.integral());
+        fDay.__set_fraction(it.second.feeDay.fraction());
+        node.__set_feeDay(fDay);
+        general::Amount fMonth;
+        fMonth.__set_integral(it.second.feeMonth.integral());
+        fMonth.__set_fraction(it.second.feeMonth.fraction());
+        node.__set_feeMonth(fMonth);
+        general::Amount fPrevMonth;
+        fPrevMonth.__set_integral(it.second.feePrevMonth.integral());
+        fPrevMonth.__set_fraction(it.second.feePrevMonth.fraction());
+        node.__set_feePrevMonth(fPrevMonth);
+        general::Amount fTotal;
+        fTotal.__set_integral(it.second.feeTotal.integral());
+        fTotal.__set_fraction(it.second.feeTotal.fraction());
+        node.__set_feeTotal(fTotal);
+        node.__set_trustDay(it.second.trustedDay);
+        node.__set_trustMonth(it.second.trustedMonth);
+        node.__set_trustPrevMonth(it.second.trustedPrevMonth);
+        node.__set_trustTotal(it.second.trustedTotal);
+        node.__set_trustedADay(it.second.trustedADay);
+        node.__set_trustedAMonth(it.second.trustedAMonth);
+        node.__set_trustedAPrevMonth(it.second.trustedAPrevMonth);
+        node.__set_trustedATotal(it.second.trustedATotal);
+
+        nodes.push_back(node);
+    }
+}
 
 void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info) {
     cs::Sequence sequence = blockChain_.getLastSeq();
