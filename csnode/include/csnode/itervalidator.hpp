@@ -68,7 +68,8 @@ public:
         kDifferentDelegatedAmount,
         kNoDelegatedAmountToWithdraw,
         kInsufficientDelegatedBalance,
-        kAmountTooLow
+        kAmountTooLow,
+        kNegativeAmount
     };
 
     static std::string getRejectMessage(RejectCode);

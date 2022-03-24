@@ -328,6 +328,9 @@ public:
     void dumpKnownPeersToFile();
     void getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes);
 
+    void printInitialConfidants();
+
+
     /**
      * Gets node information. Caller MUST care about concurrency.
      * One SHOULD make a call to this from CallsQueue or directly from processorRoutine

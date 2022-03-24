@@ -400,7 +400,7 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
             return "Such kind of transactions is prohibited for this recipient";
         case kNoDelegateTarget:
             return "No such delegate in your list";
-        case  kNoDelegateSource:
+        case kNoDelegateSource:
             return "Target account doesn't have you as source";
         case kNoDelegatedAmountToWithdraw:
             return "Target account doesn't have delegated amount that could be withdrawn";
@@ -409,7 +409,9 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
         case kDifferentDelegatedAmount:
             return "This account has another delegation amount from your account";
         case kAmountTooLow:
-            return "The amount of thansaction is too low";
+            return "The amount of transaction is too low";
+        case kNegativeAmount:
+            return "The amount of transaction is negative";
         default :
             return "Unknown reject reason.";
     }
@@ -424,6 +426,10 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
 
     if (!fee::estimateMaxFee(t, countedFee, sc)) {
         rc = kInsufficientMaxFee;
+    }
+
+    if (!rc && t.amount() < csdb::Amount(0)) {
+        rc = kNegativeAmount;
     }
 
     if (!rc) {

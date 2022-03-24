@@ -46,6 +46,7 @@ struct NodeStat {
     csdb::Amount feeMonth;
     csdb::Amount feePrevMonth;
     csdb::Amount feeTotal;
+    cs::Sequence lastConsensus = 0ULL;
 };
 
 class RoundStat {
