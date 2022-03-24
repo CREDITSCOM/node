@@ -86,6 +86,8 @@ void RoundStat::dayChangeProcedure() {
         it->second.failedTrustedDay = 0;
         it->second.feeDay = csdb::Amount{ 0 };
         it->second.trustedDay = 0ULL;
+        it->second.failedTrustedADay = 0ULL;
+        it->second.trustedADay = 0ULL;
         ++it;
     }
 }
@@ -129,20 +131,21 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
     }
     auto feePart = (rTrustedNumber != 0) ? rCost / rTrustedNumber : csdb::Amount(0);
     std::string blockTime = block.user_field(BlockChain::kFieldTimestamp).is_valid() ? block.user_field(BlockChain::kFieldTimestamp).value<std::string>(): "0";
-    int64_t bTime = 1647257052; //static_cast<int64_t>((std::stoll(blockTime.empty() ? "0" : blockTime))/1000);
+    int64_t bTime = static_cast<int64_t>((std::stoll(blockTime.empty() ? "0" : blockTime))/1000);
     const time_t longTime = (time_t)bTime;
     struct tm* structTime = gmtime(&longTime);
     //csdebug() << "Block time: " << blockTime << " == " << longTime << " -> " << structTime->tm_mon << " - " << structTime->tm_mday << " " << structTime->tm_hour << ":" << structTime->tm_min << ":" << structTime->tm_sec;
     if (bTime == 0ULL) {
         return;
     }
-    if (block.sequence() == 0ULL) {
+    if (block.sequence() < 5ULL) {
         lastMonth_ = structTime->tm_mon;
         lastDay_ = structTime->tm_mday;
     }
-
     bool dayChange = lastDay_ != structTime->tm_mday;
     bool monthChange = lastMonth_ != structTime->tm_mon;
+    lastMonth_ = structTime->tm_mon;
+    lastDay_ = structTime->tm_mday;
     if (dayChange) {
         dayChangeProcedure();
     }
@@ -153,6 +156,7 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
         const auto& key = confs[i];
         if (nodes_.find(key) != nodes_.end()) {
             nodes_[key].nodeOn = true;
+            nodes_[key].lastConsensus = block.sequence();
             if (trusted[i] == 0) {
                 if (block.transactions_count() > 0) {
                     nodes_[key].trustedDay += 1;
@@ -208,8 +212,6 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
         }
     }
 
-    lastMonth_ = structTime->tm_mon;
-    lastDay_ = structTime->tm_mday;
 }
 
 void RoundStat::onReadBlock(const csdb::Pool& block, bool* /*shouldStop*/) {
@@ -224,6 +226,7 @@ void RoundStat::onStoreBlock(const csdb::Pool& block) {
 void RoundStat::onStopReadingFromDb(uint64_t totalTransactions) {
     if (totalAcceptedTransactions_ == totalTransactions){
         totalAcceptedTransactions_ = totalTransactions;
+        csdebug() << "All transactions read successfully";
     }
     else{
         cserror() << " The number of counted transactions is different";

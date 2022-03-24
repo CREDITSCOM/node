@@ -133,8 +133,6 @@ void Node::dumpKnownPeersToFile() {
 bool Node::init() {
     auto& initConfidants = cs::ConfigHolder::instance().config()->getInitialConfidants();
     initialConfidants_ = decltype(initialConfidants_)(initConfidants.begin(), initConfidants.end());
-
-
     if (initialConfidants_.find(solver_->getPublicKey()) != initialConfidants_.end()) {
         transport_->setPermanentNeighbours(initialConfidants_);
     }
@@ -172,7 +170,6 @@ bool Node::init() {
         }
         return true;
     }
-
     if (!blockChain_.init(
             cs::ConfigHolder::instance().config()->getPathToDB(),
             &cachesSerializationManager_, initialConfidants_)
@@ -236,6 +233,16 @@ void Node::initPoolSynchronizer() {
 void Node::setupNextMessageBehaviour() {
     cs::Connector::connect(&cs::Conveyer::instance().roundChanged, &stat_, &cs::RoundStat::onRoundChanged);
     cs::Connector::connect(&stat_.roundTimeElapsed, this, &Node::onRoundTimeElapsed);
+}
+
+void Node::printInitialConfidants() {
+    const cs::PublicKey& own_key = solver_->getPublicKey();
+    csinfo() << "Initial confidants: ";
+    for (const auto& item : initialConfidants_) {
+        const auto beg = item.data();
+        const auto end = beg + item.size();
+        csinfo() << "NODE> " << " - " << EncodeBase58(beg, end) << (item == own_key ? " (me)" : "");
+    }
 }
 
 void Node::setupPoolSynchronizerBehaviour() {
@@ -4091,7 +4098,6 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 uint8_t cnt;
                 stream >> cnt;
                 csdebug() << "Rehabilitated smart-contracts: ";
-                initialConfidants_.clear();
                 for (uint8_t i = 1; i <= cnt; ++i) {
                     cs::PublicKey key;
                     stream >> key;
@@ -4245,7 +4251,6 @@ void Node::deepBlockValidation(const csdb::Pool& block, bool* check_failed) {//c
 void Node::onRoundTimeElapsed() {
     solver_->resetGrayList();
     const cs::PublicKey& own_key = solver_->getPublicKey();
-
     if (initialConfidants_.find(own_key) == initialConfidants_.end()) {
         cslog() << "Waiting for next round...";
 
