@@ -397,6 +397,7 @@ private:
     void reviewConveyerHashes();
 
     void processSync();
+    void updateWithPeerData(std::map<cs::PublicKey, cs::NodeStat>& sNodes);
 
     // transport
     void addToBlackList(const cs::PublicKey& key, bool isMarked);

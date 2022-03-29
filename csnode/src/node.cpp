@@ -4480,6 +4480,28 @@ void Node::getKnownPeers(std::vector<api_diag::ServerNode>& nodes) {
 }
 
 
+void Node::updateWithPeerData(std::map<cs::PublicKey, cs::NodeStat>& sNodes) {
+    std::vector<cs::PeerData> peers;
+    transport_->getKnownPeers(peers);
+    for (const auto& peer : peers) {
+        cs::PublicKey key;
+        cs::Bytes kBytes;
+        cs::Bytes bytes;
+        if (DecodeBase58(peer.id, bytes)) {
+            cs::PublicKey key;
+            if (key.size() == bytes.size()) {
+                std::copy(bytes.cbegin(), bytes.cend(), key.begin());
+                auto it = sNodes.find(key);
+                if (it != sNodes.end()) {
+                    it->second.ip = peer.ip;
+                    it->second.version = peer.version;
+                    it->second.platform = peer.platform;
+                }
+            }
+        }
+    }
+}
+
 void Node::getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes) {
     auto statNodes = stat_.getNodes();
     for (auto it : statNodes) {
@@ -4526,6 +4548,7 @@ void Node::getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes) {
 
         nodes.push_back(node);
     }
+    updateWithPeerData(statNodes);
 }
 
 void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info) {

@@ -80,7 +80,7 @@ void RoundStat::onRoundStart(RoundNumber round, bool skipLogs) {
     resetLastRoundMs();
 }
 
-void RoundStat::dayChangeProcedure() {
+void RoundStat::dayChangeProcedure(uint64_t cTime) {
     auto it = nodes_.begin();
     while (it != nodes_.end()) {
         it->second.failedTrustedDay = 0;
@@ -88,6 +88,10 @@ void RoundStat::dayChangeProcedure() {
         it->second.trustedDay = 0ULL;
         it->second.failedTrustedADay = 0ULL;
         it->second.trustedADay = 0ULL;
+        if (cTime > it->second.lastConsensus + daySeconds) {
+            it->second.nodeOn = false;
+            it->second.timeActive = 0ULL;
+        }
         ++it;
     }
 }
@@ -147,7 +151,7 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
     lastMonth_ = structTime->tm_mon;
     lastDay_ = structTime->tm_mday;
     if (dayChange) {
-        dayChangeProcedure();
+        dayChangeProcedure(bTime);
     }
     if (monthChange) {
         monthChangeProcedure();
@@ -155,8 +159,12 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
     for (int i = 0; i < trusted.size(); ++i) {
         const auto& key = confs[i];
         if (nodes_.find(key) != nodes_.end()) {
-            nodes_[key].nodeOn = true;
-            nodes_[key].lastConsensus = block.sequence();
+            if (!nodes_[key].nodeOn) {
+                nodes_[key].nodeOn = true;
+                nodes_[key].timeActive = bTime;
+            }
+            
+            nodes_[key].lastConsensus = bTime;
             if (trusted[i] == 0) {
                 if (block.transactions_count() > 0) {
                     nodes_[key].trustedDay += 1;
