@@ -260,7 +260,7 @@ Config Config::read(po::variables_map& vm, bool atStart) {
         }
         else {
             result.showBalanceChangeKey_.fill(0);
-            csinfo() << "Balance changes account is set to " << cs::Utils::byteStreamToHex(result.showBalanceChangeKey_);
+            //csinfo() << "Balance changes account is set to " << cs::Utils::byteStreamToHex(result.showBalanceChangeKey_);
         }
     }
     return result;

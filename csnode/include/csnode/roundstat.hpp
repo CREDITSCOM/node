@@ -16,6 +16,7 @@ class Config;
 
 namespace cs {
 constexpr size_t kMaxRoundDelay = 30000;
+constexpr uint64_t daySeconds = 86400ULL;
 
 using PingCheckSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 
@@ -102,7 +103,7 @@ private:
     void checkStoreBlockElapse();
     void countTrustAndTrx(const csdb::Pool& block);
 
-    void dayChangeProcedure();
+    void dayChangeProcedure(uint64_t cTime);
     void monthChangeProcedure();
 
     static const int64_t kMaxPingSynchroDelay = 30000;
