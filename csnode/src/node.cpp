@@ -4494,16 +4494,26 @@ void Node::updateWithPeerData(std::map<cs::PublicKey, cs::NodeStat>& sNodes) {
                 auto it = sNodes.find(key);
                 if (it != sNodes.end()) {
                     it->second.ip = peer.ip;
-                    it->second.version = peer.version;
-                    it->second.platform = peer.platform;
+                    it->second.version = std::to_string(peer.version);
+                    it->second.platform = std::to_string(peer.platform);
                 }
             }
         }
     }
+    auto it = sNodes.find(nodeIdKey_);
+    if (it != sNodes.end()) {
+        it->second.ip = cs::ConfigHolder::instance().config()->getAddressEndpoint().ipSpecified 
+            ? cs::ConfigHolder::instance().config()->getAddressEndpoint().ip 
+            : "";
+        it->second.version = std::to_string(NODE_VERSION);
+        it->second.platform = std::to_string(csconnector::connector::platform());
+    }
+    
 }
 
 void Node::getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes) {
     auto statNodes = stat_.getNodes();
+    updateWithPeerData(statNodes);
     for (auto it : statNodes) {
         api_diag::ServerTrustNode node;
         node.__set_ip(it.second.ip);
@@ -4548,7 +4558,6 @@ void Node::getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes) {
 
         nodes.push_back(node);
     }
-    updateWithPeerData(statNodes);
 }
 
 void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info) {
