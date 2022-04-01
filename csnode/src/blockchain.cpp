@@ -81,17 +81,23 @@ bool BlockChain::tryQuickStart(
     std::set<cs::PublicKey>& initialConfidants
 ) {
     cslog() << "Try QUICK START...";
-
     if (!bindSerializationManToCaches(serializationManPtr, initialConfidants)) {
         return false;
     }
 
+    std::set<cs::PublicKey> reserveConf;
+    for (auto it : initialConfidants) {
+        reserveConf.insert(it);
+    }
     bool ok = serializationManPtr_->load();
 
     if (ok) {
         cslog() << "Caches for QUICK START loaded successfully!";
     } else {
         cswarning() << "Could not load caches for QUICK START, continue with slow start :(";
+        for (auto it : reserveConf) {
+            initialConfidants.insert(it);
+        }
     }
 
     return ok;

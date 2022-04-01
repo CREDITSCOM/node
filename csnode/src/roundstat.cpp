@@ -1,4 +1,5 @@
 #include <csnode/roundstat.hpp>
+#include <csnode/blockchain.hpp> 
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
@@ -19,6 +20,7 @@ RoundStat::RoundStat()
 , lastRoundMs_(0)
 , roundElapseTimePoint_(std::chrono::steady_clock::now())
 , storeBlockElapseTimePoint_(std::chrono::steady_clock::now()) {
+    //nodes_ = new std::map<cs::PublicKey, cs::NodeStat>();
 }
 
 void RoundStat::onRoundStart(RoundNumber round, bool skipLogs) {
@@ -78,16 +80,165 @@ void RoundStat::onRoundStart(RoundNumber round, bool skipLogs) {
     resetLastRoundMs();
 }
 
-void RoundStat::onReadBlock(const csdb::Pool& block, bool* /*shouldStop*/) {
-    totalAcceptedTransactions_ += block.transactions_count();
+void RoundStat::dayChangeProcedure(uint64_t cTime) {
+    auto it = nodes_.begin();
+    while (it != nodes_.end()) {
+        it->second.failedTrustedDay = 0;
+        it->second.feeDay = csdb::Amount{ 0 };
+        it->second.trustedDay = 0ULL;
+        it->second.failedTrustedADay = 0ULL;
+        it->second.trustedADay = 0ULL;
+        if (cTime > it->second.lastConsensus + daySeconds) {
+            it->second.nodeOn = false;
+            it->second.timeActive = 0ULL;
+        }
+        ++it;
+    }
 }
 
-void RoundStat::onStopReadingFromDb(uint64_t totalTransactions) {
-    totalAcceptedTransactions_ = totalTransactions;
+void RoundStat::monthChangeProcedure() {
+    auto it = nodes_.begin();
+    while (it != nodes_.end()) {
+        it->second.failedTrustedPrevMonth = it->second.failedTrustedMonth;
+        it->second.failedTrustedMonth = 0ULL;
+        it->second.feePrevMonth = it->second.feeMonth;
+        it->second.feeMonth = csdb::Amount{ 0 };
+        it->second.trustedPrevMonth = it->second.trustedMonth;
+        it->second.trustedMonth = 0ULL;
+        it->second.failedTrustedAPrevMonth = it->second.failedTrustedAMonth;
+        it->second.failedTrustedAMonth = 0ULL;
+        it->second.trustedAPrevMonth = it->second.trustedAMonth;
+        it->second.trustedAMonth = 0ULL;
+        ++it;
+    }
+}
+
+void RoundStat::setNodeStatus(const cs::PublicKey key, bool status) {
+    auto it = nodes_.find(key);
+    if (it == nodes_.end()) {
+        return;
+    }
+    it->second.nodeOn = status;
+}
+
+void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
+    using namespace std::chrono;
+    totalAcceptedTransactions_ += block.transactions_count();
+    auto confs = block.confidants();
+    auto trusted = cs::Utils::bitsToMask(block.numberTrusted(), block.realTrusted());
+    const int rTrustedNumber = static_cast<int>(std::count(trusted.begin(), trusted.end(), 0));
+    csdb::Amount rCost{ 0 };
+    if (block.transactions_count() > 0) {
+        for (auto tr : block.transactions()) {
+            rCost += tr.counted_fee().to_double();
+        }
+    }
+    auto feePart = (rTrustedNumber != 0) ? rCost / rTrustedNumber : csdb::Amount(0);
+    std::string blockTime = block.user_field(BlockChain::kFieldTimestamp).is_valid() ? block.user_field(BlockChain::kFieldTimestamp).value<std::string>(): "0";
+    int64_t bTime = static_cast<int64_t>((std::stoll(blockTime.empty() ? "0" : blockTime))/1000);
+    const time_t longTime = (time_t)bTime;
+    struct tm* structTime = gmtime(&longTime);
+    //csdebug() << "Block time: " << blockTime << " == " << longTime << " -> " << structTime->tm_mon << " - " << structTime->tm_mday << " " << structTime->tm_hour << ":" << structTime->tm_min << ":" << structTime->tm_sec;
+    if (bTime == 0ULL) {
+        return;
+    }
+    if (block.sequence() < 5ULL) {
+        lastMonth_ = structTime->tm_mon;
+        lastDay_ = structTime->tm_mday;
+    }
+    bool dayChange = lastDay_ != structTime->tm_mday;
+    bool monthChange = lastMonth_ != structTime->tm_mon;
+    lastMonth_ = structTime->tm_mon;
+    lastDay_ = structTime->tm_mday;
+    if (dayChange) {
+        dayChangeProcedure(bTime);
+    }
+    if (monthChange) {
+        monthChangeProcedure();
+    }
+    for (int i = 0; i < trusted.size(); ++i) {
+        const auto& key = confs[i];
+        if (nodes_.find(key) != nodes_.end()) {
+            if (!nodes_[key].nodeOn) {
+                nodes_[key].nodeOn = true;
+                nodes_[key].timeActive = bTime;
+            }
+            
+            nodes_[key].lastConsensus = bTime;
+            if (trusted[i] == 0) {
+                if (block.transactions_count() > 0) {
+                    nodes_[key].trustedDay += 1;
+                    nodes_[key].trustedMonth += 1;
+                    nodes_[key].trustedTotal += 1;
+                    nodes_[key].feeDay += feePart;
+                    nodes_[key].feeMonth += feePart;
+                    nodes_[key].feeTotal += feePart;
+                }
+                nodes_[key].trustedADay += 1;
+                nodes_[key].trustedAMonth += 1;
+                nodes_[key].trustedATotal += 1;
+
+            }
+            else {
+                if (block.transactions_count() > 0) {
+                    nodes_[key].failedTrustedDay += 1;
+                    nodes_[key].failedTrustedMonth += 1;
+                    nodes_[key].failedTrustedTotal += 1;
+                }
+                nodes_[key].failedTrustedADay += 1;
+                nodes_[key].failedTrustedAMonth += 1;
+                nodes_[key].failedTrustedATotal += 1;
+            }
+        }
+        else {
+            auto nStat = new NodeStat();
+            nStat->nodeOn = true;
+            if (trusted[i] == 0) {
+                if (block.transactions_count() > 0) {
+                    nStat->trustedDay = 1;
+                    nStat->trustedMonth = 1;
+                    nStat->trustedTotal = 1;
+                    nStat->feeDay = feePart;
+                    nStat->feeMonth = feePart;
+                    nStat->feeTotal = feePart;
+                }
+                nStat->trustedADay = 1;
+                nStat->trustedAMonth = 1;
+                nStat->trustedATotal = 1;
+            }
+            else {
+                if (block.transactions_count() > 0) {
+                    nStat->failedTrustedDay = 1;
+                    nStat->failedTrustedMonth = 1;
+                    nStat->failedTrustedTotal = 1;
+                }
+                nStat->failedTrustedADay = 1;
+                nStat->failedTrustedAMonth = 1;
+                nStat->failedTrustedATotal = 1;
+            }
+            nodes_.emplace(key, *nStat);
+        }
+    }
+
+}
+
+void RoundStat::onReadBlock(const csdb::Pool& block, bool* /*shouldStop*/) {
+
+    countTrustAndTrx(block);
 }
 
 void RoundStat::onStoreBlock(const csdb::Pool& block) {
-    totalAcceptedTransactions_ += block.transactions_count();
+    countTrustAndTrx(block);
+}
+
+void RoundStat::onStopReadingFromDb(uint64_t totalTransactions) {
+    if (totalAcceptedTransactions_ == totalTransactions){
+        totalAcceptedTransactions_ = totalTransactions;
+        csdebug() << "All transactions read successfully";
+    }
+    else{
+        cserror() << " The number of counted transactions is different";
+    }
 }
 
 size_t RoundStat::uptimeMs() const {

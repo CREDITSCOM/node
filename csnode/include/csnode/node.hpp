@@ -326,6 +326,10 @@ public:
     
     void getKnownPeers(std::vector<api_diag::ServerNode>& nodes);
     void dumpKnownPeersToFile();
+    void getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes);
+
+    void printInitialConfidants();
+
 
     /**
      * Gets node information. Caller MUST care about concurrency.
@@ -393,6 +397,7 @@ private:
     void reviewConveyerHashes();
 
     void processSync();
+    void updateWithPeerData(std::map<cs::PublicKey, cs::NodeStat>& sNodes);
 
     // transport
     void addToBlackList(const cs::PublicKey& key, bool isMarked);

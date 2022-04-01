@@ -14,6 +14,7 @@ namespace api_diag {
 
         // former start node proto
         void GetActiveNodes(ActiveNodesResult& _return) override;
+        void GetActiveTrustNodes(ActiveTrustNodesResult& _return) override;
         void GetActiveTransactionsCount(ActiveTransactionsResult& _return) override;
 
         // diagnocstic proro

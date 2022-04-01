@@ -1364,6 +1364,7 @@ void APIHandler::processBalancesRequest(const api::Addresses walletAddresses, ui
             bal.balance.__set_integral(0);
             bal.balance.__set_fraction(0ULL);
             bal.notFound = true;
+            result.balances.push_back(bal);
             continue;
         }
         bal.notFound = false;
@@ -1438,7 +1439,39 @@ void APIHandler::FilteredTrxsListGetResult(api::FilteredTransactionsListResult& 
     }
 }
 
-void APIHandler::TransactionsListSend(api::SendTransactionResult& _return, const api::TransactionsList& transactions) {}
+void APIHandler::TransactionsListSend(api::SendTransactionResult& _return, const api::TransactionsList& transactions) {
+#ifdef MONITOR_NODE
+    _return.status.code = int8_t(ERROR_CODE);
+    _return.status.message = "Monitor node don't receive transactions";
+    _return.requestId = 0;
+    return;
+#endif
+    _return.roundNum = static_cast<int32_t>(cs::Conveyer::instance().currentRoundTable().round); // possible overflow
+    for (auto transaction : transactions.transactions) {
+        csdb::Transaction transactionToSend;
+        if (auto errInfo = checkTransaction(transaction, transactionToSend); errInfo.has_value()) {
+            _return.status.code = int8_t(ERROR_CODE);
+            _return.status.message = errInfo.value();
+            _return.requestId = 0;
+            return;
+        }
+
+        _return.requestId = ++requestId_;
+        if (!transaction.__isset.smartContract && !solver_.smart_contracts().is_payable_call(transactionToSend)) {
+            std::thread t1(&APIHandler::processTransaction, this, transactionToSend, requestId_);
+            t1.detach();
+        }
+
+        else {
+            std::thread t2(&APIHandler::processSmartTransaction, this, transaction, transactionToSend, requestId_);
+            t2.detach();
+        }
+        //csinfo() << "State transaction: seq = " << _return.stateId.poolSeq << ", index = " << _return.stateId.index;
+
+        _return.status.code = 0;
+        _return.status.message = "";
+    }
+}
 void APIHandler::TransactionsListResultGet(api::TransactionsListFlowResult& _return, int64_t requestId) {}
 
 void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t const_limit) {

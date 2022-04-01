@@ -133,8 +133,6 @@ void Node::dumpKnownPeersToFile() {
 bool Node::init() {
     auto& initConfidants = cs::ConfigHolder::instance().config()->getInitialConfidants();
     initialConfidants_ = decltype(initialConfidants_)(initConfidants.begin(), initConfidants.end());
-
-
     if (initialConfidants_.find(solver_->getPublicKey()) != initialConfidants_.end()) {
         transport_->setPermanentNeighbours(initialConfidants_);
     }
@@ -172,7 +170,6 @@ bool Node::init() {
         }
         return true;
     }
-
     if (!blockChain_.init(
             cs::ConfigHolder::instance().config()->getPathToDB(),
             &cachesSerializationManager_, initialConfidants_)
@@ -236,6 +233,16 @@ void Node::initPoolSynchronizer() {
 void Node::setupNextMessageBehaviour() {
     cs::Connector::connect(&cs::Conveyer::instance().roundChanged, &stat_, &cs::RoundStat::onRoundChanged);
     cs::Connector::connect(&stat_.roundTimeElapsed, this, &Node::onRoundTimeElapsed);
+}
+
+void Node::printInitialConfidants() {
+    const cs::PublicKey& own_key = solver_->getPublicKey();
+    csinfo() << "Initial confidants: ";
+    for (const auto& item : initialConfidants_) {
+        const auto beg = item.data();
+        const auto end = beg + item.size();
+        csinfo() << "NODE> " << " - " << EncodeBase58(beg, end) << (item == own_key ? " (me)" : "");
+    }
 }
 
 void Node::setupPoolSynchronizerBehaviour() {
@@ -1196,6 +1203,7 @@ void Node::getEventReport(const uint8_t* data, const std::size_t size, const cs:
             if (EventReport::parseRunningStatus(bin_pack, status)) {
                 csevent() << log_prefix << cs::Utils::byteStreamToHex(sender.data(), sender.size())
                     << " go to state " << Running::to_string(status);
+                stat_.setNodeStatus(sender, status == Running::Status::Stop);
             }
             else {
                 csevent() << log_prefix << "failed to parse invalid running status from "
@@ -4090,7 +4098,6 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 uint8_t cnt;
                 stream >> cnt;
                 csdebug() << "Rehabilitated smart-contracts: ";
-                initialConfidants_.clear();
                 for (uint8_t i = 1; i <= cnt; ++i) {
                     cs::PublicKey key;
                     stream >> key;
@@ -4244,7 +4251,6 @@ void Node::deepBlockValidation(const csdb::Pool& block, bool* check_failed) {//c
 void Node::onRoundTimeElapsed() {
     solver_->resetGrayList();
     const cs::PublicKey& own_key = solver_->getPublicKey();
-
     if (initialConfidants_.find(own_key) == initialConfidants_.end()) {
         cslog() << "Waiting for next round...";
 
@@ -4473,6 +4479,86 @@ void Node::getKnownPeers(std::vector<api_diag::ServerNode>& nodes) {
 
 }
 
+
+void Node::updateWithPeerData(std::map<cs::PublicKey, cs::NodeStat>& sNodes) {
+    std::vector<cs::PeerData> peers;
+    transport_->getKnownPeers(peers);
+    for (const auto& peer : peers) {
+        cs::PublicKey key;
+        cs::Bytes kBytes;
+        cs::Bytes bytes;
+        if (DecodeBase58(peer.id, bytes)) {
+            cs::PublicKey key;
+            if (key.size() == bytes.size()) {
+                std::copy(bytes.cbegin(), bytes.cend(), key.begin());
+                auto it = sNodes.find(key);
+                if (it != sNodes.end()) {
+                    it->second.ip = peer.ip;
+                    it->second.version = std::to_string(peer.version);
+                    it->second.platform = std::to_string(peer.platform);
+                }
+            }
+        }
+    }
+    auto it = sNodes.find(nodeIdKey_);
+    if (it != sNodes.end()) {
+        it->second.ip = cs::ConfigHolder::instance().config()->getAddressEndpoint().ipSpecified 
+            ? cs::ConfigHolder::instance().config()->getAddressEndpoint().ip 
+            : "";
+        it->second.version = std::to_string(NODE_VERSION);
+        it->second.platform = std::to_string(csconnector::connector::platform());
+    }
+    
+}
+
+void Node::getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes) {
+    auto statNodes = stat_.getNodes();
+    updateWithPeerData(statNodes);
+    for (auto it : statNodes) {
+        api_diag::ServerTrustNode node;
+        node.__set_ip(it.second.ip);
+        node.__set_publicKey(EncodeBase58(it.first.data(), it.first.data() + it.first.size()));
+        node.__set_timeActive(it.second.timeActive);
+        node.__set_timeRegistration(it.second.timeReg);
+        node.__set_platform(it.second.platform);
+        node.__set_version(it.second.version);
+        node.__set_failedTrustDay(it.second.failedTrustedDay);
+        node.__set_failedTrustMonth(it.second.failedTrustedMonth);
+        node.__set_failedTrustPrevMonth(it.second.failedTrustedMonth);
+        node.__set_failedTrustTotal(it.second.failedTrustedTotal);
+        node.__set_active(it.second.nodeOn);
+        node.__set_failedTrustedADay(it.second.failedTrustedADay);
+        node.__set_failedTrustedAMonth(it.second.failedTrustedAMonth);
+        node.__set_failedTrustedAPrevMonth(it.second.failedTrustedAPrevMonth);
+        node.__set_failedTrustedATotal(it.second.failedTrustedATotal);
+        general::Amount fDay;
+        fDay.__set_integral(it.second.feeDay.integral());
+        fDay.__set_fraction(it.second.feeDay.fraction());
+        node.__set_feeDay(fDay);
+        general::Amount fMonth;
+        fMonth.__set_integral(it.second.feeMonth.integral());
+        fMonth.__set_fraction(it.second.feeMonth.fraction());
+        node.__set_feeMonth(fMonth);
+        general::Amount fPrevMonth;
+        fPrevMonth.__set_integral(it.second.feePrevMonth.integral());
+        fPrevMonth.__set_fraction(it.second.feePrevMonth.fraction());
+        node.__set_feePrevMonth(fPrevMonth);
+        general::Amount fTotal;
+        fTotal.__set_integral(it.second.feeTotal.integral());
+        fTotal.__set_fraction(it.second.feeTotal.fraction());
+        node.__set_feeTotal(fTotal);
+        node.__set_trustDay(it.second.trustedDay);
+        node.__set_trustMonth(it.second.trustedMonth);
+        node.__set_trustPrevMonth(it.second.trustedPrevMonth);
+        node.__set_trustTotal(it.second.trustedTotal);
+        node.__set_trustedADay(it.second.trustedADay);
+        node.__set_trustedAMonth(it.second.trustedAMonth);
+        node.__set_trustedAPrevMonth(it.second.trustedAPrevMonth);
+        node.__set_trustedATotal(it.second.trustedATotal);
+
+        nodes.push_back(node);
+    }
+}
 
 void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeInfo& info) {
     cs::Sequence sequence = blockChain_.getLastSeq();
