@@ -328,7 +328,7 @@ public:
     // wallet transactions: pools cache + db search
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
     void getTransactionsUntill(Transactions& transactions, csdb::Address address, csdb::TransactionID id, uint16_t flagg);
-
+    void getAccountRegTime(uint64_t& aTime, csdb::Address address);
     void setBlocksToBeRemoved(cs::Sequence number);
 
     std::string printWalletCaches();

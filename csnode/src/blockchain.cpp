@@ -844,6 +844,12 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
     }
 }
 
+void BlockChain::getAccountRegTime(uint64_t& aTime, csdb::Address address) {
+    for (auto trIt = cs::TransactionsIterator(*this, address); trIt.isValid(); trIt.next()) {
+        aTime=BlockChain::getBlockTime(trIt.getPool());
+    }
+}
+
 void BlockChain::getTransactionsUntill(Transactions& transactions, csdb::Address address, csdb::TransactionID id, uint16_t flagg) {
     for (auto trIt = cs::TransactionsIterator(*this, address); trIt.isValid(); trIt.next()) {
         if (id.pool_seq() + 1 > cs::Conveyer::instance().currentRoundNumber() 

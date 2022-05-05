@@ -107,6 +107,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.storeBlockEvent, this, &Node::processSpecialInfo);
     cs::Connector::connect(&blockChain_.uncertainBlock, this, &Node::sendBlockRequestToConfidants);
     cs::Connector::connect(&blockChain_.orderNecessaryBlock, this, &Node::sendNecessaryBlockRequest);
+    cs::Connector::connect(&stat_.accountInitiationRequest, this, &Node::accountInitiationRequest);
     initPoolSynchronizer();
     setupNextMessageBehaviour();
     setupPoolSynchronizerBehaviour();
@@ -4754,4 +4755,11 @@ void Node::getNecessaryBlockRequest(cs::PoolsBlock& pBlock, const cs::PublicKey&
         //TODO - change neighbours
     }
 
+}
+
+void Node::accountInitiationRequest(uint64_t& aTime, cs::PublicKey key) {
+    const auto data = key.data();
+    std::string str = EncodeBase58(data, data + cscrypto::kPublicKeySize);
+    auto addr = blockChain_.getAddressFromKey(str);
+    blockChain_.getAccountRegTime(aTime, addr);
 }

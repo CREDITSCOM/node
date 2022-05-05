@@ -193,6 +193,8 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
         else {
             auto nStat = new NodeStat();
             nStat->nodeOn = true;
+            
+            emit accountInitiationRequest(nStat->timeReg, key);
             if (trusted[i] == 0) {
                 if (block.transactions_count() > 0) {
                     nStat->trustedDay = 1;

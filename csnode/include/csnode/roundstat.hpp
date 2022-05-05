@@ -19,6 +19,7 @@ constexpr size_t kMaxRoundDelay = 30000;
 constexpr uint64_t daySeconds = 86400ULL;
 
 using PingCheckSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
+using AccountStartTimeSignal = cs::Signal<void(uint64_t&, const cs::PublicKey)>;
 
 struct NodeStat {
     bool nodeOn;
@@ -97,6 +98,7 @@ public signals:
     cs::Action roundTimeElapsed;
     cs::Action storeBlockTimeElapsed;
     PingCheckSignal pingChecked;
+    AccountStartTimeSignal accountInitiationRequest;
 
 private:
     void checkRoundElapse();

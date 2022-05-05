@@ -184,6 +184,7 @@ public:
 
     void tryResolveHashProblems();
 
+    void accountInitiationRequest(uint64_t& aTime, cs::PublicKey key);
     void cleanConfirmationList(cs::RoundNumber rNum);
     uint8_t calculateBootStrapWeight(cs::PublicKeys& confidants);
     // state syncro functions
