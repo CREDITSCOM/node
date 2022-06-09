@@ -845,8 +845,12 @@ void BlockChain::getTransactions(Transactions& transactions, csdb::Address addre
 }
 
 void BlockChain::getAccountRegTime(uint64_t& aTime, csdb::Address address) {
+    const cs::Sequence firstBlock = 1U;
     for (auto trIt = cs::TransactionsIterator(*this, address); trIt.isValid(); trIt.next()) {
         aTime=BlockChain::getBlockTime(trIt.getPool());
+    }
+    if (aTime == 0) {
+        aTime = getBlockTime(loadBlock(firstBlock));
     }
 }
 

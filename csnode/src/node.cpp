@@ -4758,8 +4758,7 @@ void Node::getNecessaryBlockRequest(cs::PoolsBlock& pBlock, const cs::PublicKey&
 }
 
 void Node::accountInitiationRequest(uint64_t& aTime, cs::PublicKey key) {
-    const auto data = key.data();
-    std::string str = EncodeBase58(data, data + cscrypto::kPublicKeySize);
+    std::string str = std::string(key.data(), key.data() + key.size());
     auto addr = blockChain_.getAddressFromKey(str);
     blockChain_.getAccountRegTime(aTime, addr);
 }
