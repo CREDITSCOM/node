@@ -1742,16 +1742,18 @@ void Node::sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey&
         csdetails() << "NODE> Send block reply. Sequence: " << pool.sequence();
     }
     
-    csdebug() << "Node> Sending " << poolsBlock.size() << " blocks with signatures from " << poolsBlock.front().sequence() << " to " << poolsBlock.back().sequence();
+    csdebug() << "NODE> Sending " << poolsBlock.size() << " blocks with signatures from " << poolsBlock.front().sequence() << " to " << poolsBlock.back().sequence();
 
     for (const auto& it : poolsBlock) {
         csdetails() << "#" << it.sequence() << " signs = " << it.signatures().size();
     }
 
     auto region = compressor_.compress(poolsBlock);
+    csdebug() << "NODE> block package compressed";
     changeSynchroRequestsLog(target, cs::SyncroMessage::Sent);
 
     sendDirect(target, MsgTypes::RequestedBlock, cs::Conveyer::instance().currentRoundNumber(), region);
+    csdebug() << "NODE> block package sent";
 }
 
 void Node::becomeWriter() {
