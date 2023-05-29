@@ -115,15 +115,15 @@ const bool Consensus::DisableTrustedRequestNextRound = false;
 itself or make individual request to dedicated trusted nodes*/
 const size_t Consensus::MaxContractStateSizeToSync = 8192;
 
-csdb::Amount Consensus::blockReward = csdb::Amount{ 0 };
+csdb::Amount Consensus::blockReward = csdb::Amount{ 1 };
 
 csdb::Amount Consensus::miningCoefficient = csdb::Amount{ 0 };
 
 //Attention! before turning it on you should add a table of rounds where staking is on 
 //to ensure that when the blocks will be rescanned from beginning the walletscache 
 //results to the synchronized with other nodes values
-bool Consensus::stakingOn = false; 
+bool Consensus::stakingOn = true; 
 
-bool Consensus::miningOn = false;
+bool Consensus::miningOn = true;
 
 cs::RoundNumber Consensus::syncroChangeRound = 8446744073709551615;
