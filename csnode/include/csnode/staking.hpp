@@ -44,28 +44,32 @@ public:
         const PublicKey& source,
         const PublicKey& target,
         const csdb::Amount& amount,
-        const csdb::TransactionID&
+        const csdb::TransactionID&,
+        const uint64_t timeStamp
     );
     void revertDelegationsForTarget(
         const csdb::UserField&,
         const PublicKey& source,
         const PublicKey& target,
         const csdb::Amount& amount,
-        const csdb::TransactionID&
+        const csdb::TransactionID&,
+        const uint64_t timeStamp
     );
 
     void addDelegationsForSource(
         const csdb::UserField&,
         const PublicKey& source,
         const PublicKey& target,
-        const csdb::Amount& amount
+        const csdb::Amount& amount,
+        const uint64_t timeStamp
     );
     void revertDelegationsForSource(
         const csdb::UserField&,
         const PublicKey& source,
         const PublicKey& target,
         const csdb::Amount& amount,
-        const csdb::TransactionID&
+        const csdb::TransactionID&,
+        const uint64_t timeStamp
     );
 
     const DelegationsTiming& getCurrentDelegations() const { return currentDelegations_; }

@@ -124,16 +124,18 @@ private:
     WalletData getWalletData(const PublicKey&);
     WalletData getWalletData(const csdb::Address&);
 
-    double load(const csdb::Transaction& tr, const BlockChain& blockchain, bool inverse);
+    double load(const csdb::Transaction& tr, const BlockChain& blockchain, const uint64_t timeStamp, bool inverse);
 
     double loadTrxForSource(const csdb::Transaction& tr,
                             const BlockChain& blockchain,
+                            const uint64_t timeStamp,
                             bool inverse);
-    void loadTrxForTarget(const csdb::Transaction& tr, bool inverse);
+    void loadTrxForTarget(const csdb::Transaction& tr, const uint64_t timeStamp, bool inverse);
 
     void fundConfidantsWalletsWithFee(const csdb::Amount& totalFee,
                                       const cs::ConfidantsKeys& confidants,
                                       const std::vector<uint8_t>& realTrusted,
+                                      const cs::Sequence poolSeq,
                                       bool inverse);
     void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction,
                                           const BlockChain& blockchain,
@@ -156,9 +158,9 @@ private:
     bool showBalanceChange_ = false;
 };
 
-inline double WalletsCache::Updater::load(const csdb::Transaction& t, const BlockChain& bc, bool inverse) {
-    loadTrxForTarget(t, inverse);
-    return loadTrxForSource(t, bc, inverse);
+inline double WalletsCache::Updater::load(const csdb::Transaction& t, const BlockChain& bc, const uint64_t timeStamp, bool inverse) {
+    loadTrxForTarget(t, timeStamp, inverse);
+    return loadTrxForSource(t, bc, timeStamp, inverse);
 }
 } // namespace cs
 #endif // WALLETS_CACHE_HPP

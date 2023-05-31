@@ -168,7 +168,8 @@ void Staking::addDelegationsForTarget(
     const PublicKey& sKey,
     const PublicKey& tKey,
     const csdb::Amount& amount,
-    const csdb::TransactionID& trx_id
+    const csdb::TransactionID& trx_id,
+    const uint64_t timeStamp
 ) {
     WalletsCache::WalletData targetWallet = getWalletData_(tKey);
 
@@ -179,7 +180,7 @@ void Staking::addDelegationsForTarget(
     auto& timeMoneyVector = (*targetWallet.delegateSources_)[sKey];
 
     if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
-        cs::TimeMoney tm(cs::Zero::timeStamp, amount);
+        cs::TimeMoney tm(timeStamp, cs::Zero::timeStamp, amount);
 
         auto it = std::find_if(
             timeMoneyVector.begin(),
@@ -214,7 +215,7 @@ void Staking::addDelegationsForTarget(
         }
     }
     else if (ufld.value<uint64_t>() >= trx_uf::sp::de::legate_min_utc) {
-        cs::TimeMoney tm(ufld.value<uint64_t>(), amount);
+        cs::TimeMoney tm(timeStamp, ufld.value<uint64_t>(), amount);
         timeMoneyVector.push_back(tm);
         targetWallet.delegated_ += amount;
         currentDelegations_[tm.time].push_back(std::make_tuple(sKey, tKey, trx_id));
@@ -239,7 +240,8 @@ void Staking::revertDelegationsForTarget(
     const PublicKey& sKey,
     const PublicKey& tKey,
     const csdb::Amount& amount,
-    const csdb::TransactionID& trx_id
+    const csdb::TransactionID& trx_id,
+    const uint64_t timeStamp
 ) {
     WalletsCache::WalletData targetWallet = getWalletData_(tKey);
 
@@ -267,7 +269,7 @@ void Staking::revertDelegationsForTarget(
         }
     }
     else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
-        cs::TimeMoney tm(cs::Zero::timeStamp, amount);
+        cs::TimeMoney tm(timeStamp, cs::Zero::timeStamp, amount);
 
         auto it = std::find_if(
             timeMoneyVector.begin(),
@@ -285,7 +287,7 @@ void Staking::revertDelegationsForTarget(
         targetWallet.delegated_ += amount;
     }
     else if (ufld.value<uint64_t>() >= trx_uf::sp::de::legate_min_utc) {
-        cs::TimeMoney tm(ufld.value<uint64_t>(), amount);
+        cs::TimeMoney tm(timeStamp, ufld.value<uint64_t>(), amount);
         auto it = std::find_if(
           timeMoneyVector.begin(),
           timeMoneyVector.end(),
@@ -317,7 +319,8 @@ void Staking::addDelegationsForSource(
     const csdb::UserField& ufld,
     const PublicKey& sKey,
     const PublicKey& tKey,
-    const csdb::Amount& amount
+    const csdb::Amount& amount,
+    const uint64_t timeStamp
 ) {
     auto wallData = getWalletData_(sKey);
     if (wallData.delegateTargets_ == nullptr) {
@@ -326,7 +329,7 @@ void Staking::addDelegationsForSource(
     auto it = wallData.delegateTargets_->find(tKey);
     if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
         wallData.balance_ -= amount;
-        cs::TimeMoney tm(cs::Zero::timeStamp, amount);
+        cs::TimeMoney tm(timeStamp, cs::Zero::timeStamp, amount);
         if (it == wallData.delegateTargets_->end()) {
             std::vector<cs::TimeMoney> firstElement;
             firstElement.push_back(tm);
@@ -359,7 +362,7 @@ void Staking::addDelegationsForSource(
         }
     }
     else if (ufld.value<uint64_t>() >= trx_uf::sp::de::legate_min_utc) {
-        cs::TimeMoney tm(ufld.value<uint64_t>() , amount);
+        cs::TimeMoney tm(timeStamp, ufld.value<uint64_t>() , amount);
         wallData.balance_ -= amount;
         if (it == wallData.delegateTargets_->end()) {
             std::vector<cs::TimeMoney> firstElement;
@@ -381,7 +384,8 @@ void Staking::revertDelegationsForSource(
     const PublicKey& sKey,
     const PublicKey& tKey,
     const csdb::Amount& amount,
-    const csdb::TransactionID& trx_id
+    const csdb::TransactionID& trx_id,
+    const uint64_t timeStamp
 ) {
     auto wallData = getWalletData_(sKey);
     if (wallData.delegateTargets_ == nullptr) {
@@ -408,7 +412,7 @@ void Staking::revertDelegationsForSource(
     //withdraw delegation (inverse)
     else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
         wallData.balance_ -= amount;
-        cs::TimeMoney tm(cs::Zero::timeStamp, amount);
+        cs::TimeMoney tm(timeStamp, cs::Zero::timeStamp, amount);
         if (it == wallData.delegateTargets_->end()) {
             std::vector<cs::TimeMoney> firstElement;
             firstElement.push_back(tm);

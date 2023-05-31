@@ -8,9 +8,36 @@ Zero::Zero() {
     key.fill(0);
     timeStamp = 0U;
 }
-TimeMoney::TimeMoney(uint64_t t, csdb::Amount am) {
+TimeMoney::TimeMoney(uint64_t it, uint64_t t, csdb::Amount am){
+    initialTime = it;
     time = t;
-    amount = am;
+    amount = am; 
+    uint64_t ThreeMonthMilliseconds = 7862400000;
+    if (time == cs::Zero::timeStamp) {
+        coeff = StakingCoefficient::NoStaking;
+    }
+    else {
+        uint64_t m = (time - initialTime) / ThreeMonthMilliseconds;
+        switch (m) {
+        case 1: 
+            coeff = StakingCoefficient::ThreeMonth;
+            break;
+        case 2:
+            coeff = StakingCoefficient::SixMonth;
+            break;
+        case 3:
+            coeff = StakingCoefficient::NineMonth;
+            break;
+        case 4:
+            coeff = StakingCoefficient::Anni;
+            break;
+        default:
+            coeff = StakingCoefficient::NoStaking;
+        }
+    }
+    
+
+    
 }
 }  // namespace cs
 

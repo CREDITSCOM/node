@@ -150,10 +150,20 @@ struct RoundTableMessage {
     cs::PublicKey sender;
 };
 
+enum StakingCoefficient : uint8_t {
+    NoStaking,
+    ThreeMonth,
+    SixMonth,
+    NineMonth,
+    Anni
+};
+
 struct TimeMoney {
-    TimeMoney(uint64_t t, csdb::Amount am);
+    TimeMoney(uint64_t it, uint64_t t, csdb::Amount am);
+    uint64_t initialTime;
     uint64_t time;
     csdb::Amount amount;
+    StakingCoefficient coeff;
 };
 
 struct NodeVersionChange {

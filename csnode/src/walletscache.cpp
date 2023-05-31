@@ -86,6 +86,19 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
                                           const BlockChain& blockchain,
                                           bool inverse /* = false */) {
 
+    auto ufld = pool.user_field(BlockChain::kFieldTimestamp);
+    int64_t timeStamp;
+    if (ufld.is_valid()) {
+        try {
+            timeStamp = std::stoull(ufld.value<std::string>());
+        }
+        catch (const std::exception& e) {
+            timeStamp = 0ULL;
+        }
+    }
+    else {
+        timeStamp = 0ULL;
+    }
     const auto& conf = cs::ConfigHolder::instance().config();
     if (conf->getBalanceChangeFlag() && conf->getBalanceChangeKey() != cs::Zero::key) {
         showBalanceChange_ = true;
@@ -103,7 +116,7 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
     //}
     for (auto itTrx = transactions.begin(); itTrx != transactions.end(); ++itTrx) {
         //csdebug() << "Start transaction: " << itTrx->id().to_string();
-        totalAmountOfCountedFee += load(*itTrx, blockchain, inverse);
+        totalAmountOfCountedFee += load(*itTrx, blockchain, timeStamp, inverse);
         if (SmartContracts::is_new_state(*itTrx)) {
             //csdebug() << "Start conf funding for execution";
             fundConfidantsWalletsWithExecFee(*itTrx, blockchain, inverse);
@@ -114,7 +127,7 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
 
     if (totalAmountOfCountedFee > csdb::Amount(0)) {
         fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants,
-                                     cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()), 
+                                     cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()), pool.sequence(),
                                      inverse);
     }
 
@@ -274,6 +287,7 @@ bool WalletsCache::Updater::setWalletTime(const PublicKey& address, const uint64
 void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& totalFee,
                                                          const cs::ConfidantsKeys& confidants,
                                                          const std::vector<uint8_t>& realTrusted,
+                                                         const cs::Sequence poolSeq,
                                                          bool inverse) {
     if (!confidants.size()) {
         cslog() << kLogPrefix << "NO CONFIDANTS";
@@ -303,28 +317,50 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
             totalStake += keyAndStake.second.amount;
         }
     }
-    csdb::Amount feeWithMining = totalFee  + totalFee * Consensus::miningCoefficient + Consensus::blockReward;
-    csdb::Amount onePartOfFee = Consensus::stakingOn ? feeWithMining / totalStake : feeWithMining/realTrustedNumber;
-    csdb::Amount payedFee = 0;
-    size_t numPayedTrusted = 0;
 
+    //Fee only
+    csdb::Amount feeOnly = totalFee;
+    csdb::Amount minedValue = totalFee * Consensus::miningCoefficient + Consensus::blockReward;
+    csdb::Amount onePartOfFee = feeOnly/realTrustedNumber;
+    if (totalStake < csdb::Amount{ 1 }) {
+        totalStake = csdb::Amount{ 1 };
+    }
+    csdb::Amount oneMiningPart = Consensus::stakingOn ? minedValue / totalStake : csdb::Amount{ 0 };
+    csdb::Amount payedFee = 0;
+    csdb::Amount payedReward = 0;
+    size_t numPayedTrusted = 0;
+    csdebug() << "fundConfidantsWalletsWithFee - feeOnly: " << feeOnly.to_string() << ", minedValue: " << minedValue.to_string() << ", " << oneMiningPart.to_string();
     for (auto& confAndStake : confidantAndStake) {
             auto walletData = getWalletData(confAndStake.first);
             csdb::Amount feeToPay = 0; 
+            csdb::Amount rewardToPay = 0;
 
             if (numPayedTrusted == confidantAndStake.size() - 1) {
-                feeToPay = feeWithMining - payedFee;
+                feeToPay = feeOnly - payedFee;
+                if (poolSeq < 300) {
+                    rewardToPay = 0;
+                }
+                else {
+                    rewardToPay = minedValue - payedReward;
+                }
             }
             else {
-                feeToPay = Consensus::stakingOn ? onePartOfFee * confAndStake.second : onePartOfFee;
+                feeToPay = onePartOfFee;
+                if (poolSeq < 300) {
+                    rewardToPay = 0;
+                }
+                else {
+                    rewardToPay = oneMiningPart * confAndStake.second;
+                }
             }
 
             if (!inverse) {
-                walletData.balance_ += feeToPay;
+                walletData.balance_ += (feeToPay + rewardToPay);
                 logOperation("Confidant fee added: +", confAndStake.first, feeToPay);
+                csdebug() << cs::Utils::byteStreamToHex(confAndStake.first) << " - paidSum: " << feeToPay.to_string();
             }
             else {
-                walletData.balance_ -= feeToPay;
+                walletData.balance_ -= (feeToPay + rewardToPay);
                 logOperation("Confidant fee reverted: -", confAndStake.first, feeToPay);
             }
 
@@ -341,6 +377,7 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
 #endif
 
             payedFee += feeToPay;
+            payedReward += rewardToPay;
             ++numPayedTrusted;
 
             data_.multiWallets_->onWalletCacheUpdated(walletData);
@@ -371,6 +408,7 @@ void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transac
         transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>(),
         pool.confidants(),
         cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()),
+        pool.sequence(),
         inverse
     );
 }
@@ -384,6 +422,7 @@ void WalletsCache::Updater::logOperation(const std::string& reason, const cs::Pu
 
 double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                                                const BlockChain& blockchain,
+                                               const uint64_t timeStamp,
                                                bool inverse) {
     csdb::Address wallAddress;
     bool smartIniter = false;
@@ -579,7 +618,8 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                     ufld,
                     toPublicKey(tr.source()),
                     toPublicKey(tr.target()),
-                    tr.amount()
+                    tr.amount(),
+                    timeStamp
                 );
             }
         }
@@ -590,7 +630,8 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                     toPublicKey(tr.source()),
                     toPublicKey(tr.target()),
                     tr.amount(),
-                    tr.id()
+                    tr.id(),
+                    timeStamp
                 );
             }
         }
@@ -710,7 +751,7 @@ void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& i
     }
 }
 
-void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool inverse) {
+void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, const uint64_t timeStamp, bool inverse) {
     auto wallData = getWalletData(tr.target());
     csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
     //bool alreadyUpdated = false;
@@ -767,7 +808,8 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
                 toPublicKey(tr.source()),
                 toPublicKey(tr.target()),
                 tr.amount(),
-                tr.id()
+                tr.id(),
+                timeStamp
             );
             //alreadyUpdated = true;
         }
@@ -779,7 +821,8 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
                 toPublicKey(tr.source()),
                 toPublicKey(tr.target()),
                 tr.amount(),
-                tr.id()
+                tr.id(),
+                timeStamp
             );
         }
     }
