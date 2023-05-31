@@ -31,7 +31,7 @@ csdb::Amount Consensus::MinStakeValue = csdb::Amount{50000};
 csdb::Amount Consensus::MaxStakeValue = csdb::Amount{ 500000 };
 
 /** @brief   The round when DPOS starts working */
-const uint64_t Consensus::StartingDPOS = 10'000ULL;
+const uint64_t Consensus::StartingDPOS = 300;//10'000ULL;
 
 /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
 const uint8_t Consensus::GeneralNotSelected = 100;

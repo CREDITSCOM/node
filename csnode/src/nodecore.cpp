@@ -9,15 +9,16 @@ Zero::Zero() {
     timeStamp = 0U;
 }
 TimeMoney::TimeMoney(uint64_t it, uint64_t t, csdb::Amount am){
-    initialTime = it;
+    initialTime = it/1000;
     time = t;
     amount = am; 
-    uint64_t ThreeMonthMilliseconds = 7862400000;
+    uint64_t ThreeMonthMilliseconds = 7862400;
+    uint64_t m = 0ULL;
     if (time == cs::Zero::timeStamp) {
         coeff = StakingCoefficient::NoStaking;
     }
     else {
-        uint64_t m = (time - initialTime) / ThreeMonthMilliseconds;
+        m = (time - initialTime) / ThreeMonthMilliseconds;
         switch (m) {
         case 1: 
             coeff = StakingCoefficient::ThreeMonth;
@@ -35,7 +36,7 @@ TimeMoney::TimeMoney(uint64_t it, uint64_t t, csdb::Amount am){
             coeff = StakingCoefficient::NoStaking;
         }
     }
-    
+    csdebug() << "TimeMoney created: initial time " << initialTime << ", final time: " << time << ", amount: " << amount.to_string() << ", coeff = " << static_cast<int>(coeff) << ", m = " << m;
 
     
 }

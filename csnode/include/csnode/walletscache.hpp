@@ -148,6 +148,20 @@ private:
     void checkCanceledSmart(const csdb::Address& contract_addr,
                             const csdb::TransactionID& tid,
                             bool inverse);
+    double getStakingCoefficient(StakingCoefficient coeff) {
+        switch (coeff) {
+        case StakingCoefficient::ThreeMonth:
+            return 0.25;
+        case StakingCoefficient::SixMonth:
+            return 0.5;
+        case StakingCoefficient::NineMonth:
+            return 0.75;
+        case StakingCoefficient::Anni:
+            return 1;
+        default:
+            return 0.1;
+        }
+    }
 
 #ifdef MONITOR_NODE
     bool setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp);

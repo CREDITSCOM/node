@@ -150,7 +150,7 @@ struct RoundTableMessage {
     cs::PublicKey sender;
 };
 
-enum StakingCoefficient : uint8_t {
+enum class StakingCoefficient : uint8_t {
     NoStaking,
     ThreeMonth,
     SixMonth,
