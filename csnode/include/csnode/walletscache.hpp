@@ -135,7 +135,7 @@ private:
     void fundConfidantsWalletsWithFee(const csdb::Amount& totalFee,
                                       const cs::ConfidantsKeys& confidants,
                                       const std::vector<uint8_t>& realTrusted,
-                                      const cs::Sequence poolSeq,
+                                      const cs::Sequence poolSeq, //const csdb::Amount& blockReward, const std::vector<csdb::Amount>& rewardDistribution
                                       bool inverse);
     void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction,
                                           const BlockChain& blockchain,

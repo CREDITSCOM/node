@@ -127,7 +127,8 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
 
     if (totalAmountOfCountedFee > csdb::Amount(0)) {
         fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants,
-                                     cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()), pool.sequence(),
+                                     cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()),
+                                     /*getBlockReward(pool),*/pool.sequence(),
                                      inverse);
     }
 
@@ -286,7 +287,7 @@ bool WalletsCache::Updater::setWalletTime(const PublicKey& address, const uint64
 
 void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& totalFee,
                                                          const cs::ConfidantsKeys& confidants,
-                                                         const std::vector<uint8_t>& realTrusted,
+                                                         const std::vector<uint8_t>& realTrusted, //const csdb::Amount& blockReward, const std::vector<csdb::Amount>& rewardDistribution 
                                                          const cs::Sequence poolSeq,
                                                          bool inverse) {
     if (!confidants.size()) {

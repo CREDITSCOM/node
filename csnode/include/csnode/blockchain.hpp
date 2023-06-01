@@ -180,6 +180,7 @@ public:
 
     static inline const csdb::user_field_id_t kFieldTimestamp = 0;
     static inline const csdb::user_field_id_t kFieldServiceInfo = 1;
+    static inline const csdb::user_field_id_t kFieldBlockReward = 3;
 
     static void setTimestamp(csdb::Pool& block, const std::string& timestamp);
     static void setBootstrap(csdb::Pool& block, bool is_bootstrap);
