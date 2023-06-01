@@ -315,11 +315,18 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
     return std::to_string(meanTimeStamp);
 }
 
+<<<<<<< Updated upstream
 std::string SolverCore::getBlockReward(const cs::PublicKeys& confidants, const cs::Bytes& realTrusted) {
     csdb::Amount totalStake = 0;
     std::map<PublicKey, csdb::Amount> confidantAndStake;
     int32_t realTrustedNumber = 0;
     const uint8_t kUntrustedMarker = 255;
+=======
+std::string SolverCore::getBlockReward(const cs::PublicKeys& confidants, const cs::Bytes& realtrusted) {
+    csdb::Amount totalStake = 0;
+    std::map<PublicKey, csdb::Amount> confidantAndStake;
+    int32_t realTrustedNumber = 0;
+>>>>>>> Stashed changes
 
     for (size_t i = 0; i < confidants.size() && i < realTrusted.size(); ++i) {
         csdb::Amount nodeConfidantAndStake;
@@ -329,6 +336,7 @@ std::string SolverCore::getBlockReward(const cs::PublicKeys& confidants, const c
             continue;
         }
         ++realTrustedNumber;
+<<<<<<< Updated upstream
         BlockChain::WalletData wData;
         pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(confidants[i]), wData);
         totalNodeStake += wData.balance_;
@@ -339,6 +347,17 @@ std::string SolverCore::getBlockReward(const cs::PublicKeys& confidants, const c
         //auto miningDelegations = wData.delegateSources_;
         if (wData.delegateSources_->size() > 0) {
             for (auto& keyAndStake : *(wData.delegateSources_)) {
+=======
+        auto wallet = getWalletData(confidants[i]);
+        totalNodeStake += wallet.balance_;
+        csdebug() << "fundConfidantsWalletsWithFee - applying to: " << cs::Utils::byteStreamToHex(confidants[i]);
+        csdebug() << "fundConfidantsWalletsWithFee - node balance added: " << totalNodeStake.to_string();
+        nodeConfidantAndStake += wallet.balance_;
+
+        auto miningDelegations = data_.staking_->getMiningDelegations(confidants[i]);
+        if (miningDelegations) {
+            for (auto& keyAndStake : *miningDelegations) {
+>>>>>>> Stashed changes
                 if (keyAndStake.second.coeff == StakingCoefficient::NoStaking) {
                     nodeConfidantAndStake += keyAndStake.second.amount;
                     csdebug() << "fundConfidantsWalletsWithFee - simple delegation added: " << keyAndStake.second.amount.to_string();
