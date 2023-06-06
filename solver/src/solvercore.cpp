@@ -315,18 +315,20 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
     return std::to_string(meanTimeStamp);
 }
 
-<<<<<<< Updated upstream
-std::string SolverCore::getBlockReward(const cs::PublicKeys& confidants, const cs::Bytes& realTrusted) {
+
+void SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& realTrusted) {
+    auto confidants = defBlock.confidants();
+    csdb::Amount totalFee = defBlock.roundCost();
+    csdebug() << "setBlockReward - round cost: " << totalFee.to_string();
+    if (totalFee == csdb::Amount{ 0 }) {
+        for (auto& tr : defBlock.transactions()) {
+            totalFee += csdb::Amount(tr.counted_fee().to_double());
+        }
+    }
     csdb::Amount totalStake = 0;
     std::map<PublicKey, csdb::Amount> confidantAndStake;
     int32_t realTrustedNumber = 0;
     const uint8_t kUntrustedMarker = 255;
-=======
-std::string SolverCore::getBlockReward(const cs::PublicKeys& confidants, const cs::Bytes& realtrusted) {
-    csdb::Amount totalStake = 0;
-    std::map<PublicKey, csdb::Amount> confidantAndStake;
-    int32_t realTrustedNumber = 0;
->>>>>>> Stashed changes
 
     for (size_t i = 0; i < confidants.size() && i < realTrusted.size(); ++i) {
         csdb::Amount nodeConfidantAndStake;
@@ -336,58 +338,76 @@ std::string SolverCore::getBlockReward(const cs::PublicKeys& confidants, const c
             continue;
         }
         ++realTrustedNumber;
-<<<<<<< Updated upstream
         BlockChain::WalletData wData;
         pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(confidants[i]), wData);
         totalNodeStake += wData.balance_;
-        csdebug() << "fundConfidantsWalletsWithFee - applying to: " << cs::Utils::byteStreamToHex(confidants[i]);
-        csdebug() << "fundConfidantsWalletsWithFee - node balance added: " << totalNodeStake.to_string();
+        csdebug() << "setBlockReward - applying to: " << cs::Utils::byteStreamToHex(confidants[i]);
+        csdebug() << "setBlockReward - node balance added: " << totalNodeStake.to_string();
         nodeConfidantAndStake += wData.balance_;
-
-        //auto miningDelegations = wData.delegateSources_;
-        if (wData.delegateSources_->size() > 0) {
+        csdebug() << "setBlockReward - before check";
+        if (wData.delegateSources_ != nullptr && wData.delegateSources_->size() > 0) {
+            csdebug() << "setBlockReward - before cycle";
             for (auto& keyAndStake : *(wData.delegateSources_)) {
-=======
-        auto wallet = getWalletData(confidants[i]);
-        totalNodeStake += wallet.balance_;
-        csdebug() << "fundConfidantsWalletsWithFee - applying to: " << cs::Utils::byteStreamToHex(confidants[i]);
-        csdebug() << "fundConfidantsWalletsWithFee - node balance added: " << totalNodeStake.to_string();
-        nodeConfidantAndStake += wallet.balance_;
+                csdebug() << "setBlockReward - in first cycle";
+                for(auto& tm : keyAndStake.second){
+                    csdebug() << "setBlockReward - in second cycle";
+                    if (tm.coeff == StakingCoefficient::NoStaking) {
+                        nodeConfidantAndStake += tm.amount;
+                        csdebug() << "setBlockReward - simple delegation added: " << tm.amount.to_string();
+                    }
+                    else {
+                        nodeConfidantAndFreezenStake += tm.amount * pnode->getBlockChain().getStakingCoefficient(tm.coeff);
+                        csdebug() << "setBlockReward - time delegation added: " << tm.amount.to_string() << " as " << nodeConfidantAndFreezenStake.to_string();
+                    }
 
-        auto miningDelegations = data_.staking_->getMiningDelegations(confidants[i]);
-        if (miningDelegations) {
-            for (auto& keyAndStake : *miningDelegations) {
->>>>>>> Stashed changes
-                if (keyAndStake.second.coeff == StakingCoefficient::NoStaking) {
-                    nodeConfidantAndStake += keyAndStake.second.amount;
-                    csdebug() << "fundConfidantsWalletsWithFee - simple delegation added: " << keyAndStake.second.amount.to_string();
                 }
-                else {
-                    nodeConfidantAndFreezenStake += keyAndStake.second.amount * getStakingCoefficient(keyAndStake.second.coeff);
-                    csdebug() << "fundConfidantsWalletsWithFee - time delegation added: " << keyAndStake.second.amount.to_string() << " as " << nodeConfidantAndFreezenStake.to_string();
-                }
-                totalNodeStake += keyAndStake.second.amount;
-                csdebug() << "fundConfidantsWalletsWithFee - total node stake: " << totalNodeStake.to_string();
             }
         }
+        csdebug() << "setBlockReward - after check";
+        totalNodeStake = nodeConfidantAndStake + nodeConfidantAndFreezenStake;
+        csdebug() << "setBlockReward - total node stake: " << totalNodeStake.to_string();
 
         csdb::Amount totaNodeCutStake = totalNodeStake;
         if (totaNodeCutStake > Consensus::MaxStakeValue) {
             totaNodeCutStake = Consensus::MaxStakeValue;
         }
 
-        confidantAndStake[confidants[i]] += (nodeConfidantAndStake * getStakingCoefficient(StakingCoefficient::NoStaking) + nodeConfidantAndFreezenStake) * (totalNodeStake > csdb::Amount{ 1 } ? totaNodeCutStake / totalNodeStake : 1);
+        confidantAndStake[confidants[i]] += (nodeConfidantAndStake * pnode->getBlockChain().getStakingCoefficient(StakingCoefficient::NoStaking) + nodeConfidantAndFreezenStake) * (totalNodeStake > csdb::Amount{ 1 } ? totaNodeCutStake / totalNodeStake : 1);
         totalStake += confidantAndStake[confidants[i]];
-        csdebug() << "fundConfidantsWalletsWithFee - final confAndStake: " << confidantAndStake[confidants[i]].to_string();
+        csdebug() << "setBlockReward - final confAndStake: " << confidantAndStake[confidants[i]].to_string();
     }
 
-    //Fee only
-    csdb::Amount feeOnly = totalFee;
-    csdb::Amount minedValue = poolSeq < Consensus::StartingDPOS ? csdb::Amount{ 0 } : totalFee * Consensus::miningCoefficient + Consensus::blockReward;
-    csdb::Amount onePartOfFee = feeOnly / realTrustedNumber;
+    csdb::Amount minedValue = defBlock.sequence() < Consensus::StartingDPOS ? csdb::Amount{ 0 } : totalFee * Consensus::miningCoefficient + Consensus::blockReward;
+    //csdb::Amount onePartOfFee = feeOnly / realTrustedNumber;
     if (totalStake < csdb::Amount{ 1 }) {
         totalStake = csdb::Amount{ 1 };
     }
+    csdb::Amount oneMiningPart = Consensus::stakingOn ? minedValue / totalStake : csdb::Amount{ 0 };
+    //csdb::Amount payedFee = 0;
+    csdb::Amount payedReward = 0;
+    size_t numPayedTrusted = 0;
+    cs::Bytes fldBytes;
+    cs::ODataStream stream(fldBytes);
+    csdebug() << "setBlockReward - minedValue: " << minedValue.to_string() << ", " << oneMiningPart.to_string();
+    for (auto& confAndStake : confidantAndStake) {
+        csdb::Amount rewardToPay = 0;
+
+        if (numPayedTrusted == confidantAndStake.size() - 1) {
+            rewardToPay = minedValue - payedReward;
+        }
+        else {
+            rewardToPay = oneMiningPart * confAndStake.second;
+        }
+        stream << rewardToPay.integral() << rewardToPay.fraction();
+        csdebug() << "setBlockReward -> " << cs::Utils::byteStreamToHex(confAndStake.first) << ", Mined: " << rewardToPay.to_string();
+        payedReward += rewardToPay;
+        ++numPayedTrusted;
+    }
+    if (numPayedTrusted == realTrustedNumber && fldBytes.size() > 0) {
+        std::string fld(fldBytes.begin(), fldBytes.end());
+        defBlock.add_user_field(BlockChain::kFieldBlockReward, fld);
+    }
+    
 }
 
 // TODO: this function is to be implemented the block and RoundTable building <====
@@ -455,13 +475,13 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
 //        uploadNewStates(conveyer.uploadNewStates());
         deferredBlock_ = std::move(pool.value());
         deferredBlock_.set_confidants(conveyer.confidants());
-        if (deferredBlock_.transactions().size() > 0) {
-            deferredBlock_.add_user_field(BlockChain::kFieldBlockReward, getBlockReward(conveyer.confidants(), poolMetaInfo.realTrustedMask));
-        }
         
         csmeta(csdebug) << "block #" << deferredBlock_.sequence() << " add new wallets to pool";
         pnode->getBlockChain().addNewWalletsToPool(deferredBlock_);
         pnode->getBlockChain().setTransactionsFees(deferredBlock_);
+        if (deferredBlock_.sequence() > Consensus::StartingDPOS && deferredBlock_.transactions().size() > 0) {
+            setBlockReward(deferredBlock_, poolMetaInfo.realTrustedMask);
+        }
         const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
         if (confirmation.has_value()) {
             confirmationMask = confirmation.value().mask;

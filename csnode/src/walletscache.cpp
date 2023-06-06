@@ -128,7 +128,7 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
     if (totalAmountOfCountedFee > csdb::Amount(0)) {
         fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants,
                                      cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()),
-                                     /*getBlockReward(pool),*/pool.sequence(),
+                                     getRewardDistribution(pool),
                                      inverse);
     }
 
@@ -287,92 +287,57 @@ bool WalletsCache::Updater::setWalletTime(const PublicKey& address, const uint64
 
 void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& totalFee,
                                                          const cs::ConfidantsKeys& confidants,
-                                                         const std::vector<uint8_t>& realTrusted, //const csdb::Amount& blockReward, const std::vector<csdb::Amount>& rewardDistribution 
-                                                         const cs::Sequence poolSeq,
+                                                         const std::vector<uint8_t>& realTrusted, 
+                                                         const std::vector<csdb::Amount>& rewardDistribution,
                                                          bool inverse) {
-    if (!confidants.size()) {
+    csdebug() << "fundConfidantsWalletsWithFee: start";
+    if (confidants.size() == 0ULL) {
         cslog() << kLogPrefix << "NO CONFIDANTS";
         return;
     }
-    csdb::Amount totalStake = 0;
-    std::map<PublicKey, csdb::Amount> confidantAndStake;
-    int32_t realTrustedNumber = 0;
+    if (confidants.size() != realTrusted.size()) {
+        cslog() << kLogPrefix << "Real trusted and confidants have different sizes";
+        return;
+    }
 
-    for (size_t i = 0; i < confidants.size() && i < realTrusted.size(); ++i) {
-        csdb::Amount nodeConfidantAndStake;
-        csdb::Amount nodeConfidantAndFreezenStake;
-        csdb::Amount totalNodeStake = 0;
+    int32_t realTrustedNumber = 0;
+    for (size_t i = 0; i < confidants.size(); ++i) {
         if (realTrusted[i] == kUntrustedMarker) {
             continue;
         }
         ++realTrustedNumber;
-        auto wallet = getWalletData(confidants[i]);
-        totalNodeStake += wallet.balance_;
-        csdebug() << "fundConfidantsWalletsWithFee - applying to: " << cs::Utils::byteStreamToHex(confidants[i]);
-        csdebug() << "fundConfidantsWalletsWithFee - node balance added: " << totalNodeStake.to_string();
-        nodeConfidantAndStake += wallet.balance_;
-
-        auto miningDelegations = data_.staking_->getMiningDelegations(confidants[i]);
-        if (miningDelegations) {
-            for (auto& keyAndStake : *miningDelegations) {
-                if (keyAndStake.second.coeff == StakingCoefficient::NoStaking) {
-                    nodeConfidantAndStake += keyAndStake.second.amount;
-                    csdebug() << "fundConfidantsWalletsWithFee - simple delegation added: " << keyAndStake.second.amount.to_string();
-                }
-                else {
-                    nodeConfidantAndFreezenStake += keyAndStake.second.amount * getStakingCoefficient(keyAndStake.second.coeff);
-                    csdebug() << "fundConfidantsWalletsWithFee - time delegation added: " << keyAndStake.second.amount.to_string() << " as " << nodeConfidantAndFreezenStake.to_string();
-                }
-                totalNodeStake += keyAndStake.second.amount;
-                csdebug() << "fundConfidantsWalletsWithFee - total node stake: " << totalNodeStake.to_string();
-            }
-        }
-
-        csdb::Amount totaNodeCutStake = totalNodeStake;
-        if (totaNodeCutStake > Consensus::MaxStakeValue) {
-            totaNodeCutStake = Consensus::MaxStakeValue;
-        }
-        
-        confidantAndStake[confidants[i]] += (nodeConfidantAndStake * getStakingCoefficient(StakingCoefficient::NoStaking) + nodeConfidantAndFreezenStake) * (totalNodeStake > csdb::Amount{ 1 } ? totaNodeCutStake / totalNodeStake : 1);
-        totalStake += confidantAndStake[confidants[i]];
-        csdebug() << "fundConfidantsWalletsWithFee - final confAndStake: " << confidantAndStake[confidants[i]].to_string();
     }
-
     //Fee only
-    csdb::Amount feeOnly = totalFee;
-    csdb::Amount minedValue = poolSeq < Consensus::StartingDPOS ? csdb::Amount{ 0 } : totalFee * Consensus::miningCoefficient + Consensus::blockReward;
-    csdb::Amount onePartOfFee = feeOnly/realTrustedNumber;
-    if (totalStake < csdb::Amount{ 1 }) {
-        totalStake = csdb::Amount{ 1 };
-    }
-    csdb::Amount oneMiningPart = Consensus::stakingOn ? minedValue / totalStake : csdb::Amount{ 0 };
+    csdb::Amount onePartOfFee = totalFee /realTrustedNumber;
+    auto rewIt = rewardDistribution.begin();
     csdb::Amount payedFee = 0;
-    csdb::Amount payedReward = 0;
     size_t numPayedTrusted = 0;
-    csdebug() << "fundConfidantsWalletsWithFee - feeOnly: " << feeOnly.to_string() << ", minedValue: " << minedValue.to_string() << ", " << oneMiningPart.to_string();
-    for (auto& confAndStake : confidantAndStake) {
-            auto walletData = getWalletData(confAndStake.first);
-            csdb::Amount feeToPay = 0; 
-            csdb::Amount rewardToPay = 0;
-
-            if (numPayedTrusted == confidantAndStake.size() - 1) {
-                feeToPay = feeOnly - payedFee;
-                rewardToPay = minedValue - payedReward;
-            }
-            else {
-                feeToPay = onePartOfFee;
-                rewardToPay = oneMiningPart * confAndStake.second;
-            }
-
-            if (!inverse) {
-                walletData.balance_ += (feeToPay + rewardToPay);
-                logOperation("Confidant fee added: +", confAndStake.first, feeToPay);
-                csdebug() << cs::Utils::byteStreamToHex(confAndStake.first) << " - paidSum: " << feeToPay.to_string();
-            }
-            else {
-                walletData.balance_ -= (feeToPay + rewardToPay);
-                logOperation("Confidant fee reverted: -", confAndStake.first, feeToPay);
-            }
+    csdebug() << "fundConfidantsWalletsWithFee - totalFee: " << totalFee.to_string() << ", onePartFee = " << onePartOfFee.to_string();
+    for (size_t i = 0; i < confidants.size(); ++i) {
+        if (realTrusted[i] == kUntrustedMarker) {
+            continue;
+        }
+        csdebug() << "fundConfidantsWalletsWithFee: before getting walletdata";
+        auto walletData = getWalletData(confidants[i]);
+        csdb::Amount feeToPay = 0; 
+        csdb::Amount reward = rewardDistribution.size() > 0 ? *rewIt : csdb::Amount{ 0 };
+        csdebug() << "fundConfidantsWalletsWithFee: before calc";
+        if (numPayedTrusted == confidants.size() - 1) {
+            feeToPay = totalFee - payedFee;
+        }
+        else {
+            feeToPay = onePartOfFee;
+        }
+        csdebug() << "fundConfidantsWalletsWithFee - FeeToPay: " << feeToPay.to_string();
+        if (!inverse) {
+            walletData.balance_ += (feeToPay + reward);
+            logOperation("Confidant fee added: +", confidants[i], feeToPay);
+            csdebug() << cs::Utils::byteStreamToHex(confidants[i]) << " - paidSum: " << feeToPay.to_string();
+        }
+        else {
+            walletData.balance_ -= (feeToPay + reward);
+            logOperation("Confidant fee reverted: -", confidants[i], feeToPay);
+        }
 
 #ifdef MONITOR_NODE
             auto it_writer = data_.trusted_info_.find(confAndStake.first);
@@ -385,12 +350,14 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
                 }
             }
 #endif
-            csdebug() << "fundConfidantsWalletsWithFee -> " << cs::Utils::byteStreamToHex(confAndStake.first) << ", Fee: " << feeToPay.to_string() << ", Mined: " << rewardToPay.to_string();
-            payedFee += feeToPay;
-            payedReward += rewardToPay;
-            ++numPayedTrusted;
+        csdebug() << "fundConfidantsWalletsWithFee -> " << cs::Utils::byteStreamToHex(confidants[i]) << ", Fee: " << feeToPay.to_string() << ", Mined: " << reward.to_string();
+        payedFee += feeToPay;
+        ++numPayedTrusted;
+        if (rewIt != rewardDistribution.end()) {
+            ++rewIt;
+        }
 
-            data_.multiWallets_->onWalletCacheUpdated(walletData);
+        data_.multiWallets_->onWalletCacheUpdated(walletData);
     }
 }
 
@@ -418,9 +385,32 @@ void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transac
         transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>(),
         pool.confidants(),
         cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()),
-        pool.sequence(),
+        getRewardDistribution(pool),
         inverse
     );
+}
+
+std::vector<csdb::Amount> WalletsCache::Updater::getRewardDistribution(const csdb::Pool& pool) {
+    std::vector<csdb::Amount> rewDistribution;
+    auto mask = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
+    auto fld = pool.user_field(BlockChain::kFieldBlockReward);
+    if (fld.is_valid()) {
+        auto data = fld.value<std::string>();
+        IDataStream stream(data.data(), data.size());
+
+
+        for (auto it : mask) {
+            if (it == kUntrustedMarker) {
+                continue;
+            }
+            int32_t integer = 0L;
+            uint64_t fraction = 0ULL;
+            stream >> integer >> fraction;
+
+            rewDistribution.emplace_back(integer, fraction);
+        }
+    }
+    return rewDistribution;
 }
 
 void WalletsCache::Updater::logOperation(const std::string& reason, const cs::PublicKey& key, const csdb::Amount& sum) {
@@ -813,6 +803,7 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, const 
 
     if (!inverse) {
         if (ufld.is_valid()) {
+            csdebug() << "addDelegationForTarget: " << cs::Utils::byteStreamToHex(toPublicKey(tr.target())) << " <- " << tr.amount().to_string();
             data_.staking_->addDelegationsForTarget(
                 ufld,
                 toPublicKey(tr.source()),
@@ -821,6 +812,21 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, const 
                 tr.id(),
                 timeStamp
             );
+            csdebug() << "before showing delegations: " << cs::Utils::byteStreamToHex(wallData.key_);
+            if (wallData.delegateSources_ != nullptr) {
+                csdebug() << "delegations: ";
+                for (auto a : *(wallData.delegateSources_)){
+                    csdebug() << "pKey: " << cs::Utils::byteStreamToHex(a.first);
+                    for (auto b : a.second) {
+                        csdebug() << "initial: " << b.initialTime << ", final: " << b.time << ", amount: " << b.amount.to_string() << ", coeff: " << static_cast<int>(b.coeff);
+                    }
+                }
+                
+            }
+            else {
+                csdebug() << "... no delegations found";
+            }
+            csdebug() << "... strange behavour";
             //alreadyUpdated = true;
         }
     }

@@ -119,6 +119,7 @@ public:
 
 
     PublicKey toPublicKey(const csdb::Address&) const;
+    std::vector<csdb::Amount> getRewardDistribution(const csdb::Pool& pool);
 
 private:
     WalletData getWalletData(const PublicKey&);
@@ -135,7 +136,7 @@ private:
     void fundConfidantsWalletsWithFee(const csdb::Amount& totalFee,
                                       const cs::ConfidantsKeys& confidants,
                                       const std::vector<uint8_t>& realTrusted,
-                                      const cs::Sequence poolSeq, //const csdb::Amount& blockReward, const std::vector<csdb::Amount>& rewardDistribution
+                                      const std::vector<csdb::Amount>& rewardDistribution,
                                       bool inverse);
     void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction,
                                           const BlockChain& blockchain,
@@ -148,20 +149,6 @@ private:
     void checkCanceledSmart(const csdb::Address& contract_addr,
                             const csdb::TransactionID& tid,
                             bool inverse);
-    double getStakingCoefficient(StakingCoefficient coeff) {
-        switch (coeff) {
-        case StakingCoefficient::ThreeMonth:
-            return 0.25;
-        case StakingCoefficient::SixMonth:
-            return 0.5;
-        case StakingCoefficient::NineMonth:
-            return 0.75;
-        case StakingCoefficient::Anni:
-            return 1;
-        default:
-            return 0.1;
-        }
-    }
 
 #ifdef MONITOR_NODE
     bool setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp);

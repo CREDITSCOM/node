@@ -134,7 +134,7 @@ public:
     void getGrayListContentBase58(std::vector<std::string>& gray_list) const;
 
     bool isTransactionsInputAvailable();
-    std::string getBlockReward(const cs::PublicKeys& confidants, const cs::Bytes& realTrusted);
+    void setBlockReward(csdb::Pool& defBlock, const cs::Bytes& realTrusted);
     void askTrustedRound(cs::RoundNumber rNum, const cs::ConfidantsKeys& confidants);
     uint64_t lastTimeStamp();
     void uploadNewStates(std::vector<csdb::Transaction> newStates);

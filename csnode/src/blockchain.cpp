@@ -1108,6 +1108,21 @@ bool BlockChain::findWalletData(WalletId id, WalletData& wallData) const {
     return findWalletData_Unsafe(id, wallData);
 }
 
+double BlockChain::getStakingCoefficient(StakingCoefficient coeff) {
+    switch (coeff) {
+    case StakingCoefficient::ThreeMonth:
+        return 0.25;
+    case StakingCoefficient::SixMonth:
+        return 0.5;
+    case StakingCoefficient::NineMonth:
+        return 0.75;
+    case StakingCoefficient::Anni:
+        return 1;
+    default:
+        return 0.1;
+    }
+}
+
 bool BlockChain::findWalletData_Unsafe(WalletId id, WalletData& wallData) const {
     auto pubKey = getAddressByType(csdb::Address::from_wallet_id(id), AddressType::PublicKey);
     auto wallDataPtr = walletsCacheUpdater_->findWallet(pubKey.public_key());
