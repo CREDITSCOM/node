@@ -14,7 +14,7 @@ TimeMoney::TimeMoney(uint64_t it, uint64_t t, csdb::Amount am){
     amount = am; 
     uint64_t ThreeMonthMilliseconds = 7862400;
     uint64_t m = 0ULL;
-    if (time == cs::Zero::timeStamp) {
+    if (time == cs::Zero::timeStamp || t < it) {
         coeff = StakingCoefficient::NoStaking;
     }
     else {
