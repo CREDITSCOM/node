@@ -326,7 +326,7 @@ void SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& realTrust
         }
     }
     csdb::Amount totalStake = 0;
-    std::map<PublicKey, csdb::Amount> confidantAndStake;
+    std::unordered_map<PublicKey, csdb::Amount> confidantAndStake;
     int32_t realTrustedNumber = 0;
     const uint8_t kUntrustedMarker = 255;
 

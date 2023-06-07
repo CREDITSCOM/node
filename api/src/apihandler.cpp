@@ -108,8 +108,8 @@ void APIHandlerBase::SetResponseStatus(general::APIResponse& response, APIReques
         {4, "Transaction in progress"}
     };
 
-    response.code = int8_t(statuses[static_cast<uint8_t>(status)].code);
-    response.message = statuses[static_cast<uint8_t>(status)].message + ": " + details;
+    response.__set_code(int8_t(statuses[static_cast<uint8_t>(status)].code));
+    response.__set_message(statuses[static_cast<uint8_t>(status)].message + ": " + details);
 }
 
 void APIHandlerBase::SetResponseStatus(general::APIResponse& response, bool commandWasHandled) {
@@ -673,6 +673,18 @@ api::Pool APIHandler::convertPool(const csdb::Pool& pool) {
         result.transactionsCount = int32_t(pool.transactions_count());  // DO NOT EVER CREATE POOLS WITH
                                                                         // MORE THAN 2 BILLION
                                                                         // TRANSACTIONS, EVEN AT NIGHT
+
+        if (pool.transactions_count() > 0) {
+            auto rewDistribution = cs::WalletsCache::Updater::getRewardDistribution(pool);
+            std::vector< ::general::Amount> rewards;
+            for (auto it : rewDistribution) {
+                general::Amount am;
+                am.__set_integral(it.integral());
+                am.__set_fraction(it.fraction());
+                rewards.emplace_back(std::move(am));
+            }
+            result.__set_blockReward(rewards);
+        }
 
         const auto& wpk = pool.writer_public_key();
         result.writer = fromByteArray(cs::Bytes(wpk.begin(), wpk.end()));
@@ -1520,7 +1532,7 @@ void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const int64_t sequence,
     _return.isFound = pool.is_valid();
 
     if (_return.isFound) {
-        _return.pool = convertPool(pool);
+        _return.__set_pool(convertPool(pool));
     }
 
     SetResponseStatus(_return.status, APIRequestStatusType::SUCCESS);

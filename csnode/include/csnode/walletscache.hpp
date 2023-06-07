@@ -119,7 +119,7 @@ public:
 
 
     PublicKey toPublicKey(const csdb::Address&) const;
-    std::vector<csdb::Amount> getRewardDistribution(const csdb::Pool& pool);
+    static std::vector<csdb::Amount> getRewardDistribution(const csdb::Pool& pool);
 
 private:
     WalletData getWalletData(const PublicKey&);

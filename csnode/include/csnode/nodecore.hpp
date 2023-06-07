@@ -159,7 +159,7 @@ enum class StakingCoefficient : uint8_t {
 };
 
 struct TimeMoney {
-    TimeMoney(uint64_t it, uint64_t t, csdb::Amount am);
+    TimeMoney(const uint64_t it, const uint64_t t, const csdb::Amount am);
     uint64_t initialTime;
     uint64_t time;
     csdb::Amount amount;
