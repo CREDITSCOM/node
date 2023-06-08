@@ -326,11 +326,11 @@ void SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& realTrust
         }
     }
     csdb::Amount totalStake = 0;
-    std::unordered_map<PublicKey, csdb::Amount> confidantAndStake;
+    std::vector<csdb::Amount> confidantAndStake;
     int32_t realTrustedNumber = 0;
     const uint8_t kUntrustedMarker = 255;
 
-    for (size_t i = 0; i < confidants.size() && i < realTrusted.size(); ++i) {
+    for (size_t i = 0; i < confidants.size(); ++i) {
         csdb::Amount nodeConfidantAndStake;
         csdb::Amount nodeConfidantAndFreezenStake;
         csdb::Amount totalNodeStake = 0;
@@ -372,9 +372,9 @@ void SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& realTrust
             totaNodeCutStake = Consensus::MaxStakeValue;
         }
 
-        confidantAndStake[confidants[i]] += (nodeConfidantAndStake * pnode->getBlockChain().getStakingCoefficient(StakingCoefficient::NoStaking) + nodeConfidantAndFreezenStake) * (totalNodeStake > csdb::Amount{ 1 } ? totaNodeCutStake / totalNodeStake : 1);
-        totalStake += confidantAndStake[confidants[i]];
-        csdebug() << "setBlockReward - final confAndStake: " << confidantAndStake[confidants[i]].to_string();
+        confidantAndStake.push_back((nodeConfidantAndStake * pnode->getBlockChain().getStakingCoefficient(StakingCoefficient::NoStaking) + nodeConfidantAndFreezenStake) * (totalNodeStake > csdb::Amount{ 1 } ? totaNodeCutStake / totalNodeStake : 1));
+        totalStake += confidantAndStake[i];
+        csdebug() << "setBlockReward - final confAndStake: " << confidantAndStake[i].to_string();
     }
 
     csdb::Amount minedValue = defBlock.sequence() < Consensus::StartingDPOS ? csdb::Amount{ 0 } : totalFee * Consensus::miningCoefficient + Consensus::blockReward;
@@ -389,17 +389,17 @@ void SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& realTrust
     cs::Bytes fldBytes;
     cs::ODataStream stream(fldBytes);
     csdebug() << "setBlockReward - minedValue: " << minedValue.to_string() << ", " << oneMiningPart.to_string();
-    for (auto& confAndStake : confidantAndStake) {
+    for (size_t i = 0; i < confidants.size(); ++i) {
         csdb::Amount rewardToPay = 0;
 
-        if (numPayedTrusted == confidantAndStake.size() - 1) {
+        if (numPayedTrusted == confidants.size() - 1) {
             rewardToPay = minedValue - payedReward;
         }
         else {
-            rewardToPay = oneMiningPart * confAndStake.second;
+            rewardToPay = oneMiningPart * confidantAndStake[i];
         }
         stream << rewardToPay.integral() << rewardToPay.fraction();
-        csdebug() << "setBlockReward -> " << cs::Utils::byteStreamToHex(confAndStake.first) << ", Mined: " << rewardToPay.to_string();
+        csdebug() << "setBlockReward -> " << cs::Utils::byteStreamToHex(confidants[i]) << ", Mined: " << rewardToPay.to_string();
         payedReward += rewardToPay;
         ++numPayedTrusted;
     }
