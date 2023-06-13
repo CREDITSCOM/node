@@ -128,7 +128,7 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
     if (totalAmountOfCountedFee > csdb::Amount(0)) {
         fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants,
                                      cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()),
-                                     getRewardDistribution(pool),
+                                     getRewardDistribution(pool, false),
                                      inverse);
     }
 
@@ -385,14 +385,20 @@ void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transac
         transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>(),
         pool.confidants(),
         cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()),
-        getRewardDistribution(pool),
+        getRewardDistribution(pool, true),
         inverse
     );
 }
 
-std::vector<csdb::Amount> WalletsCache::Updater::getRewardDistribution(const csdb::Pool& pool) {
+std::vector<csdb::Amount> WalletsCache::Updater::getRewardDistribution(const csdb::Pool& pool, bool execFee) {
     std::vector<csdb::Amount> rewDistribution;
     auto mask = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
+    if (execFee) {
+        for (auto it : mask) {
+            rewDistribution.emplace_back(0);
+        }
+        return rewDistribution;
+    }
     auto fld = pool.user_field(BlockChain::kFieldBlockReward);
     if (fld.is_valid()) {
         auto data = fld.value<std::string>();

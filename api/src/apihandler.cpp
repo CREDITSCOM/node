@@ -259,9 +259,11 @@ std::optional<api::Delegated> APIHandler::getDelegated(const BlockChain::WalletD
                 donor.__set_wallet(fromByteArray(item.first));
                 auto s = convertAmount(tm.amount);
                 donor.__set_sum(s);
-                if (tm.time > 0) {
+                if (tm.time >= 0) {
                     donor.__set_validUntil(tm.time);
+                    donor.__set_fromTime(tm.initialTime);
                 }
+                donor.__set_coeff(static_cast<int8_t>(tm.coeff));
                 donors.push_back(donor);
             }
         }
@@ -675,7 +677,7 @@ api::Pool APIHandler::convertPool(const csdb::Pool& pool) {
                                                                         // TRANSACTIONS, EVEN AT NIGHT
 
         if (pool.transactions_count() > 0) {
-            auto rewDistribution = cs::WalletsCache::Updater::getRewardDistribution(pool);
+            auto rewDistribution = cs::WalletsCache::Updater::getRewardDistribution(pool, false);
             std::vector< ::general::Amount> rewards;
             for (auto it : rewDistribution) {
                 general::Amount am;

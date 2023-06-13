@@ -3960,7 +3960,10 @@ bool Node::checkNodeVersion(cs::Sequence curSequence, std::string& msg) {
 
 void Node::processSpecialInfo(const csdb::Pool& pool) {
     for (auto it : pool.transactions()) {
-        if (getBlockChain().isSpecial(it)) {
+        if (!getBlockChain().isSpecial(it)) {
+            continue;
+        } 
+        else {
             auto stringBytes = it.user_field(cs::trx_uf::sp::managing).value<std::string>();
             std::vector<cs::Byte> msg(stringBytes.begin(), stringBytes.end());
             cs::IDataStream stream(msg.data(), msg.size());
@@ -4110,7 +4113,21 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 }
             }
 
-            if (order == 33U) {// apply new global features
+            if (order == 35U) {// apply new global features
+                uint64_t value;
+                stream >> value;
+                Consensus::syncroChangeRound = value;
+                cslog() << "Changes will be aplied in round " << Consensus::syncroChangeRound;
+            }
+
+            if (order == 36U) {// turn on mining
+                uint64_t value;
+                stream >> value;
+                Consensus::syncroChangeRound = value;
+                cslog() << "Changes will be aplied in round " << Consensus::syncroChangeRound;
+            }
+
+            if (order == 37U) {// turn off mining
                 uint64_t value;
                 stream >> value;
                 Consensus::syncroChangeRound = value;
