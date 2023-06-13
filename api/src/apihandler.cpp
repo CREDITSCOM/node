@@ -289,7 +289,9 @@ std::optional<api::Delegated> APIHandler::getDelegated(const BlockChain::WalletD
                 recipient.__set_sum(s);
                 if (tm.time > 0) {
                     recipient.__set_validUntil(tm.time);
+                    recipient.__set_fromTime(tm.initialTime);
                 }
+                recipient.__set_coeff(static_cast<int8_t>(tm.coeff));
                 recipients.push_back(recipient);
             }
 
