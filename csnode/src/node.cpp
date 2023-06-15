@@ -921,7 +921,8 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
 
     csdebug() << "NODE> Sequence " << rPackage.poolMetaInfo().sequenceNumber
         << ", mask size " << rPackage.poolMetaInfo().characteristic.mask.size()
-        << ", timestamp " << rPackage.poolMetaInfo().timestamp;
+        << ", timestamp " << rPackage.poolMetaInfo().timestamp
+        << ", reward " << cs::Utils::byteStreamToHex(rPackage.poolMetaInfo().reward.data(), rPackage.poolMetaInfo().reward.size());
 
     if (blockChain_.getLastSeq() > rPackage.poolMetaInfo().sequenceNumber) {
         csmeta(cswarning) << "blockChain last seq: " << blockChain_.getLastSeq()
@@ -959,6 +960,8 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
         tmpPool.add_real_trusted(cs::Utils::maskToBits(rPackage.poolMetaInfo().realTrustedMask));
         tmpPool.set_signatures(tmp2);
         csdebug() << "Signatures " << tmp2.size() << " were added to the pool: " << tmpPool.signatures().size();
+        //tmpPool.add_user_field(BlockChain::kFieldBlockReward, rPackage.poolMetaInfo().reward);
+        //csdebug() << "Reward " << rPackage.poolMetaInfo().reward.size() << " were added to the pool: " << cs::Utils::byteStreamToHex(rPackage.poolMetaInfo().reward.data(), rPackage.poolMetaInfo().reward.size());
         auto resPool = getBlockChain().createBlock(tmpPool);
 
         if (resPool.has_value()) {

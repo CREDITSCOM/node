@@ -97,6 +97,7 @@ struct RoundTable {
 struct PoolMetaInfo {
     Characteristic characteristic;
     std::string timestamp;
+    std::string reward;
     csdb::PoolHash previousHash;
     cs::Sequence sequenceNumber;
     cs::Bytes realTrustedMask;

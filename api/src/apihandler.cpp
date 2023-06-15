@@ -679,7 +679,7 @@ api::Pool APIHandler::convertPool(const csdb::Pool& pool) {
                                                                         // TRANSACTIONS, EVEN AT NIGHT
 
         if (pool.transactions_count() > 0) {
-            auto rewDistribution = cs::WalletsCache::Updater::getRewardDistribution(pool, false);
+            auto rewDistribution = cs::WalletsCache::Updater::getRewardDistribution(pool);
             std::vector< ::general::Amount> rewards;
             for (auto it : rewDistribution) {
                 general::Amount am;

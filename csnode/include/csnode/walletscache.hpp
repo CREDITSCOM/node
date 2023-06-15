@@ -119,7 +119,7 @@ public:
 
 
     PublicKey toPublicKey(const csdb::Address&) const;
-    static std::vector<csdb::Amount> getRewardDistribution(const csdb::Pool& pool, bool execFee);
+    static std::vector<csdb::Amount> getRewardDistribution(const csdb::Pool& pool);
 
 private:
     WalletData getWalletData(const PublicKey&);
@@ -136,11 +136,14 @@ private:
     void fundConfidantsWalletsWithFee(const csdb::Amount& totalFee,
                                       const cs::ConfidantsKeys& confidants,
                                       const std::vector<uint8_t>& realTrusted,
-                                      const std::vector<csdb::Amount>& rewardDistribution,
                                       bool inverse);
     void fundConfidantsWalletsWithExecFee(const csdb::Transaction& transaction,
                                           const BlockChain& blockchain,
                                           bool inverse);
+    void fundConfidantsWalletsWitnReward(const cs::ConfidantsKeys& confidants,
+        const std::vector<csdb::Amount>& rewards,
+        const std::vector<uint8_t>& realTrusted,
+        bool inverse);
 
     void checkSmartWaitingForMoney(const csdb::Transaction& initTransaction,
                                    const csdb::Transaction& newStateTransaction,

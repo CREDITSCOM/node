@@ -59,6 +59,7 @@ bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::
     }
 
     roundStream >> poolMetaInfo_.timestamp;
+    roundStream >> poolMetaInfo_.reward;
 
     if (poolMetaInfo_.timestamp.size() > 20U) {  // TODO: change the number with the appropriate constant
         csmeta(cserror) << name() << "Illegal TimeStamp size: " << poolMetaInfo_.timestamp.size();
@@ -130,6 +131,7 @@ std::string RoundPackage::toString() {
     packageString = packageString + "\n\t" + "Trusted Mask:   " + cs::TrustedMask::toString(poolMetaInfo_.realTrustedMask);
     packageString = packageString + "\n\t" + "Sequence Number: " + std::to_string(poolMetaInfo_.sequenceNumber);
     packageString = packageString + ", TimeStamp: " + poolMetaInfo_.timestamp;
+    packageString = packageString + ", Reward: " + cs::Utils::byteStreamToHex(poolMetaInfo_.reward.data(), poolMetaInfo_.reward.size());
     // packageString = packageString + "\n" + "Smart Signatures:" + poolMetaInfo_.smartSignatures;
     packageString = packageString + "\n" + "PoolSignatures(" + std::to_string(poolSignatures_.size()) + "):";
 
@@ -217,6 +219,7 @@ void RoundPackage::refillToSign() {
     stream << subRound_ << iteration;
     stream << roundTable_.hashes;
     stream << poolMetaInfo_.timestamp;
+    stream << poolMetaInfo_.reward;
     stream << poolMetaInfo_.characteristic.mask;
     stream << poolMetaInfo_.sequenceNumber;
     stream << poolMetaInfo_.previousHash;

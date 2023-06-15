@@ -316,8 +316,9 @@ std::string SolverCore::chooseTimeStamp(cs::Bytes mask) {
 }
 
 
-void SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& realTrusted) {
+std::string SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& realTrusted) {
     auto confidants = defBlock.confidants();
+    csdebug() << "setBlockReward - conf num: " << confidants.size();
     csdb::Amount totalFee = defBlock.roundCost();
     csdebug() << "setBlockReward - round cost: " << totalFee.to_string();
     if (totalFee == csdb::Amount{ 0 }) {
@@ -372,7 +373,7 @@ void SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& realTrust
             totaNodeCutStake = Consensus::MaxStakeValue;
         }
 
-        confidantAndStake.push_back((nodeConfidantAndStake * pnode->getBlockChain().getStakingCoefficient(StakingCoefficient::NoStaking) + nodeConfidantAndFreezenStake) * (totalNodeStake > csdb::Amount{ 1 } ? totaNodeCutStake / totalNodeStake : 1));
+        confidantAndStake.push_back((nodeConfidantAndStake * pnode->getBlockChain().getStakingCoefficient(StakingCoefficient::NoStaking) + nodeConfidantAndFreezenStake) * (totalNodeStake > csdb::Amount{ 1 } ? totaNodeCutStake / totalNodeStake : csdb::Amount{ 1 }));
         totalStake += confidantAndStake[i];
         csdebug() << "setBlockReward - final confAndStake: " << confidantAndStake[i].to_string();
     }
@@ -405,7 +406,11 @@ void SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& realTrust
     }
     if (numPayedTrusted == realTrustedNumber && fldBytes.size() > 0) {
         std::string fld(fldBytes.begin(), fldBytes.end());
-        defBlock.add_user_field(BlockChain::kFieldBlockReward, fld);
+        csdebug() << "setBlockReward - final string: " << cs::Utils::byteStreamToHex(fld.data(), fld.size());
+        return fld;
+    }
+    else {
+        return std::string();
     }
     
 }
@@ -460,7 +465,6 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     poolMetaInfo.realTrustedMask = stage3.realTrustedMask;
     poolMetaInfo.previousHash = pnode->getBlockChain().getLastHash();
 
-    justCreatedRoundPackage.updatePoolMeta(poolMetaInfo);
     cs::Bytes confirmationMask;
     cs::Signatures confirmations;
     // TODO: in this method we delete the local hashes - so if we need to rebuild thid pool again from the roundTable it's impossible
@@ -479,9 +483,13 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         csmeta(csdebug) << "block #" << deferredBlock_.sequence() << " add new wallets to pool";
         pnode->getBlockChain().addNewWalletsToPool(deferredBlock_);
         pnode->getBlockChain().setTransactionsFees(deferredBlock_);
-        if (deferredBlock_.sequence() > Consensus::StartingDPOS && deferredBlock_.transactions().size() > 0) {
-            setBlockReward(deferredBlock_, poolMetaInfo.realTrustedMask);
+        if (deferredBlock_.sequence() > Consensus::StartingDPOS && Consensus::miningOn) {
+            poolMetaInfo.reward = setBlockReward(deferredBlock_, poolMetaInfo.realTrustedMask);
+            csdebug() << log_prefix << "Reward: " << cs::Utils::byteStreamToHex(poolMetaInfo.reward.data(), poolMetaInfo.reward.size());
+            deferredBlock_.add_user_field(BlockChain::kFieldBlockReward, poolMetaInfo.reward);
         }
+        justCreatedRoundPackage.updatePoolMeta(poolMetaInfo);
+        
         const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
         if (confirmation.has_value()) {
             confirmationMask = confirmation.value().mask;
@@ -499,12 +507,25 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         tmpPool.set_previous_hash(deferredBlock_.previous_hash());
         tmpPool.add_real_trusted(cs::Utils::maskToBits(stage3.realTrustedMask));
         tmpPool.add_number_trusted(static_cast<uint8_t>(stage3.realTrustedMask.size()));
+
+        if (deferredBlock_.sequence() > Consensus::StartingDPOS && Consensus::miningOn) {
+            poolMetaInfo.reward = setBlockReward(tmpPool, poolMetaInfo.realTrustedMask);
+            csdebug() << log_prefix << "Reward: " << cs::Utils::byteStreamToHex(poolMetaInfo.reward.data(), poolMetaInfo.reward.size());
+            tmpPool.add_user_field(BlockChain::kFieldBlockReward, poolMetaInfo.reward);
+        }
+        justCreatedRoundPackage.updatePoolMeta(poolMetaInfo);
+
         tmpPool.setRoundCost(deferredBlock_.roundCost());
         tmpPool.set_confidants(deferredBlock_.confidants());
         for (auto& it : deferredBlock_.transactions()) {
             tmpPool.add_transaction(it);
         }
         BlockChain::setTimestamp(tmpPool, justCreatedRoundPackage.poolMetaInfo().timestamp);
+        auto rewardFld = deferredBlock_.user_field(BlockChain::kFieldBlockReward);
+        if (rewardFld.is_valid()) {
+            tmpPool.add_user_field(BlockChain::kFieldBlockReward, rewardFld.value<std::string>());
+        }
+        
         for (auto& it : deferredBlock_.smartSignatures()) {
             tmpPool.add_smart_signature(it);
         }
