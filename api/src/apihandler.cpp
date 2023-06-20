@@ -678,17 +678,17 @@ api::Pool APIHandler::convertPool(const csdb::Pool& pool) {
                                                                         // MORE THAN 2 BILLION
                                                                         // TRANSACTIONS, EVEN AT NIGHT
 
-        if (pool.transactions_count() > 0) {
-            auto rewDistribution = cs::WalletsCache::Updater::getRewardDistribution(pool);
-            std::vector< ::general::Amount> rewards;
-            for (auto it : rewDistribution) {
-                general::Amount am;
-                am.__set_integral(it.integral());
-                am.__set_fraction(it.fraction());
-                rewards.emplace_back(std::move(am));
-            }
-            result.__set_blockReward(rewards);
+        
+        auto rewDistribution = cs::WalletsCache::Updater::getRewardDistribution(pool);
+        std::vector< ::general::Amount> rewards;
+        for (auto it : rewDistribution) {
+            general::Amount am;
+            am.__set_integral(it.integral());
+            am.__set_fraction(it.fraction());
+            rewards.emplace_back(std::move(am));
         }
+        result.__set_blockReward(rewards);
+        
 
         const auto& wpk = pool.writer_public_key();
         result.writer = fromByteArray(cs::Bytes(wpk.begin(), wpk.end()));
