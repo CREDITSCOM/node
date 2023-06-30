@@ -4123,27 +4123,54 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 cslog() << "Changes will be aplied in round " << Consensus::syncroChangeRound;
             }
 
-            if (order == 36U) {// turn on mining
-                uint64_t value;
-                stream >> value;
-                Consensus::syncroChangeRound = value;
-                cslog() << "Changes will be aplied in round " << Consensus::syncroChangeRound;
-            }
+            if (order == 37U) {// turn on/off mining
+                uint8_t sign;
+                uint64_t round;
+                int32_t rewInt;
+                int32_t coeffInt;
+                uint64_t rewFrac;
+                uint64_t coefFrac;
+                stream >> sign >> round >> rewInt >> rewFrac >> coeffInt >> coefFrac;
+                
+                if (round == 0ULL || round == ULLONG_MAX) {
+                    consensusSettingsChangingRound_ = ULLONG_MAX;
+                }
+                consensusSettingsChangingRound_ = round;
+                stakingOn_ = (sign == 3 || sign == 2) ? true : false;
+                miningOn_ = (sign == 3 || sign == 1) ? true : false;
+                blockReward_ = csdb::Amount(rewInt, rewFrac);
+                miningCoefficient_ = csdb::Amount(coeffInt, coefFrac);
 
-            if (order == 37U) {// turn off mining
-                uint64_t value;
-                stream >> value;
-                Consensus::syncroChangeRound = value;
-                cslog() << "Changes will be aplied in round " << Consensus::syncroChangeRound;
+                cslog() << "Minng settings will be changed in round " << consensusSettingsChangingRound_;
             }
 
         }
     }
     std::string msg;
     checkNodeVersion(pool.sequence(), msg);
+    checkConsensusSettings(pool.sequence(), msg);
     if (!msg.empty()) {
         cslog() << msg;
     }
+}
+
+void Node::checkConsensusSettings(cs::Sequence seq, std::string& msg){
+    if (seq != consensusSettingsChangingRound_) {
+        return;
+    }
+    consensusSettingsChangingRound_ = ULLONG_MAX;
+    Consensus::stakingOn = stakingOn_;
+    Consensus::miningOn = miningOn_;
+    Consensus::blockReward = blockReward_;
+    Consensus::miningCoefficient = miningCoefficient_;
+    bool msgIs = msg.size() > 0;
+    std::string miningStr = Consensus::miningOn ? "true" : "false";
+    std::string stakingStr = Consensus::stakingOn ? "true" : "false";
+    std::string curMsg = "Changing consensus setings to:\nstakingOn = " + stakingStr
+        + "\nminingOn" + miningStr
+        + "\nblockReward" + Consensus::blockReward.to_string()
+        + "\nminingCoefficient" + Consensus::miningCoefficient.to_string();
+    msg += (msg.size() > 0) ? "\n" + curMsg : curMsg;
 }
 
 void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {

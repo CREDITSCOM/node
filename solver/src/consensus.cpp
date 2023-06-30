@@ -31,7 +31,7 @@ csdb::Amount Consensus::MinStakeValue = csdb::Amount{50000};
 csdb::Amount Consensus::MaxStakeValue = csdb::Amount{ 500000 };
 
 /** @brief   The round when DPOS starts working */
-const uint64_t Consensus::StartingDPOS = 300;//10'000ULL;
+const uint64_t Consensus::StartingDPOS = 10'000ULL;
 
 /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
 const uint8_t Consensus::GeneralNotSelected = 100;
@@ -115,15 +115,15 @@ const bool Consensus::DisableTrustedRequestNextRound = false;
 itself or make individual request to dedicated trusted nodes*/
 const size_t Consensus::MaxContractStateSizeToSync = 8192;
 
-csdb::Amount Consensus::blockReward = csdb::Amount{ 1 };
+csdb::Amount Consensus::blockReward = csdb::Amount{ 0 };
 
 csdb::Amount Consensus::miningCoefficient = csdb::Amount{ 0 };
 
 //Attention! before turning it on you should add a table of rounds where staking is on 
 //to ensure that when the blocks will be rescanned from beginning the walletscache 
 //results to the synchronized with other nodes values
-bool Consensus::stakingOn = true; 
+bool Consensus::stakingOn = false; 
 
-bool Consensus::miningOn = true;
+bool Consensus::miningOn = false;
 
-cs::RoundNumber Consensus::syncroChangeRound = 8446744073709551615;
+cs::RoundNumber Consensus::syncroChangeRound = ULLONG_MAX;

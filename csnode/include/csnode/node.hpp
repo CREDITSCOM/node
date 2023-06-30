@@ -376,6 +376,8 @@ public slots:
     // request current trusted nodes for block with specific sequence
     void sendBlockRequestToConfidants(cs::Sequence sequence);
     void processSpecialInfo(const csdb::Pool& pool);
+    void checkConsensusSettings(cs::Sequence seq, std::string& msg);
+
     void validateBlock(const csdb::Pool& block, bool* shouldStop);
     void deepBlockValidation(const csdb::Pool& block, bool* shouldStop);
     void sendBlockAlarmSignal(cs::Sequence seq);
@@ -542,6 +544,14 @@ private:
     cs::PublicKeys requestedKeys_;
     size_t goodAnswers_ = 0;
     bool cacheLBs_ = false;
+    
+    //consensus settings changing values
+    cs::Sequence consensusSettingsChangingRound_ = ULLONG_MAX;
+    bool stakingOn_ = false; 
+    bool miningOn_ = false;
+    csdb::Amount blockReward_ = 0;
+    csdb::Amount miningCoefficient_ = 0;
+
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);
