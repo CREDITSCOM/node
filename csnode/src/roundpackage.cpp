@@ -8,9 +8,9 @@ namespace cs {
 RoundPackage::RoundPackage() {
 }
 
-const Bytes& RoundPackage::toBinary() {
+const Bytes& RoundPackage::toBinary(bool showVersion) {
     if (binaryRepresentation_.size() == 0) {
-        refillToSign();
+        refillToSign(showVersion);
     }
 
     if (binaryRepresentation_.size() == messageSize_) {
@@ -33,9 +33,18 @@ bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::
     csdetails() << "rPackage-binary: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
     cs::IDataStream roundStream(bytes.data(), bytes.size());
     cs::ConfidantsKeys confidants;
-
     roundTable_.round = rNum;
     // subRound_ = subRound;
+
+    bool newVer = true;
+    Byte ver = 1U;
+    if (bytes.front() != ver) {
+        newVer = false;
+        ver = 0U;
+    }
+    else {
+        roundStream >> ver;
+    }
     roundStream >> roundTable_.confidants;
 
     if (roundTable_.confidants.empty() || roundTable_.confidants.size() > Consensus::MaxTrustedNodes) {
@@ -59,7 +68,10 @@ bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::
     }
 
     roundStream >> poolMetaInfo_.timestamp;
-    roundStream >> poolMetaInfo_.reward;
+    if (newVer) {
+        roundStream >> poolMetaInfo_.reward;
+    }
+    
 
     if (poolMetaInfo_.timestamp.size() > 20U) {  // TODO: change the number with the appropriate constant
         csmeta(cserror) << name() << "Illegal TimeStamp size: " << poolMetaInfo_.timestamp.size();
@@ -154,8 +166,8 @@ std::string RoundPackage::toString() {
     return packageString;
 }
 
-cs::Bytes RoundPackage::bytesToSign() {
-    refillToSign();
+cs::Bytes RoundPackage::bytesToSign(bool showVersion) {
+    refillToSign(showVersion);
     cs::Bytes bytes(binaryRepresentation_.data(), binaryRepresentation_.data() + messageSize_);
     return bytes;
 }
@@ -204,7 +216,7 @@ size_t RoundPackage::messageLength() {
     return binaryRepresentation_.size();
 }
 
-void RoundPackage::refillToSign() {
+void RoundPackage::refillToSign(bool showVersion) {
     size_t expectedMessageSize = roundTable_.confidants.size() * sizeof(cscrypto::PublicKey) + sizeof(size_t) + roundTable_.hashes.size() * sizeof(cscrypto::Hash) +
                                  sizeof(size_t) + poolMetaInfo_.timestamp.size() * sizeof(cs::Byte) + sizeof(size_t) + poolMetaInfo_.characteristic.mask.size() * sizeof(cs::Byte) +
                                  sizeof(size_t) + sizeof(size_t) + sizeof(cs::Hash) + sizeof(size_t) + poolMetaInfo_.realTrustedMask.size() + sizeof(size_t);
@@ -214,12 +226,20 @@ void RoundPackage::refillToSign() {
     cs::ODataStream stream(binaryRepresentation_);
 
     uint8_t iteration = 0;
+    Byte ver = 1U;
+    if (showVersion) {
+        stream << ver;
+    }
+
     stream << roundTable_.confidants;
     stream << poolMetaInfo_.realTrustedMask;
     stream << subRound_ << iteration;
     stream << roundTable_.hashes;
     stream << poolMetaInfo_.timestamp;
-    stream << poolMetaInfo_.reward;
+    if (poolMetaInfo_.reward.size() > 0) {
+        stream << poolMetaInfo_.reward;
+    }
+
     stream << poolMetaInfo_.characteristic.mask;
     stream << poolMetaInfo_.sequenceNumber;
     stream << poolMetaInfo_.previousHash;

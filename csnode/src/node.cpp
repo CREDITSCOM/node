@@ -2876,8 +2876,8 @@ bool Node::sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& tar
         csdebug() << "Cannot find round table, so cannot send";
         return false;
     }
-
-    sendDirect(target, MsgTypes::RoundTable, rpCurrent->roundTable().round, rpCurrent->subRound(), rpCurrent->toBinary());
+    bool showVersion = rpCurrent->roundTable().round >= Consensus::StartingDPOS && Consensus::miningOn;
+    sendDirect(target, MsgTypes::RoundTable, rpCurrent->roundTable().round, rpCurrent->subRound(), rpCurrent->toBinary(showVersion));
     csdebug() << "Done";
 
     if (!rpCurrent->poolMetaInfo().characteristic.mask.empty()) {
@@ -2890,8 +2890,8 @@ bool Node::sendRoundPackage(const cs::RoundNumber rNum, const cs::PublicKey& tar
 void Node::sendRoundPackageToAll(cs::RoundPackage& rPackage) {
     // add signatures// blockSignatures, roundSignatures);
     csmeta(csdetails) << "Send round table to all";
-    
-    sendBroadcast(MsgTypes::RoundTable, rPackage.roundTable().round, rPackage.subRound(), rPackage.toBinary());
+    bool showVersion = rPackage.roundTable().round >= Consensus::StartingDPOS && Consensus::miningOn;
+    sendBroadcast(MsgTypes::RoundTable, rPackage.roundTable().round, rPackage.subRound(), rPackage.toBinary(showVersion));
 
     if (!rPackage.poolMetaInfo().characteristic.mask.empty()) {
         csmeta(csdebug) << "Packing " << rPackage.poolMetaInfo().characteristic.mask.size() << " bytes of char. mask to send";
@@ -2935,8 +2935,8 @@ bool Node::receivingSignatures(cs::RoundPackage& rPackage, cs::PublicKeys& curre
         csmeta(cserror) << "Illegal trusted mask count in round table: " << rPackage.poolMetaInfo().realTrustedMask.size();
         return false;
     }
-
-    cs::Bytes roundBytes = rPackage.bytesToSign();
+    bool showVersion = rPackage.roundTable().round >= Consensus::StartingDPOS && Consensus::miningOn;
+    cs::Bytes roundBytes = rPackage.bytesToSign(showVersion);
     cs::Hash tempHash = cscrypto::calculateHash(roundBytes.data(), roundBytes.size());
 
     if (!cs::NodeUtils::checkGroupSignature(currentConfidants, rPackage.poolMetaInfo().realTrustedMask, rPackage.roundSignatures(), tempHash)) {
@@ -3549,7 +3549,8 @@ void Node::roundPackReply(const cs::PublicKey& respondent) {
     }
 
     cs::RoundPackage rp = roundPackageCache_.back();
-    sendDirect(respondent, MsgTypes::RoundTable, rp.roundTable().round, rp.subRound(), rp.toBinary());
+    bool showVersion = rp.roundTable().round >= Consensus::StartingDPOS && Consensus::miningOn;
+    sendDirect(respondent, MsgTypes::RoundTable, rp.roundTable().round, rp.subRound(), rp.toBinary(showVersion));
 }
 
 void Node::sendRoundTableRequest(uint8_t respondent) {

@@ -588,8 +588,8 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         csmeta(cserror) << "Send round info characteristic not found, logic error";
         return;
     }
-
-    cs::Bytes bytes = justCreatedRoundPackage.bytesToSign();
+    bool showVersion = justCreatedRoundPackage.roundTable().round >= Consensus::StartingDPOS && Consensus::miningOn;
+    cs::Bytes bytes = justCreatedRoundPackage.bytesToSign(showVersion);
     stage3.roundHash = cscrypto::calculateHash(bytes.data(), bytes.size());
 
     cs::Bytes messageToSign;
