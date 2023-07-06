@@ -127,7 +127,7 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
                                           bool inverse /* = false */) {
 
     auto ufld = pool.user_field(BlockChain::kFieldTimestamp);
-    int64_t timeStamp;
+    uint64_t timeStamp;
     if (ufld.is_valid()) {
         try {
             timeStamp = std::stoull(ufld.value<std::string>());
@@ -198,7 +198,6 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
         if (!inverse) ++it_trusted->second.times_trusted;
         else --it_trusted->second.times_trusted;
     }
-    auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
     setWalletTime(wrWall, timeStamp);
 #endif
 /* @TODO optimize checkWallets - takes 96% of time during db loading
@@ -381,13 +380,13 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
         }
 
 #ifdef MONITOR_NODE
-            auto it_writer = data_.trusted_info_.find(confAndStake.first);
-            if (it_writer != data_.trusted_info_.end()) {
+            auto it_trusted = data_.trusted_info_.find(confidants[i]);
+            if (it_trusted != data_.trusted_info_.end()) {
                 if (!inverse) {
-                    it_writer->second.totalFee += feeToPay;
+                    it_trusted->second.totalFee += feeToPay;
                 }
                 else {
-                    it_writer->second.totalFee -= feeToPay;
+                    it_trusted->second.totalFee -= feeToPay;
                 }
             }
 #endif
