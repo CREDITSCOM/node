@@ -49,6 +49,7 @@ bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::
 
     if (roundTable_.confidants.empty() || roundTable_.confidants.size() > Consensus::MaxTrustedNodes) {
         csmeta(cserror) << name() << "Illegal confidants number in round table: " << roundTable_.confidants.size();
+        csdebug() << name() << "Incorrect round package bytes: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
         return false;
     }
 
@@ -57,6 +58,7 @@ bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::
 
     if (poolMetaInfo_.realTrustedMask.size() > Consensus::MaxTrustedNodes) {
         csmeta(cserror) << name() << "Illegal trusted mask size: " << poolMetaInfo_.realTrustedMask.size();
+        csdebug() << name() << "Incorrect round package bytes: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
         return false;
     }
 
@@ -64,6 +66,7 @@ bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::
 
     if (roundTable_.hashes.size() > Consensus::MaxStageOneHashes * 2) {
         csmeta(cserror) << name() << "Illegal number of hashes: " << roundTable_.hashes.size();
+        csdebug() << name() << "Incorrect round package bytes: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
         return false;
     }
 
@@ -75,6 +78,7 @@ bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::
 
     if (poolMetaInfo_.timestamp.size() > 20U) {  // TODO: change the number with the appropriate constant
         csmeta(cserror) << name() << "Illegal TimeStamp size: " << poolMetaInfo_.timestamp.size();
+        csdebug() << name() << "Incorrect round package bytes: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
         return false;
     }
 
@@ -82,6 +86,7 @@ bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::
 
     if (poolMetaInfo_.characteristic.mask.size() > 1'000'000U) {  // TODO: change the number with the appropriate constant
         csmeta(cserror) << name() << "Illegal Characteristic Mask size: " << poolMetaInfo_.characteristic.mask.size();
+        csdebug() << name() << "Incorrect round package bytes: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
         return false;
     }
 
@@ -90,6 +95,7 @@ bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::
 
     if (poolMetaInfo_.sequenceNumber != roundTable_.round - 1) {
         csmeta(cserror) << name() << "Incorrect new Block sequence: " << poolMetaInfo_.sequenceNumber;
+        csdebug() << name() << "Incorrect round package bytes: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
         return false;
     }
 
@@ -100,6 +106,7 @@ bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::
 
     if (tCount != roundSignatures_.size()) {
         csmeta(cserror) << name() << "Illegal Round Signatures size: " << roundSignatures_.size();
+        csdebug() << name() << "Incorrect round package bytes: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
         return false;
     }
 
@@ -107,12 +114,14 @@ bool RoundPackage::fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::
 
     if (tCount != poolSignatures_.size()) {
         csmeta(cserror) << name() << "Illegal Pool Signatures size: " << poolSignatures_.size();
+        csdebug() << name() << "Incorrect round package bytes: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
         return false;
     }
     roundStream >> trustedSignatures_;
 
     if (tCount != trustedSignatures_.size()) {
         csmeta(cserror) << name() << "Illegal Trusted Confirmations size: " << trustedSignatures_.size();
+        csdebug() << name() << "Incorrect round package bytes: " << cs::Utils::byteStreamToHex(bytes.data(), bytes.size());
         return false;
     }
 
