@@ -336,6 +336,7 @@ std::string SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& re
         csdb::Amount nodeConfidantAndFreezenStake;
         csdb::Amount totalNodeStake = 0;
         if (realTrusted[i] == kUntrustedMarker) {
+            confidantAndStake.push_back(csdb::Amount{ 0 });
             continue;
         }
         ++realTrustedNumber;
@@ -345,13 +346,9 @@ std::string SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& re
         csdebug() << "setBlockReward - applying to: " << cs::Utils::byteStreamToHex(confidants[i]);
         csdebug() << "setBlockReward - node balance added: " << totalNodeStake.to_string();
         nodeConfidantAndStake += wData.balance_;
-        csdebug() << "setBlockReward - before check";
         if (wData.delegateSources_ != nullptr && wData.delegateSources_->size() > 0) {
-            csdebug() << "setBlockReward - before cycle";
             for (auto& keyAndStake : *(wData.delegateSources_)) {
-                csdebug() << "setBlockReward - in first cycle";
                 for(auto& tm : keyAndStake.second){
-                    csdebug() << "setBlockReward - in second cycle";
                     if (tm.coeff == StakingCoefficient::NoStaking) {
                         nodeConfidantAndStake += tm.amount;
                         csdebug() << "setBlockReward - simple delegation added: " << tm.amount.to_string();
@@ -364,7 +361,6 @@ std::string SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& re
                 }
             }
         }
-        csdebug() << "setBlockReward - after check";
         totalNodeStake = nodeConfidantAndStake + nodeConfidantAndFreezenStake;
         csdebug() << "setBlockReward - total node stake: " << totalNodeStake.to_string();
 
@@ -400,8 +396,15 @@ std::string SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& re
             rewardToPay = oneMiningPart * confidantAndStake[i];
         }
         stream << rewardToPay.integral() << rewardToPay.fraction();
+        if (rewardToPay > minedValue || rewardToPay < csdb::Amount{ 0 }) {
+            cserror() << "setBlockReward -> reward value beyond range";
+        }
         csdebug() << "setBlockReward -> " << cs::Utils::byteStreamToHex(confidants[i]) << ", Mined: " << rewardToPay.to_string();
+
         payedReward += rewardToPay;
+        if (rewardToPay > minedValue || rewardToPay < csdb::Amount{ 0 }) {
+            cserror() << "setBlockReward -> total payed reward value beyond range: " << payedReward.to_string();
+        }
         ++numPayedTrusted;
     }
     if (numPayedTrusted == realTrustedNumber && fldBytes.size() > 0) {
