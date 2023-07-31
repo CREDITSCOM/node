@@ -245,7 +245,7 @@ void RoundPackage::refillToSign(bool showVersion) {
     stream << subRound_ << iteration;
     stream << roundTable_.hashes;
     stream << poolMetaInfo_.timestamp;
-    if (poolMetaInfo_.reward.size() > 0) {
+    if (poolMetaInfo_.reward.size() > 0 || showVersion) {
         stream << poolMetaInfo_.reward;
     }
 

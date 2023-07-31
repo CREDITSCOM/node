@@ -407,14 +407,10 @@ std::string SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& re
         }
         ++numPayedTrusted;
     }
-    if (numPayedTrusted == realTrustedNumber && fldBytes.size() > 0) {
-        std::string fld(fldBytes.begin(), fldBytes.end());
-        csdebug() << "setBlockReward - final string: " << cs::Utils::byteStreamToHex(fld.data(), fld.size());
-        return fld;
-    }
-    else {
-        return std::string();
-    }
+    std::string fld(fldBytes.begin(), fldBytes.end());
+    csdebug() << "setBlockReward - final string: " << cs::Utils::byteStreamToHex(fld.data(), fld.size());
+    return fld;
+
     
 }
 
