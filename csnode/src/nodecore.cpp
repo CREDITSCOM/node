@@ -12,14 +12,14 @@ TimeMoney::TimeMoney(const uint64_t it, const uint64_t t, const csdb::Amount am)
     initialTime = it/1000;
     time = t;
     amount = am; 
-    uint64_t ThreeMonthMilliseconds = 3600ULL;//7862400ULL;
+    uint64_t ThreeMonthSeconds = 7862400ULL;
     uint64_t m = 0ULL;
     if (time == cs::Zero::timeStamp || time < initialTime) {
         csdebug() << "TimeMoney: setting coeff to zero: it = " << initialTime << ", t = " << time;
         coeff = StakingCoefficient::NoStaking;
     }
     else {
-        m = (time - initialTime) / ThreeMonthMilliseconds;
+        m = (time - initialTime) / ThreeMonthSeconds;
         csdebug() << "TimeMoney: calculating coeff, m: " << m;
         switch (m) {
         case 0:
