@@ -91,15 +91,24 @@ void WalletsCache::Updater::fundConfidantsWalletsWitnReward(const cs::Confidants
         return;
     }
 
+    if (rewards.size() == realTrusted.size()) {
+        cslog() << kLogPrefix << "realTrusted.size = rewards.size";
+        return;
+    }
+
     auto rewIt = rewards.begin();
     size_t numPayedTrusted = 0;
     for (size_t i = 0; i < confidants.size(); ++i) {
-        if (realTrusted[i] == kUntrustedMarker) {
-            continue;
-        }
+        //if (realTrusted[i] == kUntrustedMarker) {
+        //    continue;
+        //}
         csdebug() << "fundConfidantsWalletsWitnReward: before getting walletdata";
         auto walletData = getWalletData(confidants[i]);
-        csdb::Amount reward = rewards.size() > 0 ? *rewIt : csdb::Amount{ 0 };
+        csdb::Amount reward = rewIt != rewards.end() ? *rewIt : csdb::Amount{ 0 };
+        if (reward > Consensus::blockReward || reward < csdb::Amount{ 0 }) {
+            reward = csdb::Amount{ 0 };
+        }
+
         if (!inverse) {
             walletData.balance_ += (reward);
             logOperation("Confidant reward added: +", confidants[i], reward);

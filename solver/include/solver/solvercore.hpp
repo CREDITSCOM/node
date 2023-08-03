@@ -349,7 +349,7 @@ private:
     TimeoutTracking track_next_round;
     std::map<cs::PublicKey, uint16_t> grayList_;
     cs::RoundNumber lastGrayUpdated_ = 0;
-    RoundPackage justCreatedRoundPackage;
+    RoundPackage justCreatedRoundPackage_;
     SentSignatures lastSentSignatures_;
     std::unique_ptr<IterValidator> pVal_;
     std::string kLogPrefix_;

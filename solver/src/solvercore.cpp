@@ -388,24 +388,28 @@ std::string SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& re
     csdebug() << "setBlockReward - minedValue: " << minedValue.to_string() << ", " << oneMiningPart.to_string();
     for (size_t i = 0; i < confidants.size(); ++i) {
         csdb::Amount rewardToPay = 0;
-
-        if (numPayedTrusted == confidants.size() - 1) {
-            rewardToPay = minedValue - payedReward;
+        if (realTrusted[i] != kUntrustedMarker){
+            if (numPayedTrusted == realTrustedNumber - 1) {
+                rewardToPay = minedValue - payedReward;
+            }
+            else {
+                rewardToPay = oneMiningPart * confidantAndStake[i];
+            }
+            ++numPayedTrusted;
         }
-        else {
-            rewardToPay = oneMiningPart * confidantAndStake[i];
+        
+        if (rewardToPay > minedValue || rewardToPay < csdb::Amount{ 0 }) {
+            cserror() << "setBlockReward -> reward value beyond range: " << rewardToPay.to_string() << " - reduced to zero";
+            rewardToPay = csdb::Amount{ 0 };
         }
         stream << rewardToPay.integral() << rewardToPay.fraction();
-        if (rewardToPay > minedValue || rewardToPay < csdb::Amount{ 0 }) {
-            cserror() << "setBlockReward -> reward value beyond range";
-        }
         csdebug() << "setBlockReward -> " << cs::Utils::byteStreamToHex(confidants[i]) << ", Mined: " << rewardToPay.to_string();
 
         payedReward += rewardToPay;
         if (rewardToPay > minedValue || rewardToPay < csdb::Amount{ 0 }) {
             cserror() << "setBlockReward -> total payed reward value beyond range: " << payedReward.to_string();
         }
-        ++numPayedTrusted;
+        
     }
     std::string fld(fldBytes.begin(), fldBytes.end());
     csdebug() << "setBlockReward - final string: " << cs::Utils::byteStreamToHex(fld.data(), fld.size());
@@ -427,13 +431,13 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
     table.round = conveyer.currentRoundNumber() + 1;
     table.confidants = nodes;
     table.hashes = hashes;
-    justCreatedRoundPackage.updateRoundTable(table);
+    justCreatedRoundPackage_.updateRoundTable(table);
     csdetails() << log_prefix << "applying " << hashes.size() << " hashes to ROUND Table";
 
     // only for new consensus
     cs::PoolMetaInfo poolMetaInfo;
     std::string timeStamp = conveyer.currentRoundNumber() == 1 ? currentTimeStamp : chooseTimeStamp(stage3.realTrustedMask);
-    poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSeq() + 1;  // change for roundNumber
+    poolMetaInfo.sequenceNumber = pnode->getBlockChain().getLastSeq() + 1;
     poolMetaInfo.timestamp = std::move(timeStamp);
     auto ptr = conveyer.characteristic(conveyer.currentRoundNumber());
     if (ptr != nullptr) {
@@ -487,14 +491,14 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
             csdebug() << log_prefix << "Reward: " << cs::Utils::byteStreamToHex(poolMetaInfo.reward.data(), poolMetaInfo.reward.size());
             deferredBlock_.add_user_field(BlockChain::kFieldBlockReward, poolMetaInfo.reward);
         }
-        justCreatedRoundPackage.updatePoolMeta(poolMetaInfo);
+        justCreatedRoundPackage_.updatePoolMeta(poolMetaInfo);
         
         const auto confirmation = pnode->getConfirmation(conveyer.currentRoundNumber());
         if (confirmation.has_value()) {
             confirmationMask = confirmation.value().mask;
             confirmations = confirmation.value().signatures;
         }
-        if (justCreatedRoundPackage.poolMetaInfo().sequenceNumber > 1) {
+        if (justCreatedRoundPackage_.poolMetaInfo().sequenceNumber > 1) {
             deferredBlock_.add_number_confirmations(static_cast<uint8_t>(confirmationMask.size()));
             deferredBlock_.add_confirmation_mask(cs::Utils::maskToBits(confirmationMask));
             deferredBlock_.add_round_confirmations(confirmations);
@@ -507,24 +511,21 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         tmpPool.add_real_trusted(cs::Utils::maskToBits(stage3.realTrustedMask));
         tmpPool.add_number_trusted(static_cast<uint8_t>(stage3.realTrustedMask.size()));
 
-        if (deferredBlock_.sequence() > Consensus::StartingDPOS && Consensus::miningOn) {
-            poolMetaInfo.reward = setBlockReward(tmpPool, poolMetaInfo.realTrustedMask);
-            csdebug() << log_prefix << "Reward: " << cs::Utils::byteStreamToHex(poolMetaInfo.reward.data(), poolMetaInfo.reward.size());
-            tmpPool.add_user_field(BlockChain::kFieldBlockReward, poolMetaInfo.reward);
-        }
-        justCreatedRoundPackage.updatePoolMeta(poolMetaInfo);
-
         tmpPool.setRoundCost(deferredBlock_.roundCost());
         tmpPool.set_confidants(deferredBlock_.confidants());
         for (auto& it : deferredBlock_.transactions()) {
             tmpPool.add_transaction(it);
         }
-        BlockChain::setTimestamp(tmpPool, justCreatedRoundPackage.poolMetaInfo().timestamp);
-        auto rewardFld = deferredBlock_.user_field(BlockChain::kFieldBlockReward);
-        if (rewardFld.is_valid()) {
-            tmpPool.add_user_field(BlockChain::kFieldBlockReward, rewardFld.value<std::string>());
+
+
+        if (tmpPool.sequence() > Consensus::StartingDPOS && Consensus::miningOn) {
+            poolMetaInfo.reward = setBlockReward(tmpPool, poolMetaInfo.realTrustedMask);
+            csdebug() << log_prefix << "Reward: " << cs::Utils::byteStreamToHex(poolMetaInfo.reward.data(), poolMetaInfo.reward.size());
+            tmpPool.add_user_field(BlockChain::kFieldBlockReward, poolMetaInfo.reward);
         }
-        
+        justCreatedRoundPackage_.updatePoolMeta(poolMetaInfo);
+        BlockChain::setTimestamp(tmpPool, justCreatedRoundPackage_.poolMetaInfo().timestamp);
+
         for (auto& it : deferredBlock_.smartSignatures()) {
             tmpPool.add_smart_signature(it);
         }
@@ -587,22 +588,22 @@ void SolverCore::spawn_next_round(const cs::PublicKeys& nodes, const cs::Packets
         csmeta(cserror) << "Send round info characteristic not found, logic error";
         return;
     }
-    bool showVersion = justCreatedRoundPackage.roundTable().round >= Consensus::StartingDPOS && Consensus::miningOn;
-    cs::Bytes bytes = justCreatedRoundPackage.bytesToSign(showVersion);
+    bool showVersion = justCreatedRoundPackage_.roundTable().round >= Consensus::StartingDPOS && Consensus::miningOn;
+    cs::Bytes bytes = justCreatedRoundPackage_.bytesToSign(showVersion);
     stage3.roundHash = cscrypto::calculateHash(bytes.data(), bytes.size());
 
     cs::Bytes messageToSign;
     messageToSign.reserve(sizeof(cs::RoundNumber) + sizeof(uint8_t) + sizeof(cs::Hash));
     cs::ODataStream signStream(messageToSign);
-    signStream << justCreatedRoundPackage.roundTable().round;
+    signStream << justCreatedRoundPackage_.roundTable().round;
     signStream << pnode->subRound();
     signStream << stage3.roundHash;
     stage3.roundSignature = cscrypto::generateSignature(private_key, stage3.roundHash.data(), stage3.roundHash.size());
 
     cs::Bytes trustedList;
     cs::ODataStream tStream(trustedList);
-    tStream << justCreatedRoundPackage.roundTable().round;
-    tStream << justCreatedRoundPackage.roundTable().confidants;
+    tStream << justCreatedRoundPackage_.roundTable().round;
+    tStream << justCreatedRoundPackage_.roundTable().confidants;
     stage3.trustedHash = cscrypto::calculateHash(trustedList.data(), trustedList.size());
     stage3.trustedSignature = cscrypto::generateSignature(private_key, stage3.trustedHash.data(), stage3.trustedHash.size());
 
@@ -614,7 +615,7 @@ void SolverCore::uploadNewStates([[maybe_unused]] std::vector<csdb::Transaction>
 }
 
 void SolverCore::sendRoundTable() {
-    pnode->sendRoundTable(justCreatedRoundPackage);
+    pnode->sendRoundTable(justCreatedRoundPackage_);
 }
 
 void SolverCore::checkZeroSmartSignatures(csdb::Pool& pool) {
@@ -681,11 +682,11 @@ csdb::Pool& SolverCore::getDeferredBlock() {
 }
 
 void SolverCore::updateLastPackageSignatures() {
-    justCreatedRoundPackage.updatePoolSignatures(lastSentSignatures_.poolSignatures);
-    justCreatedRoundPackage.updateRoundSignatures(lastSentSignatures_.roundSignatures);
-    justCreatedRoundPackage.updateTrustedSignatures(lastSentSignatures_.trustedConfirmation);
+    justCreatedRoundPackage_.updatePoolSignatures(lastSentSignatures_.poolSignatures);
+    justCreatedRoundPackage_.updateRoundSignatures(lastSentSignatures_.roundSignatures);
+    justCreatedRoundPackage_.updateTrustedSignatures(lastSentSignatures_.trustedConfirmation);
 
-    pnode->setCurrentRP(justCreatedRoundPackage);
+    pnode->setCurrentRP(justCreatedRoundPackage_);
 }
 
 void SolverCore::removeDeferredBlock(cs::Sequence seq) {

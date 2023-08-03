@@ -953,6 +953,9 @@ void Node::getCharacteristic(cs::RoundPackage& rPackage) {
     if (tmpPool.is_valid() && tmpPool.sequence() == round) {
         auto tmp2 = rPackage.poolSignatures();
         BlockChain::setTimestamp(tmpPool, rPackage.poolMetaInfo().timestamp);
+        if (rPackage.poolMetaInfo().reward.size() > 0) {
+            tmpPool.add_user_field(BlockChain::kFieldBlockReward, rPackage.poolMetaInfo().reward);
+        }
         if (isBootstrapRound()) {
             BlockChain::setBootstrap(tmpPool, true);
         }
