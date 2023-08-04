@@ -91,20 +91,19 @@ void WalletsCache::Updater::fundConfidantsWalletsWitnReward(const cs::Confidants
         return;
     }
 
-    if (rewards.size() == realTrusted.size()) {
-        cslog() << kLogPrefix << "realTrusted.size = rewards.size";
+    if (rewards.size() != realTrusted.size() || confidants.size() != realTrusted.size()) {
+        cslog() << kLogPrefix << "conf.size = " << confidants.size() << ", realTrusted.size = " << realTrusted.size() << ", rewards.size = " << rewards.size();
         return;
     }
 
-    auto rewIt = rewards.begin();
     size_t numPayedTrusted = 0;
     for (size_t i = 0; i < confidants.size(); ++i) {
-        //if (realTrusted[i] == kUntrustedMarker) {
-        //    continue;
-        //}
+        if (realTrusted[i] == kUntrustedMarker) {
+            continue;
+        }
         csdebug() << "fundConfidantsWalletsWitnReward: before getting walletdata";
         auto walletData = getWalletData(confidants[i]);
-        csdb::Amount reward = rewIt != rewards.end() ? *rewIt : csdb::Amount{ 0 };
+        csdb::Amount reward = rewards[i];
         if (reward > Consensus::blockReward || reward < csdb::Amount{ 0 }) {
             reward = csdb::Amount{ 0 };
         }
@@ -121,9 +120,6 @@ void WalletsCache::Updater::fundConfidantsWalletsWitnReward(const cs::Confidants
 
         csdebug() << "fundConfidantsWalletsWitnReward -> " << cs::Utils::byteStreamToHex(confidants[i]) << ", Mined: " << reward.to_string();
         ++numPayedTrusted;
-        if (rewIt != rewards.end()) {
-            ++rewIt;
-        }
 
         data_.multiWallets_->onWalletCacheUpdated(walletData);
     }
@@ -445,9 +441,6 @@ std::vector<csdb::Amount> WalletsCache::Updater::getRewardDistribution(const csd
 
 
         for (auto it : mask) {
-            if (it == kUntrustedMarker) {
-                continue;
-            }
             int32_t integer = 0L;
             uint64_t fraction = 0ULL;
             stream >> integer >> fraction;
