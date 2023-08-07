@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <set>
 
+#include "csdb/amount.hpp"
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/map.hpp>
 #include <boost/serialization/set.hpp>
@@ -26,6 +27,7 @@ public:
     ::cscrypto::Hash hash();
 
 private:
+
     struct NonEmptyBlockData {
         friend class boost::serialization::access;
         template<class Archive>
@@ -44,6 +46,14 @@ private:
     std::atomic<uint64_t> *uuid_;
     std::atomic<Sequence> *lastSequence_;
     std::set<cs::PublicKey> *initialConfidants_;
+
+    int32_t *blockRewardIntegral_;
+    uint64_t* blockRewardFraction_;
+    int32_t* miningCoefficientIntegral_;
+    uint64_t* miningCoefficientFraction_;
+    bool *stakingOn_;
+    bool *miningOn_;
+    uint32_t *TimeMinStage1_;
 };
 }  // namespace cs
 #endif //  BLOCKCHAIN_SERIALIZER_HPP

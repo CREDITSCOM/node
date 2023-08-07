@@ -78,12 +78,15 @@ private:
 
         template<class Archive>
         void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
+            ar & initialTime;
             ar & time;
             ar & amount;
+            ar& coeff;
         }
-
+        uint64_t initialTime;
         uint64_t time;
         Amount amount;
+        uint8_t coeff;
     };
 
     class WalletData {

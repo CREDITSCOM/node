@@ -7,6 +7,7 @@
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/unordered_map.hpp>
+#include <boost/serialization/unordered_set.hpp>
 #include <boost/serialization/map.hpp>
 
 #include <csnode/transactionspacket.hpp>
@@ -102,6 +103,13 @@ private:
     };
 
     std::unordered_map<csdb::Address, StateItem> *known_contracts = nullptr;
+
+    std::unordered_set<csdb::Address> *blacklistedContracts_ = nullptr;
+
+    //std::unordered_set<csdb::Address> *locked_contracts;
+
+    //std::vector<SmartContractRef> *uncompleted_contracts;
+
     std::list<QueueItem> *exe_queue = nullptr;
 };
 }  // namespace cs

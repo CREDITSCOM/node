@@ -169,6 +169,19 @@ bool Node::init() {
 
             return false;
         }
+        Consensus::TimeMinStage1 = blockChain_.getTimeMinStage1();
+        Consensus::stakingOn = blockChain_.getStakingOn();
+        Consensus::miningOn = blockChain_.getMiningOn();
+        Consensus::blockReward = blockChain_.getBlockReward();
+        Consensus::miningCoefficient = blockChain_.getMiningCoefficient();
+
+        std::string miningStr = Consensus::miningOn ? "true" : "false";
+        std::string stakingStr = Consensus::stakingOn ? "true" : "false";
+        std::string curMsg = "Changing consensus settings to:\nstakingOn = " + stakingStr
+            + "\nminingOn = " + miningStr
+            + "\nblockReward = " + Consensus::blockReward.to_string()
+            + "\nminingCoefficient = " + Consensus::miningCoefficient.to_string();
+        csinfo() << curMsg;
         return true;
     }
     if (!blockChain_.init(
@@ -4145,7 +4158,7 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 blockReward_ = csdb::Amount(rewInt, rewFrac);
                 miningCoefficient_ = csdb::Amount(coeffInt, coefFrac);
 
-                cslog() << "Minng settings will be changed in round " << consensusSettingsChangingRound_;
+                cslog() << "Mining settings will be changed in round " << consensusSettingsChangingRound_;
             }
 
         }
@@ -4170,10 +4183,10 @@ void Node::checkConsensusSettings(cs::Sequence seq, std::string& msg){
     bool msgIs = msg.size() > 0;
     std::string miningStr = Consensus::miningOn ? "true" : "false";
     std::string stakingStr = Consensus::stakingOn ? "true" : "false";
-    std::string curMsg = "Changing consensus setings to:\nstakingOn = " + stakingStr
-        + "\nminingOn" + miningStr
-        + "\nblockReward" + Consensus::blockReward.to_string()
-        + "\nminingCoefficient" + Consensus::miningCoefficient.to_string();
+    std::string curMsg = "Changing consensus settings to:\nstakingOn = " + stakingStr
+        + "\nminingOn = " + miningStr
+        + "\nblockReward = " + Consensus::blockReward.to_string()
+        + "\nminingCoefficient = " + Consensus::miningCoefficient.to_string();
     msg += (msg.size() > 0) ? "\n" + curMsg : curMsg;
 }
 

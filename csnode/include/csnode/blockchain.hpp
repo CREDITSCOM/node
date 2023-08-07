@@ -370,6 +370,26 @@ public:
     void tryFlushDeferredBlock();
     void addIncorrectBlockNumber(cs::Sequence seq);
 
+    csdb::Amount getBlockReward() {
+        return csdb::Amount(blockRewardIntegral_, blockRewardFraction_);
+    }
+
+    csdb::Amount getMiningCoefficient() {
+        return csdb::Amount(miningCoefficientIntegral_, miningCoefficientFraction_);
+    }
+
+    bool getStakingOn() {
+        return stakingOn_;
+    }
+
+    bool getMiningOn() {
+        return miningOn_;
+    }
+
+    uint32_t getTimeMinStage1() {
+        return TimeMinStage1_;
+    }
+
 private:
     void createCachesPath();
     bool findAddrByWalletId(const WalletId id, csdb::Address& addr) const;
@@ -513,5 +533,12 @@ private:
     friend class cs::BlockChain_Serializer;
 
     const size_t kQuickStartSaveCachesInterval = 10'000'000;
+    int32_t blockRewardIntegral_;
+    uint64_t blockRewardFraction_ ;
+    int32_t miningCoefficientIntegral_;
+    uint64_t miningCoefficientFraction_;
+    bool stakingOn_;
+    bool miningOn_;
+    uint32_t TimeMinStage1_;
 };
 #endif  //  BLOCKCHAIN_HPP
