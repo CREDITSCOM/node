@@ -16,13 +16,13 @@ namespace cs {
 void SmartContracts_Serializer::bind(SmartContracts& contract) {
     known_contracts = reinterpret_cast<decltype(known_contracts)>(&contract.known_contracts);
     exe_queue = reinterpret_cast<decltype(exe_queue)>(&contract.exe_queue);
-    blacklistedContracts_ = reinterpret_cast<decltype(blacklistedContracts_)>(&contract.blacklistedContracts_);
+    //blacklistedContracts_ = reinterpret_cast<decltype(blacklistedContracts_)>(&contract.blacklistedContracts_);
 }
 
 void SmartContracts_Serializer::clear(const std::filesystem::path& rootDir) {
     known_contracts->clear();
     exe_queue->clear();
-    blacklistedContracts_->clear();
+    //blacklistedContracts_->clear();
     save(rootDir);
 }
 
@@ -31,7 +31,7 @@ void SmartContracts_Serializer::save(const std::filesystem::path& rootDir) {
     boost::archive::text_oarchive oa(ofs);
     oa << *known_contracts;
     oa << *exe_queue;
-    oa << *blacklistedContracts_;
+   // oa << *blacklistedContracts_;
 }
 
 ::cscrypto::Hash SmartContracts_Serializer::hash() {
@@ -48,7 +48,7 @@ void SmartContracts_Serializer::save(const std::filesystem::path& rootDir) {
           );
           oa << tmp;
           oa << *exe_queue;
-          oa << *blacklistedContracts_;
+          //oa << *blacklistedContracts_;
         }
     }
 
@@ -62,6 +62,6 @@ void SmartContracts_Serializer::load(const std::filesystem::path& rootDir) {
     boost::archive::text_iarchive ia(ifs);
     ia >> *known_contracts;
     ia >> *exe_queue;
-    ia >> *blacklistedContracts_;
+    //ia >> *blacklistedContracts_;
 }
 }  // namespace cs
