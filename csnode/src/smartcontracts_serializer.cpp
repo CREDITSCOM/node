@@ -53,7 +53,7 @@ void SmartContracts_Serializer::save(const std::filesystem::path& rootDir) {
     }
 
     auto result = SerializersHelper::getHashFromFile(kDataFileName);
-    std::filesystem::remove(kDataFileName);
+    //std::filesystem::remove(kDataFileName);
     return result;
 }
 

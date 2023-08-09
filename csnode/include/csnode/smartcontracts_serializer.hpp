@@ -104,7 +104,7 @@ private:
 
     std::unordered_map<csdb::Address, StateItem> *known_contracts = nullptr;
 
-    //std::unordered_set<csdb::Address> *blacklistedContracts_ = nullptr;
+    std::unordered_set<csdb::Address> *blacklistedContracts_ = nullptr;
 
     //std::unordered_set<csdb::Address> *locked_contracts;
 

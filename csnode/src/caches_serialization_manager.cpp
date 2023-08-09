@@ -129,7 +129,7 @@ struct CachesSerializationManager::Impl {
         f >> writtenHashes;
         csinfo() << "current hashes is:\n"
                  << currentHashes
-                 << ", written hases is:\n"
+                 << ", written hashes is:\n"
                  << writtenHashes;
         return currentHashes == writtenHashes;
     }
