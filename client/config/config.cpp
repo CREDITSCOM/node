@@ -28,7 +28,7 @@
 #endif
 
 const NodeVersion NODE_VERSION = 530;
-const uint8_t MINOR_NODE_VERSION = 0;
+const uint8_t MINOR_NODE_VERSION = 1;
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
