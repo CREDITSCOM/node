@@ -108,6 +108,7 @@ Node::Node(cs::config::Observer& observer)
     cs::Connector::connect(&blockChain_.uncertainBlock, this, &Node::sendBlockRequestToConfidants);
     cs::Connector::connect(&blockChain_.orderNecessaryBlock, this, &Node::sendNecessaryBlockRequest);
     cs::Connector::connect(&stat_.accountInitiationRequest, this, &Node::accountInitiationRequest);
+    cs::Connector::connect(&blockChain_.successfullQuickStartEvent, this, &Node::onSuccessQS);
     initPoolSynchronizer();
     setupNextMessageBehaviour();
     setupPoolSynchronizerBehaviour();
@@ -321,6 +322,24 @@ void Node::onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq
 
 void Node::onNeighbourRemoved(const cs::PublicKey& neighbour) {
     cslog() << "NODE: neighbour removed " << EncodeBase58(neighbour.data(), neighbour.data() + neighbour.size());
+}
+
+void Node::onSuccessQS(csdb::Amount blockReward, csdb::Amount miningCoeff, bool miningOn, bool stakingOn, uint32_t stageOneHashesTime) {
+    Consensus::stakingOn = stakingOn;
+    Consensus::miningOn = miningOn;
+    Consensus::blockReward = blockReward;
+    Consensus::miningCoefficient = miningCoeff;
+    Consensus::TimeMinStage1 = stageOneHashesTime;
+    std::string msg;
+    std::string miningStr = Consensus::miningOn ? "true" : "false";
+    std::string stakingStr = Consensus::stakingOn ? "true" : "false";
+    std::string curMsg = "Changing consensus settings after qs to:\nstakingOn = " + stakingStr
+        + "\nminingOn = " + miningStr
+        + "\nblockReward = " + Consensus::blockReward.to_string()
+        + "\nminingCoefficient = " + Consensus::miningCoefficient.to_string()
+        + "\nminingCoefficient = " + std::to_string(Consensus::TimeMinStage1);
+    csinfo() << curMsg;
+
 }
 
 void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
@@ -4049,6 +4068,7 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 stream >> value;
                 Consensus::TimeMinStage1 = value;
                 cslog() << "TimeMinStage1 changed to: " << Consensus::TimeMinStage1;
+                saveConsensusSettingsToChain();
             }
 
             if (order == 24U) {// Gray list punishment set
@@ -4171,6 +4191,14 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
     }
 }
 
+void Node::saveConsensusSettingsToChain() {
+    blockChain_.setBlockReward(Consensus::blockReward);
+    blockChain_.setMiningCoefficient(Consensus::miningCoefficient);
+    blockChain_.setMiningOn(Consensus::miningOn);
+    blockChain_.setStakingOn(Consensus::stakingOn);
+    blockChain_.setTimeMinStage1(Consensus::TimeMinStage1);
+}
+
 void Node::checkConsensusSettings(cs::Sequence seq, std::string& msg){
     if (seq != consensusSettingsChangingRound_) {
         return;
@@ -4188,6 +4216,7 @@ void Node::checkConsensusSettings(cs::Sequence seq, std::string& msg){
         + "\nblockReward = " + Consensus::blockReward.to_string()
         + "\nminingCoefficient = " + Consensus::miningCoefficient.to_string();
     msg += (msg.size() > 0) ? "\n" + curMsg : curMsg;
+    saveConsensusSettingsToChain();
 }
 
 void Node::validateBlock(const csdb::Pool& block, bool* shouldStop) {

@@ -128,6 +128,7 @@ bool BlockChain::init(
     if (successfulQuickStart) {
         if (lastSequence_ != 0) {
             firstBlockToReadInDatabase = lastSequence_ + 1;
+            emit successfullQuickStartEvent(csdb::Amount(blockRewardIntegral_, blockRewardFraction_), csdb::Amount(miningCoefficientIntegral_, miningCoefficientFraction_), miningOn_, miningOn_, TimeMinStage1_);
         }
 
         csinfo() << "QUICK START! lastSequence_   is " << lastSequence_.load();
@@ -2240,4 +2241,23 @@ void BlockChain::getCachedMissedBlock(const csdb::Pool& block) {
     lastPrevHash_ = block.previous_hash();
     cachedBlocks_->insert(block, cs::PoolStoreType::Synced);
     cacheLastBlocks();
+}
+
+void BlockChain::setBlockReward(csdb::Amount reward) {
+    blockRewardIntegral_ = reward.integral();
+    blockRewardFraction_ = reward.fraction();
+ 
+}
+void BlockChain::setMiningCoefficient(csdb::Amount coefficient) {
+    miningCoefficientIntegral_ = coefficient.integral();
+    miningCoefficientFraction_ = coefficient.fraction();
+}
+void BlockChain::setMiningOn(bool mOn) {
+    stakingOn_ = mOn;
+}
+void BlockChain::setStakingOn(bool stOn) {
+    miningOn_ = stOn;
+}
+void BlockChain::setTimeMinStage1(uint32_t timeStage1) {
+    TimeMinStage1_ = timeStage1;
 }

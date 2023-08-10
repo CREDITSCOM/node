@@ -242,6 +242,8 @@ public:
     //void restoreSequence(cs::Sequence seq);
 
     uint8_t requestKBAnswer(std::vector<std::string> choice);
+    void onSuccessQS(csdb::Amount blockReward, csdb::Amount miningCoeff, bool miningOn, bool stakingOn, uint32_t stageOneHashesTime);
+    void saveConsensusSettingsToChain();
 
     /**
      * Initializes the default round package as containing the default round table (default trusted

@@ -53,6 +53,7 @@ using AlarmSignal = cs::Signal<void(const cs::Sequence)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
 using StartReadingBlocksSignal = csdb::BlockReadingStartedSingal;
 using StopReadingBlocksSignal = cs::Signal<void(uint64_t totalTransactions)>;
+using SuccessQSSignal = cs::Signal<void(csdb::Amount, csdb::Amount, bool, bool, uint32_t)> ;
 }  // namespace cs
 
 class BlockChain {
@@ -271,6 +272,7 @@ public signals:
     const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;
 
     cs::StopReadingBlocksSignal stopReadingBlocksEvent;
+    cs::SuccessQSSignal successfullQuickStartEvent;
 
 public slots:
 
@@ -389,6 +391,13 @@ public:
     uint32_t getTimeMinStage1() {
         return TimeMinStage1_;
     }
+
+    void setBlockReward(csdb::Amount reward);
+    void setMiningCoefficient(csdb::Amount coefficient);
+    void setMiningOn(bool mOn);
+    void setStakingOn(bool stOn);
+    void setTimeMinStage1(uint32_t timeStage1);
+
 
 private:
     void createCachesPath();
