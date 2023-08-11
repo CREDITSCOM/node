@@ -1510,11 +1510,6 @@ void APIHandler::PoolListGet(api::PoolListGetResult& _return, const int64_t offs
 }
 
 void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const int64_t sequence, const int64_t offset, const int64_t const_limit) {
-    #ifdef WEB_WALLET_NODE
-        _return.status.code = int8_t(ERROR_CODE);
-        _return.status.message = "Node don't use such method";
-        return;
-    #endif
     auto limit = limitPage(const_limit);
     csdb::Pool pool = executor_.loadBlockApi(cs::Sequence(sequence));
 
@@ -1526,11 +1521,6 @@ void APIHandler::PoolTransactionsGet(PoolTransactionsGetResult& _return, const i
 }
 
 void APIHandler::PoolInfoGet(PoolInfoGetResult& _return, const int64_t sequence, const int64_t index) {
-    #ifdef WEB_WALLET_NODE
-        _return.status.code = int8_t(ERROR_CODE);
-        _return.status.message = "Node don't use such method";
-        return;
-    #endif
     csunused(index);
     csdb::Pool pool = executor_.loadBlockApi(cs::Sequence(sequence));
     _return.isFound = pool.is_valid();
