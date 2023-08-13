@@ -156,6 +156,10 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
     if (monthChange) {
         monthChangeProcedure();
     }
+
+    auto rew = WalletsCache::Updater::getRewardDistribution(block);
+    auto rewIt = rew.begin();
+    bool rewFlag = rew.size() > 0;
     for (int i = 0; i < trusted.size(); ++i) {
         const auto& key = confs[i];
         if (nodes_.find(key) != nodes_.end()) {
@@ -177,6 +181,12 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
                 nodes_[key].trustedADay += 1;
                 nodes_[key].trustedAMonth += 1;
                 nodes_[key].trustedATotal += 1;
+                if (rewFlag) {
+                    nodes_[key].rewardDay += *rewIt;
+                    nodes_[key].rewardMonth += *rewIt;
+                    nodes_[key].rewardTotal += *rewIt;
+                }
+
 
             }
             else {
@@ -207,6 +217,12 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
                 nStat->trustedADay = 1;
                 nStat->trustedAMonth = 1;
                 nStat->trustedATotal = 1;
+                if (rewFlag) {
+                    nodes_[key].rewardDay = *rewIt;
+                    nodes_[key].rewardMonth = *rewIt;
+                    nodes_[key].rewardTotal = *rewIt;
+                }
+
             }
             else {
                 if (block.transactions_count() > 0) {
@@ -219,6 +235,10 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
                 nStat->failedTrustedATotal = 1;
             }
             nodes_.emplace(key, *nStat);
+            if (rewFlag) {
+                ++rewIt;
+            }
+
         }
     }
 

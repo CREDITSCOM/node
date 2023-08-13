@@ -4657,6 +4657,22 @@ void Node::getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes) {
         node.__set_trustedAMonth(it.second.trustedAMonth);
         node.__set_trustedAPrevMonth(it.second.trustedAPrevMonth);
         node.__set_trustedATotal(it.second.trustedATotal);
+        general::Amount rDay;
+        rDay.__set_integral(it.second.rewardDay.integral());
+        rDay.__set_fraction(it.second.rewardDay.fraction());
+        node.__set_rewardDay(rDay);
+        general::Amount rMonth;
+        rMonth.__set_integral(it.second.rewardMonth.integral());
+        rMonth.__set_fraction(it.second.rewardMonth.fraction());
+        node.__set_rewardMonth(rMonth);
+        general::Amount rPrevMonth;
+        rPrevMonth.__set_integral(it.second.rewardPrevMonth.integral());
+        rPrevMonth.__set_fraction(it.second.rewardPrevMonth.fraction());
+        node.__set_rewardPrevMonth(rPrevMonth);
+        general::Amount rTotal;
+        rTotal.__set_integral(it.second.rewardTotal.integral());
+        rTotal.__set_fraction(it.second.rewardTotal.fraction());
+        node.__set_rewardTotal(rTotal);
 
         nodes.push_back(node);
     }

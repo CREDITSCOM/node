@@ -27,6 +27,7 @@ struct NodeStat {
     std::string version;
     std::string platform;
     uint64_t timeReg;
+    uint64_t timeFirstConsensus;
     uint64_t timeActive;
     uint64_t trustedDay;
     uint64_t trustedMonth;
@@ -48,6 +49,10 @@ struct NodeStat {
     csdb::Amount feeMonth;
     csdb::Amount feePrevMonth;
     csdb::Amount feeTotal;
+    csdb::Amount rewardDay;
+    csdb::Amount rewardMonth;
+    csdb::Amount rewardPrevMonth;
+    csdb::Amount rewardTotal;
     cs::Sequence lastConsensus = 0ULL;
 };
 
