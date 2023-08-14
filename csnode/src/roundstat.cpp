@@ -85,6 +85,7 @@ void RoundStat::dayChangeProcedure(uint64_t cTime) {
     while (it != nodes_.end()) {
         it->second.failedTrustedDay = 0;
         it->second.feeDay = csdb::Amount{ 0 };
+        it->second.rewardDay = csdb::Amount{ 0 };
         it->second.trustedDay = 0ULL;
         it->second.failedTrustedADay = 0ULL;
         it->second.trustedADay = 0ULL;
@@ -109,6 +110,8 @@ void RoundStat::monthChangeProcedure() {
         it->second.failedTrustedAMonth = 0ULL;
         it->second.trustedAPrevMonth = it->second.trustedAMonth;
         it->second.trustedAMonth = 0ULL;
+        it->second.rewardPrevMonth = it->second.rewardMonth;
+        it->second.rewardMonth = csdb::Amount{ 0 };
         ++it;
     }
 }
@@ -235,10 +238,9 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
                 nStat->failedTrustedATotal = 1;
             }
             nodes_.emplace(key, *nStat);
-            if (rewFlag) {
-                ++rewIt;
-            }
-
+        }
+        if (rewFlag) {
+            ++rewIt;
         }
     }
 
