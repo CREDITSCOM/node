@@ -60,9 +60,10 @@ namespace api_diag {
         std::condition_variable cv;
         bool done = false;
         std::vector<api_diag::ServerTrustNode> nodes;
+        csdb::Address emptyKey;
 
         auto task = [&]() {
-            node_.getKnownPeersUpd(nodes);
+            node_.getKnownPeersUpd(nodes, false, emptyKey);
             done = true;
             cv.notify_one();
         };
@@ -73,6 +74,39 @@ namespace api_diag {
         }
 
         _return.__set_nodes(nodes);
+    }
+
+    void APIDiagHandler::GetNodeStat(ActiveTrustNodesResult& _return, const general::Address& address) {
+
+
+        const csdb::Address addr = BlockChain::getAddressFromKey(address);
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        std::vector<api_diag::ServerTrustNode> nodes;
+
+        auto task = [&]() {
+            node_.getKnownPeersUpd(nodes, true, addr);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+        general::APIResponse resp;
+        if (nodes.size() > 0) {
+            resp.__set_code(kOk);
+            _return.__set_result(resp);
+            _return.__set_nodes(nodes);
+        }
+        else {
+            resp.__set_code(kError);
+            resp.__set_message("Node not found");
+            _return.__set_result(resp);
+        }
+
     }
 
     void APIDiagHandler::GetActiveTransactionsCount(ActiveTransactionsResult& _return) {
@@ -397,5 +431,9 @@ namespace api_diag {
 
         _return.__set_code(success? kOk : kError);
 
+    }
+
+    cs::Bytes toByteArray(const std::string& s) {
+        return cs::Bytes(s.begin(), s.end());
     }
 }

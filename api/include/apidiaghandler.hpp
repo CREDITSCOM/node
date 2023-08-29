@@ -16,6 +16,7 @@ namespace api_diag {
         void GetActiveNodes(ActiveNodesResult& _return) override;
         void GetActiveTrustNodes(ActiveTrustNodesResult& _return) override;
         void GetActiveTransactionsCount(ActiveTransactionsResult& _return) override;
+        void GetNodeStat(ActiveTrustNodesResult& _return, const general::Address& address) override;
 
         // diagnocstic proro
         void GetTransaction(GetTransactionResponse& _return, const TransactionId& id) override;

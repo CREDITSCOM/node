@@ -329,7 +329,8 @@ public:
     
     void getKnownPeers(std::vector<api_diag::ServerNode>& nodes);
     void dumpKnownPeersToFile();
-    void getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes);
+    void getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes, bool oneKey, const csdb::Address& pKey);
+    api_diag::ServerTrustNode convertNodeInfo(const cs::PublicKey& pKey, const cs::NodeStat& ns);
 
     void printInitialConfidants();
 
