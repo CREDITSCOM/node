@@ -30,6 +30,7 @@ struct CachesSerializationManager::Impl {
 
     const std::string kHashesFile = "quick_start_hashes.dat";
     const std::string kQuickStartRoot = "qs";
+    const std::vector <std::string> hashesDivisions = {"blockchain", "smartcontracts","walletscache","walletsIds","tokensmaster","apihandler"};
 
     enum BindBits {
       BlockChainBit,
@@ -117,6 +118,23 @@ struct CachesSerializationManager::Impl {
         f << getHashes();
     }
 
+    std::vector<std::string> divideHashes(std::string initial) {
+        std::vector<std::string> res;
+        size_t hexHashLen = 64;
+        auto start = initial.begin();
+        int inc = 0;
+        csinfo() << __func__ << " total: " << initial;
+
+        while (inc < 6) {
+            auto tmp = std::string(start, start + hexHashLen);
+            res.push_back(tmp);
+            start = start + hexHashLen;
+            csinfo() << __func__ << " divide hashes: " << inc << "/" << initial.size() << ": " << tmp;
+            ++inc;
+        }
+        return res;
+    }
+
     bool checkHashes(size_t version) {
         csinfo() << "Start check hashes...";
         auto currentHashes = getHashes();
@@ -125,12 +143,28 @@ struct CachesSerializationManager::Impl {
           std::to_string(version) /
           kHashesFile
         );
+        
         std::string writtenHashes;
         f >> writtenHashes;
-        csinfo() << "current hashes is:\n"
-                 << currentHashes
-                 << ", written hashes is:\n"
-                 << writtenHashes;
+        csinfo() << __func__ << " - divide written hashes";
+        auto writtenHashesDivided = divideHashes(writtenHashes);
+        csinfo() << __func__ << " - divide current hashes";
+        auto currentHashesDivided = divideHashes(currentHashes);
+        auto wIt = writtenHashesDivided.begin();
+        auto cIt = currentHashesDivided.begin();
+        auto nIt = hashesDivisions.begin();
+        while (wIt < writtenHashesDivided.end()) {
+            if (*wIt != *cIt) {
+                csinfo() << *nIt << " current: "
+                    << *cIt
+                    << ", written: "
+                    << *wIt;
+
+            }
+            ++wIt;
+            ++cIt;
+            ++nIt;
+        }
         return currentHashes == writtenHashes;
     }
 
@@ -168,12 +202,18 @@ struct CachesSerializationManager::Impl {
             p /= std::to_string(version);
 
             blockchainSerializer.load(p);
+            csinfo() << "Blockchain settings: loaded";
             smartContractsSerializer.load(p);
+            csinfo() << "Smart-contracts: loaded";
             walletsCacheSerializer.load(p);
+            csinfo() << "Wallets: loaded";
             walletsIdsSerializer.load(p);
+            csinfo() << "Wallets Ids: loaded";
 #ifdef NODE_API
             tokensMasterSerializer.load(p);
+            csinfo() << "Tokens: loaded";
             apiHandlerSerializer.load(p);
+            csinfo() << "API handler: loaded";
 #endif
             if (!checkHashes(version)) {
                 cserror() << "CachesSerializationManager: invalid hashes on load";
@@ -281,6 +321,7 @@ bool CachesSerializationManager::load() {
 
     // try to load most recent version first
     if (pImpl_->loadVersion(0)) {
+        csinfo() << "CachesSerializationManager: successfully load version 0";
         return true;
     }
 

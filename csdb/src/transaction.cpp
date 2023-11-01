@@ -199,6 +199,12 @@ void Transaction::set_signature(const cs::Signature& signature) {
     }
 }
 
+void Transaction::update_id(const csdb::TransactionID& id) {
+    if (!d.constData()->read_only_) {
+        d->id_ = id;
+    }
+}
+
 bool Transaction::add_user_field(user_field_id_t id, UserField field) noexcept {
     if (d.constData()->read_only_ || (!field.is_valid())) {
         return false;

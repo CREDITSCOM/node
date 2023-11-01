@@ -338,7 +338,7 @@ void Node::onSuccessQS(csdb::Amount blockReward, csdb::Amount miningCoeff, bool 
         + "\nminingOn = " + miningStr
         + "\nblockReward = " + Consensus::blockReward.to_string()
         + "\nminingCoefficient = " + Consensus::miningCoefficient.to_string()
-        + "\nminingCoefficient = " + std::to_string(Consensus::TimeMinStage1);
+        + "\nTimeMinStage1 = " + std::to_string(Consensus::TimeMinStage1);
     csinfo() << curMsg;
 
 }
