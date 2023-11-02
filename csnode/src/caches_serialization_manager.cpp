@@ -123,13 +123,11 @@ struct CachesSerializationManager::Impl {
         size_t hexHashLen = 64;
         auto start = initial.begin();
         int inc = 0;
-        csinfo() << __func__ << " total: " << initial;
 
         while (inc < 6) {
             auto tmp = std::string(start, start + hexHashLen);
             res.push_back(tmp);
             start = start + hexHashLen;
-            csinfo() << __func__ << " divide hashes: " << inc << "/" << initial.size() << ": " << tmp;
             ++inc;
         }
         return res;
@@ -146,9 +144,7 @@ struct CachesSerializationManager::Impl {
         
         std::string writtenHashes;
         f >> writtenHashes;
-        csinfo() << __func__ << " - divide written hashes";
         auto writtenHashesDivided = divideHashes(writtenHashes);
-        csinfo() << __func__ << " - divide current hashes";
         auto currentHashesDivided = divideHashes(currentHashes);
         auto wIt = writtenHashesDivided.begin();
         auto cIt = currentHashesDivided.begin();

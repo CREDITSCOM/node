@@ -2,8 +2,11 @@
 
 #include <fstream>
 
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
+//#include <boost/archive/text_oarchive.hpp>
+//#include <boost/archive/text_iarchive.hpp>
+
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
 
 #include <csconnector/csconnector.hpp>
 #include <csnode/serializers_helper.hpp>
@@ -20,11 +23,12 @@ void APIHandler_Serializer::bind(api::APIHandler& apih) {
     smart_origin = reinterpret_cast<decltype(smart_origin)>(&apih.smart_origin);
     deployedByCreator_ = reinterpret_cast<decltype(deployedByCreator_)>(&apih.deployedByCreator_);
     mExecuteCount_ = reinterpret_cast<decltype(mExecuteCount_)>(&apih.mExecuteCount_);
+    csdebug() << "ApiHandler bindings made";
 }
 
 void APIHandler_Serializer::save(const std::filesystem::path& rootDir) {
-    std::ofstream ofs(rootDir / kDataFileName);
-    boost::archive::text_oarchive oa(ofs);
+    std::ofstream ofs(rootDir / kDataFileName, std::ios::binary);
+    boost::archive::binary_oarchive oa(ofs);
 
     auto saveHelper = [&](auto& entity) {
       auto ref = lockedReference(entity);
@@ -40,8 +44,8 @@ void APIHandler_Serializer::save(const std::filesystem::path& rootDir) {
 }
 
 void APIHandler_Serializer::load(const std::filesystem::path& rootDir) {
-    std::ifstream ifs(rootDir / kDataFileName);
-    boost::archive::text_iarchive ia(ifs);
+    std::ifstream ifs(rootDir / kDataFileName, std::ios::binary);
+    boost::archive::binary_iarchive ia(ifs);
 
     auto loadHelper = [&](auto& entity) {
       auto ref = lockedReference(entity);

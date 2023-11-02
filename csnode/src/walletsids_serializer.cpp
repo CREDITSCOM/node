@@ -2,12 +2,17 @@
 #include <fstream>
 #include <sstream>
 
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
+//#include <boost/archive/text_oarchive.hpp>
+//#include <boost/archive/text_iarchive.hpp>
+
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
 
 #include <csnode/walletsids.hpp>
 #include <csnode/walletsids_serializer.hpp>
 #include <csnode/serializers_helper.hpp>
+
+#include "logger.hpp"
 
 namespace {
 const std::string kDataFileName = "walletsids.dat";
@@ -17,6 +22,7 @@ namespace cs {
 void WalletsIds_Serializer::bind(WalletsIds& ids) {
     data_ = reinterpret_cast<decltype(data_)>(&ids.data_);
     nextId_ = &ids.nextId_;
+    csdebug() << "WalletsIds bindings made";
 }
 
 void WalletsIds_Serializer::clear(const std::filesystem::path& rootDir) {
@@ -26,16 +32,16 @@ void WalletsIds_Serializer::clear(const std::filesystem::path& rootDir) {
 }
 
 void WalletsIds_Serializer::save(const std::filesystem::path& rootDir) {
-    std::ofstream ofs(rootDir / kDataFileName);
-    boost::archive::text_oarchive oa(ofs);
+    std::ofstream ofs(rootDir / kDataFileName, std::ios::binary);
+    boost::archive::binary_oarchive oa(ofs);
     oa << *data_;
     oa << *nextId_;
 }
 
 ::cscrypto::Hash WalletsIds_Serializer::hash() {
     {
-        std::ofstream ofs(kDataFileName);
-        boost::archive::text_oarchive oa(
+        std::ofstream ofs(kDataFileName, std::ios::binary);
+        boost::archive::binary_oarchive oa(
           ofs,
           boost::archive::no_header | boost::archive::no_codecvt
         );
@@ -58,8 +64,8 @@ void WalletsIds_Serializer::save(const std::filesystem::path& rootDir) {
 }
 
 void WalletsIds_Serializer::load(const std::filesystem::path& rootDir) {
-    std::ifstream ifs(rootDir / kDataFileName);
-    boost::archive::text_iarchive ia(ifs);
+    std::ifstream ifs(rootDir / kDataFileName, std::ios::binary);
+    boost::archive::binary_iarchive ia(ifs);
     ia >> *data_;
     ia >> *nextId_;
 }

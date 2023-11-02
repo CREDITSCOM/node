@@ -12,6 +12,8 @@
 #include <csnode/staking.hpp>
 #include <csnode/serializers_helper.hpp>
 
+#include "logger.hpp"
+
 namespace {
 const std::string kTmpDataFile = "wcachedata.tmp";
 const std::string kDataFileName = "walletscache.dat";
@@ -28,6 +30,7 @@ void WalletsCache_Serializer::bind(WalletsCache& wCache) {
 #endif
     currentDelegations_ = reinterpret_cast<decltype(currentDelegations_)>(&wCache.staking_->currentDelegations_);
     miningDelegations_ = reinterpret_cast<decltype(miningDelegations_)>(&wCache.staking_->miningDelegations_);
+    csdebug() << "WalletsCaches bindings made";
 }
 
 void WalletsCache_Serializer::clear(const std::filesystem::path& rootDir) {
@@ -43,7 +46,7 @@ void WalletsCache_Serializer::clear(const std::filesystem::path& rootDir) {
 }
 
 void WalletsCache_Serializer::save(const std::filesystem::path& rootDir) {
-    std::ofstream ofs(rootDir / kDataFileName);
+    std::ofstream ofs(rootDir / kDataFileName, std::ios::binary);
     boost::archive::text_oarchive oa(ofs);
     oa << *smartPayableTransactions_;
     oa << *canceledSmarts_;
@@ -94,7 +97,7 @@ void WalletsCache_Serializer::save(const std::filesystem::path& rootDir) {
 }
 
 void WalletsCache_Serializer::load(const std::filesystem::path& rootDir) {
-    std::ifstream ifs(rootDir / kDataFileName);
+    std::ifstream ifs(rootDir / kDataFileName, std::ios::binary);
     boost::archive::text_iarchive ia(ifs);
     ia >> *smartPayableTransactions_;
     ia >> *canceledSmarts_;

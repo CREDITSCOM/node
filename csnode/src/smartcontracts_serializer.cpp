@@ -20,9 +20,10 @@ const std::string kLogPrefix = "SmartContracts_Serializer: ";
 } // namespace
 
 namespace cs {
-void SmartContracts_Serializer::bind(SmartContracts& contract) {
-    known_contracts = reinterpret_cast<decltype(known_contracts)>(&contract.known_contracts);
-    exe_queue = reinterpret_cast<decltype(exe_queue)>(&contract.exe_queue);
+void SmartContracts_Serializer::bind(SmartContracts& contracts) {
+    known_contracts = reinterpret_cast<decltype(known_contracts)>(&contracts.known_contracts);
+    exe_queue = reinterpret_cast<decltype(exe_queue)>(&contracts.exe_queue);
+    csdebug() << "Contracts bindings made";
     //blacklistedContracts_ = reinterpret_cast<decltype(blacklistedContracts_)>(&contract.blacklistedContracts_);
 }
 

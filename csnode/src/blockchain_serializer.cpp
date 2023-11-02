@@ -1,8 +1,11 @@
 #include <fstream>
 #include <sstream>
 
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
+//#include <boost/archive/text_oarchive.hpp>
+//#include <boost/archive/text_iarchive.hpp>
+
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
 
 #include <csnode/blockchain.hpp>
 #include <csnode/blockchain_serializer.hpp>
@@ -28,6 +31,7 @@ void BlockChain_Serializer::bind(BlockChain& bchain, std::set<cs::PublicKey>& in
     stakingOn_ = &bchain.stakingOn_;
     miningOn_ = &bchain.miningOn_;
     TimeMinStage1_ = &bchain.TimeMinStage1_;
+    csdebug() << "Blockchain bindings made";
 }
 
 void BlockChain_Serializer::clear(const std::filesystem::path& rootDir) {
@@ -49,8 +53,8 @@ void BlockChain_Serializer::clear(const std::filesystem::path& rootDir) {
 }
 
 void BlockChain_Serializer::save(const std::filesystem::path& rootDir) {
-    std::ofstream ofs(rootDir / kDataFileName);
-    boost::archive::text_oarchive oa(ofs);
+    std::ofstream ofs(rootDir / kDataFileName, std::ios::binary);
+    boost::archive::binary_oarchive oa(ofs);
     oa << *previousNonEmpty_;
     oa << *lastNonEmptyBlock_;
     oa << *totalTransactionsCount_;
@@ -74,8 +78,8 @@ void BlockChain_Serializer::save(const std::filesystem::path& rootDir) {
 }
 
 void BlockChain_Serializer::load(const std::filesystem::path& rootDir) {
-    std::ifstream ifs(rootDir / kDataFileName);
-    boost::archive::text_iarchive ia(ifs);
+    std::ifstream ifs(rootDir / kDataFileName, std::ios::binary);
+    boost::archive::binary_iarchive ia(ifs);
     ia >> *previousNonEmpty_;
     ia >> *lastNonEmptyBlock_;
     ia >> *totalTransactionsCount_;

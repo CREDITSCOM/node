@@ -18,10 +18,12 @@
 
 #include "address_serializer.hpp"
 
-namespace cs {
 class SmartContracts;
 class SmartConsensus;
 class csdb::Transaction;
+
+namespace cs {
+
 
 class SmartContracts_Serializer {
 public:
@@ -87,7 +89,7 @@ public:
         std::string toString() {
         
             std::string res;
-            res += "Payable_status: " + std::to_string(getIntPayable()) + "\n";
+            res += "Payable_status: " + std::to_string(static_cast<int>(payable)) + "\n";
             res += "Ref deploy: " + ref_deploy.toString() + "\n";
             res += "Ref execute: " + ref_execute.toString() + "\n";
             res += "Ref cache: " + ref_cache.toString() + "\n";
@@ -96,103 +98,9 @@ public:
             res += "Execute trx: \n" + transactionToString(execute) + "\n";
             return res;
         }
-        PayableStatus getPayable() {
-            return payable;
-        }
-
-        int getIntPayable() {
-            return static_cast<int>(payable);
-        }
-
-        SmartContractRef getRefDeploy() {
-            return ref_deploy;
-        }
-
-        SmartContractRef getRefExecute() {
-            return ref_execute;
-        }
-
-        SmartContractRef getRefCache() {
-            return ref_cache;
-        }
-
-        SmartContractRef getRefState() {
-            return ref_state;
-        }
-
-        csdb::Transaction getDeployTransaction() {
-            return deploy;
-        }
-
-        csdb::Transaction getExecuteTransaction() {
-            return execute;
-        }
-
-        std::string getState() {
-            return state;
-
-        }
-
-        std::unordered_map<std::string, std::unordered_map<csdb::Address, std::string>> getUses() {
-            return uses;
-        }
-
-        void setPayable(PayableStatus& p) {
-            payable = p;
-        }
-
-        void setPayable(int p) {
-            payable = static_cast<PayableStatus>(p);
-        }
-        void setRefDeploy(SmartContractRef& r) {
-            ref_deploy = r;
-        }
-
-        void setRefExecute(SmartContractRef& r) {
-            ref_execute = r;
-        }
-
-         void setRefCache(SmartContractRef& r) {
-            ref_cache = r;
-        }
-
-        void setRefState(SmartContractRef& r) {
-            ref_state = r;
-        }
-
-        void setDeployTransaction(csdb::Transaction& tr) {
-            deploy = tr;
-        }
-
-        void setExecuteTransaction(csdb::Transaction& tr) {
-            execute = tr;
-        }
-
-        void setState(std::string& st) {
-            state = st;
-
-
-        }
-
-        void setUses(std::unordered_map<std::string, std::unordered_map<csdb::Address, std::string>>& us) {
-            uses = us;
-        }
-
+ 
     private:
 
-
-        //template<class Archive>
-        //void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
-        //    ar & payable;
-        //    ar & ref_deploy;
-        //    ar & ref_execute;
-        //    ar & ref_state;
-        //    ar & deploy;
-        //    ar & execute;
-        //    ar& state;
-        //    ar& uses;
-
-        //}
         template<class Archive>
         void save(Archive& ar, const unsigned int version) const {
             ar & payable;
@@ -230,6 +138,7 @@ public:
             ar& uses;
         }
         BOOST_SERIALIZATION_SPLIT_MEMBER()
+
         PayableStatus payable;
         SmartContractRef ref_deploy;
         SmartContractRef ref_execute;
