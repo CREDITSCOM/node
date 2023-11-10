@@ -789,6 +789,7 @@ api::SmartContract APIHandler::fetch_smart_body(const csdb::Transaction& tr) {
     res.smartContractDeploy.byteCodeObjects = sci.smartContractDeploy.byteCodeObjects;
     res.smartContractDeploy.sourceCode = sci.smartContractDeploy.sourceCode;
     res.smartContractDeploy.hashState = sci.smartContractDeploy.hashState;
+    res.smartContractDeploy.methods = sci.smartContractDeploy.methods;
     res.deployer = fromByteArray(blockchain_.getAddressByType(tr.source(), BlockChain::AddressType::PublicKey).public_key());
     res.address = fromByteArray(blockchain_.getAddressByType(tr.target(), BlockChain::AddressType::PublicKey).public_key());
 

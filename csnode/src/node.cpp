@@ -340,7 +340,8 @@ void Node::onSuccessQS(csdb::Amount blockReward, csdb::Amount miningCoeff, bool 
         + "\nminingCoefficient = " + Consensus::miningCoefficient.to_string()
         + "\nTimeMinStage1 = " + std::to_string(Consensus::TimeMinStage1);
     csinfo() << curMsg;
-
+    csinfo() << "Number of contracts: " << solver_->smart_contracts().contracts_count();
+    //csinfo() << "Test value = " << solver_->smart_contracts().getTestValue();
 }
 
 void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
@@ -3048,6 +3049,7 @@ bool Node::isLastRPStakeFull(cs::RoundNumber rNum) {
     if (!roundPackageCache_.empty()) {
         auto mask = roundPackageCache_.back().poolMetaInfo().realTrustedMask;
         if (cs::Conveyer::instance().currentRoundNumber() == rNum && cs::TrustedMask::trustedSize(mask) == mask.size()) {
+            csdebug() << "Trusted mask in " << __func__ << ": " << cs::TrustedMask::toString(mask);
             return true;
         }
     }

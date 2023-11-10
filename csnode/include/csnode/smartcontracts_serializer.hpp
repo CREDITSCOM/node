@@ -20,7 +20,7 @@
 
 class SmartContracts;
 class SmartConsensus;
-class csdb::Transaction;
+//class csdb::Transaction;
 
 namespace cs {
 
@@ -102,7 +102,7 @@ public:
     private:
 
         template<class Archive>
-        void save(Archive& ar, const unsigned int version) const {
+        void save(Archive& ar, [[maybe_unused]] const unsigned int version) const {
             ar & payable;
             ar & ref_deploy;
             ar & ref_execute;
@@ -113,7 +113,7 @@ public:
             ar& uses;
         }
         template<class Archive>
-        void load(Archive& ar, const unsigned int version) {
+        void load(Archive& ar, [[maybe_unused]] const unsigned int version) {
             ar & payable;
             ar & ref_deploy;
             ar & ref_execute;
@@ -124,7 +124,7 @@ public:
             deploy = csdb::Transaction::from_binary(td);
             deploy.update_id(csdb::TransactionID(ref_deploy.getSequence(), ref_deploy.getTransaction()));
 
-            csdebug() << "DeployTransaction: " << StateItem::transactionToString(deploy);
+            //csdebug() << "DeployTransaction: " << StateItem::transactionToString(deploy);
 
 
             cs::Bytes bytesExecute;
@@ -132,7 +132,7 @@ public:
             execute = csdb::Transaction::from_binary(bytesExecute);
             execute.update_id(csdb::TransactionID(ref_execute.getSequence(), ref_execute.getTransaction()));
 
-            csdebug() << "ExecuteTransaction: " << StateItem::transactionToString(execute);
+            //csdebug() << "ExecuteTransaction: " << StateItem::transactionToString(execute);
 
             ar& state;
             ar& uses;
@@ -162,60 +162,60 @@ public:
     class ExecutionItem {
         friend class boost::serialization::access;
     public:
-        SmartContractRef getRefStart() {
-            return ref_start;
-        }
+        //SmartContractRef getRefStart() {
+        //    return ref_start;
+        //}
 
-        csdb::Transaction getTransaction() {
-            return transaction;
-        }
+        //csdb::Transaction getTransaction() {
+        //    return transaction;
+        //}
 
-        Amount getAvailableFee() {
-            return avail_fee;
-        }
+        //Amount getAvailableFee() {
+        //    return avail_fee;
+        //}
 
-        Amount getNewStateFee() {
-            return new_state_fee;
-        }
+        //Amount getNewStateFee() {
+        //    return new_state_fee;
+        //}
 
-        Amount getConsumedFee() {
-            return consumed_fee;
-        }
+        //Amount getConsumedFee() {
+        //    return consumed_fee;
+        //}
 
-        std::vector<csdb::Address> getUses() {
-            return  uses;
-        }
-        cs::TransactionsPacket getTransactionsPacket() {
-            return result;
-        }
+        //std::vector<csdb::Address> getUses() {
+        //    return  uses;
+        //}
+        //cs::TransactionsPacket getTransactionsPacket() {
+        //    return result;
+        //}
 
-        void setSmartContractRef(SmartContractRef& ref) {
-            ref_start = ref;
-        }
+        //void setSmartContractRef(SmartContractRef& ref) {
+        //    ref_start = ref;
+        //}
 
-        void setTransaction(csdb::Transaction& tr) {
-            transaction = tr;
-        }
+        //void setTransaction(csdb::Transaction& tr) {
+        //    transaction = tr;
+        //}
 
-        void setAvailFee(Amount& fee) {
-            avail_fee = fee;
-        }
+        //void setAvailFee(Amount& fee) {
+        //    avail_fee = fee;
+        //}
 
-        void setNewStateFee(Amount& am) {
-            new_state_fee = am;
-        }
+        //void setNewStateFee(Amount& am) {
+        //    new_state_fee = am;
+        //}
 
-        void setConsumedFee(Amount& am) {
-            consumed_fee = am;
-        }
+        //void setConsumedFee(Amount& am) {
+        //    consumed_fee = am;
+        //}
 
-        void setUses(std::vector<csdb::Address>& us) {
-            uses = us;
-        }
+        //void setUses(std::vector<csdb::Address>& us) {
+        //    uses = us;
+        //}
 
-        void setTransactionsPacket(cs::TransactionsPacket& pack) {
-            result = pack;
-        }
+        //void setTransactionsPacket(cs::TransactionsPacket& pack) {
+        //    result = pack;
+        //}
     private:
 
         //template<class Archive>
@@ -229,7 +229,7 @@ public:
         //    ar& result;
         //}
         template<class Archive>
-        void save(Archive& ar, const unsigned int version) const {
+        void save(Archive& ar, [[maybe_unused]] const unsigned int version) const {
             ar& ref_start;
             ar& transaction.to_byte_stream();
             ar& avail_fee;
@@ -238,7 +238,7 @@ public:
             ar& result.toBinary();
         }
         template<class Archive>
-        void load(Archive& ar, const unsigned int version) {
+        void load(Archive& ar, [[maybe_unused]] const unsigned int version) {
             ar& ref_start;
 
             cs::Bytes tr;
@@ -273,66 +273,66 @@ public:
     class QueueItem {
         friend class boost::serialization::access;
     public:
-        std::vector<ExecutionItem> getExecutions() {
-            return executions;
-        }
+        //std::vector<ExecutionItem> getExecutions() {
+        //    return executions;
+        //}
 
-        SmartContractStatus getContractStatus() {
-            return status;
-        }
+        //SmartContractStatus getContractStatus() {
+        //    return status;
+        //}
 
-        cs::Sequence enqueSeq() {
-            return seq_enqueue;
-        }
+        //cs::Sequence enqueSeq() {
+        //    return seq_enqueue;
+        //}
 
-        cs::Sequence getStart() {
-            return seq_start;
-        }
+        //cs::Sequence getStart() {
+        //    return seq_start;
+        //}
 
-        cs::Sequence getFinish() {
-            return seq_finish;
-        }
+        //cs::Sequence getFinish() {
+        //    return seq_finish;
+        //}
 
-        csdb::Address getContractAddr() {
-            return abs_addr;
-        }
+        //csdb::Address getContractAddr() {
+        //    return abs_addr;
+        //}
 
-        bool getIsExecutor() {
-            return is_executor;
-        }
+        //bool getIsExecutor() {
+        //    return is_executor;
+        //}
 
-        bool getIsRejected() {
-            return is_rejected;
-        }
+        //bool getIsRejected() {
+        //    return is_rejected;
+        //}
 
-        void setExecution(std::vector<ExecutionItem>& execs) {
-            executions = execs;
-        }
+        //void setExecution(std::vector<ExecutionItem>& execs) {
+        //    executions = execs;
+        //}
 
-        void setContractStatus(SmartContractStatus& st) {
-            status = st;
-        }
-        void setEnqueue(cs::Sequence enq) {
-            seq_enqueue = enq;
-        }
-        void setStart(cs::Sequence st) {
-            seq_start = st;
-        }
+        //void setContractStatus(SmartContractStatus& st) {
+        //    status = st;
+        //}
+        //void setEnqueue(cs::Sequence enq) {
+        //    seq_enqueue = enq;
+        //}
+        //void setStart(cs::Sequence st) {
+        //    seq_start = st;
+        //}
 
-        void setFinish(cs::Sequence fin) {
-            seq_finish = fin;
-        }
+        //void setFinish(cs::Sequence fin) {
+        //    seq_finish = fin;
+        //}
 
-        void setAbsAddr(csdb::Address& addr) {
-            abs_addr = addr;
-        }
+        //void setAbsAddr(csdb::Address& addr) {
+        //    abs_addr = addr;
+        //}
 
-        void setIsExecutor(bool ex) {
-            is_executor = ex;
-        }
-        void setIsRejected(bool rej) {
-            is_rejected = rej;
-        }
+        //void setIsExecutor(bool ex) {
+        //    is_executor = ex;
+        //}
+        //void setIsRejected(bool rej) {
+        //    is_rejected = rej;
+        //}
 
     private:
 
@@ -357,7 +357,7 @@ public:
         csdb::Address abs_addr;
         bool is_executor;
         bool is_rejected;
-        //std::unique_ptr<SmartConsensus> pconsensus;
+        std::unique_ptr<SmartConsensus> pconsensus;
     };
 
 private:
@@ -365,7 +365,7 @@ private:
 
     std::unordered_set<csdb::Address> *blacklistedContracts_ = nullptr;
 
-    //std::unordered_set<csdb::Address> *locked_contracts;
+    std::unordered_set<csdb::Address> *locked_contracts_;
 
     //std::vector<SmartContractRef> *uncompleted_contracts;
 

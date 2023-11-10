@@ -370,6 +370,10 @@ public:
         return (blacklistedContracts_.find(abs_addr) != blacklistedContracts_.cend());
     }
 
+    //uint64_t getTestValue() {
+    //    return testValue;
+    //}
+
     void setBlacklisted(const csdb::Address& abs_addr, bool status) {
         if (status) {
             if (!isBlacklisted(abs_addr)) {
@@ -596,6 +600,8 @@ private:
     std::unordered_set<csdb::Address> blacklistedContracts_;
 
     std::unordered_set<csdb::Address> locked_contracts;
+
+    //uint64_t testValue = 0;
 
     // contract replenish transactions stored during reading from DB on stratup
     std::vector<SmartContractRef> uncompleted_contracts;

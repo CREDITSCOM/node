@@ -246,6 +246,7 @@ void CachesSerializationManager::bind(BlockChain& bc, std::set<cs::PublicKey>& i
 }
 
 void CachesSerializationManager::bind(SmartContracts& sc) {
+    csdebug() << "Contracts bindings";
     pImpl_->smartContractsSerializer.bind(sc);
     pImpl_->bindFlags |= (1 << Impl::SmartContractsBit);
 }
