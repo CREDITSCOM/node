@@ -103,6 +103,7 @@ bool SmartConsensus::initSmartRound(const cs::TransactionsPacket& pack, uint8_t 
             Hash newStateHash;
             if (stateOnly.size() > 0) {
                 cscrypto::Bytes st(stateOnly.data(), stateOnly.data() + stateOnly.size());
+                csdebug() << "Smart: new state = " << cs::Utils::byteStreamToHex(stateOnly);
                 newStateHash = cscrypto::calculateHash(st.data(),st.size());
             }
             else {

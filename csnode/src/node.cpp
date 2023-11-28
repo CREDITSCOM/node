@@ -3681,6 +3681,12 @@ void Node::getRoundTableReply(const uint8_t* data, const size_t size, const cs::
     solver_->gotRoundInfoReply(hasRequestedInfo, respondent);
 }
 
+std::string Node::KeyToBase58(cs::PublicKey key) {
+    const auto beg = key.data();
+    const auto end = beg + key.size();
+    return EncodeBase58(beg, end);
+}
+
 void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     bool found = false;
     uint8_t confidantIndex = 0;
@@ -3768,7 +3774,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     const std::size_t fixedWidth = s.size();
 
     cslog() << s;
-    csdebug() << " Node key " << cs::Utils::byteStreamToHex(nodeIdKey_);
+    csdebug() << " Node key " << KeyToBase58(nodeIdKey_);
     cslog() << " Last written sequence = " << WithDelimiters(blockChain_.getLastSeq()) << ", neighbour nodes = " << transport_->getNeighboursCount();
 
     std::ostringstream line2;
@@ -3781,7 +3787,7 @@ void Node::onRoundStart(const cs::RoundTable& roundTable, bool updateRound) {
     csdebug() << " Confidants:";
     for (size_t i = 0; i < roundTable.confidants.size(); ++i) {
         auto result = myLevel_ == Level::Confidant && i == myConfidantIndex_;
-        auto name = result ? "me" : cs::Utils::byteStreamToHex(roundTable.confidants[i]);
+        auto name = result ? "me" : KeyToBase58(roundTable.confidants[i]);
 
         csdebug() << "[" << i << "] " << name;
     }
@@ -4406,9 +4412,7 @@ void Node::onRoundTimeElapsed() {
 
     cslog() << "NODE> Bootstrap available nodes [" << actualConfidants.size() << "]:";
     for (const auto& item : actualConfidants) {
-        const auto beg = item.data();
-        const auto end = beg + item.size();
-        cslog() << "NODE> " << " - " << EncodeBase58(beg, end) << (item == own_key ? " (me)" : "");
+        cslog() << "NODE> " << " - " << KeyToBase58(item) << (item == own_key ? " (me)" : "");
     }
 
     if (actualConfidants.size() < initialConfidants_.size()) {
@@ -4477,9 +4481,7 @@ void Node::onRoundTimeElapsed() {
         reviewConveyerHashes();
     }
     else {
-        const auto beg = actualConfidants.cbegin()->data();
-        const auto end = beg + actualConfidants.cbegin()->size();
-        cslog() << "Wait for " << EncodeBase58(beg, end) << " to start round...";
+        cslog() << "Wait for " << KeyToBase58(*actualConfidants.cbegin()) << " to start round...";
     }
 }
 

@@ -137,6 +137,7 @@ csdb::UserField SmartContractRef::to_user_field() const {
 }
 
 void SmartContractRef::from_user_field(const csdb::UserField& fld) {
+
     std::string data = fld.value<std::string>();
     cs::IDataStream stream(data.c_str(), data.size());
     csdb::PoolHash dummy; // for compatibility
@@ -1617,15 +1618,7 @@ void SmartContracts::on_remove_block(const csdb::Pool& block) {
     }
 }
 
-/*private*/
-void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db, bool* should_stop) {
-    if (!should_stop) {
-        cslog() << kLogPrefix << "stop is requested";
-        return;
-    }
-
-    test_contracts_locks();
-
+void SmartContracts::checkExeQueue(const csdb::Pool& block, bool reading_db, bool* should_stop) {
     const auto seq = block.sequence();
     for (auto& item : exe_queue) {
         // unconditionally cancel (and as well remove) over-MaxRoundsCancelContract items from queue
@@ -1692,13 +1685,24 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
         }
 
     }  // for each exe_queue item
+}
 
+/*private*/
+void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db, bool* should_stop) {
+    if (!should_stop) {
+        cslog() << kLogPrefix << "stop is requested";
+        return;
+    }
+
+    test_contracts_locks();
+    checkExeQueue(block, reading_db, should_stop);
     // inspect transactions against smart contracts, raise special event on every item found:
     if (block.transactions_count() > 0) {
         size_t tr_idx = 0;
         for (const auto& tr : block.transactions()) {
             if (is_smart_contract(tr)) {
                 if (is_new_state(tr)) {
+                    const csdb::Address abs_addr = absolute_address(tr.target());
                     if (!reading_db) {
                         csdebug() << kLogPrefix << "found new state " << FormatRef(block.sequence(), tr_idx);
                     }
@@ -1710,7 +1714,7 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
                     else {
                         SmartContractRef ref_start(fld_contract_ref);
                         // update state
-                        const csdb::Address abs_addr = absolute_address(tr.target());
+                        
                         if (!update_contract_state(tr, reading_db)) {
                             if (!reading_db) {
                                 csdebug() << kLogPrefix << to_base58(abs_addr) << " state is unchanged after " << ref_start;
@@ -1722,6 +1726,8 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
                         }
                         remove_from_queue(ref_start, reading_db);
                     }
+                    StateItem& item_tmp = known_contracts[abs_addr];
+                    csdebug() << kLogPrefix << "New state after update: " << item_tmp.state;
                     if (!reading_db) {
                         csdb::UserField fld_fee = tr.user_field(trx_uf::new_state::Fee);
                         if (fld_fee.is_valid()) {
@@ -2024,6 +2030,8 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
                 const auto& head = data.result.smartsRes.front();
                 if (head.states.count(data.abs_addr) > 0) {
                     last_state = head.states.at(data.abs_addr);
+                    cscrypto::Bytes st1(last_state.data(), last_state.data() + last_state.size());
+                    csdebug() << kLogPrefix << __func__ << " last_state: " << cs::Utils::byteStreamToHex(st1);
                 }
             }
         }
@@ -2555,7 +2563,8 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         bool replenish = !deploy && !call;
 
         if (!reading_db) {
-            cslog() << kLogPrefix << to_base58(abs_addr) << " state is updated by " << ref_start << ", new size is " << state_value.size();
+            cscrypto::Bytes st1(state_value.data(), state_value.data() + state_value.size());
+            cslog() << kLogPrefix << to_base58(abs_addr) << " state is updated by " << ref_start << ", new size is " << state_value.size() << ", value: " << cs::Utils::byteStreamToHex(st1);
         }
 
         // create or get contract state item
@@ -2605,7 +2614,12 @@ bool SmartContracts::update_contract_state(const csdb::Transaction& t, bool read
         }
 
         // there is only one place to update state in "memory cache" and only after successful dbcache_update()!!!
+
+        cscrypto::Bytes st1(state_value.data(), state_value.data() + state_value.size());
+        csdebug() << "Smart: new state before update = " << cs::Utils::byteStreamToHex(st1);
         item.state = std::move(state_value);
+        cscrypto::Bytes st(item.state.data(), item.state.data() + item.state.size());
+        csdebug() << "Smart: new state after update = " << cs::Utils::byteStreamToHex(st);
         item.ref_state = SmartContractRef(t.id());
         // determine it is the result of whether deploy or execute
         if (!replenish) {
@@ -2916,17 +2930,36 @@ void SmartContracts::update_status(QueueItem& item, cs::RoundNumber r, SmartCont
 
 void SmartContracts::test_contracts_locks() {
     // lookup running items
+    std::vector<csdb::Address> couldBeLocked;
     if (!exe_queue.empty()) {
         for (const auto& exe_item : exe_queue) {
             if (exe_item.status == SmartContractStatus::Running || exe_item.status == SmartContractStatus::Finished) {
-                return;
+                //return;
+                couldBeLocked.push_back(exe_item.abs_addr);
             }
         }
     }
     // no running items, ensure no locked contracts
+    std::vector<csdb::Address> toErase;
+
     if (!locked_contracts.empty()) {
-        csdebug() << kLogPrefix << "find " << locked_contracts.size() << "  locked contract(s) which is not executed now, unlock";
-        locked_contracts.clear();
+        if (!couldBeLocked.empty()) {
+            for (auto it : locked_contracts) {
+                auto foundIt = std::find(couldBeLocked.begin(), couldBeLocked.end(), it);
+                if(foundIt == couldBeLocked.end()) {
+                    toErase.push_back(*foundIt);
+                }
+            }
+            for (auto it : toErase) {
+                auto foundIt = std::find(locked_contracts.begin(), locked_contracts.end(), it);
+                locked_contracts.erase(foundIt);
+            }
+        }
+        else {
+            csdebug() << kLogPrefix << "find " << locked_contracts.size() << "  locked contract(s) which is not executed now, unlock";
+            locked_contracts.clear();
+        }
+
     }
 }
 
@@ -3106,7 +3139,12 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
         if (dbcache_update(contract_abs_addr, ref, state, false)) {
             if (in_known_contracts(contract_abs_addr)) {
                 auto& item = known_contracts[contract_abs_addr];
+                cscrypto::Bytes st1(item.state.data(), item.state.data() + item.state.size());
+                csdebug() << kLogPrefix << __func__ << " previous value: " << cs::Utils::byteStreamToHex(st1);
                 item.state = state;
+
+                cscrypto::Bytes st2(item.state.data(), item.state.data() + item.state.size());
+                csdebug() << kLogPrefix << __func__ << " updated value value: " << cs::Utils::byteStreamToHex(st1);
                 item.ref_cache = ref;
                 item.ref_execute = ref;
                 csdebug() << kLogPrefix << to_base58(contract_abs_addr) << " state has updated from net package with " << ref << " state value";

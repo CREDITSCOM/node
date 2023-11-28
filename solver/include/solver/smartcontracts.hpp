@@ -942,6 +942,7 @@ private:
      */
 
     void on_next_block_impl(const csdb::Pool& block, bool reading_db, bool* should_stop);
+    void checkExeQueue(const csdb::Pool& block, bool reading_db, bool* should_stop);
 
     // request correct state in network
     void net_request_contract_state(const csdb::Address& abs_addr);
