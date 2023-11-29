@@ -106,6 +106,7 @@ public:
             ar & payable;
             ar & ref_deploy;
             ar & ref_execute;
+            ar & ref_cache;
             ar & ref_state;
             ar & deploy.to_byte_stream();
             ar & execute.to_byte_stream();
@@ -117,6 +118,7 @@ public:
             ar & payable;
             ar & ref_deploy;
             ar & ref_execute;
+            ar & ref_cache;
             ar & ref_state;
 
             cs::Bytes td;
