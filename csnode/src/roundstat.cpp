@@ -1,16 +1,15 @@
 #include <csnode/roundstat.hpp>
-#include <csnode/blockchain.hpp> 
 
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 #include <lib/system/concurrent.hpp>
-
+#include "idatastream.hpp"
 #include <configholder.hpp>
 
 #include <sstream>
 
 namespace cs {
-RoundStat::RoundStat()
+RoundStat::RoundStat(BlockChain* bch)
 : totalReceivedTransactions_(0)
 , totalAcceptedTransactions_(0)
 , deferredTransactionsCount_(0)
@@ -21,6 +20,7 @@ RoundStat::RoundStat()
 , roundElapseTimePoint_(std::chrono::steady_clock::now())
 , storeBlockElapseTimePoint_(std::chrono::steady_clock::now()) {
     //nodes_ = new std::map<cs::PublicKey, cs::NodeStat>();
+    blockChain_ = bch;
 }
 
 void RoundStat::onRoundStart(RoundNumber round, bool skipLogs) {
@@ -95,6 +95,14 @@ void RoundStat::dayChangeProcedure(uint64_t cTime) {
         }
         ++it;
     }
+
+    for (auto rewIt : minedEvaluation_) {
+        for (auto delIt : rewIt.second.me) {
+            delIt.second.rewardDay = csdb::Amount{ 0 };
+        }
+    }
+
+    totalMined_.rewardDay = csdb::Amount{ 0 };
 }
 
 void RoundStat::monthChangeProcedure() {
@@ -114,6 +122,16 @@ void RoundStat::monthChangeProcedure() {
         it->second.rewardMonth = csdb::Amount{ 0 };
         ++it;
     }
+
+    for (auto rewIt : minedEvaluation_) {
+        for (auto delIt : rewIt.second.me) {
+            delIt.second.rewardPrevMonth = delIt.second.rewardMonth;
+            delIt.second.rewardMonth = csdb::Amount{ 0 };
+        }
+    }
+
+    totalMined_.rewardPrevMonth = totalMined_.rewardMonth;
+    totalMined_.rewardMonth = csdb::Amount{ 0 };
 }
 
 void RoundStat::setNodeStatus(const cs::PublicKey key, bool status) {
@@ -122,6 +140,80 @@ void RoundStat::setNodeStatus(const cs::PublicKey key, bool status) {
         return;
     }
     it->second.nodeOn = status;
+}
+
+void RoundStat::fillMinedEvaluation(const cs::PublicKeys& confidants, const std::vector<csdb::Amount>& rew) {
+    std::map<cs::PublicKey, csdb::Amount> blockRewardsDistribution;
+    //auto confidants = block.confidants();
+    //auto realTrusted = cs::Utils::bitsToMask(block.numberTrusted(), block.realTrusted());
+
+
+    //auto rew = WalletsCache::Updater::getRewardDistribution(block);
+    auto rewIt = rew.begin();
+    bool rewFlag = rew.size() > 0;
+
+    csdb::Amount totalStake = 0;
+    std::vector<csdb::Amount> confidantAndStake;
+    int32_t realTrustedNumber = 0;
+    const uint8_t kUntrustedMarker = 255;
+    for (size_t cfd = 0; cfd < confidants.size(); ++cfd) {
+        csdb::Amount nodeConfidantAndStake;
+        csdb::Amount nodeConfidantAndFreezenStake;
+        csdb::Amount totalNodeStake = 0;
+        BlockChain::WalletData wData;
+        blockChain_->findWalletData(csdb::Address::from_public_key(confidants[cfd]), wData);
+        nodeConfidantAndStake += wData.balance_ * blockChain_->getStakingCoefficient(StakingCoefficient::NoStaking);
+        if (wData.delegateSources_ != nullptr && wData.delegateSources_->size() > 0) {
+            for (auto& keyAndStake : *(wData.delegateSources_)) {
+                for (auto& tm : keyAndStake.second) {
+                    if (tm.coeff == StakingCoefficient::NoStaking) {
+                        nodeConfidantAndStake += tm.amount * blockChain_->getStakingCoefficient(StakingCoefficient::NoStaking);
+                        csdebug() << "fillMinedEvaluation - simple delegation added: " << tm.amount.to_string();
+                    }
+                    else {
+                        nodeConfidantAndFreezenStake += tm.amount * blockChain_->getStakingCoefficient(tm.coeff);
+                        csdebug() << "fillMinedEvaluation - time delegation added: " << tm.amount.to_string() << " as " << nodeConfidantAndFreezenStake.to_string();
+                    }
+
+                }
+            }
+            totalNodeStake = nodeConfidantAndStake + nodeConfidantAndFreezenStake;
+            if (totalNodeStake == csdb::Amount{ 0 }) {
+                continue;
+            }
+            auto rewardPart = *rewIt / totalNodeStake;
+            csdebug() << "setBlockReward - total node stake: " << totalNodeStake.to_string();
+            //distributing block reward for each node
+            for (auto& keyAndStake : *(wData.delegateSources_)) {
+                for (auto& tm : keyAndStake.second) {
+                    auto cfdIt = minedEvaluation_.find(confidants[cfd]);
+                    if (cfdIt == minedEvaluation_.end()) {
+                        minedEvaluation_[confidants[cfd]] = MinedEvaluationDelegator();
+                        cfdIt = minedEvaluation_.find(confidants[cfd]);
+                    }
+                    auto ksIt = cfdIt->second.me.find(keyAndStake.first);
+                    if (ksIt == cfdIt->second.me.end()) {
+                        cfdIt->second.me[keyAndStake.first] = MinedEvaluation();
+                        ksIt = cfdIt->second.me.find(keyAndStake.first);
+                    }
+
+
+                    if (tm.coeff == StakingCoefficient::NoStaking) {
+                        ksIt->second.rewardDay += tm.amount * blockChain_->getStakingCoefficient(StakingCoefficient::NoStaking) * rewardPart;
+                        ksIt->second.rewardMonth += tm.amount * blockChain_->getStakingCoefficient(StakingCoefficient::NoStaking) * rewardPart;
+                        ksIt->second.rewardTotal += tm.amount * blockChain_->getStakingCoefficient(StakingCoefficient::NoStaking) * rewardPart;
+                    }
+                    else {
+                        ksIt->second.rewardDay += tm.amount * blockChain_->getStakingCoefficient(tm.coeff) * rewardPart;
+                        ksIt->second.rewardMonth += tm.amount * blockChain_->getStakingCoefficient(tm.coeff) * rewardPart;
+                        ksIt->second.rewardTotal += tm.amount * blockChain_->getStakingCoefficient(tm.coeff) * rewardPart;
+                    }
+
+                }
+            }
+        }
+        ++rewIt;
+    }
 }
 
 void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
@@ -161,6 +253,14 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
     }
 
     auto rew = WalletsCache::Updater::getRewardDistribution(block);
+    if (rew.size() > 0) {
+        fillMinedEvaluation(block.confidants(), rew);
+    }
+    for (auto rIt : rew) {
+        totalMined_.rewardDay += rIt;
+        totalMined_.rewardMonth += rIt;
+        totalMined_.rewardTotal += rIt;
+    }
     auto rewIt = rew.begin();
     bool rewFlag = rew.size() > 0;
     for (int i = 0; i < trusted.size(); ++i) {
@@ -244,7 +344,14 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
         }
     }
 
+
+    if (rewFlag) {
+
+    }
+
 }
+
+
 
 void RoundStat::onReadBlock(const csdb::Pool& block, bool* /*shouldStop*/) {
 

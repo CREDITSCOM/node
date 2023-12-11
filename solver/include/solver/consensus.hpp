@@ -65,7 +65,7 @@ public:
     constexpr static csdb::Amount MinStakeDelegated = csdb::Amount{ 5 };
 
     /** @brief   The round when DPOS starts working */
-    const static uint64_t StartingDPOS;
+    static uint64_t StartingDPOS;
 
     /** @brief   The return value means: general (Writer->General) is not selected by "generals" */
     const static uint8_t GeneralNotSelected;

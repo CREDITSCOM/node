@@ -17,11 +17,13 @@ namespace api_diag {
         void GetActiveTrustNodes(ActiveTrustNodesResult& _return) override;
         void GetActiveTransactionsCount(ActiveTransactionsResult& _return) override;
         void GetNodeStat(ActiveTrustNodesResult& _return, const general::Address& address) override;
-
-        // diagnocstic proro
+        void GetNodeRewardEvaluation(RewardEvaluation& _return, const general::Address& address);
+        // diagnostic proto
         void GetTransaction(GetTransactionResponse& _return, const TransactionId& id) override;
 
         void GetNodeInfo(NodeInfoRespone& _return, const NodeInfoRequest& request) override;
+
+        void GetSupply(SupplyInfo& _return) override;
 
         void SetRawData(general::APIResponse& _return, const std::string& data) override;
 

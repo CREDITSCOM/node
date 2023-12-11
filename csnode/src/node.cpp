@@ -61,7 +61,7 @@ Node::Node(cs::config::Observer& observer)
 : nodeIdKey_(cs::ConfigHolder::instance().config()->getMyPublicKey())
 , nodeIdPrivate_(cs::ConfigHolder::instance().config()->getMyPrivateKey())
 , blockChain_(genesisAddress_, startAddress_, cs::ConfigHolder::instance().config()->recreateIndex())
-, stat_()
+, stat_(&blockChain_)
 , blockValidator_(std::make_unique<cs::BlockValidator>(*this))
 , observer_(observer)
 , status_(cs::NodeStatus::ReadingBlocks){
@@ -4046,6 +4046,13 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 nVersionChange_.check = NODE_VERSION >= nVersionChange_.minFullVersion ? cs::CheckVersion::None : (NODE_VERSION < nVersionChange_.minCompatibleVersion ? cs::CheckVersion::Full : cs::CheckVersion::Normal);
             }
 
+            if (order == 9U) {// max round mum smart contract execution time
+                cs::Sequence startDPOSSequence;
+                stream >> startDPOSSequence;
+                Consensus::StartingDPOS = startDPOSSequence;
+                cslog() << "StartingDPOS sequrnce changed to: " << Consensus::StartingDPOS;
+            }
+
             if (order == 10U) {// transaction's packages life time
 
             }
@@ -4187,7 +4194,10 @@ void Node::processSpecialInfo(const csdb::Pool& pool) {
                 blockReward_ = csdb::Amount(rewInt, rewFrac);
                 miningCoefficient_ = csdb::Amount(coeffInt, coefFrac);
 
-                cslog() << "Mining settings will be changed in round " << consensusSettingsChangingRound_;
+                cslog() << "Mining settings will be changed in round " << consensusSettingsChangingRound_ << ": \n staking " << (stakingOn_ ? "ON" : "OFF")
+                    << "\n mining " << (miningOn_ ? "ON" : "OFF")
+                    << "\n blockReward " << blockReward_.to_string()
+                    << "\n miningCoefficient " << miningCoefficient_.to_string();
             }
 
         }
@@ -4796,6 +4806,81 @@ void Node::getNodeInfo(const api_diag::NodeInfoRequest& request, api_diag::NodeI
     info.__set_bootstrap(bootstrap_list);
 
 }
+
+void Node::getSupply(std::vector<csdb::Amount>& supply) {
+    BlockChain::WalletData wData;
+    BlockChain::WalletId wId;
+    std::string genesis = "11111111111111111111111111111112";
+    cscrypto::Bytes bytesAddr;
+    csdb::Amount genBalance{ 0 };
+    if (!DecodeBase58(genesis, bytesAddr)) {
+        csdebug() << __func__ << ": can't convert address " << genesis;
+        return;
+    }
+    if (!getBlockChain().findWalletData(csdb::Address::from_public_key(bytesAddr), wData, wId)) {
+        csdebug() << __func__ << ": can't find address " << cs::Utils::byteStreamToHex(bytesAddr);
+
+    }
+    else {
+        genBalance += wData.balance_;
+    }
+    supply.push_back(genBalance);
+
+    std::string rBin = "CSoooooooooooooooooooooooooooooooooooooooooo";
+    csdb::Amount binBalance{ 0 };
+    if (!DecodeBase58(rBin, bytesAddr)) {
+        csdebug() << __func__ << ": can't convert address " << rBin;
+        return;
+    }
+    if (!getBlockChain().findWalletData(csdb::Address::from_public_key(bytesAddr), wData, wId)) {
+        csdebug() << __func__ << ": can't find address " << cs::Utils::byteStreamToHex(bytesAddr);
+    }
+    else {
+        binBalance += wData.balance_;
+    }
+
+    supply.push_back(binBalance);
+
+    auto mined = stat_.getMined();
+    supply.push_back(mined.rewardTotal);
+    supply.push_back(genBalance + mined.rewardTotal - binBalance);
+
+}
+
+void Node::getNodeRewardEvaluation(std::vector<api_diag::NodeRewardSet>& request, std::string& msg, const cs::PublicKey& pKey, bool oneNode) {
+    auto statNodes = stat_.getRoundEvaluation();
+    if (oneNode) {
+        auto it = statNodes.find(pKey);
+        if (it == statNodes.end()) {
+            msg = "Not found";
+            return;
+        }
+        api_diag::NodeRewardSet rew;
+        rew.nodeAddress = std::string(pKey.begin(), pKey.end());
+        std::vector< api_diag::DelegatorRewardSet> dRew;
+        for (auto a : it->second.me) {
+            api_diag::DelegatorRewardSet dSet;
+            dSet.__set_delegatorAddress(std::string(a.first.begin(), a.first.end()));
+            dSet.rewardDay.__set_integral(a.second.rewardDay.integral());
+            dSet.rewardDay.__set_fraction(a.second.rewardDay.fraction());
+
+            dSet.rewardMonth.__set_integral(a.second.rewardMonth.integral());
+            dSet.rewardMonth.__set_fraction(a.second.rewardMonth.fraction());
+
+            dSet.rewardPrevMonth.__set_integral(a.second.rewardPrevMonth.integral());
+            dSet.rewardPrevMonth.__set_fraction(a.second.rewardPrevMonth.fraction());
+
+            dSet.rewardTotal.__set_integral(a.second.rewardTotal.integral());
+            dSet.rewardTotal.__set_fraction(a.second.rewardTotal.fraction());
+            dRew.push_back(dSet);
+        }
+
+        rew.__set_delegators(dRew);
+        request.push_back(rew);
+    }
+}
+
+
 
 uint8_t Node::requestKBAnswer(std::vector<std::string> choice) {
     if (choice.size() < 2) {

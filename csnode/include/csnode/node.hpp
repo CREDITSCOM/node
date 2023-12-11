@@ -245,6 +245,8 @@ public:
     void onSuccessQS(csdb::Amount blockReward, csdb::Amount miningCoeff, bool miningOn, bool stakingOn, uint32_t stageOneHashesTime);
     void saveConsensusSettingsToChain();
 
+    void getNodeRewardEvaluation(std::vector<api_diag::NodeRewardSet>& request, std::string& msg, const cs::PublicKey& pKey, bool oneNode);
+
     /**
      * Initializes the default round package as containing the default round table (default trusted
      * nodes)
@@ -264,6 +266,8 @@ public:
 
     bool isPoolsSyncroStarted();
     bool checkNodeVersion(cs::Sequence curSequence, std::string& msg);
+
+    void getSupply(std::vector<csdb::Amount>& suply);
 
     std::optional<cs::TrustedConfirmation> getConfirmation(cs::RoundNumber round) const;
 

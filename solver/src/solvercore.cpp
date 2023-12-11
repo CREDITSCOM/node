@@ -343,19 +343,19 @@ std::string SolverCore::setBlockReward(csdb::Pool& defBlock, const cs::Bytes& re
         BlockChain::WalletData wData;
         pnode->getBlockChain().findWalletData(csdb::Address::from_public_key(confidants[i]), wData);
         totalNodeStake += wData.balance_;
-        csdebug() << "setBlockReward - applying to: " << cs::Utils::byteStreamToHex(confidants[i]);
-        csdebug() << "setBlockReward - node balance added: " << totalNodeStake.to_string();
+        //csdebug() << "setBlockReward - applying to: " << cs::Utils::byteStreamToHex(confidants[i]);
+        //csdebug() << "setBlockReward - node balance added: " << totalNodeStake.to_string();
         nodeConfidantAndStake += wData.balance_;
         if (wData.delegateSources_ != nullptr && wData.delegateSources_->size() > 0) {
             for (auto& keyAndStake : *(wData.delegateSources_)) {
                 for(auto& tm : keyAndStake.second){
                     if (tm.coeff == StakingCoefficient::NoStaking) {
                         nodeConfidantAndStake += tm.amount;
-                        csdebug() << "setBlockReward - simple delegation added: " << tm.amount.to_string();
+                        //csdebug() << "setBlockReward - simple delegation added: " << tm.amount.to_string();
                     }
                     else {
                         nodeConfidantAndFreezenStake += tm.amount * pnode->getBlockChain().getStakingCoefficient(tm.coeff);
-                        csdebug() << "setBlockReward - time delegation added: " << tm.amount.to_string() << " as " << nodeConfidantAndFreezenStake.to_string();
+                        //csdebug() << "setBlockReward - time delegation added: " << tm.amount.to_string() << " as " << nodeConfidantAndFreezenStake.to_string();
                     }
 
                 }

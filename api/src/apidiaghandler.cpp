@@ -51,6 +51,86 @@ namespace api_diag {
         _return.__set_nodes(nodes);
     }
 
+    void APIDiagHandler::GetSupply(SupplyInfo& _return) {
+        general::APIResponse resp;
+
+
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        std::vector<csdb::Amount> supply;
+        std::string msg;
+
+        auto task = [&]() {
+            node_.getSupply(supply);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+
+        csdebug() << "GetSupply: size = " << supply.size();
+        if (supply.size() != 4ULL) {
+            resp.__set_code(kError);
+            resp.__set_message("info is not provided");
+            _return.__set_result(resp);
+            return;
+        }
+        resp.__set_code(kOk);
+        _return.__set_result(resp);
+
+        general::Amount genesis;
+        genesis.__set_integral(supply[0].integral());
+        genesis.__set_fraction(supply[0].fraction());
+        _return.__set_initialSupply(genesis);
+
+        general::Amount burned;
+        genesis.__set_integral(supply[1].integral());
+        genesis.__set_fraction(supply[1].fraction());
+        _return.__set_initialSupply(genesis);
+
+        general::Amount mined;
+        genesis.__set_integral(supply[2].integral());
+        genesis.__set_fraction(supply[2].fraction());
+        _return.__set_initialSupply(genesis);
+
+        general::Amount current;
+        genesis.__set_integral(supply[3].integral());
+        genesis.__set_fraction(supply[3].fraction());
+        _return.__set_initialSupply(genesis);
+    }
+
+
+    void APIDiagHandler::GetNodeRewardEvaluation(RewardEvaluation& _return, const general::Address& address) {
+        general::APIResponse resp;
+        auto addr = BlockChain::getAddressFromKey(address);
+        resp.__set_code(kOk);
+        _return.__set_result(resp);
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        std::vector<api_diag::NodeRewardSet> nodesReward;
+        std::string msg;
+
+        auto task = [&]() {
+            node_.getNodeRewardEvaluation(nodesReward, msg, addr.public_key(), true);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+
+        _return.__set_nodesReward(nodesReward);
+
+    }
+
+
     void APIDiagHandler::GetActiveTrustNodes(ActiveTrustNodesResult& _return) {
         general::APIResponse resp;
         resp.__set_code(kOk);

@@ -2,6 +2,7 @@
 #define ROUNDSTAT_HPP
 
 #include <csdb/pool.hpp>
+#include <csnode/blockchain.hpp> 
 
 #include <lib/system/common.hpp>
 #include <lib/system/signals.hpp>
@@ -56,9 +57,23 @@ struct NodeStat {
     cs::Sequence lastConsensus = 0ULL;
 };
 
+
+struct MinedEvaluation{
+    csdb::Amount rewardDay;
+    csdb::Amount rewardMonth;
+    csdb::Amount rewardPrevMonth;
+    csdb::Amount rewardTotal;
+};
+
+struct MinedEvaluationDelegator {
+    std::map<cs::PublicKey, cs::MinedEvaluation> me;
+};
+
+
+
 class RoundStat {
 public:
-    RoundStat();
+    RoundStat(BlockChain* bch);
 
     void onRoundStart(cs::RoundNumber round, bool skipLogs);
 
@@ -80,12 +95,19 @@ public:
     size_t aveRoundMs() const;
     size_t nodeStartRound() const;
 
+    MinedEvaluation getMined() {
+        return totalMined_;
+    }
+
     // returns duration from last round in ms,
     // only if connected to transport ping signal
     size_t lastRoundMs() const;
 
     void resetLastRoundMs();
     bool isCurrentRoundTooLong(size_t longDurationMs = kMaxRoundDelay) const;
+    const std::map<cs::PublicKey, cs::MinedEvaluationDelegator>& getRoundEvaluation() {
+        return minedEvaluation_;
+    }
 
     const std::map<cs::PublicKey, cs::NodeStat> getNodes() const {
         return  nodes_;
@@ -109,7 +131,7 @@ private:
     void checkRoundElapse();
     void checkStoreBlockElapse();
     void countTrustAndTrx(const csdb::Pool& block);
-
+    void fillMinedEvaluation(const cs::PublicKeys& confidants, const std::vector<csdb::Amount>& rew);
     void dayChangeProcedure(uint64_t cTime);
     void monthChangeProcedure();
 
@@ -140,8 +162,11 @@ private:
 
     std::chrono::milliseconds checkPingDelta_{0};
     std::map<cs::PublicKey, cs::NodeStat> nodes_;
+    std::map<cs::PublicKey, cs::MinedEvaluationDelegator> minedEvaluation_; //node key (minedEvaluation(DelegatorKey, reward))
     int lastMonth_ = 0;
     int lastDay_ = 0;
+    BlockChain* blockChain_;
+    MinedEvaluation totalMined_;
 };
 
 }  // namespace cs
