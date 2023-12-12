@@ -4817,12 +4817,12 @@ void Node::getSupply(std::vector<csdb::Amount>& supply) {
         csdebug() << __func__ << ": can't convert address " << genesis;
         return;
     }
-    if (!getBlockChain().findWalletData(csdb::Address::from_public_key(bytesAddr), wData, wId)) {
+    if (!getBlockChain().findWalletData(BlockChain::getAddressFromKey(bytesAddr), wData)) {
         csdebug() << __func__ << ": can't find address " << cs::Utils::byteStreamToHex(bytesAddr);
 
     }
     else {
-        genBalance += wData.balance_;
+        genBalance -= wData.balance_;
     }
     supply.push_back(genBalance);
 
@@ -4832,7 +4832,7 @@ void Node::getSupply(std::vector<csdb::Amount>& supply) {
         csdebug() << __func__ << ": can't convert address " << rBin;
         return;
     }
-    if (!getBlockChain().findWalletData(csdb::Address::from_public_key(bytesAddr), wData, wId)) {
+    if (!getBlockChain().findWalletData(BlockChain::getAddressFromKey(bytesAddr), wData)) {
         csdebug() << __func__ << ": can't find address " << cs::Utils::byteStreamToHex(bytesAddr);
     }
     else {
@@ -4841,10 +4841,20 @@ void Node::getSupply(std::vector<csdb::Amount>& supply) {
 
     supply.push_back(binBalance);
 
-    auto mined = stat_.getMined();
-    supply.push_back(mined.rewardTotal);
-    supply.push_back(genBalance + mined.rewardTotal - binBalance);
+    auto mined = stat_.getMined().rewardTotal;
+    supply.push_back(mined);
+    auto tot = genBalance + mined - binBalance;
+    supply.push_back(tot);
+    //csdebug() << "Initial: " << genBalance.to_string() << ", burned: " << binBalance.to_string() << ", mined: " << mined.to_string() << ", total: " << tot.to_string();
 
+}
+
+void Node::getMined(std::vector<csdb::Amount>& mined) {
+    auto minedStat = stat_.getMined();
+    mined.push_back(minedStat.rewardDay);
+    mined.push_back(minedStat.rewardMonth);
+    mined.push_back(minedStat.rewardPrevMonth);
+    mined.push_back(minedStat.rewardTotal);
 }
 
 void Node::getNodeRewardEvaluation(std::vector<api_diag::NodeRewardSet>& request, std::string& msg, const cs::PublicKey& pKey, bool oneNode) {

@@ -579,6 +579,19 @@ csdb::Address BlockChain::getAddressFromKey(const std::string& key) {
 }
 
 /*static*/
+csdb::Address BlockChain::getAddressFromKey(const cs::Bytes& key) {
+    if (key.size() == kPublicKeyLength) {
+        csdb::Address res = csdb::Address::from_public_key(key);
+        return res;
+    }
+    else {
+        csdb::internal::WalletId id = *reinterpret_cast<const csdb::internal::WalletId*>(key.data());
+        csdb::Address res = csdb::Address::from_wallet_id(id);
+        return res;
+    }
+}
+
+/*static*/
 uint64_t BlockChain::getBlockTime(const csdb::Pool& block) noexcept {
     if (block.is_valid()) {
         if (block.user_field_ids().count(kFieldTimestamp) > 0) {

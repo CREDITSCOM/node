@@ -88,19 +88,19 @@ namespace api_diag {
         _return.__set_initialSupply(genesis);
 
         general::Amount burned;
-        genesis.__set_integral(supply[1].integral());
-        genesis.__set_fraction(supply[1].fraction());
-        _return.__set_initialSupply(genesis);
+        burned.__set_integral(supply[1].integral());
+        burned.__set_fraction(supply[1].fraction());
+        _return.__set_coinsBurned(burned);
 
         general::Amount mined;
-        genesis.__set_integral(supply[2].integral());
-        genesis.__set_fraction(supply[2].fraction());
-        _return.__set_initialSupply(genesis);
+        mined.__set_integral(supply[2].integral());
+        mined.__set_fraction(supply[2].fraction());
+        _return.__set_coinsMined(mined);
 
         general::Amount current;
-        genesis.__set_integral(supply[3].integral());
-        genesis.__set_fraction(supply[3].fraction());
-        _return.__set_initialSupply(genesis);
+        current.__set_integral(supply[3].integral());
+        current.__set_fraction(supply[3].fraction());
+        _return.__set_currentSupply(current);
     }
 
 

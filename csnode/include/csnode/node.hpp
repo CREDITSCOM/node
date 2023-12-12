@@ -268,6 +268,7 @@ public:
     bool checkNodeVersion(cs::Sequence curSequence, std::string& msg);
 
     void getSupply(std::vector<csdb::Amount>& suply);
+    void getMined(std::vector<csdb::Amount>& mined);
 
     std::optional<cs::TrustedConfirmation> getConfirmation(cs::RoundNumber round) const;
 

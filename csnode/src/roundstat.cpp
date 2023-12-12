@@ -81,6 +81,7 @@ void RoundStat::onRoundStart(RoundNumber round, bool skipLogs) {
 }
 
 void RoundStat::dayChangeProcedure(uint64_t cTime) {
+    csdebug() << __func__;
     auto it = nodes_.begin();
     while (it != nodes_.end()) {
         it->second.failedTrustedDay = 0;
@@ -96,16 +97,21 @@ void RoundStat::dayChangeProcedure(uint64_t cTime) {
         ++it;
     }
 
-    for (auto rewIt : minedEvaluation_) {
-        for (auto delIt : rewIt.second.me) {
-            delIt.second.rewardDay = csdb::Amount{ 0 };
+    auto rewIt = minedEvaluation_.begin();
+    while (rewIt != minedEvaluation_.end()) {
+        auto delIt = rewIt->second.me.begin();
+        while (delIt != rewIt->second.me.end()) {
+            delIt->second.rewardDay = csdb::Amount{ 0 };
+            ++delIt;
         }
+        ++rewIt;
     }
 
     totalMined_.rewardDay = csdb::Amount{ 0 };
 }
 
 void RoundStat::monthChangeProcedure() {
+    //csdebug() << __func__;
     auto it = nodes_.begin();
     while (it != nodes_.end()) {
         it->second.failedTrustedPrevMonth = it->second.failedTrustedMonth;
@@ -123,11 +129,15 @@ void RoundStat::monthChangeProcedure() {
         ++it;
     }
 
-    for (auto rewIt : minedEvaluation_) {
-        for (auto delIt : rewIt.second.me) {
-            delIt.second.rewardPrevMonth = delIt.second.rewardMonth;
-            delIt.second.rewardMonth = csdb::Amount{ 0 };
+    auto rewIt = minedEvaluation_.begin();
+    while (rewIt != minedEvaluation_.end()) {
+        auto delIt = rewIt->second.me.begin();
+        while (delIt != rewIt->second.me.end()) {
+            delIt->second.rewardPrevMonth = delIt->second.rewardMonth;
+            delIt->second.rewardMonth = csdb::Amount{ 0 };
+            ++delIt;
         }
+        ++rewIt;
     }
 
     totalMined_.rewardPrevMonth = totalMined_.rewardMonth;
@@ -168,11 +178,11 @@ void RoundStat::fillMinedEvaluation(const cs::PublicKeys& confidants, const std:
                 for (auto& tm : keyAndStake.second) {
                     if (tm.coeff == StakingCoefficient::NoStaking) {
                         nodeConfidantAndStake += tm.amount * blockChain_->getStakingCoefficient(StakingCoefficient::NoStaking);
-                        csdebug() << "fillMinedEvaluation - simple delegation added: " << tm.amount.to_string();
+                        //csdebug() << "fillMinedEvaluation - simple delegation added: " << tm.amount.to_string();
                     }
                     else {
                         nodeConfidantAndFreezenStake += tm.amount * blockChain_->getStakingCoefficient(tm.coeff);
-                        csdebug() << "fillMinedEvaluation - time delegation added: " << tm.amount.to_string() << " as " << nodeConfidantAndFreezenStake.to_string();
+                        //csdebug() << "fillMinedEvaluation - time delegation added: " << tm.amount.to_string() << " as " << nodeConfidantAndFreezenStake.to_string();
                     }
 
                 }
@@ -182,7 +192,7 @@ void RoundStat::fillMinedEvaluation(const cs::PublicKeys& confidants, const std:
                 continue;
             }
             auto rewardPart = *rewIt / totalNodeStake;
-            csdebug() << "setBlockReward - total node stake: " << totalNodeStake.to_string();
+            //csdebug() << "setBlockReward - total node stake: " << totalNodeStake.to_string();
             //distributing block reward for each node
             for (auto& keyAndStake : *(wData.delegateSources_)) {
                 for (auto& tm : keyAndStake.second) {
@@ -255,11 +265,12 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
     auto rew = WalletsCache::Updater::getRewardDistribution(block);
     if (rew.size() > 0) {
         fillMinedEvaluation(block.confidants(), rew);
-    }
-    for (auto rIt : rew) {
-        totalMined_.rewardDay += rIt;
-        totalMined_.rewardMonth += rIt;
-        totalMined_.rewardTotal += rIt;
+
+        for (auto rIt : rew) {
+            totalMined_.rewardDay += rIt;
+            totalMined_.rewardMonth += rIt;
+            totalMined_.rewardTotal += rIt;
+        }
     }
     auto rewIt = rew.begin();
     bool rewFlag = rew.size() > 0;

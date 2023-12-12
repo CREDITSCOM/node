@@ -31,6 +31,8 @@
 #include <condition_variable>
 #include <mutex>
 
+#include <lib/system/common.hpp>
+
 namespace cs {
 class BlockHashes;
 class WalletsIds;
@@ -92,6 +94,7 @@ public:
     bool isEqual(const csdb::Address& laddr, const csdb::Address& raddr) const;
 
     static csdb::Address getAddressFromKey(const std::string&);
+    static csdb::Address getAddressFromKey(const cs::Bytes&);
 
     static uint64_t getBlockTime(const csdb::Pool& block) noexcept;
     static std::string poolInfo(const csdb::Pool& pool);

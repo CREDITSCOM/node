@@ -248,7 +248,7 @@ public:
             transaction = csdb::Transaction::from_binary(tr);
             transaction.update_id(csdb::TransactionID(ref_start.getSequence(), ref_start.getTransaction()));
 
-            csdebug() << "StartTransaction: " << StateItem::transactionToString(transaction);
+            //csdebug() << "StartTransaction: " << StateItem::transactionToString(transaction);
 
             ar& avail_fee;
             ar& consumed_fee;
