@@ -1259,6 +1259,7 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
         return;
     }
 
+
     if (!dumbCv_.addCVInfo(send_transaction.signature())) {
         _return.status.code = int8_t(ERROR_CODE);
         _return.status.message = "This transaction has been seen before";
@@ -1266,7 +1267,7 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
     }
 
     cs::Conveyer::instance().addTransaction(send_transaction);
-
+    csdebug() << __func__ << "> transaction added";
     cs::Hash hashState;
     csdb::TransactionID newTransactionId{};
 
@@ -1339,7 +1340,7 @@ void APIHandler::smartTransactionFlow(api::TransactionFlowResult& _return, const
 void APIHandler::TransactionFlow(api::TransactionFlowResult& _return, const Transaction& transaction) {
     #ifdef MONITOR_NODE
     _return.status.code = int8_t(ERROR_CODE);
-    _return.status.message = "Monitor node don't receive transactions";
+    _return.status.message = "Monitor node does't receive transactions";
     return;
     #endif
     _return.roundNum = static_cast<int32_t>(cs::Conveyer::instance().currentRoundTable().round); // possible overflow

@@ -720,7 +720,7 @@ bool BlockChain::finalizeBlock(csdb::Pool& pool, bool isTrusted, cs::PublicKeys 
         //  csmeta(csdebug) << "Prev Hash: " << cs::Utils::byteStreamToHex(pool.previous_hash().to_binary().data(), pool.previous_hash().to_binary().size());
         Hash tempHash;
         auto hash = pool.hash().to_binary();
-        csdebug() << "New pool " << pool.sequence() << ": " << cs::Utils::byteStreamToHex(pool.to_binary());
+        //csdebug() << "New pool " << pool.sequence() << ": " << cs::Utils::byteStreamToHex(pool.to_binary());
         std::copy(hash.cbegin(), hash.cend(), tempHash.data());
         if (NodeUtils::checkGroupSignature(confidants, mask, signatures, tempHash)) {
             csmeta(csdebug) << kLogPrefix << "The number of signatures is sufficient and all of them are OK";

@@ -136,10 +136,11 @@ private:
     void monthChangeProcedure();
 
     static const int64_t kMaxPingSynchroDelay = 30000;
-
+    //<to save>
     // amount of transactions received (to verify or not or to ignore)
     size_t totalReceivedTransactions_;
 
+    //<to save>
     // amount of accepted transactions (stored in blockchain)
     std::atomic<size_t> totalAcceptedTransactions_;
 
@@ -161,11 +162,14 @@ private:
     std::chrono::steady_clock::time_point storeBlockElapseTimePoint_;
 
     std::chrono::milliseconds checkPingDelta_{0};
+    //<to save>
     std::map<cs::PublicKey, cs::NodeStat> nodes_;
+    //<to save>
     std::map<cs::PublicKey, cs::MinedEvaluationDelegator> minedEvaluation_; //node key (minedEvaluation(DelegatorKey, reward))
     int lastMonth_ = 0;
     int lastDay_ = 0;
     BlockChain* blockChain_;
+    //<to save>
     MinedEvaluation totalMined_;
 };
 

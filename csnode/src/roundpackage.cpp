@@ -154,23 +154,23 @@ std::string RoundPackage::toString() {
     packageString = packageString + ", TimeStamp: " + poolMetaInfo_.timestamp;
     packageString = packageString + ", Reward: " + cs::Utils::byteStreamToHex(poolMetaInfo_.reward.data(), poolMetaInfo_.reward.size());
     // packageString = packageString + "\n" + "Smart Signatures:" + poolMetaInfo_.smartSignatures;
-    packageString = packageString + "\n" + "PoolSignatures(" + std::to_string(poolSignatures_.size()) + "):";
+    packageString = packageString + "\n" + "PoolSignatures(" + std::to_string(poolSignatures_.size()) + ")";// :";
 
-    for (auto it : poolSignatures_) {
-        packageString = packageString + "\n\t" + cs::Utils::byteStreamToHex(it.data(), it.size());
-    }
+    //for (auto it : poolSignatures_) {
+    //    packageString = packageString + "\n\t" + cs::Utils::byteStreamToHex(it.data(), it.size());
+    //}
 
-    packageString = packageString + "\n" + "TrustedSignatures(" + std::to_string(trustedSignatures_.size()) + "):";
+    packageString = packageString + "\n" + "TrustedSignatures(" + std::to_string(trustedSignatures_.size()) + ")";// :";
 
-    for (auto it : trustedSignatures_) {
-        packageString = packageString + "\n\t" + cs::Utils::byteStreamToHex(it.data(), it.size());
-    }
+    //for (auto it : trustedSignatures_) {
+    //    packageString = packageString + "\n\t" + cs::Utils::byteStreamToHex(it.data(), it.size());
+    //}
 
-    packageString = packageString + "\n" + "RoundSignatures(" + std::to_string(roundSignatures_.size()) + "):";
+    packageString = packageString + "\n" + "RoundSignatures(" + std::to_string(roundSignatures_.size()) + ")";// :";
 
-    for (auto it : roundSignatures_) {
-        packageString = packageString + "\n\t" + cs::Utils::byteStreamToHex(it.data(), it.size());
-    }
+    //for (auto it : roundSignatures_) {
+    //    packageString = packageString + "\n\t" + cs::Utils::byteStreamToHex(it.data(), it.size());
+    //}
 
     return packageString;
 }
