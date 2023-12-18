@@ -2265,8 +2265,7 @@ void Node::getStageOne(const uint8_t* data, const size_t size, const cs::PublicK
     }
 
     const cs::PublicKey& confidant = conveyer.confidantByIndex(stage.sender);
-    csdebug() << kLogPrefix_ << "StageOne Message[" << static_cast<int>(stage.sender) <<"]: " << cs::Utils::byteStreamToHex(stage.message.data(), stage.message.size());
-    if (!cscrypto::verifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
+       if (!cscrypto::verifySignature(stage.signature, confidant, signedMessage.data(), signedMessage.size())) {
         cswarning() << kLogPrefix_ << "StageOne from T[" << static_cast<int>(stage.sender) << "] -  WRONG SIGNATURE!!! Message: " 
             << cs::Utils::byteStreamToHex(stage.message.data(), stage.message.size());
         return;
@@ -3879,7 +3878,7 @@ void Node::sendHashReply(const csdb::PoolHash& hash, const cs::PublicKey& respon
     }
 
     cs::Signature signature = cscrypto::generateSignature(solver_->getPrivateKey(), hash.to_binary().data(), hash.size());
-    /*bool notused =*/ sendDirect(respondent, MsgTypes::HashReply, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, getConfidantNumber(), hash);
+    /*bool notused =*/ sendDirect(respondent, MsgTypes::HashReply, cs::Conveyer::instance().currentRoundNumber(), subRound_, signature, getConfidantNumber(), hash);//add block sequence and block weight
 }
 
 void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber rNum, const cs::PublicKey& sender) {
@@ -3929,7 +3928,7 @@ void Node::getHashReply(const uint8_t* data, const size_t size, cs::RoundNumber 
 
     const auto badHashReplySummary = std::count_if(badHashReplyCounter_.begin(), badHashReplyCounter_.end(), [](bool badHash) { return badHash; });
 
-    if (static_cast<size_t>(badHashReplySummary) > conveyer.confidantsCount() / 2 && !lastBlockRemoved_) {
+    if ((static_cast<size_t>(badHashReplySummary) > conveyer.confidantsCount() / 2) || (isBootstrapRound_ && (static_cast<size_t>(badHashReplySummary) > 1)) && !lastBlockRemoved_) {
         csmeta(csdebug) << "This node really have not valid HASH!!! Removing last block from DB and trying to syncronize";
         // TODO: examine what will be done without this function
         if (!roundPackageCache_.empty() && roundPackageCache_.back().poolMetaInfo().realTrustedMask.size() > cs::TrustedMask::trustedSize(roundPackageCache_.back().poolMetaInfo().realTrustedMask)) {
