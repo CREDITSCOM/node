@@ -20,6 +20,7 @@ namespace cs {
 class SmartContracts;
 class WalletsCache;
 class WalletsIds;
+class RoundStat;
 
 class CachesSerializationManager {
 public:
@@ -30,6 +31,7 @@ public:
     void bind(SmartContracts&);
     void bind(WalletsCache&);
     void bind(WalletsIds&);
+    void bind(RoundStat&);
     void bind(TokensMaster&);
     void bind(api::APIHandler&);
 

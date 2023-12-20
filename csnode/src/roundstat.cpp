@@ -373,13 +373,16 @@ void RoundStat::onStoreBlock(const csdb::Pool& block) {
     countTrustAndTrx(block);
 }
 
-void RoundStat::onStopReadingFromDb(uint64_t totalTransactions) {
+void RoundStat::onStopReadingFromDb(uint64_t totalTransactions, bool successfulQuickStart) {
+    if (successfulQuickStart) {
+        totalAcceptedTransactions_ == totalTransactions;
+    }
     if (totalAcceptedTransactions_ == totalTransactions){
         totalAcceptedTransactions_ = totalTransactions;
         csdebug() << "All transactions read successfully";
     }
     else{
-        cserror() << " The number of counted transactions is different";
+        cserror() << " The number of counted transactions is different: accepted: " << totalAcceptedTransactions_ << ", in bch: " << totalTransactions;
     }
 }
 

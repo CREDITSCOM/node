@@ -163,73 +163,8 @@ public:
 
     class ExecutionItem {
         friend class boost::serialization::access;
-    public:
-        //SmartContractRef getRefStart() {
-        //    return ref_start;
-        //}
-
-        //csdb::Transaction getTransaction() {
-        //    return transaction;
-        //}
-
-        //Amount getAvailableFee() {
-        //    return avail_fee;
-        //}
-
-        //Amount getNewStateFee() {
-        //    return new_state_fee;
-        //}
-
-        //Amount getConsumedFee() {
-        //    return consumed_fee;
-        //}
-
-        //std::vector<csdb::Address> getUses() {
-        //    return  uses;
-        //}
-        //cs::TransactionsPacket getTransactionsPacket() {
-        //    return result;
-        //}
-
-        //void setSmartContractRef(SmartContractRef& ref) {
-        //    ref_start = ref;
-        //}
-
-        //void setTransaction(csdb::Transaction& tr) {
-        //    transaction = tr;
-        //}
-
-        //void setAvailFee(Amount& fee) {
-        //    avail_fee = fee;
-        //}
-
-        //void setNewStateFee(Amount& am) {
-        //    new_state_fee = am;
-        //}
-
-        //void setConsumedFee(Amount& am) {
-        //    consumed_fee = am;
-        //}
-
-        //void setUses(std::vector<csdb::Address>& us) {
-        //    uses = us;
-        //}
-
-        //void setTransactionsPacket(cs::TransactionsPacket& pack) {
-        //    result = pack;
-        //}
     private:
 
-        //template<class Archive>
-        //void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
-        //    ar & ref_start;
-        //    ar& transaction;
-        //    ar& avail_fee;
-        //    ar& new_state_fee;
-        //    ar& consumed_fee;
-        //    ar& uses;
-        //    ar& result;
-        //}
         template<class Archive>
         void save(Archive& ar, [[maybe_unused]] const unsigned int version) const {
             ar& ref_start;
@@ -274,68 +209,6 @@ public:
 
     class QueueItem {
         friend class boost::serialization::access;
-    public:
-        //std::vector<ExecutionItem> getExecutions() {
-        //    return executions;
-        //}
-
-        //SmartContractStatus getContractStatus() {
-        //    return status;
-        //}
-
-        //cs::Sequence enqueSeq() {
-        //    return seq_enqueue;
-        //}
-
-        //cs::Sequence getStart() {
-        //    return seq_start;
-        //}
-
-        //cs::Sequence getFinish() {
-        //    return seq_finish;
-        //}
-
-        //csdb::Address getContractAddr() {
-        //    return abs_addr;
-        //}
-
-        //bool getIsExecutor() {
-        //    return is_executor;
-        //}
-
-        //bool getIsRejected() {
-        //    return is_rejected;
-        //}
-
-        //void setExecution(std::vector<ExecutionItem>& execs) {
-        //    executions = execs;
-        //}
-
-        //void setContractStatus(SmartContractStatus& st) {
-        //    status = st;
-        //}
-        //void setEnqueue(cs::Sequence enq) {
-        //    seq_enqueue = enq;
-        //}
-        //void setStart(cs::Sequence st) {
-        //    seq_start = st;
-        //}
-
-        //void setFinish(cs::Sequence fin) {
-        //    seq_finish = fin;
-        //}
-
-        //void setAbsAddr(csdb::Address& addr) {
-        //    abs_addr = addr;
-        //}
-
-        //void setIsExecutor(bool ex) {
-        //    is_executor = ex;
-        //}
-        //void setIsRejected(bool rej) {
-        //    is_rejected = rej;
-        //}
-
     private:
 
         template<class Archive>

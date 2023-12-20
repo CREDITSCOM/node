@@ -80,7 +80,7 @@ public:
     // called when next block is read from database
     void onReadBlock(const csdb::Pool& block, bool* shouldStop);
 
-    void onStopReadingFromDb(uint64_t totalTransactions);
+    void onStopReadingFromDb(uint64_t totalTransactions, bool successfulQuickStart);
 
     // called when next block is stored
     void onStoreBlock(const csdb::Pool& block);
@@ -139,6 +139,7 @@ private:
     //<to save>
     // amount of transactions received (to verify or not or to ignore)
     size_t totalReceivedTransactions_;
+    size_t totalBlockChainTransactions_ = 0;
 
     //<to save>
     // amount of accepted transactions (stored in blockchain)
@@ -171,6 +172,7 @@ private:
     BlockChain* blockChain_;
     //<to save>
     MinedEvaluation totalMined_;
+    friend class RoundStat_Serializer;
 };
 
 }  // namespace cs

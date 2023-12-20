@@ -48,7 +48,7 @@ void SmartContracts_Serializer::save(const std::filesystem::path& rootDir) {
     oa << exe_queue;
     oa << blacklistedContracts_;
     oa << locked_contracts_;
-    printClassInfo();
+    //printClassInfo();
 
 }
 
@@ -111,13 +111,18 @@ void SmartContracts_Serializer::printClassInfo() {
             known_contracts->begin(),
             known_contracts->end()
           );
-          csdebug() << kLogPrefix << __func__;
-          printClassInfo();
-          oa << known_contracts;
+          //csdebug() << kLogPrefix << __func__;
+          //printClassInfo();
+          oa << tmp.size();
+          for (auto it : tmp) {
+              oa << it.first;
+              oa << it.second;
+          }
           oa << exe_queue;
           oa << blacklistedContracts_;
           oa << locked_contracts_;
         }
+
     }
     
     auto result = SerializersHelper::getHashFromFile(kDataFileName);
@@ -154,7 +159,7 @@ void SmartContracts_Serializer::load(const std::filesystem::path& rootDir) {
     ia >> exe_queue;
     ia >> blacklistedContracts_;
     ia >> locked_contracts_;
-    printClassInfo();
+    //printClassInfo();
 
 }
 //TODO: insert own serialization for contracts to work properly:

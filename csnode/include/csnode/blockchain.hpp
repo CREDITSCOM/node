@@ -54,7 +54,7 @@ using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using AlarmSignal = cs::Signal<void(const cs::Sequence)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
 using StartReadingBlocksSignal = csdb::BlockReadingStartedSingal;
-using StopReadingBlocksSignal = cs::Signal<void(uint64_t totalTransactions)>;
+using StopReadingBlocksSignal = cs::Signal<void(uint64_t, bool)>;
 using SuccessQSSignal = cs::Signal<void(csdb::Amount, csdb::Amount, bool, bool, uint32_t)> ;
 }  // namespace cs
 

@@ -266,7 +266,7 @@ bool BlockChain::postInitFromDB(bool successfulQuickStart) {
     };
     walletsCacheStorage_->iterateOverWallets(func);
     if (successfulQuickStart) {
-        emit stopReadingBlocksEvent(totalTransactionsCount_);
+        emit stopReadingBlocksEvent(totalTransactionsCount_, successfulQuickStart);
     }
     return true;
 }

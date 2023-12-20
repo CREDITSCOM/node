@@ -12,6 +12,7 @@
 #include <csnode/walletscache_serializer.hpp>
 #include <csnode/walletsids_serializer.hpp>
 #include <csnode/apihandler_serializer.hpp>
+#include <csnode/roundstat_serializer.hpp>
 #include <csconnector/csconnector.hpp>
 
 #include <lib/system/logger.hpp>
@@ -27,16 +28,19 @@ struct CachesSerializationManager::Impl {
 #endif
     WalletsCache_Serializer   walletsCacheSerializer;
     WalletsIds_Serializer     walletsIdsSerializer;
+    RoundStat_Serializer roundStatSerializer;
+
 
     const std::string kHashesFile = "quick_start_hashes.dat";
     const std::string kQuickStartRoot = "qs";
-    const std::vector <std::string> hashesDivisions = {"blockchain", "smartcontracts","walletscache","walletsIds","tokensmaster","apihandler"};
+    const std::vector <std::string> hashesDivisions = {"blockchain", "smartcontracts","walletscache","walletsIds","roundstat","tokensmaster","apihandler"};
 
     enum BindBits {
       BlockChainBit,
       SmartContractsBit,
       WalletsCacheBit,
-      WalletsIdsBit
+      WalletsIdsBit,
+      RoundStatBit
 #ifdef NODE_API
       , TokensMasterBit
       , APIHandlerBit
@@ -50,7 +54,8 @@ struct CachesSerializationManager::Impl {
             (bindFlags & (1 << BlockChainBit)) &&
             (bindFlags & (1 << SmartContractsBit)) &&
             (bindFlags & (1 << WalletsCacheBit)) &&
-            (bindFlags & (1 << WalletsIdsBit))
+            (bindFlags & (1 << WalletsIdsBit)) &&
+            (bindFlags & (1 << RoundStatBit))
 #ifdef NODE_API
             && (bindFlags & (1 << TokensMasterBit))
             && (bindFlags & (1 << APIHandlerBit))
@@ -72,6 +77,7 @@ struct CachesSerializationManager::Impl {
 #endif
             walletsCacheSerializer.clear(p);
             walletsIdsSerializer.clear(p);
+            roundStatSerializer.clear(p);
             std::filesystem::remove_all(p);
         }
         catch (const std::exception& e) {
@@ -96,6 +102,8 @@ struct CachesSerializationManager::Impl {
       csdebug() << "Got walletscache hashes";
       addHash(result, walletsIdsSerializer);
       csdebug() << "Got walletids hashes";
+      addHash(result, roundStatSerializer);
+      csdebug() << "Got roundStat hashes";
 #ifdef NODE_API
       addHash(result, tokensMasterSerializer);
       csdebug() << "Got tokensmaster hashes";
@@ -150,13 +158,13 @@ struct CachesSerializationManager::Impl {
         auto cIt = currentHashesDivided.begin();
         auto nIt = hashesDivisions.begin();
         while (wIt < writtenHashesDivided.end()) {
-            if (*wIt != *cIt) {
+ //           if (*wIt != *cIt) {
                 csinfo() << *nIt << " current: "
                     << *cIt
                     << ", written: "
                     << *wIt;
 
-            }
+ //           }
             ++wIt;
             ++cIt;
             ++nIt;
@@ -204,6 +212,8 @@ struct CachesSerializationManager::Impl {
             walletsCacheSerializer.load(p);
             csinfo() << "Wallets: loaded";
             walletsIdsSerializer.load(p);
+            csinfo() << "Wallets Ids: loaded";
+            roundStatSerializer.load(p);
             csinfo() << "Wallets Ids: loaded";
 #ifdef NODE_API
             tokensMasterSerializer.load(p);
@@ -261,6 +271,11 @@ void CachesSerializationManager::bind(WalletsIds& wi) {
     pImpl_->bindFlags |= (1 << Impl::WalletsIdsBit);
 }
 
+void CachesSerializationManager::bind(RoundStat& rs) {
+    pImpl_->roundStatSerializer.bind(rs);
+    pImpl_->bindFlags |= (1 << Impl::RoundStatBit);
+}
+
 void CachesSerializationManager::bind([[maybe_unused]] TokensMaster& tm) {
 #ifdef NODE_API
     pImpl_->tokensMasterSerializer.bind(tm);
@@ -293,6 +308,7 @@ bool CachesSerializationManager::save(size_t version) {
         pImpl_->smartContractsSerializer.save(p);
         pImpl_->walletsCacheSerializer.save(p);
         pImpl_->walletsIdsSerializer.save(p);
+        pImpl_->roundStatSerializer.save(p);
 #ifdef NODE_API
         pImpl_->tokensMasterSerializer.save(p);
         pImpl_->apiHandlerSerializer.save(p);

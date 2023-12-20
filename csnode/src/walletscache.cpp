@@ -85,14 +85,14 @@ void WalletsCache::Updater::fundConfidantsWalletsWitnReward(const cs::Confidants
                                                             const std::vector<csdb::Amount>& rewards,
                                                             const std::vector<uint8_t>& realTrusted,
                                                             bool inverse) {
-    csdebug() << "fundConfidantsWalletsWitnReward: start";
+    //csdebug() << "fundConfidantsWalletsWitnReward: start";
     if (rewards.size() == 0ULL) {
-        cslog() << kLogPrefix << "NO Reward";
+        //cslog() << kLogPrefix << "NO Reward";
         return;
     }
 
     if (rewards.size() != realTrusted.size() || confidants.size() != realTrusted.size()) {
-        cslog() << kLogPrefix << "conf.size = " << confidants.size() << ", realTrusted.size = " << realTrusted.size() << ", rewards.size = " << rewards.size();
+        //cslog() << kLogPrefix << "conf.size = " << confidants.size() << ", realTrusted.size = " << realTrusted.size() << ", rewards.size = " << rewards.size();
         return;
     }
 
@@ -101,7 +101,7 @@ void WalletsCache::Updater::fundConfidantsWalletsWitnReward(const cs::Confidants
         if (realTrusted[i] == kUntrustedMarker) {
             continue;
         }
-        csdebug() << "fundConfidantsWalletsWitnReward: before getting walletdata";
+        //csdebug() << "fundConfidantsWalletsWitnReward: before getting walletdata";
         auto walletData = getWalletData(confidants[i]);
         csdb::Amount reward = rewards[i];
         if (reward > Consensus::blockReward || reward < csdb::Amount{ 0 }) {
@@ -111,14 +111,14 @@ void WalletsCache::Updater::fundConfidantsWalletsWitnReward(const cs::Confidants
         if (!inverse) {
             walletData.balance_ += (reward);
             logOperation("Confidant reward added: +", confidants[i], reward);
-            csdebug() << cs::Utils::byteStreamToHex(confidants[i]) << " - paidSum: " << reward.to_string();
+            //csdebug() << cs::Utils::byteStreamToHex(confidants[i]) << " - paidSum: " << reward.to_string();
         }
         else {
             walletData.balance_ -= (reward);
             logOperation("Confidant reward reverted: -", confidants[i], reward);
         }
 
-        csdebug() << "fundConfidantsWalletsWitnReward -> " << cs::Utils::byteStreamToHex(confidants[i]) << ", Mined: " << reward.to_string();
+        //csdebug() << "fundConfidantsWalletsWitnReward -> " << cs::Utils::byteStreamToHex(confidants[i]) << ", Mined: " << reward.to_string();
         ++numPayedTrusted;
 
         data_.multiWallets_->onWalletCacheUpdated(walletData);
@@ -337,13 +337,13 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
                                                          const cs::ConfidantsKeys& confidants,
                                                          const std::vector<uint8_t>& realTrusted, 
                                                          bool inverse) {
-    csdebug() << "fundConfidantsWalletsWithFee: start";
+    //csdebug() << "fundConfidantsWalletsWithFee: start";
     if (confidants.size() == 0ULL) {
-        cslog() << kLogPrefix << "NO CONFIDANTS";
+        //cslog() << kLogPrefix << "NO CONFIDANTS";
         return;
     }
     if (confidants.size() != realTrusted.size()) {
-        cslog() << kLogPrefix << "Real trusted and confidants have different sizes";
+        //cslog() << kLogPrefix << "Real trusted and confidants have different sizes";
         return;
     }
 
@@ -358,26 +358,26 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
     csdb::Amount onePartOfFee = totalFee /realTrustedNumber;
     csdb::Amount payedFee = 0;
     size_t numPayedTrusted = 0;
-    csdebug() << "fundConfidantsWalletsWithFee - totalFee: " << totalFee.to_string() << ", onePartFee = " << onePartOfFee.to_string();
+    //csdebug() << "fundConfidantsWalletsWithFee - totalFee: " << totalFee.to_string() << ", onePartFee = " << onePartOfFee.to_string();
     for (size_t i = 0; i < confidants.size(); ++i) {
         if (realTrusted[i] == kUntrustedMarker) {
             continue;
         }
-        csdebug() << "fundConfidantsWalletsWithFee: before getting walletdata";
+        //csdebug() << "fundConfidantsWalletsWithFee: before getting walletdata";
         auto walletData = getWalletData(confidants[i]);
         csdb::Amount feeToPay = 0; 
-        csdebug() << "fundConfidantsWalletsWithFee: before calc";
+        //csdebug() << "fundConfidantsWalletsWithFee: before calc";
         if (numPayedTrusted == confidants.size() - 1) {
             feeToPay = totalFee - payedFee;
         }
         else {
             feeToPay = onePartOfFee;
         }
-        csdebug() << "fundConfidantsWalletsWithFee - FeeToPay: " << feeToPay.to_string();
+        //csdebug() << "fundConfidantsWalletsWithFee - FeeToPay: " << feeToPay.to_string();
         if (!inverse) {
             walletData.balance_ += feeToPay;
             logOperation("Confidant fee added: +", confidants[i], feeToPay);
-            csdebug() << cs::Utils::byteStreamToHex(confidants[i]) << " - paidSum: " << feeToPay.to_string();
+            //csdebug() << cs::Utils::byteStreamToHex(confidants[i]) << " - paidSum: " << feeToPay.to_string();
         }
         else {
             walletData.balance_ -= feeToPay;
@@ -395,7 +395,7 @@ void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& tot
                 }
             }
 #endif
-        csdebug() << "fundConfidantsWalletsWithFee -> " << cs::Utils::byteStreamToHex(confidants[i]) << ", Fee: " << feeToPay.to_string();
+        //csdebug() << "fundConfidantsWalletsWithFee -> " << cs::Utils::byteStreamToHex(confidants[i]) << ", Fee: " << feeToPay.to_string();
         payedFee += feeToPay;
         ++numPayedTrusted;
 
