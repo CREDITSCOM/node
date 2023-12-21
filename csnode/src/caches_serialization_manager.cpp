@@ -158,13 +158,13 @@ struct CachesSerializationManager::Impl {
         auto cIt = currentHashesDivided.begin();
         auto nIt = hashesDivisions.begin();
         while (wIt < writtenHashesDivided.end()) {
- //           if (*wIt != *cIt) {
+            if (*wIt != *cIt) {
                 csinfo() << *nIt << " current: "
                     << *cIt
                     << ", written: "
                     << *wIt;
 
- //           }
+            }
             ++wIt;
             ++cIt;
             ++nIt;
@@ -256,7 +256,6 @@ void CachesSerializationManager::bind(BlockChain& bc, std::set<cs::PublicKey>& i
 }
 
 void CachesSerializationManager::bind(SmartContracts& sc) {
-    csdebug() << "Contracts bindings";
     pImpl_->smartContractsSerializer.bind(sc);
     pImpl_->bindFlags |= (1 << Impl::SmartContractsBit);
 }

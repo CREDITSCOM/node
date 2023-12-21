@@ -8,14 +8,19 @@
 #include <csnode/tokens_serializer.hpp>
 #include <csnode/serializers_helper.hpp>
 
+
+#include "logger.hpp"
+
 namespace {
 const std::string kDataFileName = "tokens.dat";
+const std::string kLogPrefix = "TokensMaster_Serializer: ";
 } // namespace
 
 namespace cs {
 void TokensMaster_Serializer::bind(TokensMaster& tokens) {
     tokens_ = reinterpret_cast<decltype(tokens_)>(&tokens.tokens_);
     holders_ = reinterpret_cast<decltype(holders_)>(&tokens.holders_);
+    csdebug() << "TokensMaster bindings made";
 }
 
 void TokensMaster_Serializer::clear(const std::filesystem::path& rootDir) {

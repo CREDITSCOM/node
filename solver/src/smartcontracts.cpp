@@ -137,7 +137,7 @@ csdb::UserField SmartContractRef::to_user_field() const {
 }
 
 void SmartContractRef::from_user_field(const csdb::UserField& fld) {
-    csdebug() << kLogPrefix << __func__;
+    //csdebug() << kLogPrefix << __func__;
     std::string data = fld.value<std::string>();
     cs::IDataStream stream(data.c_str(), data.size());
     csdb::PoolHash dummy; // for compatibility
@@ -423,7 +423,7 @@ std::string SmartContracts::get_contract_state(const BlockChain& storage, const 
     // no matter which value is returned:
     /*bool ok =*/ SmartContracts::dbcache_read(storage, abs_addr, dummy, state);
     cscrypto::Bytes st1(state.data(), state.data() + state.size());
-    csdebug() << kLogPrefix << __func__ << " state from dbcache: " << cs::Utils::byteStreamToHex(st1);
+    //csdebug() << kLogPrefix << __func__ << " state from dbcache: " << cs::Utils::byteStreamToHex(st1);
     return state;
 }
 
@@ -1762,7 +1762,7 @@ void SmartContracts::on_next_block_impl(const csdb::Pool& block, bool reading_db
                     }
                     StateItem& item_tmp = known_contracts[abs_addr];
                     cscrypto::Bytes st1(item_tmp.state.data(), item_tmp.state.data() + item_tmp.state.size());
-                    csdebug() << kLogPrefix << "New state after update: " << cs::Utils::byteStreamToHex(st1);
+                    //csdebug() << kLogPrefix << "New state after update: " << cs::Utils::byteStreamToHex(st1);
                     if (!reading_db) {
                         csdb::UserField fld_fee = tr.user_field(trx_uf::new_state::Fee);
                         if (fld_fee.is_valid()) {

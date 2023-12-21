@@ -374,9 +374,11 @@ void RoundStat::onStoreBlock(const csdb::Pool& block) {
 }
 
 void RoundStat::onStopReadingFromDb(uint64_t totalTransactions, bool successfulQuickStart) {
-    if (successfulQuickStart) {
-        totalAcceptedTransactions_ == totalTransactions;
-    }
+    //csdebug() << __func__;
+    //if (successfulQuickStart) {
+    //    totalAcceptedTransactions_ == totalBlockChainTransactions_;
+    //    csdebug() << "Saving " << totalBlockChainTransactions_ << " into total transactions";
+    //}
     if (totalAcceptedTransactions_ == totalTransactions){
         totalAcceptedTransactions_ = totalTransactions;
         csdebug() << "All transactions read successfully";

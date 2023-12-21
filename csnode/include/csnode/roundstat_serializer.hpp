@@ -50,41 +50,7 @@ namespace cs {
         struct NodeStat {
             friend class boost::serialization::access;
             template<class Archive>
-
-            void serialize(Archive& ar, [[maybe_unused]] const unsigned int archiveVersion) {
-                ar& nodeOn;
-                ar& ip;
-                ar& version;
-                ar& platform;
-                ar& timeReg;
-                ar& timeFirstConsensus;
-                ar& timeActive;
-                ar& trustedDay;
-                ar& trustedMonth;
-                ar& trustedPrevMonth;
-                ar& trustedTotal;
-                ar& failedTrustedDay;
-                ar& failedTrustedMonth;
-                ar& failedTrustedPrevMonth;
-                ar& failedTrustedTotal;
-                ar& trustedADay;
-                ar& trustedAMonth;
-                ar& trustedAPrevMonth;
-                ar& trustedATotal;
-                ar& failedTrustedADay;
-                ar& failedTrustedAMonth;
-                ar& failedTrustedAPrevMonth;
-                ar& failedTrustedATotal;
-                ar& feeDay;
-                ar& feeMonth;
-                ar& feePrevMonth;
-                ar& feeTotal;
-                ar& rewardDay;
-                ar& rewardMonth;
-                ar& rewardPrevMonth;
-                ar& rewardTotal;
-                ar& lastConsensus;
-            }
+            void serialize(Archive& ar, [[maybe_unused]] const unsigned int archiveVersion);
 
             bool nodeOn;
             std::string ip;
@@ -143,22 +109,23 @@ namespace cs {
 
             template<class Archive>
             void save(Archive& ar, [[maybe_unused]] const unsigned int version) const {
-                ar << me.size();
-                for (auto it : me) {
-                    ar << it.first << it.second;
-                }
+                //ar << me.size();
+                //for (auto it : me) {
+                //    ar << it.first << it.second;
+                //}
+                ar << me;
             }
             template<class Archive>
             void load(Archive& ar, [[maybe_unused]] const unsigned int version) {
-                size_t mSize = 0ULL;
-                ar >> mSize;
-                for (size_t i = 0ULL; i < mSize;++i) {
-                    cs::PublicKey key;
-                    MinedEvaluation evl;
-                    ar >> key >> evl;
-                    me.emplace(key, evl);
-                }
-
+                //size_t mSize = 0ULL;
+                //ar >> mSize;
+                //for (size_t i = 0ULL; i < mSize;++i) {
+                //    cs::PublicKey key;
+                //    MinedEvaluation evl;
+                //    ar >> key >> evl;
+                //    me.emplace(key, evl);
+                //}
+                ar >> me;
             }
 
             BOOST_SERIALIZATION_SPLIT_MEMBER()
@@ -171,7 +138,8 @@ namespace cs {
         std::map<cs::PublicKey, MinedEvaluationDelegator>* minedEvaluation_ = nullptr;
         std::map<cs::PublicKey, NodeStat>* nodes_ = nullptr;
         MinedEvaluation* totalMined_ = nullptr;
-        size_t* totalBlockChainTransactions_ = 0ULL;
+        size_t* totalAcceptedTransactions_ = nullptr;
+        size_t totalBchTransactions_ = 0ULL;
     };
 }
 

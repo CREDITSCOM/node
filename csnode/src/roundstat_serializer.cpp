@@ -20,38 +20,26 @@ namespace cs {
         minedEvaluation_ = reinterpret_cast<decltype(minedEvaluation_)>(&roundStat.minedEvaluation_);
         nodes_ = reinterpret_cast<decltype(nodes_)>(&roundStat.nodes_);
         totalMined_ = reinterpret_cast<decltype(totalMined_)>(&roundStat.totalMined_);
-        totalBlockChainTransactions_ = reinterpret_cast<decltype(totalBlockChainTransactions_)>(&roundStat.totalBlockChainTransactions_);
+        totalAcceptedTransactions_ = reinterpret_cast<decltype(totalAcceptedTransactions_)>(&roundStat.totalAcceptedTransactions_);
         csdebug() << "Roundstat bindings made";
     }
 
     void RoundStat_Serializer::clear(const std::filesystem::path& rootDir) {
         minedEvaluation_->clear();
         nodes_->clear();
-        //totalMined_->rewardDay = Amount{ 0 };
-        //totalMined_->rewardMonth = Amount{ 0 };
-        //totalMined_->rewardPrevMonth = Amount{ 0 };
-        //totalMined_->rewardTotal = Amount{ 0 };
-        //totalBlockChainTransactions_ = 0ULL;
+        totalBchTransactions_ = 0ULL;
         save(rootDir);
     }
 
     void RoundStat_Serializer::save(const std::filesystem::path& rootDir) {
         std::ofstream ofs(rootDir / kDataFileName, std::ios::binary);
         boost::archive::binary_oarchive oa(ofs);
-        //csdebug() << kLogPrefix << __func__;
-        oa << minedEvaluation_->size();
-        for (auto it : *minedEvaluation_) {
-            oa << it.first;
-            oa << it.second;
-        }
-        oa << nodes_->size();
-        for (auto it : *nodes_) {
-            oa << it.first;
-            oa << it.second;
-        }
-        oa << totalMined_->rewardDay << totalMined_->rewardMonth << totalMined_->rewardPrevMonth << totalMined_->rewardTotal;
-        //oa << totalBlockChainTransactions_;
-
+        csdebug() << kLogPrefix << __func__;
+        totalBchTransactions_ = *totalAcceptedTransactions_;
+        oa << minedEvaluation_;
+        oa << nodes_;
+        oa << totalMined_;
+        oa << totalBchTransactions_;
     }
 
     ::cscrypto::Hash RoundStat_Serializer::hash() {
@@ -62,26 +50,52 @@ namespace cs {
                     ofs,
                     boost::archive::no_header | boost::archive::no_codecvt
                 );
-                
-                csdebug() << kLogPrefix << __func__;
-                oa << minedEvaluation_->size();
-                for (auto it : *minedEvaluation_) {
-                    oa << it.first;
-                    oa << it.second;
-                }
-                oa << nodes_->size();
-                for (auto it : *nodes_) {
-                    oa << it.first;
-                    oa << it.second;
-                }
-                oa << totalMined_->rewardDay << totalMined_->rewardMonth << totalMined_->rewardPrevMonth << totalMined_->rewardTotal;
-                //oa << totalBlockChainTransactions_;
+                totalBchTransactions_ = *totalAcceptedTransactions_;
+                oa << minedEvaluation_;
+                oa << nodes_;
+                oa << totalMined_;
+                oa << totalBchTransactions_;
             }
         }
 
         auto result = SerializersHelper::getHashFromFile(kDataFileName);
         //std::filesystem::remove(kDataFileName);
         return result;
+    }
+    template<class Archive>
+    void RoundStat_Serializer::NodeStat::serialize(Archive& ar, [[maybe_unused]] const unsigned int archiveVersion) {
+        ar& nodeOn;
+        ar& ip;
+        ar& version;
+        ar& platform;
+        ar& timeReg;
+        ar& timeFirstConsensus;
+        ar& timeActive;
+        ar& trustedDay;
+        ar& trustedMonth;
+        ar& trustedPrevMonth;
+        ar& trustedTotal;
+        ar& failedTrustedDay;
+        ar& failedTrustedMonth;
+        ar& failedTrustedPrevMonth;
+        ar& failedTrustedTotal;
+        ar& trustedADay;
+        ar& trustedAMonth;
+        ar& trustedAPrevMonth;
+        ar& trustedATotal;
+        ar& failedTrustedADay;
+        ar& failedTrustedAMonth;
+        ar& failedTrustedAPrevMonth;
+        ar& failedTrustedATotal;
+        ar& feeDay;
+        ar& feeMonth;
+        ar& feePrevMonth;
+        ar& feeTotal;
+        ar& rewardDay;
+        ar& rewardMonth;
+        ar& rewardPrevMonth;
+        ar& rewardTotal;
+        ar& lastConsensus;
     }
 
     void RoundStat_Serializer::load(const std::filesystem::path& rootDir) {
@@ -90,25 +104,10 @@ namespace cs {
         csdebug() << kLogPrefix << __func__;
         size_t mSize;
         size_t nSize;
-
-        ia >> mSize;
-        for (int m = 0; m < mSize; ++m) {
-            PublicKey pKey;
-            MinedEvaluationDelegator md;
-            ia >> pKey;
-            ia >> md;
-            minedEvaluation_->try_emplace(pKey, md);
-        }
-        ia >> nSize;
-        for (int n = 0; n < mSize; ++n) {
-            PublicKey pKey;
-            NodeStat ns;
-            ia >> pKey;
-            ia >> ns;
-            nodes_->try_emplace(pKey, ns);
-        }
-        ia >> totalMined_->rewardDay >> totalMined_->rewardMonth >> totalMined_->rewardPrevMonth >> totalMined_->rewardTotal;
-        //ia >> totalBlockChainTransactions_;
-
+        ia >> minedEvaluation_;
+        ia >> nodes_;
+        ia >> totalMined_;
+        ia >> totalBchTransactions_;
+        *totalAcceptedTransactions_ = totalBchTransactions_;
     }
 }
