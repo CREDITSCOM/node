@@ -40,11 +40,13 @@ void SmartContracts_Serializer::save(const std::filesystem::path& rootDir) {
     std::ofstream ofs(rootDir / kDataFileName, std::ios::binary);
     boost::archive::binary_oarchive oa(ofs);
     csdebug() << kLogPrefix << __func__;
-    oa << known_contracts->size();
-    for (auto it : *known_contracts) {
-        oa << it.first;
-        oa << it.second;
-    }
+    //oa << known_contracts->size();
+    //for (auto it : *known_contracts) {
+    //    csdebug() << "Contract: " << it.first.to_string();
+    //    oa << it.first;
+    //    oa << it.second;
+    //}
+    oa << known_contracts;
     oa << exe_queue;
     oa << blacklistedContracts_;
     oa << locked_contracts_;
@@ -113,11 +115,13 @@ void SmartContracts_Serializer::printClassInfo() {
           );
           //csdebug() << kLogPrefix << __func__;
           //printClassInfo();
-          oa << tmp.size();
-          for (auto it : tmp) {
-              oa << it.first;
-              oa << it.second;
-          }
+          //oa << tmp.size();
+          //for (auto it : tmp) {
+          //    csdebug() << "Contract: " << it.first.to_string();
+          //    oa << it.first;
+          //    oa << it.second;
+          //}
+          oa << tmp;
           oa << exe_queue;
           oa << blacklistedContracts_;
           oa << locked_contracts_;
@@ -146,16 +150,17 @@ void SmartContracts_Serializer::load(const std::filesystem::path& rootDir) {
     std::ifstream ifs(rootDir / kDataFileName, std::ios::binary);
     boost::archive::binary_iarchive ia(ifs);
     csdebug() << kLogPrefix << __func__;
-    size_t cSize;
+    //size_t cSize;
 
-    ia >> cSize;
-    for (size_t i = 0ULL; i < cSize; ++i) {
-        SmartContracts_Serializer::StateItem st;
-        csdb::Address addr;
-        ia >> addr;
-        ia >> st;
-        known_contracts->emplace(addr, st);
-    }
+    //ia >> cSize;
+    //for (size_t i = 0ULL; i < cSize; ++i) {
+    //    SmartContracts_Serializer::StateItem st;
+    //    csdb::Address addr;
+    //    ia >> addr;
+    //    ia >> st;
+    //    known_contracts->emplace(addr, st);
+    //}
+    ia >> known_contracts;
     ia >> exe_queue;
     ia >> blacklistedContracts_;
     ia >> locked_contracts_;
