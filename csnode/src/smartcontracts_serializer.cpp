@@ -40,16 +40,41 @@ void SmartContracts_Serializer::save(const std::filesystem::path& rootDir) {
     std::ofstream ofs(rootDir / kDataFileName, std::ios::binary);
     boost::archive::binary_oarchive oa(ofs);
     csdebug() << kLogPrefix << __func__;
-    //oa << known_contracts->size();
-    //for (auto it : *known_contracts) {
-    //    csdebug() << "Contract: " << it.first.to_string();
-    //    oa << it.first;
-    //    oa << it.second;
+    oa << known_contracts->size();
+    for (auto it : *known_contracts) {
+        csdebug() << "Contract: " << it.first.to_string();
+        oa << it.first;
+        oa << it.second;
+    }
+    
+    //size_t queueSize = exe_queue->size();
+    //oa << queueSize;
+    //auto qIt = exe_queue->begin();
+    //for (size_t i = 0; i < queueSize; ++i) {
+    //    oa << *qIt;
+    //    ++qIt;
     //}
-    oa << known_contracts;
-    oa << exe_queue;
-    oa << blacklistedContracts_;
-    oa << locked_contracts_;
+    
+    size_t bSize = blacklistedContracts_->size();
+    oa << bSize;
+    auto bIt = blacklistedContracts_->begin();
+    for (size_t i = 0; i < bSize; ++i) {
+       // oa << *bIt;
+        ++bIt;
+    }
+    
+    size_t lSize = locked_contracts_->size();
+    oa << lSize;
+    auto lIt = locked_contracts_->begin();
+    for (size_t i = 0; i < lSize; ++i) {
+       // oa << lIt;
+        ++lIt;
+    }
+
+    //oa << known_contracts;
+    //oa << exe_queue;
+    //oa << blacklistedContracts_;
+    //oa << locked_contracts_;
     //printClassInfo();
 
 }
@@ -113,18 +138,41 @@ void SmartContracts_Serializer::printClassInfo() {
             known_contracts->begin(),
             known_contracts->end()
           );
-          //csdebug() << kLogPrefix << __func__;
-          //printClassInfo();
-          //oa << tmp.size();
-          //for (auto it : tmp) {
-          //    csdebug() << "Contract: " << it.first.to_string();
-          //    oa << it.first;
-          //    oa << it.second;
+          csdebug() << kLogPrefix << __func__;
+          oa << tmp.size();
+          for (auto it : tmp) {
+              csdebug() << "Contract: " << it.first.to_string();
+              oa << it.first;
+              oa << it.second;
+          }
+          
+          //size_t queueSize = exe_queue->size();
+          //oa << queueSize;
+          //auto qIt = exe_queue->begin();
+          //for (size_t i = 0; i < queueSize; ++i) {
+          //    oa << *qIt;
+          //    ++qIt;
           //}
-          oa << tmp;
-          oa << exe_queue;
-          oa << blacklistedContracts_;
-          oa << locked_contracts_;
+          
+          size_t bSize = blacklistedContracts_->size();
+          oa << bSize;
+          auto bIt = blacklistedContracts_->begin();
+          for (size_t i = 0; i < bSize; ++i) {
+             // oa << *bIt;
+              ++bIt;
+          }
+          
+          size_t lSize = locked_contracts_->size();
+          oa << lSize;
+          auto lIt = locked_contracts_->begin();
+          for (size_t i = 0; i < lSize; ++i) {
+             // oa << lIt;
+              ++lIt;
+          }
+          //oa << known_contracts;
+          //oa << exe_queue;
+          //oa << blacklistedContracts_;
+          //oa << locked_contracts_;
         }
 
     }
@@ -150,20 +198,42 @@ void SmartContracts_Serializer::load(const std::filesystem::path& rootDir) {
     std::ifstream ifs(rootDir / kDataFileName, std::ios::binary);
     boost::archive::binary_iarchive ia(ifs);
     csdebug() << kLogPrefix << __func__;
-    //size_t cSize;
-
-    //ia >> cSize;
-    //for (size_t i = 0ULL; i < cSize; ++i) {
-    //    SmartContracts_Serializer::StateItem st;
-    //    csdb::Address addr;
-    //    ia >> addr;
-    //    ia >> st;
-    //    known_contracts->emplace(addr, st);
+    size_t kSize = 0;
+    ia >> kSize;
+    for (size_t i = 0; i < kSize; ++i){
+        csdb::Address addr;
+        StateItem sIt;
+        ia >> addr;
+        ia >> sIt;
+        known_contracts->emplace(addr, sIt);
+    }
+    //size_t queueSize = 0;
+    //ia >> queueSize;
+    //for (size_t i = 0; i < queueSize; ++i) {
+    //    QueueItem eIt;
+    //    ia >> eIt;
+    //    exe_queue->push_back(eIt);
     //}
-    ia >> known_contracts;
-    ia >> exe_queue;
-    ia >> blacklistedContracts_;
-    ia >> locked_contracts_;
+    
+    size_t bSize = 0;
+    ia >> bSize;
+    for (size_t i = 0; i < bSize; ++i) {
+        csdb::Address addr;
+        //ia >> addr;
+        blacklistedContracts_->insert(addr);
+    }
+
+    size_t lSize = locked_contracts_->size();
+    ia >> lSize;
+    for (size_t i = 0; i < lSize; ++i) {
+        csdb::Address addr;
+        //ia >> addr;
+        locked_contracts_->insert(addr);
+    }
+    //ia >> known_contracts;
+    //ia >> exe_queue;
+    //ia >> blacklistedContracts_;
+    //ia >> locked_contracts_;
     //printClassInfo();
 
 }
