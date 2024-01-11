@@ -591,7 +591,7 @@ private:
         // current state which is result of last successful execution / deploy
         std::string state;
         // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
-        std::unordered_map<std::string, std::unordered_map<csdb::Address, std::string>> uses;
+        std::map<std::string, std::map<csdb::Address, std::string>> uses;
     };
 
     // last contract's state storage

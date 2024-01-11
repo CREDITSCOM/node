@@ -5,9 +5,8 @@
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
-#include <boost/serialization/unordered_map.hpp>
-#include <boost/serialization/unordered_set.hpp>
 #include <boost/serialization/map.hpp>
+#include <boost/serialization/unordered_set.hpp>
 #include <boost/serialization/split_member.hpp>
 
 #include <csnode/transactionspacket.hpp>
@@ -148,7 +147,7 @@ public:
         csdb::Transaction deploy{};
         csdb::Transaction execute{};
         std::string state;
-        std::unordered_map<std::string, std::unordered_map<csdb::Address, std::string>> uses;
+        std::map<std::string, std::map<csdb::Address, std::string>> uses;
     };
 //#pragma pack(push, 1)
 
