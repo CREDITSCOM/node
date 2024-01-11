@@ -6,6 +6,7 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/map.hpp>
+#include <boost/serialization/list.hpp>
 #include <boost/serialization/unordered_set.hpp>
 #include <boost/serialization/split_member.hpp>
 
@@ -211,10 +212,10 @@ public:
 
         template<class Archive>
         void serialize(Archive &ar, [[maybe_unused]] const unsigned int version) {
-            ar & executions;
+            ar& executions;
             ar& status;
             ar& seq_enqueue;
-            ar & seq_start;
+            ar& seq_start;
             ar& seq_finish;
             ar& abs_addr;
             ar& is_executor;
@@ -230,7 +231,7 @@ public:
         csdb::Address abs_addr;
         bool is_executor;
         bool is_rejected;
-        std::unique_ptr<SmartConsensus> pconsensus;
+        std::unique_ptr<SmartConsensus> pconsensus = nullptr;
     };
 
 private:
