@@ -5,7 +5,6 @@
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
-#include <boost/serialization/list.hpp>
 #include <boost/serialization/map.hpp>
 #include <boost/serialization/array.hpp>
 #include <boost/serialization/split_member.hpp>
@@ -21,18 +20,18 @@ namespace cs {
         void save(const std::filesystem::path& rootDir);
         void load(const std::filesystem::path& rootDir);
         void clear(const std::filesystem::path& rootDir);
-        //void printClassInfo();
+        void printClassInfo();
 
         ::cscrypto::Hash hash();
 
         class Amount {
             friend class boost::serialization::access;
             template<class Archive>
-
             void serialize(Archive& ar, [[maybe_unused]] const unsigned int version) {
                 ar& integral_;
                 ar& fraction_;
             }
+            static constexpr const uint64_t AMOUNT_MAX_FRACTION = 1000000000000000000ULL;
 
             int32_t integral_;
             uint64_t fraction_;
@@ -45,12 +44,33 @@ namespace cs {
             bool operator>(const Amount& other) const noexcept {
                 return (integral_ > other.integral_) ? true : (integral_ < other.integral_) ? false : (fraction_ > other.fraction_);
             }
+            std::string toString(size_t min_decimal_places = 2) {
+                char buf[64];
+                char* end;
+                if ((0 > integral_) && (0 != fraction_)) {
+                    end = sprintf_s(buf, "-%d.%018" PRIu64, (-1) - integral_, AMOUNT_MAX_FRACTION - fraction_) + buf - 1;
+                }
+                else {
+                    end = sprintf_s(buf, "%d.%018" PRIu64, integral_, fraction_) + buf - 1;
+                }
+
+                for (min_decimal_places = 18 - ::std::min<size_t>(min_decimal_places, 18); (min_decimal_places != 0u) && ('0' == (*end)); --min_decimal_places, --end) {
+                }
+
+                if ('.' == *end) {
+                    --end;
+                }
+                end[1] = '\0';
+
+                return buf;
+            }
         };
 
         struct NodeStat {
             friend class boost::serialization::access;
             template<class Archive>
             void serialize(Archive& ar, [[maybe_unused]] const unsigned int archiveVersion);
+            std::string toString();
 
             bool nodeOn;
             std::string ip;
@@ -107,24 +127,13 @@ namespace cs {
         struct MinedEvaluationDelegator {
             friend class boost::serialization::access;
 
+
             template<class Archive>
             void save(Archive& ar, [[maybe_unused]] const unsigned int version) const {
-                //ar << me.size();
-                //for (auto it : me) {
-                //    ar << it.first << it.second;
-                //}
                 ar << me;
             }
             template<class Archive>
             void load(Archive& ar, [[maybe_unused]] const unsigned int version) {
-                //size_t mSize = 0ULL;
-                //ar >> mSize;
-                //for (size_t i = 0ULL; i < mSize;++i) {
-                //    cs::PublicKey key;
-                //    MinedEvaluation evl;
-                //    ar >> key >> evl;
-                //    me.emplace(key, evl);
-                //}
                 ar >> me;
             }
 

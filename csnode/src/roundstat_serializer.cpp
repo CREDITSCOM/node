@@ -31,6 +31,54 @@ namespace cs {
         save(rootDir);
     }
 
+
+    void RoundStat_Serializer::printClassInfo() {
+        size_t cnt = 0ULL;
+        csdebug() << "Mined:";
+        for (auto it : *minedEvaluation_) {
+            csdebug() << cnt << ". " << cs::Utils::byteStreamToHex(it.first);
+            size_t cntt = 0ULL;
+            for (auto itt : it.second.me) {
+                csdebug() << cntt << ". " << cs::Utils::byteStreamToHex(itt.first) << " " << itt.second.rewardDay.toString() << " " << itt.second.rewardMonth.toString() << " " << itt.second.rewardPrevMonth.toString() << " " << itt.second.rewardTotal.toString();
+            }
+        }
+        cnt = 0ULL;
+        csdebug() << "Nodes:";
+        for (auto it : *nodes_) {
+            csdebug() << cnt << ". " << cs::Utils::byteStreamToHex(it.first) << it.second.toString();
+        }
+        csdebug() << "Total mined: " << totalMined_->rewardDay.toString() << " " << totalMined_->rewardMonth.toString() << " " << totalMined_->rewardPrevMonth.toString() << " " << totalMined_->rewardTotal.toString();
+
+        csdebug() << "Total transactions: " << totalBchTransactions_;
+
+    }
+
+    std::string RoundStat_Serializer::NodeStat::toString() {
+        std::string res;
+        res += std::string(nodeOn ? "Node ON" : "Node OFF");
+        res += ", ip: " + ip;
+        res += ", version: " + version;
+        res += ", platform: " + platform + "\n";
+        res += "timeReg: " + std::to_string(timeReg);
+        res += ", timeFirstConsensus: " + std::to_string(timeFirstConsensus);
+        res += ", lastConsensus: " + std::to_string(lastConsensus);
+        res += ", timeActive: " + std::to_string(timeActive) + "\n";
+        res += "trustedDay: " + std::to_string(trustedDay) + ", trustedMonth: " + std::to_string(trustedMonth)
+            + ", trustedPrevMonth: " + std::to_string(trustedPrevMonth) + ", trustedTotal: " + std::to_string(trustedTotal);
+        res += "failedTrustedDay: " + std::to_string(failedTrustedDay) + ", failedTrustedMonth: " + std::to_string(failedTrustedMonth)
+            + ", failedTrustedPrevMonth: " + std::to_string(failedTrustedPrevMonth) + ", failedTrustedTotal: " + std::to_string(failedTrustedTotal);
+        res += "trustedADay: " + std::to_string(trustedADay) + ", trustedAMonth: " + std::to_string(trustedAMonth)
+            + ", trustedAPrevMonth: " + std::to_string(trustedAPrevMonth) + ", trustedATotal: " + std::to_string(trustedATotal);
+        res += "failedTrustedADay: " + std::to_string(failedTrustedADay) + ", failedTrustedAMonth: " + std::to_string(failedTrustedAMonth)
+            + ", failedTrustedAPrevMonth: " + std::to_string(failedTrustedAPrevMonth) + ", failedTrustedAPrevMonth: " + std::to_string(failedTrustedAPrevMonth);
+        res += "feeDay: " + feeDay.toString() + ", feeMonth: " + feeMonth.toString()
+            + ", failedTrustedPrevMonth: " + feeMonth.toString() + ", failedTrustedTotal: " + feeMonth.toString();
+        res += "rewardDay: " + rewardDay.toString() + ", rewardMonth: " + rewardMonth.toString()
+            + ", rewardPrevMonth: " + rewardPrevMonth.toString() + ", rewardTotal: " + rewardTotal.toString();
+
+        return res;
+    }
+
     void RoundStat_Serializer::save(const std::filesystem::path& rootDir) {
         std::ofstream ofs(rootDir / kDataFileName, std::ios::binary);
         boost::archive::binary_oarchive oa(ofs);
@@ -40,6 +88,7 @@ namespace cs {
         oa << nodes_;
         oa << totalMined_;
         oa << totalBchTransactions_;
+        printClassInfo();
     }
 
     ::cscrypto::Hash RoundStat_Serializer::hash() {
@@ -55,6 +104,7 @@ namespace cs {
                 oa << nodes_;
                 oa << totalMined_;
                 oa << totalBchTransactions_;
+                printClassInfo();
             }
         }
 
@@ -109,5 +159,7 @@ namespace cs {
         ia >> totalMined_;
         ia >> totalBchTransactions_;
         *totalAcceptedTransactions_ = totalBchTransactions_;
+
+        printClassInfo();
     }
 }

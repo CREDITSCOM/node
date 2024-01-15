@@ -231,7 +231,7 @@ public:
         csdb::Address abs_addr;
         bool is_executor;
         bool is_rejected;
-        std::unique_ptr<SmartConsensus> pconsensus = nullptr;
+        std::unique_ptr<SmartConsensus> pconsensus;
     };
 
 private:
