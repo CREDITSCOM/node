@@ -40,12 +40,15 @@ namespace cs {
             size_t cntt = 0ULL;
             for (auto itt : it.second.me) {
                 csdebug() << cntt << ". " << cs::Utils::byteStreamToHex(itt.first) << " " << itt.second.rewardDay.toString() << " " << itt.second.rewardMonth.toString() << " " << itt.second.rewardPrevMonth.toString() << " " << itt.second.rewardTotal.toString();
+                ++cntt;
             }
+            ++cnt;
         }
         cnt = 0ULL;
         csdebug() << "Nodes:";
         for (auto it : *nodes_) {
-            csdebug() << cnt << ". " << cs::Utils::byteStreamToHex(it.first) << it.second.toString();
+            csdebug() << cnt << ". " << cs::Utils::byteStreamToHex(it.first) << ": " << it.second.toString();
+            ++cnt;
         }
         csdebug() << "Total mined: " << totalMined_->rewardDay.toString() << " " << totalMined_->rewardMonth.toString() << " " << totalMined_->rewardPrevMonth.toString() << " " << totalMined_->rewardTotal.toString();
 
@@ -58,23 +61,23 @@ namespace cs {
         res += std::string(nodeOn ? "Node ON" : "Node OFF");
         res += ", ip: " + ip;
         res += ", version: " + version;
-        res += ", platform: " + platform + "\n";
+        res += ", platform: " + platform + ",\n";
         res += "timeReg: " + std::to_string(timeReg);
         res += ", timeFirstConsensus: " + std::to_string(timeFirstConsensus);
         res += ", lastConsensus: " + std::to_string(lastConsensus);
         res += ", timeActive: " + std::to_string(timeActive) + "\n";
         res += "trustedDay: " + std::to_string(trustedDay) + ", trustedMonth: " + std::to_string(trustedMonth)
-            + ", trustedPrevMonth: " + std::to_string(trustedPrevMonth) + ", trustedTotal: " + std::to_string(trustedTotal);
+            + ", trustedPrevMonth: " + std::to_string(trustedPrevMonth) + ", trustedTotal: " + std::to_string(trustedTotal) + "\n";;
         res += "failedTrustedDay: " + std::to_string(failedTrustedDay) + ", failedTrustedMonth: " + std::to_string(failedTrustedMonth)
-            + ", failedTrustedPrevMonth: " + std::to_string(failedTrustedPrevMonth) + ", failedTrustedTotal: " + std::to_string(failedTrustedTotal);
+            + ", failedTrustedPrevMonth: " + std::to_string(failedTrustedPrevMonth) + ", failedTrustedTotal: " + std::to_string(failedTrustedTotal) + "\n";;
         res += "trustedADay: " + std::to_string(trustedADay) + ", trustedAMonth: " + std::to_string(trustedAMonth)
-            + ", trustedAPrevMonth: " + std::to_string(trustedAPrevMonth) + ", trustedATotal: " + std::to_string(trustedATotal);
+            + ", trustedAPrevMonth: " + std::to_string(trustedAPrevMonth) + ", trustedATotal: " + std::to_string(trustedATotal) + "\n";;
         res += "failedTrustedADay: " + std::to_string(failedTrustedADay) + ", failedTrustedAMonth: " + std::to_string(failedTrustedAMonth)
-            + ", failedTrustedAPrevMonth: " + std::to_string(failedTrustedAPrevMonth) + ", failedTrustedAPrevMonth: " + std::to_string(failedTrustedAPrevMonth);
+            + ", failedTrustedAPrevMonth: " + std::to_string(failedTrustedAPrevMonth) + ", failedTrustedAPrevMonth: " + std::to_string(failedTrustedAPrevMonth) + "\n";;
         res += "feeDay: " + feeDay.toString() + ", feeMonth: " + feeMonth.toString()
-            + ", failedTrustedPrevMonth: " + feeMonth.toString() + ", failedTrustedTotal: " + feeMonth.toString();
+            + ", failedTrustedPrevMonth: " + feeMonth.toString() + ", failedTrustedTotal: " + feeMonth.toString() + "\n";;
         res += "rewardDay: " + rewardDay.toString() + ", rewardMonth: " + rewardMonth.toString()
-            + ", rewardPrevMonth: " + rewardPrevMonth.toString() + ", rewardTotal: " + rewardTotal.toString();
+            + ", rewardPrevMonth: " + rewardPrevMonth.toString() + ", rewardTotal: " + rewardTotal.toString() + "\n";;
 
         return res;
     }

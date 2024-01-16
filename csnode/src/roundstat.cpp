@@ -317,7 +317,17 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
         else {
             auto nStat = new NodeStat();
             nStat->nodeOn = true;
-            
+            int32_t kFieldTimestamp = 0;
+            int64_t lts;
+            try {
+                lts = std::stoll(block.user_field(kFieldTimestamp).value<std::string>());
+            }
+            catch (...) {
+                csdebug() << "Timestamp of block #" << block.sequence() << " can't be read";
+                lts = 0LL;
+            }
+            nStat->timeFirstConsensus = static_cast<uint64_t>(lts);
+
             emit accountInitiationRequest(nStat->timeReg, key);
             if (trusted[i] == 0) {
                 if (block.transactions_count() > 0) {
@@ -348,6 +358,7 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
                 nStat->failedTrustedAMonth = 1;
                 nStat->failedTrustedATotal = 1;
             }
+            nStat->lastConsensus = block.sequence();
             nodes_.emplace(key, *nStat);
         }
         if (rewFlag) {

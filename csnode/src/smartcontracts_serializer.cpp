@@ -131,7 +131,7 @@ void SmartContracts_Serializer::printClassInfo() {
           csdebug() << kLogPrefix << __func__;
           oa << tmp.size();
           for (auto it : tmp) {
-              csdebug() << "Contract: " << it.first.to_string();
+              //csdebug() << "Contract: " << it.first.to_string();
               oa << it.first;
               oa << it.second;
           }

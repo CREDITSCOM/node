@@ -21,7 +21,7 @@ namespace cs {
         void load(const std::filesystem::path& rootDir);
         void clear(const std::filesystem::path& rootDir);
         void printClassInfo();
-
+        static constexpr const uint64_t AMOUNT_MAX_FRACTION = 1000000000000000000ULL;
         ::cscrypto::Hash hash();
 
         class Amount {
@@ -31,8 +31,7 @@ namespace cs {
                 ar& integral_;
                 ar& fraction_;
             }
-            static constexpr const uint64_t AMOUNT_MAX_FRACTION = 1000000000000000000ULL;
-
+            
             int32_t integral_;
             uint64_t fraction_;
 
@@ -45,24 +44,17 @@ namespace cs {
                 return (integral_ > other.integral_) ? true : (integral_ < other.integral_) ? false : (fraction_ > other.fraction_);
             }
             std::string toString(size_t min_decimal_places = 2) {
-                char buf[64];
-                char* end;
-                if ((0 > integral_) && (0 != fraction_)) {
-                    end = sprintf_s(buf, "-%d.%018" PRIu64, (-1) - integral_, AMOUNT_MAX_FRACTION - fraction_) + buf - 1;
+                std::string res;
+                int32_t integral = integral_ > 0 ? integral_ : integral_ + 1;
+                uint64_t fraction = integral_ > 0 ? fraction_ : AMOUNT_MAX_FRACTION - fraction_;
+                res += std::to_string(integral) + ".";
+                std::string frac = std::to_string(fraction_);
+                for (int i = 0; i < 18 - frac.size(); ++i) {
+                    res += "0";
                 }
-                else {
-                    end = sprintf_s(buf, "%d.%018" PRIu64, integral_, fraction_) + buf - 1;
-                }
+                res += frac;
 
-                for (min_decimal_places = 18 - ::std::min<size_t>(min_decimal_places, 18); (min_decimal_places != 0u) && ('0' == (*end)); --min_decimal_places, --end) {
-                }
-
-                if ('.' == *end) {
-                    --end;
-                }
-                end[1] = '\0';
-
-                return buf;
+                return res;
             }
         };
 
