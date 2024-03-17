@@ -208,8 +208,8 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
         exec_handler_ptr = connector_ptr->apiExecHandler();
     }
     node_id = id;
-    unusedJavaLibs_.push_back("java.nio");
-    unusedJavaLibs_.push_back("java.io");
+    //unusedJavaLibs_.push_back("java.nio");
+    //unusedJavaLibs_.push_back("java.io");
 }
 
 /*public*/

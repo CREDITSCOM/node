@@ -107,7 +107,7 @@ namespace cs {
                 oa << nodes_;
                 oa << totalMined_;
                 oa << totalBchTransactions_;
-                printClassInfo();
+                //printClassInfo();
             }
         }
 

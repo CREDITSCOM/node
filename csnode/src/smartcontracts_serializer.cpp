@@ -42,7 +42,7 @@ void SmartContracts_Serializer::save(const std::filesystem::path& rootDir) {
     csdebug() << kLogPrefix << __func__;
     oa << known_contracts->size();
     for (auto it : *known_contracts) {
-        csdebug() << "Contract: " << it.first.to_string();
+        //csdebug() << "Contract: " << it.first.to_string();
         oa << it.first;
         oa << it.second;
     }
