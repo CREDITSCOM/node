@@ -195,7 +195,9 @@ struct SmartContractRef {
     }
 
     // "serialization" methods
-
+    std::string toString(){
+        return std::to_string(sequence) + "." + std::to_string(transaction);
+    }
     csdb::UserField to_user_field() const;
 
     void from_user_field(const csdb::UserField& fld);
@@ -360,6 +362,12 @@ public:
     void addUnusedJavaLib(std::string libname);
     void removeUnusedJavaLib(std::string libname);
     std::vector<std::string>* getUnusedJavaLibsList();
+
+    //serialization try:
+    void clear();
+    void printClassInfo();
+    Bytes serialize();
+    void deserialize(Bytes& data);
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
@@ -574,6 +582,10 @@ private:
 
     // defines current contract state, the contracts cache is a container of every contract state
     struct StateItem {
+        std::string toString();
+        std::string transactionToString(const csdb::Transaction& tr);
+        Bytes to_bytes();
+        StateItem from_bytes(Bytes& data);
         // payable() method is implemented
         PayableStatus payable{ PayableStatus::Unknown };
         // reference to deploy transaction
@@ -608,6 +620,8 @@ private:
 
     // specifies a one contract call
     struct ExecutionItem {
+        Bytes to_bytes();
+        ExecutionItem from_bytes(Bytes& data);
         // reference to smart in block chain (block/transaction) that spawns execution
         SmartContractRef ref_start;
         // starter transaction
@@ -632,6 +646,8 @@ private:
 
     // defines an item of execution queue which is a one or more simultaneous calls to specific contract
     struct QueueItem {
+        Bytes to_bytes();
+        QueueItem from_bytes(Bytes& data);
         // list of execution items, empty list is senceless
         std::vector<ExecutionItem> executions;
         // current status (running/waiting)

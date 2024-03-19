@@ -3,7 +3,7 @@
 #include <lib/system/logger.hpp>
 #include <lib/system/utils.hpp>
 #include <lib/system/concurrent.hpp>
-#include "idatastream.hpp"
+#include "datastream.hpp"
 #include <configholder.hpp>
 
 #include <sstream>
@@ -226,6 +226,237 @@ void RoundStat::fillMinedEvaluation(const cs::PublicKeys& confidants, const std:
     }
 }
 
+Bytes NodeStat::to_bytes() {
+    Bytes data;
+    ODataStream os(data);
+    os << nodeOn;
+    os << ip;
+    os << version;
+    os << platform;
+    os << timeReg;
+    os << timeFirstConsensus;
+    os << timeActive;
+    os << trustedDay;
+    os << trustedMonth;
+    os << trustedPrevMonth;
+    os << trustedTotal;
+    os << failedTrustedDay;
+    os << failedTrustedMonth;
+    os << failedTrustedPrevMonth;
+    os << failedTrustedTotal;
+    os << trustedADay;
+    os << trustedAMonth;
+    os << trustedAPrevMonth;
+    os << trustedATotal;
+    os << failedTrustedADay;
+    os << failedTrustedAMonth;
+    os << failedTrustedAPrevMonth;
+    os << failedTrustedATotal;
+    os << feeDay;
+    os << feeMonth;
+    os << feePrevMonth;
+    os << feeTotal;
+    os << rewardDay;
+    os << rewardMonth;
+    os << rewardPrevMonth;
+    os << rewardTotal;
+    os << lastConsensus;
+    return data;
+}
+
+NodeStat NodeStat::from_bytes(Bytes& data) {
+    NodeStat res;
+    IDataStream is(data.data(), data.size());
+    is >> res.nodeOn;
+    is >> res.ip;
+    is >> res.version;
+    is >> res.platform;
+    is >> res.timeReg;
+    is >> res.timeFirstConsensus;
+    is >> res.timeActive;
+    is >> res.trustedDay;
+    is >> res.trustedMonth;
+    is >> res.trustedPrevMonth;
+    is >> res.trustedTotal;
+    is >> res.failedTrustedDay;
+    is >> res.failedTrustedMonth;
+    is >> res.failedTrustedPrevMonth;
+    is >> res.failedTrustedTotal;
+    is >> res.trustedADay;
+    is >> res.trustedAMonth;
+    is >> res.trustedAPrevMonth;
+    is >> res.trustedATotal;
+    is >> res.failedTrustedADay;
+    is >> res.failedTrustedAMonth;
+    is >> res.failedTrustedAPrevMonth;
+    is >> res.failedTrustedATotal;
+    is >> res.feeDay;
+    is >> res.feeMonth;
+    is >> res.feePrevMonth;
+    is >> res.feeTotal;
+    is >> res.rewardDay;
+    is >> res.rewardMonth;
+    is >> res.rewardPrevMonth;
+    is >> res.rewardTotal;
+    is >> res.lastConsensus;
+    return res;
+}
+
+Bytes MinedEvaluationDelegator::to_bytes() {
+    Bytes data;
+    ODataStream os(data);
+    os << me.size();
+    auto it = me.begin();
+    while (it != me.end()) {
+        os << it->first << it->second.to_bytes();
+        ++it;
+    }
+    return data;
+}
+
+MinedEvaluationDelegator MinedEvaluationDelegator::from_bytes(Bytes& data) {
+    MinedEvaluationDelegator res;
+    IDataStream is(data.data(), data.size());
+    size_t mSize = 0;
+    is >> mSize;
+    for (size_t i = 0ULL; i < mSize; ++i) {
+        PublicKey pKey;
+        Bytes mData;
+        is >> pKey >> mData;
+        res.me.emplace(pKey, MinedEvaluation::from_bytes(mData));
+    }
+
+    return res;
+}
+
+Bytes MinedEvaluation::to_bytes() {
+    Bytes data;
+    ODataStream os(data);
+    os << rewardDay;
+    os << rewardMonth;
+    os << rewardPrevMonth;
+    os << rewardTotal;
+    return data;
+}
+
+MinedEvaluation MinedEvaluation::from_bytes(Bytes& data) {
+    MinedEvaluation res;
+    IDataStream is(data.data(), data.size());
+    is >> res.rewardDay;
+    is >> res.rewardMonth;
+    is >> res.rewardPrevMonth;
+    is >> res.rewardTotal;
+    return res;
+}
+
+
+Bytes RoundStat::serialize() {
+    Bytes data;
+    ODataStream os(data);
+    size_t totalBchTransactions_ = totalAcceptedTransactions_;
+    os << totalBchTransactions_;
+
+    os << minedEvaluation_.size();
+    auto itm = minedEvaluation_.begin();
+    while (itm != minedEvaluation_.end()) {
+        os << itm->first << itm->second.to_bytes();
+        ++itm;
+    }
+    os << nodes_.size();
+    auto itn = nodes_.begin();
+    while (itn != nodes_.end()) {
+        os << itn->first << itn->second.to_bytes();
+        ++itn;
+    }
+    os << totalMined_.to_bytes();
+    return data;
+}
+void RoundStat::deserialize(Bytes& data) {
+    IDataStream is(data.data(), data.size());
+    size_t totalBchTransactions_ = 0ULL;
+    is >> totalBchTransactions_;
+    Bytes dataME;
+    size_t me_size;
+    is >> me_size;
+    for (size_t i = 0ULL; i < me_size; ++i) {
+        PublicKey pKey;
+        MinedEvaluationDelegator md;
+        Bytes data;
+        is >> pKey >> data;
+        md.from_bytes(data);
+        minedEvaluation_.emplace(pKey, MinedEvaluationDelegator::from_bytes(data));
+    }
+
+    size_t n_size;
+    is >> n_size;
+    for (size_t i = 0ULL; i < n_size; ++i) {
+        PublicKey pKey;
+        Bytes data;
+        is >> pKey >> data;
+        nodes_.emplace(pKey, NodeStat::from_bytes(data));
+    }
+    Bytes dataTM;
+    is >> dataTM;
+    totalMined_ = MinedEvaluation::from_bytes(dataTM);
+    totalAcceptedTransactions_ = totalBchTransactions_;
+}
+
+void RoundStat::clear() {
+    minedEvaluation_.clear();
+    nodes_.clear();
+    totalMined_ = MinedEvaluation();
+    totalAcceptedTransactions_ = 0;
+}
+
+void RoundStat::printClassInfo(){
+    size_t cnt = 0ULL;
+    csdebug() << "Mined:";
+    for (auto it : minedEvaluation_) {
+        csdebug() << cnt << ". " << cs::Utils::byteStreamToHex(it.first);
+        size_t cntt = 0ULL;
+        for (auto itt : it.second.me) {
+            csdebug() << cntt << ". " << cs::Utils::byteStreamToHex(itt.first) << " " << itt.second.rewardDay.to_string() << " " << itt.second.rewardMonth.to_string() << " " << itt.second.rewardPrevMonth.to_string() << " " << itt.second.rewardTotal.to_string();
+            ++cntt;
+        }
+        ++cnt;
+    }
+    cnt = 0ULL;
+    csdebug() << "Nodes:";
+    for (auto it : nodes_) {
+        csdebug() << cnt << ". " << cs::Utils::byteStreamToHex(it.first) << ": " << it.second.toString();
+        ++cnt;
+    }
+    csdebug() << "Total mined: " << totalMined_.rewardDay.to_string() << " " << totalMined_.rewardMonth.to_string() << " " << totalMined_.rewardPrevMonth.to_string() << " " << totalMined_.rewardTotal.to_string();
+
+    csdebug() << "Total transactions: " << totalAcceptedTransactions_;
+}
+
+
+std::string NodeStat::toString() {
+    std::string res;
+    res += std::string(nodeOn ? "Node ON" : "Node OFF");
+    res += ", ip: " + ip;
+    res += ", version: " + version;
+    res += ", platform: " + platform + ",\n";
+    res += "timeReg: " + std::to_string(timeReg);
+    res += ", timeFirstConsensus: " + std::to_string(timeFirstConsensus);
+    res += ", lastConsensus: " + std::to_string(lastConsensus);
+    res += ", timeActive: " + std::to_string(timeActive) + "\n";
+    res += "trustedDay: " + std::to_string(trustedDay) + ", trustedMonth: " + std::to_string(trustedMonth)
+        + ", trustedPrevMonth: " + std::to_string(trustedPrevMonth) + ", trustedTotal: " + std::to_string(trustedTotal) + "\n";;
+    res += "failedTrustedDay: " + std::to_string(failedTrustedDay) + ", failedTrustedMonth: " + std::to_string(failedTrustedMonth)
+        + ", failedTrustedPrevMonth: " + std::to_string(failedTrustedPrevMonth) + ", failedTrustedTotal: " + std::to_string(failedTrustedTotal) + "\n";;
+    res += "trustedADay: " + std::to_string(trustedADay) + ", trustedAMonth: " + std::to_string(trustedAMonth)
+        + ", trustedAPrevMonth: " + std::to_string(trustedAPrevMonth) + ", trustedATotal: " + std::to_string(trustedATotal) + "\n";;
+    res += "failedTrustedADay: " + std::to_string(failedTrustedADay) + ", failedTrustedAMonth: " + std::to_string(failedTrustedAMonth)
+        + ", failedTrustedAPrevMonth: " + std::to_string(failedTrustedAPrevMonth) + ", failedTrustedAPrevMonth: " + std::to_string(failedTrustedAPrevMonth) + "\n";;
+    res += "feeDay: " + feeDay.to_string() + ", feeMonth: " + feeMonth.to_string()
+        + ", failedTrustedPrevMonth: " + feeMonth.to_string() + ", failedTrustedTotal: " + feeMonth.to_string() + "\n";;
+    res += "rewardDay: " + rewardDay.to_string() + ", rewardMonth: " + rewardMonth.to_string()
+        + ", rewardPrevMonth: " + rewardPrevMonth.to_string() + ", rewardTotal: " + rewardTotal.to_string() + "\n";;
+
+    return res;
+}
 void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
     using namespace std::chrono;
     totalAcceptedTransactions_ += block.transactions_count();

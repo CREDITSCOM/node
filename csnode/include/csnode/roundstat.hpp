@@ -23,49 +23,60 @@ using PingCheckSignal = cs::Signal<void(cs::Sequence, const cs::PublicKey&)>;
 using AccountStartTimeSignal = cs::Signal<void(uint64_t&, const cs::PublicKey)>;
 
 struct NodeStat {
+    std::string toString();
+    Bytes to_bytes();
+    static NodeStat from_bytes(Bytes& data);
+
     bool nodeOn;
-    std::string ip;
-    std::string version;
-    std::string platform;
-    uint64_t timeReg;
-    uint64_t timeFirstConsensus;
-    uint64_t timeActive;
-    uint64_t trustedDay;
-    uint64_t trustedMonth;
-    uint64_t trustedPrevMonth;
-    uint64_t trustedTotal;
-    uint64_t failedTrustedDay;
-    uint64_t failedTrustedMonth;
-    uint64_t failedTrustedPrevMonth;
-    uint64_t failedTrustedTotal;
-    uint64_t trustedADay;
-    uint64_t trustedAMonth;
-    uint64_t trustedAPrevMonth;
-    uint64_t trustedATotal;
-    uint64_t failedTrustedADay;
-    uint64_t failedTrustedAMonth;
-    uint64_t failedTrustedAPrevMonth;
-    uint64_t failedTrustedATotal;
-    csdb::Amount feeDay;
-    csdb::Amount feeMonth;
-    csdb::Amount feePrevMonth;
-    csdb::Amount feeTotal;
-    csdb::Amount rewardDay;
-    csdb::Amount rewardMonth;
-    csdb::Amount rewardPrevMonth;
-    csdb::Amount rewardTotal;
+    std::string ip = "";
+    std::string version ="";
+    std::string platform ="";
+    uint64_t timeReg = 0ULL;
+    uint64_t timeFirstConsensus = 0ULL;
+    uint64_t timeActive = 0ULL;
+    uint64_t trustedDay = 0ULL;
+    uint64_t trustedMonth = 0ULL;
+    uint64_t trustedPrevMonth = 0ULL;
+    uint64_t trustedTotal = 0ULL;
+    uint64_t failedTrustedDay = 0ULL;
+    uint64_t failedTrustedMonth = 0ULL;
+    uint64_t failedTrustedPrevMonth = 0ULL;
+    uint64_t failedTrustedTotal = 0ULL;
+    uint64_t trustedADay = 0ULL;
+    uint64_t trustedAMonth = 0ULL;
+    uint64_t trustedAPrevMonth = 0ULL;
+    uint64_t trustedATotal = 0ULL;
+    uint64_t failedTrustedADay = 0ULL;
+    uint64_t failedTrustedAMonth = 0ULL;
+    uint64_t failedTrustedAPrevMonth = 0ULL;
+    uint64_t failedTrustedATotal = 0ULL;
+    csdb::Amount feeDay{ 0 };
+    csdb::Amount feeMonth{ 0 };
+    csdb::Amount feePrevMonth{ 0 };
+    csdb::Amount feeTotal{ 0 };
+    csdb::Amount rewardDay{ 0 };
+    csdb::Amount rewardMonth{ 0 };
+    csdb::Amount rewardPrevMonth{ 0 };
+    csdb::Amount rewardTotal{ 0 };
     cs::Sequence lastConsensus = 0ULL;
 };
 
 
 struct MinedEvaluation{
-    csdb::Amount rewardDay;
-    csdb::Amount rewardMonth;
-    csdb::Amount rewardPrevMonth;
-    csdb::Amount rewardTotal;
+    Bytes to_bytes();
+    static MinedEvaluation from_bytes(Bytes& data);
+
+    csdb::Amount rewardDay{ 0 };
+    csdb::Amount rewardMonth{ 0 };
+    csdb::Amount rewardPrevMonth{ 0 };
+    csdb::Amount rewardTotal{ 0 };
+
 };
 
 struct MinedEvaluationDelegator {
+    Bytes to_bytes();
+    static MinedEvaluationDelegator from_bytes(Bytes& data);
+
     std::map<cs::PublicKey, cs::MinedEvaluation> me;
 };
 
@@ -112,6 +123,12 @@ public:
     const std::map<cs::PublicKey, cs::NodeStat> getNodes() const {
         return  nodes_;
     }
+
+    //serialization try:
+    void clear();
+    void printClassInfo();
+    Bytes serialize();
+    void deserialize(Bytes& data);
 
 public slots:
     void onPingReceived(cs::Sequence, const cs::PublicKey&);

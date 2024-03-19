@@ -208,8 +208,8 @@ void SmartContracts::init(const cs::PublicKey& id, Node* node) {
         exec_handler_ptr = connector_ptr->apiExecHandler();
     }
     node_id = id;
-    //unusedJavaLibs_.push_back("java.nio");
-    //unusedJavaLibs_.push_back("java.io");
+    unusedJavaLibs_.push_back("java.nio");
+    unusedJavaLibs_.push_back("java.io");
 }
 
 /*public*/
@@ -3362,6 +3362,316 @@ void SmartContracts::removeUnusedJavaLib(std::string libname) {
 std::vector<std::string>* SmartContracts::getUnusedJavaLibsList() {
     //csdebug() << kLogPrefix << __func__;
     return &unusedJavaLibs_;
+}
+
+void SmartContracts::clear() {
+
+    uncompleted_contracts.clear();
+    known_contracts.clear();
+    exe_queue.clear();
+    blacklistedContracts_.clear();
+    locked_contracts.clear();
+}
+
+
+Bytes SmartContracts::serialize() {
+    Bytes data;
+    ODataStream os(data);
+    std::map<csdb::Address, StateItem> tmp(
+      known_contracts.begin(),
+      known_contracts.end()
+    );
+    os << tmp.size();
+    for (auto it : tmp) {
+        csdebug() << "Contract: " << it.first.to_string();
+        os << it.first.public_key();
+        os << it.second.to_bytes();
+    }
+
+    size_t queueSize = exe_queue.size();
+    //oa << exe_queue;// queueSize;
+    os << queueSize;
+    auto qIt = exe_queue.begin();
+    for (size_t i = 0; i < queueSize; ++i) {
+        os << qIt->to_bytes();
+        ++qIt;
+    }
+
+    //TODO: next two set should be sorted unless we impact the difference of hashes while loading contracts
+    size_t bSize = blacklistedContracts_.size();
+    os << bSize;
+    auto bIt = blacklistedContracts_.begin();
+    for (size_t i = 0; i < bSize; ++i) {
+        os << bIt->public_key();
+        ++bIt;
+    }
+
+    size_t lSize = locked_contracts.size();
+    os << lSize;
+    auto lIt = locked_contracts.begin();
+    for (size_t i = 0; i < lSize; ++i) {
+        os << lIt->public_key();
+        ++lIt;
+    }
+    return data;
+}
+
+void SmartContracts::deserialize(Bytes& data) {
+    IDataStream is(data.data(), data.size());
+    size_t kcSize = 0ULL;
+    is >> kcSize;
+    for (size_t i = 0ULL; i < kcSize; ++i) {
+        PublicKey pKey;
+        is >> pKey;
+        Bytes sData;
+        is >> sData;
+        SmartContracts::StateItem tmpItem;
+        tmpItem.from_bytes(sData);
+        known_contracts.emplace(csdb::Address::from_public_key(pKey), tmpItem);
+    }
+
+    
+    size_t queueSize = 0ULL;
+    is >> queueSize;
+    for (size_t i = 0; i < queueSize; ++i) {
+        Bytes sData;
+        is >> sData;
+        SmartContracts::QueueItem tmpItem;
+        tmpItem.from_bytes(sData);
+        exe_queue.push_back(tmpItem);
+    }
+
+    size_t bSize = 0ULL;
+    is >> bSize;
+    for (size_t i = 0; i < bSize; ++i) {
+        PublicKey pKey;
+        is >> pKey;
+        blacklistedContracts_.insert(csdb::Address::from_public_key(pKey));
+    }
+
+    size_t lSize = 0ULL;
+    is >> lSize;
+    for (size_t i = 0; i < lSize; ++i) {
+        PublicKey pKey;
+        is >> pKey;
+        locked_contracts.insert(csdb::Address::from_public_key(pKey));
+    }
+
+}
+
+void SmartContracts::printClassInfo() {
+    csdebug() << kLogPrefix << __func__ << "> Known contracts (" << known_contracts.size() << "):";
+    int i = 0;
+    for (auto a : known_contracts) {
+        csdebug() << "Address:" << a.first.to_string();
+        csdebug() << "Item #" << i << ": " << a.second.toString();
+        ++i;
+
+    }
+    csdebug() << kLogPrefix << __func__ << "> Exe queue (" << exe_queue.size() << "):";
+
+}
+
+
+Bytes SmartContracts::StateItem::to_bytes() {
+    Bytes data;
+    ODataStream os(data);
+    os << payable;
+    os << ref_deploy.sequence << ref_deploy.transaction;
+    os << ref_execute.sequence << ref_execute.transaction;
+    os << ref_cache.sequence << ref_cache.transaction;
+    os << ref_state.sequence << ref_state.transaction;
+    os << deploy.to_byte_stream();
+    os << execute.to_byte_stream();
+    os << state;
+    size_t uSize = uses.size();
+    os << uSize;
+    if (uSize > 0ULL) {
+        auto it = uses.begin();
+        while (it != uses.end()) {
+            os << it->first;
+            auto itt = it->second.begin();
+            os << it->second.size();
+            while (itt != it->second.end()) {
+                os << itt->first.public_key();
+                os << itt->second;
+                ++itt;
+
+            }
+            ++it;
+        }
+    }
+    return data;
+}
+SmartContracts::StateItem SmartContracts::StateItem::from_bytes(Bytes& data) {
+    SmartContracts::StateItem res;
+    IDataStream is(data.data(), data.size());
+    is >> payable;
+    is >> ref_deploy.sequence >> ref_deploy.transaction;
+    is >> ref_execute.sequence >> ref_execute.transaction;
+    is >> ref_cache.sequence >> ref_cache.transaction;
+    is >> ref_state.sequence >> ref_state.transaction;
+    Bytes dtr;
+    is >> dtr;
+    deploy = csdb::Transaction::from_binary(dtr);
+    Bytes etr;
+    is >> etr;
+    execute= csdb::Transaction::from_binary(etr);
+    is >> state;
+    size_t uSize = 0;
+    is >> uSize;
+    for (size_t i = 0ULL; i < uSize; ++i) {
+        std::string u1;
+        is >> u1;   
+        size_t u1Size = 0;
+        is >> u1Size;    
+        std::map<csdb::Address, std::string> iMap;
+        for (size_t i1 = 0ULL; i < u1Size; ++i) {
+            PublicKey pKey;
+            std::string s1;
+            is >> pKey;
+            is >> s1;
+            iMap.emplace(csdb::Address::from_public_key(pKey), s1);
+        }
+    }
+    return res;
+}
+
+Bytes SmartContracts::QueueItem::to_bytes() {
+    Bytes data;
+    ODataStream os(data);
+    os << executions.size();
+    for (auto& it : executions) {
+        os << it.to_bytes();
+    }
+    os << status;
+    os << seq_enqueue;
+    os << seq_start;
+    os << seq_finish;
+    os << abs_addr.public_key();
+    os << is_executor;
+    os << is_rejected;
+    return data;
+}
+
+SmartContracts::QueueItem SmartContracts::QueueItem::from_bytes(Bytes& data) {
+    SmartContracts::QueueItem res;
+    IDataStream is(data.data(), data.size());
+    size_t eSize = 0ULL;
+    is >> eSize;
+    for (size_t i = 0ULL; i < eSize;++i) {
+        Bytes eData;
+        is >> eData;
+        SmartContracts::ExecutionItem tmp;
+        tmp.from_bytes(eData);
+        res.executions.push_back(tmp);
+    }
+    is >> status;
+    is >> seq_enqueue;
+    is >> seq_start;
+    is >> seq_finish;
+    PublicKey pKey;
+    is >> pKey;
+    res.abs_addr = csdb::Address::from_public_key(pKey);
+    is >> is_executor;
+    is >> is_rejected;
+    return res;
+}
+
+Bytes SmartContracts::ExecutionItem::to_bytes() {
+    Bytes data;
+    ODataStream os(data);
+    os << ref_start.sequence << ref_start.transaction;
+    os << transaction.to_binary();
+    os << avail_fee.integral() << avail_fee.fraction();
+    os << new_state_fee.integral() << new_state_fee.fraction();
+    os << consumed_fee.integral() << consumed_fee.fraction();
+    size_t uSize = uses.size();
+    os << uSize;
+    auto it = uses.begin();
+    while (it != uses.end()) {
+        os << it->public_key();
+    }
+
+    os << result.toBinary();
+    return data;
+}
+
+SmartContracts::ExecutionItem SmartContracts::ExecutionItem::from_bytes(Bytes& data) {
+    SmartContracts::ExecutionItem res;
+    IDataStream is(data.data(), data.size());
+    is >> res.ref_start.sequence >> res.ref_start.transaction;
+    Bytes tdata;
+    is >> tdata;
+    transaction.from_binary(tdata);
+    int32_t tint;
+    uint64_t tfrac;
+
+    is >> tint >> tfrac;
+    res.avail_fee = csdb::Amount(tint, tfrac);
+    is >> tint >> tfrac;
+    res.new_state_fee = csdb::Amount(tint, tfrac);
+    is >> tint >> tfrac;
+    consumed_fee = csdb::Amount(tint, tfrac);
+    size_t uSize = 0ULL;
+    is >> uSize;
+    for (size_t i = 0ULL; i < uSize; ++i) {
+        PublicKey pKey;
+        is >> pKey;
+        res.uses.push_back(csdb::Address::from_public_key(pKey));
+    }
+    Bytes tpData;
+    is >> tpData;
+    res.result.fromBinary(tpData);
+
+    return res;
+}
+
+std::string SmartContracts::StateItem::toString() {
+
+    std::string res;
+    res += "Payable_status: " + std::to_string(static_cast<int>(payable)) + "\n";
+    res += "Ref deploy: " + ref_deploy.toString() + "\n";
+    res += "Ref execute: " + ref_execute.toString() + "\n";
+    res += "Ref cache: " + ref_cache.toString() + "\n";
+    res += "Ref state: " + ref_state.toString() + "\n";
+    res += "Deploy trx: \n" + transactionToString(deploy) + "\n";
+    res += "Execute trx: \n" + transactionToString(execute) + "\n";
+    return res;
+}
+
+std::string SmartContracts::StateItem::transactionToString(const csdb::Transaction& tr) {
+    std::ostringstream os;
+
+    os << "Id: " << tr.id().to_string() << "\n";
+    os << "InnerId: " << std::to_string(tr.innerID()) << "\n";
+    os << "Amount: " << tr.amount().to_string() << "\n";
+    os << "Sender: " << tr.source().to_string() << "\n";
+    os << "Recipient: " << tr.target().to_string() << "\n";
+    os << "Signature:" << cs::Utils::byteStreamToHex(tr.signature()) << "\n";
+    os << "MaxFee: " << std::to_string(tr.max_fee().to_double()) << "\n";
+    os << "CountedFee: " << std::to_string(tr.counted_fee().to_double()) << "\n";
+    os << "User fields: " << "\n";
+    auto ufids = tr.user_field_ids();
+    for (auto a : ufids) {
+        auto ufld = tr.user_field(a);
+        if (ufld.is_valid()) {
+            switch (ufld.type()) {
+            case ufld.Amount:
+                os << "#" << static_cast<int>(a) << "(amount): " << ufld.value<csdb::Amount>().to_string();
+                break;
+            case ufld.Integer:
+                os << "#" << static_cast<int>(a) << "(Integer): " << std::to_string(ufld.value<uint64_t>());
+                break;
+            case ufld.String:
+                os << "#" << static_cast<int>(a) << "(String): " << ufld.value<std::string>();
+                break;
+            default:
+                os << "#" << static_cast<int>(a) << "User field type not defined";
+            }
+        }
+    }
+    return os.str();
 }
 
 }  // namespace cs
