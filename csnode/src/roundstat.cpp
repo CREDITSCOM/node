@@ -478,10 +478,11 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
     if (bTime == 0ULL) {
         return;
     }
-    if (block.sequence() < 5ULL) {
+    if (block.sequence() < 5ULL || currentSessionBlockCounter_++ < 2ULL) {
         lastMonth_ = structTime->tm_mon;
         lastDay_ = structTime->tm_mday;
     }
+
     bool dayChange = lastDay_ != structTime->tm_mday;
     bool monthChange = lastMonth_ != structTime->tm_mon;
     lastMonth_ = structTime->tm_mon;

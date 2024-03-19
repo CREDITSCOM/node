@@ -43,9 +43,6 @@ void panic() {
 int main(int argc, char* argv[]) {
     const char* kDeprecatedDBPath = "test_db";
     const char* kServiceName = "credits_node";
-    std::cout << "Press any key ... ";
-    char symb;
-    std::cin >> symb;
     std::ios_base::sync_with_stdio(false);
 
     using namespace boost::program_options;

@@ -189,6 +189,7 @@ private:
     BlockChain* blockChain_;
     //<to save>
     MinedEvaluation totalMined_;
+    size_t currentSessionBlockCounter_ = 0ULL;
     friend class RoundStat_Serializer;
 };
 
