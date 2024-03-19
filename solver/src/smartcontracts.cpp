@@ -3425,9 +3425,7 @@ void SmartContracts::deserialize(Bytes& data) {
         is >> pKey;
         Bytes sData;
         is >> sData;
-        SmartContracts::StateItem tmpItem;
-        tmpItem.from_bytes(sData);
-        known_contracts.emplace(csdb::Address::from_public_key(pKey), tmpItem);
+        known_contracts.emplace(csdb::Address::from_public_key(pKey), StateItem::from_bytes(sData));
     }
 
     
@@ -3436,9 +3434,7 @@ void SmartContracts::deserialize(Bytes& data) {
     for (size_t i = 0; i < queueSize; ++i) {
         Bytes sData;
         is >> sData;
-        SmartContracts::QueueItem tmpItem;
-        tmpItem.from_bytes(sData);
-        exe_queue.push_back(tmpItem);
+        exe_queue.push_back(QueueItem::from_bytes(sData));
     }
 
     size_t bSize = 0ULL;
@@ -3503,21 +3499,23 @@ Bytes SmartContracts::StateItem::to_bytes() {
     }
     return data;
 }
+
+/*static*/
 SmartContracts::StateItem SmartContracts::StateItem::from_bytes(Bytes& data) {
     SmartContracts::StateItem res;
     IDataStream is(data.data(), data.size());
-    is >> payable;
-    is >> ref_deploy.sequence >> ref_deploy.transaction;
-    is >> ref_execute.sequence >> ref_execute.transaction;
-    is >> ref_cache.sequence >> ref_cache.transaction;
-    is >> ref_state.sequence >> ref_state.transaction;
+    is >> res.payable;
+    is >> res.ref_deploy.sequence >> res.ref_deploy.transaction;
+    is >> res.ref_execute.sequence >> res.ref_execute.transaction;
+    is >> res.ref_cache.sequence >> res.ref_cache.transaction;
+    is >> res.ref_state.sequence >> res.ref_state.transaction;
     Bytes dtr;
     is >> dtr;
-    deploy = csdb::Transaction::from_binary(dtr);
+    res.deploy = csdb::Transaction::from_binary(dtr);
     Bytes etr;
     is >> etr;
-    execute= csdb::Transaction::from_binary(etr);
-    is >> state;
+    res.execute= csdb::Transaction::from_binary(etr);
+    is >> res.state;
     size_t uSize = 0;
     is >> uSize;
     for (size_t i = 0ULL; i < uSize; ++i) {
@@ -3533,6 +3531,7 @@ SmartContracts::StateItem SmartContracts::StateItem::from_bytes(Bytes& data) {
             is >> s1;
             iMap.emplace(csdb::Address::from_public_key(pKey), s1);
         }
+        res.uses.try_emplace(u1, iMap);
     }
     return res;
 }
@@ -3554,6 +3553,7 @@ Bytes SmartContracts::QueueItem::to_bytes() {
     return data;
 }
 
+/*static*/
 SmartContracts::QueueItem SmartContracts::QueueItem::from_bytes(Bytes& data) {
     SmartContracts::QueueItem res;
     IDataStream is(data.data(), data.size());
@@ -3566,15 +3566,15 @@ SmartContracts::QueueItem SmartContracts::QueueItem::from_bytes(Bytes& data) {
         tmp.from_bytes(eData);
         res.executions.push_back(tmp);
     }
-    is >> status;
-    is >> seq_enqueue;
-    is >> seq_start;
-    is >> seq_finish;
+    is >> res.status;
+    is >> res.seq_enqueue;
+    is >> res.seq_start;
+    is >> res.seq_finish;
     PublicKey pKey;
     is >> pKey;
     res.abs_addr = csdb::Address::from_public_key(pKey);
-    is >> is_executor;
-    is >> is_rejected;
+    is >> res.is_executor;
+    is >> res.is_rejected;
     return res;
 }
 
@@ -3597,13 +3597,14 @@ Bytes SmartContracts::ExecutionItem::to_bytes() {
     return data;
 }
 
+/*static*/
 SmartContracts::ExecutionItem SmartContracts::ExecutionItem::from_bytes(Bytes& data) {
     SmartContracts::ExecutionItem res;
     IDataStream is(data.data(), data.size());
     is >> res.ref_start.sequence >> res.ref_start.transaction;
     Bytes tdata;
     is >> tdata;
-    transaction.from_binary(tdata);
+    res.transaction.from_binary(tdata);
     int32_t tint;
     uint64_t tfrac;
 
@@ -3612,7 +3613,7 @@ SmartContracts::ExecutionItem SmartContracts::ExecutionItem::from_bytes(Bytes& d
     is >> tint >> tfrac;
     res.new_state_fee = csdb::Amount(tint, tfrac);
     is >> tint >> tfrac;
-    consumed_fee = csdb::Amount(tint, tfrac);
+    res.consumed_fee = csdb::Amount(tint, tfrac);
     size_t uSize = 0ULL;
     is >> uSize;
     for (size_t i = 0ULL; i < uSize; ++i) {

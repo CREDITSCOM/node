@@ -111,7 +111,7 @@ void RoundStat::dayChangeProcedure(uint64_t cTime) {
 }
 
 void RoundStat::monthChangeProcedure() {
-    //csdebug() << __func__;
+    csdebug() << __func__;
     auto it = nodes_.begin();
     while (it != nodes_.end()) {
         it->second.failedTrustedPrevMonth = it->second.failedTrustedMonth;
@@ -264,6 +264,7 @@ Bytes NodeStat::to_bytes() {
     return data;
 }
 
+/*static*/
 NodeStat NodeStat::from_bytes(Bytes& data) {
     NodeStat res;
     IDataStream is(data.data(), data.size());
@@ -314,6 +315,7 @@ Bytes MinedEvaluationDelegator::to_bytes() {
     return data;
 }
 
+/*static*/
 MinedEvaluationDelegator MinedEvaluationDelegator::from_bytes(Bytes& data) {
     MinedEvaluationDelegator res;
     IDataStream is(data.data(), data.size());
@@ -339,6 +341,7 @@ Bytes MinedEvaluation::to_bytes() {
     return data;
 }
 
+/*static*/
 MinedEvaluation MinedEvaluation::from_bytes(Bytes& data) {
     MinedEvaluation res;
     IDataStream is(data.data(), data.size());
@@ -457,6 +460,14 @@ std::string NodeStat::toString() {
 
     return res;
 }
+
+/*static*/
+tm* RoundStat::convertTime(uint64_t time_seconds) {
+    const time_t longTime = (time_t)time_seconds;
+    struct tm* structTime = gmtime(&longTime);
+    return structTime;
+}
+
 void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
     using namespace std::chrono;
     totalAcceptedTransactions_ += block.transactions_count();
@@ -470,15 +481,22 @@ void RoundStat::countTrustAndTrx(const csdb::Pool& block) {
         }
     }
     auto feePart = (rTrustedNumber != 0) ? rCost / rTrustedNumber : csdb::Amount(0);
-    std::string blockTime = block.user_field(BlockChain::kFieldTimestamp).is_valid() ? block.user_field(BlockChain::kFieldTimestamp).value<std::string>(): "0";
-    int64_t bTime = static_cast<int64_t>((std::stoll(blockTime.empty() ? "0" : blockTime))/1000);
-    const time_t longTime = (time_t)bTime;
-    struct tm* structTime = gmtime(&longTime);
+    //std::string blockTime = block.user_field(BlockChain::kFieldTimestamp).is_valid() ? block.user_field(BlockChain::kFieldTimestamp).value<std::string>(): "0";
+    // static_cast<int64_t>((std::stoll(blockTime.empty() ? "0" : blockTime))/1000);
+    int64_t bTime = blockChain_->getBlockTime(block)/1000;
+    struct tm* structTime = convertTime(bTime);
     //csdebug() << "Block time: " << blockTime << " == " << longTime << " -> " << structTime->tm_mon << " - " << structTime->tm_mday << " " << structTime->tm_hour << ":" << structTime->tm_min << ":" << structTime->tm_sec;
     if (bTime == 0ULL) {
         return;
     }
-    if (block.sequence() < 5ULL || currentSessionBlockCounter_++ < 2ULL) {
+    if (currentSessionBlockCounter_++ == 0ULL && block.sequence() > 2ULL) {
+        uint64_t prevTime = blockChain_->getBlockTime(blockChain_->loadBlock(block.sequence() - 1ULL))/1000;
+        csdebug() << "Previous block time: " << prevTime;
+        struct tm* structPrevTime = convertTime(prevTime);
+        lastMonth_ = structPrevTime->tm_mon;
+        lastDay_ = structPrevTime->tm_mday;
+    }
+    if (block.sequence() < 5ULL) {
         lastMonth_ = structTime->tm_mon;
         lastDay_ = structTime->tm_mday;
     }

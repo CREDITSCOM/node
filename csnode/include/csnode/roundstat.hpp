@@ -124,6 +124,8 @@ public:
         return  nodes_;
     }
 
+    static tm* convertTime(uint64_t time_seconds);
+
     //serialization try:
     void clear();
     void printClassInfo();

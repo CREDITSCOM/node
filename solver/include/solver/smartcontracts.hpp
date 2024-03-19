@@ -585,7 +585,7 @@ private:
         std::string toString();
         std::string transactionToString(const csdb::Transaction& tr);
         Bytes to_bytes();
-        StateItem from_bytes(Bytes& data);
+        static StateItem from_bytes(Bytes& data);
         // payable() method is implemented
         PayableStatus payable{ PayableStatus::Unknown };
         // reference to deploy transaction
@@ -621,7 +621,7 @@ private:
     // specifies a one contract call
     struct ExecutionItem {
         Bytes to_bytes();
-        ExecutionItem from_bytes(Bytes& data);
+        static ExecutionItem from_bytes(Bytes& data);
         // reference to smart in block chain (block/transaction) that spawns execution
         SmartContractRef ref_start;
         // starter transaction
@@ -647,7 +647,7 @@ private:
     // defines an item of execution queue which is a one or more simultaneous calls to specific contract
     struct QueueItem {
         Bytes to_bytes();
-        QueueItem from_bytes(Bytes& data);
+        static QueueItem from_bytes(Bytes& data);
         // list of execution items, empty list is senceless
         std::vector<ExecutionItem> executions;
         // current status (running/waiting)
