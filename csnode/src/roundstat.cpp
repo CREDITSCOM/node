@@ -306,7 +306,7 @@ NodeStat NodeStat::from_bytes(Bytes& data) {
 Bytes MinedEvaluationDelegator::to_bytes() {
     Bytes data;
     ODataStream os(data);
-    os << me.size();
+    os << static_cast<uint64_t>(me.size());
     auto it = me.begin();
     while (it != me.end()) {
         os << it->first << it->second.to_bytes();
@@ -319,9 +319,9 @@ Bytes MinedEvaluationDelegator::to_bytes() {
 MinedEvaluationDelegator MinedEvaluationDelegator::from_bytes(Bytes& data) {
     MinedEvaluationDelegator res;
     IDataStream is(data.data(), data.size());
-    size_t mSize = 0;
+    uint64_t mSize = 0;
     is >> mSize;
-    for (size_t i = 0ULL; i < mSize; ++i) {
+    for (uint64_t i = 0ULL; i < mSize; ++i) {
         PublicKey pKey;
         Bytes mData;
         is >> pKey >> mData;
@@ -356,16 +356,16 @@ MinedEvaluation MinedEvaluation::from_bytes(Bytes& data) {
 Bytes RoundStat::serialize() {
     Bytes data;
     ODataStream os(data);
-    size_t totalBchTransactions_ = totalAcceptedTransactions_;
+    uint64_t totalBchTransactions_ = static_cast<uint64_t>(totalAcceptedTransactions_);
     os << totalBchTransactions_;
 
-    os << minedEvaluation_.size();
+    os << static_cast<uint64_t>(minedEvaluation_.size());
     auto itm = minedEvaluation_.begin();
     while (itm != minedEvaluation_.end()) {
         os << itm->first << itm->second.to_bytes();
         ++itm;
     }
-    os << nodes_.size();
+    os << static_cast<uint64_t>(nodes_.size());
     auto itn = nodes_.begin();
     while (itn != nodes_.end()) {
         os << itn->first << itn->second.to_bytes();
@@ -376,12 +376,12 @@ Bytes RoundStat::serialize() {
 }
 void RoundStat::deserialize(Bytes& data) {
     IDataStream is(data.data(), data.size());
-    size_t totalBchTransactions_ = 0ULL;
+    uint64_t totalBchTransactions_ = 0ULL;
     is >> totalBchTransactions_;
     Bytes dataME;
-    size_t me_size;
+    uint64_t me_size;
     is >> me_size;
-    for (size_t i = 0ULL; i < me_size; ++i) {
+    for (uint64_t i = 0ULL; i < me_size; ++i) {
         PublicKey pKey;
         MinedEvaluationDelegator md;
         Bytes data;
@@ -390,9 +390,9 @@ void RoundStat::deserialize(Bytes& data) {
         minedEvaluation_.emplace(pKey, MinedEvaluationDelegator::from_bytes(data));
     }
 
-    size_t n_size;
+    uint64_t n_size;
     is >> n_size;
-    for (size_t i = 0ULL; i < n_size; ++i) {
+    for (uint64_t i = 0ULL; i < n_size; ++i) {
         PublicKey pKey;
         Bytes data;
         is >> pKey >> data;
