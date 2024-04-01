@@ -3381,7 +3381,7 @@ Bytes SmartContracts::serialize() {
       known_contracts.begin(),
       known_contracts.end()
     );
-    os << tmp.size();
+    os << static_cast<uint64_t>(tmp.size());
     for (auto it : tmp) {
         csdebug() << "Contract: " << it.first.to_string();
         os << it.first.public_key();
@@ -3480,14 +3480,14 @@ Bytes SmartContracts::StateItem::to_bytes() {
     os << deploy.to_byte_stream();
     os << execute.to_byte_stream();
     os << state;
-    size_t uSize = uses.size();
+    uint64_t uSize = uses.size();
     os << uSize;
     if (uSize > 0ULL) {
         auto it = uses.begin();
         while (it != uses.end()) {
             os << it->first;
             auto itt = it->second.begin();
-            os << it->second.size();
+            os << static_cast<uint64_t>(it->second.size());
             while (itt != it->second.end()) {
                 os << itt->first.public_key();
                 os << itt->second;
@@ -3516,12 +3516,12 @@ SmartContracts::StateItem SmartContracts::StateItem::from_bytes(Bytes& data) {
     is >> etr;
     res.execute= csdb::Transaction::from_binary(etr);
     is >> res.state;
-    size_t uSize = 0;
+    uint64_t uSize = 0;
     is >> uSize;
-    for (size_t i = 0ULL; i < uSize; ++i) {
+    for (uint64_t i = 0ULL; i < uSize; ++i) {
         std::string u1;
         is >> u1;   
-        size_t u1Size = 0;
+        uint64_t u1Size = 0;
         is >> u1Size;    
         std::map<csdb::Address, std::string> iMap;
         for (size_t i1 = 0ULL; i < u1Size; ++i) {
@@ -3539,7 +3539,7 @@ SmartContracts::StateItem SmartContracts::StateItem::from_bytes(Bytes& data) {
 Bytes SmartContracts::QueueItem::to_bytes() {
     Bytes data;
     ODataStream os(data);
-    os << executions.size();
+    os << static_cast<uint64_t>(executions.size());
     for (auto& it : executions) {
         os << it.to_bytes();
     }
@@ -3557,7 +3557,7 @@ Bytes SmartContracts::QueueItem::to_bytes() {
 SmartContracts::QueueItem SmartContracts::QueueItem::from_bytes(Bytes& data) {
     SmartContracts::QueueItem res;
     IDataStream is(data.data(), data.size());
-    size_t eSize = 0ULL;
+    uint64_t eSize = 0ULL;
     is >> eSize;
     for (size_t i = 0ULL; i < eSize;++i) {
         Bytes eData;
@@ -3586,7 +3586,7 @@ Bytes SmartContracts::ExecutionItem::to_bytes() {
     os << avail_fee.integral() << avail_fee.fraction();
     os << new_state_fee.integral() << new_state_fee.fraction();
     os << consumed_fee.integral() << consumed_fee.fraction();
-    size_t uSize = uses.size();
+    uint64_t uSize = uses.size();
     os << uSize;
     auto it = uses.begin();
     while (it != uses.end()) {
@@ -3614,9 +3614,9 @@ SmartContracts::ExecutionItem SmartContracts::ExecutionItem::from_bytes(Bytes& d
     res.new_state_fee = csdb::Amount(tint, tfrac);
     is >> tint >> tfrac;
     res.consumed_fee = csdb::Amount(tint, tfrac);
-    size_t uSize = 0ULL;
+    uint64_t uSize = 0ULL;
     is >> uSize;
-    for (size_t i = 0ULL; i < uSize; ++i) {
+    for (uint64_t i = 0ULL; i < uSize; ++i) {
         PublicKey pKey;
         is >> pKey;
         res.uses.push_back(csdb::Address::from_public_key(pKey));
