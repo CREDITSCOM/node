@@ -15,7 +15,7 @@ The Node processes and stores transactions, executes and confirms smart contract
 Written on C++.
 
 ## Version
-Current node version 4.2.522
+Current node version 4.2.532.0
 
 <h2>What is Credits Node?</h2>
 <p>Credits Node is the main module that provide an opportunity to run a node and participate in CREDITS blockhain network. The node performs processing and storage of transactions, execution and confirmation of the terms of smart contracts, processing requests from third-party systems, and provides data upon request. Each node on the network has the same functionality.
@@ -57,12 +57,65 @@ On Linux:<br/>
 >cmake -DCMAKE_BUILD_TYPE=Release ..
 >make -j4
 
+<h4>If necessary, full step-by-step instruction for Linux:</h4>
+
+Update repos and install required package
+
+>sudo apt update
+>apt upgrade -y
+>sudo apt install build-essential libssl-dev autoconf -y
+>sudo apt install flex bison libtool -y
+
+Create build directory
+
+>mkdir csbuild
+>d csbuild
+
+Update gcc g++
+>sudo apt install gcc-8 g++-8 -y
+>sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 80 --slave /usr/bin/g++ g++ /usr/bin/g++-8 --slave /usr/bin/gcov gcov /usr/bin/gcov-8
+>gcc --version
+>gcc (Ubuntu 8.4.0-1ubuntu1~18.04) 8.4.0
+>Copyright (C) 2018 Free Software Foundation, Inc.
+>This is free software; see the source for copying conditions.  There is NO
+>warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE
+
+Update cmake to latest version
+>wget -c https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0.tar.gz
+>tar zxfv cmake-3.17.0.tar.gz
+>cd cmake-3.17.0
+>./bootstrap
+>make
+>sudo make install
+>cd ..
+
+Install boost
+
+>wget -c $https://dl.bintray.com/boostorg/release/1.72.0/source/boost_1_72_0.tar.gz
+>tar zxfv boost_1_72_0.tar.gz
+>cd boost_1_72_0
+>./bootstrap.sh
+>./b2 --build-type=complete link=static threading=multi $runtime-link=static --layout=tagged install --prefix=../boost
+>export PATH=~/csbuild/boost:$PATH
+>export BOOST_ROOT=~/csbuild/boost
+>cd ..
+
+Build node
+
+>git clone https://github.com/CREDITSCOM/node.git
+>cd node
+>git submodule update --init --recursive
+>mkdir build
+>cd build
+>cmake -DCMAKE_CXX_FLAGS=-DMONITOR_NODE -DCMAKE_BUILD_TYPE=Release ..
+>make -j2
+
 <h2>System requirements:</h2>
 <h4>Minimum system requirements:</h4>
 Operating system: Windows® 7 / Windows® 8 / Windows® 10 64-bit (with the last update package)
 Processor (CPU): with frequency of 1 GHz (or faster) with PAE, NX and SSE2 support;
-Memory (RAM): 4 Gb
-HDD: 1 Tb
+Memory (RAM): 8 Gb
+HDD: 600Gb
 Internet connection: 3 Mbit/s.
 <h4>Recommended system requirements:</h4>
 
@@ -88,14 +141,14 @@ Please make sure your contributions adhere to our coding guidelines:</p>
 
 <a href="https://github.com/CREDITSCOM/DOCUMENTATION">Documentation</a>
 
-<a href="https://credits.com/Content/Docs/TechnicalWhitePaperCREDITSEng.pdf">Whitepaper</a>
+<a href="https://github.com/CREDITSCOM/Documentation/blob/master/WhitePaper%20CREDITS%20Eng.pdf">Whitepaper</a>
 
-<a href="https://credits.com/Content/Docs/TechnicalPaperENG.pdf">Technical paper</a>
+<a href="https://github.com/CREDITSCOM/Documentation/blob/master/TechnicalPaper%20CREDITS%20Eng.pdf">Technical paper</a>
 
 <a href="https://developers.credits.com/">Developers portal</a>
 
-<a href="http://forum.credits.com/">Credits forum</a>
 <h3>Community links</h3>
+   <a href="https://t.me/creditstechnical"><<img src ="https://simpleicons.org/icons/telegram.svg" height=40 widht=40 ></a>
    <a href="https://t.me/creditscom"><img src ="https://simpleicons.org/icons/telegram.svg" height=40 widht=40 ></a>
    <a href="https://twitter.com/creditscom"><img src ="https://simpleicons.org/icons/twitter.svg" height=40 widht=40 ></a>
    <a href="https://www.reddit.com/r/CreditsOfficial/"><img src ="https://simpleicons.org/icons/reddit.svg" height=40 widht=40></a> 

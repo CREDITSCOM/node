@@ -23,36 +23,36 @@ class ibstream;
 }  // namespace priv
 
 /**
- * Тип идентификатора поля. Тип знаковый. Предполагается, что "стандартные" идентификатор,
- * перечеисленные ниже, отрицательные. "Пользовательские" идентификаторы положительные.
+ * User field Id type. Types is signed. It's assumed that "standard" ids. 
+ * Mentioned later are negative. "User" ids are positive.
  *
- * Тип дополнительного поля никак не связан с его идентификатором, т.е. дополнительное поле
- * с конкретным идентификатором может быть любого типа, однако в одном объекте не могут
- * быть два поля с одинаковым идетификатором и разными типами (добавление поля с тем
- * же идентификатором замещает предыдущее добавленное значение).
+ * The type of user field is not connected with its id, i.e. user field
+ * with predefined id can be of different type, but in the one object unit there is not possible
+ * the existance of two user fields with the same id but different types. 
+ * The addition of user field with the same id replaces thee former one.
  */
 using user_field_id_t = int32_t;
 
 /**
- * @brief Строковый комментарий
+ * @brief comment
  */
 constexpr const user_field_id_t UFID_COMMENT = (-1);
 
 /**
- * @brief Класс для хранения значения дополнительного поля.
+ * @brief Class for additional field holding
  *
- * Класс предназначен для храниения типизированного значения дополнительного поля. В настоящий
- * момент поддерживаются три типа значения:
- * - произвольное целое число (::std::is_integral<T>::value == true)
- * - строка (произвольные бинарные данные с длиной, ::std::string)
+ * The purpose of this class is to keep the predefined type value of additional field.  In current 
+ * version three types of user filed are supperted:
+ * - integer value (::std::is_integral<T>::value == true)
+ * - string value (different binary data, ::std::string)
  * - \ref ::csdb::Amount
  *
- * В классе имеет набор конструкторов для конструирования объекта класса из любого из
- * перечисленных типов, а также шаблон \ref value, позволяющий получать значение поля соответстующего
- * типа. Если тип поля не соответствует запрашиваемому тип, возвращается значени типа по
- * умолчанию (пустая строка для строк, 0 для остальных).
+ * Class has the set of constructors fro creating the objects of class form one of mentioned 
+ * above types, and the template \ref value, that allows to get value of the field of corresponding type
+ * IF the type does not correspond to requested one, the default type value will be returned 
+ * (empty string for string, or 0 for other).
  *
- * Дополнительные поля используются в классах \ref Transaction и \ref Pool.
+ * User fields are used in classes \ref Transaction and \ref Pool.
  */
 class UserField {
     SHARED_DATA_CLASS_DECLARE(UserField)

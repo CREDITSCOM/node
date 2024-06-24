@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.11)
 
-# Конечно, лучше помещать сгенерённые файлы не в ${CMAKE_CURRENT_SOURCE_DIR}, а в
-# ${CMAKE_CURRENT_BINARY_DIR}. Но если уже в ${CMAKE_CURRENT_SOURCE_DIR}, надо каталог
-# добавить в .gitignore
+# It's better to put the files not into' ${CMAKE_CURRENT_SOURCE_DIR},
+# ${CMAKE_CURRENT_BINARY_DIR}. But if in ${CMAKE_CURRENT_SOURCE_DIR}, 
+# this dir should be added to .gitignore
 set(THRIFT_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-# Список файлов лучше задать заранее. На этапе генерайии thirft compiler ещё
-# банально может не быть собран. При изменении thrift-файла список надо будет
-# обновить вручную.
+# The files list is better to set in advance. IN the generation stage thirft compiler can't'
+# be built. In case of changes thrift-files-list should be
+# updated manually
 set(THRIFT_GENERATED_FILES
   ${THRIFT_GEN_DIR}/general_constants.cpp
   ${THRIFT_GEN_DIR}/general_types.cpp
@@ -15,8 +15,8 @@ set(THRIFT_GENERATED_FILES
   ${THRIFT_GEN_DIR}/general_types.h
   )
 
-# Вызов thrift compiler лучше добавлять в фазу сборки - иначе
-# в случае изменения thrift-файла он не будет перекомпилирован.
+# thrift compiler call is better to be added to build stage - in other cases
+# when thrift-file is changed it won't be compiled correctly.
 add_custom_command(
   OUTPUT ${THRIFT_GENERATED_FILES}
   COMMAND thrift-compiler -r -gen cpp:no_skeleton,pure_enums,moveable_types

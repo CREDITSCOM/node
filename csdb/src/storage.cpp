@@ -47,9 +47,9 @@ namespace csdb {
 namespace {
 
 struct head_info_t {
-    size_t len_;     // Количество блоков в цепочке
-    PoolHash next_;  // хеш следующего пула, или пустая строка для первого пула
-                     // в цепочее (нет родителя, начало цепочки).
+    size_t len_;     // Number of blocks in the chain
+    PoolHash next_;  // next pool hash, or empty string for genesis
+                     // in chain (no parent, chain start).
 };
 using heads_t = std::map<PoolHash, head_info_t>;
 using tails_t = std::map<PoolHash, PoolHash>;
@@ -60,24 +60,24 @@ using tails_t = std::map<PoolHash, PoolHash>;
     bool eith = (heads.end() != ith);
     bool eitt = (tails.end() != itt);
     if (eith && eitt) {
-        // Склеиваем две подцепочки.
+        // Concat two chains
         assert(1 == heads.count(itt->second));
         head_info_t& ith1 = heads[itt->second];
         ith1.next_ = ith->second.next_;
         ith1.len_ += (1 + ith->second.len_);
         if (!ith->second.next_.is_empty()) {
-            /// \todo Проверить, почему выпадает assert!
+            /// \todo Check, when assert is called!
             // assert(1 == tails.count(ith->second.next_));
             tails[ith->second.next_] = itt->second;
         }
         heads.erase(ith);
-        // Мы, возможно, уже изменили tails - поэтому нельзя удалять по итератору!
+        // Probably we changed tails - don't remove using iterator!
         tails.erase(cur_hash);
     }
     else if (eith && (!eitt)) {
-        // Добавляем в начало цепочки.
+        // Add to the beginning of the chain
         if (!ith->second.next_.is_empty()) {
-            /// \todo Проверить, почему выпадает assert!
+            /// \todo \todo Check, when assert is called!
             // assert(1 == tails.count(ith->second.next_));
             tails[ith->second.next_] = cur_hash;
         }
@@ -86,26 +86,26 @@ using tails_t = std::map<PoolHash, PoolHash>;
         heads.erase(prev_hash);
     }
     else if ((!eith) && eitt) {
-        // Добавляем в конец цепочки.
+        // Add to the end of the chain
         assert(1 == heads.count(itt->second));
         head_info_t& ith1 = heads[itt->second];
         ith1.next_ = prev_hash;
         ++ith1.len_;
         if (!prev_hash.is_empty()) {
-            // assert не нужен, т.е. наличие такого "хвоста" говорит о пересекающихся или зацикленных
-            // цепочках (т.е. уже была цепочка, имеющая этот же хвост).
-            // TODO: Доделать детектирование таких цепочек (после создания unit-тестов)
+            // we don't need assert, because the presence of such tail ith the evidence of the crossing of cycling chains
+            // (i.e. we had the chain with the same tail).
+            // TODO: Create such cases detection (after utin-tests)
             // assert(0 == tails.count(prev_hash));
             tails.emplace(prev_hash, itt->second);
         }
         tails.erase(cur_hash);
     }
     else {
-        // Ни с чем не пересекаемся! Просто подвешиваем.
+        // No intersections! Just hang up
         assert(0 == heads.count(cur_hash));
         heads.emplace(cur_hash, head_info_t{1, prev_hash});
         if (!prev_hash.is_empty()) {
-            // см. TODO к пердыдущей ветке.
+            // look TODO to prev thread.
             // assert(0 == tails.count(prev_hash));
             tails.emplace(prev_hash, cur_hash);
         }
@@ -133,8 +133,8 @@ private:
     void write_routine();
 
     std::shared_ptr<Database> db = nullptr;
-    PoolHash last_hash;     // Хеш последнего пула
-    size_t count_pool = 0;  // Количество пулов транзакций в хранилище (первоночально заполняется в check)
+    PoolHash last_hash;     // Last pool's hash
+    size_t count_pool = 0;  // Number of transaction's pools inthe storage (initially filled in check)
     cs::Sequence startSequence = 0;
 
     void set_last_error(Storage::Error error = Storage::NoError, const ::std::string& message = ::std::string());

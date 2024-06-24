@@ -27,8 +27,8 @@
 #include <unistd.h>
 #endif
 
-const NodeVersion NODE_VERSION = 531;
-const uint8_t MINOR_NODE_VERSION = 15;
+const NodeVersion NODE_VERSION = 532;
+const uint8_t MINOR_NODE_VERSION = 0;
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
@@ -966,6 +966,8 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_VERSION_COMMIT_MIN, apiData_.executorCommitMin);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_VERSION_COMMIT_MAX, apiData_.executorCommitMax);
 
+
+    cslog() << "[configInfo]: commitMin_: " << apiData_.executorCommitMin << ", commitMax_: " << apiData_.executorCommitMax;
     if (data.count(PARAM_NAME_EXECUTOR_IP)) {
         apiData_.executorHost = data.get<std::string>(PARAM_NAME_EXECUTOR_IP);
     }

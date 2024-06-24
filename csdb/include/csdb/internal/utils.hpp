@@ -64,100 +64,100 @@ inline std::string to_hex(const cs::Bytes &val) {
 }
 
 /**
- * @brief Добавляет оконечный разделитель к пути
- * @param Путь к папке
- * @return Путь к папке с добавленым оконечным разделителем
+ * @brief Adds final splitter to path
+ * @param Path to folder
+ * @return Path to folder with adding the final splitter
  *
- * Функция не проверят реального существования папки и просто добавляет
- * оконечный разделитель (в зависимости от платформы) в случае его отсутствия.
+ * Method doesn't check the existance of folder, but just adds
+ * the final splitter (depending of platform) in case of its absence.
  *
- * Если оконечный разделитель уже присутствует, путь возвращается без изменений.
+ * If the final splitter presents the path is returned without the changes.
  */
 std::string path_add_separator(const std::string &path);
 
 /**
- * @brief Путь к папке для хранения данных приложения.
- * @return Путь к папке для хранения данных приложения.
+ * @brief Path to the directory with application data.
+ * @return  Path to the directory with application data.
  *
- * Функция возвращает специфичный для платформы путь для хранения данных приложения.
- * Если папки не существует, папака создаётся.
+ * Method returns the specific for the platform path to application data.
+ * If the directory doesn't exist it'll be created.
  *
- * Возвращаемый путь всегда завершается разделителем (слешем)
+ * The returned path is always finished with splitter (slash)
  */
 std::string app_data_path();
 
 /**
- * @brief Размер файла
- * @param[in] name Имя файла
- * @return Размер файла в байтах, или static_cast<size_t>(-1), если файл не существует или является папкой.
+ * @brief File size
+ * @param[in] name - File name
+ * @return File size in bytes, or static_cast<size_t>(-1), if the file doesn't exist or is a Folder.
  */
 size_t file_size(const std::string &name);
 
 /**
- * @brief exists_file функция проверяет существование файла
- * @param path путь до проверяемого файла
- * @return true - файл существует
+ * @brief exists_file method checks the existance of the file
+ * @param path - path to checked file
+ * @return true - if file exists
  */
 inline bool file_exists(const std::string &path) {
     return (static_cast<uint64_t>(-1) != file_size(path));
 }
 
 /**
- * @brief remove_file функция удаляет файл
- * @param path путь до файла
- * @return true - файл удален
+ * @brief remove_file method removes file
+ * @param path - path to file
+ * @return true - if metod removes file
  */
 bool file_remove(const std::string &path);
 
 /**
- * @brief exists_dir функция проверяет существование директории
- * @param path путь до проверяемой директории
- * @return true - директория существует
+ * @brief exists_dir method
+ * @param path - path to checked directory
+ * @return true - if directory exists
  */
 bool dir_exists(const std::string &path);
 
 /**
- * @brief make_dir функция создает директорию
- * Для успешного создания директории необходимо,
- * что-бы родительская директория для создаваемой существовала.
- * Например, для успешного создания директории /home/user/.appdata/storage,
- * необходимо что-бы уже существовала директория /home/user/.appdata
- * @param path путь до создаваемой директории
- * @return true - директория создана
+ * @brief make_dir method creates directory
+ * To sucessfully create directory it's necessary,
+ * that the parent directory exists.
+ * I.e., to create directory /home/user/.appdata/storage,
+ * it's necessary the directory /home/user/.appdata exists.
+ * @param path - path to created directory
+ * @return true - if directory created
  */
 bool dir_make(const std::string &path);
 
 /**
- * @brief remove_dir удалить деркторию
- * Для успешного удалениия директории, она должна быть пуста.
- * @param path путь до удаляемой директории
- * @return true - дерктория удалена
+ * @brief remove_dir - removes directory
+ * To remove directory sucessfully it should be empty.
+ * @param path - path to removed directory
+ * @return true - if directory removed sucessfully
  */
 bool dir_remove(const std::string &path);
 
 /**
- * @brief make_path функция создает полный путь до указанной директории
- * В процессе создания пути будут созданы все промежуточные директории
- * @param path путь до создаваемой директории
- * @return true - директория полностью создан
+ * @brief make_path method creates full path to given directory
+ * During the path creation all necessary directories will be created
+ * @param path - path to created directory
+ * @return true - if the directory is fully created
  */
 bool path_make(const std::string &path);
 
 /**
- * @brief remove_path функция удаляет директорию по указанному пути
- * со всем содержимым (будут удалены все файлы и директории)
- * @param path путь до удаляемой директории
- * @return true - директория полностью удалена
+ * @brief remove_path - method removes the directory at the given path
+ * aith all content (all directories and files will be removed)
+ * @param path path to given directory
+ * @return true - is the directory is fully removed
  */
 bool path_remove(const std::string &path);
 
 /**
- * @brief Объём папки
- * @param[in] path Путь к папке (оконочный разделитель не обязателен)
- * @return Суммарный размер всех файлов в папке, включая вложенные папки.
+ * @brief directory size
+ * @param[in] path - path to the directory (final splitter is not necessary)
+ * @return Summary size of all files in the directory including nested folders.
  *
- * Если указанный путь является файлом, возвращается размер файла. Если ни папка, ни файл
- * с таким имененм не существуют, возвращается static_cast<size_t>(-1).
+ * If the given path is the file, method gies the file size. If there is no folder nor file
+ * with diven name(path) exists, method returns static_cast<size_t>(-1).
  */
 size_t path_size(const std::string &path);
 

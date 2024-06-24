@@ -9,9 +9,9 @@ add_subdirectory(api_gen)
 add_subdirectory(executor_gen)
 add_subdirectory(variant_gen)
 
-# Не рекомендуется использовать file(GLOB, поскольку он вызывается только на стадии
-# генератора Cmake. При добавлении файлов в папку он вызван не будет - и список файлов
-# не обновится.
+# It's not recommended to use file(GLOB, because it's called only in the
+# Cmake-generator stage. When adding the files in the dir it won't be called - and the list of files
+# will not be updated.
 add_library(csconnector
     include/csstats.hpp
     src/csstats.cpp
@@ -40,10 +40,10 @@ add_library(csconnector
 
 target_link_libraries (csconnector PUBLIC csdb csnode lib csconnector_gen csconnector_executor_gen variant_gen)
 
-# INCLUDE DIRECTORIES лучше задавать не глобально, а для конкретного проекта.
-# INCLUDE DIRECTORIES из подключаемых библиотек (в данном случае thrift и csdb)
-# задавать не надо. Они включены в INTERFACE библиотек и подключатся автоматически
-# в target_link_libraries
+# INCLUDE DIRECTORIES it's better not to set globally but for each project.
+# INCLUDE DIRECTORIES consists of include libraries (in this case thrift and csdb)
+# and should not be set. Those are included into INTERFACE libs and will be included automatically
+# in target_link_libraries
 target_include_directories(csconnector
   PUBLIC include
   PRIVATE src

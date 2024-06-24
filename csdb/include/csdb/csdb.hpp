@@ -9,20 +9,20 @@
 #include <csdb/storage.hpp>
 
 namespace csdb {
-/* Набор глобальныйх функций предназначен во-первых, для совместимости с предыдущей версией csdb,
- * а во-вторых, для работы с единственным хранилищем, без создания экземпляров класса \ref ::csdb::Storage.
+/* The global functions set is necessary for the compatibility with previous csdb version,
+ * and for working with the single storage without creating \ref ::csdb::Storage class object.
  *
- * Набор практически копирует набор методов \ref ::csdb::Storage, реализуюя работу с единственным
- * внутренним экземпляром объекта класса. Подробные описания функций находятся в документации к
- * классу \ref ::csdb::Storage.
+ * This set almost copies the method's det of \ref ::csdb::Storage, realizing the work with single
+ * internal class object. The detailed description of methods is in the \ref ::csdb::Storage
+ * class documentation.
  */
 
 /**
- * @brief Инициализация внутреннего объекта хранилища
+ * @brief Initializing of inner storage object
  *
- * Параметры функции эквивалентны параметрам \ref ::csdb::Storage::open. Основное отличие заключается
- * в том, что в случае, если внутренний объект \ref ::csdb::Storage уже открыт, то функция не
- * пытается открыть новое хранилище, а сразу возвращает false.
+ * The method parameters are equivalent to those of \ref ::csdb::Storage::open, main discrepancy is
+ * that, in the case when inner \ref ::csdb::Storage object is already opened, then method doesn't 
+ * try to open the new Storage, but returns false immediately.
  *
  * @sa ::csdb::Storage::open
  */
@@ -34,44 +34,45 @@ bool init(const Storage::OpenOptions& options, Storage::OpenCallback callback = 
 bool init(const char* path_to_bases, const Storage::OpenCallback& callback = nullptr);
 
 /**
- * @brief Проверка, инициализирован ли внутренний объект хранилища
+ * @brief 
+ Check if the internal storage object is initialized
  * @sa ::csdb::Storage::isOpen
  */
 bool isInitialized();
 
 /**
- * @brief Закрытие внутреннего объекта хранилища
+ * @brief Closing of internal storage object
  * @sa ::csdb::Storage::close
  */
 void done();
 
 /**
- * @brief Код последней ошибки
+ * @brief Last error code
  * @sa ::csdb::Storage::last_error()
  */
 Storage::Error lastError();
 
 /**
- * @brief Описание последней ошибки
+ * @brief Last error description
  * @sa ::csdb::Storage::last_error_message()
  */
 ::std::string lastErrorMessage();
 
 /**
- * @brief Код последней ошибки работы с драйвером базы данных
+ * @brief Last database drivers work error code
  * @sa ::csdb::Storage::db_last_error()
  */
 Database::Error dbLastError();
 
 /**
- * @brief Описание последней ошибки работы с драйвером базы данных
+ * @brief Last database drivers work error description
  * @sa ::csdb::Storage::db_last_error_message()
  */
 ::std::string dbLastErrorMessage();
 
 /**
- * @brief Хранилище по умолчанию
- * @return Внутренний екземпляр объекта хранилища.
+ * @brief Default storage
+ * @return Internal object of storage
  */
 Storage defaultStorage();
 

@@ -36,7 +36,7 @@ struct Token {
     uint64_t transfersCount = 0;
     uint64_t realHoldersCount = 0;  // Non-zero balance
 
-    // TmpРЎache: name, symbol, totalSupply, balance
+    // Tmp cache: name, symbol, totalSupply, balance
     std::string name;
     std::string symbol;
     std::string totalSupply;

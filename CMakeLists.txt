@@ -85,7 +85,7 @@ else()
   message(STATUS "CMAKE_CXX_FLAGS_RELEASE = ${CMAKE_CXX_FLAGS_RELEASE}")
 endif()
 
-# Вот этот большой список нужен, чтобы thrift не собирал ничего лишнего.
+# This large list is necessary to prevent thrift from generating unused stuff
 add_definitions(-DUSE_STD_THREAD)
 
 if (MSVC)
