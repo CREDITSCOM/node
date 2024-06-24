@@ -51,6 +51,144 @@ namespace api_diag {
         _return.__set_nodes(nodes);
     }
 
+    void APIDiagHandler::GetSupply(SupplyInfo& _return) {
+        general::APIResponse resp;
+
+
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        std::vector<csdb::Amount> supply;
+        std::string msg;
+
+        auto task = [&]() {
+            node_.getSupply(supply);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+
+        csdebug() << "GetSupply: size = " << supply.size();
+        if (supply.size() != 4ULL) {
+            resp.__set_code(kError);
+            resp.__set_message("info is not provided");
+            _return.__set_result(resp);
+            return;
+        }
+        resp.__set_code(kOk);
+        _return.__set_result(resp);
+
+        general::Amount genesis;
+        genesis.__set_integral(supply[0].integral());
+        genesis.__set_fraction(supply[0].fraction());
+        _return.__set_initialSupply(genesis);
+
+        general::Amount burned;
+        burned.__set_integral(supply[1].integral());
+        burned.__set_fraction(supply[1].fraction());
+        _return.__set_coinsBurned(burned);
+
+        general::Amount mined;
+        mined.__set_integral(supply[2].integral());
+        mined.__set_fraction(supply[2].fraction());
+        _return.__set_coinsMined(mined);
+
+        general::Amount current;
+        current.__set_integral(supply[3].integral());
+        current.__set_fraction(supply[3].fraction());
+        _return.__set_currentSupply(current);
+    }
+
+
+    void APIDiagHandler::GetNodeRewardEvaluation(RewardEvaluation& _return, const general::Address& address) {
+        general::APIResponse resp;
+        auto addr = BlockChain::getAddressFromKey(address);
+        resp.__set_code(kOk);
+        _return.__set_result(resp);
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        std::vector<api_diag::NodeRewardSet> nodesReward;
+        std::string msg;
+
+        auto task = [&]() {
+            node_.getNodeRewardEvaluation(nodesReward, msg, addr.public_key(), true);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+
+        _return.__set_nodesReward(nodesReward);
+
+    }
+
+
+    void APIDiagHandler::GetActiveTrustNodes(ActiveTrustNodesResult& _return) {
+        general::APIResponse resp;
+        resp.__set_code(kOk);
+        _return.__set_result(resp);
+
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        std::vector<api_diag::ServerTrustNode> nodes;
+        csdb::Address emptyKey;
+
+        auto task = [&]() {
+            node_.getKnownPeersUpd(nodes, false, emptyKey);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+
+        _return.__set_nodes(nodes);
+    }
+
+    void APIDiagHandler::GetNodeStat(ActiveTrustNodesResult& _return, const general::Address& address) {
+
+
+        const csdb::Address addr = BlockChain::getAddressFromKey(address);
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool done = false;
+        std::vector<api_diag::ServerTrustNode> nodes;
+
+        auto task = [&]() {
+            node_.getKnownPeersUpd(nodes, true, addr);
+            done = true;
+            cv.notify_one();
+        };
+        cs::Concurrent::execute(cs::RunPolicy::CallQueuePolicy, task);
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [&] { return done; });
+        }
+        general::APIResponse resp;
+        if (nodes.size() > 0) {
+            resp.__set_code(kOk);
+            _return.__set_result(resp);
+            _return.__set_nodes(nodes);
+        }
+        else {
+            resp.__set_code(kError);
+            resp.__set_message("Node not found");
+            _return.__set_result(resp);
+        }
+
+    }
+
     void APIDiagHandler::GetActiveTransactionsCount(ActiveTransactionsResult& _return) {
         general::APIResponse resp;
         resp.__set_code(kOk);
@@ -298,6 +436,42 @@ namespace api_diag {
         _return.__set_info(info);
     }
 
+    void APIDiagHandler::UserCommand(general::APIResponse& _return, const std::string& data) {
+        std::vector<cs::Byte> msg(data.begin(), data.end());
+        cs::IDataStream stream(msg.data(), msg.size());
+        uint16_t order;
+        stream >> order;
+ /*       if (order == 2U) {
+            cs::Sequence seq;
+            cs::PublicKey key;
+            stream >> seq >> key;
+            node_.specialSync(seq, key);
+        }
+        if (order == 3U) {
+            cs::Sequence seq;
+            stream >> seq;
+            node_.setTop(seq);
+        }
+        if (order == 4U) {
+            node_.showNeighbours();
+        }
+
+        if (order == 5U) {
+            node_.setIdle();
+        }
+
+        if (order == 6U) {
+            node_.setWorking();
+        }
+
+        if (order == 7U) {
+            node_.showDbParams();
+        }*/
+
+        _return.__set_code(kNotImplemented);
+        _return.__set_message("Not implemented");
+    }
+
     void APIDiagHandler::SetRawData(general::APIResponse& _return, const std::string& data) {
         const size_t min_len = sizeof(cs::RoundNumber) + 1 + Consensus::MinTrustedNodes * kPublicKeyLength + cscrypto::kSignatureSize;
         if (data.size() < min_len) {
@@ -337,5 +511,9 @@ namespace api_diag {
 
         _return.__set_code(success? kOk : kError);
 
+    }
+
+    cs::Bytes toByteArray(const std::string& s) {
+        return cs::Bytes(s.begin(), s.end());
     }
 }

@@ -41,7 +41,10 @@ endif()
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/version.cpp" @ONLY)
 
 add_executable(client
+  include/client/peer.hpp
   include/client/params.hpp
+  include/client/cmdlineargs.hpp
+  src/peer.cpp
   src/main.cpp
   "${CMAKE_CURRENT_BINARY_DIR}/version.cpp" include/client/version.hpp
 )

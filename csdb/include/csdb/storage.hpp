@@ -34,21 +34,23 @@ using BlockReadingStartedSingal = cs::Signal<void(cs::Sequence lastBlockNum)>;
 using BlockReadingStoppedSignal = cs::Signal<void()>;
 
 /**
- * @brief Объект хранилища.
+ * @brief Storage object
  *
- * Объект хранилища является классом, через который осуществляется дальнейшая работа с данными
- * в хранилище (чтение, запись и т.п.). Объект по сути является "разделяемым указателем" (shared_ptr),
- * поэтому может свододно копироваться, однако фактически копии ссылаются на один и то же экземпляр,
- * и изменения, произведённые в одном из экземпляров, отразятся во всех копиях.
+ * Storage object is a class, that is used to process all kinds of actions with data in 
+ * database(storage) (read, save and so on). Object is a shared pointer(shared_ptr),
+ * and can be freely copied, but all copies are linked to one (the same) storage object,
+ * so the changes, made in one object are translated in all copies.
  *
- * Для работы с физическим хранилищем используется интерфейсный класс \ref ::csdb::Database.
+ * To work with physical storage the interface class \ref ::csdb::Database is used.
  *
- * В данный момент имеется единственная реализация интерфейса \ref ::csdb::Database -
- * \ref ::csdb::DatabaseLevelDB. Она же используется при открытии объекта \ref ::csdb::Storage.
- *
- * При создании объект \ref ::csdb::Storage имеет статус "не открытого", вызовы любых методов получени
- * или записи данных порождают ошибку ::csdb::Storage::NotOpen. Для работы с объектом \ref ::csdb::Storage
- * необходимо вызывать функцию \ref ::csdb::Storage::open или создать объект с помощью функции
+ * (orig)=== In previous version there was only one realization of interface \ref ::csdb::Database -
+ * \ref ::csdb::DatabaseLevelDB. It's used to open the object \ref ::csdb::Storage too. ===
+ * 
+ * In current version this interface was changed for berkly db, that showed more reliable results under increased loads.
+ * 
+ * When creating \ref ::csdb::Storage object has not opened status, and calls of any method reading or 
+ * saving data spawn exception ::csdb::Storage::NotOpen. To work with object \ref ::csdb::Storage
+ * the method \ref ::csdb::Storage::open should be called or the object should be created with method
  * ::csdb::Storage::get.
  */
 class Storage final {
@@ -93,9 +95,10 @@ public:
 
 public:
     struct OpenOptions {
-        /// Экземпляр драйвера базы данных
+        /// Db driver unit
         ::std::shared_ptr<Database> db;
         ::cs::Sequence newBlockchainTop = ::cs::kWrongSequence;
+        ::cs::Sequence startSequence = 0;
     };
 
     struct OpenProgress {
@@ -103,98 +106,98 @@ public:
     };
 
     /**
-     * @brief Callback для операции открытия
-     * @return true, если операцию необходимо прервать.
+     * @brief Callback for open operation
+     * @return true, if the operation should be interrupted.
      */
     typedef ::std::function<bool(const OpenProgress&)> OpenCallback;
 
     /**
-     * @brief Открывает хранилище по набору параметров.
-     * @param opt       Набор параметров для открытия. Член стурктуры \ref OpenOptions::db должен
-     *                  указывать на уже открытую базу.
-     * @param callback  Функция обратного вызова для процедуры открытия
-     * @return          true, если открытие и анализ прошли успешно. В противном случае false.
+     * @brief Opens storage with parameters.
+     * @param opt       Parameter's set for opening storage. Structure \ref OpenOptions::db member has to
+     *                  point at alreadyy opened database.
+     * @param callback  Callback for opening
+     * @return          true, if successfull opening and check, otherwise false.
      *
-     * В случае неудачи информацию об ошибке можно получить с помошью методов \ref last_error,
-     * \ref last_error_message, \ref db_last_error() и \ref db_last_error_message()
+     * In case of fail the error info can be obtained with the aid of methods \ref last_error,
+     * \ref last_error_message, \ref db_last_error() and \ref db_last_error_message()
      */
     bool open(const OpenOptions& opt, OpenCallback callback = nullptr);
 
     /**
-     * @brief Открывает хранилище по пути к хранилищу
-     * @param path_to_base  Путь к базе данных (слеш в конце необязателен)
-     * @param callback      Функция обратного вызова для процедуры открытия
-     * @return              true, если открытие и анализ прошли успешно. В противном случае false.
+     * @brief Opens storage using given path
+     * @param path_to_base  path to database (terminating slash is not necessary)
+     * @param callback      Callback to open
+     * @return              true, if opening was successfull, otherwise false.
      * @overload
      *
-     * Метод пытается открыть существующее (или создать новое) хранилище с драйвером базы
-     * данных, определённым для текущей платформы. Если указанный путь не существует, метод пытается
-     * создать указанный путь. Если передан пустой путь, то используется путь по умолчанию для
-     * текущей платформы.
+     * Method tries to open the existing or to create a new storage with database driver
+     * defined for current platform. If the given path does not exist, method tries to
+     * create the new path. If the given path is empty, then the default path for current platform will be used.
      *
-     * В случае неудачи информацию об ошибке можно получить с помошью методов \ref last_error,
-     * \ref last_error_message, \ref db_last_error() и \ref db_last_error_message()
+     * In case of fail the error info can be received with methods:  \ref last_error,
+     * \ref last_error_message, \ref db_last_error() and \ref db_last_error_message()
      */
-    bool open(const ::std::string& path_to_base = ::std::string{}, OpenCallback callback = nullptr,
-              cs::Sequence newBlockchainTop = cs::kWrongSequence);
+    bool open(const ::std::string& path_to_base = ::std::string{},
+              OpenCallback callback = nullptr,
+              cs::Sequence newBlockchainTop = cs::kWrongSequence,
+              cs::Sequence startReadFrom = 0);
 
     /**
-     * @brief Создание хранилища по набору параметров.
+     * @brief Creating the storage using the parameters set.
      *
-     * Создаёт объект хранилища и пытается его открыть. См. \ref open(const OpenOptions &opt, OpenCallback callback);
+     * Creates a storage and tries to open it. See \ref open(const OpenOptions &opt, OpenCallback callback);
      */
     static inline Storage get(const OpenOptions& opt, OpenCallback callback = nullptr);
 
     /**
-     * @brief Создание хранилища по пути к хранилищу.
+     * @brief Creating the storage st the given path.
      *
-     * Создаёт объект хранилища и пытается его открыть.
-     * См. \ref open(const ::std::string& path_to_base, OpenCallback callback);
+     * Creates a storage and tries to open it.
+     * See \ref open(const ::std::string& path_to_base, OpenCallback callback);
      */
     static inline Storage get(const ::std::string& path_to_base = ::std::string{}, OpenCallback callback = nullptr);
 
     /**
-     * @brief Проверяет, открыто ли хранилище.
-     * @return true, если хранилище открыто и с ним можно работать. Иначе false.
+     * @brief Checks if the storage is opened.
+     * @return true, if the storage is opened and can be used, otherwise false.
      */
     bool isOpen() const;
 
     /**
-     * @brief Закрывает хранилище
+     * @brief Closes the storage
      *
-     * После вызова этого метода обращение к любым методам получения или записи данных приводят
-     * к ошибке \ref NotOpen.
+     * After using this method every reading or saving info methods leads to error \ref NotOpen.
      */
     void close();
 
     /**
-     * @brief Хэш последнего блока
-     * @return Хэш последнего блока
+     * @brief Last block hash
+     * @return Last block hash
      *
-     * Хеш последнего блока возвращается корректно только в том случае, если блоки,
-     * помещённые в хранилище (в том числе и после открытия), образуют корректную
-     * связанную цепочку.
+     * Last block hash is returned correctly only in that case if the blocks, 
+     * saved in the storage (event during db opening), are the corrent consistent chain.
      *
-     * Если хранилище пустое, или не содержит законченной цепочки, возвращается пустой хэш.
+     * If storage is empty or doesn't has the correctly finished chain, returns empty hash.
      */
     PoolHash last_hash() const noexcept;
     void set_last_hash(const PoolHash&) noexcept;
     void set_size(const size_t) noexcept;
 
     /**
-     * @brief Записавает пул в хранилище
-     * @param[in] pool Пул для записи в хранилище.
-     * @return true, если пул успешно записан.
+     * @brief writes the pool into the storage
+     * @param[in] pool Pool to be stored
+     * @return true, if poll stored.
      *
      * \sa ::csdb::Pool::save
      */
     bool pool_save(Pool pool);
 
     /**
-     * @brief Загружает пул из хранилища
-     * @param[in] hash Хэш пула, который надо загрузить.
-     * @return Загруженный пул. Если пул не найден или данные из хранилища не могут быть
-     *         интерпретированы, как пул, возвращается невалидный пул.
+     * @brief Loads pool form the storage/ overloaded method
+     * @param[in]   hash - hash of pool to be loaded,
+     *              sequence - sequence of pool to be loaded.
+     * @return Loaded pool. If pool was not found or the storage data can't be
+     *         interpreted, as pool, the invalid pool is returned. 
      *         (\ref ::csdb::Pool::is_valid() == false).
      *
      * \sa ::csdb::Pool::load
@@ -204,68 +207,72 @@ public:
     Pool pool_load_meta(const PoolHash& hash, size_t& cnt) const;
 
     Pool pool_remove_last();
-
-	/**
-	 * @brief Удаляет последний блок из хранилища без вычисления хэша блока. Используется при нарушении целостности данных,
-	 * когда из удаляемого блока нельзя получить его хэш, а само значение хэша известно из другого источника, например из кэша. Также, корректно
-	 * удалит последний блок, когда его хэш уже удален из таблицы "хэш -> номер", а сам блок из таблицы блоков еще не удален
-	 * @param[in] test_sequence Номер блока, который надо проверить. Должен строго указывать на последний блок в хранилище
-	 * @param[in] test_hash Хэш блока, который надо удалить. Должен указывать на последний блок в хранилище или не указывать на запись
-	 * в таблице "хэш - номер" вообще. Последнее возможно в результате преддшествущей частично неуспешной операции удаления последнего блока
-	 * @return Признак успешного удаления блока
+    /**
+	 * @brief Removes last pool form the storage without calculating pool hash. Used in case of data consistancy interrruption,
+	 * when hash can't be obtained from the deleted pool, but the hash value is known form another source, i.e. cache. 
+	 * Method can correctly delete the last pool when its hash is deleted from the hash table "hash -> sequence", and the pool 
+     * is still not deleted from the pools table.
+	 * @param[in] test_sequence Pool sequence (block number) to be checked. Sequence should exactly point the last pool in the storage.
+	 * @param[in] test_hash Pools hash, that should be removed. Should point the last pool in the storage or not point the record int the
+	 * "hash - sequence" table at all. The lase case is possible after previously not correct last pool removing procedure
+	 * @return true if pool is successfully removed
 	 *
 	 * \sa ::csdb::Pool::load
 	 */bool pool_remove_last_repair(cs::Sequence test_sequence, const csdb::PoolHash& test_hash);
 
+     bool pool_remove_(cs::Sequence testSequence);
+
     /**
-     * @brief Получение транзакции по идентификатору.
-     * @param[in] id Идентификатор транзакции
-     * @return Объект транзакции. Если тразакции с таким идентификаторм отсутствует в хранилище,
-     *         возвращается невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
+     * @brief Requesting the transaction using transaction id (pool.number_in_pool).
+     * @param[in] id transaction id
+     * @return Transaction object. If transaction with such id can't be found in the storage,
+     *         returns invalid object(\ref ::csdb::Transaction::is_valid() == false).
      */
     Transaction transaction(const TransactionID& id) const;
 
     /**
-     * @brief Получить последнюю транзакцию по адресу источника
-     * @param[in] source Адрес источника
-     * @return Объект транзакции. Если транзакции не существует в данном пуле, возвращается
-     *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
+     * @brief Get last transaction in storage from sender using its address.
+     * @param[in] source Senders address
+     * @return Transaction object. If transaction with such id can't be found in the storage,
+     *         returns invalid object(\ref ::csdb::Transaction::is_valid() == false).
      */
     Transaction get_last_by_source(Address source) const noexcept;
 
     /**
-     * @brief Получить последнюю транзакцию по адресу назначения
-     * @param[in] source Адрес назначения
-     * @return Объект транзакции. Если транзакции не существует в данном пуле, возвращается
-     *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
+     * @brief Get last transaction in storage to recipient using its address.
+     * @param[in] target Recipient address
+     * @return Transaction object. If transaction with such id can't be found in the storage,
+     *         returns invalid object(\ref ::csdb::Transaction::is_valid() == false).
      */
     Transaction get_last_by_target(Address target) const noexcept;
 
     /**
-     * @brief size возвращает количество пулов в хранилище
-     * @return количество блоков в хранилище
+     * @brief size returns number of pools in the storage
+     * @return number of pools in the storage
      *
-     * \deprecated Функция будет удалена в последующих версиях.
+     * \deprecated method will be removed in the next versions
      */
     size_t size() const noexcept;
 
     /**
-     * @brief wallet получить кошелек для указанного адреса
-     * Кошелек содержит все данные для расчета баланса и проведению транзакций для
-     * указанного адреса
-     * @param addr адрес кошелька
-     * @return кошелек
+     * @brief wallet get wallet using address
+     * Wallet contains all data cor calculating the balance of the address
+     * @param addr wallet address
+     * @return wallet
+     * 
+     * \deprecated method will be removed in the next versions, because don't support 
+     * different porpose transaction functionality. Use wallet cache instead 
      */
     Wallet wallet(const Address& addr) const;
 
     /**
-     * @brief transactions получить список транзакций для указанного адреса
-     * @param addr адрес кошелька
-     * @param limit маскимальное число транзакций в списке
-     * @param offset идентификатор транзакции после которой начинать формирование списка
-     * @return список транзакций
+     * @brief transactions - get transaction's list for given address
+     * @param addr wallet address
+     * @param limit maximum number of transactions in the list (limited by 100)
+     * @param offset transaction Id after that the list will be started
+     * @return transaction's list
      *
-     * \deprecated Функция будет удалена в последующих версиях.
+     * \deprecated method will be removed in the next versions
      */
     std::vector<Transaction> transactions(const Address& addr, size_t limit = 100, const TransactionID& offset = TransactionID()) const;
 

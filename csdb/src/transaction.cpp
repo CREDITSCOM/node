@@ -18,26 +18,29 @@
 
 namespace csdb {
 
-SHARED_DATA_CLASS_IMPLEMENTATION(TransactionID)
+//SHARED_DATA_CLASS_IMPLEMENTATION(TransactionID)
+
+TransactionID::TransactionID()
+    : pool_seq_(cs::kWrongSequence), index_(0) {}
 
 TransactionID::TransactionID(cs::Sequence pool_seq, cs::Sequence index)
-    : d(new priv(pool_seq, index)) {}
+    : pool_seq_(pool_seq) , index_(index) {}
 
 bool TransactionID::is_valid() const noexcept {
-    return d->pool_seq_ != cs::kWrongSequence;
+    return pool_seq_ != cs::kWrongSequence;
 }
 
 cs::Sequence TransactionID::pool_seq() const noexcept {
-    return d->pool_seq_;
+    return pool_seq_;
 }
 
 cs::Sequence TransactionID::index() const noexcept {
-    return d->index_;
+    return index_;
 }
 
 std::string TransactionID::to_string() const noexcept {
     std::ostringstream os;
-    os << d->pool_seq_ << ':' << d->index_;
+    os << pool_seq_ << ':' << index_;
     return os.str();
 }
 
@@ -52,8 +55,8 @@ TransactionID TransactionID::from_string(const ::std::string& str) {
             if ('\0' != (*start)) {
                 uintmax_t idx = strtoumax(start, &end, 10);
                 if ((end != start) && ('\0' == (*end))) {
-                    res.d->pool_seq_ = static_cast<cs::Sequence>(pSeq);
-                    res.d->index_ = static_cast<cs::Sequence>(idx);
+                    res.pool_seq_ = static_cast<cs::Sequence>(pSeq);
+                    res.index_ = static_cast<cs::Sequence>(idx);
                 }
             }
         }
@@ -77,12 +80,12 @@ bool TransactionID::operator<(const TransactionID& other) const noexcept {
 }
 
 void TransactionID::put(::csdb::priv::obstream& os) const {
-    os.put(d->pool_seq_);
-    os.put(d->index_);
+    os.put(pool_seq_);
+    os.put(index_);
 }
 
 bool TransactionID::get(::csdb::priv::ibstream& is) {
-    return is.get(d->pool_seq_) && is.get(d->index_);
+    return is.get(pool_seq_) && is.get(index_);
 }
 
 SHARED_DATA_CLASS_IMPLEMENTATION(Transaction)
@@ -193,6 +196,12 @@ void Transaction::set_counted_fee_unsafe(AmountCommission counted_fee) {
 void Transaction::set_signature(const cs::Signature& signature) {
     if (!d.constData()->read_only_) {
         d->signature_ = signature;
+    }
+}
+
+void Transaction::update_id(const csdb::TransactionID& id) {
+    if (!d.constData()->read_only_) {
+        d->id_ = id;
     }
 }
 

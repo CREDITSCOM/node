@@ -12,6 +12,7 @@
 #include <csdb/pool.hpp>
 #include <csnode/transactionspacket.hpp>
 #include <csnode/roundpackage.hpp>
+#include <csnode/caches_serialization_manager.hpp>
 
 #include <algorithm>
 #include <array>
@@ -76,7 +77,11 @@ public:
     // Solver "public" interface,
     // below are the "required" methods to be implemented by Solver-compatibility issue:
     void subscribeToSignals();
-    void init(const cs::PublicKey& pub, const cs::PrivateKey& priv);
+    void init(
+        const cs::PublicKey& pub,
+        const cs::PrivateKey& priv,
+        cs::CachesSerializationManager&
+    );
     void gotConveyerSync(cs::RoundNumber rNum);
     void gotHash(const cs::StageHash&& sHash, uint8_t currentTrustedSize);
 
@@ -129,7 +134,7 @@ public:
     void getGrayListContentBase58(std::vector<std::string>& gray_list) const;
 
     bool isTransactionsInputAvailable();
-
+    std::string setBlockReward(csdb::Pool& defBlock, const cs::Bytes& realTrusted);
     void askTrustedRound(cs::RoundNumber rNum, const cs::ConfidantsKeys& confidants);
     uint64_t lastTimeStamp();
     void uploadNewStates(std::vector<csdb::Transaction> newStates);
@@ -344,7 +349,7 @@ private:
     TimeoutTracking track_next_round;
     std::map<cs::PublicKey, uint16_t> grayList_;
     cs::RoundNumber lastGrayUpdated_ = 0;
-    RoundPackage justCreatedRoundPackage;
+    RoundPackage justCreatedRoundPackage_;
     SentSignatures lastSentSignatures_;
     std::unique_ptr<IterValidator> pVal_;
     std::string kLogPrefix_;

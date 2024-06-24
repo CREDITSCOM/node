@@ -24,4 +24,4 @@
 	url = https://github.com/Neargye/nameof.git
 [submodule "p2p"]
 	path = p2p
-	url = https://github.com/SychevS/p2p.git
+	url = git@github.com:SychevS/p2p.git

@@ -39,7 +39,11 @@ public:
 
     using AddressAndPort = std::pair<std::string, uint16_t>;
     using BanList = std::vector<AddressAndPort>;
-
+    enum ProcSpeed {
+        setDefault,
+        increase,
+        decrease
+    };
     explicit Transport(Node* node);
     ~Transport();
 
@@ -58,6 +62,7 @@ public:
     void revertBan(const cs::PublicKey&);
     void clearBanList();
     void getBanList(BanList&) const;
+    void clearInbox();
 
     // neighbours interface
     void setPermanentNeighbours(const std::set<cs::PublicKey>&);
@@ -87,10 +92,6 @@ protected:
     void OnMessageReceived(const net::NodeId&, net::ByteVector&&) override;
     void OnNodeDiscovered(const net::NodeId&) override;
     void OnNodeRemoved(const net::NodeId&) override;
-
-    void OnFragmentFound(const net::FragmentId&, net::ByteVector&&) override {}
-    void OnFragmentNotFound(const net::FragmentId&) override {}
-    net::FragmentId GetFragmentId(const net::ByteVector&);
 
 private:
 // Postpone logic - beg

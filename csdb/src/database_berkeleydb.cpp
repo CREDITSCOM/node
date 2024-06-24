@@ -396,8 +396,8 @@ public:
 
         int ret = it_->get(&key, &value, DB_FIRST);
         if (ret == 0) {
-			set_key(key);
-			set_value(value);
+            set_key(key);
+            set_value(value);
             valid_ = true;
         }
         else {
@@ -415,8 +415,8 @@ public:
 
         int ret = it_->get(&key, &value, DB_LAST);
         if (ret == 0) {
-			set_key(key);
-			set_value(value);
+            set_key(key);
+            set_value(value);
             valid_ = true;
         }
         else {
@@ -426,6 +426,27 @@ public:
 
     void seek(const cs::Bytes &) final {
         assert(false);
+    }
+
+    void seek(const uint32_t seq_no) final {
+        if (it_ == nullptr) {
+            return;
+        }
+
+        // storage wants to load blocks by 0-based index:
+        // 1 => pool[0], 2 => pool[1] etc.
+        Dbt_copy<uint32_t> key(seq_no + 1);
+        Dbt_safe value;
+
+        int ret = it_->get(&key, &value, DB_SET);
+        if (ret == 0) {
+            set_key(key);
+            set_value(value);
+            valid_ = true;
+        }
+        else {
+            valid_ = false;
+        }
     }
 
     void next() override final {
@@ -438,7 +459,7 @@ public:
 
         int ret = it_->get(&key, &value, DB_NEXT);
         if (ret == 0) {
-			set_key(key);
+            set_key(key);
             set_value(value);
             valid_ = true;
         }
@@ -452,9 +473,9 @@ public:
     }
 
     uint32_t key() const final {
-		if (valid_) {
-			return key_;
-		}
+        if (valid_) {
+            return key_;
+        }
         return std::numeric_limits<uint32_t>::max();
     }
 
@@ -471,23 +492,23 @@ private:
         value_.assign(begin, begin + value.get_size());
     }
 
-	void set_key(const Dbt& key) {
-		auto begin = static_cast<uint8_t*>(key.get_data());
-		cs::Bytes tmp;
-		tmp.assign(begin, begin + key.get_size());
-		if (tmp.size() == sizeof(uint32_t)) {
-			// storage wants to use 0-based keys: 1 => pool[0], 2 => pool[1] etc.
-			key_ = *reinterpret_cast<uint32_t*>(tmp.data()) - 1;
-		}
-		else {
-			key_ = std::numeric_limits<uint32_t>::max();
-		}
-	}
+    void set_key(const Dbt& key) {
+        auto begin = static_cast<uint8_t*>(key.get_data());
+        cs::Bytes tmp;
+        tmp.assign(begin, begin + key.get_size());
+        if (tmp.size() == sizeof(uint32_t)) {
+            // storage wants to use 0-based keys: 1 => pool[0], 2 => pool[1] etc.
+            key_ = *reinterpret_cast<uint32_t*>(tmp.data()) - 1;
+        }
+        else {
+            key_ = std::numeric_limits<uint32_t>::max();
+        }
+    }
 
     Dbc *it_;
     bool valid_;
     cs::Bytes value_;
-	uint32_t key_;
+    uint32_t key_;
 };
 
 DatabaseBerkeleyDB::IteratorPtr DatabaseBerkeleyDB::new_iterator() {

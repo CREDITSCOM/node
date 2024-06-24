@@ -15,6 +15,8 @@
 #include "dumbcv.hpp"
 #include "executor.hpp"
 
+#include <csnode/apihandler_serializer.hpp>
+
 namespace csconnector {
 class connector;
 }  // namespace csconnector
@@ -81,6 +83,22 @@ public:
     void TransactionGet(api::TransactionGetResult& _return, const api::TransactionId& transactionId) override;
     void TransactionsGet(api::TransactionsGetResult& _return, const general::Address& address, const int64_t offset, const int64_t limit) override;
     void TransactionFlow(api::TransactionFlowResult& _return, const api::Transaction& transaction) override;
+
+    void TransactionSend(api::SendTransactionResult& _return, const Transaction& transaction) override;
+    void TransactionResultGet(api::TransactionFlowResult& _return, const int64_t requestId) override;
+
+    //requesting wallet's balances w/o getting results immediately
+    void WalletsListBalancesGet(api::AcceptedRequestId& _return, const api::Addresses& walletAddresses) override;
+    void WalletsListBalancesResultGet(api::WalletBalanceResults& _return, const int64_t requestId) override;
+
+        //requesting filtered transaction's list w/o getting result immediately
+    void FilteredTrxsListGet(api::AcceptedRequestId& _return, const api::TransactionsQuery& generalQuery) override;
+    void FilteredTrxsListGetResult(api::FilteredTransactionsListResult& _return, const int64_t requestId) override;
+
+        //sending transaction's list w/o getting results immediately
+    void TransactionsListSend(api::SendTransactionResult& _return, const api::TransactionsList& transactions) override;
+    void TransactionsListResultGet(api::TransactionsListFlowResult& _return, const int64_t requestId) override;
+
     void FilteredTransactionsListGet(api::FilteredTransactionsListResult& _return, const api::TransactionsQuery& generalQuery) override;
     // Get list of pools from last one (head pool) to the first one.
     void PoolListGet(api::PoolListGetResult& _return, const int64_t offset, const int64_t limit) override;
@@ -217,7 +235,7 @@ private:
         }
         SmartOperation(const SmartOperation& rhs)
         : state(rhs.state)
-        , stateTransaction(rhs.stateTransaction.clone())
+        , stateTransaction(rhs.stateTransaction)
         , hasRetval(rhs.hasRetval)
         , returnsBool(rhs.returnsBool)
         , boolResult(rhs.boolResult) {
@@ -261,6 +279,9 @@ private:
     api::SealedTransaction convertTransaction(const csdb::Transaction& transaction);
 
     std::vector<api::SealedTransaction> convertTransactions(const std::vector<csdb::Transaction>& transactions);
+    
+    void filteredTrxsProcess(const api::TransactionsQuery& generalQuery, uint64_t requestId);
+    void processBalancesRequest(api::Addresses walletAddresses, uint64_t requestId);
 
     std::vector<api::ExtraFee> fillExtraFee(const csdb::Transaction& transaction, const csdb::TransactionID transactionId);
 
@@ -278,6 +299,8 @@ private:
     ::csdb::Transaction makeTransaction(const ::api::Transaction&);
     void dumbTransactionFlow(api::TransactionFlowResult& _return, const csdb::Transaction& tr);
     void smartTransactionFlow(api::TransactionFlowResult& _return, const ::api::Transaction&, csdb::Transaction& send_transaction);
+    void processTransaction(csdb::Transaction trx, uint64_t requestId);
+    void processSmartTransaction(const Transaction& transaction, csdb::Transaction transactionToSend, uint64_t requestId);
 
     std::optional<std::string> checkTransaction(const ::api::Transaction&, csdb::Transaction& cTransaction);
     void checkTransactionsFlow(const cs::TransactionsPacket& packet, cs::DumbCv::Condition condition);
@@ -288,14 +311,25 @@ private:
     const uint8_t ERROR_CODE = 1;
 
     friend class ::csconnector::connector;
+    friend class ::cs::APIHandler_Serializer;
 
     std::condition_variable_any newBlockCv_;
     std::mutex dbLock_;
-
+    
     cs::Sequence maxReadSequence{};
 
     std::optional<api::Delegated> getDelegated(const BlockChain::WalletData& wallet);
     const size_t MaxQueriesNumber = 1000;
+
+    std::unordered_map<uint64_t, api::TransactionFlowResult> transactions_;
+    std::mutex trxsLock_;
+    std::unordered_map<uint64_t, api::FilteredTransactionsListResult> ftRequests_;
+    std::mutex fltLock_;
+    std::unordered_map<uint64_t, api::WalletBalanceResults> walBalances_;
+    std::mutex wbLock_;
+    std::unordered_map<uint64_t, api::TransactionsListFlowResult> trxLists_;
+    std::mutex tlMutex_;
+    uint64_t requestId_ = 0;
 
 private slots:
     void updateSmartCachesPool(const csdb::Pool& pool);

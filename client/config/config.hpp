@@ -18,6 +18,7 @@ namespace ip = boost::asio::ip;
 
 using NodeVersion = cs::Version;
 extern const NodeVersion NODE_VERSION;
+extern const uint8_t MINOR_NODE_VERSION;
 
 const std::string DEFAULT_PATH_TO_CONFIG = "config.ini";
 const std::string DEFAULT_PATH_TO_DB = "db";
@@ -34,7 +35,7 @@ const uint32_t DEFAULT_OBSERVER_WAIT_TIME = 5 * 60 * 1000;  // ms
 const uint32_t DEFAULT_ROUND_ELAPSE_TIME = 1000 * 60; // ms
 const uint32_t DEFAULT_STORE_BLOCK_ELAPSE_TIME = 1000 * 40; // ms
 
-const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 10; // rounds
+const size_t DEFAULT_CONVEYER_MAX_PACKET_LIFETIME = 30; // rounds
 
 using Port = short unsigned;
 
@@ -151,7 +152,7 @@ public:
     Config& operator=(const Config&) = default;
     Config& operator=(Config&&) = default;
 
-    static Config read(po::variables_map&);
+    static Config read(po::variables_map&, bool);
     
     const EndpointData& getInputEndpoint() const {
         return inputEp_;
@@ -236,6 +237,11 @@ public:
     static NodeVersion getNodeVersion() {
         return NODE_VERSION;
     }
+    
+    static NodeVersion getMinorNodeVersion() {
+        return MINOR_NODE_VERSION;
+    }
+
 
     NodeVersion getMinCompatibleVersion() const {
         return minCompatibleVersion_;
@@ -255,12 +261,29 @@ public:
         return compatibleVersion_;
     }
 
+    bool getForkGeneration() const{
+        return generateFork_;
+    }
+
+
+    bool isSyncOn() const {
+        return sync_on_;
+    }
+
+    bool isIdleMode() const {
+        return idleMode_;
+    }
+
     uint64_t maxUncorrectedBlock() const {
         return maxUncorrectedBlock_;
     }
 
     bool traverseNAT() const {
         return traverseNAT_;
+    }
+
+    bool daemonMode() const {
+        return daemonMode_;
     }
 
     uint64_t newBlockchainTopSeq() const {
@@ -297,6 +320,23 @@ public:
     const DbSQLData& getDbSQLData() const {
         return dbSQLData_;
     }
+
+    bool isStakinOn(cs::RoundNumber round);
+    bool isMiningOn(cs::RoundNumber round);
+
+    bool getBalanceChangeFlag() const {
+        return showBalanceChange_;
+    }
+
+    cs::PublicKey getBalanceChangeKey() const{
+        return showBalanceChangeKey_;
+    }
+
+    std::string getBalanceChangeAddress() const {
+        return showBalanceChangeAddress_;
+        ;
+    }
+
 
 private:
     static Config readFromFile(const std::string& fileName);
@@ -353,13 +393,19 @@ private:
     ApiData apiData_;
     DbSQLData dbSQLData_;
 
+    bool showBalanceChange_ = false;
     bool alwaysExecuteContracts_ = false;
     bool recreateIndex_ = false;
     bool newBlockchainTop_ = false;
     bool autoShutdownEnabled_ = true;
     bool compatibleVersion_ = true;
     bool traverseNAT_ = true;
+    bool sync_on_ = true;
     uint64_t newBlockchainTopSeq_;
+    bool generateFork_ = false;
+    bool idleMode_ = false;
+
+    bool daemonMode_ = false;
 
     uint64_t observerWaitTime_ = DEFAULT_OBSERVER_WAIT_TIME;
     uint64_t roundElapseTime_ = DEFAULT_ROUND_ELAPSE_TIME;
@@ -368,6 +414,13 @@ private:
     ConveyerData conveyerData_;
 
     EventsReportData eventsReport_;
+
+    cs::PublicKey showBalanceChangeKey_;
+    std::string showBalanceChangeAddress_;
+
+    std::vector<std::pair<cs::RoundNumber, cs::RoundNumber>> stakingRoundRanges_;
+
+    std::vector<std::pair<cs::RoundNumber, cs::RoundNumber>> miningRoundRanges_;
 
     friend bool operator==(const Config&, const Config&);
     friend class cs::config::Observer;

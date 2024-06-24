@@ -38,7 +38,7 @@ public:
     explicit AmountCommission(uint16_t value);
     explicit AmountCommission(double value);
 
-    // Получение значений
+    // Values retriving
 public:
     inline double to_double() const noexcept;
     inline explicit operator double() const noexcept {
@@ -48,7 +48,7 @@ public:
         return u_.bits;
     }
 
-    // Сериализация
+    // Serialization
 public:
     void put(priv::obstream&) const;
     bool get(priv::ibstream&);

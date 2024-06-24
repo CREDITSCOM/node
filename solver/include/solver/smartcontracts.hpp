@@ -195,7 +195,9 @@ struct SmartContractRef {
     }
 
     // "serialization" methods
-
+    std::string toString(){
+        return std::to_string(sequence) + "." + std::to_string(transaction);
+    }
     csdb::UserField to_user_field() const;
 
     void from_user_field(const csdb::UserField& fld);
@@ -357,10 +359,40 @@ public:
 
     static std::vector<cs::TransactionsPacket> grepNewStatesPacks(const BlockChain& storage, const std::vector<csdb::Transaction>& trxs);
 
+    void addUnusedJavaLib(std::string libname);
+    void removeUnusedJavaLib(std::string libname);
+    std::vector<std::string>* getUnusedJavaLibsList();
+
+    //serialization try:
+    void clear();
+    void printClassInfo();
+    Bytes serialize();
+    void deserialize(Bytes& data);
 
     std::optional<api::SmartContractInvocation> get_smart_contract(const csdb::Transaction& tr) {
         cs::Lock lock(public_access_lock);
         return get_smart_contract_impl(tr);
+    }
+
+    bool isBlacklisted(const csdb::Address& abs_addr) const {
+        return (blacklistedContracts_.find(abs_addr) != blacklistedContracts_.cend());
+    }
+
+    //uint64_t getTestValue() {
+    //    return testValue;
+    //}
+
+    void setBlacklisted(const csdb::Address& abs_addr, bool status) {
+        if (status) {
+            if (!isBlacklisted(abs_addr)) {
+                blacklistedContracts_.insert(abs_addr);
+            }
+        }
+        else {
+            if (isBlacklisted(abs_addr)) {
+                blacklistedContracts_.erase(abs_addr);
+            }
+        }
     }
 
     csdb::Transaction get_contract_call(const csdb::Transaction& contract_state) const;
@@ -393,7 +425,7 @@ public:
 
     bool is_known_smart_contract(const csdb::Address& addr) const {
         cs::Lock lock(public_access_lock);
-        return in_known_contracts(addr);
+        return in_known_contracts(addr) && !isBlacklisted(addr);
     }
 
     bool is_contract_locked(const csdb::Address& addr) const {
@@ -550,6 +582,10 @@ private:
 
     // defines current contract state, the contracts cache is a container of every contract state
     struct StateItem {
+        std::string toString();
+        std::string transactionToString(const csdb::Transaction& tr);
+        Bytes to_bytes();
+        static StateItem from_bytes(Bytes& data);
         // payable() method is implemented
         PayableStatus payable{ PayableStatus::Unknown };
         // reference to deploy transaction
@@ -567,19 +603,25 @@ private:
         // current state which is result of last successful execution / deploy
         std::string state;
         // using other contracts: [own_method] - [ [other_contract - its_method], ... ], ...
-        std::unordered_map<std::string, std::unordered_map<csdb::Address, std::string>> uses;
+        std::map<std::string, std::map<csdb::Address, std::string>> uses;
     };
 
     // last contract's state storage
     std::unordered_map<csdb::Address, StateItem> known_contracts;
 
+    std::unordered_set<csdb::Address> blacklistedContracts_;
+
     std::unordered_set<csdb::Address> locked_contracts;
+
+    //uint64_t testValue = 0;
 
     // contract replenish transactions stored during reading from DB on stratup
     std::vector<SmartContractRef> uncompleted_contracts;
 
     // specifies a one contract call
     struct ExecutionItem {
+        Bytes to_bytes();
+        static ExecutionItem from_bytes(Bytes& data);
         // reference to smart in block chain (block/transaction) that spawns execution
         SmartContractRef ref_start;
         // starter transaction
@@ -604,6 +646,8 @@ private:
 
     // defines an item of execution queue which is a one or more simultaneous calls to specific contract
     struct QueueItem {
+        Bytes to_bytes();
+        static QueueItem from_bytes(Bytes& data);
         // list of execution items, empty list is senceless
         std::vector<ExecutionItem> executions;
         // current status (running/waiting)
@@ -685,6 +729,7 @@ private:
     using execution_const_iterator = std::vector<ExecutionItem>::const_iterator;
 
     Node* pnode;
+    std::vector<std::string> unusedJavaLibs_;
 
     queue_const_iterator find_in_queue(const SmartContractRef& item) const {
         for (auto it = exe_queue.cbegin(); it != exe_queue.cend(); ++it) {
@@ -842,6 +887,7 @@ private:
         }
     }
 
+
     std::optional<api::SmartContractInvocation> get_smart_contract_impl(const csdb::Transaction& tr);
 
     void on_execution_completed_impl(const std::vector<SmartExecutionData>& data_list);
@@ -912,11 +958,14 @@ private:
      */
 
     void on_next_block_impl(const csdb::Pool& block, bool reading_db, bool* should_stop);
+    void checkExeQueue(const csdb::Pool& block, bool reading_db, bool* should_stop);
 
     // request correct state in network
     void net_request_contract_state(const csdb::Address& abs_addr);
 
     Reject::Reason prevalidate_inner(const cs::TransactionsPacket& pack);
+
+    friend class SmartContracts_Serializer;
 };
 
 }  // namespace cs

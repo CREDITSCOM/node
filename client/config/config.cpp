@@ -27,7 +27,8 @@
 #include <unistd.h>
 #endif
 
-const NodeVersion NODE_VERSION = 524;
+const NodeVersion NODE_VERSION = 532;
+const uint8_t MINOR_NODE_VERSION = 0;
 
 const std::string BLOCK_NAME_PARAMS = "params";
 const std::string BLOCK_NAME_HOST_INPUT = "host_input";
@@ -53,7 +54,11 @@ const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contract
 const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
 const std::string PARAM_NAME_COMPATIBLE_VERSION = "compatible_version";
 const std::string PARAM_NAME_TRAVERSE_NAT = "traverse_nat";
+const std::string PARAM_NAME_SYNC_ON = "sync_on";
 const std::string PARAM_NAME_MAX_UNCORRECTED_BLOCK = "max_uncorrected_block";
+const std::string PARAM_NAME_GENERATE_FORK = "generate_fork";
+const std::string PARAM_NAME_IDLE_MODE = "idle_mode";
+const std::string PARAM_NAME_DAEMON_MODE = "daemon_mode";
 
 const std::string PARAM_NAME_CONVEYER_MAX_PACKET_LIFETIME = "max_packet_life_time";
 
@@ -113,6 +118,7 @@ const std::string ARG_NAME_PRIVATE_KEY_FILE = "private-key-file";
 const std::string ARG_NAME_ENCRYPT_KEY_FILE = "encryptkey";
 const std::string ARG_NAME_RECREATE_INDEX = "recreate-index";
 const std::string ARG_NAME_NEW_BC_TOP = "set-bc-top";
+const std::string ARG_NAME_BAL_CHANGE = "bal-change";
 const std::string ARG_NAME_DISABLE_AUTO_SHUTDOWN = "disable-auto-shutdown";
 
 const uint32_t MIN_PASSWORD_LENGTH = 3;
@@ -222,19 +228,41 @@ Config::Config(const ConveyerData& conveyerData)
 : conveyerData_(conveyerData) {
 }
 
-Config Config::read(po::variables_map& vm) {
+Config Config::read(po::variables_map& vm, bool atStart) {
     Config result = readFromFile(getArgFromCmdLine(vm, ARG_NAME_CONFIG_FILE, DEFAULT_PATH_TO_CONFIG));
 
     result.recreateIndex_ = vm.count(ARG_NAME_RECREATE_INDEX);
     result.autoShutdownEnabled_ = !vm.count(ARG_NAME_DISABLE_AUTO_SHUTDOWN);
     result.pathToDb_ = getArgFromCmdLine(vm, ARG_NAME_DB_PATH, DEFAULT_PATH_TO_DB);
 
-    if (vm.count(ARG_NAME_NEW_BC_TOP)) {
-        result.newBlockchainTop_ = true;
-        result.newBlockchainTopSeq_ =
-            vm[ARG_NAME_NEW_BC_TOP].as<decltype(result.newBlockchainTopSeq_)>();
-    }
+    if (atStart) {
+        if (vm.count(ARG_NAME_NEW_BC_TOP)) {
+            result.newBlockchainTop_ = true;
+            result.newBlockchainTopSeq_ =
+                vm[ARG_NAME_NEW_BC_TOP].as<decltype(result.newBlockchainTopSeq_)>();
+        }
 
+        if (vm.count(ARG_NAME_BAL_CHANGE)) {
+            result.showBalanceChangeAddress_ =
+                vm[ARG_NAME_BAL_CHANGE].as<decltype(result.showBalanceChangeAddress_)>();
+            cs::Bytes bytes;
+            if (!result.showBalanceChange_) {
+                if (DecodeBase58(result.showBalanceChangeAddress_, bytes)) {
+                    result.showBalanceChange_ = true;
+                    std::copy(bytes.begin(), bytes.end(), result.showBalanceChangeKey_.begin());
+                    csinfo() << "Balance changes of account " << result.showBalanceChangeAddress_ << " will be logged";
+                }
+                else {
+                    result.showBalanceChangeKey_.fill(0);
+                    csinfo() << "Balance changes account is set to " << cs::Utils::byteStreamToHex(result.showBalanceChangeKey_);
+                }
+            }
+        }
+        else {
+            result.showBalanceChangeKey_.fill(0);
+            //csinfo() << "Balance changes account is set to " << cs::Utils::byteStreamToHex(result.showBalanceChangeKey_);
+        }
+    }
     return result;
 }
 
@@ -750,6 +778,10 @@ Config Config::readFromFile(const std::string& fileName) {
             result.traverseNAT_ = (params.get<std::string>(PARAM_NAME_TRAVERSE_NAT) == "true");
         }
 
+        if (params.count(PARAM_NAME_DAEMON_MODE)) {
+            result.daemonMode_ = (params.get<std::string>(PARAM_NAME_DAEMON_MODE) == "true");
+        }
+
         result.minNeighbours_ = params.count(PARAM_NAME_MIN_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MIN_NEIGHBOURS) : DEFAULT_MIN_NEIGHBOURS;
         result.maxNeighbours_ = params.count(PARAM_NAME_MAX_NEIGHBOURS) ? params.get<uint32_t>(PARAM_NAME_MAX_NEIGHBOURS) : DEFAULT_MAX_NEIGHBOURS;
         result.restrictNeighbours_ = params.count(PARAM_NAME_RESTRICT_NEIGHBOURS) ? params.get<bool>(PARAM_NAME_RESTRICT_NEIGHBOURS) : false;
@@ -762,8 +794,17 @@ Config Config::readFromFile(const std::string& fileName) {
         if (params.count(PARAM_NAME_COMPATIBLE_VERSION)) {
             result.compatibleVersion_ = params.get<bool>(PARAM_NAME_COMPATIBLE_VERSION);
         }
-        result.maxUncorrectedBlock_ = params.count(PARAM_NAME_MAX_UNCORRECTED_BLOCK) ? params.get<uint64_t>(PARAM_NAME_MAX_UNCORRECTED_BLOCK) : DEFAULT_MAX_UNCORRECTED_BLOCK;
 
+        result.maxUncorrectedBlock_ = params.count(PARAM_NAME_MAX_UNCORRECTED_BLOCK) ? params.get<uint64_t>(PARAM_NAME_MAX_UNCORRECTED_BLOCK) : DEFAULT_MAX_UNCORRECTED_BLOCK;
+        result.generateFork_ = params.count(PARAM_NAME_GENERATE_FORK) ? params.get<bool>(PARAM_NAME_GENERATE_FORK) : false;
+
+        if (params.count(PARAM_NAME_SYNC_ON)) {
+            result.sync_on_ = params.get<bool>(PARAM_NAME_SYNC_ON);
+        }
+
+        if (params.count(PARAM_NAME_IDLE_MODE)) {
+            result.idleMode_ = params.get<bool>(PARAM_NAME_IDLE_MODE);
+        }
 
         result.connectionBandwidth_ = params.count(PARAM_NAME_CONNECTION_BANDWIDTH) ? params.get<uint64_t>(PARAM_NAME_CONNECTION_BANDWIDTH) : DEFAULT_CONNECTION_BANDWIDTH;
         result.observerWaitTime_ = params.count(PARAM_NAME_OBSERVER_WAIT_TIME) ? params.get<uint64_t>(PARAM_NAME_OBSERVER_WAIT_TIME) : DEFAULT_OBSERVER_WAIT_TIME;
@@ -925,6 +966,8 @@ void Config::readApiData(const boost::property_tree::ptree& config) {
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_VERSION_COMMIT_MIN, apiData_.executorCommitMin);
     checkAndSaveValue(data, BLOCK_NAME_API, PARAM_NAME_EXECUTOR_VERSION_COMMIT_MAX, apiData_.executorCommitMax);
 
+
+    cslog() << "[configInfo]: commitMin_: " << apiData_.executorCommitMin << ", commitMax_: " << apiData_.executorCommitMax;
     if (data.count(PARAM_NAME_EXECUTOR_IP)) {
         apiData_.executorHost = data.get<std::string>(PARAM_NAME_EXECUTOR_IP);
     }

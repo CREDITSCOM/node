@@ -17,48 +17,47 @@
 #include "lib/system/common.hpp"
 
 namespace csdb {
-/** @brief Класс для хранения количества валюты.
+/** @brief Class for coin storage.
  *
- * Класс предназначен для хранения количества произвольной суммы валюты в формате с фиксированной точкой с
- * повышенной точностью. Диапазон хранимых значений от INT32_MIN до INT32_MAX, точное количество значащих
- * цифр после запятой - 18.
+ * This class is designed to store sifferent sums of coins in format of fixed point with  
+ * increased precision. The range of values from INT32_MIN to INT32_MAX, the exact number of 
+ * significant digits after comma - 18.
  *
- * Целая часть хранится в виде числа типа INT32 со знаком. Дробная часть хранится в виде числа UINT64 без
- * знака, и интерпретируется как количество 1/10^18 долей единицы. Т.е. значение дробной части "1"
- * означает 0.000000000000000001, а для 0.1 значение дробной части равно 100000000000000000.
+ * The integer part is stored in the format of signed INT32 value.The fracture part is stored as unsigned UINT64
+ * and is interpreted as 1/10^18 parts of unity. I.e.the vaue of fracrure part "1"
+ * means 0.000000000000000001, and for 0.1 the value of fracture part will be 100000000000000000.
  *
- * Отрицательные числа кодируются в дополнительном формате, т.е. целая часть является максимальным целым
- * числом, не превышающим значения, а дробная часть является дополнением целой части до значения.
+ * Negative values are coded in extended format, i.e. the integer part is the maximum integer number,
+ * not exeeding the total value, and the fracture part is addition of the integer part to the total value.
  *
- * Примеры кодирования:
+ * Examples:
  * \li 1: {1,0}
  * \li 0.1: {1,500000000000000000}
  * \li -1: {-1,0}
  * \li -1.5: {-2,500000000000000000}
  * \li -0.1: {-1,900000000000000000}
  *
- * Такой формат кодирования позволяет осуществлять операции сложения и вычитания не обращая внимания на знак.
+ * Such way of coding allows to process the addition and subtraction operations regardless of sign.
  *
- * В классе реализованы основные арифметические операции для работы с \ref Amount как с обычным числовым типом.
- * Большинство операций реализовано в виде constexpr-операторов, что позволяет создавать константы этого типа,
- * вычисляемые на этапе компиляции. Для задания констант также можно использовать литеральный оператор с
- * суффиксом "_c".
+ * In this class the main arithmetic operations for working with \ref Amount as usual number type are implemented.
+ * The main part of operations is realized as constexpr-operators, that allows to create constants of this type,
+ * calculated at the compilation stage. To set the constants the literal operator with "_c"-suffix can be used.
  *
- * Примеры выражений с классом Amount:
+ * Examples of expressions with Amount-class:
  * \code
  * constexpr Amount a1{1};                  // a1 = 1.0;
- * const Amount a2{1.1};                    // a2 = 1.1; преобразование из double
- * constexpr Amount a3{1.1_c};              // a3 = 1.1; литерал
- * constexpr Amount a4{(1_c + 1.2_c) * 2};  // a3 = 4.4; выражение из литералов
- * constexpr Amount a4{0,1};                // a3 = 0.01; задание в виде дроби с делителем по умолчанию (100)
- * constexpr Amount a4{0,1,10};             // a3 = 0.1; задание в виде дроби с делителем 10
+ * const Amount a2{1.1};                    // a2 = 1.1; transformation from double
+ * constexpr Amount a3{1.1_c};              // a3 = 1.1; literal
+ * constexpr Amount a4{(1_c + 1.2_c) * 2};  // a3 = 4.4; literal expression
+ * constexpr Amount a4{0,1};                // a3 = 0.01; set value as fracture with default divider (100)
+ * constexpr Amount a4{0,1,10};             // a3 = 0.1; set value as fracture with divider 10
  * \endcode
  *
- * Настоятельно не рекомендуется использовать преобразование из double, т.к. оно может привести к потере
- * точности (значащих цифр). Кодирование double обеспечивает только 15 значащих цифр, в то время как
- * класс \ref Amount обеспечивает 9 значащих цифр в целой части и 18 в дробной. Для задания значений с
- * большим количеством значащих цифр рекомендуется использовать литеральный оператор, а при вычислениях
- * рекомендуется сначала привести значения к типу \ref Amount, а потом использовать операторы для него.
+ * We don't recommend to from-double transformations, as htey can lead to acuracy loss (significant figures).
+ * Double type provides only 15 significant figures, but
+ * \ref Amount class provides 9 significant figures in integral part and 18 in fractional. To set the values 
+ * with more significant figures' numbers we recommend to use literal operator, and before the calculations 
+ * you should convert the value to \ref Amount type, and then you can use the operators for it.
  */
 class Amount;
 }  // namespace csdb
@@ -82,21 +81,21 @@ public:
     : integral_(value) {
     }
     /**
-     * @brief Конструтор из целой части и правильной положительной дробной части
-     * @param integral Целая часть
-     * @param numerator Числитель дробной части
-     * @param denominator Знаменатель дробной части
+     * @brief Constructor from integer and proper fraction part
+     * @param integral - integer part of value
+     * @param numerator - numenator of fractional part
+     * @param denominator -  denominator of fractional part
      *
-     * Примеры:
+     * Examples:
      * \code
      * Amount a(0,1);     // a = 0.01;
      * Amount a(0,1,10);  // a = 0.1;
      * Amount a(0,1,2);   // a = 0.5;
-     * Amount a(0,1,0);   // Ошибка деления на ноль.
-     * Amount a(0,3,2);   // Ошибка - числитель обязан быть меньше знаменателя.
+     * Amount a(0,1,0);   // Dividing by zero error
+     * Amount a(0,3,2);   // Error - numenator should be less than denominator.
      * \endcode
      *
-     * Для конструирования \ref Amount из неправильной дроби следует использовать оператор деления:
+     * To construct \ref Amount from improper fraction the division operator should be used:
      * \code
      * Amount a1{5_c / 2};        // a1 = 2.5;
      * int32 n = -9;
@@ -104,7 +103,7 @@ public:
      * \endcode
      */
     inline constexpr Amount(int32_t integral, uint64_t numerator, uint64_t denominator);
-    /// \todo Переделать на inline constexpr
+    /// \todo redo as inline constexpr
     Amount(double value);
 
     inline constexpr Amount(const int32_t integral, const uint64_t fraction) noexcept
@@ -117,7 +116,7 @@ private:
     inline constexpr Amount(const internal::uint128_t::division64_result& value) noexcept;
     static inline constexpr uint64_t _check_fraction(const internal::uint128_t& fraction);
 
-    // Получение значений
+    // getting values
 public:
     inline constexpr int32_t integral() const noexcept {
         return integral_;
@@ -134,7 +133,7 @@ public:
         return to_double();
     }
 
-    // Сравнение
+    // comparison
 public:
     inline constexpr bool operator==(const Amount& other) const noexcept;
     inline constexpr bool operator!=(const Amount& other) const noexcept;
@@ -143,7 +142,7 @@ public:
     inline constexpr bool operator<=(const Amount& other) const noexcept;
     inline constexpr bool operator>=(const Amount& other) const noexcept;
 
-    // Арифметические операции
+    // arithmetical operations
 public:
     inline constexpr Amount operator-() const noexcept;
 
@@ -159,7 +158,7 @@ public:
     inline constexpr Amount operator*(const int32_t other) const noexcept;
     inline Amount operator*(double other) const;
 
-    /// \todo Реализовать версию для const Amount& other
+    /// \todo create version of const Amount& other
     // inline constexpr Amount operator *(const Amount& other) const;
     inline constexpr Amount operator/(const int32_t other) const;
     // inline Amount operator *(double other) const;
@@ -176,16 +175,16 @@ public:
     inline Amount& operator*=(int32_t other) noexcept;
     inline Amount& operator*=(double other);
 
-    /// \todo Реализовать версию для const Amount& other
+    /// \todo create version for const Amount& other
     // inline Amount& operator /=(const Amount& other);
     inline Amount& operator/=(int32_t other);
     // inline Amount& operator /=(double other);
 
-    /// \todo Реализовать функцию muldiv для вычисление долей (процентов) для больших значений
+    /// \todo create function muldiv to calculate fractions (percentage) for large values
 
     ::std::string to_string(size_t min_decimal_places = 2) const noexcept;
 
-    // Сериализация
+    // serialization
     cs::Bytes toBytes() const;
     static Amount fromBytes(const cs::Bytes&);
 public:
@@ -196,7 +195,7 @@ private:
     int32_t integral_ = 0;
     uint64_t fraction_ = 0;
 
-    // Шаблоны для constexpr литерального оператора.
+    // Templates for constexpr of literal operator.
 private:
     template <uint64_t m, char d, char... s>
     struct amount_fraction;
@@ -446,11 +445,11 @@ inline constexpr csdb::Amount operator "" _c ()
   return csdb::Amount::amount_full<s...>::value();
 }
 
-/// \todo Реализовать вывод в строку с поддержкой ширины поля и точности.
+/// \todo Create output to string with support of field width and precision.
 inline ::std::ostream& operator << (::std::ostream& os, const csdb::Amount& value)
 {
   return (os << value.to_string());
 }
-/// \todo Реализовать чтение из строки
+/// \todo Create read form string
 
 #endif // _CREDITS_CSDB_AMOUNT_H_INCLUDED_

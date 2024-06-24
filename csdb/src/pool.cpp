@@ -11,7 +11,9 @@
 #ifdef _MSC_VER
 #include <intrin.h>
 #else
+#if !defined(__arm__) && !defined(__aarch64__)
 #include <x86intrin.h>
+#endif
 #endif
 
 #include <csdb/csdb.hpp>
@@ -385,7 +387,7 @@ class Pool::priv : public ::csdb::internal::shared_data {
 		size_t cnt;
 
 		if (!get_meta(is, cnt)) {
-			csmeta(cswarning) << "get meta is failed";
+            csmeta(cswarning) << "get meta is failed: size =" << is.size();
 			return false;
 		}
 
@@ -468,13 +470,13 @@ class Pool::priv : public ::csdb::internal::shared_data {
         binary_representation_ = std::move(bytes);
     }
 
-    void update_transactions() {
-        read_only_ = true;
+    void update_transactions(bool makeReadOnly = true) {
+        read_only_ = makeReadOnly;
 
         updateHash();
 
         for (size_t idx = 0; idx < transactions_.size(); ++idx) {
-            transactions_[idx].d->_update_id(sequence_, idx);
+            transactions_[idx].d->_update_id(sequence_, idx, makeReadOnly);
         }
     }
 
@@ -622,10 +624,10 @@ const std::vector<cs::Signature>& Pool::roundConfirmations() const noexcept {
 }
 
 Transaction Pool::transaction(TransactionID id) const {
-    if ((!d->is_valid_) || (!d->read_only_) || (!id.is_valid()) || (id.pool_seq() != d->sequence_) || (d->transactions_.size() <= id.d->index_)) {
+    if ((!d->is_valid_) || (!d->read_only_) || (!id.is_valid()) || (id.pool_seq() != d->sequence_) || (d->transactions_.size() <= id.index_)) {
         return Transaction{};
     }
-    return d->transactions_[id.d->index_];
+    return d->transactions_[id.index_];
 }
 
 Transaction Pool::get_last_by_source(const Address& source) const noexcept {
@@ -907,6 +909,13 @@ cs::Bytes Pool::to_binary() const noexcept {
     return d->binary_representation_;
 }
 
+cs::Bytes Pool::to_binary_updated() const {
+    ::csdb::priv::obstream os;
+    d->put(os, false);
+    cs::Bytes result = std::move(const_cast<std::vector<uint8_t>&>(os.buffer()));
+    return result;
+}
+
 /*static*/
 PoolHash Pool::hash_from_binary(cs::Bytes&& data) {
 	std::unique_ptr<priv> p{ new priv() };
@@ -920,14 +929,14 @@ PoolHash Pool::hash_from_binary(cs::Bytes&& data) {
 }
 
 /*static*/
-Pool Pool::from_binary(cs::Bytes&& data) {
+Pool Pool::from_binary(cs::Bytes&& data, bool makeReadOnly) {
     std::unique_ptr<priv> p{new priv()};
     ::csdb::priv::ibstream is(data.data(), data.size());
     if (!p->get(is)) {
         return Pool();
     }
     p->update_binary_representation(std::move(data));
-    p->update_transactions();
+    p->update_transactions(makeReadOnly);
     return Pool(p.release());
 }
 

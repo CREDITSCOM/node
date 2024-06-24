@@ -170,35 +170,120 @@ Reject::Reason IterValidator::deployAdditionalCheck(SolverContext& context, size
 			cslog() << kLogPrefix << ": transaction[" << trxInd << "] rejected, malformed contract address";
 			return Reject::Reason::MalformedContractAddress;
 		}
+        size_t cnt = 0ULL;
+        auto unusedJavaLibs = context.smart_contracts().getUnusedJavaLibsList();
+        auto it = unusedJavaLibs->begin();
+        while (it != unusedJavaLibs->end()) {
+            if (sci.value().smartContractDeploy.sourceCode.find(*it) != std::string::npos) {
+                ++cnt;
+            }
+            ++it;
+        }
+        if (cnt > 0ULL) {
+            return Reject::Reason::NotPermittedJavaLibs;
+        }
     }
 
     return Reject::Reason::None;
 }
 
+void IterValidator::checkSignatures(const Transactions& transactions, cs::Bytes& characteristicMask, size_t ttCount, size_t tNumber) {
+
+    csdebug() << "Starting thread " << tNumber;
+    size_t rejectedCounter = 0;
+    size_t totalTrxCount = transactions.size();
+    size_t startTrxCount = ttCount * tNumber;
+    size_t endTrxCount = ttCount * (tNumber + 1);
+    if (startTrxCount > totalTrxCount) {
+        csdebug() << "Invalid tread " << tNumber << " transactions counter";
+    }
+    if (endTrxCount > totalTrxCount) {
+        endTrxCount = totalTrxCount;
+    }
+    csdebug() << "Thread: " << tNumber << ", checking transactions from " << startTrxCount << " to " << endTrxCount - 1;
+    for (size_t i = startTrxCount; i < endTrxCount; ++i) {
+        if (characteristicMask[i] == 0U && (transactionKeys_[i] != Zero::key)) {
+            auto correctSignature = transactions[i].verify_signature(transactionKeys_[i]);
+            if (!correctSignature) {
+                characteristicMask[i] = Reject::Reason::WrongSignature;
+                ++rejectedCounter;
+                cslog() << kLogPrefix << "transaction[" << i << "] rejected, incorrect signature.";
+            }
+        }
+    }
+    rCounter_ += rejectedCounter;
+    csdebug() << "Finishing thread " << tNumber;
+}
+
+
 void IterValidator::checkTransactionsSignatures(SolverContext& context, const Transactions& transactions, cs::Bytes& characteristicMask, PacketsVector& smartsPackets) {
     checkSignaturesSmartSource(context, smartsPackets);
     size_t transactionsCount = transactions.size();
-    size_t maskSize = characteristicMask.size();
-    size_t rejectedCounter = 0;
+    size_t maskSize = characteristicMask.size();//unused!!!
+    //preliminary check
+    if (transactionsCount > transactionKeys_.size()) {
+        transactionKeys_.reserve(transactionsCount);
+    }
+    transactionKeys_.clear();
     for (size_t i = 0; i < transactionsCount; ++i) {
-        if (i < maskSize) {
-            bool correctSignature = checkTransactionSignature(context, transactions[i]);
-            if (!correctSignature) {
-                characteristicMask[i] = Reject::Reason::WrongSignature;
-                rejectedCounter++;
-                cslog() << kLogPrefix << "transaction[" << i << "] rejected, incorrect signature.";
+        auto tAddress = checkTransactionSignature(context, transactions[i]);
+        if (!tAddress.first) {
+            characteristicMask[i] = Reject::Reason::WrongSignature;
+        }
+        transactionKeys_.push_back(tAddress.second);
+    }
+    //signature check
+
+
+    rCounter_ = 0;
+    int cores = std::thread::hardware_concurrency();
+    size_t maxSingleThreadValidationLimit = 100;
+    size_t threadTrxCount = transactionsCount;
+    bool multiThread = false;
+    if (transactionsCount > maxSingleThreadValidationLimit) {
+        threadTrxCount = transactionsCount / cores;
+        if (transactionsCount % cores != 0) {
+            ++threadTrxCount;
+        }
+        multiThread = true;
+    }
+    std::vector<std::thread> threadsVector;
+    size_t numCores = multiThread ? cores : 1;
+    csdebug() << "Available cores: " << numCores;
+    csdebug() << "Checking transactions: " << transactionsCount;
+    if (!multiThread) {
+        checkSignatures(transactions, characteristicMask, threadTrxCount, 0);
+    }
+    else {
+        for (size_t thCounter = 0; thCounter < numCores; ++thCounter) {
+            std::thread thr(&IterValidator::checkSignatures, this, transactions, std::ref(characteristicMask), threadTrxCount, thCounter);
+            threadsVector.emplace_back(std::move(thr));
+        }
+        for (auto& thr : threadsVector) {
+            thr.join();
+        }
+
+    }
+    size_t tmpCounter = 0;
+    {
+        /*sMutex_.lock();*/
+        //std::lock_guard<std::mutex> guard(sMutex_);
+        tmpCounter = rCounter_;
+        /*sMutex_.unlock();*/
+    }
+    if (tmpCounter) {
+        for (size_t i = 0; i < transactionsCount; ++i) {
+            if (characteristicMask[i] == Reject::Reason::WrongSignature) {
                 if (SmartContracts::is_new_state(transactions[i])) {
                     pTransval_->saveNewState(context.smart_contracts().absolute_address(transactions[i].source()), i, Reject::Reason::WrongSignature);
                 }
             }
         }
-    }
-    if (rejectedCounter) {
-        cslog() << kLogPrefix << "wrong signatures num: " << rejectedCounter;
+        cslog() << kLogPrefix << "wrong signatures num: " << tmpCounter;
     }
 }
 
-bool IterValidator::checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction) {
+std::pair<bool, PublicKey> IterValidator::checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction) {
     csdb::Address src = transaction.source();
     // TODO: is_known_smart_contract() does not recognize not yet deployed contract, so all transactions emitted in constructor
     // currently will be rejected
@@ -213,31 +298,31 @@ bool IterValidator::checkTransactionSignature(SolverContext& context, const csdb
             if (context.blockchain().isSpecial(transaction)) {
                 const auto& starter_key = cs::PacketValidator::getBlockChainKey();
                 if (pub.public_key() != starter_key) {
-                    return false;
+                    return std::make_pair(false, Zero::key);
                 }
             }
-            return transaction.verify_signature(pub.public_key());
+            return std::make_pair(true, pub.public_key());
         }
         if (context.blockchain().isSpecial(transaction)) {
             const auto& starter_key = cs::PacketValidator::getBlockChainKey();
             if (src.public_key() != starter_key) {
-                return false;
+                return std::make_pair(false, Zero::key);
             }
         }
-        return transaction.verify_signature(src.public_key());
+        return std::make_pair(true, src.public_key());
     }
     else {
         // special rule for new_state transactions
         if (SmartContracts::is_new_state(transaction) && src != transaction.target()) {
             csdebug() << kLogPrefix << "smart state transaction has different source and target";
-            return false;
+            return std::make_pair(false, Zero::key);
         }
         auto it = smartSourceInvalidSignatures_.find(transaction.source());
         if (it != smartSourceInvalidSignatures_.end()) {
             csdebug() << kLogPrefix << "smart contract transaction has invalid signature";
-            return false;
+            return std::make_pair(false, Zero::key);
         }
-        return true;
+        return std::make_pair(true, Zero::key);
     }
 }
 
@@ -315,7 +400,7 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
             return "Such kind of transactions is prohibited for this recipient";
         case kNoDelegateTarget:
             return "No such delegate in your list";
-        case  kNoDelegateSource:
+        case kNoDelegateSource:
             return "Target account doesn't have you as source";
         case kNoDelegatedAmountToWithdraw:
             return "Target account doesn't have delegated amount that could be withdrawn";
@@ -324,7 +409,9 @@ std::string IterValidator::SimpleValidator::getRejectMessage(RejectCode rc) {
         case kDifferentDelegatedAmount:
             return "This account has another delegation amount from your account";
         case kAmountTooLow:
-            return "The amount of thansaction is too low";
+            return "The amount of transaction is too low";
+        case kNegativeAmount:
+            return "The amount of transaction is negative";
         default :
             return "Unknown reject reason.";
     }
@@ -339,6 +426,10 @@ bool IterValidator::SimpleValidator::validate(const csdb::Transaction& t, const 
 
     if (!fee::estimateMaxFee(t, countedFee, sc)) {
         rc = kInsufficientMaxFee;
+    }
+
+    if (!rc && t.amount() < csdb::Amount(0)) {
+        rc = kNegativeAmount;
     }
 
     if (!rc) {

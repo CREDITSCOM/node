@@ -20,31 +20,6 @@
 
 namespace csdb {
 
-class TransactionID::priv : public ::csdb::internal::shared_data {
-    inline priv() : pool_seq_(cs::kWrongSequence), index_(0) {}
-
-    inline priv(cs::Sequence pool_seq, cs::Sequence index)
-        : pool_seq_(pool_seq) , index_(index) {}
-
-    inline void _update(cs::Sequence pool_seq, cs::Sequence index) {
-        pool_seq_ = pool_seq;
-        index_ = index;
-    }
-
-    priv clone() const {
-        priv result;
-        result.pool_seq_ = pool_seq_;
-        result.index_ = index_;
-        return result;
-    }
-
-    cs::Sequence pool_seq_;
-    cs::Sequence index_ = 0;
-    friend class TransactionID;
-    friend class Transaction;
-    friend class Pool;
-};
-
 class Transaction::priv : public ::csdb::internal::shared_data {
     inline priv()
     : read_only_(false)
@@ -82,15 +57,15 @@ class Transaction::priv : public ::csdb::internal::shared_data {
     , signature_(signature) {
     }
 
-    inline void _update_id(cs::Sequence pool_seq, cs::Sequence index) {
-        id_.d->_update(pool_seq, index);
-        read_only_ = true;
+    inline void _update_id(cs::Sequence pool_seq, cs::Sequence index, bool makeReadOnly = true) {
+        id_._update(pool_seq, index);
+        read_only_ = makeReadOnly;
     }
 
     priv clone() const {
         priv result;
         result.read_only_ = read_only_;
-        result.id_ = id_.clone();
+        result.id_ = id_;
         result.innerID_ = innerID_;
 
         result.source_ = source_.clone();

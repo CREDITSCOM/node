@@ -36,7 +36,7 @@ struct Token {
     uint64_t transfersCount = 0;
     uint64_t realHoldersCount = 0;  // Non-zero balance
 
-    // TmpРЎache: name, symbol, totalSupply, balance
+    // Tmp cache: name, symbol, totalSupply, balance
     std::string name;
     std::string symbol;
     std::string totalSupply;
@@ -50,6 +50,10 @@ struct Token {
 
 using TokensMap = std::unordered_map<TokenId, Token>;
 using HoldersMap = std::unordered_map<HolderKey, std::set<TokenId>>;
+
+namespace cs {
+class TokensMaster_Serializer;
+}  // namespace cs
 
 class TokensMaster {
 public:
@@ -103,6 +107,8 @@ private:
     std::mutex dataMut_;
     TokensMap tokens_;
     HoldersMap holders_;
+
+    friend class cs::TokensMaster_Serializer;
 };
 
 #endif  // TOKENS_HPP

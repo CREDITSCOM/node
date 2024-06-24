@@ -14,7 +14,11 @@
 #include <algorithm>
 
 namespace cs {
-void SolverCore::init(const cs::PublicKey& pub, const cs::PrivateKey& priv) {
+void SolverCore::init(
+    const cs::PublicKey& pub,
+    const cs::PrivateKey& priv,
+    cs::CachesSerializationManager& serializationMan
+) {
     public_key = pub;
     private_key = priv;
 
@@ -26,6 +30,8 @@ void SolverCore::init(const cs::PublicKey& pub, const cs::PrivateKey& priv) {
     else {
         psmarts->init(pub, nullptr);
     }
+
+    serializationMan.bind(*psmarts);
 }
 
 void SolverCore::subscribeToSignals() {

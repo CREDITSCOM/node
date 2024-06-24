@@ -47,9 +47,9 @@ namespace csdb {
 namespace {
 
 struct head_info_t {
-    size_t len_;     // Количество блоков в цепочке
-    PoolHash next_;  // хеш следующего пула, или пустая строка для первого пула
-                     // в цепочее (нет родителя, начало цепочки).
+    size_t len_;     // Number of blocks in the chain
+    PoolHash next_;  // next pool hash, or empty string for genesis
+                     // in chain (no parent, chain start).
 };
 using heads_t = std::map<PoolHash, head_info_t>;
 using tails_t = std::map<PoolHash, PoolHash>;
@@ -60,24 +60,24 @@ using tails_t = std::map<PoolHash, PoolHash>;
     bool eith = (heads.end() != ith);
     bool eitt = (tails.end() != itt);
     if (eith && eitt) {
-        // Склеиваем две подцепочки.
+        // Concat two chains
         assert(1 == heads.count(itt->second));
         head_info_t& ith1 = heads[itt->second];
         ith1.next_ = ith->second.next_;
         ith1.len_ += (1 + ith->second.len_);
         if (!ith->second.next_.is_empty()) {
-            /// \todo Проверить, почему выпадает assert!
+            /// \todo Check, when assert is called!
             // assert(1 == tails.count(ith->second.next_));
             tails[ith->second.next_] = itt->second;
         }
         heads.erase(ith);
-        // Мы, возможно, уже изменили tails - поэтому нельзя удалять по итератору!
+        // Probably we changed tails - don't remove using iterator!
         tails.erase(cur_hash);
     }
     else if (eith && (!eitt)) {
-        // Добавляем в начало цепочки.
+        // Add to the beginning of the chain
         if (!ith->second.next_.is_empty()) {
-            /// \todo Проверить, почему выпадает assert!
+            /// \todo \todo Check, when assert is called!
             // assert(1 == tails.count(ith->second.next_));
             tails[ith->second.next_] = cur_hash;
         }
@@ -86,26 +86,26 @@ using tails_t = std::map<PoolHash, PoolHash>;
         heads.erase(prev_hash);
     }
     else if ((!eith) && eitt) {
-        // Добавляем в конец цепочки.
+        // Add to the end of the chain
         assert(1 == heads.count(itt->second));
         head_info_t& ith1 = heads[itt->second];
         ith1.next_ = prev_hash;
         ++ith1.len_;
         if (!prev_hash.is_empty()) {
-            // assert не нужен, т.е. наличие такого "хвоста" говорит о пересекающихся или зацикленных
-            // цепочках (т.е. уже была цепочка, имеющая этот же хвост).
-            // TODO: Доделать детектирование таких цепочек (после создания unit-тестов)
+            // we don't need assert, because the presence of such tail ith the evidence of the crossing of cycling chains
+            // (i.e. we had the chain with the same tail).
+            // TODO: Create such cases detection (after utin-tests)
             // assert(0 == tails.count(prev_hash));
             tails.emplace(prev_hash, itt->second);
         }
         tails.erase(cur_hash);
     }
     else {
-        // Ни с чем не пересекаемся! Просто подвешиваем.
+        // No intersections! Just hang up
         assert(0 == heads.count(cur_hash));
         heads.emplace(cur_hash, head_info_t{1, prev_hash});
         if (!prev_hash.is_empty()) {
-            // см. TODO к пердыдущей ветке.
+            // look TODO to prev thread.
             // assert(0 == tails.count(prev_hash));
             tails.emplace(prev_hash, cur_hash);
         }
@@ -133,8 +133,9 @@ private:
     void write_routine();
 
     std::shared_ptr<Database> db = nullptr;
-    PoolHash last_hash;     // Хеш последнего пула
-    size_t count_pool = 0;  // Количество пулов транзакций в хранилище (первоночально заполняется в check)
+    PoolHash last_hash;     // Last pool's hash
+    size_t count_pool = 0;  // Number of transaction's pools inthe storage (initially filled in check)
+    cs::Sequence startSequence = 0;
 
     void set_last_error(Storage::Error error = Storage::NoError, const ::std::string& message = ::std::string());
     void set_last_error(Storage::Error error, const char* message, ...);
@@ -170,7 +171,7 @@ private:
         >
     > PoolCache;
     PoolCache pools_cache;
-    static const size_t cacheSize = 1000;
+    static const size_t cacheSize = 50;
 
     void pools_cache_insert(const cs::Sequence& seq, const PoolHash &hash, const Pool &pool) {
         if (pools_cache.size() == cacheSize) {
@@ -226,9 +227,7 @@ void Storage::priv::set_last_error(Storage::Error error, const char* message, ..
 bool Storage::priv::rescan(Storage::OpenCallback callback) {
     last_hash = {};
     count_pool = 0;
-
-    heads_t heads;
-    tails_t tails;
+    cs::Sequence last_seq_in_db = 0;
 
     Database::IteratorPtr it = db->new_iterator();
     assert(it);
@@ -238,6 +237,7 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
         cs::Bytes v = it->value();
         Pool p = Pool::from_binary(std::move(v));
         if (p.is_valid()) {
+            last_seq_in_db = p.sequence();
             emit start_reading_event(p.sequence());
         }
         else {
@@ -248,29 +248,73 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
         emit start_reading_event(0);
     }
 
-    Storage::OpenProgress progress{0};
-    for (it->seek_to_first(); it->is_valid(); it->next()) {
-        cs::Bytes v = it->value();
+    if (startSequence > last_seq_in_db + 1) {
+        cserror() << "startSequence > last_seq_in_db + 1";
+        return false;
+    }
 
+    Storage::OpenProgress progress{0};
+
+    bool slowStart = false;
+
+    if (startSequence > 0 && [&]() { it->seek(startSequence - 1); return it->is_valid(); }()) {
+        csinfo() << "Storage: quick start";
+        count_pool = startSequence - 1;
+        progress.poolsProcessed = count_pool;
+        if (callback != nullptr) {
+            if (callback(progress)) {
+                set_last_error(Storage::UserCancelled);
+                return false;
+            }
+        }
+    }
+    else {
+        csinfo() << "Storage: slow start";
+        it->seek_to_first();
+        slowStart = true;
+    }
+
+    if (count_pool == last_seq_in_db && !slowStart) {
+        cs::Bytes v = it->value();
         Pool p = Pool::from_binary(std::move(v));
-        if (!p.is_valid()) {
-            set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool %d.", count_pool);
+        if (p.is_valid()) {
+            last_hash = p.hash();
+        }
+        else {
+            set_last_error(Storage::DataIntegrityError, "Data integrity error: corrupted pool %d.", count_pool);
             cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
             return false;
         }
-        pools_cache_insert(p.sequence(), p.hash(), p);
+    }
 
-        bool test_failed = false;
-        last_hash = p.hash();
-        count_pool++;
+    if (!slowStart) {
+        it->next();
+    }
 
-        emit read_block_event(p, &test_failed);
-        if (test_failed) {
-            set_last_error(Storage::DataIntegrityError, "Data integrity error: client reported violation of logic in pool %d", p.sequence());
-            return false;
-        }
+    for (; it->is_valid(); it->next()) {
+        cs::Bytes v = it->value();
 
-        //update_heads_and_tails(heads, tails, p.hash(), p.previous_hash());
+            Pool p = Pool::from_binary(std::move(v));
+            if (!p.is_valid()) {
+                set_last_error(Storage::DataIntegrityError, "Data integrity error: Corrupted pool %d.", count_pool);
+                cserror() << "Please restart node with command : client --set-bc-top " << count_pool - 1;
+                return false;
+            }
+            pools_cache_insert(p.sequence(), p.hash(), p);
+
+            bool test_failed = false;
+            last_hash = p.hash();
+            if (count_pool != p.sequence()) {
+                csdebug() << "count_pool = " << count_pool << ", pool sequence = " << p.sequence();
+            }
+            count_pool++;
+
+            emit read_block_event(p, &test_failed);
+            if (test_failed) {
+                set_last_error(Storage::DataIntegrityError, "Data integrity error: client reported violation of logic in pool %d", p.sequence());
+                return false;
+            }
+
         progress.poolsProcessed++;
 
         if (callback != nullptr) {
@@ -280,28 +324,9 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
             }
         }
     }
+
     emit stop_reading_event();
-
     return true;
-
-#if 0
-    std::stringstream ss;
-    ss << "More than one chains or orphan chains. List follows:" << std::endl;
-    for (auto ith = heads.begin(); ith != heads.end(); ++ith) {
-        ss << "  " << ith->first.to_string() << " (length = " << ith->second.len_ << "): ";
-        if (ith->second.next_.is_empty()) {
-            ss << "Normal";
-        }
-        else {
-            ss << "Orphan";
-        }
-        ss << std::endl;
-    }
-    ss << std::ends;
-    set_last_error(Storage::ChainError, ss.str());
-
-    return false;
-#endif
 }
 
 void Storage::priv::write_routine() {
@@ -456,6 +481,8 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
         return true;
     }
 
+    d->startSequence = opt.startSequence;
+
     if (!d->rescan(callback)) {
         d->db.reset();
         return false;
@@ -465,7 +492,12 @@ bool Storage::open(const OpenOptions& opt, OpenCallback callback) {
     return true;
 }
 
-bool Storage::open(const ::std::string& path_to_base, OpenCallback callback, cs::Sequence newBlockchainTop) {
+bool Storage::open(
+    const ::std::string& path_to_base,
+    OpenCallback callback,
+    cs::Sequence newBlockchainTop,
+    cs::Sequence startReadFrom
+) {
     ::std::string path{path_to_base};
     if (path.empty()) {
         path = ::csdb::internal::app_data_path() + "/CREDITS";
@@ -476,7 +508,7 @@ bool Storage::open(const ::std::string& path_to_base, OpenCallback callback, cs:
 
     //d->write_thread = std::thread(&Storage::priv::write_routine, d.get());
 
-    return open(OpenOptions{db, newBlockchainTop}, callback);
+    return open(OpenOptions{db, newBlockchainTop, startReadFrom}, callback);
 }
 
 void Storage::close() {
@@ -512,7 +544,12 @@ bool Storage::pool_save(Pool pool) {
     const PoolHash hash = pool.hash();
 
     if (d->db->get(hash.to_binary())) {
-        d->set_last_error(InvalidParameter, "%s: Pool already pressent [hash: %s]", funcName(), hash.to_string().c_str());
+        d->set_last_error(InvalidParameter, "%s: Pool already present [hash: %s]", funcName(), hash.to_string().c_str());
+        return false;
+    }
+
+    if (d->last_hash != pool.previous_hash()) {
+        d->set_last_error(InvalidParameter, "%s: Trying to save pool with another prev hash [hash: %s]", funcName(), pool.previous_hash().to_string().c_str());
         return false;
     }
     /*
@@ -731,6 +768,7 @@ Pool Storage::pool_load_meta(const PoolHash& hash, size_t& cnt) const {
 }
 
 Pool Storage::pool_remove_last() {
+    csdebug() << __func__ << ", db size: " << d->count_pool;
     if (!isOpen()) {
         d->set_last_error(NotOpen);
         return Pool{};
@@ -743,6 +781,7 @@ Pool Storage::pool_remove_last() {
         d->last_hash = res.previous_hash();
         return res;
     }
+    csinfo() << "Storage: pool not found in write queue";
 
     if (last_hash().is_empty()) {
         d->set_last_error(InvalidParameter, "%s: Empty hash passed", funcName());
@@ -751,6 +790,7 @@ Pool Storage::pool_remove_last() {
 
     cs::Bytes data;
     if (!d->db->get(last_hash().to_binary(), &data)) {
+        csdebug() << "Storage: No data with such hash";
         d->set_last_error(DatabaseError);
         return Pool{};
     }
@@ -775,6 +815,7 @@ Pool Storage::pool_remove_last() {
 }
 
 bool Storage::pool_remove_last_repair(cs::Sequence test_sequence, const csdb::PoolHash& test_hash) {
+    csinfo() << __func__ << ", db size: " << d->count_pool;
 	if (!isOpen()) {
 		d->set_last_error(NotOpen);
 		return false;
@@ -791,7 +832,7 @@ bool Storage::pool_remove_last_repair(cs::Sequence test_sequence, const csdb::Po
 
 	// test sequence
 	if (test_sequence + 1 != d->count_pool) {
-		d->set_last_error(InvalidParameter, "%s: incorrect last sequence passed", funcName());
+		d->set_last_error(InvalidParameter, "%s: incorrect last sequence passed: %i, storage size: %i", funcName(), test_sequence, d->count_pool);
 		return false;
 	}
 
@@ -832,6 +873,67 @@ bool Storage::pool_remove_last_repair(cs::Sequence test_sequence, const csdb::Po
 	d->last_hash = csdb::PoolHash{};
 	d->set_last_error(DataIntegrityError, "%s: Error loading previous pool %d", funcName(), test_sequence - 1);
 	return false;
+}
+// not used
+bool Storage::pool_remove_(cs::Sequence testSequence) {
+    if (!isOpen()) {
+        d->set_last_error(NotOpen);
+        return false;
+    }
+    if (testSequence == 0) {
+        d->set_last_error(InvalidParameter, "%s: Sequence 0 passed", funcName());
+        return false;
+    }
+    auto testHash = pool_hash(testSequence);
+    if (testHash.is_empty()) {
+        // hash is required!
+        d->set_last_error(InvalidParameter, "%s: Empty hash passed", funcName());
+        return false;
+    }
+
+    // test sequence
+    if (testSequence + 1 != d->count_pool) {
+        d->set_last_error(InvalidParameter, "%s: incorrect last sequence passed", funcName());
+        return false;
+    }
+
+    // clear write_queue if it is not empty
+    {
+        std::unique_lock<std::mutex> lock(d->write_lock);
+        d->write_queue.clear();
+    }
+
+    // test hash to conform last sequence or absent at all
+    uint32_t tmp;
+    if (d->db->seq_no(testHash.to_binary(), &tmp)) {
+        if (tmp != testSequence) {
+            // wrong pair (sequence, hash) passed!
+            d->set_last_error(InvalidParameter, "%s: incorrect last hash of %d passed", funcName(), tmp);
+            return false;
+        }
+    }
+    else {
+        // there is no test_hash in seq_no table, continue with remove operation
+    }
+
+    // now we have got correct last sequence and last hash
+    // TODO: remove operation fails if test_hash not found in (hash->sequence) table!
+    if (!d->db->remove(testHash.to_binary())) {
+        // last error have already set
+        return false;
+    }
+
+    // setup new last sequence & last hash
+    --d->count_pool;
+    csdb::Pool last = pool_load(testSequence - 1);
+    if (last.is_valid()) {
+        d->last_hash = last.hash();
+        return true;
+    }
+    // previous damaged block found, its hash is unknown
+    d->last_hash = csdb::PoolHash{};
+    d->set_last_error(DataIntegrityError, "%s: Error loading previous pool %d", funcName(), testSequence - 1);
+    return false;
 }
 
 Wallet Storage::wallet(const Address& addr) const {

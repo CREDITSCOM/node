@@ -72,7 +72,7 @@ private slots:
 private:
     void initialization();
     cs::PoolStoreType cachedType(cs::Sequence sequence) const;
-    
+
     std::vector<Interval> createInterval(cs::Sequence min, cs::Sequence max) const;
 
     size_t syncedPoolSize_ = 0;

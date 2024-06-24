@@ -16,7 +16,7 @@ if(NOT APPLE)
 endif()
 set (BOOST_ALL_DYN_LINK OFF)
 
-find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem)
+find_package (Boost 1.66.0 REQUIRED COMPONENTS thread system filesystem serialization)
 if (Boost_FOUND)
   # From the offical documentation:
   # Add include directories to the build. [...] If the SYSTEM option is given,
@@ -35,8 +35,10 @@ if (Boost_FOUND)
 endif ()
 
 add_library(csnode
+  include/csnode/address_serializer.hpp
   include/csnode/bitheap.hpp
   include/csnode/blockchain.hpp
+  include/csnode/blockchain_serializer.hpp
   include/csnode/cyclicbuffer.hpp
   include/csnode/node.hpp
   include/csnode/datastream.hpp
@@ -47,7 +49,9 @@ add_library(csnode
   include/csnode/transactionsindex.hpp
   include/csnode/transactionsiterator.hpp
   include/csnode/walletscache.hpp
+  include/csnode/walletscache_serializer.hpp
   include/csnode/walletsids.hpp
+  include/csnode/walletsids_serializer.hpp
   include/csnode/blockhashes.hpp
   include/csnode/poolsynchronizer.hpp
   include/csnode/fee.hpp
@@ -69,13 +73,23 @@ add_library(csnode
   include/csnode/idatastream.hpp
   include/csnode/odatastream.hpp
   include/csnode/poolcache.hpp
+  include/csnode/staking.hpp
+  include/csnode/smartcontracts_serializer.hpp
+  include/csnode/tokens_serializer.hpp
+  include/csnode/caches_serialization_manager.hpp
+  include/csnode/serializers_helper.hpp
+  include/csnode/apihandler_serializer.hpp
+  include/csnode/roundstat_serializer.hpp
   src/blockchain.cpp
+  src/blockchain_serializer.cpp
   src/node.cpp
   src/nodecore.cpp
   src/conveyer.cpp
   src/transactionspacket.cpp
   src/walletscache.cpp
+  src/walletscache_serializer.cpp
   src/walletsids.cpp
+  src/walletsids_serializer.cpp
   src/blockhashes.cpp
   src/poolsynchronizer.cpp
   src/fee.cpp
@@ -96,11 +110,23 @@ add_library(csnode
   src/sendcachedata.cpp
   src/eventreport.cpp
   src/poolcache.cpp
+  src/staking.cpp
+  src/smartcontracts_serializer.cpp
+  src/tokens_serializer.cpp
+  src/caches_serialization_manager.cpp
+  src/apihandler_serializer.cpp
+  src/roundstat_serializer.cpp
 )
 
 configure_msvc_flags()
 
-target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 lmdbxx config ${Boost_LIBRARIES})
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set (FSLIBRARY stdc++fs)
+else()
+    set (FSLIBRARY "")
+endif()
+
+target_link_libraries (csnode net csdb solver lib csconnector cscrypto base58 lz4 lmdbxx config ${Boost_LIBRARIES} ${FSLIBRARY})
 if(DBSQL)
 target_link_libraries (csnode dbsql)
 endif()
@@ -117,4 +143,5 @@ target_include_directories(${PROJECT_NAME} PUBLIC
                                          ${CMAKE_BINARY_DIR}/api/api_gen
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
                                          ${CMAKE_CURRENT_SOURCE_DIR}/../lmdbxx
-                                         ${CMAKE_CURRENT_SOURCE_DIR}/../client/config)
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../client/config
+                                         ${CMAKE_CURRENT_SOURCE_DIR}/../client/include)

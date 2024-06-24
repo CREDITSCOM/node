@@ -125,7 +125,7 @@ Result TrustedStage2State::onStage1(SolverContext& context, const cs::StageOne& 
         /*signing of the second stage should be placed here*/
         csdebug() << name() << ": --> stageTwo [" << static_cast<int>(stage.sender) << "]";
         stage.toBytes();
-        csdebug() << name() << ": stageMessage (" << stage.message.size() << "): " << cs::Utils::byteStreamToHex(stage.message);
+        //csdebug() << name() << ": stageMessage (" << stage.message.size() << "): " << cs::Utils::byteStreamToHex(stage.message);
         stage.signature = cscrypto::generateSignature(context.private_key(), stage.message.data(), stage.message.size());
         context.add_stage2(stage, true);
         return Result::Finish;

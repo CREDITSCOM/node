@@ -46,7 +46,7 @@ public:  // Interface
     TransactionsPacketHash& operator=(TransactionsPacketHash&&) = default;
 
     ///
-    /// @brief Сhecks hash size bytes on 0
+    /// @brief Checks hash size bytes on 0
     /// @return true if hash size == 0
     ///
     bool isEmpty() const noexcept;

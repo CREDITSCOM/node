@@ -1,38 +1,77 @@
 #include <algorithm>
+#include <map>
 
 #include <blockchain.hpp>
 #include <csdb/amount_commission.hpp>
+#include <csnode/multiwallets.hpp>
+#include <csnode/staking.hpp>
 #include <csnode/walletscache.hpp>
 #include <csnode/walletsids.hpp>
 #include <lib/system/logger.hpp>
 #include <solver/smartcontracts.hpp>
+#include <solver/consensus.hpp>
+#include <csnode/configholder.hpp>
 
 namespace {
 const uint8_t kUntrustedMarker = 255;
-
-inline int32_t getRealTrustedNum(const std::vector<uint8_t>& realTrusted) {
-    int32_t res = 0;
-
-    for (auto trustedMarker : realTrusted) {
-        if (trustedMarker != kUntrustedMarker) {
-            ++res;
-        }
-    }
-    return res;
-}
-
 const char* kLogPrefix = "WalletsCache: ";
 }  // namespace
 
 namespace cs {
 
-WalletsCache::WalletsCache(WalletsIds& walletsIds) : walletsIds_(walletsIds) {}
+WalletsCache::WalletsCache(WalletsIds& walletsIds) : walletsIds_(walletsIds) {
+    multiWallets_ = std::make_unique<MultiWallets>();
+    staking_ = std::make_unique<Staking>(
+      [this](const PublicKey& k) -> WalletData {
+          WalletData data;
+          data.key_ = k;
+          multiWallets_->getWalletData(data);
+          return data;
+      },
+      [this](const WalletsCache::WalletData& wallet) {
+          multiWallets_->onWalletCacheUpdated(wallet);
+      }
+    );
+}
+
+WalletsCache::~WalletsCache() = default;
+
+uint64_t WalletsCache::getCount() const {
+    return multiWallets_->size();
+}
 
 std::unique_ptr<WalletsCache::Updater> WalletsCache::createUpdater() {
     return std::make_unique<Updater>(*this);
 }
 
-WalletsCache::Updater::Updater(WalletsCache& data) : data_(data) {}
+WalletsCache::Updater::Updater(WalletsCache& data)
+  : data_(data) {}
+
+WalletsCache::Updater::~Updater() = default;
+
+std::unique_ptr<WalletsCache::WalletData> WalletsCache::Updater::findWallet(const PublicKey& key) const {
+    WalletsCache::WalletData data;
+    data.key_ = key;
+    if (!data_.multiWallets_->getWalletData(data)) {
+        return nullptr;
+    }
+    return std::make_unique<WalletsCache::WalletData>(data);
+}
+
+std::unique_ptr<WalletsCache::WalletData> WalletsCache::Updater::findWallet(const csdb::Address& addr) const {
+  return findWallet(toPublicKey(addr));
+}
+
+WalletsCache::WalletData WalletsCache::Updater::getWalletData(const PublicKey& key) {
+  WalletsCache::WalletData data;
+  data.key_ = key;
+  data_.multiWallets_->getWalletData(data);
+  return data;
+}
+
+WalletsCache::WalletData WalletsCache::Updater::getWalletData(const csdb::Address& addr) {
+  return getWalletData(toPublicKey(addr));
+}
 
 PublicKey WalletsCache::Updater::toPublicKey(const csdb::Address& addr) const {
     csdb::Address res;
@@ -42,27 +81,107 @@ PublicKey WalletsCache::Updater::toPublicKey(const csdb::Address& addr) const {
     return res.public_key();
 }
 
+void WalletsCache::Updater::fundConfidantsWalletsWitnReward(const cs::ConfidantsKeys& confidants, 
+                                                            const std::vector<csdb::Amount>& rewards,
+                                                            const std::vector<uint8_t>& realTrusted,
+                                                            bool inverse) {
+    //csdebug() << "fundConfidantsWalletsWitnReward: start";
+    if (rewards.size() == 0ULL) {
+        //cslog() << kLogPrefix << "NO Reward";
+        return;
+    }
+
+    if (rewards.size() != realTrusted.size() || confidants.size() != realTrusted.size()) {
+        //cslog() << kLogPrefix << "conf.size = " << confidants.size() << ", realTrusted.size = " << realTrusted.size() << ", rewards.size = " << rewards.size();
+        return;
+    }
+
+    size_t numPayedTrusted = 0;
+    for (size_t i = 0; i < confidants.size(); ++i) {
+        if (realTrusted[i] == kUntrustedMarker) {
+            continue;
+        }
+        //csdebug() << "fundConfidantsWalletsWitnReward: before getting walletdata";
+        auto walletData = getWalletData(confidants[i]);
+        csdb::Amount reward = rewards[i];
+        if (reward > Consensus::blockReward || reward < csdb::Amount{ 0 }) {
+            reward = csdb::Amount{ 0 };
+        }
+
+        if (!inverse) {
+            walletData.balance_ += (reward);
+            logOperation("Confidant reward added: +", confidants[i], reward);
+            //csdebug() << cs::Utils::byteStreamToHex(confidants[i]) << " - paidSum: " << reward.to_string();
+        }
+        else {
+            walletData.balance_ -= (reward);
+            logOperation("Confidant reward reverted: -", confidants[i], reward);
+        }
+
+        //csdebug() << "fundConfidantsWalletsWitnReward -> " << cs::Utils::byteStreamToHex(confidants[i]) << ", Mined: " << reward.to_string();
+        ++numPayedTrusted;
+
+        data_.multiWallets_->onWalletCacheUpdated(walletData);
+    }
+}
+
+
 void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
                                           const cs::ConfidantsKeys& confidants,
                                           const BlockChain& blockchain,
                                           bool inverse /* = false */) {
+
+    auto ufld = pool.user_field(BlockChain::kFieldTimestamp);
+    uint64_t timeStamp;
+    if (ufld.is_valid()) {
+        try {
+            timeStamp = std::stoull(ufld.value<std::string>());
+        }
+        catch (const std::exception& e) {
+            timeStamp = 0ULL;
+        }
+    }
+    else {
+        timeStamp = 0ULL;
+    }
+    const auto& conf = cs::ConfigHolder::instance().config();
+    if (conf->getBalanceChangeFlag() && conf->getBalanceChangeKey() != cs::Zero::key) {
+        showBalanceChange_ = true;
+        showBalanceChangeKey_ = conf->getBalanceChangeKey();
+        //csdebug() << kLogPrefix << "Balance changes of account " << cs::Utils::byteStreamToHex(showBalanceChangeKey_) << " will be logged";
+    }
+    else {
+        //csdebug() << kLogPrefix << "No balance change info will be logged";
+    }
+
     auto& transactions = pool.transactions();
     csdb::Amount totalAmountOfCountedFee = 0;
-
+    //if (!transactions.empty()) {
+    //    csdebug() << "Start block: " << pool.sequence();
+    //}
     for (auto itTrx = transactions.begin(); itTrx != transactions.end(); ++itTrx) {
-        totalAmountOfCountedFee += load(*itTrx, blockchain, inverse);
+        //csdebug() << "Start transaction: " << itTrx->id().to_string();
+        totalAmountOfCountedFee += load(*itTrx, blockchain, timeStamp, inverse);
         if (SmartContracts::is_new_state(*itTrx)) {
+            //csdebug() << "Start conf funding for execution";
             fundConfidantsWalletsWithExecFee(*itTrx, blockchain, inverse);
+            //csdebug() << "Finish conf funding for execution";
         }
+        //csdebug() << "Finish transaction";
     }
 
     if (totalAmountOfCountedFee > csdb::Amount(0)) {
         fundConfidantsWalletsWithFee(totalAmountOfCountedFee, confidants,
-                                     cs::Utils::bitsToMask(pool.numberTrusted(),
-                                     pool.realTrusted()), inverse);
+                                     cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()),
+                                     inverse);
     }
 
-    cleanObsoletteDelegations(BlockChain::getBlockTime(pool));
+    auto rew = getRewardDistribution(pool);
+    if (rew.size() > 0) {
+        fundConfidantsWalletsWitnReward(confidants, rew, cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()), inverse);
+    }
+
+    data_.staking_->cleanObsoletteDelegations(BlockChain::getBlockTime(pool));
 
 #ifdef MONITOR_NODE
     const auto& wrWall = pool.writer_public_key();
@@ -84,130 +203,21 @@ void WalletsCache::Updater::loadNextBlock(const csdb::Pool& pool,
         if (!inverse) ++it_trusted->second.times_trusted;
         else --it_trusted->second.times_trusted;
     }
-    auto timeStamp = atoll(pool.user_field(0).value<std::string>().c_str());
     setWalletTime(wrWall, timeStamp);
 #endif
+/* @TODO optimize checkWallets - takes 96% of time during db loading
+    if (!transactions.empty()) {
+        csdebug() << "Finish block, total caches: " << data_.multiWallets_->checkWallets().to_string();
+    }
+*/
 }
-
-void WalletsCache::Updater::cleanObsoletteDelegations(uint64_t time) {
-    uint64_t delTime = time / 1000;
-    auto it = getCurrentDelegations().begin();
-    while (it->first < delTime && it != getCurrentDelegations().end()) {
-        cleanDelegationsFromCache(delTime, it->second);
-        it = getCurrentDelegations().erase(it);
-    }
-}
-
-void WalletsCache::Updater::cleanDelegationsFromCache(uint64_t delTime, Delegations& value) {
-    for (auto it : value) {
-        auto& sourceWallData = getWalletData(std::get<0>(it));
-        auto& targetWallData = getWalletData(std::get<1>(it));
-        auto itt = sourceWallData.delegateTargets_->find(std::get<1>(it));
-        auto its = targetWallData.delegateSources_->find(std::get<0>(it));
-        if (itt != sourceWallData.delegateTargets_->end()) {
-            auto shuttle = itt->second.begin();
-            while (shuttle != itt->second.end()) {
-                if (shuttle->time < delTime && shuttle->time != 0U) {
-                    sourceWallData.balance_ += shuttle->amount;
-                    shuttle = itt->second.erase(shuttle);
-                }
-                else {
-                    ++shuttle;
-                }
-            }
-            if (itt->second.empty()) {
-                sourceWallData.delegateTargets_->erase(itt);
-                if (sourceWallData.delegateTargets_->empty()) {
-                    sourceWallData.delegateTargets_.reset();
-                }
-            }
-        }
-        if (its != targetWallData.delegateSources_->end()) {
-            auto shuttle = its->second.begin();
-            while (shuttle != its->second.end()) {
-                if (shuttle->time < delTime && shuttle->time != 0U) {
-                    targetWallData.delegated_ -= shuttle->amount;
-                    shuttle = its->second.erase(shuttle);
-                }
-                else {
-                    ++shuttle;
-                }
-            }
-            if (its->second.empty()) {
-                targetWallData.delegateSources_->erase(its);
-                if (targetWallData.delegateSources_->empty()) {
-                    targetWallData.delegateSources_.reset();
-                }
-            }
-        }
-    }
-}
-
-bool WalletsCache::Updater::removeSingleDelegation(uint64_t delTime, PublicKey& first, PublicKey& second, csdb::TransactionID id) {
-    auto value = getCurrentDelegations().find(delTime);
-    if (value == getCurrentDelegations().end()) {
-        cserror() << "Delegated amount couldn't be removed. Could be database inconsistency";
-        return false;
-    }
-
-    auto current = std::find_if(value->second.begin(), value->second.end(), [id](std::tuple<PublicKey, PublicKey, csdb::TransactionID> iter) {return std::get<2>(iter) == id; });
-    if (current != value->second.end()) {
-        value->second.erase(current);
-    }
-
-    for (auto it : value->second) {
-        auto& sourceWallData = getWalletData(first);
-        auto& targetWallData = getWalletData(second);
-        auto itt = sourceWallData.delegateTargets_->find(second);
-        auto its = targetWallData.delegateSources_->find(first);
-        if (itt != sourceWallData.delegateTargets_->end()) {
-            auto shuttle = itt->second.begin();
-            while (shuttle != itt->second.end()) {
-                if (shuttle->time == delTime ) {
-                    sourceWallData.balance_ += shuttle->amount;
-                    shuttle = itt->second.erase(shuttle);
-                    break;
-                }
-                else {
-                    ++shuttle;
-                }
-            }
-            if (itt->second.empty()) {
-                sourceWallData.delegateTargets_->erase(itt);
-                if (sourceWallData.delegateTargets_->empty()) {
-                    sourceWallData.delegateTargets_.reset();
-                }
-            }
-        }
-        if (its != targetWallData.delegateSources_->end()) {
-            auto shuttle = its->second.begin();
-            while (shuttle != its->second.end()) {
-                if (shuttle->time == delTime) {
-                    targetWallData.delegated_ -= shuttle->amount;
-                    shuttle = its->second.erase(shuttle);
-                    break;
-                }
-                else {
-                    ++shuttle;
-                }
-            }
-            if (its->second.empty()) {
-                targetWallData.delegateSources_->erase(its);
-                if (targetWallData.delegateSources_->empty()) {
-                    targetWallData.delegateSources_.reset();
-                }
-            }
-        }
-    }
-    return true;
-}
-
 
 void WalletsCache::Updater::invokeReplenishPayableContract(const csdb::Transaction& transaction, bool inverse /* = false */) {
-    auto& wallData = getWalletData(transaction.target());
+    auto wallData = getWalletData(transaction.target());
 
     if (!inverse) {
         wallData.balance_ -= transaction.amount();
+        logOperation("Payable contract cost ", wallData.key_, transaction.amount());
         data_.smartPayableTransactions_.push_back(transaction.id());
     }
     else {
@@ -216,20 +226,22 @@ void WalletsCache::Updater::invokeReplenishPayableContract(const csdb::Transacti
     }
 
     if (!SmartContracts::is_executable(transaction)) {
-        auto& sourceWallData = getWalletData(transaction.source());
+        auto sourceWallData = getWalletData(transaction.source());
         if (!inverse) {
             sourceWallData.balance_ += csdb::Amount(transaction.counted_fee().to_double());
-            sourceWallData.balance_ -= csdb::Amount(transaction.max_fee().to_double());
+            logOperation("Counted fee +", sourceWallData.key_, csdb::Amount(transaction.counted_fee().to_double()));
+            sourceWallData.balance_ -= csdb::Amount(transaction.max_fee().to_double()); 
+            logOperation("Max fee -", sourceWallData.key_, csdb::Amount(transaction.max_fee().to_double()));
         }
         else {
             sourceWallData.balance_ -= csdb::Amount(transaction.counted_fee().to_double());
             sourceWallData.balance_ += csdb::Amount(transaction.max_fee().to_double());
         }
 
-        emit walletUpdateEvent(toPublicKey(transaction.source()), sourceWallData);
+        data_.multiWallets_->onWalletCacheUpdated(sourceWallData);
     }
 
-    emit walletUpdateEvent(toPublicKey(transaction.target()), wallData);
+    data_.multiWallets_->onWalletCacheUpdated(wallData);
 }
 
 void WalletsCache::Updater::smartSourceTransactionReleased(const csdb::Transaction& smartSourceTrx,
@@ -237,30 +249,35 @@ void WalletsCache::Updater::smartSourceTransactionReleased(const csdb::Transacti
                                                            bool inverse /* = false */) {
     auto countedFee = csdb::Amount(smartSourceTrx.counted_fee().to_double());
 
-    auto& smartWallData = getWalletData(smartSourceTrx.source());
-    auto& initWallData = getWalletData(initTrx.source());
+    auto smartWallData = getWalletData(smartSourceTrx.source());
+    auto initWallData = getWalletData(initTrx.source());
 
     if (!inverse) {
         smartWallData.balance_ += countedFee;
+        logOperation("Smart balance increase +", smartWallData.key_, countedFee);
         initWallData.balance_ -= countedFee;
+        logOperation("Initiators balance decrease -", initWallData.key_, countedFee);
     }
     else {
         smartWallData.balance_ -= countedFee;
         initWallData.balance_ += countedFee;
     }
 
-    emit walletUpdateEvent(toPublicKey(smartSourceTrx.source()), smartWallData);
-    emit walletUpdateEvent(toPublicKey(initTrx.source()), initWallData);
+    data_.multiWallets_->onWalletCacheUpdated(smartWallData);
+    data_.multiWallets_->onWalletCacheUpdated(initWallData);
 }
 
 void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transaction& transaction,
                                                             const csdb::Amount& execFee,
                                                             bool inverse /* = false */) {
-    auto& wallData = getWalletData(transaction.source());
+    auto wallData = getWalletData(transaction.source());
     if (!inverse) {
         wallData.balance_ += transaction.amount();
+        logOperation("Rollback exceeded timeout for contract +", transaction.source().public_key(), transaction.amount());
         wallData.balance_ += csdb::Amount(transaction.max_fee().to_double());
+        logOperation("Rollback max fee +", transaction.source().public_key(), transaction.amount());
         wallData.balance_ -= csdb::Amount(transaction.counted_fee().to_double());
+        logOperation("Rollback counted fee -", transaction.source().public_key(), transaction.amount());
     }
     else {
         wallData.balance_ -= transaction.amount();
@@ -290,6 +307,7 @@ void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transact
         if (it != data_.smartPayableTransactions_.cend() && !inverse) {
             data_.smartPayableTransactions_.erase(it);
             wallData.balance_ -= execFee;
+            logOperation("Rollback exec fee -", transaction.source().public_key(), execFee);
         }
         else {
             if (inverse) {
@@ -299,65 +317,89 @@ void WalletsCache::Updater::rollbackExceededTimeoutContract(const csdb::Transact
         }
     }
 
-    emit walletUpdateEvent(toPublicKey(transaction.source()), wallData);
+    data_.multiWallets_->onWalletCacheUpdated(wallData);
 }
 
 #ifdef MONITOR_NODE
 bool WalletsCache::Updater::setWalletTime(const PublicKey& address, const uint64_t& p_timeStamp) {
-    auto it = data_.wallets_.find(address);
-    if (it != data_.wallets_.end()) {
-        if (it->second.createTime_ == 0) {
-            it->second.createTime_ = p_timeStamp;
-        }
-        emit walletUpdateEvent(it->first, it->second);
-        return true;
+
+    auto wData = getWalletData(address);
+
+    if (wData.createTime_ == 0) {
+        wData.createTime_ = p_timeStamp;
     }
-    return false;
+    data_.multiWallets_->onWalletCacheUpdated(wData);
+    return true;
 }
 #endif
 
 void WalletsCache::Updater::fundConfidantsWalletsWithFee(const csdb::Amount& totalFee,
                                                          const cs::ConfidantsKeys& confidants,
-                                                         const std::vector<uint8_t>& realTrusted,
+                                                         const std::vector<uint8_t>& realTrusted, 
                                                          bool inverse) {
-    if (!confidants.size()) {
-        cslog() << kLogPrefix << "NO CONFIDANTS";
+    //csdebug() << "fundConfidantsWalletsWithFee: start";
+    if (confidants.size() == 0ULL) {
+        //cslog() << kLogPrefix << "NO CONFIDANTS";
         return;
     }
-    auto realTrustedNumber = getRealTrustedNum(realTrusted);
-    csdb::Amount feeToEachConfidant = totalFee / realTrustedNumber;
-    csdb::Amount payedFee = 0;
-    int32_t numPayedTrusted = 0;
+    if (confidants.size() != realTrusted.size()) {
+        //cslog() << kLogPrefix << "Real trusted and confidants have different sizes";
+        return;
+    }
+
+    int32_t realTrustedNumber = 0;
     for (size_t i = 0; i < confidants.size(); ++i) {
-        if (i < realTrusted.size() && realTrusted[i] != kUntrustedMarker) {
-            auto& walletData = getWalletData(confidants[i]);
-            if (!inverse) {
-                walletData.balance_ += feeToEachConfidant;
-            }
-            else {
-                walletData.balance_ -= feeToEachConfidant;
-            }
+        if (realTrusted[i] == kUntrustedMarker) {
+            continue;
+        }
+        ++realTrustedNumber;
+    }
+    //Fee only
+    csdb::Amount onePartOfFee = totalFee /realTrustedNumber;
+    csdb::Amount payedFee = 0;
+    size_t numPayedTrusted = 0;
+    //csdebug() << "fundConfidantsWalletsWithFee - totalFee: " << totalFee.to_string() << ", onePartFee = " << onePartOfFee.to_string();
+    for (size_t i = 0; i < confidants.size(); ++i) {
+        if (realTrusted[i] == kUntrustedMarker) {
+            continue;
+        }
+        //csdebug() << "fundConfidantsWalletsWithFee: before getting walletdata";
+        auto walletData = getWalletData(confidants[i]);
+        csdb::Amount feeToPay = 0; 
+        //csdebug() << "fundConfidantsWalletsWithFee: before calc";
+        if (numPayedTrusted == confidants.size() - 1) {
+            feeToPay = totalFee - payedFee;
+        }
+        else {
+            feeToPay = onePartOfFee;
+        }
+        //csdebug() << "fundConfidantsWalletsWithFee - FeeToPay: " << feeToPay.to_string();
+        if (!inverse) {
+            walletData.balance_ += feeToPay;
+            logOperation("Confidant fee added: +", confidants[i], feeToPay);
+            //csdebug() << cs::Utils::byteStreamToHex(confidants[i]) << " - paidSum: " << feeToPay.to_string();
+        }
+        else {
+            walletData.balance_ -= feeToPay;
+            logOperation("Confidant fee reverted: -", confidants[i], feeToPay);
+        }
 
 #ifdef MONITOR_NODE
-            auto it_writer = data_.trusted_info_.find(confidants[i]);
-            if (it_writer != data_.trusted_info_.end()) {
+            auto it_trusted = data_.trusted_info_.find(confidants[i]);
+            if (it_trusted != data_.trusted_info_.end()) {
                 if (!inverse) {
-                    it_writer->second.totalFee += feeToEachConfidant;
+                    it_trusted->second.totalFee += feeToPay;
                 }
                 else {
-                    it_writer->second.totalFee -= feeToEachConfidant;
+                    it_trusted->second.totalFee -= feeToPay;
                 }
             }
 #endif
+        //csdebug() << "fundConfidantsWalletsWithFee -> " << cs::Utils::byteStreamToHex(confidants[i]) << ", Fee: " << feeToPay.to_string();
+        payedFee += feeToPay;
+        ++numPayedTrusted;
 
-            payedFee += feeToEachConfidant;
-            ++numPayedTrusted;
-            if (numPayedTrusted == (realTrustedNumber - 1)) {
-                feeToEachConfidant = totalFee - payedFee;
-            }
-
-            emit walletUpdateEvent(confidants[i], walletData);
-        }
+        data_.multiWallets_->onWalletCacheUpdated(walletData);
     }
 }
 
@@ -368,44 +410,57 @@ void WalletsCache::Updater::fundConfidantsWalletsWithExecFee(const csdb::Transac
         csmeta(cswarning) << "transaction is not new state";
         return;
     }
+
     SmartContractRef smartRef(transaction.user_field(trx_uf::new_state::RefStart));
     if (!smartRef.is_valid()) {
         csmeta(cserror) << "incorrect reference to starter transaction in new state";
         return;
     }
+
     csdb::Pool pool = blockchain.loadBlock(smartRef.sequence);
     if (!pool.is_valid()) {
         csmeta(cserror) << "invalid pool";
         return;
     }
-    const ConfidantsKeys& confidants = pool.confidants();
-    std::vector<uint8_t> realTrusted = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
-    auto realTrustedNumber = getRealTrustedNum(realTrusted);
-    csdb::Amount feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>() / realTrustedNumber;
-    csdb::Amount payedFee = 0;
-    int32_t numPayedTrusted = 0;
-    for (size_t i = 0; i < confidants.size(); ++i) {
-        if (i < realTrusted.size() && realTrusted[i] != kUntrustedMarker) {
-            WalletData& walletData = getWalletData(confidants[i]);
-            if (!inverse) {
-                walletData.balance_ += feeToEachConfidant;
-            }
-            else {
-                walletData.balance_ -= feeToEachConfidant;
-            }
-            payedFee += feeToEachConfidant;
-            ++numPayedTrusted;
-            if (numPayedTrusted == (realTrustedNumber - 1)) {
-                feeToEachConfidant = transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>() - payedFee;
-            }
 
-            emit walletUpdateEvent(confidants[i], walletData);
+    fundConfidantsWalletsWithFee(
+        transaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>(),
+        pool.confidants(),
+        cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted()),
+        inverse
+    );
+}
+
+std::vector<csdb::Amount> WalletsCache::Updater::getRewardDistribution(const csdb::Pool& pool) {
+    std::vector<csdb::Amount> rewDistribution;
+    auto mask = cs::Utils::bitsToMask(pool.numberTrusted(), pool.realTrusted());
+    auto fld = pool.user_field(BlockChain::kFieldBlockReward);
+    if (fld.is_valid()) {
+        auto data = fld.value<std::string>();
+        IDataStream stream(data.data(), data.size());
+
+
+        for (auto it : mask) {
+            int32_t integer = 0L;
+            uint64_t fraction = 0ULL;
+            stream >> integer >> fraction;
+
+            rewDistribution.emplace_back(integer, fraction);
         }
+    }
+    return rewDistribution;
+}
+
+void WalletsCache::Updater::logOperation(const std::string& reason, const cs::PublicKey& key, const csdb::Amount& sum) {
+    if (showBalanceChange_ && key == showBalanceChangeKey_) {
+        csdebug() << reason << sum.to_string();
     }
 }
 
+
 double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                                                const BlockChain& blockchain,
+                                               const uint64_t timeStamp,
                                                bool inverse) {
     csdb::Address wallAddress;
     bool smartIniter = false;
@@ -430,14 +485,17 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
     // In case of contract new state (smartIniter == true) and wallData is initer, not contract
     // Otherwise (smartIniter = false) and wallData is tr.source()
 
-    auto& wallData = getWalletData(wallAddress);
+    auto wallData = getWalletData(wallAddress);
+    bool alreadyUpdated = false;
 
     if (SmartContracts::is_executable(tr)) {
         if (!inverse) {
             wallData.balance_ -= csdb::Amount(tr.max_fee().to_double());
+            logOperation("Fee paid : -", tr.source().public_key(), csdb::Amount(tr.max_fee().to_double()));
         }
         else {
             wallData.balance_ += csdb::Amount(tr.max_fee().to_double());
+            logOperation("Fee pay reverted: +", tr.source().public_key(), csdb::Amount(tr.max_fee().to_double()));
         }
     }
     else if (SmartContracts::is_new_state(tr)) {
@@ -457,22 +515,32 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
                     << WithDelimiters(tr.id().pool_seq());
                 if (!inverse) {
                     wallData.balance_ -= initTransaction.amount();
+                    logOperation("Sum paid : -", wallData.key_, initTransaction.amount());
                     wallData.balance_ -= start_max_fee;
+                    logOperation("Max fee : -", wallData.key_, start_max_fee);
                     wallData.balance_ += start_counted_fee;
+                    logOperation("Start counted fee : +", wallData.key_, start_counted_fee);
                 }
                 else {
                     wallData.balance_ += initTransaction.amount();
+                    logOperation("Sum paid (inversed): +", wallData.key_, initTransaction.amount());
                     wallData.balance_ += start_max_fee;
+                    logOperation("Max fee (inversed): +", wallData.key_, start_max_fee);
                     wallData.balance_ -= start_counted_fee;
+                    logOperation("Start counted fee (inversed): -", wallData.key_, start_counted_fee);
                 }
             }
             checkCanceledSmart(start_target, start_id, inverse);
             if (SmartContracts::is_executable(initTransaction)) {
                 if (!inverse) {
                     wallData.balance_ += start_max_fee;
+                    logOperation("Max fee : +", wallData.key_, start_max_fee);
                     wallData.balance_ -= start_counted_fee;
+                    logOperation("Start counted fee : -", wallData.key_, start_counted_fee);
                     wallData.balance_ -= csdb::Amount(tr.counted_fee().to_double());
+                    logOperation("Counted fee : -", wallData.key_, csdb::Amount(tr.counted_fee().to_double()));
                     wallData.balance_ -= csdb::Amount(tr.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
+                    logOperation("Execute fee : -", wallData.key_, csdb::Amount(tr.user_field(trx_uf::new_state::Fee).value<csdb::Amount>()));
                 }
                 else {
                     wallData.balance_ -= start_max_fee;
@@ -483,9 +551,10 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
             }
             else {
                 checkSmartWaitingForMoney(initTransaction, tr, inverse);
+                alreadyUpdated = true;
             }
         }
-        auto& wallData_s = getWalletData(tr.source());
+        auto wallData_s = getWalletData(tr.source());
         if (!inverse) {
             ++wallData_s.transNum_;
             wallData_s.trxTail_.push(tr.innerID());
@@ -500,78 +569,35 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
             --wallData_s.transNum_;
         }
 
-        emit walletUpdateEvent(toPublicKey(tr.source()), wallData_s);
+        data_.multiWallets_->onWalletCacheUpdated(wallData_s);
     }
     else {
         if (!inverse) {
             wallData.balance_ -= csdb::Amount(tr.counted_fee().to_double());
+            logOperation("Fee paid : -", tr.source().public_key(), csdb::Amount(tr.counted_fee().to_double()));
         }
         else {
             wallData.balance_ += csdb::Amount(tr.counted_fee().to_double());
+            logOperation("Fee paid : +", tr.source().public_key(), csdb::Amount(tr.counted_fee().to_double()));
         }
     }
 	//wallData = sources Account
+
     if (!smartIniter) {
         csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
         if (!inverse) {
             if (ufld.is_valid()) {
-                auto tKey = toPublicKey(tr.target());
-                if (wallData.delegateTargets_ == nullptr) {
-                    wallData.delegateTargets_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
-                }
-                auto it = wallData.delegateTargets_->find(tKey);
-                if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
-                    wallData.balance_ -= tr.amount();
-                    cs::TimeMoney tm(cs::Zero::timeStamp, tr.amount());
-                    if (it == wallData.delegateTargets_->end()) {
-                        std::vector<cs::TimeMoney> firstElement;
-                        firstElement.push_back(tm);
-                        wallData.delegateTargets_->emplace(tKey, firstElement);
-                    }
-                    else {
-                        auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                        if (itt == it->second.end()) {
-                            it->second.push_back(tm);
-                        }
-                        else {
-                            itt->amount += tr.amount();
-                        }
-                    }
-                }
-                else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
-                    if (it != wallData.delegateTargets_->end()) {
-                        auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                        if (itt != it->second.end()) {
-                            itt->amount -= tr.amount();
-                            wallData.balance_ += tr.amount();
-                            //removing empty records
-                            if (itt->amount == csdb::Amount{ 0 }) {
-                                it->second.erase(itt);
-                                if (it->second.size() == 0U) {
-                                    wallData.delegateTargets_->erase(tKey);
-                                }
-                            }
-                        }
-                    }
-                }
-                else if (ufld.value<uint64_t>() >= trx_uf::sp::de::legate_min_utc) {
-                    cs::TimeMoney tm(ufld.value<uint64_t>() , tr.amount());
-                    wallData.balance_ -= tr.amount();
-                    if (it == wallData.delegateTargets_->end()) {
-                        std::vector<cs::TimeMoney> firstElement;
-                        firstElement.push_back(tm);
-                        wallData.delegateTargets_->emplace(tKey, firstElement);
-                    }
-                    else {
-                        it->second.push_back(tm);
-                    }
-                }
-                else {
-                    cserror() << "WalletCache: no such delegats in sources list 1";
-                }
+                //data_.staking_->addDelegationsForSource(
+                //    ufld,
+                //    toPublicKey(tr.source()),
+                //    toPublicKey(tr.target()),
+                //    tr.amount()
+                //);
+                //alreadyUpdated = true;
             }
             else {
                 wallData.balance_ -= tr.amount();
+                logOperation("Transaction " + tr.id().to_string() + " send: -", tr.source().public_key(), tr.amount());
             }
             ++wallData.transNum_;
             wallData.trxTail_.push(tr.innerID());
@@ -587,64 +613,20 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
 #endif
         }
         else {
-            auto tKey = toPublicKey(tr.target());
-            if (wallData.delegateTargets_ == nullptr) {
-                wallData.delegateTargets_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
-            }
             if (ufld.is_valid()) {
-                //delegate transaction(inverse)
-                auto it = wallData.delegateTargets_->find(tKey);
-                if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
-                    if (it != wallData.delegateTargets_->end()) {
-                        auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                        if (itt != it->second.end()) {
-                            itt->amount -= tr.amount();
-                            wallData.balance_ += tr.amount();
-                            //removing empty records
-                            if (itt->amount == csdb::Amount{ 0 }) {
-                                it->second.erase(itt);
-                                if (it->second.size() == 0U) {
-                                    wallData.delegateTargets_->erase(tKey);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                //withdraw delegation (inverse)
-                else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
-                    wallData.balance_ -= tr.amount();
-                    cs::TimeMoney tm(cs::Zero::timeStamp, tr.amount());
-                    if (it == wallData.delegateTargets_->end()) {
-                        std::vector<cs::TimeMoney> firstElement;
-                        firstElement.push_back(tm);
-                        wallData.delegateTargets_->emplace(tKey, firstElement);
-                    }
-                    else {
-                        auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                        if (itt == it->second.end()) {
-                            it->second.push_back(tm);
-                        }
-                        else {
-                            itt->amount += tr.amount();
-                        }
-                    }
-                }
-
-                else if (ufld.value<uint64_t>() >= trx_uf::sp::de::legate_min_utc) {
-                    //nothing to do if time of this transacton is already finished
-                    auto sKey = toPublicKey(tr.source());
-                    removeSingleDelegation(ufld.value<uint64_t>(), sKey, tKey, tr.id());
-                }
-                else {
-                    cserror() << "WalletCache: error as source in delegations 2";
-                }
-
+                //data_.staking_->revertDelegationsForSource(
+                //    ufld,
+                //    toPublicKey(tr.source()),
+                //    toPublicKey(tr.target()),
+                //    tr.amount(),
+                //    tr.id()
+                //);
+		        //alreadyUpdated = true;
             }
             else {
                 wallData.balance_ += tr.amount();
+                logOperation("Transaction " + tr.id().to_string() + " send (reverted): +", wallData.key_, tr.amount());
             }
-
             --wallData.transNum_;
         }
     }
@@ -653,15 +635,45 @@ double WalletsCache::Updater::loadTrxForSource(const csdb::Transaction& tr,
         if (smartIniter) {
             wallAddress = tr.source();
         }
-        auto& wallData_s = getWalletData(wallAddress);
+        auto wallData_s = getWalletData(wallAddress);
         auto pubKey = toPublicKey(wallAddress);
         csdetails() << "Wallets: erase innerID of "
             << EncodeBase58(cs::Bytes(pubKey.begin(), pubKey.end()))
             << " -> " << tr.innerID();
         wallData_s.trxTail_.erase(tr.innerID());
+        data_.multiWallets_->onWalletCacheUpdated(wallData_s);
     }
 
-    emit walletUpdateEvent(toPublicKey(wallAddress), wallData);
+    if(!alreadyUpdated){
+        data_.multiWallets_->onWalletCacheUpdated(wallData);
+    }
+
+    if (!smartIniter) {
+        csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
+        if (!inverse) {
+            if (ufld.is_valid()) {
+                data_.staking_->addDelegationsForSource(
+                    ufld,
+                    toPublicKey(tr.source()),
+                    toPublicKey(tr.target()),
+                    tr.amount(),
+                    timeStamp
+                );
+            }
+        }
+        else {
+            if (ufld.is_valid()) {
+                data_.staking_->revertDelegationsForSource(
+                    ufld,
+                    toPublicKey(tr.source()),
+                    toPublicKey(tr.target()),
+                    tr.amount(),
+                    tr.id(),
+                    timeStamp
+                );
+            }
+        }
+    }
     return tr.counted_fee().to_double();
 }
 
@@ -719,13 +731,16 @@ void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& i
             fee = fld.value<csdb::Amount>();
         }
         rollbackExceededTimeoutContract(initTransaction, fee, inverse);
-        auto& wallDataIniter = getWalletData(initTransaction.source());
+        auto wallDataIniter = getWalletData(initTransaction.source());
         if (!inverse) {
             wallDataIniter.balance_ -= csdb::Amount(newStateTransaction.counted_fee().to_double());
+            logOperation("Contract counted fee : -", initTransaction.source().public_key(), csdb::Amount(newStateTransaction.counted_fee().to_double()));
         }
         else {
             wallDataIniter.balance_ += csdb::Amount(newStateTransaction.counted_fee().to_double());
+            logOperation("Contract counted fee (reverted): +", initTransaction.source().public_key(), csdb::Amount(newStateTransaction.counted_fee().to_double()));
         }
+        data_.multiWallets_->onWalletCacheUpdated(wallDataIniter);
         return;
     }
     bool waitingSmart = false;
@@ -740,107 +755,58 @@ void WalletsCache::Updater::checkSmartWaitingForMoney(const csdb::Transaction& i
         if (inverse) {
             data_.smartPayableTransactions_.push_back(initTransaction.id());
 
-            auto& wallDataIniter = getWalletData(initTransaction.source());
+            auto wallDataIniter = getWalletData(initTransaction.source());
             wallDataIniter.balance_ += csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
             wallDataIniter.balance_ += csdb::Amount(initTransaction.counted_fee().to_double());
             wallDataIniter.balance_ -= csdb::Amount(initTransaction.max_fee().to_double());
             wallDataIniter.balance_ += csdb::Amount(newStateTransaction.counted_fee().to_double());
 
-            auto& wallData = getWalletData(initTransaction.target());
+            auto wallData = getWalletData(initTransaction.target());
             wallData.balance_ -= initTransaction.amount();
 
-            emit walletUpdateEvent(toPublicKey(initTransaction.source()), wallDataIniter);
-            emit walletUpdateEvent(toPublicKey(initTransaction.target()), wallData);
+            data_.multiWallets_->onWalletCacheUpdated(wallDataIniter);
+            data_.multiWallets_->onWalletCacheUpdated(wallData);
         }
     }
 
     if (waitingSmart && !inverse) {
-        auto& wallDataIniter = getWalletData(initTransaction.source());
+        auto wallDataIniter = getWalletData(initTransaction.source());
         wallDataIniter.balance_ -= csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>());
+        logOperation("Transaction " + initTransaction.id().to_string() + ": Execution fee : -", initTransaction.source().public_key(), csdb::Amount(newStateTransaction.user_field(trx_uf::new_state::Fee).value<csdb::Amount>()));
         wallDataIniter.balance_ -= csdb::Amount(initTransaction.counted_fee().to_double());
+        logOperation("Transaction " + initTransaction.id().to_string() + ": Init transaction counted fee : -", initTransaction.source().public_key(), csdb::Amount(initTransaction.counted_fee().to_double()));
         wallDataIniter.balance_ += csdb::Amount(initTransaction.max_fee().to_double());
+        logOperation("Transaction " + initTransaction.id().to_string() + ": Init transaction max fee : +", initTransaction.source().public_key(), csdb::Amount(initTransaction.max_fee().to_double()));
         wallDataIniter.balance_ -= csdb::Amount(newStateTransaction.counted_fee().to_double());
+        logOperation("Transaction " + initTransaction.id().to_string() + ": New state counted fee : -", initTransaction.source().public_key(), csdb::Amount(newStateTransaction.counted_fee().to_double()));
 
-        auto& wallData = getWalletData(initTransaction.target());
+        auto wallData = getWalletData(initTransaction.target());
         wallData.balance_ += initTransaction.amount();
+        logOperation("Init transactions +", wallData.key_, initTransaction.amount());
 
-        emit walletUpdateEvent(toPublicKey(initTransaction.source()), wallDataIniter);
-        emit walletUpdateEvent(toPublicKey(initTransaction.target()), wallData);
+        data_.multiWallets_->onWalletCacheUpdated(wallDataIniter);
+        data_.multiWallets_->onWalletCacheUpdated(wallData);
     }
 }
 
-void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool inverse) {
-    auto& wallData = getWalletData(tr.target());
+void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, const uint64_t timeStamp, bool inverse) {
+    auto wallData = getWalletData(tr.target());
     csdb::UserField ufld = tr.user_field(trx_uf::sp::delegated);
+    //bool alreadyUpdated = false;
     if (!inverse) {
         if (ufld.is_valid()) {
-            auto sKey = toPublicKey(tr.source());
-            if (wallData.delegateSources_ == nullptr) {
-                wallData.delegateSources_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
-            }
-            auto it = wallData.delegateSources_->find(sKey);
-            if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
-                cs::TimeMoney tm(cs::Zero::timeStamp, tr.amount());
-                if (it == wallData.delegateSources_->end()) {
-                    std::vector<cs::TimeMoney> firstElement;
-                    firstElement.push_back(tm);
-                    wallData.delegateSources_->emplace(sKey, firstElement);
-                }
-                else {
-                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                    if (itt == it->second.end()) {
-                        it->second.push_back(tm);
-                    }
-                    else {
-                        itt->amount += tr.amount();
-                    }
-                }
-                wallData.delegated_ += tr.amount();
-            }
-            else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
-                if (it != wallData.delegateSources_->end()) {
-                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                    if (itt != it->second.end()) {
-                        itt->amount -= tr.amount();
-                        wallData.delegated_ -= tr.amount();
-                        //removing empty records
-                        if (itt->amount == csdb::Amount{ 0 }) {
-                            it->second.erase(itt);
-                            if (it->second.size() == 0U) {
-                                wallData.delegateSources_->erase(sKey);
-                            }
-                        }
-                    }
-                }
-            }
-            else if (ufld.value<uint64_t>() >= trx_uf::sp::de::legate_min_utc) {
-                cs::TimeMoney tm(ufld.value<uint64_t>() , tr.amount());
-                if (it == wallData.delegateSources_->end()) {
-                    std::vector<cs::TimeMoney> firstElement;
-                    firstElement.push_back(tm);
-                    wallData.delegateSources_->emplace(sKey, firstElement);
-                }
-                else {
-                    it->second.push_back(tm);
-                }
-                wallData.delegated_ += tr.amount();
-                auto it2 = getCurrentDelegations().find(tm.time);
-                auto tKey = toPublicKey(tr.target());
-                if (it2 == getCurrentDelegations().end()) {
-                    Delegations deleg;
-                    deleg.push_back(std::make_tuple(sKey, tKey, tr.id()));
-                    getCurrentDelegations().emplace(tm.time, deleg);
-                }
-                else {
-                    getCurrentDelegations()[tm.time].push_back(std::make_tuple(sKey, tKey, tr.id()));
-                }
-            }
-            else {
-                cserror() << "WalletCache: error as target in delegations";
-            }
+            //data_.staking_->addDelegationsForTarget(
+            //    ufld,
+            //    toPublicKey(tr.source()),
+            //    toPublicKey(tr.target()),
+            //    tr.amount(),
+            //    tr.id()
+            //);
         }
         else {
             wallData.balance_ += tr.amount();
+            auto addr = tr.target().public_key();
+            logOperation("Transaction " + tr.id().to_string() + " received: ", addr, tr.amount());
         }
 
 #ifdef MONITOR_NODE
@@ -850,79 +816,87 @@ void WalletsCache::Updater::loadTrxForTarget(const csdb::Transaction& tr, bool i
     }
     else {
         if (ufld.is_valid()) {
-            auto sKey = toPublicKey(tr.source());
-            if (wallData.delegateSources_ == nullptr) {
-                wallData.delegateSources_ = std::make_shared<std::map<cs::PublicKey, std::vector<cs::TimeMoney>>>();
-            }
-            auto it = wallData.delegateSources_->find(sKey);
-            if (ufld.value<uint64_t>() == trx_uf::sp::de::legate) {
-                if (it != wallData.delegateSources_->end()) {
-                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                    if (itt != it->second.end()) {
-                        itt->amount -= tr.amount();
-                        wallData.delegated_ -= tr.amount();
-                        //removing empty records
-                        if (itt->amount == csdb::Amount{ 0 }) {
-                            it->second.erase(itt);
-                            if (it->second.size() == 0U) {
-                                wallData.delegateSources_->erase(sKey);
-                            }
-                        }
-                    }
-                }
-            }
-            else if (ufld.value<uint64_t>() == trx_uf::sp::de::legated_withdraw) {
-                cs::TimeMoney tm(cs::Zero::timeStamp, tr.amount());
-                if (it == wallData.delegateSources_->end()) {
-                    std::vector<cs::TimeMoney> firstElement;
-                    firstElement.push_back(tm);
-                    wallData.delegateSources_->emplace(sKey, firstElement);
-                }
-                else {
-                    auto itt = std::find_if(it->second.begin(), it->second.end(), [](cs::TimeMoney& tm) {return tm.time == cs::Zero::timeStamp; });
-                    if (itt == it->second.end()) {
-                        it->second.push_back(tm);
-                    }
-                    else {
-                        itt->amount += tr.amount();
-                    }
-                }
-                wallData.delegated_ += tr.amount();
-            }
-            else {
-                cserror() << "WalletCache: error as target in delegations";
-            }
+            //data_.staking_->revertDelegationsForTarget(
+            //    ufld,
+            //    toPublicKey(tr.source()),
+            //    toPublicKey(tr.target()),
+            //    tr.amount(),
+            //    tr.id()
+            //);
         }
         else {
             wallData.balance_ -= tr.amount();
+            auto addr = tr.target().public_key();
+            if (showBalanceChange_ && addr == showBalanceChangeKey_) {
+                csdebug() << "Transaction " << tr.id().to_string() << " send (reverted): -" << tr.amount().to_string();
+            }
         }
-
     }
 
     if (tr.source() != tr.target()) { // Already counted in loadTrxForSource
         !inverse ? ++wallData.transNum_ : --wallData.transNum_;
     }
+    
+    data_.multiWallets_->onWalletCacheUpdated(wallData);
 
-    emit walletUpdateEvent(toPublicKey(tr.target()), wallData);
+    if (!inverse) {
+        if (ufld.is_valid()) {
+            csdebug() << "addDelegationForTarget: " << cs::Utils::byteStreamToHex(toPublicKey(tr.target())) << " <- " << tr.amount().to_string();
+            data_.staking_->addDelegationsForTarget(
+                ufld,
+                toPublicKey(tr.source()),
+                toPublicKey(tr.target()),
+                tr.amount(),
+                tr.id(),
+                timeStamp
+            );
+            csdebug() << "before showing delegations: " << cs::Utils::byteStreamToHex(wallData.key_);
+            if (wallData.delegateSources_ != nullptr) {
+                csdebug() << "delegations: ";
+                for (auto a : *(wallData.delegateSources_)){
+                    csdebug() << "pKey: " << cs::Utils::byteStreamToHex(a.first);
+                    for (auto b : a.second) {
+                        csdebug() << "initial: " << b.initialTime << ", final: " << b.time << ", amount: " << b.amount.to_string() << ", coeff: " << static_cast<int>(b.coeff);
+                    }
+                }
+                
+            }
+            else {
+                csdebug() << "... no delegations found";
+            }
+            csdebug() << "... strange behavour";
+            //alreadyUpdated = true;
+        }
+    }
+    else {
+        if (ufld.is_valid()) {
+            data_.staking_->revertDelegationsForTarget(
+                ufld,
+                toPublicKey(tr.source()),
+                toPublicKey(tr.target()),
+                tr.amount(),
+                tr.id(),
+                timeStamp
+            );
+        }
+    }
 }
 
 void WalletsCache::Updater::updateLastTransactions(const std::vector<std::pair<PublicKey, csdb::TransactionID>>& updates) {
     for (const auto& u : updates) {
-        auto it = data_.wallets_.find(u.first);
-        if (it != data_.wallets_.end()) {
-            it->second.lastTransaction_ = u.second;
-
-            emit walletUpdateEvent(it->first, it->second);
+        WalletsCache::WalletData wallet;
+        wallet.key_ = u.first;
+        if (!data_.multiWallets_->getWalletData(wallet)) {
+            continue;
         }
+
+        wallet.lastTransaction_ = u.second;
+        data_.multiWallets_->onWalletCacheUpdated(wallet);
     }
 }
 
 void WalletsCache::iterateOverWallets(const std::function<bool(const PublicKey&, const WalletData&)> func) {
-    for (const auto& wallet : wallets_) {
-        if (!func(wallet.first, wallet.second)) {
-            break;
-        }
-    }
+    multiWallets_->iterate(func);
 }
 
 #ifdef MONITOR_NODE

@@ -71,7 +71,15 @@ enum CheckVersion : Byte {
 
 enum class PoolStoreType : cs::Byte {
     Created,
-    Synced
+    Synced,
+    Restored
+};
+
+enum NodeStatus : Byte {
+    ReadingBlocks,
+    Synchronization,
+    InRound,
+    Trusted
 };
 
 // all info about round
@@ -89,6 +97,7 @@ struct RoundTable {
 struct PoolMetaInfo {
     Characteristic characteristic;
     std::string timestamp;
+    std::string reward;
     csdb::PoolHash previousHash;
     cs::Sequence sequenceNumber;
     cs::Bytes realTrustedMask;
@@ -107,6 +116,16 @@ struct Command{
     size_t intParam;
     cs::Bytes data;
 };
+
+enum SyncroMessage : uint8_t {
+    NoAnswer,
+    AwaitAnswer,
+    IncorrectRequest,
+    NoSuchBlocks,
+    DuplicatedRequest,
+    Sent
+};
+
 
 using PoolMetaMap = std::map<cs::Sequence, cs::PoolSyncMeta>;
 
@@ -132,10 +151,20 @@ struct RoundTableMessage {
     cs::PublicKey sender;
 };
 
+enum class StakingCoefficient : uint8_t {
+    NoStaking,
+    ThreeMonth,
+    SixMonth,
+    NineMonth,
+    Anni
+};
+
 struct TimeMoney {
-    TimeMoney(uint64_t t, csdb::Amount am);
+    TimeMoney(const uint64_t it, const uint64_t t, const csdb::Amount am);
+    uint64_t initialTime;
     uint64_t time;
     csdb::Amount amount;
+    StakingCoefficient coeff;
 };
 
 struct NodeVersionChange {

@@ -9,6 +9,7 @@
 
 #include <csconnector/csconnector.hpp>
 
+#include <csnode/caches_serialization_manager.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
 
@@ -181,6 +182,9 @@ public:
 
     void sendBlockAlarm(const cs::PublicKey& source_node, cs::Sequence seq);
 
+    void tryResolveHashProblems();
+
+    void accountInitiationRequest(uint64_t& aTime, cs::PublicKey key);
     void cleanConfirmationList(cs::RoundNumber rNum);
     uint8_t calculateBootStrapWeight(cs::PublicKeys& confidants);
     // state syncro functions
@@ -192,7 +196,30 @@ public:
 
     // syncro get functions
     void getBlockRequest(const uint8_t*, const size_t, const cs::PublicKey& sender);
-    void getBlockReply(const uint8_t*, const size_t);
+    void getBlockReply(const uint8_t*, const size_t, const cs::PublicKey& sender);
+
+    void sendSyncroMessage(cs::Byte msg, const cs::PublicKey& target);
+    void getSyncroMessage(const uint8_t* data, const size_t size, const cs::PublicKey& sender);
+
+    // syncro log functions
+    void addSynchroRequestsLog(const cs::PublicKey& sender, cs::Sequence seq, cs::SyncroMessage msg);
+    bool checkSynchroRequestsLog(const cs::PublicKey& sender, cs::Sequence seq);
+    bool changeSynchroRequestsLog(const cs::PublicKey& sender, cs::SyncroMessage msg);
+    void updateSynchroRequestsLog();
+    bool removeSynchroRequestsLog(const cs::PublicKey& sender);
+
+    void sendPacketHash(const cs::TransactionsPacketHash& hash);
+    void getPacketHash(const uint8_t* data, const std::size_t size, const cs::RoundNumber rNum, const cs::PublicKey& sender);
+
+    void sendPacketHashRequest(const cs::PacketsHashes& hashes, const cs::PublicKey& respondent, cs::RoundNumber round);
+    void getPacketHashRequest(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
+    void processPacketsBaseRequest(cs::PacketsHashes&& hashes, const cs::RoundNumber round, const cs::PublicKey& sender);
+    void sendPacketHashesBaseReply(const cs::PacketsVector& packets, const cs::RoundNumber round, const cs::PublicKey& target);
+    void getPacketHashesBaseReply(const uint8_t* data, const std::size_t size, const cs::RoundNumber round, const cs::PublicKey& sender);
+
+    void sendTransactionsPacketHash(const cs::TransactionsPacket& packet);
+    void sendNecessaryBlockRequest(csdb::PoolHash hash, cs::Sequence seq);
+    void getNecessaryBlockRequest(cs::PoolsBlock& pBlock, const cs::PublicKey& sender);
 
     // transaction's pack syncro
     void sendTransactionsPacket(const cs::TransactionsPacket& packet);
@@ -203,6 +230,22 @@ public:
 
     // syncro send functions
     void sendBlockReply(const cs::PoolsBlock& poolsBlock, const cs::PublicKey& target);
+
+    void specialSync(cs::Sequence finSeq, cs::PublicKey& source);
+    void setTop(cs::Sequence finSeq);
+    bool checkKnownIssues(cs::Sequence seq);
+
+    void showNeighbours();
+    void setIdle();
+    void setWorking();
+    void showDbParams();
+    //void restoreSequence(cs::Sequence seq);
+
+    uint8_t requestKBAnswer(std::vector<std::string> choice);
+    void onSuccessQS(csdb::Amount blockReward, csdb::Amount miningCoeff, bool miningOn, bool stakingOn, uint32_t stageOneHashesTime);
+    void saveConsensusSettingsToChain();
+
+    void getNodeRewardEvaluation(std::vector<api_diag::NodeRewardSet>& request, std::string& msg, const cs::PublicKey& pKey, bool oneNode);
 
     /**
      * Initializes the default round package as containing the default round table (default trusted
@@ -223,6 +266,9 @@ public:
 
     bool isPoolsSyncroStarted();
     bool checkNodeVersion(cs::Sequence curSequence, std::string& msg);
+
+    void getSupply(std::vector<csdb::Amount>& suply);
+    void getMined(std::vector<csdb::Amount>& mined);
 
     std::optional<cs::TrustedConfirmation> getConfirmation(cs::RoundNumber round) const;
 
@@ -288,6 +334,12 @@ public:
     
     void getKnownPeers(std::vector<api_diag::ServerNode>& nodes);
     void dumpKnownPeersToFile();
+    void getKnownPeersUpd(std::vector<api_diag::ServerTrustNode>& nodes, bool oneKey, const csdb::Address& pKey);
+    api_diag::ServerTrustNode convertNodeInfo(const cs::PublicKey& pKey, const cs::NodeStat& ns);
+
+    std::string KeyToBase58(cs::PublicKey key);
+    void printInitialConfidants();
+
 
     /**
      * Gets node information. Caller MUST care about concurrency.
@@ -333,8 +385,10 @@ public slots:
     // request current trusted nodes for block with specific sequence
     void sendBlockRequestToConfidants(cs::Sequence sequence);
     void processSpecialInfo(const csdb::Pool& pool);
+    void checkConsensusSettings(cs::Sequence seq, std::string& msg);
+
     void validateBlock(const csdb::Pool& block, bool* shouldStop);
-    void deepBlockValidation(csdb::Pool block, bool* shouldStop);
+    void deepBlockValidation(const csdb::Pool& block, bool* shouldStop);
     void sendBlockAlarmSignal(cs::Sequence seq);
     void onRoundTimeElapsed();
     void onNeighbourAdded(const cs::PublicKey& neighbour, cs::Sequence lastSeq, cs::RoundNumber lastRound);
@@ -355,6 +409,7 @@ private:
     void reviewConveyerHashes();
 
     void processSync();
+    void updateWithPeerData(std::map<cs::PublicKey, cs::NodeStat>& sNodes);
 
     // transport
     void addToBlackList(const cs::PublicKey& key, bool isMarked);
@@ -486,6 +541,26 @@ private:
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;
+    cs::CachesSerializationManager cachesSerializationManager_;
+
+    size_t notInRound_ = 0;
+    std::map<cs::PublicKey, std::tuple<cs::Sequence, cs::SyncroMessage, uint64_t>> synchroRequestsLog_;
+    std::map<cs::TransactionsPacketHash, cs::RoundNumber> orderedPackets_;
+    cs::NodeStatus status_;
+
+    cs::Sequence neededSequence_ = 0ULL;
+    csdb::PoolHash neededHash_;
+    cs::PublicKeys requestedKeys_;
+    size_t goodAnswers_ = 0;
+    bool cacheLBs_ = false;
+    
+    //consensus settings changing values
+    cs::Sequence consensusSettingsChangingRound_ = ULLONG_MAX;
+    bool stakingOn_ = false; 
+    bool miningOn_ = false;
+    csdb::Amount blockReward_ = 0;
+    csdb::Amount miningCoefficient_ = 0;
+
 };
 
 std::ostream& operator<<(std::ostream& os, Node::Level nodeLevel);

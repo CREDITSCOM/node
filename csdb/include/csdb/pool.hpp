@@ -44,11 +44,11 @@ public:
     std::string to_string() const noexcept;
 
     /**
-     * @brief Получение хэша из строкового представления
-     * @param[in] str Строковое представление хэша
-     * @return Хэш, полученный из строкового представления.
+     * @brief Converting hash from hex string format
+     * @param[in] str String value of hash
+     * @return Hash in format PoolHash, obtained from string value
      *
-     * В случае, если строковое представление неверное, возвращается пустой хэш.
+     * In case when the string value is incorrect empty hash is returned.
      */
     static PoolHash from_string(const ::std::string& str);
 
@@ -61,8 +61,7 @@ public:
     /**
      * @brief operator <
      *
-     * Оператор предназначен для возможности сортировок контейнеров класса или
-     * использования класса в качестве ключа.
+     * Operator for sorting the class containers or for using class as key.
      */
     bool operator<(const PoolHash& other) const noexcept;
     size_t calcHash() const noexcept;
@@ -147,13 +146,14 @@ public:
     Pool(PoolHash previous_hash, cs::Sequence sequence, const Storage& storage = Storage());
 
     static PoolHash hash_from_binary(cs::Bytes&& data);
-    static Pool from_binary(cs::Bytes&& data);
+    static Pool from_binary(cs::Bytes&& data, bool makeReadOnly = true);
     static Pool meta_from_binary(cs::Bytes&& data, size_t& cnt);
     static Pool load(const PoolHash& hash, Storage storage = Storage());
 
     // static Pool from_byte_stream(const char* data, size_t size);
     char* to_byte_stream(uint32_t&);
     cs::Bytes to_byte_stream_for_sig();
+    cs::Bytes to_binary_updated() const;
 
     Pool meta_from_byte_stream(const char*, size_t);
     static Pool from_lz4_byte_stream(size_t);
@@ -198,16 +198,15 @@ public:
     uint8_t numberConfirmations() const noexcept;
     uint8_t numberTrusted() const noexcept;
     /**
-     * @brief Добавляет транзакцию в пул.
-     * @param[in] transaction Транзакция для добавления
-     * @return true, если транзакция была успешно добавлена. false, если транзакция не прошла
-     * проверку.
+     * @brief Adds transaction to pool.
+     * @param[in] transaction transaction to be added
+     * @return true, if transaction addad successfully. false, if transaction didn't pass the check
      *
-     * Добаление возможно только во вновь создаваемый пул (т.е. если \ref is_read_only возвращает false).
+     * The transaction can be added only to new pool (i.e. only if \ref is_read_only is false).
      *
-     * Перед добавлением транзакция проходит проверку на валидность по базе данных, указанной для
-     * пула, и по ранее добавленным транзакциям. Если база данных не задана, или она была закрыта,
-     * проверка считается неуспешной.
+     * Before adding the transaction should be checked for validity in database, set for its pool, 
+     * and through previously added transactions. If database is not set, or it's closed the 
+     * check is not successfull.
      */
     bool add_transaction(Transaction transaction
 #ifdef CSDB_UNIT_TEST
@@ -217,104 +216,101 @@ public:
     );
 
     /**
-     * @brief Закончить формирование пула.
-     * @return true, если для пула успешно сформировано бинарное представление.
+     * @brief Finalize the pool creation.
+     * @return true, if the binary representation is formed for the current pool
      *
-     * Для вновь создаваемого пула (т.е. если \ref is_read_only возвращает false) метод формирует
-     * его бинарное представлени, вычисляет хэш и переводит пул в состояние read-only. После этого
-     * для пула становятся доступными функции \ref hash, \ref save и \ref to_binary.
+     * For the new-created pool (i.e. if \ref is_read_only returns false) creates its binary 
+     * representation, calculates hash and switches pool into read-only state. After that
+     * the methods \ref hash, \ref save and \ref to_binary are available for the pool.
      *
-     * Для read-only пулов функция не делает ничего и просто возвращает true.
+     * For read-only pools this method doesn't process anything and just returns true.
      */
     bool compose();
 
     /**
-     * @brief Хеш пула
-     * @return Хеш пула, если пул находится в режиме read-only, и пустой хеш в противном
-     *         случае.
+     * @brief Pools hash
+     * @return Pools hash if pool is in the read-only state, and empty hash in other cases.
      */
     PoolHash hash() const noexcept;
     void recount() noexcept;
 
     /**
-     * @brief Бинарное представление пула
-     * @return Бинарное представление пула, если пул находится в режиме read-only, и пустой
-     *         массив в противном случае.
+     * @brief Pools binary representation
+     * @return Pools binary representation, if pool is in the read-only state and empty bytes-vector in other cases.
      */
     cs::Bytes to_binary() const noexcept;
 
     /**
-     * @brief Сохранение пула в хранилище.
-     * @param[in] storage Хранилище, в котором нужно сохранить пул.
-     * @return  true, если сохранение прошло успешно.
+     * @brief Saving pool in storage
+     * @param[in] storage Storage to save the pool
+     * @return  true, if save-operation succeded.
      *
-     * Функция работает только для сформированных пулов (т.е. находящихся в режиме read-only).
+     * Function works only for finalized pools, (i.e. those are in read-only state).
      *
-     * Если переданное хранилище не доступно (не открыто), то функция пытается сохранить пул в том
-     * хранилище, которое было передано ему при создании. Если и это хранилище недоступно, функци
-     * пытается использовать хранилище по умолчанию. Если ни одно из перечисленных хранилищ не доступно,
-     * возвращается false.
+     * If the supplied storage is inavailable (not opened), then method tries to save pool in 
+     * the storage received during constructing time. If this storage is inavailable too,
+     * method tries to use default storage. If none of those storages is available, FALSE is returned. 
      *
-     * Функция не проверяет, есть ли уже пул с таким же хэшем в хранилище, т.к. вероятность совпадения
-     * хешей у двух разных пулов практически нулевая.
+     * Function doesn't check if there is a pool with similar hash in the storage, because the possibility
+     * of equality two different pool's hashes is extremely low. 
      *
-     * Если сохранение прошло успешно, то хранилище, в которое произошло сохранение, становится хранилищем
-     * для данного экземпляра объекта (поэтому метод не константный).
+     * If the saving procedure was successful, then the storage, where pool was saved becomes the storage 
+     * for the objects item (thats why the method isn't constant).
      */
     bool save(Storage storage = Storage());
 
     /**
-     * @brief Добавляет дополнительное произвольное поле к пулу
-     * @param[in] id    Идентификатор дополнительного поля
-     * @param[in] field Значение дополнительного поля
-     * @return true, если поле добавлено, false в противном случае
+     * @brief adds additional information fiels to pool
+     * @param[in] id    - user field Id
+     * @param[in] field - user field value 
+     * @return true, if field is added, otherwise false
      *
-     * Поле добавляется только для пулов, не находящихся в режим Read-Only
-     * (\ref is_read_only возвращает false).
+     * The field can be added only to pools, those are not in Read-Only state
+     * (if \ref is_read_only returns false).
      *
-     * Если поле с таким идентификатором было добавлено ранее, они замещается новым.
+     * If the field with the same Id is added before it will be replace by new one.
      */
     bool add_user_field(user_field_id_t id, const UserField& field) noexcept;
 
     /**
-     * @brief Возвращает дополнительное поле.
-     * @param[in] id  Идентификатор дополнительного поля
-     * @return  Значение дополнительного поля. Если поля с таким идентификатором нет в списке
-     *          дополнительных полей, возвращается невалидный объект
+     * @brief Returns user field (additional customized field).
+     * @param[in] id  User field Id
+     * @return  The value of user field. If there is no field with such Id
+     *          in the user field's list, invalid object is returned 
      *          (\ref UserField::is_valid == false).
      */
     UserField user_field(user_field_id_t id) const noexcept;
 
     /**
-     * @brief Список идентификаторов дополнительных полей
-     * @return  Список идентификаторов дополнительных полей
+     * @brief List of user field's Ids
+     * @return  List of user field's Ids
      */
     ::std::set<user_field_id_t> user_field_ids() const noexcept;
 
-    /// \deprecated Функция будет исключена в последующих версиях.
+    /// \deprecated Method will be deprecated in later versions of csdb.
     Transaction transaction(size_t index) const;
 
     /**
-     * @brief Получить транзакцию по идентификатору
-     * @param[in] id Идентификатор транзакции
-     * @return Возвращает объект транзакции. Если транзакции не существует в данном пуле, возвращается
-     *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
+     * @brief Get transaction using transaction Id
+     * @param[in] id - transaction identifier (pool_number.transaction_number)
+     * @return Returns transaction object. If transaction doesn't exist in current pool, r
+     *         eturns invalid object (\ref ::csdb::Transaction::is_valid() == false).
      */
     Transaction transaction(TransactionID id) const;
 
     /**
-     * @brief Получить последнюю транзакцию по адресу источника
-     * @param[in] source Адрес источника
-     * @return Возвращает объект транзакции. Если транзакции не существует в данном пуле, возвращается
-     *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
+     * @brief Get last transaction using source address
+     * @param[in] source - source address
+     * @return transaction object. If transaction doesn't exist in current pool, returns
+     *         invalid object (\ref ::csdb::Transaction::is_valid() == false).
      */
     Transaction get_last_by_source(const Address& source) const noexcept;
 
     /**
-     * @brief Получить последнюю транзакцию по адресу назначения
-     * @param[in] source Адрес назначения
-     * @return Возвращает объект транзакции. Если транзакции не существует в данном пуле, возвращается
-     *         невалидный объект (\ref ::csdb::Transaction::is_valid() == false).
+     * @brief Get last transaction using target address
+     * @param[in] target - target address
+     * @return transaction object. If transaction doesn't exist in current pool, returns
+     *         invalid object (\ref ::csdb::Transaction::is_valid() == false).
      */
     Transaction get_last_by_target(const Address& target) const noexcept;
 

@@ -34,9 +34,9 @@ enum class Role {
  *
  * @brief   A solver context.
  *
- *          "Интерфейсный" класс для обращений из классов состояний к ядру солвера, определяет
- *          подмножество вызовов солвера, которые доступны из классов состояний, д. б.
- *          достаточным, но не избыточным одновременно.
+ *           Interface class for requests from state class to solvercore, defines 
+ *          the subset of solver requests, those are availalbe from state classes, shold be enough,
+ *          but not excessive simultaneously.
  *
  * @author  aae
  * @date    03.10.2018

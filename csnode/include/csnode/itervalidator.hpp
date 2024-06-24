@@ -37,12 +37,18 @@ private:
 
     void checkSignaturesSmartSource(SolverContext&, PacketsVector& smartContractsPackets);
     void checkTransactionsSignatures(SolverContext& context, const Transactions& transactions, Bytes& characteristicMask, PacketsVector& smartsPackets);
-    bool checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction);
+    std::pair<bool, PublicKey> checkTransactionSignature(SolverContext& context, const csdb::Transaction& transaction);
+    void checkSignatures(const Transactions& transactions, cs::Bytes& characteristicMask, size_t ttCount, size_t tNumber);
 
 	Reject::Reason deployAdditionalCheck(SolverContext& context, size_t trxInd, const csdb::Transaction& transaction);
 
     std::unique_ptr<TransactionsValidator> pTransval_;
     std::set<csdb::Address> smartSourceInvalidSignatures_;
+    std::vector<PublicKey> transactionKeys_;
+
+    std::mutex sMutex_;
+
+    size_t rCounter_;
 };
 
 class IterValidator::SimpleValidator {
@@ -62,7 +68,8 @@ public:
         kDifferentDelegatedAmount,
         kNoDelegatedAmountToWithdraw,
         kInsufficientDelegatedBalance,
-        kAmountTooLow
+        kAmountTooLow,
+        kNegativeAmount
     };
 
     static std::string getRejectMessage(RejectCode);

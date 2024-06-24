@@ -6,11 +6,44 @@ Zero::Zero() {
     hash.fill(0);
     signature.fill(0);
     key.fill(0);
-    timeStamp = 0U;
+    timeStamp = 0ULL;
 }
-TimeMoney::TimeMoney(uint64_t t, csdb::Amount am) {
+TimeMoney::TimeMoney(const uint64_t it, const uint64_t t, const csdb::Amount am){
+    initialTime = it/1000;
     time = t;
-    amount = am;
+    amount = am; 
+    uint64_t ThreeMonthSeconds = 7862400ULL;
+    uint64_t m = 0ULL;
+    if (time == cs::Zero::timeStamp || time < initialTime) {
+        csdebug() << "TimeMoney: setting coeff to zero: it = " << initialTime << ", t = " << time;
+        coeff = StakingCoefficient::NoStaking;
+    }
+    else {
+        m = (time - initialTime) / ThreeMonthSeconds;
+        csdebug() << "TimeMoney: calculating coeff, m: " << m;
+        switch (m) {
+        case 0:
+            coeff = StakingCoefficient::NoStaking;
+            break;
+        case 1: 
+            coeff = StakingCoefficient::ThreeMonth;
+            break;
+        case 2:
+            coeff = StakingCoefficient::SixMonth;
+            break;
+        case 3:
+            coeff = StakingCoefficient::NineMonth;
+            break;
+        case 4:
+            coeff = StakingCoefficient::Anni;
+            break;
+        default:
+            coeff = StakingCoefficient::Anni;
+        }
+    }
+    csdebug() << "TimeMoney created: initial time " << initialTime << ", final time: " << time << ", amount: " << amount.to_string() << ", coeff = " << static_cast<int>(coeff) << ", m = " << m;
+
+    
 }
 }  // namespace cs
 

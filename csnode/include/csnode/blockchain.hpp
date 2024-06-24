@@ -22,6 +22,7 @@
 #include <csnode/multiwallets.hpp>
 #include <csnode/walletsids.hpp>
 #include <csnode/poolcache.hpp>
+#include <csnode/caches_serialization_manager.hpp>
 
 #include <roundpackage.hpp>
 
@@ -30,17 +31,22 @@
 #include <condition_variable>
 #include <mutex>
 
+#include <lib/system/common.hpp>
+
 namespace cs {
 class BlockHashes;
 class WalletsIds;
 class Fee;
 class TransactionsIndex;
 class TransactionsPacket;
+class BlockChain_Serializer;
 
 /** @brief   The synchronized block signal emits when block is trying to be stored */
 using TryToStoreBlockSignal = cs::Signal<void(const csdb::Pool&, bool*)>;
+using NeedStopSignal = cs::Signal<void(bool)>;
 /** @brief   The new block signal emits when finalizeBlock() occurs just before recordBlock() */
 using StoreBlockSignal = cs::Signal<void(const csdb::Pool&)>;
+using OrderNecessaryBlockSignal = cs::Signal<void(csdb::PoolHash, cs::Sequence)>;
 
 /** @brief   The write block or remove block signal emits when block is flushed to disk */
 using ChangeBlockSignal = cs::Signal<void(const cs::Sequence)>;
@@ -48,6 +54,8 @@ using RemoveBlockSignal = cs::Signal<void(const csdb::Pool&)>;
 using AlarmSignal = cs::Signal<void(const cs::Sequence)>;
 using ReadBlockSignal = csdb::ReadBlockSignal;
 using StartReadingBlocksSignal = csdb::BlockReadingStartedSingal;
+using StopReadingBlocksSignal = cs::Signal<void(uint64_t, bool)>;
+using SuccessQSSignal = cs::Signal<void(csdb::Amount, csdb::Amount, bool, bool, uint32_t)> ;
 }  // namespace cs
 
 class BlockChain {
@@ -66,8 +74,12 @@ public:
                         bool recreateIndex = false);
     ~BlockChain();
 
-    bool init(const std::string& path,
-              cs::Sequence newBlockchainTop = cs::kWrongSequence);
+    bool init(
+      const std::string& path,
+      cs::CachesSerializationManager*,
+      std::set<cs::PublicKey>& initialConfidants,
+      cs::Sequence newBlockchainTop = cs::kWrongSequence
+    );
     // called immediately after object construction, better place to subscribe on signals
     void subscribeToSignals();
 
@@ -82,9 +94,10 @@ public:
     bool isEqual(const csdb::Address& laddr, const csdb::Address& raddr) const;
 
     static csdb::Address getAddressFromKey(const std::string&);
+    static csdb::Address getAddressFromKey(const cs::Bytes&);
 
     static uint64_t getBlockTime(const csdb::Pool& block) noexcept;
-
+    static std::string poolInfo(const csdb::Pool& pool);
     // create/save block and related methods
 
     /**
@@ -120,13 +133,13 @@ public:
      * @return    The new recorded block if ok, otherwise nullopt.
      */
 
-    std::optional<csdb::Pool> createBlock(csdb::Pool pool) {
+    std::optional<csdb::Pool> createBlock(csdb::Pool& pool) {
         return recordBlock(pool, true);
     }
 
     void removeWalletsInPoolFromCache(const csdb::Pool& pool);
     void removeLastBlock();
-
+    void showDBParams();
     /**
      * Mark last block as compromised and handle the situation:
      *  - store required parameters  
@@ -144,18 +157,20 @@ public:
 
     // updates fees in every transaction
     void setTransactionsFees(cs::TransactionsPacket& packet);
-    void setTransactionsFees(csdb::Pool& pool);
+    void setTransactionsFees(csdb::Pool& pool, cs::PoolStoreType type = cs::PoolStoreType::Created);
     void setTransactionsFees(std::vector<csdb::Transaction>& transactions);
     void setTransactionsFees(std::vector<csdb::Transaction>& transactions, const cs::Bytes& characteristicMask);
 
-    void addNewWalletsToPool(csdb::Pool& pool);
+    bool addNewWalletsToPool(csdb::Pool& pool);
     void updateLastTransactions(const std::vector<std::pair<cs::PublicKey, csdb::TransactionID>>&);
 
-    bool checkForConsistency(csdb::Pool & pool);
+    bool checkForConsistency(csdb::Pool & pool, bool isNew);
 
     // storage adaptor
     void close();
     bool getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const;
+    void arrangeBlocksInCache();
+
 
 public:
     std::string getLastTimeStamp() const;
@@ -169,6 +184,7 @@ public:
 
     static inline const csdb::user_field_id_t kFieldTimestamp = 0;
     static inline const csdb::user_field_id_t kFieldServiceInfo = 1;
+    static inline const csdb::user_field_id_t kFieldBlockReward = 3;
 
     static void setTimestamp(csdb::Pool& block, const std::string& timestamp);
     static void setBootstrap(csdb::Pool& block, bool is_bootstrap);
@@ -191,6 +207,13 @@ public:
     std::size_t getCachedBlocksSizeSynced() const;
     void clearBlockCache();
 
+    void cacheLastBlocks();
+    void replaceCachedIncorrectBlock(const csdb::Pool& block);
+    void getCachedMissedBlock(const csdb::Pool& block);
+    void badBlockIssue(const csdb::Pool& pool);
+    void lookForBadBlocks();
+
+    std::vector<cs::Sequence>* getIncorrectBlockNumbers();
     // continuous interval from ... to
     using SequenceInterval = std::pair<cs::Sequence, cs::Sequence>;
 
@@ -225,9 +248,13 @@ public:
     }
 
 public signals:
+    //orderNecessaryBlock(&tryBlock, lastBlock.sequence());
+    cs::OrderNecessaryBlockSignal orderNecessaryBlock;
 
     /** @brief The new block event. Raised when the next incoming block is finalized and just before stored into chain */
     cs::StoreBlockSignal storeBlockEvent;
+
+    cs::NeedStopSignal stopNode;
 
     /** @brief The event storing synchronized block. Raised when the next incoming block is trying to be stored into chain */
     cs::TryToStoreBlockSignal tryToStoreBlockEvent;
@@ -246,6 +273,9 @@ public signals:
 
     const cs::ReadBlockSignal& readBlockEvent() const;
     const cs::StartReadingBlocksSignal& startReadingBlocksEvent() const;
+
+    cs::StopReadingBlocksSignal stopReadingBlocksEvent;
+    cs::SuccessQSSignal successfullQuickStartEvent;
 
 public slots:
 
@@ -275,6 +305,7 @@ public:
 
     csdb::Pool loadBlock(const csdb::PoolHash&) const;
     csdb::Pool loadBlock(const cs::Sequence sequence) const;
+    csdb::Pool loadBlockForSync(const cs::Sequence sequence) const;
     csdb::Pool loadBlockMeta(const csdb::PoolHash&, size_t& cnt) const;
     csdb::Transaction loadTransaction(const csdb::TransactionID&) const;
     void iterateOverWallets(const std::function<bool(const cs::PublicKey&, const cs::WalletsCache::WalletData&)>);
@@ -282,6 +313,9 @@ public:
         return loadBlock(getLastSeq());
     }
 
+    bool isAntiForkModeOn() {
+        return antiForkMode_;
+    }
     // info
 
     size_t getSize() const;
@@ -300,8 +334,9 @@ public:
     // wallet transactions: pools cache + db search
     void getTransactions(Transactions& transactions, csdb::Address address, uint64_t offset, uint64_t limit);
     void getTransactionsUntill(Transactions& transactions, csdb::Address address, csdb::TransactionID id, uint16_t flagg);
-
+    void getAccountRegTime(uint64_t& aTime, csdb::Address address);
     void setBlocksToBeRemoved(cs::Sequence number);
+    double getStakingCoefficient(cs::StakingCoefficient coeff);
 
     std::string printWalletCaches();
 
@@ -338,6 +373,34 @@ public:
      */
 
     void tryFlushDeferredBlock();
+    void addIncorrectBlockNumber(cs::Sequence seq);
+
+    csdb::Amount getBlockReward() {
+        return csdb::Amount(blockRewardIntegral_, blockRewardFraction_);
+    }
+
+    csdb::Amount getMiningCoefficient() {
+        return csdb::Amount(miningCoefficientIntegral_, miningCoefficientFraction_);
+    }
+
+    bool getStakingOn() {
+        return stakingOn_;
+    }
+
+    bool getMiningOn() {
+        return miningOn_;
+    }
+
+    uint32_t getTimeMinStage1() {
+        return TimeMinStage1_;
+    }
+
+    void setBlockReward(csdb::Amount reward);
+    void setMiningCoefficient(csdb::Amount coefficient);
+    void setMiningOn(bool mOn);
+    void setStakingOn(bool stOn);
+    void setTimeMinStage1(uint32_t timeStage1);
+
 
 private:
     void createCachesPath();
@@ -352,7 +415,7 @@ private:
 
     void onStartReadFromDB(cs::Sequence lastWrittenPoolSeq);
     void onReadFromDB(csdb::Pool block, bool* shouldStop);
-    bool postInitFromDB();
+    bool postInitFromDB(bool successfulQuickStart);
 
     bool updateWalletIds(const csdb::Pool& pool, cs::WalletsCache::Updater& updater);
     bool insertNewWalletId(const csdb::Address& newWallAddress, WalletId newWalletId, cs::WalletsCache::Updater& updater);
@@ -377,7 +440,6 @@ private:
     std::unique_ptr<cs::WalletsIds> walletIds_;
     std::unique_ptr<cs::WalletsCache> walletsCacheStorage_;
     std::unique_ptr<cs::WalletsCache::Updater> walletsCacheUpdater_;
-    std::unique_ptr<cs::MultiWallets> multiWallets_;
 
     mutable cs::SpinLock cacheMutex_{ATOMIC_FLAG_INIT};
 
@@ -442,6 +504,16 @@ private:
     cs::Sequence blocksToBeRemoved_ = 0;
     std::atomic_bool stop_ = false;
 
+    std::vector<cs::Sequence> incorrectBlocks_;//blocks with wrong hashes (during db reading)
+    std::vector<cs::Sequence> badBlocks_;//blocks containing invalid transactions
+    bool selectionFinished_ = true;
+    csdb::PoolHash lastPrevHash_ = csdb::PoolHash();
+    bool antiForkMode_ = false;
+    uint8_t emittingRequest_ = 0;
+    cs::Sequence neededCacheSeq_ = 0ULL;
+    cs::Sequence startingBchSeq_ = 0ULL;
+
+
     // support the ability to replace last deferred block by the alternative with the same content, anti-fork feature
     // flag the last block is uncertain:
     bool uncertainLastBlockFlag_ = false;
@@ -461,8 +533,24 @@ private:
         desiredHash_ = csdb::PoolHash{};
     }
 
+    bool tryQuickStart(cs::CachesSerializationManager*, std::set<cs::PublicKey>& initialConfidants);
+    bool bindSerializationManToCaches(cs::CachesSerializationManager*, std::set<cs::PublicKey>& initialConfidants);
+
+    cs::CachesSerializationManager* serializationManPtr_ = nullptr;
+
     // compare only state content: transactions, new wallets, sequence, round fee, user fields
     // true if both pools are not valid, or both pools have equal state content
     static bool testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs);
+
+    friend class cs::BlockChain_Serializer;
+
+    const size_t kQuickStartSaveCachesInterval = 10'000'000;
+    int32_t blockRewardIntegral_;
+    uint64_t blockRewardFraction_ ;
+    int32_t miningCoefficientIntegral_;
+    uint64_t miningCoefficientFraction_;
+    bool stakingOn_;
+    bool miningOn_;
+    uint32_t TimeMinStage1_;
 };
 #endif  //  BLOCKCHAIN_HPP

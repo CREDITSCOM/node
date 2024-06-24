@@ -16,7 +16,6 @@
 using namespace boost::multi_index;
 
 namespace cs {
-
 class WalletsIds {
 public:
     using WalletId = csdb::internal::WalletId;
@@ -47,7 +46,7 @@ public:
     WalletsIds& operator=(const WalletsIds&) = delete;
     WalletsIds(const WalletsIds&&) = delete;
     WalletsIds& operator=(const WalletsIds&&) = delete;
-    
+
     Normal& normal() {
         return *norm_;
     }
@@ -80,8 +79,9 @@ private:
     Data data_;
     WalletId nextId_;
     std::unique_ptr<Normal> norm_;
-};
 
+    friend class WalletsIds_Serializer;
+};
 }  // namespace cs
 
 #endif

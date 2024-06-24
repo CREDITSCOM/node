@@ -8,12 +8,12 @@ class RoundPackage {
 public:
     RoundPackage();
 
-    const cs::Bytes& toBinary();
+    const cs::Bytes& toBinary(bool showVersion);
     cs::Byte subRound();
     bool fromBinary(const cs::Bytes& bytes, cs::RoundNumber rNum, cs::Byte subRound);
 
     std::string toString();
-    cs::Bytes bytesToSign();
+    cs::Bytes bytesToSign(bool showVersion);
     const cs::RoundTable& roundTable() const;
     const cs::PoolMetaInfo& poolMetaInfo() const;
 
@@ -50,7 +50,7 @@ private:
         return "RoundPackage> ";
     }
 
-    void refillToSign();
+    void refillToSign(bool showVersion);
 
     cs::RoundTable roundTable_;
     cs::PoolMetaInfo poolMetaInfo_;  // confirmations sent in rt are confirmations for next pool

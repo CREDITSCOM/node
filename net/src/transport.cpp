@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <thread>
+#include <unordered_set>
 
 #include <csconnector/csconnector.hpp>
 #include <cscrypto/cscrypto.hpp>
@@ -188,7 +189,7 @@ void Transport::sendDirect(Packet&& pack, const cs::PublicKey& receiver) {
 }
 
 void Transport::ban(const cs::PublicKey& key) {
-    host_.Ban(toNodeId(key));
+    //host_.Ban(toNodeId(key));
 }
 
 void Transport::revertBan(const cs::PublicKey& key) {
@@ -223,10 +224,17 @@ void Transport::sendBroadcastIfNoConnection(Packet&& pack, const cs::PublicKey& 
     host_.SendBroadcastIfNoConnection(toNodeId(receiver), pack.moveData());
 }
 
+void Transport::clearInbox() {
+    {
+        std::lock_guard g(inboxMux_);
+        inboxQueue_.clear();
+    }
+}
+
 void Transport::processorRoutine() {
     constexpr size_t kRoutineWaitTimeMs = 50;
 
-    while (!node_->isStopRequested()) {
+    while (Transport::gSignalStatus == 0) {
         process();
 
         std::unique_lock lock(inboxMux_);
@@ -300,7 +308,7 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
         case MsgTypes::BlockRequest:
             return node_->getBlockRequest(data, size, sender);
         case MsgTypes::RequestedBlock:
-            return node_->getBlockReply(data, size);
+            return node_->getBlockReply(data, size, sender);
         case MsgTypes::Utility:
             return node_->getUtilityMessage(data, size);
         case MsgTypes::NodeStopRequest:
@@ -361,6 +369,14 @@ void Transport::dispatchNodeMessage(const cs::PublicKey& sender, const MsgTypes 
             return node_->getBlockAlarm(data, size, rNum, sender);
         case MsgTypes::EventReport:
             return node_->getEventReport(data, size, rNum, sender);
+        case MsgTypes::SyncroMsg:
+            return node_->getSyncroMessage(data, size, sender);
+        case MsgTypes::TransactionPacketHash:
+            return node_->getPacketHash(data, size, rNum, sender);
+        case MsgTypes::TransactionsPacketBaseRequest:
+            return node_->getPacketHashRequest(data, size, rNum, sender);
+        case MsgTypes::TransactionsPacketBaseReply:
+            return node_->getPacketHashesBaseReply(data, size, rNum, sender);
         default:
             break;
     }
@@ -404,6 +420,8 @@ void Transport::getKnownPeers(std::vector<cs::PeerData>& result) {
     std::vector<net::NodeEntrance> knownPeers;
     host_.GetKnownNodes(knownPeers);
 
+    std::unordered_set<std::string> uniqueIds;
+
     for (auto& p : knownPeers) {
         cs::PeerData peerData;
         auto ptr = reinterpret_cast<const uint8_t*>(p.id.GetPtr());
@@ -415,17 +433,21 @@ void Transport::getKnownPeers(std::vector<cs::PeerData>& result) {
           peerData.platform = static_cast<decltype(peerData.platform)>(getPlatform(p.user_data));
         }
 
-        result.push_back(peerData);
+        if (uniqueIds.insert(peerData.id).second) {
+          result.push_back(peerData);
+        }
+        else {
+          std::string errorMsg = "Transport::getKnownPeers: peer with duplicated id detected "
+                                 "in routing table. Id: ";
+          errorMsg += peerData.id;
+#ifdef MONITOR_NODE
+          errorMsg += ". MONITOR_NODE";
+#endif
+          cserror() << errorMsg;
+        }
     }
 }
 
 void Transport::addToNeighbours(const std::set<cs::PublicKey>& keys) {
     neighbourhood_.add(keys);
-}
-
-net::FragmentId Transport::GetFragmentId(const net::ByteVector& fragment) {
-  auto h = cscrypto::calculateHash(fragment.data(), fragment.size());
-  net::FragmentId id;
-  std::copy(h.begin(), h.end(), reinterpret_cast<uint8_t*>(id.GetPtr()));
-  return id;
 }

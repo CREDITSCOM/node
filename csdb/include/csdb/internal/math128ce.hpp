@@ -1,7 +1,7 @@
 /**
  * @file math128ce.h
  * @author Evgeny V. Zalivochkin
- * @brief Небольшой набор constexpr-функций и классов для работы со 128-битной арифметикой.
+ * @brief Set of constexpr-functions and classes for 128-bits arithmetic.
  */
 
 #ifndef _CREDITS_CSDB_INTERNAL_MATH128CE_H_INCLUDED_
@@ -32,7 +32,7 @@ struct uint128_t {
     constexpr inline uint128_t operator+(const uint64_t summand) const noexcept;
     constexpr inline uint128_t operator+(const uint128_t& summand) const noexcept;
 
-    // Умножение
+    // Multiplication
 public:
     static constexpr inline uint128_t mul(uint64_t a, uint64_t b);
 
@@ -40,7 +40,7 @@ private:
     static constexpr inline uint128_t mul1(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d);
     static constexpr inline uint128_t mul2(const uint64_t ac, const uint64_t ad, const uint64_t bc, const uint64_t bd);
 
-    // Деление
+    // Division
 public:
     struct division64_result;
     constexpr inline division64_result div(const uint64_t divisor) const;
