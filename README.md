@@ -14,6 +14,7 @@ A node is a client-side application that is installed on the user equipment.
 The Node processes and stores transactions, executes and confirms smart contract rules requests processing from third-party systems and provides data when requested.
 Written on C++.
 
+## Version
 Current node version 4.2.532.0
 
 <h2>What is Credits Node?</h2>
@@ -59,18 +60,19 @@ On Linux:<br/>
 <h4>If necessary, full step-by-step instruction for Linux:</h4>
 
 Update repos and install required package
-
+>```sh
 >sudo apt update
 >apt upgrade -y
 >sudo apt install build-essential libssl-dev autoconf -y
 >sudo apt install flex bison libtool -y
 
 Create build directory
-
+>```sh
 >mkdir csbuild
 >d csbuild
 
-Update gcc g++
+Update gcc g++ (there is no need to update in version of Ubuntu 20 and later)
+>```sh
 >sudo apt install gcc-8 g++-8 -y
 >sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 80 --slave /usr/bin/g++ g++ /usr/bin/g++-8 --slave /usr/bin/gcov gcov /usr/bin/gcov-8
 >gcc --version
@@ -80,6 +82,7 @@ Update gcc g++
 >warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE
 
 Update cmake to latest version
+>```sh
 >wget -c https://github.com/Kitware/CMake/releases/download/v3.17.0/cmake-3.17.0.tar.gz
 >tar zxfv cmake-3.17.0.tar.gz
 >cd cmake-3.17.0
@@ -89,7 +92,7 @@ Update cmake to latest version
 >cd ..
 
 Install boost
-
+>```sh
 >wget -c $https://dl.bintray.com/boostorg/release/1.72.0/source/boost_1_72_0.tar.gz
 >tar zxfv boost_1_72_0.tar.gz
 >cd boost_1_72_0
@@ -100,13 +103,13 @@ Install boost
 >cd ..
 
 Build node
-
+>```sh
 >git clone https://github.com/CREDITSCOM/node.git
 >cd node
 >git submodule update --init --recursive
 >mkdir build
 >cd build
->cmake -DCMAKE_CXX_FLAGS=-DMONITOR_NODE -DCMAKE_BUILD_TYPE=Release ..
+>cmake -DCMAKE_BUILD_TYPE=Release ..
 >make -j2
 
 <h2>System requirements:</h2>
