@@ -35,10 +35,10 @@ The node consists of the following elements:</p>
 <li> Requirements fo building <a href="https://thrift.apache.org/docs/install/">Apache Thrift</a></li>
 <li>The building Berkeley DB distribution uses the Free Software Foundation's autoconf and libtool tools to build on UNIX platforms.</li>
 
-On Windows:<br/>
+
 
 It is necessary to run in the terminal, which sets the environment variables for building a Visual Studio project
-
+For Windows:<br/>
 >```sh
 >git clone https://github.com/CREDITSCOM/node.git
 >cd node
@@ -47,7 +47,49 @@ It is necessary to run in the terminal, which sets the environment variables for
 >cd build
 >cmake -DCMAKE_BUILD_TYPE=Release -A x64 ..
 >cmake --build . --target ALL_BUILD --config Release
-On Linux:<br/>
+
+
+<h4>If necessary, full step-by-step instruction for Windows:</h4>
+
+>```sh
+># Install cmake
+># After install you can try to run in command line version check:
+>cmake --version
+># If installation was successful, the result will be like:
+>cmake version 3.17.0-rc1
+># Install git, check the version the same way:
+>git --version
+># and result result:
+>git version 2.33.0.windows.2
+># Install Visual Studio, as result you can rut it
+># FLEX&BISON usually are installed automatically with vVisual Studio and are not necessary, but you can find them in Internet and install
+># Check is made the same way by requesting Software version. System should give the correct answer.
+># Install boost from 1.68.0 to 1.72.0:
+>wget -c $https://dl.bintray.com/boostorg/release/1.72.0/source/boost_1_72_0.tar.gz
+># or just load with your browser
+># unzip with any archiver, you prefer and go to directory:
+>cd boost_1_72_0
+>./bootstrap.sh
+>./b2 --build-type=complete link=static threading=multi $runtime-link=static --layout=tagged install --prefix=../boost
+># do not forget to add BOOST_ROOT to your SYSTEM VARIABLES and set the value pointing your BOOST directory C:\boost\boost_1_72_0
+># Check it:
+>echo %BOOST_ROOT%
+># Result: boost root variable value
+># and add the directories of boost-root and boost-libs to your SYSTEM PATHS like that:
+># C:\boost\boost_1_72_0
+># C:\boost\boost_1_72_0\stage\lib
+># Now you are ready to get node repository and build it:
+>git clone https://github.com/CREDITSCOM/node.git
+>cd node
+>git submodule update --init --recursive
+>mkdir build
+>cd build
+>cmake -DCMAKE_BUILD_TYPE=Release -A x64 ..
+>cmake --build . --target ALL_BUILD --config Release
+
+
+
+For Linux:<br/>
 >```sh
 >git clone https://github.com/CREDITSCOM/node.git
 >cd node
