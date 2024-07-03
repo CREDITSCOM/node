@@ -62,7 +62,8 @@ For Windows:<br/>
 ># and result result:
 >git version 2.33.0.windows.2
 ># Install Visual Studio, as result you can rut it
-># FLEX&BISON usually are installed automatically with vVisual Studio and are not necessary, but you can find them in Internet and install
+># FLEX&BISON usually are installed automatically with Visual Studio and are not necessary to install yourself
+># DO NOT TRY TO INSTALL IT SEPARATELY IF IT ISN'T NECESSARY, IT CAN PREVENT YOU FROM CORRECT NODE BUILDING PROCESS
 ># Check is made the same way by requesting Software version. System should give the correct answer.
 ># Install boost from 1.68.0 to 1.72.0:
 >wget -c $https://dl.bintray.com/boostorg/release/1.72.0/source/boost_1_72_0.tar.gz
