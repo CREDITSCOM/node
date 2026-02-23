@@ -53,6 +53,12 @@ void Staking::cleanDelegationsFromCache(uint64_t delTime, Delegations& value) {
     for (auto& it : value) {
         auto sourceWallData = getWalletData_(std::get<0>(it));
         auto targetWallData = getWalletData_(std::get<1>(it));
+if (!(sourceWallData.delegateTargets_) || !(targetWallData.delegateSources_)) {
+            cserror() << ": sourceWallData.delegateTargets_ == " << (sourceWallData.delegateTargets_ ? "some_value" : "nullptr")
+                << ": targetWallData.delegateSources_ == " << (targetWallData.delegateSources_ ? "some_value" : "nullptr")
+                << " for " << std::get<2>(it).to_string();
+            continue;
+        }
         auto itt = sourceWallData.delegateTargets_->find(std::get<1>(it));
         auto its = targetWallData.delegateSources_->find(std::get<0>(it));
         if (itt != sourceWallData.delegateTargets_->end()) {
