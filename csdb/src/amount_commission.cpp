@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "blockchain"
 #include <cmath>
 
 #include <csdb/amount_commission.hpp>

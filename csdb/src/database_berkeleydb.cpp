@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "blockchain"
 #include <db_cxx.h>
 #include <cassert>
 #include <cstdio>

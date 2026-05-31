@@ -1,4 +1,7 @@
+#include <algorithm>
+#include <cctype>
 #include <iostream>
+#include <optional>
 #include <regex>
 #include <stdexcept>
 #include <string>
@@ -877,7 +880,8 @@ Config Config::readFromFile(const std::string& fileName) {
             result.minCompatibleVersion_ = params.get<NodeVersion>(PARAM_NAME_MIN_COMPATIBLE_VERSION);
         }
 
-        result.setLoggerSettings(config);
+        result.setLoggerSettingsFromFile(fileName);
+        result.readLogChannelLevels(config);
         result.readPoolSynchronizerData(config);
         result.readStorageData(config);
         result.readApiData(config);
@@ -932,6 +936,65 @@ void Config::setLoggerSettings(const boost::property_tree::ptree& config) {
     std::stringstream ss;
     boost::property_tree::write_ini(ss, settings);
     loggerSettings_ = boost::log::parse_settings(ss);
+}
+
+// Bypass the property_tree round-trip for logger settings: feed raw [Core] and
+// [Sinks.*] lines straight into boost::log::parse_settings. Required because
+// the round-trip mangles values containing inner quotes (e.g. filter string
+// literals like %Channel% == \"smartcontracts\"), which are exactly what
+// per-channel filters need.
+void Config::setLoggerSettingsFromFile(const std::string& fileName) {
+    std::ifstream fin(fileName);
+    if (!fin) return;
+    std::stringstream ss;
+    bool include = false;
+    std::string line;
+    while (std::getline(fin, line)) {
+        auto trimmed = line;
+        if (auto s = trimmed.find_first_not_of(" \t"); s != std::string::npos) {
+            trimmed.erase(0, s);
+        }
+        if (auto e = trimmed.find_last_not_of(" \t\r"); e != std::string::npos) {
+            trimmed.erase(e + 1);
+        }
+        if (!trimmed.empty() && trimmed.front() == '[' && trimmed.back() == ']') {
+            std::string section = trimmed.substr(1, trimmed.size() - 2);
+            include = (section == "Core") || (section.rfind("Sinks.", 0) == 0);
+        }
+        if (include) {
+            ss << line << "\n";
+        }
+    }
+    try {
+        loggerSettings_ = boost::log::parse_settings(ss);
+    } catch (...) {
+        // fall back silently; logger::initialize() will surface the error
+    }
+}
+
+void Config::readLogChannelLevels(const boost::property_tree::ptree& config) {
+    const std::string block = "log_channels";
+    if (!config.count(block)) {
+        return;
+    }
+    auto parseLevel = [](std::string s) -> std::optional<boost::log::trivial::severity_level> {
+        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+        if (s == "trace")   return boost::log::trivial::trace;
+        if (s == "debug")   return boost::log::trivial::debug;
+        if (s == "info")    return boost::log::trivial::info;
+        if (s == "warning") return boost::log::trivial::warning;
+        if (s == "error")   return boost::log::trivial::error;
+        if (s == "fatal")   return boost::log::trivial::fatal;
+        return std::nullopt;
+    };
+    for (const auto& [key, value] : config.get_child(block)) {
+        if (auto lvl = parseLevel(value.data())) {
+            logChannelLevels_[key] = *lvl;
+        }
+        else {
+            cswarning() << "[log_channels] " << key << "=" << value.data() << " has unknown severity, ignored";
+        }
+    }
 }
 
 void Config::readPoolSynchronizerData(const boost::property_tree::ptree& config) {

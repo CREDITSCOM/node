@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "sync"
 #include "poolsynchronizer.hpp"
 
 #include <chrono>

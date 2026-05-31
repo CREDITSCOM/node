@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "blockchain"
 #include <csdb/currency.hpp>
 
 #include "binary_streams.hpp"

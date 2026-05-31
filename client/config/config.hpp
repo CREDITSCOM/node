@@ -2,9 +2,11 @@
 #ifndef CONFIG_HPP
 #define CONFIG_HPP
 
+#include <map>
 #include <string>
 
 #include <boost/asio.hpp>
+#include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/settings.hpp>
 #include <boost/program_options.hpp>
 
@@ -216,6 +218,10 @@ public:
         return loggerSettings_;
     }
 
+    const std::map<std::string, boost::log::trivial::severity_level>& getLogChannelLevels() const {
+        return logChannelLevels_;
+    }
+
     const PoolSyncData& getPoolSyncSettings() const {
         return poolSyncData_;
     }
@@ -352,6 +358,8 @@ private:
     static Config readFromFile(const std::string& fileName);
 
     void setLoggerSettings(const boost::property_tree::ptree& config);
+    void setLoggerSettingsFromFile(const std::string& fileName);
+    void readLogChannelLevels(const boost::property_tree::ptree& config);
     void readPoolSynchronizerData(const boost::property_tree::ptree& config);
     void readStorageData(const boost::property_tree::ptree& config);
     void readApiData(const boost::property_tree::ptree& config);
@@ -399,6 +407,7 @@ private:
     cs::PrivateKey privateKey_{};
 
     boost::log::settings loggerSettings_{};
+    std::map<std::string, boost::log::trivial::severity_level> logChannelLevels_;
 
     PoolSyncData poolSyncData_;
     StorageData storageData_;

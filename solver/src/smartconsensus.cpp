@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "consensus"
 #include <map>
 #include <smartconsensus.hpp>
 #include <smartcontracts.hpp>

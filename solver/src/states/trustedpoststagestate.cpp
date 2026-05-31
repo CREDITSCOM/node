@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "consensus"
 #include <csnode/conveyer.hpp>
 #include <lib/system/logger.hpp>
 #include <solvercontext.hpp>

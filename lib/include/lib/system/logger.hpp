@@ -8,7 +8,9 @@
 #include <boost/log/utility/manipulators/dump.hpp>
 #include <boost/log/utility/setup/settings.hpp>
 
+#include <map>
 #include <sstream>
+#include <string>
 
 /*
  * \brief Just a syntax shugar over Boost::Log v2.
@@ -33,6 +35,9 @@ namespace logger {
 using severity_level = logging::trivial::severity_level;
 
 void initialize(const logging::settings& settings);
+// Per-channel threshold map overrides [Core] Filter; missing channel falls back to "default", then info.
+void initialize(const logging::settings& settings,
+                const std::map<std::string, severity_level>& channelLevels);
 void cleanup();
 
 template <typename T = logging::trivial::logger>
@@ -56,17 +61,55 @@ BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(File, logging::sources::severity_channe
 BOOST_LOG_INLINE_GLOBAL_LOGGER_CTOR_ARGS(EventLogger, logging::sources::severity_channel_logger_mt<logging::trivial::severity_level>, (logging::keywords::channel = "Event"))
 }  // namespace logger
 
+// ----------------------------------------------------------------------------
+// Per-TU channel routing.
+//
+// Each .cpp file may set its own channel BEFORE including this header:
+//
+//     #define CS_LOG_CHANNEL "consensus"
+//     #include <lib/system/logger.hpp>
+//
+// All bare csdebug()/cslog()/etc. calls in that translation unit are then
+// tagged with that channel name and can be filtered separately in config:
+//
+//     [Sinks.Console]
+//     Filter="%Channel% == \"consensus\" & %Severity% >= debug"
+//
+// Calls that pass an explicit logger type (e.g. `csdebug(logger::File)`,
+// `csdebug(logger::None)`) keep their original behaviour and bypass the
+// per-TU channel.
+// ----------------------------------------------------------------------------
+#ifndef CS_LOG_CHANNEL
+#  define CS_LOG_CHANNEL "default"
+#endif
+
+namespace {  // anonymous: per-TU storage; channel string baked in at compile time
+
+inline boost::log::sources::severity_channel_logger_mt<logger::severity_level>& csTUChannelLogger() {
+    static boost::log::sources::severity_channel_logger_mt<logger::severity_level> lg(
+        boost::log::keywords::channel = CS_LOG_CHANNEL);
+    return lg;
+}
+
+template <typename T = logging::trivial::logger>
+inline auto& csResolveLogger() { return T::get(); }
+
+template <>
+inline auto& csResolveLogger<logging::trivial::logger>() { return csTUChannelLogger(); }
+
+}  // anonymous namespace
+
 #define LOG_SEV(level, ...)               \
     if (!logger::useLogger<__VA_ARGS__>()) \
         ;                                  \
     else                                   \
-        BOOST_LOG_SEV(logger::getLogger<__VA_ARGS__>(), logger::severity_level::level)
+        BOOST_LOG_SEV(csResolveLogger<__VA_ARGS__>(), logger::severity_level::level)
 
 #define cstrace(...)                       \
     if (!logger::useLogger<__VA_ARGS__>()) \
         ;                                  \
     else                                   \
-        BOOST_LOG_SEV(logger::getLogger<__VA_ARGS__>(), logger::severity_level::trace) << __FILE__ << ":" << __func__ << ":" << __LINE__ << " "
+        BOOST_LOG_SEV(csResolveLogger<__VA_ARGS__>(), logger::severity_level::trace) << __FILE__ << ":" << __func__ << ":" << __LINE__ << " "
 
 // set Filter="%Severity% >= trace" in config to view this level messages:
 #define csdetails(...) LOG_SEV(trace, __VA_ARGS__)

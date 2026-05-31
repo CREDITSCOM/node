@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "smartcontracts"
 #include <fstream>
 #include <sstream>
 #include <exception>

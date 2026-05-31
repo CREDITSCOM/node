@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "blockchain"
 #include "priv_crypto.hpp"
 
 #ifdef CSDB_UNIT_TEST

@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "consensus"
 #include <solvercontext.hpp>
 #include <states/trustedstage3state.hpp>
 

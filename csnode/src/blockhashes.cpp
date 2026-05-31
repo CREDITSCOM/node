@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "blockchain"
 #include <csnode/blockhashes.hpp>
 
 #include <conveyer.hpp>

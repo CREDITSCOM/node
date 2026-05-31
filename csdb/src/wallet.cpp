@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "blockchain"
 #include <csdb/wallet.hpp>
 
 #include <map>

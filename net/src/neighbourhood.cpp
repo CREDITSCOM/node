@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "net"
 #include <neighbourhood.hpp>
 
 #include <cscrypto/cscrypto.hpp>

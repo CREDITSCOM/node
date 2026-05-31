@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "net"
 #include <networkcommands.hpp>
 
 const char* networkCommandToString(NetworkCommand command) {

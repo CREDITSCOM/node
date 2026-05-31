@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "blockchain"
 #include "integral_encdec.hpp"
 
 #include <cstring>

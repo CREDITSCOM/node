@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "net"
 #include <packet.hpp>
 
 #include <lib/system/utils.hpp>

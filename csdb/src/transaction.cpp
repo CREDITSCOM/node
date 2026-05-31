@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "blockchain"
 #include <csdb/transaction.hpp>
 #include "transaction_p.hpp"
 

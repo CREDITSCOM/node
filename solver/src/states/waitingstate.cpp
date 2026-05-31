@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "consensus"
 #include "waitingstate.hpp"
 #include <consensus.hpp>
 #include <solvercontext.hpp>

@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "net"
 /* Send blaming letters to @yrtimd */
 #include "transport.hpp"
 

@@ -1,3 +1,4 @@
+#define CS_LOG_CHANNEL "smartcontracts"
 #include <smartcontracts.hpp>
 #include <solvercontext.hpp>
 
