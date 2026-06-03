@@ -99,6 +99,9 @@ public:
         ::std::shared_ptr<Database> db;
         ::cs::Sequence newBlockchainTop = ::cs::kWrongSequence;
         ::cs::Sequence startSequence = 0;
+        // 0 = leave Storage defaults (5000 / 100) untouched.
+        size_t asyncWriteQueueMax = 0;
+        size_t writeBatchSize = 0;
     };
 
     struct OpenProgress {
@@ -140,7 +143,12 @@ public:
     bool open(const ::std::string& path_to_base = ::std::string{},
               OpenCallback callback = nullptr,
               cs::Sequence newBlockchainTop = cs::kWrongSequence,
-              cs::Sequence startReadFrom = 0);
+              cs::Sequence startReadFrom = 0,
+              size_t asyncWriteQueueMax = 5000,
+              size_t writeBatchSize = 100,
+              uint64_t rocksDbBlockCacheBytes = 0,
+              uint64_t rocksDbMemtableBytes = 0,
+              const std::string& dbBackend = std::string{});
 
     /**
      * @brief Creating the storage using the parameters set.
@@ -169,6 +177,9 @@ public:
      * After using this method every reading or saving info methods leads to error \ref NotOpen.
      */
     void close();
+
+    // Anchor buffered writes to disk (RocksDB SyncWAL; BerkeleyDB no-op). Call at checkpoint boundaries.
+    bool flush();
 
     /**
      * @brief Last block hash

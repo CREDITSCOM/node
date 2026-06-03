@@ -62,6 +62,11 @@ struct StorageData {
     size_t checkpointKeep = 5;              // retained periodic checkpoints (qs/0 always kept on top)
     size_t checkpointEvery = 500'000;       // blocks between periodic checkpoints (rolling history depth = checkpointEvery * checkpointKeep)
     size_t checkpointEveryMinutes = 0;      // wall-clock fallback: also save if this many minutes elapsed since last save (0 = disabled; opt-in for slow networks)
+    size_t asyncWriteQueueSize = 5000;      // bounded queue for the async DB writer
+    size_t writeBatchSize = 100;            // pools coalesced into one DB write
+    std::string dbBackend = "berkeleydb";   // runtime DB backend (CSDB_BACKEND=both builds); set to "rocksdb" to opt in
+    size_t rocksdbBlockCacheMb = 1024;      // RocksDB shared block cache (MiB); 0 = built-in default
+    size_t rocksdbMemtableMb = 256;         // RocksDB write_buffer_size (MiB); 0 = built-in default
 };
 
 struct ApiData {

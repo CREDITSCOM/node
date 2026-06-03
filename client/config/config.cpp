@@ -962,6 +962,11 @@ void Config::readStorageData(const boost::property_tree::ptree& config) {
         storageData_.checkpointEvery = 1000;
     }
     checkAndSaveValue(data, block, PARAM_NAME_STORAGE_CHECKPOINT_EVERY_MINUTES, storageData_.checkpointEveryMinutes);
+    checkAndSaveValue(data, block, "async_write_queue_size", storageData_.asyncWriteQueueSize);
+    checkAndSaveValue(data, block, "write_batch_size",       storageData_.writeBatchSize);
+    checkAndSaveValue(data, block, "db_backend",             storageData_.dbBackend);
+    checkAndSaveValue(data, block, "rocksdb_block_cache_mb", storageData_.rocksdbBlockCacheMb);
+    checkAndSaveValue(data, block, "rocksdb_memtable_mb",    storageData_.rocksdbMemtableMb);
 }
 
 void Config::readApiData(const boost::property_tree::ptree& config) {

@@ -26,6 +26,15 @@ Database::Iterator::Iterator() = default;
 
 Database::Iterator::~Iterator() = default;
 
+bool Database::put_batch(const std::vector<PendingWrite>& items) {
+    for (const auto& item : items) {
+        if (!put(item.hash_key, item.seq_no, item.payload)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 Database::Error Database::last_error() const {
     return last_error_map(this).last_error_;
 }

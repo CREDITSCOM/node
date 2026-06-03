@@ -23,6 +23,11 @@ option(LEVELDB_BUILD_TESTS "" OFF)
 option(LEVELDB_AUTORUN_TESTS "" OFF)
 option(DBSQL "Enable PostgeSQL server connection" OFF)
 
+# The node binary always carries both DB backends; runtime selection is via
+# config.ini `db_backend` (berkeleydb default, rocksdb opt-in).
+set(CSDB_BACKEND "both" CACHE INTERNAL "csdb storage backend (locked to 'both')")
+message(STATUS "csdb backend: both (locked)")
+
 IF(DBSQL)
     ADD_DEFINITIONS(-DDBSQL)
 ENDIF(DBSQL)
@@ -87,6 +92,10 @@ endif()
 
 # This large list is necessary to prevent thrift from generating unused stuff
 add_definitions(-DUSE_STD_THREAD)
+
+# Disable Boost's MSVC auto-link pragmas; we link Boost targets explicitly via
+# CMake. Without this the linker hunts for libboost_*-vc142-mt-s-x64-*.lib.
+add_definitions(-DBOOST_ALL_NO_LIB)
 
 if (MSVC)
     MARK_AS_ADVANCED(

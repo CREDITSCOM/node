@@ -41,12 +41,23 @@ public:
     virtual bool remove(const cs::Bytes& key) = 0;
     virtual bool seq_no(const cs::Bytes& key, uint32_t* value) = 0; // sequence from block hash
 
+    // Vectorized put. Backends may override to coalesce writes (e.g. RocksDB WriteBatch).
+    struct PendingWrite {
+        cs::Bytes hash_key;
+        uint32_t  seq_no;
+        cs::Bytes payload;
+    };
+    virtual bool put_batch(const std::vector<PendingWrite>& items);
+
     using Item = std::pair<cs::Bytes, cs::Bytes>;
     using ItemList = std::vector<Item>;
     virtual bool write_batch(const ItemList& items) = 0;
 
     virtual bool updateContractData(const cs::Bytes& key, const cs::Bytes& data) = 0;
     virtual bool getContractData(const cs::Bytes& key, cs::Bytes& data) = 0;
+
+    // anchor buffered writes to disk at checkpoint boundaries; default no-op (BDB has its own loop)
+    virtual bool flush() { return true; }
 
     class Iterator {
     protected:
