@@ -280,6 +280,29 @@ void SolverCore::gotStageTwo(const cs::StageTwo& stage) {
     stageTwoStorage.push_back(stage);
     csdebug() << kLogPrefix_ << __func__ << ": <-- stage-2 [" << static_cast<int>(stage.sender) << "] = " << stageTwoStorage.size();
 
+    // Fold peer stage-2 receipts into local untrusted set: if a BFT quorum of
+    // peers report Zero::hash for sender j, j is consensus-LOST → mark locally
+    // so chooseTimeStamp / realTrustedMask align with the network view.
+    if (pcontext) {
+        const size_t cnt = pcontext->cnt_trusted();
+        if (cnt > 0 && cnt <= Consensus::MaxTrustedNodes) {
+            std::vector<uint8_t> votes(cnt, 0);
+            for (const auto& s2 : stageTwoStorage) {
+                if (s2.hashes.size() != cnt) continue;
+                for (size_t j = 0; j < cnt; ++j) {
+                    if (s2.hashes[j] == cs::Zero::hash) ++votes[j];
+                }
+            }
+            const uint8_t quorum = static_cast<uint8_t>(cnt - cnt / 2);
+            const uint8_t self = pcontext->own_conf_number();
+            for (uint8_t j = 0; j < cnt; ++j) {
+                if (votes[j] >= quorum && j != self) {
+                    pcontext->mark_untrusted(j);
+                }
+            }
+        }
+    }
+
     if (!pstate) {
         return;
     }
