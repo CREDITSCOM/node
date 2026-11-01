@@ -70,10 +70,9 @@ void cs::Executor::executeByteCodeMultiple(executor::ExecuteByteCodeMultipleResu
         origExecutor_->executeByteCodeMultiple(_return, static_cast<general::AccessID>(accessId), initiatorAddress, invokedContract, method, params, executionTime, EXECUTOR_VERSION);
     }
     catch (::apache::thrift::transport::TTransportException& x) {
-        // sets stop_ flag to true forever, replace with new instance
-        if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-            recreateOriginExecutor();
-        }
+        // any transport error leaves the concurrent client dead (stop_ set forever) and a late reply
+        // could still arrive on this connection: replace it now, not on the next call
+        recreateOriginExecutor();
 
         _return.status.code = 1;
         _return.status.message = x.what();
@@ -97,10 +96,9 @@ void cs::Executor::getContractMethods(executor::GetContractMethodsResult& _retur
         origExecutor_->getContractMethods(_return, byteCodeObjects, EXECUTOR_VERSION);
     }
     catch (const ::apache::thrift::transport::TTransportException& x) {
-        // sets stop_ flag to true forever, replace with new instance
-        if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-            recreateOriginExecutor();
-        }
+        // any transport error leaves the concurrent client dead (stop_ set forever) and a late reply
+        // could still arrive on this connection: replace it now, not on the next call
+        recreateOriginExecutor();
 
         _return.status.code = 1;
         _return.status.message = x.what();
@@ -121,10 +119,9 @@ void cs::Executor::getContractVariables(executor::GetContractVariablesResult& _r
         origExecutor_->getContractVariables(_return, byteCodeObjects, contractState, EXECUTOR_VERSION);
     }
     catch (const ::apache::thrift::transport::TTransportException& x) {
-        // sets stop_ flag to true forever, replace with new instance
-        if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-            recreateOriginExecutor();
-        }
+        // any transport error leaves the concurrent client dead (stop_ set forever) and a late reply
+        // could still arrive on this connection: replace it now, not on the next call
+        recreateOriginExecutor();
 
         _return.status.code = 1;
         _return.status.message = x.what();
@@ -145,10 +142,9 @@ void cs::Executor::compileSourceCode(executor::CompileSourceCodeResult& _return,
         origExecutor_->compileSourceCode(_return, sourceCode, EXECUTOR_VERSION);
     }
     catch (::apache::thrift::transport::TTransportException& x) {
-        // sets stop_ flag to true forever, replace with new instance
-        if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-            recreateOriginExecutor();
-        }
+        // any transport error leaves the concurrent client dead (stop_ set forever) and a late reply
+        // could still arrive on this connection: replace it now, not on the next call
+        recreateOriginExecutor();
 
         _return.status.code = 1;
         _return.status.message = x.what();
@@ -169,10 +165,9 @@ void cs::Executor::getExecutorBuildVersion(executor::ExecutorBuildVersionResult&
         origExecutor_->getExecutorBuildVersion(_return, EXECUTOR_VERSION);
     }
     catch (::apache::thrift::transport::TTransportException& x) {
-        // sets stop_ flag to true forever, replace with new instance
-        if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-            recreateOriginExecutor();
-        }
+        // any transport error leaves the concurrent client dead (stop_ set forever) and a late reply
+        // could still arrive on this connection: replace it now, not on the next call
+        recreateOriginExecutor();
 
         _return.status.code = 1;
         _return.status.message = x.what();
@@ -940,10 +935,9 @@ std::optional<cs::Executor::OriginExecuteResult> cs::Executor::execute(const std
         origExecutor_->executeByteCode(originExecuteRes.resp, static_cast<general::AccessID>(accessId), address, smartContractBinary, methodHeader, EXECUTION_TIME, EXECUTOR_VERSION);
     }
     catch (::apache::thrift::transport::TTransportException& x) {
-        // sets stop_ flag to true forever, replace with new instance
-        if (x.getType() == ::apache::thrift::transport::TTransportException::NOT_OPEN) {
-            recreateOriginExecutor();
-        }
+        // any transport error leaves the concurrent client dead (stop_ set forever) and a late reply
+        // could still arrive on this connection: replace it now, not on the next call
+        recreateOriginExecutor();
 
         if (x.getType() == ::apache::thrift::transport::TTransportException::TIMED_OUT) {
             originExecuteRes.resp.status.code = cs::error::TimeExpired;
