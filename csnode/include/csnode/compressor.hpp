@@ -1,6 +1,7 @@
 #ifndef COMPRESSOR_HPP
 #define COMPRESSOR_HPP
 
+#include <limits>
 #include <mutex>
 
 #include <lz4.h>
@@ -65,6 +66,12 @@ public:
     // try to decompress data, returns object if serializable
     template<typename T>
     T decompress(const CompressedRegion& region) {
+        // region and its binary size may come from the network: reject what no compress() could produce
+        if (region.size() < static_cast<size_t>(byteSizeof_)) {
+            cserror() << "Decompress error of " << cstype(T) << ": empty region";
+            return T{};
+        }
+
         const auto compression = checkCompression(region.data(), region.size());
 
         cs::Bytes bytes;
@@ -72,6 +79,14 @@ public:
         size_t size = 0;
 
         if (compression == Compression::Compressed) {
+            const size_t compressedSize = region.size() - static_cast<size_t>(byteSizeof_);
+
+            if (region.binarySize() > static_cast<size_t>(std::numeric_limits<int>::max()) ||
+                region.binarySize() > compressedSize * kLz4MaxExpansion) {
+                cserror() << "Decompress error of " << cstype(T) << ": invalid binary size " << region.binarySize();
+                return T{};
+            }
+
             bytes.resize(region.binarySize());
 
             const int uncompressedSize = LZ4_decompress_safe(reinterpret_cast<char*>(region.data()) + byteSizeof_, reinterpret_cast<char*>(bytes.data()),
@@ -99,6 +114,9 @@ public:
 
 private:
     static inline int byteSizeof_ = sizeof(cs::Byte);
+
+    // LZ4 can not expand compressed data more than 255 times
+    static constexpr size_t kLz4MaxExpansion = 256;
 };
 
 // multi-threaded compressor

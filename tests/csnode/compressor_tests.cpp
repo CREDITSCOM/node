@@ -56,6 +56,27 @@ TEST(Compressor, TestCompressByte) {
     ASSERT_EQ(byte, entity);
 }
 
+// a region and its binary size are read from the network (Node::getBlockReply)
+TEST(Compressor, RejectsBinarySizeLz4CannotProduce) {
+    cs::Compressor compressor;
+    std::vector<size_t> data(100, 7);
+
+    auto region = compressor.compress(data);
+    ASSERT_EQ(cs::Compressor::checkCompression(region), cs::Compressor::Compression::Compressed);
+
+    cs::CompressedRegion forged{ cs::Bytes(region.bytes()), std::numeric_limits<size_t>::max() / 2 };
+    auto entity = compressor.decompress<std::vector<size_t>>(forged);
+
+    ASSERT_TRUE(entity.empty());
+}
+
+TEST(Compressor, RejectsEmptyRegion) {
+    cs::Compressor compressor;
+    auto entity = compressor.decompress<std::vector<size_t>>(cs::CompressedRegion{});
+
+    ASSERT_TRUE(entity.empty());
+}
+
 TEST(SynchronizedCompressor, BaseSynchronizedCompressorUsage) {
     cs::SynchronizedCompressor compressor;
 
