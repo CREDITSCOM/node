@@ -11,6 +11,7 @@
 #endif
 #include <csnode/blockchain.hpp>
 #include <csnode/blockhashes.hpp>
+#include <csnode/blocktakeover.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/datastream.hpp>
 #include <csnode/fee.hpp>
@@ -1475,64 +1476,146 @@ bool BlockChain::updateLastBlock(cs::RoundPackage& rPackage) {
     return updateLastBlock(rPackage, deferredBlock_);
 }
 
-bool BlockChain::updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom) {
-    csdebug() << kLogPrefix << "Starting update last block: check ...";
-    //if (deferredBlock_.is_valid()) {
-    //  csdebug() << "BLOCKCHAIN> Deferred block is invalid, can't update it";
-    //  return false;
-    //}
-    if (poolFrom.is_read_only()) {
-        csdebug() << kLogPrefix << "Deferred block is read_only, be carefull";
-        //return false;
+/*static*/
+csdb::Pool BlockChain::blockFromPackageMeta(const csdb::Pool& from, const cs::PoolMetaInfo& meta) {
+    // the writer's block: this node's content (transactions, confidants, new wallets, confirmations,
+    // round cost, smart signatures, the user fields such as the bootstrap flag) with the package's
+    // real trusted set, timestamp and reward, which are what differ between the two blocks
+    csdb::Pool tmpPool;
+    tmpPool.set_sequence(from.sequence());
+    tmpPool.set_previous_hash(from.previous_hash());
+    tmpPool.add_real_trusted(cs::Utils::maskToBits(meta.realTrustedMask));
+    tmpPool.add_number_trusted(static_cast<uint8_t>(meta.realTrustedMask.size()));
+    tmpPool.setRoundCost(from.roundCost());
+    tmpPool.set_confidants(from.confidants());
+    for (auto& it : from.transactions()) {
+        tmpPool.add_transaction(it);
     }
+    for (auto id : from.user_field_ids()) {
+        if (id != kFieldTimestamp && id != kFieldBlockReward) {
+            tmpPool.add_user_field(id, from.user_field(id));
+        }
+    }
+    BlockChain::setTimestamp(tmpPool, meta.timestamp);
+    if (!meta.reward.empty()) {
+        tmpPool.add_user_field(kFieldBlockReward, meta.reward);
+    }
+    for (auto& it : from.smartSignatures()) {
+        tmpPool.add_smart_signature(it);
+    }
+    csdb::Pool::NewWallets* newWallets = tmpPool.newWallets();
+    if (!newWallets) {
+        return csdb::Pool{};
+    }
+    for (auto it : from.newWallets()) {
+        newWallets->push_back(it);
+    }
+    if (meta.sequenceNumber > 1) {
+        tmpPool.add_number_confirmations(from.numberConfirmations());
+        tmpPool.add_confirmation_mask(from.roundConfirmationMask());
+        tmpPool.add_round_confirmations(from.roundConfirmations());
+    }
+    return tmpPool;
+}
 
-    if (poolFrom.sequence() != rPackage.poolMetaInfo().sequenceNumber) {
-        csdebug() << kLogPrefix << "Deferred block sequence " << poolFrom.sequence() << " doesn't equal to that in the roundPackage " << rPackage.poolMetaInfo().sequenceNumber << ", can't update it";
+bool BlockChain::packageBlockVerifies(const cs::RoundPackage& rPackage) const {
+    csdb::Pool own;
+    {
+        std::lock_guard lock(dbLock_);
+        if (!deferredBlock_.is_valid() || deferredBlock_.sequence() != rPackage.poolMetaInfo().sequenceNumber) {
+            return false;
+        }
+        own = deferredBlock_.clone();
+    }
+    // the writer's block as updateLastBlock would build it, signed by the package's signers, checked
+    // against this node's own confidants of the round
+    csdb::Pool candidate = blockFromPackageMeta(own, rPackage.poolMetaInfo());
+    if (!candidate.is_valid()) {
         return false;
     }
-    if (poolFrom.signatures().size() >= rPackage.poolSignatures().size()) {
-        csdebug() << kLogPrefix << "Deferred block has more or the same amount Signatures, than received roundPackage, can't update it";
-        return true;
+    auto signatures = rPackage.poolSignatures();
+    candidate.set_signatures(signatures);
+    if (!candidate.compose()) {
+        return false;
     }
-    if (poolFrom.previous_hash() != rPackage.poolMetaInfo().previousHash) {
+    Hash hash;
+    const auto bytes = candidate.hash().to_binary();
+    if (bytes.size() != hash.size()) {
+        return false;
+    }
+    std::copy(bytes.cbegin(), bytes.cend(), hash.data());
+    return NodeUtils::checkGroupSignature(candidate.confidants(), rPackage.poolMetaInfo().realTrustedMask, rPackage.poolSignatures(), hash);
+}
+
+void BlockChain::allowTakeover(cs::Sequence sequence) {
+    takeoverAllowed_ = sequence;
+}
+
+bool BlockChain::hasDeferredBlock(cs::Sequence sequence) const {
+    std::lock_guard lock(dbLock_);
+    return deferredBlock_.is_valid() && deferredBlock_.sequence() == sequence;
+}
+
+bool BlockChain::updateLastBlock(cs::RoundPackage& rPackage, const csdb::Pool& poolFrom) {
+    csdebug() << kLogPrefix << "Starting update last block: check ...";
+    if (poolFrom.is_read_only()) {
+        csdebug() << kLogPrefix << "Deferred block is read_only, be carefull";
+    }
+
+    const auto& meta = rPackage.poolMetaInfo();
+    if (!poolFrom.is_valid() || poolFrom.sequence() != meta.sequenceNumber) {
+        csdebug() << kLogPrefix << "Deferred block sequence " << poolFrom.sequence() << " doesn't equal to that in the roundPackage " << meta.sequenceNumber << ", can't update it";
+        return false;
+    }
+    const bool samePrevious = poolFrom.previous_hash() == meta.previousHash;
+    if (poolFrom.signatures().size() >= rPackage.poolSignatures().size()) {
+        if (!samePrevious || poolFrom.realTrusted() == cs::Utils::maskToBits(meta.realTrustedMask)) {
+            csdebug() << kLogPrefix << "Deferred block has more or the same amount Signatures, than received roundPackage, can't update it";
+            return true;
+        }
+        // The same block with another set of real trusted is another block (a stage-3 retry race):
+        // the round goes on with the writer's. Official behaviour keeps the own block for good, and the
+        // node no longer matches the next rounds' hashes. Take the writer's when a majority of the
+        // round's trusted signed it and the others could not form a round on their own
+        const cs::Bytes own = cs::Utils::bitsToMask(poolFrom.numberTrusted(), poolFrom.realTrusted());
+        const auto verdict = cs::lastBlockVerdict(own, meta.realTrustedMask, Consensus::MinTrustedNodes);
+        if (verdict != cs::LastBlockVerdict::Take) {
+            cswarning() << kLogPrefix << "block #" << poolFrom.sequence() << " differs from the round package's: real trusted "
+                        << cs::TrustedMask::toString(meta.realTrustedMask) << " there, " << poolFrom.signatures().size() << " of " << own.size()
+                        << " signed here (" << cs::toString(verdict) << "), this node keeps its own (fork)";
+            return true;
+        }
+        // only once the node adopted the writer's package for this round (Node::getRoundTable): a sync
+        // reaches this point before that decision, and must not swap the block for a package it drops
+        if (takeoverAllowed_.load() != poolFrom.sequence()) {
+            csdebug() << kLogPrefix << "block #" << poolFrom.sequence() << ": the writer's block waits for the round package decision";
+            return true;
+        }
+        takeoverAllowed_ = cs::kWrongSequence;
+        cslog() << kLogPrefix << "block #" << poolFrom.sequence() << ": the round package carries another block of this sequence, real trusted "
+                << cs::TrustedMask::toString(meta.realTrustedMask) << " there against " << poolFrom.signatures().size() << " of " << own.size()
+                << " here, " << rPackage.poolSignatures().size() << " of " << own.size() << " signatures: taking the writer's block";
+    }
+    else if (!samePrevious) {
         csdebug() << kLogPrefix << "Deferred block PREVIOUS HASH doesn't equal to that in the roundPackage, can't update it";
         return false;
     }
     csdebug() << kLogPrefix << "Ok";
 
-    csdb::Pool tmpPool;
-    tmpPool.set_sequence(poolFrom.sequence());
-    tmpPool.set_previous_hash(poolFrom.previous_hash());
-    tmpPool.add_real_trusted(cs::Utils::maskToBits(rPackage.poolMetaInfo().realTrustedMask));
-    csdebug() << kLogPrefix << "new mask set to deferred block: " << cs::TrustedMask::toString(rPackage.poolMetaInfo().realTrustedMask);
-    tmpPool.add_number_trusted(static_cast<uint8_t>(rPackage.poolMetaInfo().realTrustedMask.size()));
-    tmpPool.setRoundCost(poolFrom.roundCost());
-    tmpPool.set_confidants(poolFrom.confidants());
-    for (auto& it : poolFrom.transactions()) {
-        tmpPool.add_transaction(it);
-    }
-    BlockChain::setTimestamp(tmpPool, rPackage.poolMetaInfo().timestamp);
-    for (auto& it : poolFrom.smartSignatures()) {
-        tmpPool.add_smart_signature(it);
-    }
-    csdb::Pool::NewWallets* newWallets = tmpPool.newWallets();
-    const csdb::Pool::NewWallets& defWallets = poolFrom.newWallets();
-    if (!newWallets) {
+    csdb::Pool tmpPool = blockFromPackageMeta(poolFrom, meta);
+    if (!tmpPool.is_valid()) {
         csdebug() << kLogPrefix << "newPool is read-only";
         return false;
     }
-
-    for (auto it : defWallets) {
-        newWallets->push_back(it);
+    csdebug() << kLogPrefix << "new mask set to deferred block: " << cs::TrustedMask::toString(meta.realTrustedMask);
+    if (!deferredBlockExchange(rPackage, tmpPool)) {
+        if (poolFrom.signatures().size() >= rPackage.poolSignatures().size()) {
+            cswarning() << kLogPrefix << "block #" << poolFrom.sequence() << ": could not take the writer's block, this node keeps its own (fork)";
+            return true;
+        }
+        return false;
     }
-
-    if (rPackage.poolMetaInfo().sequenceNumber > 1) {
-        tmpPool.add_number_confirmations(poolFrom.numberConfirmations());
-        tmpPool.add_confirmation_mask(poolFrom.roundConfirmationMask());
-        tmpPool.add_round_confirmations(poolFrom.roundConfirmations());
-    }
-
-    return deferredBlockExchange(rPackage, tmpPool);
+    return true;
 }
 
 /*static*/
@@ -1609,9 +1692,13 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
     auto hash = tmp_clone.hash();
     auto bytes = hash.to_binary();
     std::copy(bytes.cbegin(), bytes.cend(), tempHash.data());
+    // the signers are checked against this node's own confidants of the round (tmp_clone carries
+    // the deferred block's confidants), never against a list the package brings
     if (NodeUtils::checkGroupSignature(tmp_clone.confidants(), rPackage.poolMetaInfo().realTrustedMask, rPackage.poolSignatures(), tempHash)) {
         csmeta(csdebug) << kLogPrefix << "The number of signatures is sufficient and all of them are OK!";
-        if (!checkForConsistency(tmp_clone, true)) {
+        // not isNew: getLastHash() is the deferred block's own hash, of this very sequence, so the
+        // official check here could never pass; the previous block is the one on disk
+        if (!checkForConsistency(tmp_clone, false)) {
             csdebug() << kLogPrefix << "Replace the deferred block #" << tmp_clone.sequence() << ": consistency check failed";
             return false;
         }
@@ -1621,12 +1708,55 @@ bool BlockChain::deferredBlockExchange(cs::RoundPackage& rPackage, const csdb::P
         return false;
     }
 
-
-    // update deferred block
-    std::lock_guard lock(dbLock_);
-    deferredBlock_ = tmp_clone;
-    this->blockHashes_->update(deferredBlock_);
-
+    csdb::Pool replaced;
+    {
+        std::lock_guard lock(dbLock_);
+        if (!deferredBlock_.is_valid() || deferredBlock_.sequence() != tmp_clone.sequence()) {
+            csdebug() << kLogPrefix << "Replace the deferred block #" << tmp_clone.sequence() << ": it is no longer deferred";
+            return false;
+        }
+        replaced = deferredBlock_;
+    }
+    // The block was applied to the caches when it was deferred: fees and the block reward went to its
+    // real trusted, so move them to the new set (the undo/redo the uncertain block uses). Under
+    // cacheMutex_ only, as applyBlockToCaches: the cache update may read the storage (dbLock_), so the
+    // two locks are never taken in the other order
+    auto moveCaches = [this](const csdb::Pool& from, const csdb::Pool& to) {
+        try {
+            std::lock_guard cacheLock(cacheMutex_);
+            walletsCacheUpdater_->loadNextBlock(from, from.confidants(), *this, true);
+            walletsCacheUpdater_->loadNextBlock(to, to.confidants(), *this, false);
+            return true;
+        }
+        catch (const std::exception& e) {
+            // the caches may hold part of the move: stop the node rather than go on with them
+            cserror() << kLogPrefix << "block #" << to.sequence() << ": moving fees and reward to the new real trusted failed ("
+                      << e.what() << "), stopping the node";
+            Node::stopOnError();
+            return false;
+        }
+    };
+    if (!moveCaches(replaced, tmp_clone)) {
+        return false;
+    }
+    bool swapped = false;
+    {
+        // a stop flushes the deferred block from another thread (tryFlushDeferredBlock): only swap the
+        // very block whose caches were moved
+        std::lock_guard lock(dbLock_);
+        if (deferredBlock_.is_valid() && deferredBlock_.hash() == replaced.hash()) {
+            deferredBlock_ = tmp_clone;
+            this->blockHashes_->update(deferredBlock_);
+            swapped = true;
+        }
+    }
+    if (!swapped) {
+        csdebug() << kLogPrefix << "Replace the deferred block #" << tmp_clone.sequence() << ": it was stored meanwhile, the caches go back";
+        moveCaches(tmp_clone, replaced);
+        return false;
+    }
+    cslog() << kLogPrefix << "block #" << tmp_clone.sequence() << " replaced: real trusted " << cs::TrustedMask::toString(rPackage.poolMetaInfo().realTrustedMask)
+            << ", " << tmp_clone.signatures().size() << " signatures, hash " << replaced.hash().to_string() << " -> " << tmp_clone.hash().to_string();
     return true;
 }
 

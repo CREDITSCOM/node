@@ -9,6 +9,7 @@
 
 #include <csconnector/csconnector.hpp>
 
+#include <csnode/blocktakeover.hpp>
 #include <csnode/caches_serialization_manager.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
@@ -74,6 +75,9 @@ public:
     void destroy();
 
     static void requestStop();
+    // stops the node from inside, as a signal does: requestStop() alone does nothing unless a
+    // signal handler has set gSignalStatus first
+    static void stopOnError();
 
     bool isStopRequested() const {
         return stopRequested_;
