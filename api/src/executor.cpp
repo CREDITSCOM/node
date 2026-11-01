@@ -13,6 +13,7 @@
 #include "serializer.hpp"
 
 #include <csnode/configholder.hpp>
+#include <lib/system/polluntil.hpp>
 
 #include <solver/solvercore.hpp>
 #include <solver/smartcontracts.hpp>
@@ -174,7 +175,8 @@ void cs::Executor::getExecutorBuildVersion(executor::ExecutorBuildVersionResult&
             recreateOriginExecutor();
         }
 
-        _return.status.code = 1;
+        // the executor did not answer: told apart from an answer, as execute() does
+        _return.status.code = cs::error::ThriftException;
         _return.status.message = x.what();
 
         notifyError();
@@ -213,7 +215,9 @@ void cs::Executor::stop() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    if (manager_.isExecutorProcessRunning()) {
+    // every contract-executor JVM of the machine is this node's (official behaviour), unless the
+    // operator runs several nodes on it (executor_multi_instance): then the others are theirs to keep
+    if (!cs::ConfigHolder::instance().config()->getApiSettings().executorMultiInstance && manager_.isExecutorProcessRunning()) {
         manager_.stopExecutorProcess();
     }
 }
@@ -749,24 +753,47 @@ void cs::Executor::onExecutorProcessError(const cs::ProcessException& exception)
     cswarning() << "Executor process error occured " << exception.what() << ", code " << exception.code();
 }
 
+// Runs on the thread that launched the executor (the node's start, or the watcher when it relaunches
+// one), synchronously: moving it to a thread of its own would open the shared transport from two
+// threads. The executor gets executorCheckVersionDelay to answer and is asked every second: a JVM up
+// in 2 s lets the node go on after 2 s, dozens of JVMs starting at once on one machine still get the
+// whole delay, and the last attempt is made at or after the deadline, so this is never stricter than
+// the former single attempt after the delay. A failure ends as before: the executor is terminated.
 void cs::Executor::checkExecutorVersion() {
     executor::ExecutorBuildVersionResult _return;
     bool result = false;
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(cs::ConfigHolder::instance().config()->getApiSettings().executorCheckVersionDelay));
+    const auto start = std::chrono::steady_clock::now();
+    const auto delay = std::chrono::milliseconds(cs::ConfigHolder::instance().config()->getApiSettings().executorCheckVersionDelay);
+    cs::pollUntil(delay, std::chrono::milliseconds(1000),
+                  [&] {
+                      _return = executor::ExecutorBuildVersionResult{};
+                      if (!connect()) {
+                          return false;
+                      }
+                      getExecutorBuildVersion(_return);
+                      // any answer is final, an error one too (e.g. an unknown method); a transport
+                      // error means the executor is not listening yet
+                      return _return.status.code != cs::error::ThriftException;
+                  },
+                  [&] { return requestStop_.load(); });
 
     if (requestStop_) {
         return;
     }
 
-    connect();
-    getExecutorBuildVersion(_return);
-
+    const auto waited = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+    if (_return.status.code == 0 && !isConnected()) {
+        _return.status.code = cs::error::ThriftException;
+        _return.status.message = "no connection to the executor";
+    }
     if (_return.status.code != 0) {
-        cserror() << "Start contract executor error code " << int(_return.status.code) << ": " << _return.status.message;
+        cserror() << "Start contract executor error code " << int(_return.status.code) << ": " << _return.status.message
+                  << (_return.status.code == cs::error::ThriftException ? " (no answer within " : " (after ") << waited << " ms)";
     }
     else {
-        cslog() << "Start contract executor: " << _return.status.message << ". Executor build number " << _return.commitNumber;
+        cslog() << "Start contract executor: " << _return.status.message << ". Executor build number " << _return.commitNumber
+                << ", answered after " << waited << " ms";
     }
 
     result = _return.commitNumber < commitMin_ || (_return.commitNumber > commitMax_ && commitMax_ != -1);
