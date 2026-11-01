@@ -249,6 +249,9 @@ bool Storage::priv::rescan(Storage::OpenCallback callback) {
     }
 
     if (startSequence > last_seq_in_db + 1) {
+        set_last_error(Storage::StartAfterLastBlock,
+                       "the quick-start checkpoint continues at block %llu, the last block stored is %llu",
+                       static_cast<unsigned long long>(startSequence), static_cast<unsigned long long>(last_seq_in_db));
         cserror() << "startSequence > last_seq_in_db + 1";
         return false;
     }

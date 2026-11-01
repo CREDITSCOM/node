@@ -175,6 +175,9 @@ public:
     // storage adaptor
     void close();
     void requestStop() { stop_ = true; }
+    // init() failed because the quick-start checkpoint it loaded continues after the last block on
+    // disk: that checkpoint cannot be used with this database
+    bool checkpointAheadOfBlocks() const { return checkpointAheadOfBlocks_; }
     bool getTransaction(const csdb::Address& addr, const int64_t& innerId, csdb::Transaction& result) const;
     void arrangeBlocksInCache();
 
@@ -510,6 +513,8 @@ private:
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
     std::atomic_bool stop_ = false;
+    // the quick-start checkpoint of the last init() is ahead of the blocks on disk
+    bool checkpointAheadOfBlocks_ = false;
 
     std::vector<cs::Sequence> incorrectBlocks_;//blocks with wrong hashes (during db reading)
     std::vector<cs::Sequence> badBlocks_;//blocks containing invalid transactions

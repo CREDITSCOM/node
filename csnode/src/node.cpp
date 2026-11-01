@@ -186,8 +186,7 @@ bool Node::init() {
                     cslog() << "Saved interim QUICK START state to qs/0.";
                 }
             } else {
-                csinfo() << "Remove data for QUICK START";
-                cachesSerializationManager_.clear();
+                removeFailedQuickStartData();
             }
             return false;
         }
@@ -232,8 +231,7 @@ bool Node::init() {
                 cslog() << "Saved interim QUICK START state to qs/0.";
             }
         } else {
-            csinfo() << "Remove data for QUICK START";
-            cachesSerializationManager_.clear();
+            removeFailedQuickStartData();
         }
         return false;
     }
@@ -316,6 +314,20 @@ void Node::setupPoolSynchronizerBehaviour() {
 void Node::run() {
     std::cout << "Running transport\n";
     transport_->run();
+}
+
+void Node::removeFailedQuickStartData() {
+    const auto loaded = cachesSerializationManager_.getLoadedVersion();
+    if (blockChain_.checkpointAheadOfBlocks() && loaded.has_value()) {
+        // that checkpoint can never start with this database: set it aside, so that the next start
+        // tries the next one instead of failing in the same way for ever
+        cserror() << "QUICK START: checkpoint qs/" << *loaded << " is ahead of the blocks on disk, moving it to qs/"
+                  << *loaded << ".bad; the next start uses an older checkpoint";
+        cachesSerializationManager_.quarantine(*loaded);
+        return;
+    }
+    csinfo() << "Remove data for QUICK START";
+    cachesSerializationManager_.clear();
 }
 
 void Node::stop() {

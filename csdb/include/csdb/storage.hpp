@@ -71,6 +71,9 @@ public:
         DataIntegrityError = 4,
         UserCancelled = 5,
         InvalidParameter = 6,
+        // a quick start asked to read from a block after the last one stored: its checkpoint is
+        // ahead of the blocks on disk
+        StartAfterLastBlock = 7,
         UnknownError = 255,
     };
 

@@ -71,6 +71,9 @@ public:
 
     void run();
     void stop();
+    // after a failed init: set aside a quick-start checkpoint that is ahead of the blocks on disk,
+    // otherwise remove qs/0 as before
+    void removeFailedQuickStartData();
     void destroy();
 
     static void requestStop();

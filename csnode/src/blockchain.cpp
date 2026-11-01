@@ -175,6 +175,11 @@ bool BlockChain::init(
 
     if (!storage_.open(path, progress, newBlockchainTop, firstBlockToReadInDatabase)) {
         cserror() << kLogPrefix << "Couldn't open database at " << path;
+        checkpointAheadOfBlocks_ = successfulQuickStart && storage_.last_error() == csdb::Storage::StartAfterLastBlock;
+        if (checkpointAheadOfBlocks_) {
+            cserror() << kLogPrefix << "the QUICK START checkpoint continues after the last block on disk ("
+                      << storage_.last_error_message() << ")";
+        }
         return false;
     }
 

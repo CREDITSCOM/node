@@ -58,6 +58,10 @@ public:
     // The head info that load() recovered, if present. nullopt if the loaded
     // checkpoint is pre-A (no head.bin) — caller skips chain-binding check.
     std::optional<CheckpointHead> getLoadedHead() const;
+    // the version load() took the caches from, if any
+    std::optional<size_t> getLoadedVersion() const;
+    // moves a version aside to qs/<version>.bad, so that load() no longer takes it
+    void quarantine(size_t version);
     // Sticky bit indicating the caches have been validated by a full
     // genesis-to-head walk at some point. Cleared on a fresh init, set by
     // BlockChain after Storage::open returns from a successful slow walk.
