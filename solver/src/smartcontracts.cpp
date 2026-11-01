@@ -564,6 +564,23 @@ csdb::Transaction SmartContracts::get_transaction(const SmartContractRef& contra
     return SmartContracts::get_transaction(bc, contract);
 }
 
+cs::Executor::MethodNameConvention SmartContracts::method_convention(const csdb::Transaction& transaction) const {
+    if (!is_smart(transaction)) {
+        // the most frequent fast test
+        auto item = known_contracts.find(absolute_address(transaction.target()));
+        if (item != known_contracts.end()) {
+            const StateItem& state = item->second;
+            if (state.payable == PayableStatus::Implemented) {
+                return cs::Executor::MethodNameConvention::PayableLegacy;
+            }
+            if (state.payable == PayableStatus::ImplementedVer1) {
+                return cs::Executor::MethodNameConvention::Payable;
+            }
+        }
+    }
+    return cs::Executor::MethodNameConvention::Default;
+}
+
 csdb::Transaction SmartContracts::get_deploy_transaction(const csdb::Address& abs_addr) const {
     //csdebug() << kLogPrefix << __func__;
     auto it_state = known_contracts.find(abs_addr);
@@ -1891,7 +1908,7 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
         data.setError(error::ExecuteTransaction, "contract executor is unavailable");
         return false;
     }
-    csdb::Transaction transaction = get_transaction(data.contract_ref, data.abs_addr);
+    csdb::Transaction transaction = data.resolved ? data.transaction : get_transaction(data.contract_ref, data.abs_addr);
     if (!transaction.is_valid()) {
         data.setError(error::InternalBug, "load starter transaction failed");
         return false;
@@ -1906,25 +1923,12 @@ bool SmartContracts::execute(SmartExecutionData& data, bool validationMode) {
     std::vector<cs::Executor::ExecuteTransactionInfo> smarts;
     auto& info = smarts.emplace_back(cs::Executor::ExecuteTransactionInfo{});
     info.transaction = transaction;
-    info.deploy = get_deploy_transaction(data.abs_addr);
+    info.deploy = data.resolved ? data.deploy : get_deploy_transaction(data.abs_addr);
     info.sequence = data.contract_ref.sequence;
     // data.executor_fee bring all available fee for future execution:
     info.feeLimit = data.executor_fee;
     data.executor_fee = csdb::Amount(0);
-    info.convention = cs::Executor::MethodNameConvention::Default;
-    if (!is_smart(transaction)) {
-        // the most frequent fast test
-        auto item = known_contracts.find(absolute_address(transaction.target()));
-        if (item != known_contracts.end()) {
-            StateItem& state = item->second;
-            if (state.payable == PayableStatus::Implemented) {
-                info.convention = cs::Executor::MethodNameConvention::PayableLegacy;
-            }
-            else if (state.payable == PayableStatus::ImplementedVer1) {
-                info.convention = cs::Executor::MethodNameConvention::Payable;
-            }
-        }
-    }
+    info.convention = data.resolved ? data.convention : method_convention(transaction);
     std::optional<cs::Executor::ExecuteResult> maybe_result;
     if (validationMode) {
         // for now smarts always contains a one item:
@@ -2025,6 +2029,12 @@ bool SmartContracts::execute_async(const std::vector<ExecutionItem>& executions)
         execution_data.contract_ref = execution.ref_start;
         execution_data.abs_addr = absolute_address(start_tr.target());
         execution_data.executor_fee = execution.avail_fee;
+        // execute_async runs under public_access_lock (checkExeQueue): resolve here what execute() would
+        // otherwise read from exe_queue and known_contracts on the worker thread
+        execution_data.transaction = get_transaction(execution_data.contract_ref, execution_data.abs_addr);
+        execution_data.deploy = get_deploy_transaction(execution_data.abs_addr);
+        execution_data.convention = method_convention(execution_data.transaction);
+        execution_data.resolved = true;
         bool replenish_only = false;  // means indirect call to payable()
         if (!is_executable(start_tr)) {
             replenish_only = is_payable_target(start_tr);

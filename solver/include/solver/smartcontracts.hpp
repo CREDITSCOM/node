@@ -18,6 +18,7 @@
 #include <optional>
 #include <vector>
 #include <unordered_map>
+#include <atomic>
 #include <unordered_set>
 
 //#define DEBUG_SMARTS
@@ -261,6 +262,12 @@ struct SmartExecutionData {
     std::string error;
     std::string explicit_last_state;
     csdb::Address abs_addr;
+    // resolved under the lock by execute_async, so the worker thread does not read the queue and the
+    // known contracts while the main thread changes them; synchronous callers leave it unresolved
+    bool resolved = false;
+    csdb::Transaction transaction;
+    csdb::Transaction deploy;
+    cs::Executor::MethodNameConvention convention = cs::Executor::MethodNameConvention::Default;
 
     void setError(int8_t code, const char* message) {
         if (!result.smartsRes.empty()) {
@@ -574,7 +581,8 @@ private:
     csconnector::connector::ApiExecHandlerPtr exec_handler_ptr;
 
     // flag to allow execution, currently depends on executor presence
-    bool executor_ready;
+    // written by the worker thread of execute_async too
+    std::atomic<bool> executor_ready;
 
     // max block sequence read from DB
     cs::Sequence max_read_sequence;
@@ -825,6 +833,8 @@ private:
     csdb::Transaction get_transaction(const SmartContractRef& contract, const csdb::Address& abs_addr) const;
 
     csdb::Transaction get_deploy_transaction(const csdb::Address& abs_addr) const;
+
+    cs::Executor::MethodNameConvention method_convention(const csdb::Transaction& transaction) const;
 
     void enqueue(const csdb::Pool& block, size_t trx_idx, bool skip_log);
 
