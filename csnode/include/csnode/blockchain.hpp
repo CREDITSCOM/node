@@ -408,6 +408,10 @@ public:
     void setStakingOn(bool stOn);
     void setTimeMinStage1(uint32_t timeStage1);
 
+    // compare only state content: transactions, new wallets, sequence, round fee, user fields, trusted mask
+    // true if both pools are not valid, or both pools have equal state content
+    static bool testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs);
+
 
 private:
     void createCachesPath();
@@ -544,10 +548,6 @@ private:
     bool bindSerializationManToCaches(cs::CachesSerializationManager*, std::set<cs::PublicKey>& initialConfidants);
 
     cs::CachesSerializationManager* serializationManPtr_ = nullptr;
-
-    // compare only state content: transactions, new wallets, sequence, round fee, user fields
-    // true if both pools are not valid, or both pools have equal state content
-    static bool testContentEqual(const csdb::Pool& lhs, const csdb::Pool& rhs);
 
     friend class cs::BlockChain_Serializer;
 

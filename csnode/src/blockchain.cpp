@@ -2139,6 +2139,8 @@ namespace {
         for (const auto& it : confidants) {
             out << it;
         }
+        // rewards and fees are credited only to the confidants marked as trusted
+        out << block.numberTrusted() << block.realTrusted();
         out << block.previous_hash();
     }
 }
