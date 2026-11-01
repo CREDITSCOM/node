@@ -753,42 +753,21 @@ void Node::getTransactionsPacket(const uint8_t* data, const std::size_t size, co
 
 }
 
+// Only the node's owner stops the node. The request carries no checked signature (the check was left
+// out in 2019 and the signing key removed since), so any peer could send it: it is counted and
+// dropped. A node that is too old for the network still stops by the special order of the version
+// change (order 5), which comes in a block.
 void Node::getNodeStopRequest(const cs::RoundNumber round, const uint8_t* data, const std::size_t size) {
-    const auto localRound = cs::Conveyer::instance().currentRoundNumber();
-
-    if (round < localRound && localRound - round > cs::MaxRoundDeltaInStopRequest) {
-        // ignore too aged command to prevent store & re-use by enemies
-        return;
+    csunused(data);
+    static std::atomic<uint64_t> ignored{0};
+    static std::atomic<int64_t> lastLogged{0};
+    const auto count = ++ignored;
+    const auto now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    auto last = lastLogged.load();
+    if (now - last >= 60 && lastLogged.compare_exchange_strong(last, now)) {
+        cswarning() << "NODE> stop request from the network ignored (round " << round << ", " << size
+                    << " bytes, " << count << " ignored so far): only the node's owner stops the node";
     }
-
-    cs::IDataStream stream(data, size);
-
-    uint16_t version = 0;
-    cs::Signature sig;
-    stream >> version >> sig;
-
-    if (!stream.isValid() || !stream.isEmpty()) {
-        cswarning() << "NODE> Get stop request parsing failed";
-        return;
-    }
-
-    cs::Bytes message;
-    cs::ODataStream roundStream(message);
-    roundStream << round << version;
-
-    // packet validator have already tested starter signature
-    cswarning() << "NODE> Get stop request, received version " << version << ", received bytes " << size;
-
-    if (NODE_VERSION > version) {
-        cswarning() << "NODE> stop request does not cover my version, continue working";
-        return;
-    }
-
-    cswarning() << "NODE> Get stop request, node will be closed...";
-    stopRequested_ = true;
-
-    // unconditional stop
-    stop();
 }
 
 bool Node::canBeTrusted(bool critical) {
