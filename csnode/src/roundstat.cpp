@@ -18,7 +18,9 @@ RoundStat::RoundStat(BlockChain* bch)
 , startSkipRounds_(2)
 , lastRoundMs_(0)
 , roundElapseTimePoint_(std::chrono::steady_clock::now())
-, storeBlockElapseTimePoint_(std::chrono::steady_clock::now()) {
+, storeBlockElapseTimePoint_(std::chrono::steady_clock::now())
+, roundChangeTimePoint_(std::chrono::steady_clock::now())
+, startTimePoint_(std::chrono::steady_clock::now()) {
     //nodes_ = new std::map<cs::PublicKey, cs::NodeStat>();
     blockChain_ = bch;
 }
@@ -707,6 +709,16 @@ void RoundStat::checkPing(cs::Sequence sequence, const PublicKey& key) {
 void RoundStat::onRoundChanged() {
     cs::Lock lock(statsElapseMutex_);
     roundElapseTimePoint_ = std::chrono::steady_clock::now();
+    roundChangeTimePoint_ = roundElapseTimePoint_;
+}
+
+uint64_t RoundStat::msSinceRoundChange() {
+    cs::Lock lock(statsElapseMutex_);
+    return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - roundChangeTimePoint_).count());
+}
+
+uint64_t RoundStat::msSinceStart() const {
+    return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTimePoint_).count());
 }
 
 void RoundStat::onBlockStored() {

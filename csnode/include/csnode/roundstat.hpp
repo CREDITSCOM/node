@@ -116,6 +116,12 @@ public:
 
     void resetLastRoundMs();
     bool isCurrentRoundTooLong(size_t longDurationMs = kMaxRoundDelay) const;
+
+    // ms since the current round began on this node (its last round change), on the steady clock;
+    // unlike the round elapse time point, the elapse check does not reset it
+    uint64_t msSinceRoundChange();
+    // ms since this node started
+    uint64_t msSinceStart() const;
     const std::map<cs::PublicKey, cs::MinedEvaluationDelegator>& getRoundEvaluation() {
         return minedEvaluation_;
     }
@@ -180,6 +186,8 @@ private:
     std::mutex statsElapseMutex_;
     std::chrono::steady_clock::time_point roundElapseTimePoint_;
     std::chrono::steady_clock::time_point storeBlockElapseTimePoint_;
+    std::chrono::steady_clock::time_point roundChangeTimePoint_;  // guarded by statsElapseMutex_
+    const std::chrono::steady_clock::time_point startTimePoint_;
 
     std::chrono::milliseconds checkPingDelta_{0};
     //<to save>

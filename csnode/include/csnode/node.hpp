@@ -9,6 +9,7 @@
 
 #include <csconnector/csconnector.hpp>
 
+#include <csnode/bootstrapgate.hpp>
 #include <csnode/caches_serialization_manager.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
