@@ -530,6 +530,13 @@ size_t Storage::size() const noexcept {
     return d->count_pool;
 }
 
+bool Storage::flush() {
+    if (!d || !d->db) {
+        return false;
+    }
+    return d->db->flush();
+}
+
 bool Storage::pool_save(Pool pool) {
     if (!isOpen()) {
         d->set_last_error(NotOpen);
@@ -559,7 +566,12 @@ bool Storage::pool_save(Pool pool) {
         d->write_cond_var.notify_one();
       }
     */
-    d->db->put(hash.to_binary(), static_cast<uint32_t>(pool.sequence()), pool.to_binary());
+    if (!d->db->put(hash.to_binary(), static_cast<uint32_t>(pool.sequence()), pool.to_binary())) {
+        // not stored: do not count it, so that the next block cannot be saved on top of a hole
+        d->set_last_error(DatabaseError, "%s: cannot write pool %llu: %s", funcName(),
+                          static_cast<unsigned long long>(pool.sequence()), d->db->last_error_message().c_str());
+        return false;
+    }
 
     {
         std::unique_lock<std::mutex> lock(d->data_lock);

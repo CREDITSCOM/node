@@ -510,6 +510,12 @@ private:
     std::atomic<cs::Sequence> lastSequence_;
     cs::Sequence blocksToBeRemoved_ = 0;
     std::atomic_bool stop_ = false;
+    // a block failed to apply to the caches, which may now hold part of it: no checkpoint may be
+    // saved from them and no further block is recorded; the node stops and the next start reads the
+    // blocks again from the last checkpoint
+    std::atomic_bool cachesTainted_ = false;
+    // saves deferredBlock_; an exception of the storage (an engine that needs recovery) stops the node
+    bool saveDeferredBlock();
 
     std::vector<cs::Sequence> incorrectBlocks_;//blocks with wrong hashes (during db reading)
     std::vector<cs::Sequence> badBlocks_;//blocks containing invalid transactions

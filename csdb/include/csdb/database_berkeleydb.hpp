@@ -19,6 +19,10 @@ struct Options;
 }  // namespace berkeleydb
 
 namespace csdb {
+// true for a BerkeleyDB error that leaves the environment unusable until it is opened again with
+// DB_RECOVER (DbRunRecoveryException, DB_RUNRECOVERY); every other error is recoverable
+bool needsRecovery(const std::exception& e);
+
 
 class DatabaseBerkeleyDB : public Database {
 public:
@@ -40,6 +44,7 @@ private:
 
     bool updateContractData(const cs::Bytes& key, const cs::Bytes& data) override;
     bool getContractData(const cs::Bytes& key, cs::Bytes& data) override;
+    bool flush() override;
 
     void logfile_routine();
 
@@ -48,6 +53,13 @@ private:
 
 private:
     void set_last_error_from_berkeleydb(int status);
+    // the environment panicked (DB_RUNRECOVERY): marks it, sets the error and throws DbRunRecoveryException
+    [[noreturn]] void panic(const char* what, const std::exception& e);
+    bool panicked_ = false;
+    // runs body(DbTxn*) -> BerkeleyDB status in a transaction, committed only on 0; exceptions become
+    // a false result with the error set
+    template <typename Body>
+    bool inTransaction(const char* what, Body body);
 
 private:
     DbEnv env_;

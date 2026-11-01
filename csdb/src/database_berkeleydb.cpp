@@ -15,6 +15,15 @@
 
 namespace csdb {
 
+bool needsRecovery(const std::exception& e) {
+    if (dynamic_cast<const DbRunRecoveryException*>(&e) != nullptr) {
+        return true;
+    }
+    const auto* db = dynamic_cast<const DbException*>(&e);
+    return db != nullptr && db->get_errno() == DB_RUNRECOVERY;
+}
+
+
 namespace {
 template <typename T>
 struct Dbt_copy : public Dbt {
@@ -73,20 +82,33 @@ DatabaseBerkeleyDB::DatabaseBerkeleyDB()
 , db_contracts_(nullptr) {}
 
 DatabaseBerkeleyDB::~DatabaseBerkeleyDB() {
-    std::cout << "Attempt db_blocks_ to close...\n" << std::flush;
-    db_blocks_->close(0);
-    std::cout << "DB db_blocks_ was closed.\n" << std::flush;
-    std::cout << "Attempt db_seq_no_ to close...\n" << std::flush;
-    db_seq_no_->close(0);
-    std::cout << "DB db_seq_no_ was closed.\n" << std::flush;
-    std::cout << "Attempt db_contracts_ to close...\n" << std::flush;
-    db_contracts_->close(0);
-    std::cout << "DB db_contracts_ was closed.\n" << std::flush;
+    // A destructor must not throw: a handle of a panicked environment (e.g. after ENOSPC) throws from
+    // close(), which during the unwinding of another exception would terminate the process. After a
+    // failed open some handles were never created.
+    auto closeDb = [](Db* db, const char* name) {
+        if (!db) return;
+        try {
+            std::cout << "Attempt " << name << " to close...\n" << std::flush;
+            db->close(0);
+            std::cout << "DB " << name << " was closed.\n" << std::flush;
+        }
+        catch (const std::exception& e) {
+            std::cout << "DB " << name << " could not be closed: " << e.what() << "\n" << std::flush;
+        }
+    };
+    closeDb(db_blocks_.get(), "db_blocks_");
+    closeDb(db_seq_no_.get(), "db_seq_no_");
+    closeDb(db_contracts_.get(), "db_contracts_");
     if (logfile_thread_.joinable()) {
         quit_ = true;
         logfile_thread_.join();
     }
-    env_.close(0);
+    try {
+        env_.close(0);
+    }
+    catch (const std::exception& e) {
+        std::cout << "BerkeleyDB environment could not be closed: " << e.what() << "\n" << std::flush;
+    }
 }
 
 void DatabaseBerkeleyDB::logfile_routine() {
@@ -114,6 +136,25 @@ void DatabaseBerkeleyDB::logfile_routine() {
                 free(begin);
             }
         }
+    }
+}
+
+// Commits may leave their log records in the in-process log buffer (the environment does not sync
+// every commit). Write and sync the log, or a checkpoint saved after this call could name blocks
+// that a killed process never put on disk, and the next start would refuse the database.
+bool DatabaseBerkeleyDB::flush() {
+    if (panicked_) {
+        set_last_error(Corruption, "the BerkeleyDB environment needs recovery");
+        return false;
+    }
+    try {
+        const int status = env_.log_flush(nullptr);
+        set_last_error_from_berkeleydb(status);
+        return status == 0;
+    }
+    catch (const DbException& e) {
+        set_last_error_from_berkeleydb(e.get_errno());
+        return false;
     }
 }
 
@@ -205,44 +246,65 @@ bool DatabaseBerkeleyDB::is_open() const {
     return static_cast<bool>(db_blocks_);
 }
 
+// Runs `body` in a transaction committed only when it returns 0. BerkeleyDB reports errors by
+// exception (the handles are opened without DB_CXX_NO_EXCEPTIONS): a full disk, a panicked
+// environment. They become a failed call with the error set, never an exception to the caller, and
+// the commit is checked: a commit that fails is a failed write, not a silent success.
+template <typename Body>
+bool DatabaseBerkeleyDB::inTransaction(const char* what, Body body) {
+    DbTxn* tid = nullptr;
+    try {
+        int status = env_.txn_begin(nullptr, &tid, DB_READ_UNCOMMITTED);
+        if (status) {
+            tid = nullptr;
+            set_last_error_from_berkeleydb(status);
+            return false;
+        }
+        status = body(tid);
+        if (status) {
+            DbTxn* t = tid;
+            tid = nullptr;
+            t->abort();
+            set_last_error_from_berkeleydb(status);
+            return false;
+        }
+        DbTxn* t = tid;
+        tid = nullptr;    // a transaction handle is gone once commit returns, even when it failed
+        status = t->commit(0);
+        if (status) {
+            set_last_error_from_berkeleydb(status);
+            return false;
+        }
+    }
+    catch (const std::exception& e) {
+        if (tid) {
+            try { tid->abort(); } catch (...) {}
+        }
+        if (needsRecovery(e)) {
+            panic(what, e);    // throws
+        }
+        set_last_error(UnknownError, "%s: %s", what, e.what());
+        return false;
+    }
+    set_last_error();
+    return true;
+}
+
 bool DatabaseBerkeleyDB::put(const cs::Bytes &key, uint32_t seq_no, const cs::Bytes &value) {
     if (!db_blocks_) {
         set_last_error(NotOpen);
         return false;
     }
-
-    DbTxn *tid;
-    int status = env_.txn_begin(nullptr, &tid, DB_READ_UNCOMMITTED);
-    int txn_create_status = status;
-    auto g = cs::scopeGuard([&]() {
-        if (txn_create_status) {
-            return;
-        }
-        if (status) {
-            tid->abort();
-        }
-        else {
-            tid->commit(0);
-        }
-    });
-    Dbt_copy<uint32_t> db_seq_no(seq_no + 1);
-    if (!status) {
+    return inTransaction("put", [&](DbTxn* tid) {
+        Dbt_copy<uint32_t> db_seq_no(seq_no + 1);
         Dbt_copy<cs::Bytes> db_value(value);
-        status = db_blocks_->put(tid, &db_seq_no, &db_value, 0);
-    }
-    if (!status) {
-        Dbt_copy<cs::Bytes> db_key(key);
-        status = db_seq_no_->put(tid, &db_key, &db_seq_no, 0);
-    }
-
-    if (!status) {
-        set_last_error();
-        return true;
-    }
-    else {
-        set_last_error_from_berkeleydb(status);
-        return false;
-    }
+        int status = db_blocks_->put(tid, &db_seq_no, &db_value, 0);
+        if (!status) {
+            Dbt_copy<cs::Bytes> db_key(key);
+            status = db_seq_no_->put(tid, &db_key, &db_seq_no, 0);
+        }
+        return status;
+    });
 }
 
 bool DatabaseBerkeleyDB::get(const cs::Bytes &key, cs::Bytes *value) {
@@ -528,54 +590,11 @@ bool DatabaseBerkeleyDB::updateContractData(const cs::Bytes& key, const cs::Byte
         set_last_error(NotOpen);
         return false;
     }
-
-    DbTxn* tid;
-    int status = env_.txn_begin(nullptr, &tid, DB_READ_UNCOMMITTED);
-    int txn_create_status = status;
-    auto g = cs::scopeGuard([&]() {
-        if (txn_create_status) {
-            return;
-        }
-        if (status) {
-            tid->abort();
-        }
-        else {
-            tid->commit(0);
-        }
-    });
-
-    //Dbt_copy<uint32_t> db_seq_no(seq_no + 1);
-    //if (!status) {
-    //    Dbt_copy<cs::Bytes> db_value(value);
-    //    status = db_blocks_->put(tid, &db_seq_no, &db_value, 0);
-    //}
-    //if (!status) {
-    //    Dbt_copy<cs::Bytes> db_key(key);
-    //    status = db_seq_no_->put(tid, &db_key, &db_seq_no, 0);
-    //}
-
-    //if (!status) {
-    //    set_last_error();
-    //    return true;
-    //}
-    //else {
-    //    set_last_error_from_berkeleydb(status);
-    //    return false;
-    //}
-
-    if (status == 0) {
+    return inTransaction("updateContractData", [&](DbTxn* tid) {
         Dbt_copy<cs::Bytes> db_key(key);
         Dbt_copy<cs::Bytes> db_value(data);
-
-        status = db_contracts_->put(tid, &db_key, &db_value, 0);
-    }
-
-    if (status) {
-        set_last_error_from_berkeleydb(status);
-        return false;
-    }
-    set_last_error();
-    return true;
+        return db_contracts_->put(tid, &db_key, &db_value, 0);
+    });
 }
 
 bool DatabaseBerkeleyDB::getContractData(const cs::Bytes& key, cs::Bytes& data) {
@@ -597,6 +616,15 @@ bool DatabaseBerkeleyDB::getContractData(const cs::Bytes& key, cs::Bytes& data) 
     data.assign(begin, begin + db_value.get_size());
     set_last_error();
     return true;
+}
+
+void DatabaseBerkeleyDB::panic(const char* what, const std::exception& e) {
+    // the environment is unusable until a process opens it again with DB_RECOVER: report it and let
+    // the exception out, so that the node stops (and its supervisor restarts it) instead of failing
+    // every write for ever
+    panicked_ = true;
+    set_last_error(Corruption, "%s: the BerkeleyDB environment needs recovery (restart the node): %s", what, e.what());
+    throw DbRunRecoveryException(e.what());
 }
 
 }  // namespace csdb

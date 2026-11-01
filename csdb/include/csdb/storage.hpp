@@ -171,6 +171,15 @@ public:
     void close();
 
     /**
+     * @brief Makes every block saved so far durable in the database
+     * @return false if the storage is not open or the database failed to flush
+     *
+     * Called before a quick-start checkpoint is saved, so that the checkpoint never names blocks
+     * that a killed process did not put on disk.
+     */
+    bool flush();
+
+    /**
      * @brief Last block hash
      * @return Last block hash
      *
