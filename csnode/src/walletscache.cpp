@@ -105,6 +105,12 @@ void WalletsCache::Updater::fundConfidantsWalletsWitnReward(const cs::Confidants
         auto walletData = getWalletData(confidants[i]);
         csdb::Amount reward = rewards[i];
         if (reward > Consensus::blockReward || reward < csdb::Amount{ 0 }) {
+            // a dropped reward makes this node's balances differ from the network's
+            static uint64_t droppedRewards = 0;
+            if (droppedRewards++ % 10000 == 0) {
+                cswarning() << kLogPrefix << "confidant reward " << reward.to_string() << " dropped (local blockReward "
+                    << Consensus::blockReward.to_string() << "), " << droppedRewards << " dropped so far";
+            }
             reward = csdb::Amount{ 0 };
         }
 

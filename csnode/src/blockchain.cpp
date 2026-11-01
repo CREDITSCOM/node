@@ -136,7 +136,7 @@ bool BlockChain::init(
         if (lastSequence_ != 0) {
             firstBlockToReadInDatabase = lastSequence_ + 1;
             trxIndex_->pinFloor(lastSequence_.load());
-            emit successfullQuickStartEvent(csdb::Amount(blockRewardIntegral_, blockRewardFraction_), csdb::Amount(miningCoefficientIntegral_, miningCoefficientFraction_), miningOn_, miningOn_, TimeMinStage1_);
+            emit successfullQuickStartEvent(csdb::Amount(blockRewardIntegral_, blockRewardFraction_), csdb::Amount(miningCoefficientIntegral_, miningCoefficientFraction_), miningOn_, stakingOn_, TimeMinStage1_);
         }
 
         csinfo() << "QUICK START! lastSequence_   is " << lastSequence_.load();
@@ -2349,10 +2349,10 @@ void BlockChain::setMiningCoefficient(csdb::Amount coefficient) {
     miningCoefficientFraction_ = coefficient.fraction();
 }
 void BlockChain::setMiningOn(bool mOn) {
-    stakingOn_ = mOn;
+    miningOn_ = mOn;
 }
 void BlockChain::setStakingOn(bool stOn) {
-    miningOn_ = stOn;
+    stakingOn_ = stOn;
 }
 void BlockChain::setTimeMinStage1(uint32_t timeStage1) {
     TimeMinStage1_ = timeStage1;
