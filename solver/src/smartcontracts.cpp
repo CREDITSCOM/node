@@ -3262,6 +3262,7 @@ bool SmartContracts::wait_until_executor(unsigned int test_freq, unsigned int ma
 }
 
 void SmartContracts::net_request_contract_state(const csdb::Address& abs_addr) {
+    pending_state_requests[abs_addr] = cs::Conveyer::instance().currentRoundNumber();
     pnode->sendStateRequest(abs_addr, cs::Conveyer::instance().confidants());
 }
 
@@ -3276,6 +3277,23 @@ void SmartContracts::net_update_contract_state(const csdb::Address& contract_abs
     stream >> ref.sequence >> ref.transaction >> state;
 
     if (stream.isValid() && !stream.isAvailable(1)) {
+        // several confidants answer one request, so the entry stays until it expires
+        constexpr cs::RoundNumber kStateRequestRounds = 1000;
+        const cs::RoundNumber round = cs::Conveyer::instance().currentRoundNumber();
+        const auto pending = pending_state_requests.find(contract_abs_addr);
+        if (pending == pending_state_requests.end() || pending->second + kStateRequestRounds < round) {
+            if (pending != pending_state_requests.end()) {
+                pending_state_requests.erase(pending);
+            }
+            cswarning() << kLogPrefix << "ignore " << cs::SmartContracts::to_base58(contract_abs_addr) << " state, it was not requested";
+            return;
+        }
+        // a state cannot refer to a block later than the current round, and caching one would make every
+        // real update look outdated
+        if (ref.sequence > round) {
+            cswarning() << kLogPrefix << "ignore " << cs::SmartContracts::to_base58(contract_abs_addr) << " state of future " << ref;
+            return;
+        }
 
         if (in_known_contracts(contract_abs_addr)) {
             auto& item = known_contracts[contract_abs_addr];
@@ -3477,6 +3495,7 @@ void SmartContracts::clear() {
     exe_queue.clear();
     blacklistedContracts_.clear();
     locked_contracts.clear();
+    pending_state_requests.clear();
 }
 
 

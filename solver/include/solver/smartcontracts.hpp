@@ -621,6 +621,9 @@ private:
     std::unordered_set<csdb::Address> blacklistedContracts_;
 
     std::unordered_set<csdb::Address> locked_contracts;
+    // contracts whose state this node asked the confidants for, with the round of the last request;
+    // a StateReply for any other contract is not an answer to this node
+    std::unordered_map<csdb::Address, cs::RoundNumber> pending_state_requests;
 
     //uint64_t testValue = 0;
 
