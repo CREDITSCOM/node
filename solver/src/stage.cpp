@@ -191,8 +191,13 @@ namespace cs {
         stream >> sender; //is not larger than confidants number
         stream >> id; //is in the range of current smart IDs
         //bad implementation
-        size_t fees_size;
+        size_t fees_size = 0;
         stream >> fees_size; //fees is equal the conf amount
+        // each fee takes 12 bytes: a count beyond what the message holds is malformed
+        if (!stream.isValid() || fees_size > stream.size() / (sizeof(int32_t) + sizeof(uint64_t))) {
+            csdebug() << __func__ << ": Invalid fees count: " << fees_size;
+            return false;
+        }
  
         int32_t fee_integral;
         uint64_t fee_fracture;
@@ -200,7 +205,7 @@ namespace cs {
             fee_integral = 0;
             fee_fracture = 0;
             stream >> fee_integral >> fee_fracture;
-            if (fee_integral < 0 || fee_fracture > csdb::Amount::AMOUNT_MAX_FRACTION) {
+            if (!stream.isValid() || fee_integral < 0 || fee_fracture > csdb::Amount::AMOUNT_MAX_FRACTION) {
                 csdebug() << __func__ << ": Invalid fee value: "  << fee_integral << ", " << fee_fracture;
                 return false;
             }
@@ -208,7 +213,8 @@ namespace cs {
             fees.push_back(fee);
         }
         stream >> hash;
-        return true;
+        // a message cut short has no hash
+        return stream.isValid();
     }
 
     Bytes StageTwoSmarts::toBinary()

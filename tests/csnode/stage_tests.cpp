@@ -1,6 +1,8 @@
 #include <stage.hpp>
 #include <solvercontext.hpp>
+#include <limits>
 #include <vector>
+#include <csnode/datastream.hpp>
 #include <nodecore.hpp>
 
 
@@ -53,4 +55,36 @@ TEST(StageThree, Constructors) {
     fake.toBytes();
 
     ASSERT_TRUE(fake.message.size() > 0);
+}
+
+namespace {
+cs::Bytes smartStageOneMessage(size_t declaredFees, size_t actualFees) {
+    cs::Bytes message;
+    cs::ODataStream out(message);
+    out << uint8_t(1) << uint64_t(42) << declaredFees;
+    for (size_t i = 0; i < actualFees; ++i) {
+        out << int32_t(1) << uint64_t(0);
+    }
+    cs::Hash hash{};
+    hash.fill(7);
+    out << hash;
+    return message;
+}
+}  // namespace
+
+TEST(StageOneSmarts, ReadsItsFees) {
+    cs::StageOneSmarts stage;
+    stage.message = smartStageOneMessage(5, 5);
+    ASSERT_TRUE(stage.fillFromBinary());
+    EXPECT_EQ(stage.fees.size(), 5u);
+    EXPECT_EQ(stage.hash[0], 7);
+}
+
+TEST(StageOneSmarts, AFeeCountBeyondTheMessageIsRefused) {
+    for (size_t declared : {size_t(6), size_t(1000), std::numeric_limits<size_t>::max()}) {
+        cs::StageOneSmarts stage;
+        stage.message = smartStageOneMessage(declared, 5);
+        EXPECT_FALSE(stage.fillFromBinary()) << declared;
+        EXPECT_LE(stage.fees.size(), 7u);   // never more than the message can hold
+    }
 }

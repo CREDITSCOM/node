@@ -1,4 +1,8 @@
 #include <gtest/gtest.h>
+#include <cstring>
+#include <limits>
+#include <string>
+#include <vector>
 #include "datastream.hpp"
 #include <lib/system/console.hpp>
 
@@ -164,4 +168,134 @@ TEST(DataStream, CorrectAmountSerialization) {
     readStream >> expectedAmount;
 
     ASSERT_TRUE(amount == expectedAmount);
+}
+
+TEST(DataStream, AvailabilityOfLargeSizes) {
+    char data[16] = {};
+    cs::IDataStream stream(data, sizeof data);
+    stream.skip(8);
+    ASSERT_TRUE(stream.isAvailable(8));
+    ASSERT_FALSE(stream.isAvailable(9));
+    ASSERT_FALSE(stream.isAvailable(std::numeric_limits<std::size_t>::max()));
+    ASSERT_FALSE(stream.isAvailable(std::numeric_limits<std::size_t>::max() - 7));
+}
+
+TEST(DataStream, LargeLengthPrefixesAreRefused) {
+    for (std::size_t length : {std::numeric_limits<std::size_t>::max(), std::numeric_limits<std::size_t>::max() - 7,
+                               std::numeric_limits<std::size_t>::max() - 3}) {
+        cs::Bytes bytes;
+        cs::ODataStream out(bytes);
+        out << length;
+        bytes.resize(bytes.size() + 8, 0);
+
+        cs::IDataStream text(bytes.data(), bytes.size());
+        std::string s;
+        text >> s;
+        EXPECT_TRUE(s.empty());
+
+        cs::IDataStream vector(bytes.data(), bytes.size());
+        cs::Bytes v;
+        vector >> v;
+        EXPECT_TRUE(v.empty());
+
+        cs::IDataStream sequences(bytes.data(), bytes.size());
+        std::vector<uint64_t> list;
+        sequences >> list;
+        EXPECT_TRUE(list.empty());
+    }
+}
+
+// the bound check against the obvious formula, for every position and the sizes around the edges
+TEST(DataStream, AvailabilityAtEveryPosition) {
+    const size_t max = std::numeric_limits<size_t>::max();
+    for (size_t total : {size_t(0), size_t(1), size_t(16), size_t(4096)}) {
+        std::vector<char> data(total + 1, 0);
+        for (size_t pos = 0; pos <= total; ++pos) {
+            cs::IDataStream stream(data.data(), total);
+            stream.skip(pos);
+            ASSERT_TRUE(stream.isValid());
+            const size_t left = total - pos;
+            for (size_t size : {size_t(0), size_t(1), left, left + 1, max - pos, max - pos + 1, max}) {
+                EXPECT_EQ(stream.isAvailable(size), size <= left) << total << " " << pos << " " << size;
+            }
+        }
+    }
+}
+
+TEST(DataStream, ExhaustedStream) {
+    char data[8] = {};
+    cs::IDataStream stream(data, sizeof data);
+    stream.skip(8);
+    EXPECT_TRUE(stream.isAvailable(0));
+    EXPECT_FALSE(stream.isAvailable(1));
+    EXPECT_FALSE(stream.isAvailable(std::numeric_limits<size_t>::max()));
+    EXPECT_TRUE(stream.isEmpty());
+    EXPECT_TRUE(stream.isValid());
+}
+
+TEST(DataStream, SkipBeyondTheEndKeepsThePosition) {
+    char data[16] = {};
+    cs::IDataStream stream(data, sizeof data);
+    stream.skip(4);
+    stream.skip(std::numeric_limits<size_t>::max() - 3);
+    EXPECT_FALSE(stream.isValid());
+    EXPECT_EQ(stream.size(), 12u);
+}
+
+TEST(DataStream, HonestEncodingsAtTheBoundary) {
+    for (size_t extra : {size_t(0), size_t(1)}) {
+        cs::Bytes bytes;
+        cs::ODataStream out(bytes);
+        out << std::string(100, 's');
+        // a length that claims one byte more than there is
+        if (extra) {
+            const size_t claimed = 101;
+            std::memcpy(bytes.data(), &claimed, sizeof claimed);
+        }
+        cs::IDataStream in(bytes.data(), bytes.size());
+        std::string s;
+        in >> s;
+        if (extra) {
+            EXPECT_FALSE(in.isValid());
+            EXPECT_TRUE(s.empty());
+        }
+        else {
+            EXPECT_TRUE(in.isValid());
+            EXPECT_EQ(s, std::string(100, 's'));
+            EXPECT_TRUE(in.isEmpty());
+        }
+    }
+}
+
+TEST(DataStream, AVectorCountBeyondTheData) {
+    cs::Bytes bytes;
+    cs::ODataStream out(bytes);
+    out << size_t(1'000'000) << uint64_t(1) << uint64_t(2);
+    cs::IDataStream in(bytes.data(), bytes.size());
+    std::vector<cs::PublicKey> keys;
+    in >> keys;
+    EXPECT_TRUE(keys.empty());   // 1'000'000 keys of 32 bytes are not in 16 bytes
+}
+
+TEST(DataStream, BytesViewAndConvertReadFromThePosition) {
+    cs::Bytes bytes;
+    cs::ODataStream out(bytes);
+    out << uint32_t(7) << cs::Bytes{1, 2, 3};
+    {
+        cs::IDataStream in(bytes.data(), bytes.size());
+        uint32_t v = 0;
+        in >> v;
+        const auto view = in.parseBytesView();
+        ASSERT_EQ(view.size(), 3u);
+        EXPECT_EQ(view.data()[0], 1);
+        EXPECT_TRUE(in.isEmpty());
+    }
+    {
+        cs::IDataStream in(bytes.data(), bytes.size());
+        uint32_t v = 0;
+        in >> v;
+        const auto rest = in.convert<cs::Bytes>();
+        EXPECT_EQ(rest.size(), bytes.size() - sizeof(uint32_t));
+        EXPECT_EQ(rest.front(), bytes[sizeof(uint32_t)]);
+    }
 }

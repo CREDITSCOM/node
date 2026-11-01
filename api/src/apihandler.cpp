@@ -1013,6 +1013,10 @@ std::optional<std::string> APIHandler::checkTransaction(const Transaction& trans
                             uint32_t sSize;
                             stream >> sSize;
                             sValue.clear();
+                            if (!stream.isAvailable(sSize)) {
+                                stream.skip(sSize);   // marks the stream bad: the string is not there
+                                break;
+                            }
                             sValue += std::string{ stream.data(), sSize };
                             stream.skip(sSize);
                             cTransaction.add_user_field(uf_id, sValue);

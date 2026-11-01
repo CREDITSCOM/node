@@ -58,7 +58,7 @@ public:
     /// @return Returns state of available bytes.
     ///
     bool isAvailable(std::size_t size) {
-        return (index_ + size) <= dataSize_;
+        return index_ <= dataSize_ && size <= dataSize_ - index_;
     }
 
     ///
@@ -237,7 +237,7 @@ public:
         size_t size = parseValue<size_t>();
 
         if (isAvailable(size)) {
-            bytesView = cs::BytesView(reinterpret_cast<cs::Byte*>(data_), size);
+            bytesView = cs::BytesView(reinterpret_cast<cs::Byte*>(data_ + index_), size);
             index_ += size;
         }
         else {
@@ -254,6 +254,7 @@ public:
     ///
     template <typename T>
     inline const T& peek() const {
+        // only with sizeof(T) bytes left (callers check isAvailable first)
         return *(reinterpret_cast<T*>(data_ + index_));
     }
 
@@ -263,7 +264,7 @@ public:
     ///
     template <typename T>
     T convert() const {
-        return T(data_, data_ + (dataSize_ - index_));
+        return T(data_ + index_, data_ + dataSize_);
     }
 
 private:
@@ -366,11 +367,15 @@ inline IDataStream& operator>>(IDataStream& stream, std::vector<T, U>& entities)
     }
 
     std::vector<T, U> expectedEntities;
-    expectedEntities.reserve(size);
+    // every element takes at least one byte: no more than the bytes left, whatever the count says
+    expectedEntities.reserve(std::min(size, stream.size()));
 
     for (std::size_t i = 0; i < size; i++) {
         T entity;
         stream >> entity;
+        if (!stream.isValid()) {
+            break;
+        }
 
         expectedEntities.push_back(entity);
     }
