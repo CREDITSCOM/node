@@ -779,6 +779,11 @@ void SmartContracts::test_exe_queue(bool reading_db) {
         if (!reading_db) {
             // call to executor only if is trusted relatively to this contract
             if (it->is_executor || cs::ConfigHolder::instance().config()->alwaysExecuteContracts()) {
+                // executor_ready drops only after a failed call: a connection already lost is known now, so
+                // take the silent path below instead of executing into it and voting an empty result
+                if (executor_ready && exec_handler_ptr && !exec_handler_ptr->getExecutor().isConnected()) {
+                    executor_ready = false;
+                }
                 // final decision to execute contract is here, based on executor availability
                 if (it->is_executor && !executor_ready && !test_executor_availability()) {
                     cslog() << kLogPrefix << "skip " << FormatRef(it->seq_enqueue) << ", execution is not allowed (executor is not connected)";
