@@ -74,6 +74,9 @@ public:
     void destroy();
 
     static void requestStop();
+    // stops the node from inside, as a signal does: requestStop() alone does nothing unless a
+    // signal handler has set gSignalStatus first
+    static void stopOnError();
 
     bool isStopRequested() const {
         return stopRequested_;

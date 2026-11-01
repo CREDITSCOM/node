@@ -1131,6 +1131,11 @@ void BlockChain::close() {
         return;
     }
 
+    if (cachesTainted_) {
+        cswarning() << "Blockchain: the caches failed to apply a block, no caches saved for QUICK START.";
+        return;
+    }
+
     csinfo() << "Blockchain: try to save caches for QUICK START.";
 
     if (serializationManPtr_->save(0, headInfo)) {
@@ -1360,6 +1365,11 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
     csdebug() << kLogPrefix << "finish & store block #" << pool_seq << " to chain";
 
+    if (cachesTainted_) {
+        cserror() << kLogPrefix << "cannot record block #" << pool_seq << ": the caches failed to apply a block, the node stops";
+        return std::nullopt;
+    }
+
     if (last_seq + 1 != pool_seq) {
         cserror() << kLogPrefix << "cannot record block #" << pool_seq << " to chain, last sequence " << last_seq;
         return std::nullopt;
@@ -1378,6 +1388,7 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
 
     constexpr cs::Sequence NoSequence = std::numeric_limits<cs::Sequence>::max();
     cs::Sequence flushed_block_seq = NoSequence;
+    csdb::Pool flushedBlock;
 
     //if the block is not applied here, but the deferred block is already saved 
 //we have situation when we try to save the deferred block anther time
@@ -1395,20 +1406,16 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         }
     }
 
-    if (finalizeBlock(pool, isTrusted, lastConfidants)) {
-        csdebug() << kLogPrefix << "The block is correct";
-        if (!applyBlockToCaches(pool)) {
-            csdebug() << kLogPrefix << "failed to apply block to caches";
-            return std::nullopt;
-        }
-    }
-    else {
+    if (!finalizeBlock(pool, isTrusted, lastConfidants)) {
         csdebug() << kLogPrefix << "the signatures of the block are insufficient or incorrect";
         setBlocksToBeRemoved(1U);
         return std::nullopt;
     }
-    //========================================
+    csdebug() << kLogPrefix << "The block is correct";
 
+    // The deferred block goes to disk before this block changes the caches: if it cannot be saved
+    // (e.g. the disk is full) the block is offered again later, and had the caches already taken it,
+    // it would be applied to them a second time and the balances would diverge from the network.
     {
         cs::Lock lock(dbLock_);
 
@@ -1425,6 +1432,11 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
                     uuid_ = uuidFromBlock(deferredBlock_);
                     csdebug() << kLogPrefix << "UUID = " << uuid_;
                 }
+                // on disk now: no longer deferred, so that it is never offered to the storage again
+                // (a failure below would otherwise leave it "deferred" and every later save would be
+                // refused as already present). Loads and the last hash now come from the storage.
+                flushedBlock = deferredBlock_;
+                deferredBlock_ = csdb::Pool{};
             }
             else {
                 csmeta(cserror) << kLogPrefix << "Couldn't save block: " << deferredBlock_.sequence();
@@ -1433,9 +1445,21 @@ std::optional<csdb::Pool> BlockChain::recordBlock(csdb::Pool& pool, bool isTrust
         }
     }
 
+    if (!applyBlockToCaches(pool)) {
+        // the transaction index and the wallet ids already took the block and the wallet caches may
+        // hold part of it: applying it again would count it twice. Stop, saving no checkpoint from
+        // these caches; the next start quick-starts from the last good one and reads the blocks after it.
+        cachesTainted_ = true;
+        cserror() << kLogPrefix << "block #" << pool_seq << " failed to apply to the caches: stopping the node without "
+                  << "saving a checkpoint; the next start reads the blocks again from the last checkpoint";
+        Node::stopOnError();
+        return std::nullopt;
+    }
+    //========================================
+
     if (flushed_block_seq != NoSequence) {
         csdebug() << "---------------------------- Flush block #" << flushed_block_seq << " to disk ---------------------------";
-        csdebug() << "signatures amount = " << deferredBlock_.signatures().size() << ", smartSignatures amount = " << deferredBlock_.smartSignatures().size()
+        csdebug() << "signatures amount = " << flushedBlock.signatures().size() << ", smartSignatures amount = " << flushedBlock.smartSignatures().size()
                   << ", see block info above";
         csdebug() << "----------------------------------------------------------------------------------";
     }
@@ -2040,7 +2064,7 @@ cs::Sequence BlockChain::getPreviousPoolSeq(const csdb::Address& addr, cs::Seque
             cserror() << kLogPrefix << "Node will be stopped due to index error. Please restart it.";
 
             trxIndex_->invalidate();
-            Node::requestStop();
+            Node::stopOnError();
         }
 
         return kWrongSequence;
