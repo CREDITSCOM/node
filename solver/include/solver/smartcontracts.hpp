@@ -345,6 +345,9 @@ public:
     // new state of contract, result of invocation of executable transaction
     static bool is_new_state(const csdb::Transaction&);
 
+    // locked contracts that are neither executed now nor used by an executed contract
+    static std::vector<csdb::Address> stale_locks(const std::unordered_set<csdb::Address>& locked, const std::vector<csdb::Address>& in_use);
+
     /* Assuming deployer.is_public_key(), not a WalletId */
     static csdb::Address get_valid_smart_address(const csdb::Address& deployer, const uint64_t trId, const api::SmartContractDeploy&);
 

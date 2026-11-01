@@ -3019,23 +3019,22 @@ void SmartContracts::test_contracts_locks() {
             if (exe_item.status == SmartContractStatus::Running || exe_item.status == SmartContractStatus::Finished) {
                 //return;
                 couldBeLocked.push_back(exe_item.abs_addr);
+                // a running item also locks the contracts it uses, see update_lock_status(QueueItem)
+                for (const auto& execution : exe_item.executions) {
+                    for (const auto& u : execution.uses) {
+                        couldBeLocked.push_back(absolute_address(u));
+                    }
+                }
             }
         }
     }
     // no running items, ensure no locked contracts
-    std::vector<csdb::Address> toErase;
 
     if (!locked_contracts.empty()) {
         if (!couldBeLocked.empty()) {
-            for (auto it : locked_contracts) {
-                auto foundIt = std::find(couldBeLocked.begin(), couldBeLocked.end(), it);
-                if(foundIt == couldBeLocked.end()) {
-                    toErase.push_back(*foundIt);
-                }
-            }
-            for (auto it : toErase) {
-                auto foundIt = std::find(locked_contracts.begin(), locked_contracts.end(), it);
-                locked_contracts.erase(foundIt);
+            for (const auto& addr : stale_locks(locked_contracts, couldBeLocked)) {
+                csdebug() << kLogPrefix << "unlock " << to_base58(addr) << " which is not executed now";
+                locked_contracts.erase(addr);
             }
         }
         else {
@@ -3044,6 +3043,17 @@ void SmartContracts::test_contracts_locks() {
         }
 
     }
+}
+
+/*static*/
+std::vector<csdb::Address> SmartContracts::stale_locks(const std::unordered_set<csdb::Address>& locked, const std::vector<csdb::Address>& in_use) {
+    std::vector<csdb::Address> stale;
+    for (const auto& addr : locked) {
+        if (std::find(in_use.cbegin(), in_use.cend(), addr) == in_use.cend()) {
+            stale.push_back(addr);
+        }
+    }
+    return stale;
 }
 
 void SmartContracts::update_lock_status(const csdb::Address& abs_addr, bool value, bool skip_log) {
