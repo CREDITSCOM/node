@@ -9,6 +9,7 @@
 
 #include <csconnector/csconnector.hpp>
 
+#include <csnode/bootstrapweight.hpp>
 #include <csnode/caches_serialization_manager.hpp>
 #include <csnode/conveyer.hpp>
 #include <csnode/compressor.hpp>
@@ -186,7 +187,7 @@ public:
 
     void accountInitiationRequest(uint64_t& aTime, cs::PublicKey key);
     void cleanConfirmationList(cs::RoundNumber rNum);
-    uint8_t calculateBootStrapWeight(cs::PublicKeys& confidants);
+    cs::BootstrapWeight calculateBootStrapWeight(const cs::PublicKeys& confidants) const;
     // state syncro functions
     
     void sendStateRequest(const csdb::Address& contract_abs_addr, const cs::PublicKeys& confidants);
@@ -537,7 +538,7 @@ private:
     std::map<uint16_t, cs::Command> changeableParams_;
     cs::PublicKey globalPublicKey_;
     cs::NodeVersionChange nVersionChange_;
-    uint8_t bootStrapWeight_ = 0U;
+    cs::BootstrapWeight bootStrapWeight_ = 0U;
 
     std::set<cs::PublicKey> initialConfidants_;
     bool isBootstrapRound_ = false;

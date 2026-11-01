@@ -444,23 +444,12 @@ void Node::getUtilityMessage(const uint8_t* data, const size_t size) {
     }
 }
 
-uint8_t Node::calculateBootStrapWeight(cs::PublicKeys& confidants) {
-    size_t confSize = confidants.size();
-    uint8_t currentWeight = 0U;
-    if (confSize > 8) {
-        return currentWeight;
-    }
-    //auto it = initialConfidants_.cbegin();
-    auto itConfidants = confidants.cbegin();
-    --confSize;
-    for (auto it : initialConfidants_) {
-        if (std::equal(it.cbegin(), it.cend(), itConfidants->cbegin())) {
-            currentWeight += 1 << confSize;
-            ++itConfidants;
-        }
-        --confSize;
-    }
-    return currentWeight;
+static_assert(cs::kMaxBootstrapTable == Consensus::MaxTrustedNodes, "a bootstrap table holds at most MaxTrustedNodes keys");
+
+// the official node weighs tables of up to 8 keys only and silently drops larger ones, so a network
+// of 9 or more initial confidants never bootstraps: see cs::bootstrapWeight
+cs::BootstrapWeight Node::calculateBootStrapWeight(const cs::PublicKeys& confidants) const {
+    return cs::bootstrapWeight(initialConfidants_, confidants);
 }
 
 
@@ -495,7 +484,7 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
         }
     }
 
-    uint8_t currentWeight = calculateBootStrapWeight(confidants);
+    cs::BootstrapWeight currentWeight = calculateBootStrapWeight(confidants);
 
     if (unknown) {
         cs::Signature sig;
@@ -515,9 +504,11 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
             cswarning() << kLogPrefix_ << "failed to test bootstrap signature, drop";
             return;
         }
-        currentWeight = 255U;
+        currentWeight = cs::kSignedBootstrapWeight;
     }
     if (currentWeight <= bootStrapWeight_) {
+        cslog() << kLogPrefix_ << "bootstrap table #" << rNum << " with " << confidants.size() << " confidants weighs "
+                << currentWeight << ", not above " << bootStrapWeight_ << ", drop";
         return;
     }
 
@@ -529,7 +520,7 @@ void Node::getBootstrapTable(const uint8_t* data, const size_t size, const cs::R
 
     if (!isBootstrapRound_) {
         isBootstrapRound_ = true;
-        cslog() << "NODE> Bootstrap on";
+        cslog() << "NODE> Bootstrap on, table of " << confidants.size() << " confidants, weight " << currentWeight;
     }
 
     roundTable.confidants = std::move(confidants);
@@ -4528,7 +4519,7 @@ void Node::onRoundTimeElapsed() {
         for (auto it : actualConfidants) {
             confs.push_back(it);
         }
-        uint8_t currentWeight = calculateBootStrapWeight(confs);
+        cs::BootstrapWeight currentWeight = calculateBootStrapWeight(confs);
         if (currentWeight > bootStrapWeight_) {
             bootStrapWeight_ = currentWeight;
         }
@@ -4594,7 +4585,7 @@ bool Node::bootstrap(const cs::Bytes& bytes, cs::RoundNumber round) {
     auto& conveyer = cs::Conveyer::instance();
     conveyer.updateRoundTable(roundPackageCache_.back().roundTable().round, roundPackageCache_.back().roundTable());
 
-    uint8_t currentWeight = calculateBootStrapWeight(rt.confidants);
+    cs::BootstrapWeight currentWeight = calculateBootStrapWeight(rt.confidants);
     if (currentWeight > bootStrapWeight_) {
         bootStrapWeight_ = currentWeight;
     }
