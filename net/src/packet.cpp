@@ -82,6 +82,12 @@ const char* Packet::messageTypeToString(MsgTypes messageType) {
 }
 
 bool Packet::isHeaderValid() const {
+    // getHeadersLength() reads the flags byte: an empty payload from a peer has none
+    if (size() == 0) {
+        cserror() << "Packet is empty";
+        return false;
+    }
+
     if (size() < getHeadersLength()) {
         cserror() << "Packet size (" << size() << ") < header length (" << getHeadersLength() << ")";
         return false;
