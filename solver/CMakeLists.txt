@@ -21,6 +21,7 @@ add_library(${PROJECT_NAME} STATIC
     include/solver/callsqueuescheduler.hpp
     include/solver/timeouttracking.hpp
     include/solver/smartcontracts.hpp
+    include/solver/statefetcher.hpp
     include/solver/smartconsensus.hpp
 
     include/solver/states/defaultstatebehavior.hpp

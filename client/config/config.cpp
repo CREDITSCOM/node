@@ -52,6 +52,7 @@ const std::string PARAM_NAME_OBSERVER_WAIT_TIME = "observer_wait_time";
 const std::string PARAM_NAME_ROUND_ELAPSE_TIME = "round_elapse_time";
 const std::string PARAM_NAME_STORE_BLOCK_ELAPSE_TIME = "store_block_elapse_time";
 const std::string PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS = "always_execute_contracts";
+const std::string PARAM_NAME_SYNC_CONTRACT_EXECUTION = "sync_contract_execution";
 const std::string PARAM_NAME_MIN_COMPATIBLE_VERSION = "min_compatible_version";
 const std::string PARAM_NAME_COMPATIBLE_VERSION = "compatible_version";
 const std::string PARAM_NAME_TRAVERSE_NAT = "traverse_nat";
@@ -870,6 +871,9 @@ Config Config::readFromFile(const std::string& fileName) {
             csdebug() << "No initial confidants specified.";
         }
 
+        if (params.count(PARAM_NAME_SYNC_CONTRACT_EXECUTION) > 0) {
+            result.syncContractExecution_ = params.get<bool>(PARAM_NAME_SYNC_CONTRACT_EXECUTION);
+        }
         if (params.count(PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS) > 0) {
             result.alwaysExecuteContracts_ = params.get<bool>(PARAM_NAME_ALWAYS_EXECUTE_CONTRACTS);
         }
@@ -1199,6 +1203,7 @@ bool operator==(const Config& lhs, const Config& rhs) {
         lhs.poolSyncData_ == rhs.poolSyncData_ &&
         lhs.apiData_ == rhs.apiData_ &&
         lhs.alwaysExecuteContracts_ == rhs.alwaysExecuteContracts_ &&
+        lhs.syncContractExecution_ == rhs.syncContractExecution_ &&
         lhs.compatibleVersion_ == rhs.compatibleVersion_ &&
         lhs.recreateIndex_ == rhs.recreateIndex_ &&
         lhs.observerWaitTime_ == rhs.observerWaitTime_ &&
