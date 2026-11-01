@@ -2722,11 +2722,13 @@ void Node::getSmartStageOne(const uint8_t* data, const size_t size, const cs::Ro
                     << "Smart#: {" << block << '.' << transaction << '}';
     csdebug() << "Hash: " << cs::Utils::byteStreamToHex(stage.hash.data(), stage.hash.size());
 
-    //if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), stage.id) == activeSmartConsensuses_.cend() && canSaveSmartStages(block, nodeIdKey_)) {
-    //    csdebug() << "The SmartConsensus {" << block << '.' << transaction << "} is not active now, storing the stage";
-    //    smartStageOneStorage_.push_back(stage);
-    //    return;
-    //}
+    // a stage that arrives before this node started the same smart consensus is kept and replayed by
+    // checkForSavedSmartStages, instead of being lost until the request timers ask for it again
+    if (std::find(activeSmartConsensuses_.cbegin(), activeSmartConsensuses_.cend(), stage.id) == activeSmartConsensuses_.cend() && canSaveSmartStages(block, nodeIdKey_)) {
+        csdebug() << "The SmartConsensus {" << block << '.' << transaction << "} is not active now, storing the stage";
+        storeSmartStageOne(stage);
+        return;
+    }
 
     emit gotSmartStageOne(stage, false);
 }
@@ -2939,6 +2941,21 @@ void Node::removeSmartConsensus(uint64_t id) {
             ++it_3;
         }
     }
+}
+
+void Node::storeSmartStageOne(const cs::StageOneSmarts& stage) {
+    // stages are removed when their consensus ends, but a consensus this node never starts would keep
+    // them forever: drop those of calls too old to start, and cap the storage
+    constexpr size_t kMaxStoredSmartStages = 256;
+    const cs::Sequence lastSeq = getBlockChain().getLastSeq();
+    smartStageOneStorage_.erase(std::remove_if(smartStageOneStorage_.begin(), smartStageOneStorage_.end(),
+        [lastSeq](const cs::StageOneSmarts& stored) {
+            return cs::SmartConsensus::blockPart(stored.id) + Consensus::MaxRoundsCancelContract < lastSeq;
+        }), smartStageOneStorage_.end());
+    if (smartStageOneStorage_.size() >= kMaxStoredSmartStages) {
+        smartStageOneStorage_.erase(smartStageOneStorage_.begin());
+    }
+    smartStageOneStorage_.push_back(stage);
 }
 
 void Node::checkForSavedSmartStages(uint64_t id) {
