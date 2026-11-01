@@ -22,18 +22,6 @@ const csdb::Address startAddress = csdb::Address::from_string("00000000000000000
 class PoolSynchronizerTest : public cs::PoolSynchronizer {
 public:
     explicit PoolSynchronizerTest(BlockChain* blockchain):PoolSynchronizer(blockchain) {}
-
-    bool isCorrect() const {
-        auto n = neighbours();
-
-        for (const auto& e : n) {
-            std::cout << "Neighbour " << cs::Utils::byteStreamToHex(e.first) << ", " << e.second << std::endl;
-        }
-
-        return std::is_sorted(std::begin(n), std::end(n), [](const auto& lhs, const auto& rhs) {
-            return lhs.second > rhs.second;
-        });
-    }
 };
 
 static std::unique_ptr<PoolSynchronizerTest> createPoolSynchronizer() {
@@ -73,7 +61,8 @@ TEST(PoolSynchronizer, DISABLED_TestNeighbours) {
         auto& [key, sequence] = *iter;
         sequence += sequenceStep;
 
+        // neighbours are no longer kept sorted (unordered_map since 3ed6b98b), so only
+        // check that ping handling does not fail
         synchronizer->onPingReceived(sequence, key);
-        ASSERT_TRUE(synchronizer->isCorrect());
     }
 }

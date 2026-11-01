@@ -84,7 +84,6 @@ TEST(Process, HighLoadUsage) {
 
     std::atomic<size_t> launchCount = { 0 };
     std::atomic<size_t> finishCount = { 0 };
-    std::atomic<bool> lastExecution = { false };
 
     cs::Connector::connect(&process.started, [&]{
         launchCount.fetch_add(1u, std::memory_order_release);
@@ -94,18 +93,16 @@ TEST(Process, HighLoadUsage) {
     cs::Connector::connect(&process.finished, [&](int, const std::system_error&) {
         finishCount.fetch_add(1u, std::memory_order_release);
         cs::Console::writeLine("Finish count ", finishCount.load(std::memory_order_acquire));
-
-        lastExecution.store(false, std::memory_order_release);
     });
 
     process.launch();
 
-    while (!process.isRunning());
+    // the child runs only ~10 ms: it may already be gone when we first look
+    while (!process.isRunning() && finishCount.load(std::memory_order_acquire) == 0);
     size_t launches = 1;
 
     while (true) {
         if (maxLaunchCount <= launches) {
-            lastExecution.store(true, std::memory_order_release);
             break;
         }
 
@@ -117,7 +114,11 @@ TEST(Process, HighLoadUsage) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
-    while (lastExecution.load(std::memory_order_acquire));
+    // the last `finished` can be emitted before we get here, so wait on the counter, not on a flag
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (finishCount.load(std::memory_order_acquire) < maxLaunchCount && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 
     cs::Console::writeLine("Launch count ", launchCount.load(std::memory_order_acquire));
     cs::Console::writeLine("Finish count ", finishCount.load(std::memory_order_acquire));

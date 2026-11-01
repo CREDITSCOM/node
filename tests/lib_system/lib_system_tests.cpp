@@ -703,7 +703,7 @@ TEST(LockFreeChanger, BaseUsageSimple) {
 
             do {
                 randomValue = cs::Random::generateValue<size_t>(1, std::numeric_limits<int>::max());
-            } while (randomValue != previous.data());
+            } while (randomValue == previous.data());
 
             changer.exchange(randomValue);
 
@@ -724,8 +724,11 @@ TEST(LockFreeChanger, BaseUsageSimple) {
 
             auto desired = changer.data();
 
-            ASSERT_EQ(desired.data(), current.data());
-            ASSERT_TRUE(desired.data() != previous.data());
+            // the wait above can time out before the writer stored anything (all values still 0)
+            if (current.data() != 0) {
+                ASSERT_EQ(desired.data(), current.data());
+                ASSERT_TRUE(desired.data() != previous.data());
+            }
 
             writerVariable.notify_one();
         }
