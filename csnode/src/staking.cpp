@@ -302,11 +302,31 @@ void Staking::revertDelegationsForTarget(
         if (it != timeMoneyVector.end()) {
           timeMoneyVector.erase(it);
           targetWallet.delegated_ -= amount;
-          currentDelegations_[tm.time].erase(std::find(
-            currentDelegations_[tm.time].begin(),
-            currentDelegations_[tm.time].end(),
-            std::make_tuple(sKey, tKey, trx_id)
-          ));
+
+          // mirror of addDelegationsForTarget: forget the expiry and mining records of this delegation
+          auto timing = currentDelegations_.find(tm.time);
+          if (timing != currentDelegations_.end()) {
+            auto entry = std::find(timing->second.begin(), timing->second.end(), std::make_tuple(sKey, tKey, trx_id));
+            if (entry != timing->second.end()) {
+              timing->second.erase(entry);
+            }
+            if (timing->second.empty()) {
+              currentDelegations_.erase(timing);
+            }
+          }
+
+          auto mining = miningDelegations_.find(tKey);
+          if (mining != miningDelegations_.end()) {
+            auto record = std::find_if(mining->second.begin(), mining->second.end(), [&sKey, &tm](const auto& keyAndTimeMoney) {
+              return keyAndTimeMoney.first == sKey && keyAndTimeMoney.second.time == tm.time && keyAndTimeMoney.second.amount == tm.amount;
+            });
+            if (record != mining->second.end()) {
+              mining->second.erase(record);
+            }
+            if (mining->second.empty()) {
+              miningDelegations_.erase(mining);
+            }
+          }
         }
     }
     else {
@@ -435,8 +455,21 @@ void Staking::revertDelegationsForSource(
         }
     }
     else if (ufld.value<uint64_t>() >= trx_uf::sp::de::legate_min_utc) {
-        //nothing to do if time of this transacton is already finished
-        removeSingleDelegation(ufld.value<uint64_t>(), sKey, tKey, trx_id);
+        // mirror of addDelegationsForSource; if the delegation has already expired, the source was refunded
+        // by cleanObsoletteDelegations() and the record is gone, so there is nothing to give back
+        const uint64_t delTime = ufld.value<uint64_t>();
+        if (it != wallData.delegateTargets_->end()) {
+            auto itt = std::find_if(it->second.begin(), it->second.end(), [delTime, &amount](const cs::TimeMoney& tm) {
+                return tm.time == delTime && tm.amount == amount;
+            });
+            if (itt != it->second.end()) {
+                it->second.erase(itt);
+                wallData.balance_ += amount;
+                if (it->second.empty()) {
+                    wallData.delegateTargets_->erase(it);
+                }
+            }
+        }
     }
     else {
         cserror() << "Staking: error revertDelegationsForSource";
