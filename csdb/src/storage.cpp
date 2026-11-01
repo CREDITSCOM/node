@@ -530,6 +530,13 @@ size_t Storage::size() const noexcept {
     return d->count_pool;
 }
 
+bool Storage::flush() {
+    if (!d || !d->db) {
+        return false;
+    }
+    return d->db->flush();
+}
+
 bool Storage::pool_save(Pool pool) {
     if (!isOpen()) {
         d->set_last_error(NotOpen);

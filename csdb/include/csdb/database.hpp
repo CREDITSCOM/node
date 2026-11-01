@@ -48,6 +48,9 @@ public:
     virtual bool updateContractData(const cs::Bytes& key, const cs::Bytes& data) = 0;
     virtual bool getContractData(const cs::Bytes& key, cs::Bytes& data) = 0;
 
+    // makes every write so far durable (a checkpoint saved after it may rely on them); default no-op
+    virtual bool flush() { return true; }
+
     class Iterator {
     protected:
         Iterator();

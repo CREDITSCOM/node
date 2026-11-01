@@ -845,6 +845,10 @@ bool BlockChain::applyBlockToCaches(const csdb::Pool& pool) {
             && now - lastCheckpointWallClock_ >= std::chrono::minutes(sto.checkpointEveryMinutes));
         if (byCount || byTime) {
             trxIndex_->flush();
+            // the checkpoint must not get ahead of the blocks on disk
+            if (!storage_.flush()) {
+                cswarning() << kLogPrefix << "storage flush failed before the checkpoint at " << pool.sequence();
+            }
             cs::CheckpointHead head;
             head.sequence = pool.sequence();
             head.head_hash = pool.hash().to_binary();
