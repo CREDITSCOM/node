@@ -16,6 +16,7 @@
 #include <lib/system/lockfreechanger.hpp>
 #include <lib/system/console.hpp>
 #include <lib/system/pmrfactory.hpp>
+#include <lib/system/reflection.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(push, 0)
@@ -748,4 +749,25 @@ TEST(PmrBytes, BaseUsage) {
 
     cs::Bytes expectedBytes = { 0xFF, 0xAA, 0xBB, 0xEE };
     ASSERT_TRUE(std::equal(std::begin(bytes), std::end(bytes), std::begin(expectedBytes)));
+}
+
+namespace reflection_test {
+class Polymorphic {
+public:
+    virtual ~Polymorphic() = default;
+    std::string_view name() const { return className(); }
+};
+struct Plain {
+    std::string_view name() const { return className(); }
+};
+}  // namespace reflection_test
+
+// the class and type names in log lines (csmeta, csname, cstype) must be the names themselves:
+// nameof's fixed offsets gave GCC 13 builds a huge length, and the node crashed on such lines
+TEST(Reflection, TypeNamesAreExact) {
+    ASSERT_EQ(reflection_test::Polymorphic().name(), "reflection_test::Polymorphic");
+    ASSERT_EQ(reflection_test::Plain().name(), "reflection_test::Plain");
+    ASSERT_EQ(cstype(int), "int");
+    const reflection_test::Plain value{};
+    ASSERT_EQ(csexpression(value), "reflection_test::Plain");
 }
