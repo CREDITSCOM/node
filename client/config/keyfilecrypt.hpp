@@ -13,13 +13,14 @@ namespace keyfile {
 //
 //   legacy (88 bytes):  nonce (8) || ciphertext + tag (64 + 16)
 //                       written by older versions: cscrypto's PrivateKey::getEncrypted,
-//                       key = Argon2id with a salt that is the same for every file. Read with the same derivation and cipher (here, so that a
-//                       failed derivation is an error), never rewritten.
+//                       key = Argon2id with a salt that is the same for every file. Read here
+//                       with the same derivation and cipher (so that a failed derivation is an
+//                       error), never rewritten.
 //   salted (104 bytes): salt (16) || nonce (8) || ciphertext + tag (64 + 16)
-//                       written by this version: key = crypto_pwhash (Argon2id v1.3, the argon2id
-//                       OPSLIMIT_SENSITIVE and MEMLIMIT_SENSITIVE) with a random salt per file, then the same
-//                       crypto_aead_chacha20poly1305 (original construction, 8-byte nonce, no
-//                       associated data) as the legacy format.
+//                       written by this version: key = crypto_pwhash (Argon2id v1.3, the
+//                       argon2id OPSLIMIT_SENSITIVE and MEMLIMIT_SENSITIVE) with a random salt
+//                       per file, then the same crypto_aead_chacha20poly1305 (original
+//                       construction, 8-byte nonce, no associated data) as the legacy format.
 //
 // Any other length is not an encrypted key (64 bytes is a plain key).
 constexpr std::size_t kSaltSize = crypto_pwhash_SALTBYTES;
