@@ -10,6 +10,8 @@ add_library(${PROJECT_NAME}
     "observer.cpp"
     "config.hpp"
     "config.cpp"
+    "keyfilecrypt.hpp"
+    "keyfilecrypt.cpp"
 )
 
 target_link_libraries (${PROJECT_NAME} csnode lib)

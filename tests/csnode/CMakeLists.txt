@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 file(GLOB SRCS *.cpp)
 list(APPEND SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/../../client/config/config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../client/config/keyfilecrypt.cpp"
 )
 
 add_executable(${TEST_NAME} ${SRCS})
