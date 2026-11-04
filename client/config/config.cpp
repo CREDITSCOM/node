@@ -677,7 +677,7 @@ bool Config::readKeys(const std::string& pathToPk, const std::string& pathToSk, 
             return false;
         }
         else if (sk.size() > cscrypto::kPrivateKeySize) {
-            if (sk.size() != cs::keyfile::kLegacyEncryptedSize && sk.size() != cs::keyfile::kSaltedEncryptedSize) {
+            if (sk.size() != cs::keyfile::kEncryptedSize) {
                 cserror() << "Bad private key file in " << pathToSk << " (" << sk.size() << " bytes)";
                 return false;
             }
