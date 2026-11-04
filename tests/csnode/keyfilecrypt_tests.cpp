@@ -77,6 +77,21 @@ TEST_F(KeyFileCrypt, NewFormatRoundTripWrongPasswordChangedSalt) {
     auto badSalt = a;
     badSalt[3] ^= 1;
     EXPECT_FALSE(cs::keyfile::decrypt(badSalt, pw.data(), pw.size()));
+
+    // a byte changed past the salt (the ciphertext): the tag does not verify
+    auto badSealed = a;
+    badSealed[cs::keyfile::kSaltSize + cs::keyfile::kNonceSize + 10] ^= 1;
+    EXPECT_FALSE(cs::keyfile::decrypt(badSealed, pw.data(), pw.size()));
+}
+
+// a failed derivation (here refused at once by Argon2id: no password bytes for a length of 5, as an
+// allocation failure would be) is an error, never an empty file nor a crash, in both directions
+TEST_F(KeyFileCrypt, FailedDerivationIsAnError) {
+    EXPECT_TRUE(cs::keyfile::encrypt(sk_, nullptr, 5).empty());
+    EXPECT_TRUE(cs::keyfile::encrypt(cscrypto::PrivateKey(), "pw", 2).empty());
+    EXPECT_FALSE(cs::keyfile::decrypt(decode(kLegacyFile), nullptr, 5));
+    cscrypto::Bytes salted(cs::keyfile::kSaltedEncryptedSize, 1);
+    EXPECT_FALSE(cs::keyfile::decrypt(salted, nullptr, 5));
 }
 
 // another length is not an encrypted key: refused before any derivation

@@ -1,5 +1,6 @@
 #include "keyfilecrypt.hpp"
 
+#include <array>
 #include <cstring>
 
 namespace cs {
@@ -8,10 +9,38 @@ namespace keyfile {
 namespace {
 using FileKey = cscrypto::MemGuard<cscrypto::Byte, crypto_aead_chacha20poly1305_KEYBYTES>;
 
-// the same derivation as cscrypto's, with the file's own salt
+// the salt of the legacy format, as cscrypto's PrivateKey::getEncrypted uses it
+constexpr std::array<cscrypto::Byte, kSaltSize> kLegacySalt = {0x49, 0x44, 0x49, 0x20, 0x4e, 0x41, 0x48, 0x55,
+                                                                0x59, 0x20, 0x42, 0x4c, 0x59, 0x41, 0x54, 0x27};
+
+// Argon2id v1.3 with the SENSITIVE limits, pinned (the values of the generic crypto_pwhash
+// defaults that both formats were written with); false when the key memory or the derivation's
+// memory cannot be had
 bool deriveKey(FileKey& key, const char* passwd, std::size_t pswdLen, const cscrypto::Byte* salt) {
-    return key && crypto_pwhash(key.data(), key.size(), passwd, pswdLen, salt, crypto_pwhash_OPSLIMIT_SENSITIVE,
-                                crypto_pwhash_MEMLIMIT_SENSITIVE, crypto_pwhash_ALG_DEFAULT) == 0;
+    return key && crypto_pwhash(key.data(), key.size(), passwd, pswdLen, salt, crypto_pwhash_argon2id_OPSLIMIT_SENSITIVE,
+                                crypto_pwhash_argon2id_MEMLIMIT_SENSITIVE, crypto_pwhash_ALG_ARGON2ID13) == 0;
+}
+
+// nonce || ciphertext and tag, opened with the key derived from salt
+cscrypto::PrivateKey open(const cscrypto::Byte* salt, const cscrypto::Byte* nonce, const char* passwd, std::size_t pswdLen) {
+    const cscrypto::Byte* sealed = nonce + kNonceSize;
+
+    FileKey fileKey;
+    if (!deriveKey(fileKey, passwd, pswdLen, salt)) {
+        return cscrypto::PrivateKey();
+    }
+
+    cscrypto::MemGuard<cscrypto::Byte, cscrypto::kPrivateKeySize> sk;
+    if (!sk) {
+        return cscrypto::PrivateKey();
+    }
+    // the output is exactly kSealedSize - ABYTES = 64 bytes: libsodium zeroes that many on a bad tag
+    unsigned long long skLen = 0;
+    if (crypto_aead_chacha20poly1305_decrypt(sk.data(), &skLen, nullptr, sealed, kSealedSize, nullptr, 0, nonce, fileKey.data()) != 0 ||
+        skLen != cscrypto::kPrivateKeySize) {
+        return cscrypto::PrivateKey();
+    }
+    return cscrypto::PrivateKey::readFromBytes(sk);
 }
 }  // namespace
 
@@ -47,31 +76,12 @@ cscrypto::Bytes encrypt(const cscrypto::PrivateKey& key, const char* passwd, std
 
 cscrypto::PrivateKey decrypt(const cscrypto::Bytes& bytes, const char* passwd, std::size_t pswdLen) {
     if (bytes.size() == kLegacyEncryptedSize) {
-        return cscrypto::PrivateKey::readFromEncrypted(bytes, passwd, pswdLen);
+        return open(kLegacySalt.data(), bytes.data(), passwd, pswdLen);
     }
-    if (bytes.size() != kSaltedEncryptedSize) {
-        return cscrypto::PrivateKey();
+    if (bytes.size() == kSaltedEncryptedSize) {
+        return open(bytes.data(), bytes.data() + kSaltSize, passwd, pswdLen);
     }
-
-    const cscrypto::Byte* salt = bytes.data();
-    const cscrypto::Byte* nonce = salt + kSaltSize;
-    const cscrypto::Byte* sealed = nonce + kNonceSize;
-
-    FileKey fileKey;
-    if (!deriveKey(fileKey, passwd, pswdLen, salt)) {
-        return cscrypto::PrivateKey();
-    }
-
-    cscrypto::MemGuard<cscrypto::Byte, cscrypto::kPrivateKeySize> sk;
-    if (!sk) {
-        return cscrypto::PrivateKey();
-    }
-    unsigned long long skLen = 0;
-    if (crypto_aead_chacha20poly1305_decrypt(sk.data(), &skLen, nullptr, sealed, kSealedSize, nullptr, 0, nonce, fileKey.data()) != 0 ||
-        skLen != cscrypto::kPrivateKeySize) {
-        return cscrypto::PrivateKey();
-    }
-    return cscrypto::PrivateKey::readFromBytes(sk);
+    return cscrypto::PrivateKey();
 }
 
 }  // namespace keyfile
