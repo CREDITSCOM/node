@@ -54,8 +54,9 @@ TEST_F(KeyFileCrypt, LegacyFileOpens) {
     EXPECT_EQ(publicOf(sk), kLegacyPublic);
 }
 
-// a new encryption: 104 bytes, a random salt and nonce each time, opens with its password only
-TEST_F(KeyFileCrypt, NewFormatRoundTrip) {
+// a new encryption: 104 bytes, a random salt and nonce each time, opens with its password only,
+// and not with a changed salt
+TEST_F(KeyFileCrypt, NewFormatRoundTripWrongPasswordChangedSalt) {
     const std::string pw = "round trip ~ 42";
     const auto a = cs::keyfile::encrypt(sk_, pw.data(), pw.size());
     const auto b = cs::keyfile::encrypt(sk_, pw.data(), pw.size());
@@ -64,26 +65,16 @@ TEST_F(KeyFileCrypt, NewFormatRoundTrip) {
     EXPECT_NE(cscrypto::Bytes(a.begin(), a.begin() + cs::keyfile::kSaltSize), cscrypto::Bytes(b.begin(), b.begin() + cs::keyfile::kSaltSize));
     EXPECT_NE(a, b);
 
-    auto sk = cs::keyfile::decrypt(a, pw.data(), pw.size());
+    // the base58 text the node writes and reads back
+    const std::string text = EncodeBase58(a.data(), a.data() + a.size());
+    auto sk = cs::keyfile::decrypt(decode(text), pw.data(), pw.size());
     ASSERT_TRUE(sk);
     EXPECT_EQ(cscrypto::getMatchingPublic(sk), pk_);
 
-    // the base58 text the node writes and reads back
-    const std::string text = EncodeBase58(b.data(), b.data() + b.size());
-    auto sk2 = cs::keyfile::decrypt(decode(text), pw.data(), pw.size());
-    ASSERT_TRUE(sk2);
-    EXPECT_EQ(cscrypto::getMatchingPublic(sk2), pk_);
-}
+    const std::string wrong = "round trip ~ 43";
+    EXPECT_FALSE(cs::keyfile::decrypt(a, wrong.data(), wrong.size()));
 
-TEST_F(KeyFileCrypt, WrongPasswordAndChangedSaltRefused) {
-    const std::string pw = "the password";
-    const auto enc = cs::keyfile::encrypt(sk_, pw.data(), pw.size());
-    ASSERT_EQ(enc.size(), cs::keyfile::kSaltedEncryptedSize);
-
-    const std::string wrong = "the passwore";
-    EXPECT_FALSE(cs::keyfile::decrypt(enc, wrong.data(), wrong.size()));
-
-    auto badSalt = enc;
+    auto badSalt = a;
     badSalt[3] ^= 1;
     EXPECT_FALSE(cs::keyfile::decrypt(badSalt, pw.data(), pw.size()));
 }
